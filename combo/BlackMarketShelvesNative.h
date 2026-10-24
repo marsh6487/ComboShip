@@ -50,8 +50,15 @@ class Fixture {
                 }
             vertex += 8;
         }
-        mCollision.minBounds = { -92, 0, 84 };
-        mCollision.maxBounds = { 92, 145, 133 };
+        mCollision.minBounds = mCollision.maxBounds = mCollisionVertices[0];
+        for (const auto& v : mCollisionVertices) {
+            mCollision.minBounds.x = std::min(mCollision.minBounds.x, v.x);
+            mCollision.minBounds.y = std::min(mCollision.minBounds.y, v.y);
+            mCollision.minBounds.z = std::min(mCollision.minBounds.z, v.z);
+            mCollision.maxBounds.x = std::max(mCollision.maxBounds.x, v.x);
+            mCollision.maxBounds.y = std::max(mCollision.maxBounds.y, v.y);
+            mCollision.maxBounds.z = std::max(mCollision.maxBounds.z, v.z);
+        }
         mCollision.numVertices = mCollisionVertices.size();
         mCollision.vtxList = mCollisionVertices.data();
         mCollision.numPolygons = mPolygons.size();

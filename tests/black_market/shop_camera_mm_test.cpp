@@ -1,0 +1,1184 @@
+/* NATIVE MM SUPPORT */
+#include "combo/BlackMarketEntry.h"
+#include "combo/BlackMarketGraphicsArena.h"
+#include "combo/BlackMarketKeeper.h"
+#include "combo/BlackMarketKeeperAssets.h"
+#include "combo/BlackMarketMmShopScene.h"
+#include "combo/BlackMarketReceipt.h"
+#include "combo/rando/BlackMarket.h"
+#include "objects/object_bg/object_bg.h"
+#include <sanitizer/asan_interface.h>
+
+GameState *gGameState;
+using namespace ComboRando::BlackMarket;
+static bool active = true, safe = true, purchaseAccepted, receiptContext = true,
+            sceneReady = true;
+static bool sTalking, sCustomKeeper;
+static int sSelected, purchases, closes;
+static std::string sStatus;
+static BlackMarketReceipt::State sReceipt;
+static Session sSession;
+static std::array<PurchaseResult, 8> status;
+static std::array<Gfx, 2048> opaque, translucent;
+static auto &keeper = shop; // A real EnOssan; no EnTakaraya allocation is cast.
+bool Interior() { return true; }
+bool Active() { return active; }
+bool PackAvailable() { return true; }
+bool Safe(PlayState *) { return safe; }
+bool CustomKeeperAvailable() {
+  return true;
+} // Resource selection has its own keeper fixture.
+const Item *Offer(int index) {
+  return index >= 0 && index < 8 ? &Catalog()[index] : nullptr;
+}
+PurchaseResult Status(int index) {
+  assert(index >= 0 && index < 8);
+  return status[index];
+}
+bool ReceiptContext() { return receiptContext; }
+void CancelReceipt(bool = false) { sReceipt.Cancel(); }
+bool Purchase() {
+  ++purchases;
+  return purchaseAccepted && sReceipt.Begin(sSelected, 0, 0, 0);
+}
+extern "C" bool Player_InBlockingCsMode(PlayState *, Player *) { return false; }
+// The resource loader/RTTI boundary is checked separately. Supply decoded
+// authored scene commands before the actual native actor Init/GetCutscenes.
+bool NativeShopSceneReady(PlayState *) { return sceneReady; }
+struct FixtureSceneLifetime {
+  void reset() {}
+} sNativeShopSceneResource;
+/* PRODUCTION CONSTANTS */
+/* NATIVE STOCK UPDATE */
+/* PRODUCTION ADAPTER */
+
+extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *state, s16 id, f32 x,
+                              f32 y, f32 z, s16, s16, s16, s32 params) {
+  assert(id == ACTOR_EN_GIRLA && spawns < 8 &&
+         params == BlackMarketMmShopScene::kItemParamBase + spawns);
+  auto &item = stock[spawns++];
+  item = {};
+  item.actor.id = id;
+  item.actor.params = params;
+  item.actor.world.pos = {x, y, z};
+  InitNativeStock(&item.actor, state);
+  return &item.actor;
+}
+static void ResetArena() {
+  graphics.overlay.p = overlay.data();
+  graphics.overlay.d = overlay.data() + overlay.size();
+  graphics.polyOpa.p = opaque.data();
+  graphics.polyOpa.d = opaque.data() + opaque.size();
+  graphics.polyXlu.p = translucent.data();
+  graphics.polyXlu.d = translucent.data() + translucent.size();
+}
+static void Reset() {
+  EndBrowsing(nullptr, true);
+  play = {};
+  player = {};
+  shop = {};
+  stock = {};
+  graphics = {};
+  gSaveContext = {};
+  gPlayState = &play;
+  gGameState = &play.state;
+  active = safe = receiptContext = sceneReady = true;
+  talkAccepted = advance = purchaseAccepted = mirror = false;
+  invert = 1;
+  sReceipt = {};
+  status.fill(PurchaseResult::Ready);
+  sStatus.clear();
+  sSession.market = {{"stock", nlohmann::json::array()}};
+  for (int i = 0; i < 8; ++i)
+    sSession.market["stock"].push_back({{"clears", 1}});
+  sSelected = purchases = closes = spawns = kills = objectLookups =
+      objectLoads = 0;
+  playerWaits = playerEnds = collisionQueries = nativeSkeletonInits =
+      animationChanges = 0;
+  callbacks.clear();
+  nativeCalls.clear();
+  messageState = TEXT_STATE_NONE;
+  sCameraNextUID = 0;
+  play.state.running = true;
+  play.state.gfxCtx = &graphics;
+  ResetArena();
+  gSaveContext.save.day = 1;
+  player.transformation = PLAYER_FORM_HUMAN;
+  player.actor.world.pos = {0, 0, 130};
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+  InitNativeCameraTable();
+  Camera_Init(&mainCamera, &play.view, &play.colCtx, &play);
+  mainCamera.camId = CAM_ID_MAIN;
+  mainCamera.focalActor = &player.actor;
+  mainCamera.focalActorPosRot.pos = player.actor.world.pos;
+  mainCamera.eye = mainCamera.eyeNext = {50, 100, 260};
+  mainCamera.at = {0, 56, 0};
+  play.cameraPtrs[0] = &mainCamera;
+  Play_ChangeCameraStatus(&play, 0, CAM_STATUS_ACTIVE);
+  for (int i = 0; i < 4; ++i) {
+    std::memcpy(cameraData[i].data(), BlackMarketMmShopScene::kCameraRecords[i],
+                sizeof(cameraData[i]));
+    cameraInfo[i] = {CAM_SET_FIXED1, 3, cameraData[i].data()};
+    cutscenes[i] = {s16(BlackMarketMmShopScene::kFirstPriority + i),
+                    -1,
+                    BlackMarketMmShopScene::kCutsceneCameras[i],
+                    CS_SCRIPT_ID_NONE,
+                    s16(i == 3 ? -1 : i + 1),
+                    CS_END_SFX_NONE,
+                    255,
+                    BlackMarketMmShopScene::kHudVisibility,
+                    CS_END_CAM_0,
+                    BlackMarketMmShopScene::kLetterboxSize};
+  }
+  play.actorCsCamList = cameraInfo.data();
+  CutsceneManager_Init(&play, cutscenes.data(), cutscenes.size());
+  sCutsceneMgr.retCamId = CAM_ID_MAIN;
+  shop.actor.id = ACTOR_EN_OSSAN;
+  shop.actor.params = BlackMarketMmShopScene::kKeeperParams;
+  shop.actor.objectSlot = 0;
+  shop.actor.xzDistToPlayer = 40;
+  InitNativeKeeper(&shop.actor, &play);
+  assert(sNativeShop == &shop && shop.actionFunc == EnOssan_InitShop &&
+         !objectLookups);
+  KeeperUpdate(&shop.actor, &play);
+  assert(shop.actionFunc == EnOssan_Idle && shop.actor.update == KeeperUpdate &&
+         !sTalking);
+  assert(spawns == 8 && nativeSkeletonInits == 1 && !kills);
+  assert(shop.skelAnime.jointTable == sKeeperJoints.data() &&
+         shop.skelAnime.morphTable == sKeeperMorphs.data());
+  assert(shop.skelAnime.jointTable != shop.jointTable &&
+         shop.skelAnime.morphTable != shop.morphTable);
+  for (int i = 0; i < 8; ++i)
+    assert(shop.items[i] == &stock[i] &&
+           stock[i].actor.update == EnGirlA_Update);
+}
+static void NativeFrame() {
+  nativeCalls.clear();
+  ResetArena();
+  KeeperUpdate(&shop.actor, &play);
+  for (auto &item : stock)
+    if (item.actor.update)
+      item.actor.update(&item.actor, &play);
+  if (NativeShopOwnCamera(&play) &&
+      Play_GetActiveCamId(&play) == sBrowseCamera) {
+    assert(sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
+           sBrowseCameraPtr->mode == CAM_MODE_NORMAL);
+    assert(sCameraSettings[sBrowseCameraPtr->setting].cameraModes[0].funcId ==
+           CAM_FUNC_FIXED1);
+    assert(Camera_Fixed1(sBrowseCameraPtr));
+  }
+  KeeperDraw(&shop.actor, &play);
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  play.state.input[0] = {};
+  advance = false;
+  ++play.gameplayFrames;
+}
+static void Press(u16 button, bool shouldAdvance = false) {
+  play.state.input[0].press.button = button;
+  advance = shouldAdvance;
+  NativeFrame();
+}
+static void Stick(int x, int y) {
+  play.state.input[0].rel.stick_x = x;
+  play.state.input[0].rel.stick_y = y;
+  NativeFrame();
+}
+static void Talk() {
+  talkAccepted = true;
+  NativeFrame();
+  assert(sTalking && shop.actionFunc == EnOssan_BeginInteraction &&
+         shop.cutsceneState == 1);
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         sBrowseCamera == CAM_ID_NONE);
+  assert(player.stateFlags2 & PLAYER_STATE2_20000000);
+}
+static void ReachSlot(int slot) {
+  // Native state/cutscene transitions only; input never waits for pose
+  // settling.
+  const auto wanted = slot < 0   ? EnOssan_FaceShopkeeper
+                      : slot < 4 ? EnOssan_BrowseRightShelf
+                                 : EnOssan_BrowseLeftShelf;
+  for (int frames = 0; shop.actionFunc != wanted && frames < 16; ++frames) {
+    if (shop.actionFunc == EnOssan_Hello)
+      Press(BTN_A, true);
+    else
+      NativeFrame();
+  }
+  assert(shop.actionFunc == wanted && sTalking && NativeShopOwnCamera(&play));
+  assert(sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
+         sBrowseCameraPtr->roll == 0);
+  if (slot >= 0)
+    assert(shop.cursorIndex == slot);
+}
+static void ReturnKeeper() {
+  const bool right = shop.cursorIndex < 4;
+  NativeFrame();
+  Stick(right ? -80 : 80, 0);
+  if (shop.actionFunc == EnOssan_BrowseRightShelf ||
+      shop.actionFunc == EnOssan_BrowseLeftShelf) {
+    NativeFrame();
+    Stick(right ? -80 : 80, 0);
+  }
+  ReachSlot(-1);
+}
+static void CheckLifecycle() {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  Stick(80, 0);
+  ReachSlot(0);
+  const int starts = playerWaits;
+  Stick(0, 80);
+  assert(shop.cursorIndex == 1);
+  NativeFrame();
+  Stick(80, 0);
+  assert(shop.cursorIndex == 3);
+  NativeFrame();
+  Stick(0, -80);
+  assert(shop.cursorIndex == 2);
+  NativeFrame();
+  Stick(-80, 0);
+  assert(shop.cursorIndex == 0 && playerWaits == starts);
+  ReturnKeeper();
+  Stick(-80, 0);
+  ReachSlot(4);
+  Stick(0, 80);
+  assert(shop.cursorIndex == 5);
+  NativeFrame();
+  Stick(-80, 0);
+  assert(shop.cursorIndex == 7);
+  NativeFrame();
+  Stick(0, -80);
+  assert(shop.cursorIndex == 6);
+  NativeFrame();
+  Stick(80, 0);
+  assert(shop.cursorIndex == 4);
+  const auto owned = sBrowseCamera;
+  Press(BTN_B);
+  assert(!sTalking && shop.actionFunc == EnOssan_Idle &&
+         !(player.stateFlags2 & PLAYER_STATE2_20000000));
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         !play.cameraPtrs[owned]);
+  assert(Play_GetActiveCamId(&play) == CAM_ID_MAIN &&
+         playerWaits == playerEnds);
+  Talk();
+  ReachSlot(-1);
+  std::puts("MM production native shop: actual initialization, all8 stock, "
+            "native bank/return chain, one-B exit and re-talk passed");
+}
+static void CheckAbortBoundaries() {
+  for (int reason = 0; reason < 4; ++reason) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    const auto owned = sBrowseCamera;
+    if (reason == 0)
+      play.transitionTrigger = TRANS_TRIGGER_START;
+    if (reason == 1)
+      play.transitionMode = TRANS_MODE_FILL_OUT;
+    if (reason == 2)
+      play.gameOverCtx.state = GAMEOVER_DEATH_START;
+    if (reason == 3)
+      active = false;
+    NativeFrame();
+    assert(!sTalking && !(player.stateFlags2 & PLAYER_STATE2_20000000));
+    assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+           !play.cameraPtrs[owned]);
+  }
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  gPlayState = nullptr;
+  MonitorBrowsing();
+  assert(!sTalking && !sNativeShop && !sBrowseCameraPtr);
+  std::puts("MM production native shop: transition, death, inactive scene and "
+            "teardown release passed");
+}
+static void CheckForeignCutscene() {
+  Reset();
+  const auto foreign = Play_CreateSubCamera(&play);
+  Play_ChangeCameraStatus(&play, foreign, CAM_STATUS_ACTIVE);
+  talkAccepted = true;
+  NativeFrame();
+  assert(!sTalking && Play_GetActiveCamId(&play) == foreign);
+  Reset();
+  CutsceneManager_Start(CS_ID_GLOBAL_DOOR, &player.actor);
+  talkAccepted = true;
+  NativeFrame();
+  assert(!sTalking && CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_DOOR);
+  Reset();
+  CutsceneManager_Start(CS_ID_GLOBAL_TALK, &player.actor);
+  Talk();
+  ReachSlot(-1);
+  std::puts("MM production native shop: foreign camera/cutscene rejection and "
+            "global-talk handoff passed");
+}
+static void CheckSameCutsceneDifferentActor() {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  const auto id = shop.csId;
+  CutsceneManager_Stop(id);
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  Actor foreign{};
+  foreign.id = ACTOR_EN_OSSAN;
+  assert(CutsceneManager_StartWithPlayerCsAndSetFlag(id, &foreign) == id);
+  const auto camera = Play_GetActiveCamId(&play);
+  const auto snapshot = *play.cameraPtrs[camera];
+  assert(CutsceneManager_IsCurrentActor(&foreign) &&
+         !CutsceneManager_IsCurrentActor(&shop.actor));
+  MonitorBrowsing();
+  if (sTalking || CutsceneManager_GetCurrentCsId() != id ||
+      sCutsceneMgr.endCsId != CS_ID_NONE)
+    std::fprintf(stderr,
+                 "same-cs foreign actor: talking%d current%d end%d owned%d "
+                 "uid%d/%d targetShop%d targetForeign%d\n",
+                 sTalking, CutsceneManager_GetCurrentCsId(),
+                 sCutsceneMgr.endCsId, NativeShopOwnCamera(&play),
+                 sBrowseCameraUid, play.cameraPtrs[camera]->uid,
+                 CutsceneManager_IsCurrentActor(&shop.actor),
+                 CutsceneManager_IsCurrentActor(&foreign));
+  assert(!sTalking && CutsceneManager_GetCurrentCsId() == id &&
+         sCutsceneMgr.endCsId == CS_ID_NONE);
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(CutsceneManager_IsCurrentActor(&foreign) &&
+         Play_GetActiveCamId(&play) == camera);
+  assert(!std::memcmp(&snapshot, play.cameraPtrs[camera], sizeof(Camera)));
+  std::puts("MM production native shop: same cutscene ID owned by another "
+            "actor retains full native camera/manager state");
+}
+static void CheckLiveKeeperDestruction() {
+  for (bool alreadyStopped : {true, false}) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    const auto owned = sBrowseCamera;
+    if (alreadyStopped)
+      CutsceneManager_Stop(shop.csId);
+    assert(shop.actor.destroy == NativeKeeperDestroyed);
+    shop.actor.destroy(&shop.actor, &play);
+    assert(!sNativeShop && !sTalking);
+    assert(lastLetterbox == 0 && lastHud == HUD_VISIBILITY_ALL);
+    // Model Actor_Delete releasing its real allocation after Destroy. The
+    // manager's deferred End must not touch the retired native controller.
+    __asan_poison_memory_region(&shop, sizeof(shop));
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    __asan_unpoison_memory_region(&shop, sizeof(shop));
+    assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+           sCutsceneMgr.targetActor == nullptr);
+    assert(!play.cameraPtrs[owned] &&
+           Play_GetActiveCamId(&play) == CAM_ID_MAIN &&
+           playerWaits == playerEnds);
+  }
+  std::puts(
+      "MM production native shop: real Destroy before/after Stop releases "
+      "deferred actor/camera/player ownership without retired-actor access");
+}
+static void SelectItem() {
+  Press(BTN_A);
+  assert(shop.actionFunc == EnOssan_SelectItem);
+  for (int i = 0; i < 6; ++i)
+    NativeFrame();
+  assert(shop.shopItemSelectedTween == 1);
+}
+static void CheckProductionReceipt() {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  Stick(80, 0);
+  ReachSlot(0);
+  NativeFrame();
+  SelectItem();
+  const auto bankCamera = sBrowseCamera;
+  Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_CannotBuy && purchases == 1 &&
+         !sReceipt.pending);
+  assert(sBrowseCamera == bankCamera &&
+         CutsceneManager_GetCurrentCsId() == shop.csId);
+  Press(BTN_A, true);
+  for (int i = 0; i < 9; ++i)
+    NativeFrame();
+  SelectItem();
+  purchaseAccepted = true;
+  Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_BuyItemWithFanfare && sReceipt.pending &&
+         purchases == 2);
+  assert(!sTalking && !(player.stateFlags2 & PLAYER_STATE2_20000000));
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+  for (int i = 0; i < 3; ++i)
+    NativeFrame();
+  assert(purchases == 2 && shop.actionFunc == EnOssan_BuyItemWithFanfare &&
+         callbacks.empty());
+  // Neither native stock callbacks nor native Actor_OfferGetItem may perform
+  // a second grant/payment alongside the market's acknowledged receipt.
+  sReceipt.delivered = true;
+  NativeFrame();
+  assert(shop.actionFunc == EnOssan_SetupItemPurchased);
+  play.msgCtx.msgMode = 0;
+  messageState = TEXT_STATE_DONE;
+  player.stateFlags1 |= PLAYER_STATE1_400;
+  Press(BTN_A, true);
+  assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased);
+  player.stateFlags1 &= ~PLAYER_STATE1_400;
+  safe = false;
+  NativeFrame();
+  assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased);
+  safe = true;
+  NativeFrame();
+  assert(!sReceipt.pending && shop.actionFunc == EnOssan_ItemPurchased);
+  talkAccepted = true;
+  NativeFrame();
+  assert(shop.actionFunc == EnOssan_ContinueShopping &&
+         shop.csId == shop.lookToShopkeeperCsId);
+  assert(play.msgCtx.currentTextId == kContinueText &&
+         messageState == TEXT_STATE_CHOICE);
+  status[0] = PurchaseResult::SoldOut;
+  play.msgCtx.choiceIndex = 0;
+  Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_FaceShopkeeper &&
+         play.msgCtx.currentTextId == kKeeperMenuText);
+  assert(stock[0].isOutOfStock && stock[0].actor.world.pos.x == kShelves[0].x &&
+         stock[0].actor.world.pos.z == kShelves[0].z && callbacks.empty());
+  Press(BTN_B);
+  assert(!sTalking && shop.actionFunc == EnOssan_Idle);
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  Stick(80, 0);
+  ReachSlot(0);
+  NativeFrame();
+  SelectItem();
+  purchaseAccepted = true;
+  Press(BTN_A, true);
+  receiptContext = false;
+  NativeFrame();
+  assert(shop.actionFunc == EnOssan_Idle && !sReceipt.pending);
+  std::puts("MM production native shop: rejected reservation, single receipt "
+            "authority, pending/tutorial gating, native keeper "
+            "continue/restock and context cancellation passed");
+}
+static void CheckDestructionWithForeignOwnerAndReceipt() {
+  for (bool sameCutscene : {false, true}) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    Actor foreignActor{};
+    s16 foreign;
+    if (sameCutscene) {
+      const auto cs = shop.csId;
+      CutsceneManager_Stop(cs);
+      CutsceneManager_Update();
+      CutsceneManager_ClearWaiting();
+      assert(CutsceneManager_StartWithPlayerCsAndSetFlag(cs, &foreignActor) ==
+             cs);
+      foreign = Play_GetActiveCamId(&play);
+    } else {
+      foreign = Play_CreateSubCamera(&play);
+      Play_ChangeCameraStatus(&play, foreign, CAM_STATUS_ACTIVE);
+    }
+    auto *camera = play.cameraPtrs[foreign];
+    camera->eye = camera->eyeNext = {901, 902, 903};
+    camera->at = {801, 802, 803};
+    camera->fov = 39;
+    camera->target = &foreignActor;
+    const auto snapshot = *camera;
+    lastHud = 73;
+    lastLetterbox = 17;
+    hudCalls = letterboxCalls = 0;
+    shop.actor.destroy(&shop.actor, &play);
+    __asan_poison_memory_region(&shop, sizeof(shop));
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    __asan_unpoison_memory_region(&shop, sizeof(shop));
+    assert(Play_GetActiveCamId(&play) == foreign &&
+           !std::memcmp(&snapshot, camera, sizeof(Camera)));
+    assert(lastHud == 73 && lastLetterbox == 17 && !hudCalls &&
+           !letterboxCalls);
+    if (sameCutscene)
+      assert(CutsceneManager_IsCurrentActor(&foreignActor));
+  }
+  for (int receipt = 0; receipt < 3; ++receipt) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    Stick(80, 0);
+    ReachSlot(0);
+    NativeFrame();
+    SelectItem();
+    purchaseAccepted = true;
+    Press(BTN_A, true);
+    assert(sReceipt.pending);
+    if (receipt == 1)
+      sReceipt.delivered = true;
+    if (receipt == 2)
+      sReceipt.Cancel();
+    // A room can destroy stock before its NPC. The keeper's destructor must
+    // retire references without reading those already retired allocations.
+    __asan_poison_memory_region(stock.data(), sizeof(stock));
+    shop.actor.destroy(&shop.actor, &play);
+    assert(!sReceipt.pending && !sNativeShop);
+    __asan_poison_memory_region(&shop, sizeof(shop));
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    __asan_unpoison_memory_region(&shop, sizeof(shop));
+    __asan_unpoison_memory_region(stock.data(), sizeof(stock));
+  }
+  std::puts("MM production native shop: destruction preserves "
+            "same-CS/other-camera foreign owners and safely retires "
+            "pending/delivered/cancelled receipts and stock");
+}
+static void ProjectNativeCamera(const Camera &camera) {
+  auto dot = [](Vec3f a, Vec3f b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+  Vec3f forward{camera.at.x - camera.eye.x, camera.at.y - camera.eye.y,
+                camera.at.z - camera.eye.z};
+  const auto length = std::sqrt(dot(forward, forward));
+  forward = {forward.x / length, forward.y / length, forward.z / length};
+  const auto horizontal = std::hypot(forward.x, forward.z);
+  const Vec3f right{-forward.z / horizontal, 0, forward.x / horizontal};
+  const Vec3f up{-right.z * forward.y,
+                 right.z * forward.x - right.x * forward.z,
+                 right.x * forward.y};
+  const auto half = std::tan(camera.fov * 3.14159265359f / 360);
+  auto &matrix = play.viewProjectionMtxF;
+  matrix = {};
+  matrix.xx = right.x / half * .75f;
+  matrix.xy = right.y / half * .75f;
+  matrix.xz = right.z / half * .75f;
+  matrix.xw = -dot(camera.eye, right) / half * .75f;
+  matrix.yx = up.x / half;
+  matrix.yy = up.y / half;
+  matrix.yz = up.z / half;
+  matrix.yw = -dot(camera.eye, up) / half;
+  matrix.wx = forward.x;
+  matrix.wy = forward.y;
+  matrix.wz = forward.z;
+  matrix.ww = -dot(camera.eye, forward);
+}
+static void CheckAuthoredFraming() {
+  for (int bank = 0; bank < 2; ++bank) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    Stick(bank == 0 ? 80 : -80, 0);
+    ReachSlot(bank * 4);
+    // These idle frames establish a static framing measurement only; the
+    // actual interaction is already in its native Browse state.
+    for (int i = 0; i < 20; ++i)
+      NativeFrame();
+    const auto id = sBrowseCamera, uid = sBrowseCameraUid;
+    const auto snapshot = *sBrowseCameraPtr;
+    assert(snapshot.fov == 60 &&
+           std::abs(snapshot.paramData.fixd1.roData.unk_04 - .75f) < .0001f);
+    const auto cameraRecord =
+        BlackMarketMmShopScene::kCutsceneCameras[bank == 0 ? 2 : 1];
+    const auto &record = BlackMarketMmShopScene::kCameraRecords[cameraRecord];
+    assert(snapshot.eye.x == record[0] && snapshot.eye.y == record[1] &&
+           snapshot.eye.z == record[2]);
+    for (int slot = bank * 4; slot < bank * 4 + 4; ++slot) {
+      shop.cursorIndex = slot;
+      ProjectNativeCamera(*sBrowseCameraPtr);
+      NativeFrame();
+      NativeFrame();
+      assert(shop.drawCursor && sBrowseCamera == id && sBrowseCameraUid == uid);
+      assert(
+          !std::memcmp(&snapshot.eye, &sBrowseCameraPtr->eye, sizeof(Vec3f)) &&
+          !std::memcmp(&snapshot.at, &sBrowseCameraPtr->at, sizeof(Vec3f)) &&
+          snapshot.fov == sBrowseCameraPtr->fov);
+      assert(shop.cursorPos.x - 24 > 8 && shop.cursorPos.x + 24 < 312 &&
+             shop.cursorPos.y - 24 > 32 && shop.cursorPos.y + 24 < 142 &&
+             "all4 native48px cursors must clear the actual32px letterbox and "
+             "bottom textbox in one bank view");
+      bool rectangle = false;
+      for (auto *packet = overlay.data(); packet < graphics.overlay.p;
+           ++packet) {
+        if ((packet->words.w0 >> 24) != G_TEXRECT)
+          continue;
+        assert(((packet->words.w0 >> 12) & 0xFFF) ==
+               int((shop.cursorPos.x + 24) * 4));
+        assert((packet->words.w0 & 0xFFF) == int((shop.cursorPos.y + 24) * 4));
+        rectangle = true;
+        break;
+      }
+      assert(rectangle);
+      const float x = shop.cursorPos.x;
+      mirror = true;
+      NativeFrame();
+      assert(shop.cursorPos.x == 320 - x);
+      mirror = false;
+    }
+  }
+  std::puts("MM production native shop: authored native60FOV/.75rate, "
+            "immutable bank view, actualall8 48px cursor projection/GBI above "
+            "textbox and32px letterbox passed");
+}
+static void CheckForeignCameraTakeover() {
+  for (s16 requestedId : {s16(2), s16(3)}) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    // Protection belongs to the private scene, including subsequent native
+    // Start/End pairs after an ordinary keeper -> bank -> keeper trip.
+    Stick(80, 0);
+    ReachSlot(0);
+    ReturnKeeper();
+    const auto ownId = sBrowseCamera;
+    s16 fillerId = CAM_ID_NONE;
+    Camera filler{};
+    if (requestedId == 3) {
+      fillerId = Play_CreateSubCamera(&play);
+      assert(fillerId == 2);
+      filler = *Play_GetCamera(&play, fillerId);
+    }
+    const auto foreignId = Play_CreateSubCamera(&play);
+    assert(foreignId == requestedId && foreignId != ownId);
+    auto *foreign = Play_GetCamera(&play, foreignId);
+    foreign->eye = foreign->eyeNext = {901, 902, 903};
+    foreign->at = {801, 802, 803};
+    foreign->fov = 37;
+    Play_ChangeCameraStatus(&play, foreignId, CAM_STATUS_ACTIVE);
+    const auto snapshot = *foreign;
+    MonitorBrowsing();
+    assert(!sTalking && Play_GetActiveCamId(&play) == foreignId);
+    assert(foreign->status == CAM_STATUS_ACTIVE &&
+           foreign->uid == snapshot.uid);
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    assert(Play_GetActiveCamId(&play) == foreignId &&
+           play.cameraPtrs[ownId] == nullptr);
+    if (std::memcmp(&snapshot.eye, &foreign->eye, sizeof(Vec3f)) ||
+        foreign->uid != snapshot.uid) {
+      std::fprintf(stderr,
+                   "FOREIGN CAMERA OVERWRITE: id=%d uid=%d->%d "
+                   "eye=(%.0f,%.0f,%.0f)->(%.0f,%.0f,%.0f) stored=%d\n",
+                   foreignId, snapshot.uid, foreign->uid, snapshot.eye.x,
+                   snapshot.eye.y, snapshot.eye.z, foreign->eye.x,
+                   foreign->eye.y, foreign->eye.z, sCutsceneMgr.isCameraStored);
+    }
+    assert(!std::memcmp(&snapshot, foreign, sizeof(Camera)) &&
+           "shop release must preserve a foreign camera's identity and pose");
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    assert(Play_GetActiveCamId(&play) == foreignId &&
+           sCutsceneMgr.retCamId == foreignId);
+    assert(!std::memcmp(&snapshot, foreign, sizeof(Camera)));
+    if (fillerId != CAM_ID_NONE)
+      assert(!std::memcmp(&filler, Play_GetCamera(&play, fillerId),
+                          sizeof(Camera)));
+  }
+  std::puts("MM native: foreign camera IDs 2/3 retain active status, UID and "
+            "full camera state");
+}
+
+static void CheckOwnedSlotReuse(bool stopFirst = false) {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  const auto ownedId = sBrowseCamera;
+  const auto ownedUid = sBrowseCameraUid;
+  if (stopFirst) {
+    EndBrowsing(&play);
+    assert(sCutsceneMgr.endCsId != CS_ID_NONE &&
+           "native Stop must await End before camera cleanup");
+  }
+  Play_ClearCamera(&play, ownedId);
+  const auto foreignId = Play_CreateSubCamera(&play);
+  assert(foreignId == ownedId);
+  auto *foreign = Play_GetCamera(&play, foreignId);
+  assert(foreign->uid != ownedUid &&
+         "native reused slot must have a fresh UID");
+  foreign->eye = foreign->eyeNext = {711, 712, 713};
+  foreign->at = {611, 612, 613};
+  foreign->fov = 39;
+  Play_ChangeCameraStatus(&play, foreignId, CAM_STATUS_ACTIVE);
+  const auto snapshot = *foreign;
+  if (!stopFirst)
+    MonitorBrowsing();
+  assert(!sTalking && !(player.stateFlags2 & (1u << 29)));
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(play.cameraPtrs[foreignId] == foreign &&
+         Play_GetActiveCamId(&play) == foreignId &&
+         "deferred shop End must not clear a reused slot owned by a new native "
+         "camera UID");
+  assert(!std::memcmp(&snapshot, foreign, sizeof(Camera)) &&
+         "deferred shop End must preserve all camera state after same-ID UID "
+         "replacement");
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         playerWaits == playerEnds);
+  assert(!(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(Play_GetActiveCamId(&play) == foreignId &&
+         sCutsceneMgr.retCamId == foreignId);
+  assert(!std::memcmp(&snapshot, foreign, sizeof(Camera)));
+  Play_ClearCamera(&play, foreignId);
+  Play_ChangeCameraStatus(&play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
+  Talk();
+  ReachSlot(-1);
+  Press(BTN_B);
+  NativeFrame();
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+  std::printf("MM native: same-slot UID replacement %s Stop preserves foreign "
+              "state through deferred End and re-talk\n",
+              stopFirst ? "after" : "before");
+}
+
+static void CheckOwnedSlotCleared(bool stopFirst = false) {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  const auto ownedId = sBrowseCamera;
+  if (stopFirst) {
+    EndBrowsing(&play);
+    assert(sCutsceneMgr.endCsId != CS_ID_NONE);
+  }
+  Play_ClearCamera(&play, ownedId);
+  Play_ChangeCameraStatus(&play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
+  const auto snapshot = mainCamera;
+  if (!stopFirst)
+    MonitorBrowsing();
+  assert(!sTalking && !(player.stateFlags2 & (1u << 29)));
+  // This executes the real deferred End, including its former NULL CUR_CAM
+  // dereference. The manager must still release player/keeper cutscene state.
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(play.cameraPtrs[ownedId] == nullptr &&
+         play.cameraPtrs[CAM_ID_MAIN] == &mainCamera);
+  assert(Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+  assert(!std::memcmp(&snapshot, &mainCamera, sizeof(Camera)));
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         playerWaits == playerEnds);
+  assert(!(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(Play_GetActiveCamId(&play) == CAM_ID_MAIN &&
+         sCutsceneMgr.retCamId == CAM_ID_MAIN);
+  assert(!std::memcmp(&snapshot, &mainCamera, sizeof(Camera)));
+  Talk();
+  ReachSlot(-1);
+  Press(BTN_B);
+  NativeFrame();
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+  std::printf("MM native: owned slot cleared %s Stop preserves main camera "
+              "through deferred End and re-talk\n",
+              stopFirst ? "after" : "before");
+}
+
+static void CheckReturnSlotOwnership() {
+  for (s16 returnId : {s16(CAM_ID_MAIN), s16(2)})
+    for (bool reuse : {false, true}) {
+      Reset();
+      Talk();
+      ReachSlot(-1);
+      const auto ownedId = sBrowseCamera;
+      s16 foreignId = CAM_ID_NONE;
+      if (returnId == 2) {
+        assert(Play_CreateSubCamera(&play) == returnId);
+        CutsceneManager_SetReturnCamera(returnId);
+      } else if (!reuse) {
+        foreignId = Play_CreateSubCamera(&play);
+        assert(foreignId == 2);
+      }
+      const auto returnUid = Play_GetCamera(&play, returnId)->uid;
+      EndBrowsing(&play);
+      assert(sCutsceneMgr.endCsId != CS_ID_NONE);
+      Play_ClearCamera(&play, returnId);
+      Camera replacement{};
+      Camera expectedMain = mainCamera;
+      expectedMain.status = CAM_STATUS_ACTIVE;
+      if (reuse) {
+        if (returnId == CAM_ID_MAIN) {
+          Camera_Init(&mainCamera, &play.view, &play.colCtx, &play);
+          mainCamera.camId = CAM_ID_MAIN;
+          play.cameraPtrs[CAM_ID_MAIN] = &mainCamera;
+        } else {
+          assert(Play_CreateSubCamera(&play) == returnId);
+        }
+        auto *camera = Play_GetCamera(&play, returnId);
+        assert(camera->uid != returnUid);
+        camera->eye = camera->eyeNext = {501, 502, 503};
+        camera->at = {401, 402, 403};
+        camera->fov = 41;
+        replacement = *camera;
+        if (returnId == CAM_ID_MAIN)
+          replacement.status = CAM_STATUS_ACTIVE;
+      } else if (foreignId != CAM_ID_NONE) {
+        auto *foreign = Play_GetCamera(&play, foreignId);
+        foreign->eye = foreign->eyeNext = {301, 302, 303};
+        foreign->at = {201, 202, 203};
+        foreign->fov = 43;
+        Play_ChangeCameraStatus(&play, foreignId, CAM_STATUS_ACTIVE);
+        replacement = *foreign;
+      }
+      CutsceneManager_Update();
+      CutsceneManager_ClearWaiting();
+      assert(play.cameraPtrs[ownedId] == nullptr &&
+             CutsceneManager_GetCurrentCsId() == CS_ID_NONE);
+      assert(playerWaits == playerEnds &&
+             !(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+      assert(!sCutsceneMgr.isCameraStored &&
+             "skipped native restoration must retire its stored snapshot");
+      if (reuse) {
+        assert(play.cameraPtrs[returnId] != nullptr);
+        assert(!std::memcmp(&replacement, play.cameraPtrs[returnId],
+                            sizeof(Camera)) &&
+               "deferred End must not copy or restore over a reused "
+               "return-camera UID");
+      } else {
+        assert(play.cameraPtrs[returnId] == nullptr);
+      }
+      if (foreignId != CAM_ID_NONE) {
+        assert(Play_GetActiveCamId(&play) == foreignId);
+        assert(!std::memcmp(&replacement, play.cameraPtrs[foreignId],
+                            sizeof(Camera)));
+      } else {
+        assert(Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+        if (returnId != CAM_ID_MAIN)
+          assert(!std::memcmp(&expectedMain, &mainCamera, sizeof(Camera)));
+      }
+      // Idle Update must borrow the surviving active camera, never a stale
+      // return-slot ID which was just rejected by the deferred End.
+      const auto activeId = Play_GetActiveCamId(&play);
+      const auto activeSnapshot = *play.cameraPtrs[activeId];
+      CutsceneManager_Update();
+      CutsceneManager_ClearWaiting();
+      assert(!std::memcmp(&activeSnapshot, play.cameraPtrs[activeId],
+                          sizeof(Camera)));
+      assert(sCutsceneMgr.retCamId == activeId);
+      if (reuse && returnId != activeId)
+        assert(!std::memcmp(&replacement, play.cameraPtrs[returnId],
+                            sizeof(Camera)));
+    }
+  std::puts("MM native: default/explicit return slots cleared or reused after "
+            "Stop preserve new owners through End and idle");
+}
+
+static void CheckValidStoredReturn() {
+  Reset();
+  Talk();
+  ReachSlot(-1);
+  const auto ownedId = sBrowseCamera;
+  const auto returnId = Play_CreateSubCamera(&play);
+  assert(returnId == 2 && sCutsceneMgr.isCameraStored);
+  const auto oldReturnUid = play.cameraPtrs[returnId]->uid;
+  const auto snapshotUid = mainCamera.uid;
+  assert(oldReturnUid != snapshotUid);
+  CutsceneManager_SetReturnCamera(returnId);
+  CutsceneManager_GetCutsceneEntry(shop.csId)->endCam = CS_END_CAM_1;
+  EndBrowsing(&play);
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  auto *restored = play.cameraPtrs[returnId];
+  assert(Play_GetActiveCamId(&play) == returnId &&
+         restored->status == CAM_STATUS_ACTIVE &&
+         "a validated native EndCam1 restore must activate its explicit return "
+         "camera after replacing its UID");
+  assert(restored->uid == snapshotUid && restored->camId == returnId);
+  assert(restored->eye.x == 50 && restored->eye.y == 100 &&
+         restored->eye.z == 260 && restored->fov == 60);
+  assert(play.cameraPtrs[ownedId] == nullptr && !sCutsceneMgr.isCameraStored);
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         playerWaits == playerEnds);
+  assert(!(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+  const auto snapshot = *restored;
+  CutsceneManager_Update();
+  CutsceneManager_ClearWaiting();
+  assert(Play_GetActiveCamId(&play) == returnId &&
+         !std::memcmp(&snapshot, restored, sizeof(Camera)));
+  std::puts("MM native: valid explicit EndCam1 restoration retains native UID "
+            "replacement and return activation");
+}
+
+static void CheckLegacyNativeCameraBehavior() {
+  for (u8 endCam :
+       {u8(CS_END_CAM_0), u8(CS_END_CAM_1), u8(CS_END_CAM_SMOOTH)}) {
+    Reset();
+    // A new native scene must default to the legacy behavior after leaving
+    // the private shop, even though Reset just initialized the shop scene.
+    CutsceneManager_Init(&play, cutscenes.data(), cutscenes.size());
+    CutsceneManager_StoreCamera(&mainCamera);
+    cutscenes[0].endCam = endCam;
+    assert(CutsceneManager_StartWithPlayerCsAndSetFlag(0, &keeper.actor) == 0);
+    const auto ownedId = CutsceneManager_GetCurrentSubCamId(0);
+    auto *owned = play.cameraPtrs[ownedId];
+    owned->eye = owned->eyeNext = {11, 22, 33};
+    owned->at = {1, 2, 3};
+    owned->fov = 49;
+    owned->roll = 17;
+    const auto returnId = Play_CreateSubCamera(&play);
+    assert(returnId == 2);
+    const auto oldReturnUid = play.cameraPtrs[returnId]->uid;
+    CutsceneManager_SetReturnCamera(returnId);
+    // Baseline End always activates its return camera, even if main has
+    // independently become active. Private-scene protection must be off.
+    Play_ChangeCameraStatus(&play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
+    CutsceneManager_Stop(0);
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    auto *returned = play.cameraPtrs[returnId];
+    assert(
+        Play_GetActiveCamId(&play) == returnId &&
+        returned->status == CAM_STATUS_ACTIVE &&
+        "normal native Init must disable private-scene ownership protection");
+    assert(play.cameraPtrs[ownedId] == nullptr &&
+           CutsceneManager_GetCurrentCsId() == CS_ID_NONE);
+    assert(playerWaits == playerEnds &&
+           !(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+    if (endCam == CS_END_CAM_1) {
+      assert(returned->uid == mainCamera.uid && returned->uid != oldReturnUid);
+      assert(returned->eye.x == 50 && returned->eye.y == 100 &&
+             returned->eye.z == 260 && returned->fov == 60);
+      assert(!sCutsceneMgr.isCameraStored);
+    } else {
+      assert(returned->uid == oldReturnUid);
+      assert(returned->eye.x == 11 && returned->eye.y == 22 &&
+             returned->eye.z == 33 && returned->fov == 49);
+      assert(returned->roll == 17);
+    }
+    assert(bool(CutsceneManager_IsNext(CS_ID_GLOBAL_RETURN_TO_CAM)) ==
+           (endCam == CS_END_CAM_SMOOTH));
+  }
+  Reset();
+  CutsceneManager_Init(&play, cutscenes.data(), cutscenes.size());
+  for (s16 id = CAM_ID_SUB_FIRST; id < NUM_CAMS; ++id)
+    assert(Play_CreateSubCamera(&play) == id);
+  auto *reserved = play.cameraPtrs[NUM_CAMS - 1];
+  reserved->eye = {901, 902, 903};
+  CutsceneManager_StoreCamera(&mainCamera);
+  assert(sCutsceneMgr.isCameraStored && reserved->uid == mainCamera.uid);
+  assert(reserved->eye.x == 50 && reserved->eye.y == 100 &&
+         reserved->eye.z == 260);
+  assert(reserved->status == CAM_STATUS_INACTIVE);
+  std::puts("MM native: scene Init defaults to legacy EndCam0/1/smooth return "
+            "and snapshot-storage behavior");
+}
+
+static void CheckForeignMotionAfterStop() {
+  for (s16 requestedId : {s16(CAM_ID_MAIN), s16(2), s16(3)}) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    const auto ownedId = sBrowseCamera;
+    s16 foreignId = CAM_ID_MAIN;
+    while (foreignId < requestedId)
+      foreignId = Play_CreateSubCamera(&play);
+    assert(foreignId == requestedId);
+    auto *foreign = Play_GetCamera(&play, foreignId);
+    const auto uid = foreign->uid;
+    foreign->eye = foreign->eyeNext = {101, 102, 103};
+    foreign->at = {51, 52, 53};
+    foreign->fov = 45;
+    Play_ChangeCameraStatus(&play, foreignId, CAM_STATUS_ACTIVE);
+    MonitorBrowsing();
+    assert(!sTalking && sCutsceneMgr.endCsId != CS_ID_NONE &&
+           foreign->uid == uid);
+    // A subsequent native owner update occurs before the deferred End.
+    foreign->eye = foreign->eyeNext = {1001, 1002, 1003};
+    foreign->at = {951, 952, 953};
+    foreign->fov = 47;
+    const auto latest = *foreign;
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    assert(play.cameraPtrs[ownedId] == nullptr &&
+           Play_GetActiveCamId(&play) == foreignId);
+    assert(!std::memcmp(&latest, foreign, sizeof(Camera)) &&
+           "deferred End must preserve the foreign owner's latest pose, "
+           "including the original return camera");
+    assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+           playerWaits == playerEnds);
+    assert(!(keeper.actor.flags & ACTOR_FLAG_FREEZE_EXCEPTION));
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    assert(Play_GetActiveCamId(&play) == foreignId &&
+           sCutsceneMgr.retCamId == foreignId);
+    assert(!std::memcmp(&latest, foreign, sizeof(Camera)) &&
+           "idle snapshot storage must not overwrite or deactivate a surviving "
+           "active camera, including ID3");
+  }
+  std::puts("MM native: active return/foreign cameras retain post-Stop pose "
+            "and status through End and idle");
+}
+
+static void CheckNoFreeSubcamera() {
+  for (bool snapshotSlotTaken : {false, true}) {
+    Reset();
+    const int limit = NUM_CAMS - (snapshotSlotTaken ? 0 : 1);
+    for (int id = CAM_ID_SUB_FIRST; id < limit; ++id)
+      assert(Play_CreateSubCamera(&play) == id);
+    std::array<Camera, NUM_CAMS> snapshots;
+    for (int id = 0; id < limit; ++id)
+      snapshots[id] = *play.cameraPtrs[id];
+    // Isolate the adapter from the manager's reserved ID3 snapshot write.
+    talkAccepted = true;
+    KeeperUpdate(&keeper.actor, &play);
+    assert(!sTalking && "shop must reject native start when ordinary "
+                        "subcameras are already owned");
+    assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+           Play_GetActiveCamId(&play) == CAM_ID_MAIN);
+    for (int id = 0; id < limit; ++id)
+      assert(!std::memcmp(&snapshots[id], play.cameraPtrs[id], sizeof(Camera)));
+    if (!snapshotSlotTaken)
+      assert(play.cameraPtrs[NUM_CAMS - 1] == nullptr);
+  }
+  std::puts("MM native: exhausted ordinary camera pool preserves owners and "
+            "reserved snapshot slot");
+}
+
+static void CheckQueuedPoolExhaustion() {
+  Reset();
+  Talk();
+  const auto original = mainCamera;
+  for (int id = CAM_ID_SUB_FIRST; id < NUM_CAMS - 1; ++id)
+    assert(Play_CreateSubCamera(&play) == id);
+  for (int i = 0; i < 4; ++i)
+    NativeFrame();
+  assert(shop.actionFunc == EnOssan_BeginInteraction &&
+         shop.cutsceneState == 1);
+  assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
+         mainCamera.setting == original.setting);
+  assert(!play.cameraPtrs[NUM_CAMS - 1] ||
+         play.cameraPtrs[NUM_CAMS - 1]->status == CAM_STATUS_INACTIVE);
+  Play_ClearCamera(&play, CAM_ID_SUB_FIRST);
+  ReachSlot(-1);
+  Press(BTN_B);
+  assert(!sTalking && CutsceneManager_GetCurrentCsId() == CS_ID_NONE);
+  std::puts("MM production native shop: queued pool exhaustion retries native "
+            "Start without consuming reserved snapshot slot");
+}
+static void CheckKeeperDialogue() {
+  Reset(); Talk(); ReachSlot(-1);
+  assert(play.msgCtx.currentTextId == kKeeperMenuText);
+  const auto camera = sBrowseCameraPtr;
+  const auto cs = CutsceneManager_GetCurrentCsId();
+  auto begin = [] {
+    play.msgCtx.choiceIndex = 0; Press(BTN_A, true);
+    assert(shop.actionFunc == EnOssan_TalkToShopkeeper &&
+           play.msgCtx.currentTextId == kKeeperTalkText);
+  };
+  begin(); Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_TalkToShopkeeper &&
+         play.msgCtx.currentTextId == 0x8F17 && messageState == TEXT_STATE_CHOICE);
+  play.msgCtx.choiceIndex = 0; Press(BTN_A, true);
+  assert(play.msgCtx.currentTextId == 0x8F18);
+  messageState = TEXT_STATE_AWAITING_NEXT; Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_TalkToShopkeeper && play.msgCtx.currentTextId == 0x8F18);
+  messageState = TEXT_STATE_EVENT; Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_FaceShopkeeper && play.msgCtx.currentTextId == kKeeperMenuText);
+  begin(); Press(BTN_A, true); play.msgCtx.choiceIndex = 1; Press(BTN_A, true);
+  assert(shop.actionFunc == EnOssan_FaceShopkeeper && play.msgCtx.currentTextId == kKeeperMenuText);
+  for (int page = 0; page < 3; ++page) {
+    begin();
+    if (page > 0) Press(BTN_A, true);
+    if (page > 1) { play.msgCtx.choiceIndex = 0; Press(BTN_A, true); }
+    Press(BTN_B, true);
+    assert(shop.actionFunc == EnOssan_FaceShopkeeper && play.msgCtx.currentTextId == kKeeperMenuText);
+  }
+  assert(sTalking && sBrowseCameraPtr == camera && CutsceneManager_GetCurrentCsId() == cs &&
+         purchases == 0 && !sReceipt.pending && callbacks.empty());
+  Press(BTN_B);
+  assert(!sTalking && shop.actionFunc == EnOssan_Idle);
+  for (int page = 0; page < 3; ++page) {
+    for (int interruption = 0; interruption < 5; ++interruption) {
+      Reset(); Talk(); ReachSlot(-1); begin();
+      if (page > 0) Press(BTN_A, true);
+      if (page > 1) { play.msgCtx.choiceIndex = 0; Press(BTN_A, true); }
+      if (interruption == 0) messageState = TEXT_STATE_NONE;
+      if (interruption == 1) messageState = TEXT_STATE_CLOSING;
+      if (interruption == 2) play.msgCtx.currentTextId = 0x1234;
+      if (interruption == 3) play.transitionTrigger = TRANS_TRIGGER_START;
+      if (interruption == 4) play.gameOverCtx.state = static_cast<decltype(play.gameOverCtx.state)>(1);
+      NativeFrame();
+      assert(!sTalking && shop.actionFunc == EnOssan_Idle && purchases == 0 && !sReceipt.pending);
+      if (interruption == 2) assert(play.msgCtx.currentTextId == 0x1234 && messageState != TEXT_STATE_CLOSING);
+    }
+  }
+  std::puts("MM optional native keeper intro/help/back/B retains camera; zero purchases/receipts");
+}
+int main(int argc, char **argv) {
+  std::setbuf(stdout, nullptr);
+  if (argc == 2 && std::string(argv[1]) == "receipt") {
+    CheckProductionReceipt();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "framing") {
+    CheckAuthoredFraming();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "same-cs") {
+    CheckSameCutsceneDifferentActor();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "destroy") {
+    CheckLiveKeeperDestruction();
+    CheckDestructionWithForeignOwnerAndReceipt();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "foreign-camera") {
+    CheckForeignCameraTakeover();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "camera-pool") {
+    CheckNoFreeSubcamera();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "queued-pool") {
+    CheckQueuedPoolExhaustion();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "reused-camera") {
+    CheckOwnedSlotReuse();
+    CheckOwnedSlotReuse(true);
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "cleared-camera") {
+    CheckOwnedSlotCleared();
+    CheckOwnedSlotCleared(true);
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "return-camera") {
+    CheckReturnSlotOwnership();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "foreign-motion") {
+    CheckForeignMotionAfterStop();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "valid-return") {
+    CheckValidStoredReturn();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "legacy-camera") {
+    CheckLegacyNativeCameraBehavior();
+    return 0;
+  }
+  CheckKeeperDialogue();
+  CheckLifecycle();
+  CheckAbortBoundaries();
+  CheckForeignCutscene();
+  CheckSameCutsceneDifferentActor();
+  CheckLiveKeeperDestruction();
+  CheckProductionReceipt();
+  CheckDestructionWithForeignOwnerAndReceipt();
+  CheckAuthoredFraming();
+  CheckForeignCameraTakeover();
+  CheckOwnedSlotReuse();
+  CheckOwnedSlotReuse(true);
+  CheckOwnedSlotCleared();
+  CheckOwnedSlotCleared(true);
+  CheckReturnSlotOwnership();
+  CheckValidStoredReturn();
+  CheckLegacyNativeCameraBehavior();
+  CheckForeignMotionAfterStop();
+  CheckNoFreeSubcamera();
+  CheckQueuedPoolExhaustion();
+  std::puts(
+      "MM production native EnOssan/EnGirlA + actual CutsceneManager/Fixed1 "
+      "integration passed; configured runtime unproven");
+}

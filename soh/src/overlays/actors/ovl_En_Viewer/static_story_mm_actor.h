@@ -21,6 +21,8 @@ typedef struct {
 typedef enum {
     STATIC_STORY_MM_NORMAL_FLEX = 0,
     STATIC_STORY_MM_SCOPED_PLAYER_LOD = 1,
+    STATIC_STORY_MM_NORMAL_STANDARD = 2,
+    STATIC_STORY_MM_GHOST_FLEX = 3,
 } StaticStoryMmPresentationKind;
 
 typedef struct {
@@ -47,6 +49,8 @@ typedef struct {
     uint8_t mouthCount;
     uint8_t eyeSegment;
     uint8_t mouthSegment;
+    const char* propDisplayListPath;
+    uint8_t propLimb;
 } StaticStoryMmPresentation;
 
 const StaticStoryMmPresentation* StaticStoryMm_GetPresentation(StaticStoryActorType type, uint8_t pose);

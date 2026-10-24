@@ -1,6 +1,9 @@
 #ifdef COMBO_BUILD
 #include "ComboRegionalPassages.h"
 #include "ComboGameMode.h"
+#include "ComboLakeHyliaBridge.h"
+#include "ComboFountainSnowheadBridge.h"
+#include "entrances/IkanaGravePlacement.h"
 #include "ComboResolve.h"
 #include "entrances/RegionalPassages.h"
 #include "gameplay/CrossGameTitleCard.h"
@@ -14,11 +17,13 @@
 #include "overlays/actors/ovl_Door_Ana/z_door_ana.h"
 #include <array>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 extern "C" {
 void BgHaka_Init(Actor*, PlayState*);
 void BgHaka_Destroy(Actor*, PlayState*);
 void BgHaka_Draw(Actor*, PlayState*);
-void BgHaka_CheckPlayerOnDirtPatch(BgHaka*, Player*);
+void BgHaka_IdleOpened(BgHaka*, PlayState*);
 void DoorAna_Init(Actor*, PlayState*);
 void DoorAna_Destroy(Actor*, PlayState*);
 void DoorAna_Draw(Actor*, PlayState*);
@@ -26,17 +31,13 @@ extern void (*gComboSceneSwitchCallback)(int);
 }
 namespace {
 using namespace ComboRegional;
-struct RegionalGrave {
-    BgHaka native;
-    bool pulling;
-};
 struct Passage {
     PlayState* play = nullptr;
     Pose entry{}, mouth{}, gravePose{};
     int route = 0, room = -1, slot = -1;
     u32 seed = 0;
-    bool queried = false, ready = false, falling = false;
-    RegionalGrave* grave = nullptr;
+    bool ready = false, falling = false, departureArmed = true;
+    BgHaka* grave = nullptr;
     Actor* hole = nullptr;
 } sRegional;
 PlayState* sEntrancePlay = nullptr;
@@ -45,9 +46,22 @@ std::array<Origin, 3> sOrigins{};
 std::array<int, 3> sOriginAge{ { -1, -1, -1 } };
 std::array<bool, 3> sOriginMq{};
 int sOriginSlot = -1, sArrivalRoute = 0;
+unsigned sArrivalWaitFrames = 0;
 u32 sOriginSeed = 0;
 bool sLoadPending = true, sReturnStaged = false, sReturningGrave = false;
-RespawnData sPreservedReturn{};
+RespawnData sPreservedReturn{}, sStagedReturn{};
+// Scene-command generation, not PlayState addresses: the arena can reuse the
+// source allocation while native fade updates continue before recreation.
+u64 sSpawnGeneration = 0, sReturnStageGeneration = 0;
+void RestoreStagedReturn() {
+    if (!sReturnStaged)
+        return;
+    // A composed native arrival may replace RETURN while this route is queued.
+    // Preserve that newer owner rather than overwriting it with our snapshot.
+    if (std::memcmp(&gSaveContext.respawn[RESPAWN_MODE_RETURN], &sStagedReturn, sizeof(sStagedReturn)) == 0)
+        gSaveContext.respawn[RESPAWN_MODE_RETURN] = sPreservedReturn;
+    sReturnStaged = false;
+}
 PlayState* sArrivalCoverPlay = nullptr;
 void ClearArrivalCover() {
     if (sArrivalCoverPlay && sArrivalCoverPlay == gPlayState)
@@ -55,7 +69,7 @@ void ClearArrivalCover() {
     sArrivalCoverPlay = nullptr;
 }
 nlohmann::json sPending;
-int sGraveId = -1, sHoleId = -1;
+int sHoleId = -1;
 u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
@@ -64,7 +78,7 @@ int SceneRoute(int scene) {
         return COMBO_PORTAL_IKANA;
     if (scene == SCENE_LAKE_HYLIA)
         return COMBO_PORTAL_GREAT_BAY;
-    if (scene == SCENE_ICE_CAVERN)
+    if (scene == SCENE_ZORAS_FOUNTAIN)
         return COMBO_PORTAL_SNOWHEAD;
     return 0;
 }
@@ -77,153 +91,22 @@ bool Valid(const Origin& origin) {
     return origin.entrance >= 0 && origin.entrance < ENTR_MAX &&
            ValidOrigin(origin, gEntranceTable[origin.entrance].scene);
 }
-bool SavedSetup(int index, int scene) {
-    return Valid(sOrigins[index]) && sOrigins[index].room == sRegional.room &&
-           sOriginAge[index] == gSaveContext.linkAge &&
-           sOriginMq[index] == static_cast<bool>(ResourceMgr_IsSceneMasterQuest(scene));
-}
-struct NativeWorld {
-    PlayState* play;
-    Actor* ignored = nullptr;
-    bool Floor(Point p, float expected, float* height) {
-        Vec3f point{ p.x, expected + 100, p.z };
-        CollisionPoly* floor = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        const float y = BgCheck_EntityRaycastFloor5(play, &play->colCtx, &floor, &bg, &GET_PLAYER(play)->actor, &point);
-        if (!floor || bg != BGCHECK_SCENE || !std::isfinite(y) || y == BGCHECK_Y_MIN || std::fabs(y - expected) > 35 ||
-            floor->normal.y < 23170 || SurfaceType_GetSceneExitIndex(&play->colCtx, floor, bg) != 0)
-            return false;
-        WaterBox* water = nullptr;
-        float waterY;
-        if (WaterBox_GetSurface1(play, &play->colCtx, p.x, p.z, &waterY, &water) && waterY >= y - .5f)
-            return false;
-        *height = y;
-        return true;
-    }
-    bool Wall(Point a, Point b, Point* hit, Point* normal) {
-        Vec3f from{ a.x, a.y, a.z }, to{ b.x, b.y, b.z }, found{};
-        CollisionPoly* wall = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        if (!BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &found, &wall, true, false, false, true, &bg) ||
-            !wall || bg != BGCHECK_SCENE || std::abs(wall->normal.y) > 4096)
-            return false;
-        *hit = { found.x, found.y, found.z };
-        *normal = { wall->normal.x / 32767.f, 0, wall->normal.z / 32767.f };
-        return true;
-    }
-    bool Clear(Point a, Point b) {
-        Vec3f from{ a.x, a.y, a.z }, to{ b.x, b.y, b.z }, found{};
-        CollisionPoly* polygon = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        // A hit of any kind obstructs the apron, including dynamic geometry,
-        // floors/ceilings and backfaces. Only Wall() filters a support wall.
-        return !BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &found, &polygon, true, true, true, false, &bg);
-    }
-    bool NearWater(Point p) {
-        for (float radius : { 120.f, 280.f, 500.f })
-            for (int step = 0; step < 8; ++step) {
-                const auto point = Add(p, Forward(static_cast<short>(step * 8192)), radius);
-                WaterBox* box = nullptr;
-                float y;
-                if (WaterBox_GetSurface1(play, &play->colCtx, point.x, point.z, &y, &box) && std::isfinite(y))
-                    return true;
-            }
-        return false;
-    }
-    bool Occupied(Point p, float radius) {
-        for (int category = 0; category < ACTORCAT_MAX; ++category) {
-            if (category == ACTORCAT_PLAYER || category == ACTORCAT_MISC || category == ACTORCAT_EXPLOSIVE)
-                continue;
-            for (Actor* a = play->actorCtx.actorLists[category].head; a; a = a->next) {
-                if (a == ignored || !a->update || (a->room >= 0 && a->room != play->roomCtx.curRoom.num) ||
-                    std::fabs(a->home.pos.y - p.y) > 180)
-                    continue;
-                if (Distance2({ a->home.pos.x, a->home.pos.y, a->home.pos.z }, p) < radius * radius)
-                    return true;
-            }
-        }
-        return false;
-    }
-};
-bool FindCave(PlayState* play) {
-    NativeWorld world{ play };
-    const int index = sRegional.route - COMBO_PORTAL_IKANA;
-    if (SavedSetup(index, play->sceneNum)) {
-        const auto& saved = sOrigins[index].pose;
-        const auto front = Forward(saved.yaw);
-        const auto support = Add(saved.pos, front, -102);
-        if (ValidateMouth(world, support, front, &sRegional.mouth) &&
-            Reachable(world, sRegional.entry, sRegional.mouth) &&
-            (sRegional.route != COMBO_PORTAL_GREAT_BAY || world.NearWater(support)))
-            return true;
-    }
-    return FindMouth(world, sRegional.entry, &sRegional.mouth, sRegional.route == COMBO_PORTAL_GREAT_BAY);
-}
-void SetPulled(RegionalGrave* grave) {
-    auto& native = grave->native;
-    native.state = 1;
-    native.dyna.actor.minVelocityY = 60;
-    native.dyna.actor.world.rot.y = native.dyna.actor.shape.rot.y + 0x8000;
-    native.dyna.actor.world.pos.x = native.dyna.actor.home.pos.x + Math_SinS(native.dyna.actor.world.rot.y) * 60;
-    native.dyna.actor.world.pos.z = native.dyna.actor.home.pos.z + Math_CosS(native.dyna.actor.world.rot.y) * 60;
-}
-void GraveInit(Actor* actor, PlayState* play) {
-    BgHaka_Init(actor, play);
-    auto* grave = reinterpret_cast<RegionalGrave*>(actor);
-    grave->pulling = false;
-    if (sReturningGrave) {
-        SetPulled(grave);
-        sReturningGrave = false;
-    }
-}
-void GraveUpdate(Actor* actor, PlayState* play) {
-    auto* grave = reinterpret_cast<RegionalGrave*>(actor);
-    auto& native = grave->native;
-    Player* player = GET_PLAYER(play);
-    if (!player)
-        return;
-    if (native.state) {
-        // Match native IdleOpened: another grave/dynapoly owns the player's
-        // moving flag unless this specific grave has an outstanding force.
-        if (native.dyna.unk_150 != 0) {
-            native.dyna.unk_150 = 0;
-            player->stateFlags2 &= ~PLAYER_STATE2_MOVING_DYNAPOLY;
-        }
-        return;
-    }
-    // The added grave shares the native pull collision/kinematics and dirt
-    // sounds. Its completion owns no vanilla switch, Poe, chest or grave check.
-    if (!grave->pulling && native.dyna.unk_150 != 0) {
-        if (native.dyna.unk_150 > 0) {
-            native.dyna.unk_150 = 0;
-            player->stateFlags2 &= ~PLAYER_STATE2_MOVING_DYNAPOLY;
-        } else {
-            grave->pulling = true;
-            actor->world.rot.y = actor->shape.rot.y + 0x8000;
-        }
-    }
-    if (grave->pulling) {
-        actor->speedXZ = std::fmin(actor->speedXZ + .05f, 1.5f);
-        const bool complete = Math_StepToF(&actor->minVelocityY, 60, actor->speedXZ);
-        actor->world.pos.x = actor->home.pos.x + Math_SinS(actor->world.rot.y) * actor->minVelocityY;
-        actor->world.pos.z = actor->home.pos.z + Math_CosS(actor->world.rot.y) * actor->minVelocityY;
-        Actor_PlaySfx_Flagged(actor, NA_SE_EV_ROCK_SLIDE - SFX_FLAG);
-        if (complete) {
-            native.state = 1;
-            native.dyna.unk_150 = 0;
-            grave->pulling = false;
-            player->stateFlags2 &= ~PLAYER_STATE2_MOVING_DYNAPOLY;
-            Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
-        }
-    }
-    BgHaka_CheckPlayerOnDirtPatch(&native, player);
+void SetPulled(BgHaka* grave) {
+    auto& actor = grave->dyna.actor;
+    grave->state = 1;
+    grave->actionFunc = BgHaka_IdleOpened;
+    grave->dyna.unk_150 = 0;
+    actor.minVelocityY = 60;
+    actor.world.rot.y = actor.shape.rot.y + 0x8000;
+    actor.world.pos.x = actor.home.pos.x + Math_SinS(actor.world.rot.y) * 60;
+    actor.world.pos.z = actor.home.pos.z + Math_CosS(actor.world.rot.y) * 60;
 }
 void HoleInit(Actor* actor, PlayState* play) {
     DoorAna_Init(actor, play);
     Actor_SetScale(actor, 0);
 }
 void HoleUpdate(Actor* actor, PlayState* play) {
-    if (!sRegional.grave || !sRegional.grave->native.state)
+    if (!Bound() || play != sRegional.play || actor != sRegional.hole || !sRegional.grave || !sRegional.grave->state)
         return;
     const bool open = Math_StepToF(&actor->scale.x, .01f, .001f);
     Actor_SetScale(actor, actor->scale.x);
@@ -236,27 +119,22 @@ void HoleUpdate(Actor* actor, PlayState* play) {
         player->stateFlags1 & (PLAYER_STATE1_ON_HORSE | PLAYER_STATE1_IN_WATER))
         return;
     const auto& p = player->actor.world.pos;
+    // Native grotto pop-out starts inside the aperture. Require the player to
+    // step clear before another departure, including after its cutscene ends.
+    if (!sRegional.departureArmed) {
+        if (Distance2({ p.x, p.y, p.z }, sRegional.mouth.pos) > 45 * 45)
+            sRegional.departureArmed = true;
+        return;
+    }
     if (Distance2({ p.x, p.y, p.z }, sRegional.mouth.pos) < 15 * 15 && p.y >= sRegional.mouth.pos.y - 50 &&
         p.y <= sRegional.mouth.pos.y + 15) {
         player->stateFlags1 |= PLAYER_STATE1_FLOOR_DISABLED;
         sRegional.falling = true;
     }
 }
-void RegisterActors() {
-    if (sGraveId >= 0)
+void RegisterHole() {
+    if (sHoleId >= 0)
         return;
-    ActorDBInit grave;
-    grave.name = "Bg_ComboRegionalGrave";
-    grave.desc = "Additional Ikana passage grave";
-    grave.category = ACTORCAT_BG;
-    grave.objectId = OBJECT_HAKA;
-    grave.instanceSize = sizeof(RegionalGrave);
-    grave.flags = ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
-    grave.init = GraveInit;
-    grave.destroy = BgHaka_Destroy;
-    grave.update = GraveUpdate;
-    grave.draw = BgHaka_Draw;
-    sGraveId = ActorDB::Instance->AddEntry(grave).entry.id;
     ActorDBInit hole;
     hole.name = "Door_ComboRegionalGrave";
     hole.desc = "Native Ikana grave aperture";
@@ -270,77 +148,56 @@ void RegisterActors() {
     hole.draw = DoorAna_Draw;
     sHoleId = ActorDB::Instance->AddEntry(hole).entry.id;
 }
-bool FindGrave(PlayState* play) {
-    NativeWorld world{ play };
-    // Copy the relative grave/hole arrangement from this setup's own native
-    // actors. Existing grave locations, params, collision and exits stay intact.
-    const bool preferred = SavedSetup(0, play->sceneNum);
-    for (int pass = preferred ? 0 : 1; pass < 2; ++pass) {
-        for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_BG].head; actor; actor = actor->next) {
-            if (actor->id != ACTOR_BG_HAKA || actor->room != sRegional.room)
-                continue;
-            for (Actor* hole = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].head; hole; hole = hole->next) {
-                if (hole->id != ACTOR_DOOR_ANA || hole->room != sRegional.room)
-                    continue;
-                const Point base{ actor->home.pos.x, actor->home.pos.y, actor->home.pos.z };
-                const Point nativeHole{ hole->home.pos.x, hole->home.pos.y, hole->home.pos.z };
-                if (Distance2(base, nativeHole) > 120 * 120 || std::fabs(base.y - nativeHole.y) > 10)
-                    continue;
-                const Point front = Forward(actor->shape.rot.y), right{ front.z, 0, -front.x };
-                for (float offset : { 150.f, -150.f, 300.f, -300.f, 450.f, -450.f }) {
-                    const Point grave = Add(base, right, offset), aperture = Add(nativeHole, right, offset);
-                    if (pass == 0 && Distance2(aperture, sOrigins[0].pose.pos) > 1)
-                        continue;
-                    if (world.Occupied(grave, 95) || world.Occupied(aperture, 75))
-                        continue;
-                    bool safe = true;
-                    for (float width : { -42.f, 0.f, 42.f })
-                        for (float depth : { -100.f, -60.f, 0.f, 60.f, 100.f }) {
-                            const Point point = Add(Add(grave, right, width), front, depth);
-                            float y;
-                            if (!world.Floor(point, base.y, &y) || std::fabs(y - base.y) > 8) {
-                                safe = false;
-                                continue;
-                            }
-                            Point bottom = point, top = point;
-                            bottom.y = y + 1;
-                            top.y = y + 180;
-                            if (!world.Clear(bottom, top))
-                                safe = false;
-                        }
-                    for (float width : { -42.f, 0.f, 42.f })
-                        for (float height : { 20.f, 80.f, 140.f }) {
-                            Point a = Add(Add(grave, right, width), front, -100), b = Add(a, front, 200), hit{},
-                                  normal{};
-                            a.y = b.y = base.y + height;
-                            if (!world.Clear(a, b))
-                                safe = false;
-                        }
-                    const Pose nativeApproach{ Add(nativeHole, Forward(hole->home.rot.y), 100), hole->home.rot.y };
-                    const Pose addedMouth{ aperture, hole->home.rot.y, Forward(hole->home.rot.y) };
-                    if (!safe || !Reachable(world, nativeApproach, addedMouth))
-                        continue;
-                    RegisterActors();
-                    auto* added = Actor_Spawn(&play->actorCtx, play, sGraveId, grave.x, grave.y, grave.z, 0,
-                                              actor->shape.rot.y, 0, 1);
-                    if (!added)
-                        return false;
-                    auto* addedHole = Actor_Spawn(&play->actorCtx, play, sHoleId, aperture.x, aperture.y, aperture.z, 0,
-                                                  hole->home.rot.y, 0, 0);
-                    if (!addedHole) {
-                        Actor_Kill(added);
-                        return false;
-                    }
-                    sRegional.grave = reinterpret_cast<RegionalGrave*>(added);
-                    sRegional.hole = addedHole;
-                    sRegional.gravePose = { grave, actor->shape.rot.y, front };
-                    sRegional.mouth = { aperture, hole->home.rot.y, Forward(hole->home.rot.y) };
-                    return true;
-                }
-            }
+bool HolePresent(PlayState* play) {
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].head; actor; actor = actor->next)
+        if (actor == sRegional.hole && actor->id == sHoleId && actor->update)
+            return true;
+    return false;
+}
+bool ClaimMarkedGrave(PlayState* play) {
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_BG].head; actor; actor = actor->next) {
+        if (actor->id != ACTOR_BG_HAKA || actor->init || !actor->update ||
+            !IkanaGrave::Matches({ actor->home.pos.x, actor->home.pos.y, actor->home.pos.z }, actor->home.rot.y,
+                                 actor->params, actor->room))
+            continue;
+        // Keep the original native actor, including its init/update/draw,
+        // dynamic collision, child/day lock, pull action and vanilla checks.
+        sRegional.grave = reinterpret_cast<BgHaka*>(actor);
+        sRegional.gravePose = sRegional.mouth = IkanaGrave::kPose;
+        if (sReturningGrave) {
+            SetPulled(sRegional.grave);
+            sRegional.departureArmed = false;
+            sReturningGrave = false;
         }
+        RegisterHole();
+        const auto& p = IkanaGrave::kPose.pos;
+        // Actor_Spawn may return an actor whose object bank is still pending.
+        // Retain that one aperture while native Actor_UpdateAll initializes it.
+        if (!HolePresent(play))
+            sRegional.hole = Actor_Spawn(&play->actorCtx, play, sHoleId, p.x, p.y, p.z, 0, IkanaGrave::kPose.yaw, 0, 0);
+        return sRegional.hole && sRegional.hole->init == nullptr;
     }
     return false;
+}
+bool GraveActorsLive(PlayState* play) {
+    bool graveLive = false, holeLive = false;
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_BG].head; actor; actor = actor->next)
+        if (actor == reinterpret_cast<Actor*>(sRegional.grave) && actor->id == ACTOR_BG_HAKA && !actor->init &&
+            actor->update)
+            graveLive = true;
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].head; actor; actor = actor->next)
+        if (actor == sRegional.hole && actor->id == sHoleId && !actor->init && actor->update)
+            holeLive = true;
+    return graveLive && holeLive;
+}
+bool ResolveFixedBridge(PlayState* play) {
+    Vec3f mouth{};
+    s16 yaw = 0;
+    const bool ready = sRegional.route == COMBO_PORTAL_GREAT_BAY ? ComboLakeHyliaBridge_Get(play, &mouth, &yaw)
+                                                                 : ComboFountainSnowheadBridge_Get(play, &mouth, &yaw);
+    if (ready)
+        sRegional.mouth = { { mouth.x, mouth.y, mouth.z }, yaw, Forward(yaw) };
+    return ready;
 }
 void CaptureOrigin() {
     if (!Bound() || !sRegional.ready)
@@ -349,22 +206,29 @@ void CaptureOrigin() {
     Pose arrival = sRegional.mouth;
     if (sRegional.route != COMBO_PORTAL_IKANA)
         arrival.pos = Add(arrival.pos, arrival.forward, 100);
+    if (sRegional.route == COMBO_PORTAL_SNOWHEAD && !SnowheadReturn(&arrival))
+        return;
     const auto index = sRegional.route - COMBO_PORTAL_IKANA;
     sOrigins[index] = { sRegional.route, gSaveContext.entranceIndex, sRegional.room, arrival };
     sOriginAge[index] = gSaveContext.linkAge;
     sOriginMq[index] = ResourceMgr_IsSceneMasterQuest(sRegional.play->sceneNum);
 }
 void StageArrival(const Origin& origin) {
+    Pose grounded = origin.pose;
+    if (origin.route == COMBO_PORTAL_SNOWHEAD && !SnowheadReturn(&grounded))
+        return;
     sPreservedReturn = gSaveContext.respawn[RESPAWN_MODE_RETURN];
     sReturnStaged = true;
     auto& arrival = gSaveContext.respawn[RESPAWN_MODE_RETURN];
     arrival = {};
     arrival.entranceIndex = origin.entrance;
     arrival.roomIndex = origin.room;
-    arrival.pos = { origin.pose.pos.x, origin.pose.pos.y, origin.pose.pos.z };
-    arrival.yaw = origin.pose.yaw;
+    arrival.pos = { grounded.pos.x, grounded.pos.y, grounded.pos.z };
+    arrival.yaw = grounded.yaw;
     arrival.playerParams = origin.route == COMBO_PORTAL_IKANA ? 0x04FF : 0x0EFF;
     arrival.data = 1;
+    sStagedReturn = arrival;
+    sReturnStageGeneration = sSpawnGeneration;
     gSaveContext.entranceIndex = origin.entrance;
     gSaveContext.respawnFlag = 2;
     gSaveContext.cutsceneIndex = 0;
@@ -378,15 +242,12 @@ void PlayerUpdate() {
         sArrivalRoute = 0;
         return;
     }
-    if (sReturnStaged) {
-        gSaveContext.respawn[RESPAWN_MODE_RETURN] = sPreservedReturn;
-        sReturnStaged = false;
-    }
+    if (sReturnStaged && sSpawnGeneration != sReturnStageGeneration && GET_PLAYER(play) &&
+        GET_PLAYER(play)->actor.init == nullptr && gSaveContext.respawnFlag == 0)
+        RestoreStagedReturn();
     if (!sArrivalRoute || !play->state.running)
         return;
-    if (!ComboRegionalPassagesOot_Get(play, nullptr, nullptr, nullptr) || sRegional.route != sArrivalRoute) {
-        // An unsupported scene/setup reveals its safe native approach instead
-        // of trusting an old point or keeping the screen covered indefinitely.
+    if (SceneRoute(play->sceneNum) != sArrivalRoute) {
         ClearArrivalCover();
         sArrivalRoute = 0;
         sReturningGrave = false;
@@ -396,12 +257,26 @@ void PlayerUpdate() {
     play->envCtx.fillScreen = true;
     play->envCtx.screenFillColor[0] = play->envCtx.screenFillColor[1] = play->envCtx.screenFillColor[2] = 0;
     play->envCtx.screenFillColor[3] = 255;
+    // Loaded room actors/object banks can lag the first player update. Keep
+    // the authored arrival pending until its owner is ready; do not silently
+    // turn a required regional arrival into the native scene entrance.
+    if (!ComboRegionalPassagesOot_Get(play, nullptr, nullptr, nullptr)) {
+        if (++sArrivalWaitFrames >= 300) {
+            std::fprintf(stderr,
+                         "Combo regional arrival %d failed: authored endpoint unavailable in scene %d room %d\n",
+                         sArrivalRoute, play->sceneNum, play->roomCtx.curRoom.num);
+            ClearArrivalCover();
+            sArrivalRoute = 0;
+            sReturningGrave = false;
+        }
+        return;
+    }
+    sArrivalWaitFrames = 0;
     if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
         play->pauseCtx.state != 0 || Player_InCsMode(play))
         return;
-    // First visits and changed age/layout start at a native entrance under
-    // cover. Resolve its loaded floor, then let Player_Init consume the real
-    // native return start mode and reveal the matching passage once.
+    // Resolve the authored endpoint under cover, then let Player_Init consume
+    // the native RETURN/GROTTO start mode to reveal that passage once.
     CaptureOrigin();
     const auto origin = sOrigins[sArrivalRoute - COMBO_PORTAL_IKANA];
     sArrivalRoute = 0;
@@ -426,6 +301,7 @@ void BindFile(int slot) {
     sOriginAge = { { -1, -1, -1 } };
     sOriginMq = {};
     sArrivalRoute = 0;
+    sArrivalWaitFrames = 0;
     sReturnStaged = false;
     sReturningGrave = false;
     if (!Bound() || !sPending.is_object())
@@ -493,6 +369,7 @@ void Register() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(PlayerUpdate);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(ComboRegionalPassagesOot_Reset);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t) {
+        RestoreStagedReturn();
         sArrivalRoute = 0;
         ComboRegionalPassagesOot_Reset();
     });
@@ -511,6 +388,7 @@ extern "C" void ComboRegionalPassagesOot_CancelDeparture(void) {
 extern "C" void ComboRegionalPassagesOot_Reset(void) {
     ComboRegionalPassagesOot_CancelDeparture();
     ClearArrivalCover();
+    sArrivalWaitFrames = 0;
     sRegional = {};
 }
 extern "C" void ComboRegionalPassagesOot_ReadEntrances(PlayState* play, unsigned count) {
@@ -518,15 +396,14 @@ extern "C" void ComboRegionalPassagesOot_ReadEntrances(PlayState* play, unsigned
     sEntranceCount = count;
 }
 extern "C" void ComboRegionalPassagesOot_ReadSpawns(PlayState* play, const ActorEntry* entries, unsigned count) {
+    ++sSpawnGeneration;
     sRegional = {};
     // Farore is composed after the portal boot. Observe its native TOP start
     // mode before Player_Init consumes it, including recalls into this region.
     if (gSaveContext.respawnFlag == 3) {
         sArrivalRoute = 0;
         sReturningGrave = false;
-        if (sReturnStaged)
-            gSaveContext.respawn[RESPAWN_MODE_RETURN] = sPreservedReturn;
-        sReturnStaged = false;
+        RestoreStagedReturn();
     }
     if (!Combo_IsCombinedGame() || !play || !SceneRoute(play->sceneNum) || !entries || !play->setupEntranceList ||
         !count)
@@ -540,7 +417,7 @@ extern "C" void ComboRegionalPassagesOot_ReadSpawns(PlayState* play, const Actor
     const auto& source = entries[native.spawn];
     sRegional.play = play;
     sRegional.route = SceneRoute(play->sceneNum);
-    sRegional.room = native.room;
+    sRegional.room = sRegional.route == COMBO_PORTAL_IKANA ? IkanaGrave::kRoom : native.room;
     sRegional.entry = { { static_cast<float>(source.pos.x), static_cast<float>(source.pos.y),
                           static_cast<float>(source.pos.z) },
                         source.rot.y };
@@ -552,12 +429,19 @@ extern "C" int ComboRegionalPassagesOot_Get(PlayState* play, int* route, Vec3f* 
         play->roomCtx.curRoom.num != sRegional.room || sRegional.slot != gSaveContext.fileNum ||
         sRegional.seed != Seed() || !play->colCtx.colHeader || !GET_PLAYER(play))
         return false;
-    if (!sRegional.queried) {
-        sRegional.queried = true;
-        if (sRegional.route == COMBO_PORTAL_IKANA)
-            sRegional.ready = FindGrave(play);
-        else
-            sRegional.ready = FindCave(play);
+    // Actor initialization and bridge registration may occur after the first
+    // presentation query; retry the exact owned endpoint, never a search.
+    if (sRegional.route == COMBO_PORTAL_IKANA) {
+        if (sRegional.ready && !GraveActorsLive(play)) {
+            sRegional.ready = false;
+            sRegional.grave = nullptr;
+            sRegional.hole = nullptr;
+            sRegional.falling = false;
+        }
+        if (!sRegional.ready)
+            sRegional.ready = ClaimMarkedGrave(play);
+    } else {
+        sRegional.ready = ResolveFixedBridge(play);
     }
     if (!sRegional.ready)
         return false;
@@ -579,7 +463,8 @@ extern "C" int ComboRegionalPassagesOot_AtDeparture(PlayState* play, const Vec3f
     const Point point{ position->x, position->y, position->z };
     const bool entering = sRegional.route == COMBO_PORTAL_IKANA
                               ? sRegional.falling && point.y < sRegional.mouth.pos.y - 8
-                              : InMouth(sRegional.mouth, point);
+                          : sRegional.route == COMBO_PORTAL_SNOWHEAD ? InSnowheadMouth(sRegional.mouth, point)
+                                                                     : InMouth(sRegional.mouth, point);
     if (!entering)
         return 0;
     CaptureOrigin();
@@ -588,13 +473,14 @@ extern "C" int ComboRegionalPassagesOot_AtDeparture(PlayState* play, const Vec3f
 extern "C" int ComboRegionalPassagesOot_ApplyArrival(int route) {
     if (!Bound() || !ComboRegionalPassages_IsRoute(route))
         return 0;
-    // Saved coordinates select a preferred mouth only after its current native
-    // floor/wall have loaded and passed validation. The safe approach stays
-    // covered until a native RETURN/GROTTO start can reveal that passage.
+    RestoreStagedReturn();
+    // Always resolve the current authored endpoint. Legacy saved coordinates
+    // must never relocate a fixed passage after age/layout or resource changes.
     sArrivalRoute = route;
+    sArrivalWaitFrames = 0;
     gSaveContext.entranceIndex = route == COMBO_PORTAL_IKANA       ? ENTR_GRAVEYARD_ENTRANCE
                                  : route == COMBO_PORTAL_GREAT_BAY ? ENTR_LAKE_HYLIA_OUTSIDE_LAB
-                                                                   : ENTR_ICE_CAVERN_ENTRANCE;
+                                                                   : ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN;
     gSaveContext.respawnFlag = 0;
     gSaveContext.cutsceneIndex = 0;
     gSaveContext.cutsceneTrigger = 0;

@@ -44,13 +44,22 @@ def main():
     # A counter display must sit near the keeper rather than on the front side walls.
     assert abs(shelves[:, 0]).max() <= 90, "Stock is spread along the side walls rather than grouped at the counter"
     assert shelves[:, 2].min() >= 80 and shelves[:, 2].max() <= 125
-    # Floating offers have no shelf geometry to explain staggered depth. A
-    # single frontal plane keeps upper/lower anchors aligned in perspective.
-    assert np.ptp(shelves[:, 2]) < 1e-5, "Floating offers must share a frontal display plane; staggered depth makes the grid look angled"
+    # Native shop banks use an angled plane: rows remain aligned, while the
+    # outer column follows the bank depth. A frontal-only assertion missed the
+    # mismatch between native shelf turning and the old wall-like fixture.
+    sys.path.insert(0,str(ROOT/'tests/black_market'))
+    from check_browsing_frame import camera_views
+    cameras=camera_views()
+    for bank,view in ((shelves[:4],cameras['right']),(shelves[4:],cameras['left'])):
+        assert np.array_equal(bank[0,[0,2]],bank[1,[0,2]])
+        assert np.array_equal(bank[2,[0,2]],bank[3,[0,2]])
+        column=bank[2]-bank[0];column[1]=0;column/=np.linalg.norm(column)
+        direction=np.array(view['at'])-view['eye'];direction[1]=0;direction/=np.linalg.norm(direction)
+        assert abs(column@direction)<.001,'Shelf columns must face the native bank camera without an oblique wall view'
     for path in HOSTS:
         source = (ROOT / path).read_text()
         block = re.search(r"constexpr Vec3f kShelves\[8\] = \{(.*?)\};", source, re.S)
-        native = [[float(n) for n in row.split(",")] for row in re.findall(r"\{([^{}]+)\}", block[1])]
+        native = [[float(n.strip().removesuffix("f")) for n in row.split(",")] for row in re.findall(r"\{([^{}]+)\}", block[1])]
         assert np.array_equal(native, shelves), "Both native games and preview must use the same physical display layout"
 
     with zipfile.ZipFile(args.pack) as archive:

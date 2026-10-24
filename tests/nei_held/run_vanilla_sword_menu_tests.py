@@ -97,12 +97,21 @@ namespace ShipInit {
 void Init(const char* key) { Fixture::applies.emplace_back(key); }
 }
 namespace ImGui {
+void TextUnformatted(const char*) {}
 bool BeginTabItem(const char* label) {
     Fixture::Check(std::string(label) == "Link & Items", "checkbox belongs to Link & Items");
     return Fixture::tabOpen;
 }
 void EndTabItem() {}
 } // namespace ImGui
+// Release markers are presentation only; the real-ImGui What's New suite owns
+// their styling/identity contract. Keep this probe on native CVar/save behavior.
+namespace WhatsNew {
+constexpr const char* kEnabledCvar = "gSettings.Menu.WhatsNew";
+struct Scope {
+    Scope(const char*, const char*, bool, bool = false) {}
+};
+} // namespace WhatsNew
 
 /* HOSTS */
 

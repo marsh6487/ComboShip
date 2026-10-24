@@ -25,36 +25,36 @@ def build(host,name,source):
         subprocess.run([str(binary)],check=True,env={**ENV,'ASAN_OPTIONS':'detect_leaks=0'})
 
 build('', 'geometry', (ROOT/'tests/regional_passages/geometry_test.cpp').read_text())
-mm=(ROOT/'mm/2s2h/Enhancements/Gameplay/ComboRegionalPassages.cpp').read_text()
-build('mm','native-mm',(ROOT/'tests/regional_passages/mm_native_test.cpp').read_text().replace('/* PRODUCTION */',mm))
+# Fixed providers and endpoint owners exercise actual native actors and start
+# modes in focused fixtures. Keep the shared handoff/boot priority probes below.
+for runner, accepts_sanitize in (
+    ("run_mm_fixed_tests.py", True),
+    ("run_ikana_tests.py", True),
+    ("run_lake_bridge_tests.py", True),
+    ("run_snowhead_bridge_tests.py", False),
+):
+    command = [sys.executable, str(ROOT / "tests/regional_passages" / runner)]
+    if SANITIZE and accepts_sanitize:
+        command.append("--sanitize")
+    subprocess.run(command, check=True, env=ENV)
+
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import block_from
 
 def function(source, signature):
     return block_from(source,source.index(signature))
 
-oot=(ROOT/'soh/soh/Enhancements/Gameplay/ComboRegionalPassages.cpp').read_text()
-production=oot[oot.index('namespace {'):oot.rindex('#endif')]
-haka=(ROOT/'soh/src/overlays/actors/ovl_Bg_Haka/z_bg_haka.c').read_text()
-door=(ROOT/'soh/src/overlays/actors/ovl_Door_Ana/z_door_ana.c').read_text()
-player=(ROOT/'soh/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
-native='extern "C" {\n'
-native+=haka[haka.index('static InitChainEntry sInitChain[]'):haka.index('void BgHaka_Init(Actor* thisx, PlayState* play) {')]
-native+=door[door.index('static ColliderCylinderInit sCylinderInit'):door.index('// array of entrance table entries')]
-for source, signatures in [(haka,['void BgHaka_Init(Actor* thisx, PlayState* play) {','void BgHaka_Destroy(Actor* thisx, PlayState* play) {','void BgHaka_CheckPlayerOnDirtPatch(BgHaka* this, Player* player) {']),
-                           (door,['void DoorAna_SetupAction(DoorAna* this, DoorAnaActionFunc actionFunc) {','void DoorAna_Init(Actor* thisx, PlayState* play) {','void DoorAna_Destroy(Actor* thisx, PlayState* play) {'])]:
-    native+='\n'.join(re.sub(r'\bthis\b','self',function(source,signature)) for signature in signatures)+'\n'
-native+='}\n'
-grotto=re.sub(r'\bthis\b','self',function(player,'void Player_StartMode_Grotto(PlayState* play, Player* this) {'))
-fixture=(ROOT/'tests/regional_passages/oot_native_test.cpp').read_text().replace('/* NATIVE_ACTORS */',native).replace('/* NATIVE_GROTTO */',grotto).replace('/* PRODUCTION */',production)
-build('soh','native-oot',fixture)
-
 # Endpoint fixtures above own collision/actors. These fixtures run the actual
 # registered fade/save/boot bodies, with endpoint/DLL/IO boundaries.
 oot_port=(ROOT/'soh/soh/OTRGlobals.cpp').read_text(encoding='utf-8-sig')
 mm_port=(ROOT/'mm/2s2h/BenPort.cpp').read_text(encoding='utf-8-sig')
 def fixture(name):
-    return '#include "ComboGameMode.h"\nextern "C" { int gComboGameMode=COMBO_GAME_BOTH; }\n'+(ROOT/'tests/lost_woods_entrance'/name).read_text().split('int main()')[0]
+    body = (ROOT / "tests/lost_woods_entrance" / name).read_text().split("int main()")[0]
+    if name == "mm_arrival_test.cpp":
+        # This fixture executes native boot bodies with the SDK/application
+        # boundary replaced below; it uses the combo export ABI, not OTRGlobals.
+        body = body.replace('#include "2s2h/BenPort.h"', '#include "ComboExport.h"')
+    return '#include "ComboGameMode.h"\nextern "C" { int gComboGameMode=COMBO_GAME_BOTH; }\n' + body
 
 source=fixture('oot_handoff_test.cpp')
 source=source.replace('extern "C" s32 Player_InCsMode(PlayState*) { return 0; }',
@@ -67,7 +67,7 @@ source+=r'''
 void EnterRegional(int route,int slot=0) {
     GameInteractor::Fire<GameInteractor::OnPlayDestroy>(); play={}; player={};
     gPlayState=&play; gGameState=&play.state; play.state.running=true;
-    play.sceneNum=route==5?SCENE_GRAVEYARD:route==6?SCENE_LAKE_HYLIA:SCENE_ICE_CAVERN;
+    play.sceneNum=route==5?SCENE_GRAVEYARD:route==6?SCENE_LAKE_HYLIA:SCENE_ZORAS_FOUNTAIN;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head=&player.actor;
     gSaveContext.gameMode=GAMEMODE_NORMAL; gSaveContext.fileNum=slot;
     regionalDeparture=route; regionalReady=true; regionalFall=route==5; regionalCutscene=route==5;

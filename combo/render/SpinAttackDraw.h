@@ -141,18 +141,22 @@ static inline int CwSpinDraw_Charge(PlayState* play, CwSpinVisualSelection visua
     OPEN_DISPS(play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, charge);
     CLOSE_DISPS(play->state.gfxCtx);
-    CwSpinAccents_DrawCharge(play, visual.accentElement, great, play->gameplayFrames * 0.05f, alpha);
+    if (CwSpinAccents_DrawCharge(play, visual.accentElement, great, play->gameplayFrames * 0.05f, alpha))
+        CwSpinDraw_SetColors(play, palette, alpha);
     return 1;
 }
 
 static inline void CwSpinDraw_Accents(PlayState* play, CwSpinVisualSelection visual, int great, float phase,
                                       float alpha) {
     size_t budget = great ? 24 : 12;
+    int drawn = 0;
     if (visual.style == CW_SPIN_STYLE_DARK_ENERGY) {
         size_t sparks = great ? 8 : 4;
-        CwSpinAccents_DrawLimited(play, 1, great, phase, alpha, sparks, 0xE61946);
+        drawn |= CwSpinAccents_DrawLimited(play, 1, great, phase, alpha, sparks, 0xE61946);
         budget -= sparks;
     }
-    CwSpinAccents_DrawLimited(play, visual.accentElement, great, phase, alpha, budget, 0);
+    drawn |= CwSpinAccents_DrawLimited(play, visual.accentElement, great, phase, alpha, budget, 0);
+    if (drawn)
+        CwSpinDraw_SetColors(play, CwSpinDraw_Palette(visual, great, 0), alpha);
 }
 #endif

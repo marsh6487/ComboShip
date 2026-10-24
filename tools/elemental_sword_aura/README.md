@@ -13,6 +13,13 @@ distinct procedural I8 maps and a tighter, translucent cross-section envelope;
 the original sword metal remains visible. No new weapon model, magic cost,
 particle actor or room effect is introduced.
 
+The 2026-10-24 Ice/Light visibility pass raises their material opacity and
+broadens the existing frost veins/light rays, with a higher I8 floor so the
+casing survives distance filtering. Light retains its gentle opacity pulse.
+All blade geometry, identities, scroll speeds, palette overrides and protected
+Fire assets/material remain unchanged. The source preview uses phase-zero
+opacity; configured in-game camera-distance acceptance is still required.
+
 ## Reproduction and provenance
 
 Normal regeneration needs only this directory and the checked-in authored NEI

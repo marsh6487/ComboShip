@@ -14,7 +14,7 @@
 #include "BlackMarketGraphicsArena.h"
 #include "BlackMarketKeeper.h"
 #include "BlackMarketGrannyResources.h"
-#include "BlackMarketBrowsing.h"
+#include "BlackMarketMmShopScene.h"
 #include "BlackMarketReceipt.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/Rando/ItemReceiptText.h"
@@ -31,14 +31,34 @@
 #include "2s2h/ShipInit.hpp"
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <filesystem>
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/resourcebridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <ship/resource/CrossRMRegistry.h>
+#include "2s2h/resource/type/Scene.h"
+#include "2s2h/resource/type/scenecommand/SetCsCamera.h"
+#include "2s2h/resource/type/scenecommand/SetActorCutsceneList.h"
 int SaveManager_ReadSaveFile(const std::filesystem::path&, nlohmann::json&);
 extern "C" {
 #include "overlays/actors/ovl_En_Takaraya/z_en_takaraya.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
+#include "black_market_shop_adapter.h"
+#include "z64shrink_window.h"
+void EnOssan_Init(Actor*, PlayState*);
+void EnOssan_Update(Actor*, PlayState*);
+void EnOssan_Idle(EnOssan*, PlayState*);
+void EnOssan_InitShop(EnOssan*, PlayState*);
+void EnOssan_TalkToShopkeeper(EnOssan*, PlayState*);
+void EnOssan_BuyItemWithFanfare(EnOssan*, PlayState*);
+void EnOssan_SetupItemPurchased(EnOssan*, PlayState*);
+void EnOssan_DrawCursor(PlayState*, EnOssan*, f32, f32, f32, u8);
+void EnOssan_DrawStickDirectionPrompts(PlayState*, EnOssan*);
+void EnGirlA_DoNothing(EnGirlA*, PlayState*);
+void EnGirlA_Update(Actor*, PlayState*);
+void EnGirlA_Update2(EnGirlA*, PlayState*);
 extern SceneEntranceTableEntry sSceneEntranceTable[ENTR_SCENE_MAX];
 extern f32 sNESFontWidths[160];
 u8 ResourceMgr_FileExists(const char* path);
@@ -71,18 +91,18 @@ int sSelected = 0;
 float sDoorFloor = 0;
 std::string sStatus;
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kKeeperMenuText = 0x8F14, kKeeperTalkText = 0x8F15, kContinueText = 0x8F16,
+              kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 constexpr char kScene[] = "scenes/nonmq/skiejer_market/skiejer_market";
 constexpr char kRoom[] = "scenes/nonmq/skiejer_market/skiejer_market_room_0";
 constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
 alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market";
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 constexpr Vec3f kShelves[8] = {
-    // Two framed shelf banks; keep all offers on one frontal plane.
-    // Upper anchors clear the physical middle board and selected-item seals.
-    { 35, 58, 110 },  { 35, 110, 110 },  { 70, 58, 110 },  { 70, 110, 110 },
-    { -35, 58, 110 }, { -35, 110, 110 }, { -70, 58, 110 }, { -70, 110, 110 }
+    // Native +/-30-degree bank planes; row changes keep one bank camera.
+    { 44.84456f, 58, 98.75f },  { 44.84456f, 110, 98.75f },  { 75.15544f, 58, 116.25f },  { 75.15544f, 110, 116.25f },
+    { -44.84456f, 58, 98.75f }, { -44.84456f, 110, 98.75f }, { -75.15544f, 58, 116.25f }, { -75.15544f, 110, 116.25f }
 };
-std::array<Actor, 8> sDisplays;
 BlackMarketShelvesNative::Fixture sShelfFixture;
 Vec3f sSoloReturn = { 184, 0, -300 };
 s16 sSoloReturnYaw = -16384;
@@ -396,7 +416,7 @@ bool Purchase() {
     return false;
 }
 
-#include "BlackMarketBrowsingNative.h"
+#include "BlackMarketMmNativeShop.h"
 void MonitorReceipt() {
     if (!sReceipt.pending)
         return;
@@ -419,13 +439,8 @@ void MonitorReceipt() {
         OfferMarketReceipt(play, player);
         return;
     }
-    // The cape choice and every native tutorial own their whole message chain.
-    const int shelf = sReceipt.slot;
-    CancelReceipt();
-    if (BeginBrowsing(play)) {
-        sSelected = sBrowser.slot = shelf;
-        Message_StartTextbox(play, kBrowseText, nullptr);
-    }
+    // Delivery acknowledgement and full receipt-chain completion are separate
+    // native adapter predicates. EnOssan resumes its keeper/continue action.
 }
 
 bool CustomKeeperAvailable() {
@@ -435,39 +450,25 @@ bool CustomKeeperAvailable() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
-    auto* gal = reinterpret_cast<EnTakaraya*>(actor);
-    SkelAnime_Update(&gal->skelAnime);
-    if (gal->timer > 0)
-        --gal->timer;
-    if (!gal->timer) {
-        gal->eyeTexIndex = (gal->eyeTexIndex + 1) % 4;
-        gal->timer = gal->eyeTexIndex ? 2 : 80 + (play->gameplayFrames % 53);
-    }
-    Actor_SetFocus(actor, 55.0f);
-    if (!Active()) {
+    MonitorBrowsing();
+    auto* shop = reinterpret_cast<EnOssan*>(actor);
+    if (sNativeShop != shop || sNativeShopPlay != play)
+        return;
+    if (!Active() && shop->actionFunc != EnOssan_InitShop) {
         EndBrowsing(play);
         actor->textId = BlackMarketEntry::kUnavailableText;
         if (Actor_TalkOfferAccepted(actor, &play->state))
             Message_ContinueTextbox(play, BlackMarketEntry::kUnavailableText);
-        else
-            Actor_OfferTalk(actor, play, 150.0f);
-        return;
+        else if (Safe(play))
+            Actor_OfferTalk(actor, play, 100.0f);
+        NativeKeeperBlink(shop);
+        SkelAnime_Update(&shop->skelAnime);
+    } else {
+        EnOssan_Update(actor, play);
     }
-    if (sReceipt.pending)
-        return;
-    if (Actor_TalkOfferAccepted(actor, &play->state)) {
-        if (!BeginBrowsing(play)) {
-            Message_CloseTextbox(play);
-            return;
-        }
-        Message_ContinueTextbox(play, kWelcomeText);
-    } else if (!sTalking) {
-        actor->textId = kWelcomeText;
-        Actor_OfferTalk(actor, play, 150.0f);
-    }
-    if (!sTalking)
-        return;
-    BrowseInput(play);
+    Actor_SetFocus(actor, 55.0f);
+    sSelected = shop->cursorIndex;
+    sTalking = NativeShopDialog(shop);
 }
 s32 KeeperLimb(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, Actor* actor) {
     if (sCustomKeeper && limb == TREASURE_CHEST_SHOP_GAL_LIMB_HEAD) {
@@ -475,12 +476,12 @@ s32 KeeperLimb(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, Actor* actor
                                        "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead1DL",
                                        "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead2DL",
                                        "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead1DL" };
-        *display = reinterpret_cast<Gfx*>(const_cast<char*>(heads[reinterpret_cast<EnTakaraya*>(actor)->eyeTexIndex]));
+        *display = reinterpret_cast<Gfx*>(const_cast<char*>(heads[reinterpret_cast<EnOssan*>(actor)->eyeTexIndex]));
     }
     return false;
 }
 void KeeperDraw(Actor* actor, PlayState* play) {
-    auto* gal = reinterpret_cast<EnTakaraya*>(actor);
+    auto* gal = reinterpret_cast<EnOssan*>(actor);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     if (!sCustomKeeper)
@@ -489,13 +490,18 @@ void KeeperDraw(Actor* actor, PlayState* play) {
     SkelAnime_DrawFlexOpa(play, gal->skelAnime.skeleton, gal->skelAnime.jointTable, gal->skelAnime.dListCount,
                           KeeperLimb, nullptr, actor);
     CLOSE_DISPS(play->state.gfxCtx);
+    if (sTalking && NativeShopOwnCamera(play) && Play_GetActiveCamId(play) == sBrowseCamera &&
+        BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, 0, 64, 0, 64)) {
+        EnOssan_DrawCursor(play, gal, gal->cursorPos.x, gal->cursorPos.y, gal->cursorPos.z, gal->drawCursor);
+        EnOssan_DrawStickDirectionPrompts(play, gal);
+    }
 }
 void InitKeeper(Actor* actor) {
     if (!Interior() || !PackAvailable()) {
         Actor_Kill(actor);
         return;
     }
-    auto* gal = reinterpret_cast<EnTakaraya*>(actor);
+    auto* gal = reinterpret_cast<EnOssan*>(actor);
     sCustomKeeper = CustomKeeperAvailable();
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
@@ -503,15 +509,102 @@ void InitKeeper(Actor* actor) {
         gPlayState, &gal->skelAnime,
         (FlexSkeletonHeader*)(sCustomKeeper ? kKeeper : BlackMarketKeeperAssets::kNativeSkeleton),
         (AnimationHeader*)(sCustomKeeper ? BlackMarketKeeper::kAnimation : BlackMarketKeeperAssets::kNativeAnimation),
-        gal->jointTable, gal->morphTable, TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
+        sKeeperJoints.data(), sKeeperMorphs.data(), TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
     actor->update = KeeperUpdate;
     actor->draw = KeeperDraw;
-    actor->destroy = nullptr; // native destructor changes minigame switches and timers
+    // Native collider was never initialized; the private destructor owns only
+    // this controller reference, not the ordinary shop or minigame state.
     actor->flags |= ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED;
     actor->shape.yOffset = 0;
     gal->eyeTexIndex = 0;
-    gal->timer = 90;
+    gal->blinkTimer = 90;
+    gal->blinkFunc = NativeKeeperBlink;
     sTalking = false;
+}
+
+std::shared_ptr<SOH::Scene> sNativeShopSceneResource;
+bool NativeShopSceneReady(PlayState* play) {
+    // GetCutscenes follows linked IDs without bounds checks. Validate the
+    // actually selected native/Alt scene and its loaded pointers before the
+    // first native actor action, rather than replacing the manager at SceneInit.
+    Ship::OwnRMScope scope("mm");
+    auto scene = std::dynamic_pointer_cast<SOH::Scene>(ResourceLoad(kScene));
+    if (!scene)
+        return false;
+    std::shared_ptr<SOH::SetCsCamera> cameras;
+    std::shared_ptr<SOH::SetActorCutsceneList> cutscenes;
+    for (const auto& command : scene->commands) {
+        if (!command)
+            return false;
+        if (command->cmdId == SOH::SceneCommandID::SetCsCamera)
+            cameras = std::dynamic_pointer_cast<SOH::SetCsCamera>(command);
+        if (command->cmdId == SOH::SceneCommandID::SetActorCutsceneList)
+            cutscenes = std::dynamic_pointer_cast<SOH::SetActorCutsceneList>(command);
+    }
+    if (!cameras || !cutscenes || cameras->csCamera.size() != 4 || cutscenes->entries.size() != 4 ||
+        static_cast<void*>(play->actorCsCamList) != cameras->GetPointer() ||
+        static_cast<void*>(CutsceneManager_GetCutsceneEntry(0)) != cutscenes->GetPointer())
+        return false;
+    static_assert(sizeof(Vec3s) == sizeof(SOH::z64Vec3s));
+    static_assert(sizeof(ActorCutscene) == sizeof(SOH::CutsceneEntry));
+    for (int i = 0; i < 4; ++i) {
+        const auto& cam = cameras->csCamera[i];
+        const auto& cs = cutscenes->entries[i];
+        if (cam.setting != CAM_SET_FIXED1 || cam.count != 3 || !cam.actorCsCamFuncData ||
+            std::memcmp(cam.actorCsCamFuncData, BlackMarketMmShopScene::kCameraRecords[i], 9 * sizeof(s16)) ||
+            cs.priority != BlackMarketMmShopScene::kFirstPriority + i || cs.length != -1 ||
+            cs.csCamId != BlackMarketMmShopScene::kCutsceneCameras[i] || cs.scriptIndex != CS_SCRIPT_ID_NONE ||
+            cs.additionalCsId != (i == 3 ? CS_ID_NONE : i + 1) || cs.endSfx != CS_END_SFX_NONE ||
+            cs.customValue != 255 || cs.hudVisibility != BlackMarketMmShopScene::kHudVisibility ||
+            cs.endCam != CS_END_CAM_0 || cs.letterboxSize != BlackMarketMmShopScene::kLetterboxSize)
+            return false;
+    }
+    sNativeShopSceneResource = std::move(scene);
+    return true;
+}
+void NativeKeeperDestroyed(Actor* actor, PlayState* play) {
+    if (sNativeShop && &sNativeShop->actor == actor) {
+        const bool live = play && play == gPlayState && gGameState == &play->state && play->state.running;
+        if (live) {
+            const bool owns = CutsceneManager_IsCurrentActor(actor);
+            const s16 activeCamera = Play_GetActiveCamId(play);
+            const bool noActiveCamera = activeCamera < 0 || activeCamera >= NUM_CAMS || !play->cameraPtrs[activeCamera];
+            const bool ownsPresentation =
+                owns && ((NativeShopOwnCamera(play) && activeCamera == sBrowseCamera) || noActiveCamera);
+            auto* returnCamera = play->cameraPtrs[CAM_ID_MAIN];
+            const s16 returnUid = returnCamera ? returnCamera->uid : -1;
+            if ((owns || Play_GetActiveCamId(play) == CAM_ID_MAIN) && NativeShopMessage(play))
+                Message_CloseTextbox(play);
+            if (auto* player = GET_PLAYER(play); player && sTalking)
+                player->stateFlags2 &= ~PLAYER_STATE2_20000000;
+            const bool ended = CutsceneManager_EndForActor(play, actor);
+            // Synchronous retirement bypasses Update's completed-cutscene UI
+            // step. Restore it only if our unchanged return view survived.
+            if (ended && ownsPresentation && CutsceneManager_GetCurrentCsId() == CS_ID_NONE && returnCamera &&
+                Play_GetActiveCamId(play) == CAM_ID_MAIN && play->cameraPtrs[CAM_ID_MAIN] == returnCamera &&
+                returnCamera->uid == returnUid) {
+                ShrinkWindow_Letterbox_SetSizeTarget(0);
+                Interface_SetHudVisibility(HUD_VISIBILITY_ALL);
+            }
+        }
+        CancelReceipt(!live);
+        EndBrowsing(play, true);
+        sNativeShopSceneResource.reset();
+    }
+}
+void InitNativeKeeper(Actor* actor, PlayState* play) {
+    actor->destroy = NativeKeeperDestroyed;
+    if (!Interior() || actor->params != BlackMarketMmShopScene::kKeeperParams || !PackAvailable() ||
+        !NativeShopSceneReady(play) || sNativeShop) {
+        Actor_Kill(actor);
+        return;
+    }
+    sNativeShop = reinterpret_cast<EnOssan*>(actor);
+    sNativeShopPlay = play;
+    actor->csId = BlackMarketMmShopScene::kFirstCutscene;
+    actor->update = KeeperUpdate;
+    CutsceneManager_SetCameraOwnershipProtection(true);
+    EnOssan_Init(actor, play);
 }
 void PresentTitle() {
     if (!sTitlePending || !Interior())
@@ -533,9 +626,32 @@ void MarketText(u16* textId, bool* fromTable) {
         *fromTable = false;
         return;
     }
+    if (Active() && (*textId == kKeeperMenuText || *textId == kKeeperTalkText || *textId == kContinueText ||
+                     *textId == kKeeperHelpChoiceText || *textId == kKeeperHelpText)) {
+        CustomMessage::Entry entry;
+        entry.autoFormat = false;
+        entry.textboxYPos = 0x30;
+        if (*textId == kKeeperTalkText || *textId == kKeeperHelpChoiceText || *textId == kKeeperHelpText) {
+            const Page page = *textId == kKeeperTalkText         ? Page::KeeperTalk
+                              : *textId == kKeeperHelpChoiceText ? Page::KeeperHelpChoice
+                                                                 : Page::KeeperHelp;
+            entry.msg = BlackMarketText::Mm(page, {}, {}, sNESFontWidths);
+        } else {
+            entry.msg = ComboItemReceiptText::FromNeiMarkup(*textId == kContinueText ? "Keep shopping?"
+                                                                                     : "Left / Right: browse items");
+            ComboItemReceiptText::Wrap(entry.msg, sNESFontWidths, 160, 300.f);
+            entry.msg += "\x11\x02\xC2";
+            entry.msg += *textId == kContinueText ? "Yes\x11No\xBF" : "Talk to shopkeeper\x11Leave\xBF";
+        }
+        CustomMessage::LoadCustomMessageIntoFont(entry);
+        *fromTable = false;
+        return;
+    }
     if (!Active() ||
         (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
         return;
+    if (sNativeShop && (*textId == kBrowseText || *textId == kConfirmText))
+        sSelected = sNativeShop->cursorIndex;
     const Page page = *textId == kWelcomeText   ? Page::Welcome
                       : *textId == kConfirmText ? Page::Confirm
                       : *textId == kResultText  ? Page::Result
@@ -563,8 +679,7 @@ void MarketText(u16* textId, bool* fromTable) {
     }
     CustomMessage::Entry entry;
     entry.autoFormat = false; // The native MM codec/wrapper runs before raw choice controls are appended.
-    if (page != Page::Welcome)
-        entry.textboxYPos = 0x30; // Native header high nibble3: bottom, below the focused merchandise row.
+    entry.textboxYPos = 0x30; // Initial native Start fixes all later Continue pages below merchandise.
     if (page == Page::Browse || page == Page::Confirm)
         entry.firstItemCost = offer.price;
     entry.msg = BlackMarketText::Mm(page, offer, sStatus, sNESFontWidths);
@@ -655,17 +770,16 @@ void DrawMarket() {
             continue;
         const bool locked = status == PurchaseResult::Locked;
         BlackMarketVisual::Capture capture(locked);
-        Actor& display = sDisplays[slot];
-        display.id = ACTOR_EN_GIRLA;
-        display.world.pos = kShelves[slot];
-        display.scale = { .25f, .25f, .25f };
+        auto* stock = sNativeShop && sNativeShopPlay == play ? sNativeShop->items[slot] : nullptr;
+        if (!stock || !stock->actor.update)
+            continue;
+        Actor& display = stock->actor;
         Matrix_Push();
         Matrix_Translate(display.world.pos.x,
                          display.world.pos.y + 2.0f * std::sin((play->gameplayFrames + slot * 7) * .04f),
                          display.world.pos.z, MTXMODE_NEW);
-        Matrix_RotateYS(play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);
-        const float scale = sTalking && slot == sSelected ? .32f : .25f;
-        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+        Matrix_RotateYS(stock->rotY + play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);
+        Matrix_Scale(display.scale.x, display.scale.y, display.scale.z, MTXMODE_APPLY);
         Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
         Matrix_Pop();
         if (locked && CVarGetInteger(BlackMarketVisual::kSealsCvar, 1))
@@ -719,7 +833,8 @@ void PlayerUpdate(Actor* actor) {
 void SceneInit(s8 scene, s8 spawn) {
     CancelReceipt(true);
     sShelfFixture.Reset();
-    EndBrowsing(gPlayState, true);
+    if (sNativeShopPlay != gPlayState || scene != COMBO_BLACK_MARKET_SCENE)
+        EndBrowsing(gPlayState, true);
     GrannySceneBegin();
     ApplyGrannyInterior();
     if (sReturnStaged) {
@@ -732,7 +847,6 @@ void SceneInit(s8 scene, s8 spawn) {
     sTitlePending = false;
     if (scene == COMBO_BLACK_MARKET_SCENE) {
         sSelected = 0;
-        sDisplays = {};
         sTitlePending = PackAvailable();
     } else if (sReturnPending && MatchesTravel() && Exterior(gPlayState)) {
         sReturnPending = false;
@@ -832,14 +946,32 @@ void RegisterMarket() {
     Ship::CrossRMRegistry::RegisterTeardownListener([] { sGrannyResources.Clear(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldStart>(DrawGrannyRoom);
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorInit>(
-        ACTOR_EN_TAKARAYA, [](Actor* actor, bool* should) {
-            if (!Interior())
+        ACTOR_EN_OSSAN, [](Actor* actor, bool* should) {
+            if (!Interior() || actor->params != BlackMarketMmShopScene::kKeeperParams)
                 return;
-            // Returning false kills the actor in this engine. Replace its init
-            // pointer before dispatch, then let the normal lifecycle call us.
-            actor->init = [](Actor* keeper, PlayState*) { InitKeeper(keeper); };
+            actor->init = InitNativeKeeper;
             *should = true;
         });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorInit>(
+        ACTOR_EN_GIRLA, [](Actor* actor, bool* should) {
+            if (!Interior() || actor->params < BlackMarketMmShopScene::kItemParamBase ||
+                actor->params >= BlackMarketMmShopScene::kItemParamBase + 8)
+                return;
+            actor->init = InitNativeStock;
+            *should = true;
+        });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorInit>(ACTOR_EN_TAKARAYA,
+                                                                                     [](Actor* actor, bool* should) {
+                                                                                         if (!Interior())
+                                                                                             return;
+                                                                                         // Legacy visual packs carry a
+                                                                                         // smaller minigame actor and
+                                                                                         // no shop cutscenes. They need
+                                                                                         // the prepared MM scene; never
+                                                                                         // reinterpret it.
+                                                                                         actor->destroy = nullptr;
+                                                                                         *should = false;
+                                                                                     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>(LoadSolo);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveInit>([](s16) {
         if (gComboGameMode != COMBO_GAME_MM)
@@ -852,7 +984,6 @@ void RegisterMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(MarketText);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>([] {
         DrawMarket();
-        DrawBrowseCursor();
         DrawExterior();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([] {
@@ -863,6 +994,7 @@ void RegisterMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
+        sNativeShopSceneResource.reset();
         CancelReceipt(true);
         sGrannyActive = sGrannyPending = false;
         sTitlePending = sTalking = sDoorArmed = false;
@@ -892,6 +1024,13 @@ void RegisterMarket() {
 }
 RegisterShipInitFunc init(RegisterMarket);
 } // namespace
+
+extern "C" const ComboBlackMarketShopAdapter* ComboBlackMarketShop_GetAdapter(EnOssan* shop, PlayState* play) {
+    return shop && shop == sNativeShop && play == sNativeShopPlay && Interior() && shop->actor.id == ACTOR_EN_OSSAN &&
+                   shop->actor.params == BlackMarketMmShopScene::kKeeperParams
+               ? &kNativeShopAdapter
+               : nullptr;
+}
 
 extern "C" COMBO_EXPORT void MM_SetBlackMarketSeed(const char* text, int slot, uint16_t clears) try {
     auto value = nlohmann::json::parse(text ? text : "null");

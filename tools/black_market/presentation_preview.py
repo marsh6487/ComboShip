@@ -58,7 +58,7 @@ def shelf_positions():
         source = (ROOT / path).read_text()
         block = re.search(r"constexpr Vec3f kShelves\[8\] = \{(.*?)\};", source, re.S)
         assert block, "Inspect changed DrawMarket shelf declaration before previewing"
-        shelves = [[float(n) for n in row.split(",")] for row in re.findall(r"\{([^{}]+)\}", block[1])]
+        shelves = [[float(n.strip().removesuffix("f")) for n in row.split(",")] for row in re.findall(r"\{([^{}]+)\}", block[1])]
         assert len(shelves) == 8
         assert "const float scale = sTalking && slot == sSelected ? .32f : .25f;" in source
         hosts.append(shelves)

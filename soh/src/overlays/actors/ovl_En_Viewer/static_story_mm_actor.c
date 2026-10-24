@@ -70,6 +70,33 @@ static const StaticStoryMmPresentation sMonkeyPresentations[] = {
     ORDINARY("object_mnk", "gMonkeySkel", "object_mnk_Anim_008814", 22, 20, 16, STATIC_STORY_MM_TRACKING_NONE, 3, 0, 8,
              0),
 };
+static const StaticStoryMmPresentation sStalchildPresentations[] = {
+#define STAL(anim, frames)                                                                                 \
+    {                                                                                                      \
+        "objects/object_skb/gStalchildSkel", "objects/object_skb/" anim, NULL, NULL, NULL, NULL, NULL, 19, \
+            STATIC_STORY_MM_TRACKING_NONE, false, STATIC_STORY_MM_NORMAL_STANDARD, 0, frames, 0, 0, 0, 0   \
+    }
+    STAL("gStalchildIdleAnim", 30),          STAL("gStalchildSitLaughAnim", 20), STAL("gStalchildSitTapToesAnim", 20),
+    STAL("gStalchildSwingOnBranchAnim", 30), STAL("gStalchildSaluteAnim", 34),
+#undef STAL
+};
+static const StaticStoryMmPresentation sMikauPresentations[] = {
+    ORDINARY("object_zog", "object_zog_Skel_029170", "object_zog_Anim_0041D0", 22, 20, 30,
+             STATIC_STORY_MM_TRACKING_NONE, 3, 2, 8, 9),
+    { "objects/object_zog/object_zog_Skel_029170", "objects/object_zog/object_zog_Anim_00931C", NULL, NULL, NULL, NULL,
+      NULL, 22, STATIC_STORY_MM_TRACKING_NONE, false, STATIC_STORY_MM_NORMAL_FLEX, 20, 12, 3, 2, 8, 9,
+      "objects/object_zog/object_zog_DL_0280A8", 17 },
+};
+static const StaticStoryMmPresentation sDarmaniPresentations[] = {
+#define DARMANI(anim, frames)                                                                                   \
+    {                                                                                                           \
+        "objects/object_gg/object_gg_Skel_00F6C0", "objects/object_gg/" anim, NULL, NULL, NULL, NULL, NULL, 19, \
+            STATIC_STORY_MM_TRACKING_NONE, false, STATIC_STORY_MM_GHOST_FLEX, 17, frames, 4, 0, 8, 0            \
+    }
+    DARMANI("object_gg_Anim_00F578", 29),
+    DARMANI("object_gg_Anim_00AF40", 39),
+#undef DARMANI
+};
 #undef ORDINARY
 static const StaticStoryMmPresentation sAnjuPresentations[] = {
     { "objects/object_an1/gAnju1Skel", "objects/object_an2/gAnju2UmbrellaCryAnim", NULL, NULL, NULL, NULL, NULL, 20,
@@ -151,12 +178,28 @@ const StaticStoryMmPresentation* StaticStoryMm_GetPresentation(StaticStoryActorT
         return &sKafeiPresentations[pose];
     if (type == STATIC_STORY_ACTOR_ANJU && pose < 2)
         return &sAnjuPresentations[pose];
+    if (type == STATIC_STORY_ACTOR_STALCHILD && pose < 5)
+        return &sStalchildPresentations[pose];
+    if (type == STATIC_STORY_ACTOR_MIKAU && pose < 2)
+        return &sMikauPresentations[pose];
+    if (type == STATIC_STORY_ACTOR_DARMANI && pose < 2)
+        return &sDarmaniPresentations[pose];
     if (type == STATIC_STORY_ACTOR_MONKEY && pose < 3)
         return &sMonkeyPresentations[pose];
     return NULL;
 }
 
 const char* StaticStoryMm_GetEyeTexturePath(StaticStoryActorType type, uint8_t eyeIndex) {
+    static const char* mikau[] = { "objects/object_zog/object_zog_Tex_024750",
+                                   "objects/object_zog/object_zog_Tex_024F50",
+                                   "objects/object_zog/object_zog_Tex_025750" };
+    static const char* darmani[] = { "objects/object_gg/object_gg_Tex_009260", "objects/object_gg/object_gg_Tex_009660",
+                                     "objects/object_gg/object_gg_Tex_009A60",
+                                     "objects/object_gg/object_gg_Tex_009E60" };
+    if (type == STATIC_STORY_ACTOR_MIKAU)
+        return eyeIndex < 3 ? mikau[eyeIndex] : NULL;
+    if (type == STATIC_STORY_ACTOR_DARMANI)
+        return eyeIndex < 4 ? darmani[eyeIndex] : NULL;
     static const char* monkey[] = { "objects/object_mnk/object_mnk_Tex_015020",
                                     "objects/object_mnk/object_mnk_Tex_015920",
                                     "objects/object_mnk/object_mnk_Tex_016120" };
@@ -260,6 +303,10 @@ bool StaticStoryMm_ResourcesComplete(const StaticStoryMmPresentation* presentati
 }
 
 const char* StaticStoryMm_GetMouthTexturePath(StaticStoryActorType type, uint8_t mouthIndex) {
+    static const char* mikau[] = { "objects/object_zog/object_zog_Tex_025F50",
+                                   "objects/object_zog/object_zog_Tex_026750" };
+    if (type == STATIC_STORY_ACTOR_MIKAU)
+        return mouthIndex < 2 ? mikau[mouthIndex] : NULL;
     if (type == STATIC_STORY_ACTOR_ANJU)
         return mouthIndex == 0 ? "objects/object_an1/gAnju1MouthClosedTex" : NULL;
     static const char* kafei[] = { "objects/object_test3/gKafeiMouthClosedTex",

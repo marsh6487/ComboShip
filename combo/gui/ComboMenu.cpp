@@ -15,6 +15,7 @@
 #include "ComboTimersWindow.h" // combo-owned overlay timers (#173)
 #include "ComboSettingsSync.h" // combo-owned cross-game settings sync
 #include "BlackMarketAppearance.h"
+#include "WhatsNew.h"
 #include "rando/ComboPlaythrough.h" // plando: ParseSpoilerPlacements + Suffix/BuildForeignArray + slot paths
 #include <imgui.h>
 #include <libultraship/libultraship.h>         // CVar bridge (CVarGet/Set* incl. color) + color.h (Color_RGBA8)
@@ -1803,25 +1804,33 @@ void ComboMenu::DrawComboPanel() {
 
     ImGui::SeparatorText("Entrances");
     bool crossDungeonEntrances = CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
-    ComboRando::ComboMenu_PushCheckbox(goalTheme);
-    if (ImGui::Checkbox("Cross-Game Dungeon Entrances", &crossDungeonEntrances))
-        CVarSetInteger("gCombo.Rando.CrossDungeonEntrances", crossDungeonEntrances ? 1 : 0);
-    ComboRando::ComboMenu_PopCheckbox();
+    {
+        WhatsNew::Scope releaseHighlight("gCombo.Rando.CrossDungeonEntrances", "Cross-Game Dungeon Entrances",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        ComboRando::ComboMenu_PushCheckbox(goalTheme);
+        if (ImGui::Checkbox("Cross-Game Dungeon Entrances", &crossDungeonEntrances))
+            CVarSetInteger("gCombo.Rando.CrossDungeonEntrances", crossDungeonEntrances ? 1 : 0);
+        ComboRando::ComboMenu_PopCheckbox();
+    }
     ImGui::SetItemTooltip("Shuffle eligible Ocarina of Time and Majora's Mask dungeons together. "
                           "Uses Ocarina of Time's native entrance settings and saves the layout with the seed.");
-    auto crossPoolCheckbox = [&](const char* label, const char* cvar, const char* help) {
+    auto crossPoolCheckbox = [&](const char* label, const char* cvar, const char* help, bool disabled = false) {
         bool enabled = CVarGetInteger(cvar, 0) != 0;
-        ComboRando::ComboMenu_PushCheckbox(goalTheme);
-        if (ImGui::Checkbox(label, &enabled))
-            CVarSetInteger(cvar, enabled ? 1 : 0);
-        ComboRando::ComboMenu_PopCheckbox();
+        {
+            WhatsNew::Scope releaseHighlight(cvar, label, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, disabled);
+            ComboRando::ComboMenu_PushCheckbox(goalTheme);
+            if (ImGui::Checkbox(label, &enabled))
+                CVarSetInteger(cvar, enabled ? 1 : 0);
+            ComboRando::ComboMenu_PopCheckbox();
+        }
         ImGui::SetItemTooltip("%s", help);
     };
     ImGui::BeginDisabled(!crossDungeonEntrances);
     crossPoolCheckbox(
         "Expanded Dungeon Pool", "gCombo.Rando.ExpandedDungeonPool",
         "Add Majora's Mask's Spider Houses, Ikana Castle, Secret Shrine, Beneath the Well's two entrances, "
-        "and Pirates' Fortress to the dungeon pool.");
+        "and Pirates' Fortress to the dungeon pool.",
+        !crossDungeonEntrances);
     ImGui::EndDisabled();
     crossPoolCheckbox("Cross-Game Boss Entrances", "gCombo.Rando.CrossBossEntrances",
                       "Shuffle the eight Ocarina of Time and four Majora's Mask bosses together. "
@@ -1838,7 +1847,8 @@ void ComboMenu::DrawComboPanel() {
     crossPoolCheckbox(
         "Cross-Game Door Interiors", "gCombo.Rando.CrossDoorInteriorEntrances",
         "Shuffle other interiors with doors you open between games. Shops use their separate checkbox. "
-        "Open houses, caves, tunnels and other passageways stay in place. Applied to newly generated seeds.");
+        "Open houses, caves, tunnels and other passageways stay in place. Applied to newly generated seeds.",
+        broadInteriors);
     ImGui::EndDisabled();
     crossPoolCheckbox("Cross-Game Grottos and Graves", "gCombo.Rando.CrossGrottoEntrances",
                       "Shuffle grotto and grave entrances between games, including their return and void positions.");
@@ -1847,17 +1857,25 @@ void ComboMenu::DrawComboPanel() {
     ImGui::SeparatorText("Skiejer Black Market");
     static constexpr const char* marketPrices[] = { "Tiered", "Follow SoH Pricing" };
     int marketPricing = std::clamp(CVarGetInteger("gCombo.Rando.BlackMarketPricing", 0), 0, 1);
-    ComboRando::ComboMenu_PushCombobox(goalTheme);
-    if (ImGui::Combo("Pricing##BlackMarket", &marketPricing, marketPrices, 2))
-        CVarSetInteger("gCombo.Rando.BlackMarketPricing", marketPricing);
-    ComboRando::ComboMenu_PopCombobox();
+    {
+        WhatsNew::Scope releaseHighlight("gCombo.Rando.BlackMarketPricing", "Pricing##BlackMarket",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        ComboRando::ComboMenu_PushCombobox(goalTheme);
+        if (ImGui::Combo("Pricing##BlackMarket", &marketPricing, marketPrices, 2))
+            CVarSetInteger("gCombo.Rando.BlackMarketPricing", marketPricing);
+        ComboRando::ComboMenu_PopCombobox();
+    }
     ImGui::SetItemTooltip("Tiered prices stay within 30-200 rupees. Follow SoH Pricing uses the shop-price options, "
                           "including Set By Wallet. Stock and prices are fixed when the seed is generated.");
     bool marketUnlocks = CVarGetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", 1) != 0;
-    ComboRando::ComboMenu_PushCheckbox(goalTheme);
-    if (ImGui::Checkbox("Dungeon Purchase Unlocks", &marketUnlocks))
-        CVarSetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", marketUnlocks);
-    ComboRando::ComboMenu_PopCheckbox();
+    {
+        WhatsNew::Scope releaseHighlight("gCombo.Rando.BlackMarketDungeonUnlocks", "Dungeon Purchase Unlocks",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        ComboRando::ComboMenu_PushCheckbox(goalTheme);
+        if (ImGui::Checkbox("Dungeon Purchase Unlocks", &marketUnlocks))
+            CVarSetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", marketUnlocks);
+        ComboRando::ComboMenu_PopCheckbox();
+    }
     ImGui::SetItemTooltip("Tier 1 is available immediately. Tiers 2 and 3 require one and two unique dungeon clears "
                           "across both games. Disable to make all eight offers available immediately.");
     ImGui::TextDisabled("Eight bonus offers in MM Lost Woods. Never required by progression logic.");

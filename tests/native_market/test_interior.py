@@ -186,8 +186,8 @@ class DefaultInterior(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             module.prepare(root)
-            for game in ('soh', 'mm'):
-                for name, data in resources.items():
+            for game, host in (('soh', 'oot'), ('mm', 'mm')):
+                for name, data in module.prepared_resources(host=host).items():
                     self.assertEqual((root / game / 'assets/custom' / name).read_bytes(), data)
             shelf = root / 'mm/assets/custom/custom/skiejer_market/texture/arcane_stone'
             shelf.unlink()

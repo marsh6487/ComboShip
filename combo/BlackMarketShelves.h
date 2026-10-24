@@ -50,29 +50,40 @@ inline std::array<uint8_t, 4> Tint(bool changed, std::array<uint8_t, 4> value = 
     value[3] = 255;
     return value;
 }
-inline constexpr std::array<Box, 12> kBoxes = { { { { 14, 38, 89 }, { 18, 141, 92 } },
-                                                  { { 88, 38, 89 }, { 92, 141, 92 } },
-                                                  { { 18, 42, 89 }, { 88, 141, 92 } },
-                                                  { { 14, 38, 84 }, { 92, 42, 133 } },
-                                                  { { 14, 89, 84 }, { 92, 93, 133 } },
-                                                  { { 14, 141, 84 }, { 92, 145, 133 } },
-                                                  { { -92, 38, 89 }, { -88, 141, 92 } },
-                                                  { { -18, 38, 89 }, { -14, 141, 92 } },
-                                                  { { -88, 42, 89 }, { -18, 141, 92 } },
-                                                  { { -92, 38, 84 }, { -14, 42, 133 } },
-                                                  { { -92, 89, 84 }, { -14, 93, 133 } },
-                                                  { { -92, 141, 84 }, { -14, 145, 133 } } } };
-inline constexpr std::array<Box, 2> kCollision = { { { { 14, 0, 84 }, { 92, 145, 133 } },
-                                                     { { -92, 0, 84 }, { -14, 145, 133 } } } };
+inline constexpr std::array<Box, 12> kBoxes = { { { { 14, 38, 81 }, { 18, 141, 84 } },
+                                                  { { 88, 38, 81 }, { 92, 141, 84 } },
+                                                  { { 18, 42, 81 }, { 88, 141, 84 } },
+                                                  { { 14, 38, 76 }, { 92, 42, 133 } },
+                                                  { { 14, 89, 76 }, { 92, 93, 133 } },
+                                                  { { 14, 141, 76 }, { 92, 145, 133 } },
+                                                  { { -92, 38, 81 }, { -88, 141, 84 } },
+                                                  { { -18, 38, 81 }, { -14, 141, 84 } },
+                                                  { { -88, 42, 81 }, { -18, 141, 84 } },
+                                                  { { -92, 38, 76 }, { -14, 42, 133 } },
+                                                  { { -92, 89, 76 }, { -14, 93, 133 } },
+                                                  { { -92, 141, 76 }, { -14, 145, 133 } } } };
+inline constexpr std::array<Box, 2> kCollision = { { { { 14, 0, 76 }, { 92, 145, 133 } },
+                                                     { { -92, 0, 76 }, { -14, 145, 133 } } } };
+inline Point RoomPoint(Point p) {
+    // Native shop banks face the customer at +/-30 degrees. Place this whole
+    // fixture around the counter instead of aiming obliquely up a frontal wall.
+    const float side = p.x < 0 ? -1.f : 1.f;
+    const float x = p.x - side * 52.5f, z = p.z - 110.f;
+    return { int16_t(std::lround(side * 60.f + .8660254038f * x - side * .5f * z)), p.y,
+             int16_t(std::lround(107.5f + side * .5f * x + .8660254038f * z)) };
+}
 inline std::array<Point, 8> Corners(const Box& b) {
-    return { { { b.low.x, b.low.y, b.low.z },
-               { b.high.x, b.low.y, b.low.z },
-               { b.high.x, b.high.y, b.low.z },
-               { b.low.x, b.high.y, b.low.z },
-               { b.low.x, b.low.y, b.high.z },
-               { b.high.x, b.low.y, b.high.z },
-               { b.high.x, b.high.y, b.high.z },
-               { b.low.x, b.high.y, b.high.z } } };
+    std::array<Point, 8> corners{ { { b.low.x, b.low.y, b.low.z },
+                                    { b.high.x, b.low.y, b.low.z },
+                                    { b.high.x, b.high.y, b.low.z },
+                                    { b.low.x, b.high.y, b.low.z },
+                                    { b.low.x, b.low.y, b.high.z },
+                                    { b.high.x, b.low.y, b.high.z },
+                                    { b.high.x, b.high.y, b.high.z },
+                                    { b.low.x, b.high.y, b.high.z } } };
+    for (auto& corner : corners)
+        corner = RoomPoint(corner);
+    return corners;
 }
 inline constexpr std::array<std::array<int, 4>, 6> kFaces = { { { { 4, 5, 6, 7 } },
                                                                 { { 1, 0, 3, 2 } },

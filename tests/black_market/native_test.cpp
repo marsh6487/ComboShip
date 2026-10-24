@@ -15,6 +15,7 @@
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -43,7 +44,8 @@ s16 sSoloReturnYaw = -8192;
 u16 sSoloReturnEntrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
 RespawnData sPreservedReturn;
 bool sReturnStaged = false;
-std::array<Actor, 8> sDisplays;
+EnOssan* sNativeShop = nullptr; // Native actor actions run in the dedicated shop fixture.
+PlayState* sNativeShopPlay = nullptr;
 std::string sStatus;
 bool pack = true, owned = false, usable = true, grantWorks = true, inCs = false;
 int grants, writes;
@@ -100,6 +102,7 @@ void SaveManager_SaveCurrentForCombo(bool) {
                   { "rupees", gSaveContext.save.saveInfo.playerData.rupees } };
 }
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kKeeperMenuText = 0x8F14, kKeeperTalkText = 0x8F15, kContinueText = 0x8F16;
 namespace CustomMessage {
 Entry last;
 void LoadCustomMessageIntoFont(Entry entry) { last = std::move(entry); }
@@ -147,6 +150,7 @@ void DrawMarketReceipt(Actor*, PlayState*) {}
 
 float sNESFontWidths[160]{}; // Actual native widths/decoder are exercised by run_text_codec_tests.py.
 // Room rendering is exercised separately by run_granny_native_tests.py.
+// Native camera setup has its own real-engine integration fixture.
 void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
 void EndBrowsing(PlayState*,bool = false) { sTalking = false; }
@@ -464,7 +468,7 @@ int main(int argc, char** argv) {
     Reset();
     u16 textId = kBrowseText; bool fromTable = true;
     MarketText(&textId, &fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Back") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Leave") != std::string::npos);
     textId = kConfirmText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("\xC2I'll buy it\x11No thanks") != std::string::npos);
     textId = kWelcomeText; fromTable = true; MarketText(&textId,&fromTable);

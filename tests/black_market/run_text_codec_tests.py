@@ -121,7 +121,7 @@ def run_mm(folder):
     fixture = (ROOT / "tests/black_market/market_mm_text_codec_test.cpp").read_text()
     fixture = fixture.replace("/* CUSTOM_MESSAGE_HELPERS */", helpers).replace("/* NATIVE_METADATA */", metadata)
     fixture = fixture.replace("/* MARKET_TEXT */", function(source, "const Item* Offer(") + "\n" +
-                              function(source, "void MarketText(") + browsing_text_adapter())
+                              function(source, "void MarketText("))
     includes = [ROOT, *[ROOT / "mm" / p for p in ("", "include", "include/PR", "src", "assets", "mods", "2s2h")],
                 *[ROOT / p for p in ("combo", "combo/menu", "libultraship/include", "libultraship")]]
     flags = common_flags(includes) + ["-DMM_BUILD_DLL"]

@@ -36,7 +36,8 @@ static Session sSession;
 static int sSelected;
 static std::string sStatus;
 static PurchaseResult purchaseStatus = PurchaseResult::Ready;
-constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13,
+              kKeeperTalkText = 0x8F15, kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 static bool Interior() { return true; }
 static bool Active() { return sSession.Active(gSaveContext.fileNum); }
 static PurchaseResult Status(int) { return purchaseStatus; }
@@ -122,21 +123,24 @@ static void TestReleaseContract() {
           R_TEXT_CHOICE_YPOS(row) = 58 + row * 12;
         Decode(0x0B);
         for (u16 id : { kBrowseText, kConfirmText, kBrowseText, kConfirmText, kResultText,
-                        kBrowseText, kWelcomeText }) {
+                        kBrowseText, kWelcomeText, kKeeperTalkText, kKeeperHelpChoiceText, kKeeperHelpText, kWelcomeText }) {
             play.msgCtx.choiceIndex = 1;
             sStatus = conversation == 1 ? "You need more rupees." : "Yours: Somaria: Statues.";
             ContinueBrowsingText(&play, id);
             assert(play.msgCtx.msgMode == MSGMODE_TEXT_CONTINUING);
-            assert(R_TEXTBOX_Y == (id == kWelcomeText ? 38 : 142) &&
+            const bool keeperText = id == kWelcomeText || id == kKeeperTalkText ||
+                                    id == kKeeperHelpChoiceText || id == kKeeperHelpText;
+            assert(R_TEXTBOX_Y == (keeperText ? 38 : 142) &&
                    R_TEXTBOX_Y_TARGET == R_TEXTBOX_Y &&
                    "merchandise continuation must move an existing top box "
                    "below the focused row, then restore welcome");
-            assert(R_TEXTBOX_END_YPOS == (id == kWelcomeText ? 97 : 201));
+            assert(R_TEXTBOX_END_YPOS == (keeperText ? 97 : 201));
             for (int row = 0; row < 3; ++row)
               assert(R_TEXT_CHOICE_YPOS(row) ==
-                     (id == kWelcomeText ? 58 : 162) + row * 12);
-            Decode(id == kConfirmText ? 0x02 : 0x0B, id == kConfirmText);
-            if (id == kConfirmText)
+                     (keeperText ? 58 : 162) + row * 12);
+            Decode(id == kConfirmText || id == kKeeperHelpChoiceText ? 0x02 : 0x0B,
+                   id == kConfirmText || id == kKeeperHelpChoiceText);
+            if (id == kConfirmText || id == kKeeperHelpChoiceText)
                 assert(play.msgCtx.choiceIndex == 0);
         }
         Message_CloseTextbox(&play);
@@ -163,6 +167,13 @@ int main() {
     sSession.Bind(Generate(77), 0);
     InitMetadata();
     Select(*Find("nei.season.spring"));
+    Open(kKeeperTalkText); Decode(0x0B);
+    auto helpChoice = Open(kKeeperHelpChoiceText);
+    assert(helpChoice.find("How does this shop work?") != std::string::npos);
+    Decode(0x02, true);
+    auto help = Open(kKeeperHelpText);
+    assert(help.find("unique dungeon clears") != std::string::npos && help.find("empty bottle") != std::string::npos);
+    Decode(0x0B);
     auto body = Open(kBrowseText);
     if (body.find("Season: Spring") == std::string::npos) {
         std::fputs("FAIL OoT merchandise uses catalogue shorthand instead of fixed native item metadata\n", stderr);
