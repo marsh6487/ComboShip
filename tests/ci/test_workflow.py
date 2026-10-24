@@ -1,4 +1,4 @@
-"""Pin cross-job cancellation and required coverage in the actual Actions graph."""
+"""Pin independent completion and required coverage in the actual Actions graph."""
 
 import json
 from pathlib import Path
@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_platforms_and_every_test_group_share_native_fail_fast(self):
+    def test_platforms_and_every_test_group_finish_independently(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/build-artifacts.yml").read_text())
         checks = workflow["jobs"]["checks"]
-        self.assertIs(checks["strategy"]["fail-fast"], True)
+        self.assertIs(checks["strategy"]["fail-fast"], False)
         self.assertNotIn("continue-on-error", checks)
         entries = checks["strategy"]["matrix"]["include"]
         kinds = [entry["check"] for entry in entries]

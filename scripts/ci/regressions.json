@@ -8,6 +8,12 @@
   {
     "suite": "world",
     "origin": "gate",
+    "name": "Native forest ocarina cameras in combined and both solo modes",
+    "run": "python3 -B tests/forest_ocarina/run_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
     "name": "Verify October 20 bug-fix entry, decoder and particle paths",
     "run": "bash scripts/diagnostics/run_oct20_bugfix_regressions.sh"
   },
