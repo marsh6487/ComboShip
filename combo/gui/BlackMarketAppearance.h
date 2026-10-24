@@ -1,6 +1,7 @@
 #pragma once
 #include "BlackMarketGrannyResources.h"
 #include "BlackMarketLock.h"
+#include "WhatsNew.h"
 #include <imgui.h>
 #include <ship/window/Window.h>
 
@@ -10,9 +11,14 @@ inline void DrawAppearance() {
     bool grannyInterior = CVarGetInteger(BlackMarketGranny::kCvar, 0) != 0;
     // A saved preference can always be turned off, even after the pack is removed.
     ImGui::BeginDisabled(!grannyAvailable && !grannyInterior);
-    if (ImGui::Checkbox("Regular Granny Interior", &grannyInterior)) {
-        CVarSetInteger(BlackMarketGranny::kCvar, grannyInterior ? 1 : 0);
-        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    {
+        WhatsNew::Scope releaseHighlight(BlackMarketGranny::kCvar, "Regular Granny Interior",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         !grannyAvailable && !grannyInterior);
+        if (ImGui::Checkbox("Regular Granny Interior", &grannyInterior)) {
+            CVarSetInteger(BlackMarketGranny::kCvar, grannyInterior ? 1 : 0);
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        }
     }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip(
@@ -26,9 +32,13 @@ inline void DrawAppearance() {
             ImGui::TextWrapped("Regular interior unavailable: %s Magical room retained.", error);
     }
     bool animatedSeals = CVarGetInteger(BlackMarketVisual::kSealsCvar, 1) != 0;
-    if (ImGui::Checkbox("Animated Item Seals", &animatedSeals)) {
-        CVarSetInteger(BlackMarketVisual::kSealsCvar, animatedSeals ? 1 : 0);
-        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    {
+        WhatsNew::Scope releaseHighlight(BlackMarketVisual::kSealsCvar, "Animated Item Seals",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (ImGui::Checkbox("Animated Item Seals", &animatedSeals)) {
+            CVarSetInteger(BlackMarketVisual::kSealsCvar, animatedSeals ? 1 : 0);
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        }
     }
     ImGui::SetItemTooltip("Show the scrolling X around locked offers. This visual preference applies immediately "
                           "in either interior; purchase requirements remain the same.");

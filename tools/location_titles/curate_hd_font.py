@@ -47,7 +47,7 @@ def restore(coverage, size):
     return high.convert('L').resize((size[0] * 4, size[1] * 4), Image.Resampling.LANCZOS)
 
 
-def planes(face_source, halo_source, size, clear_rows=False):
+def planes(face_source, halo_source, size, clear_rows=False, fractional_face=False):
     if clear_rows:
         # Composed native cards clear their first/last logical rows. Apply
         # that framing before interpolation so descender halos fade to zero
@@ -55,7 +55,14 @@ def planes(face_source, halo_source, size, clear_rows=False):
         width = size[0]
         face_source = bytes(width) + face_source[width:-width] + bytes(width)
         halo_source = bytes(width) + halo_source[width:-width] + bytes(width)
-    face = restore(face_source, size)
+    if fractional_face:
+        # The resampled native E has a partially covered top bar. A binary
+        # half-coverage trace severs it and turns its tip into a white dot.
+        # Retain its actual fractional coverage with smooth interpolation.
+        face = Image.frombytes('L', size, face_source).resize((size[0] * 4, size[1] * 4),
+                                                            Image.Resampling.BICUBIC)
+    else:
+        face = restore(face_source, size)
     # Preserve the native halo's fractional opacity/softness. Turning it
     # into a filled contour makes the accepted border visibly too heavy.
     halo = Image.frombytes('L', size, halo_source).resize(face.size, Image.Resampling.BICUBIC)
@@ -77,7 +84,7 @@ def curate(destination):
         assert len(face_source) == len(halo_source) == 576
         assert sha(face_source) == metric['face_coverage_sha256']
         assert sha(halo_source) == metric['halo_coverage_sha256']
-        face, alpha = planes(face_source, halo_source, (24, 24), clear_rows=True)
+        face, alpha = planes(face_source, halo_source, (24, 24), clear_rows=True, fractional_face=ch == 'E')
         stream.extend(bytes([ord(ch)]) + face + alpha)
         records[ch] = {'native_core_bbox': metric['core_bbox'], 'advance': metric['advance'],
                        'source_face_sha256': sha(face_source), 'source_halo_sha256': sha(halo_source),
@@ -105,10 +112,10 @@ def curate(destination):
                 'packed_bytes': len(packed), 'packed_sha256': sha(packed), 'glyphs': records, 'forest': forest_record,
                 'native_manifest_sha256': sha(native_manifest.read_bytes()),
                 'authoring_dependencies': {name: version(name) for name in ('potracer', 'Pillow', 'numpy')},
-                'authorship': 'Cubic contours directly from native OoT face/halo coverage. No generated glyph geometry.',
-                'recipe': 'Clear composed native top/bottom rows before interpolation; native face coverage at 2x Lanczos; Potrace half-coverage (turdsize0, alphamax1.3, tolerance0.05); 16x supersampling to 4x output; native fractional halo at bicubic4x. Original forest donor framing is retained. Native metrics and counters retained.'}
+                'authorship': 'Native OoT face/halo coverage only: 48 cubic-contour glyphs and fractional native E interpolation. No generated glyph geometry.',
+                'recipe': 'Clear composed native top/bottom rows before interpolation; native face coverage at 2x Lanczos; Potrace half-coverage (turdsize0, alphamax1.3, tolerance0.05); 16x supersampling to 4x output. E preserves its partial top-bar coverage at bicubic4x to avoid a detached trace artifact. Native fractional halo at bicubic4x. Original forest donor framing is retained. Native metrics and counters retained.'}
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    print(json.dumps({'native_contour_glyphs': 49, 'exact_layout_forest': True,
+    print(json.dumps({'native_contour_glyphs': 48, 'fractional_native_glyphs': 'E', 'exact_layout_forest': True,
                       'compressed_bytes': len(packed), 'parts': len(parts), 'native_metrics': 'unchanged'}))
 
 

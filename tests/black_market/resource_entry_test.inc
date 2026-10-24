@@ -9,7 +9,13 @@ static void CurrentEntrance(u16 value) { gSaveContext.entranceIndex = value; }
 static u16 NextEntrance() { return play.nextEntranceIndex; }
 static void NormalizeResourceEntry() { ComboBlackMarketOot_NormalizeEntry(); }
 static void InitResourceScene(bool interior) {
+    CollisionHeader oldCameraCollision{};
+    sBrowseKeeper = &player.actor;
+    sShopOriginalCollision = &oldCameraCollision;
+    sShopBgCameras.resize(1);
+    sShopBgIndex = 7;
     ResourceSceneInit(interior ? SCENE_SKIEJER_MARKET : SCENE_SKIEJER_FOREST);
+    assert(!sBrowseKeeper && !sShopOriginalCollision && sShopBgCameras.empty() && sShopBgIndex == -1);
     // OoT clears this after its scene callback, before the first PlayerUpdate.
     gSaveContext.respawnFlag = 0;
 }

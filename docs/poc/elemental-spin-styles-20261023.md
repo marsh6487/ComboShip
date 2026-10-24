@@ -51,6 +51,13 @@ or 24 great particles, including Dark Energy's sparks, and consume no gameplay R
 Charging uses 4/8 smaller elemental accents in the blade's native charge frame;
 that pass stops at release so the burst retains the full 12/24 budget.
 
+The October 24 correction replaces the original untextured diamond accents
+with native scrolling flame, 3D ice-fragment and billboarded sparkle resources.
+Dark Energy's crimson sparks also use the native sparkle. Native textures,
+geometry and blend modes are retained without modifying shared resources or
+the parent ribbon's scroll segment. See
+[native accent correction and verification](elemental-spin-native-accents-20261024.md).
+
 The five unchanged input archives, every entry hash, generated file hashes and
 the bounded OoT Astral charge-vertex repair are recorded in
 `tools/spin_styles/manifest.json`. Reproduce the resources with:

@@ -8,6 +8,12 @@
   {
     "suite": "world",
     "origin": "gate",
+    "name": "Native forest ocarina cameras in combined and both solo modes",
+    "run": "python3 -B tests/forest_ocarina/run_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
     "name": "Verify October 20 bug-fix entry, decoder and particle paths",
     "run": "bash scripts/diagnostics/run_oct20_bugfix_regressions.sh"
   },
@@ -118,6 +124,15 @@
   },
   {
     "suite": "render",
+    "origin": "nei",
+    "name": "Drop-in regional material packs and native texture metadata",
+    "run": "python3 -B tests/regional_passages/run_material_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
     "origin": "gate",
     "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
     "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py"
@@ -139,6 +154,15 @@
     "origin": "nei",
     "name": "Native regional passage geometry, actor entry and cross-game handoff",
     "run": "python3 -B tests/regional_passages/run_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "entrances",
+    "origin": "nei",
+    "name": "Shared native and alternate Fountain valley geometry and resource lifecycle",
+    "run": "python3 -B tests/regional_passages/run_valley_tests.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
@@ -214,6 +238,12 @@
     "origin": "nei",
     "name": "scripts/diagnostics/run_forest_actor_tests.py",
     "run": "python3 -B scripts/diagnostics/run_forest_actor_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Regional Stalchild, Mikau and Darmani presentations and placement lifecycle",
+    "run": "python3 -B tests/regional_actors/run_tests.py"
   },
   {
     "suite": "world",
@@ -332,6 +362,12 @@
   {
     "suite": "world",
     "origin": "nei",
+    "name": "Native Black Market shop actor, scenes and dialogue formatting",
+    "run": "python3 -B tests/black_market/native_mm_shop_adapter_tests.py\npython3 -B tests/black_market/native_mm_scene_runtime_tests.py\npython3 -B tests/black_market/test_mm_native_shop_scene.py\npython3 -B tests/black_market/run_keeper_dialogue_oot_formatter_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
     "name": "tests/black_market/run_shelves_native_tests.py",
     "run": "python3 -B tests/black_market/run_shelves_native_tests.py"
   },
@@ -370,6 +406,18 @@
     "origin": "nei",
     "name": "tests/woods_mystery/run_active_pack_test.py",
     "run": "python3 -B tests/woods_mystery/run_active_pack_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "tests/woods_mystery/run_wall_material_test.py",
+    "run": "python3 -B tests/woods_mystery/run_wall_material_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "tests/woods_mystery/run_shimmer_placement_test.py",
+    "run": "python3 -B tests/woods_mystery/run_shimmer_placement_test.py"
   },
   {
     "suite": "world",
@@ -1045,6 +1093,12 @@
     "origin": "nei",
     "name": "tests/mm_pause_inventory/run_tests.py --sanitize",
     "run": "python3 -B tests/mm_pause_inventory/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "OoT inventory-page arrow focus and item identity",
+    "run": "python3 -B tests/oot_pause_inventory/run_tests.py --sanitize"
   },
   {
     "suite": "render",

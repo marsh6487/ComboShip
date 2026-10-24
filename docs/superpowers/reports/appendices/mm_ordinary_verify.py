@@ -24,10 +24,13 @@ def function(source, name):
     return source[start:i] + '\n'
 
 ninja = (BUILD/'build.ninja').read_text()
+cache = (BUILD/'CMakeCache.txt').read_text()
+source_root = re.search(r'^CMAKE_HOME_DIRECTORY:INTERNAL=(.*)$', cache, re.M)[1]
 def flags(object_suffix):
     match = re.search(r'^build soh/CMakeFiles/soh.dir/' + re.escape(object_suffix) + r':[^\n]*\n((?:  [^\n]*\n)+)', ninja, re.M)
     if not match: raise RuntimeError(object_suffix)
-    return sum((shlex.split(v) for k,v in re.findall(r'^  (DEFINES|FLAGS|INCLUDES) = (.*)$', match[1], re.M)), [])
+    return [part.replace(source_root + '/', str(ROOT) + '/') for part in
+            sum((shlex.split(v) for k,v in re.findall(r'^  (DEFINES|FLAGS|INCLUDES) = (.*)$', match[1], re.M)), [])]
 CFLAGS = flags('src/overlays/actors/ovl_En_Viewer/z_en_viewer.c.o') + ['-ffunction-sections', '-fdata-sections', '-DNDEBUG']
 CPPFLAGS = flags('mods/transformation_masks/assets/mm_asset_loader.cpp.o') + ['-ffunction-sections', '-fdata-sections', '-DNDEBUG']
 def run(args): subprocess.run([str(a) for a in args], cwd=ROOT, check=True)
@@ -58,6 +61,13 @@ if os.environ.get("MM_VERIFY_STAGE") != "viewer":
             output.writestr(target, data[64:])
             output.writestr(path+'.meta', json.dumps(dict(format='BINARY', type=types[kind], version=0, path=target)))
     os.environ['MM_ANJU_META_TEST_PACK'] = str(poison)
+    missing_prop = WORK/'regional-missing-prop.o2r'
+    with zipfile.ZipFile(ARCHIVES[0]) as native, zipfile.ZipFile(missing_prop, 'w') as output:
+        for path in native.namelist():
+            if path.startswith('objects/object_zog/') and path != 'objects/object_zog/object_zog_DL_0280A8':
+                output.writestr(zipfile.ZipInfo(path, (1980,1,1,0,0,0)), native.read(path))
+    os.environ['MM_REGIONAL_MISSING_PROP_PACK'] = str(missing_prop)
+
     loader = (ROOT/'soh/mods/transformation_masks/assets/mm_asset_loader.cpp').read_text()
     resource_source = (ROOT/'soh/tests/static_story_mm_resource_test.cpp').read_text()
     resource_source=resource_source.replace('/* PRODUCTION_RESOURCE_FUNCTIONS */', '\n'.join(function(loader,n) for n in [
@@ -70,7 +80,7 @@ if os.environ.get("MM_VERIFY_STAGE") != "viewer":
     objects += [compile(ROOT/'soh/mods/transformation_masks/assets/mm_strict_texture_binding.cpp',True)]
     libs = ['libultraship/src/libultraship.a','_deps/stormlib-build/libstorm.a','libultraship/libImGui.a',
             'libultraship/libstb.a','libultraship/liblibgfxd.a','_deps/prism-build/libprism.a','libultraship/libmonocypher.a']
-    sysroot=ROOT.parent/'linux-sysroot/usr/lib/x86_64-linux-gnu'
+    sysroot=Path(os.environ.get('COMBO_SDK_ROOT', str(ROOT.parent/'linux-sysroot')))/'usr/lib/x86_64-linux-gnu'
     run(['c++',*objects,'-Wl,--gc-sections','-Wl,--start-group',*[BUILD/l for l in libs],'-Wl,--end-group',
          '-L'+str(sysroot),'-Wl,-rpath,'+str(sysroot),'-lSDL2','-lOpenGL','-lzip','-ltinyxml2','-lspdlog','-lfmt','-lpng','-lz','-ldl','-pthread','-o',WORK/'resource_fixture'])
     run([WORK/'resource_fixture',*ARCHIVES])
@@ -84,7 +94,7 @@ if os.environ.get("MM_VERIFY_STAGE") != "resource":
     fixture=fixture.replace('/* PRODUCTION_OPAQUE_RENDER_MODE */',table+'\n'+function(loader,'MmAssets_GetOpaqueRenderMode'))
     functions=['EnViewer_Update','EnViewer_Destroy','EnViewer_StaticSelectSkullKidModel','EnViewerStatic_WaitForObjects','EnViewerStatic_Update',
                'EnViewer_StaticGreatFairyEyeIndex','EnViewer_StaticGreatFairyOverrideLimbDraw','EnViewer_DrawStaticGreatFairy',
-               'EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw','EnViewer_StaticAnjuPostLimbDraw','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid',
+               'EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw','EnViewer_StaticAnjuPostLimbDraw','EnViewer_StaticMikauPostLimbDraw','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid',
                'EnViewerStatic_Draw']
     draw_table=re.search(r'static EnViewerDrawFunc sDrawFuncs\[\] = \{.*?\n\};',viewer,re.S).group(0)
     fixture=fixture.replace('/* PRODUCTION_VIEWER_FUNCTIONS */','\n'.join(function(viewer,n) for n in functions) + '\n' + draw_table + '\n' + function(viewer,'EnViewer_Draw'))

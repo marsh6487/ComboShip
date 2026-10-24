@@ -237,6 +237,11 @@ def build_and_run(host, work, input_path, includes=()):
         fixture = replace_once(fixture, "bool PackAvailable() {", "bool CustomKeeperAvailable();\nbool LoadNativeKeeper();\nbool PackAvailable() {")
         fixture += "\n" + helpers
         scene = block_from(source, source.index("[](s16 scene) {", source.index("RegisterGameHook<GameInteractor::OnSceneInit>")))
+        # The real scene hook resets camera ownership even though this fixture
+        # does not run the browsing camera. Compile its exact native reset too.
+        camera = (ROOT / "combo/BlackMarketShopCameraNative.h").read_text()
+        fixture += "\nActor* sBrowseKeeper = nullptr;\nCollisionHeader* sShopOriginalCollision = nullptr;\nstd::vector<CamData> sShopBgCameras;\ns16 sShopBgIndex = -1;\n"
+        fixture += block_from(camera, camera.index("void InitBrowsingCameraScene(PlayState*) {")) + "\n"
         fixture += "\nvoid EndBrowsing(PlayState*, bool) { sTalking = false; }\nvoid GrannySceneBegin() {}\nstruct ShelfFixtureStub { void Reset() {} } sShelfFixture;\nauto ResourceSceneInit = " + scene + ";\n"
     fixture += (ROOT / "tests/black_market/resource_entry_test.inc").read_text()
     fixture_path = work / (host + "-fixture.cpp"); fixture_path.write_text(fixture)
