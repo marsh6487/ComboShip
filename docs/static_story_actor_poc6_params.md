@@ -152,3 +152,56 @@ scale `0.01`, collider `18/60/0`, focus `45`, and talk distance `80`.
 The native MM root translation adjustment applies only inside the draw callback;
 placement, collider, and sampled joints are unchanged. Dialogue is
 “I've made a promise to Anju.”
+
+## Regional actors (append-only 2026-10-24)
+
+Existing catalog IDs and `0x7F`/`0x7E` placements are unchanged. New catalog
+IDs are Stalchild 25, Mikau 26 and Darmani 27. Stalchild uses the last `0x7E`
+identity nibble; Mikau and Darmani start the `0x7D` family. `0x7D00` and
+`0x7D03` remain invalid. Each row below is an ambient presentation, with no
+quest actions, hostile AI, native path requirements or talk prompt.
+
+| Actor | Params | Pose | Skeleton limbs / matrix reservation | Frames |
+|---|---|---|---|---|
+| Stalchild | `0x7E0F` | Idle | 19 / 0 (standard) | 30 |
+| Stalchild | `0x7E1F` | Sit laugh | 19 / 0 | 20 |
+| Stalchild | `0x7E2F` | Sit tap toes | 19 / 0 | 20 |
+| Stalchild | `0x7E3F` | Swing on branch | 19 / 0 | 30 |
+| Stalchild | `0x7E4F` | Salute | 19 / 0 | 34 |
+| Mikau | `0x7D01` | Idle | 22 / 20 | 30 |
+| Mikau | `0x7D11` | Guitar | 22 / 20 | 12 |
+| Darmani | `0x7D02` | Wait | 19 / 17 | 29 |
+| Darmani | `0x7D12` | Fly | 19 / 17 | 39 |
+
+The machine-readable presets are `combo/actors/RegionalActorPresets.json`.
+All OoT rows use En_Viewer `0x002A`. Native MM rows use En_Rail_Skb `0x0212`,
+En_Zog `0x0224` and En_Gg `0x01F7`, respectively, with the same params. The
+native MM reserved rows replace callbacks before native quest initialization;
+En_Gg2 and all nonmatching original actor params retain their original code.
+Native MM presentation support is available in Combo builds, including MM-only
+mode. OoT presentations use the MM importer and fail closed if MM resources
+are unavailable. Solo modes do not create regional default groups.
+
+Mikau has 19 visible limb display lists but reserves 20 flex matrices. His
+native guitar loop is `object_zog_Anim_00931C`; its additional
+`object_zog_DL_0280A8` is required and attaches at `OBJECT_ZOG_LIMB_11` (17).
+Missing or mistyped imported props reject the presentation. Darmani uses
+`object_gg_Skel_00F6C0` with wait `object_gg_Anim_00F578` or fly
+`object_gg_Anim_00AF40`. His placed copy always uses the XLU stream, independently
+of Lens, healing and mask flags. Stalchildren use their actual standard skeleton,
+not a flex reinterpretation.
+
+The new OoT `ComboRegionalActors` module queries the endpoint every update.
+It floor-fits two seated Stalchildren near Ikana, Mikau with fallback Lulu near
+Great Bay, and a floating Darmani near Snowhead. Offsets follow endpoint yaw;
+no final Snowhead world coordinate is embedded in the NPC module. It keeps the
+central return lane clear, rejects missing floors/exits/overhead obstruction,
+and retries endpoint readiness without repeated failed actor spawns. An explicit
+matching actor in the current room suppresses its automatic family, including
+all automatic Stalchildren if one is authored. The module removes its own copies
+when mode/route/room changes and never removes authored or native quest actors.
+Native MM receives no extra automatic groups.
+
+The fixtures establish catalog/resource contracts, lifecycle and emitted draw
+commands. They do not establish visible game rendering, exact body/floor fitting
+or traversable portal clearance in either configured scene presentation.

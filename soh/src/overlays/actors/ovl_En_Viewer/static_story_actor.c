@@ -62,6 +62,13 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
                                   STATIC_TRACKING_NONE, 0, 0.0f },
     [STATIC_STORY_ACTOR_MONKEY] = { 2, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_MONKEY, 0.012f, 24.0f, 15, 30, 0, 30, 30,
                                     70.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_STALCHILD] = { 4, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_STALCHILD, 0.01f, 55.0f, 20, 65, 0, 30,
+                                       30, 90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_MIKAU] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_MIKAU, 0.01f, 55.0f, 20, 65, 0, 30, 30,
+                                   90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_DARMANI] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_DARMANI, 0.01f, 55.0f, 20, 65, 0, 30, 30,
+                                     90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+
 };
 
 static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STORY_ACTOR_POSE_COUNT] = {
@@ -204,13 +211,29 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
         STATIC_POSE(STATIC_ANIM_ANJU_UMBRELLA_CRY, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_ANJU),
         STATIC_POSE(STATIC_ANIM_ANJU_UMBRELLA_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_ANJU),
     },
+    [STATIC_STORY_ACTOR_STALCHILD] = {
+        STATIC_POSE(STATIC_ANIM_STALCHILD_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_STALCHILD),
+        STATIC_POSE(STATIC_ANIM_STALCHILD_SIT_LAUGH, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_STALCHILD),
+        STATIC_POSE(STATIC_ANIM_STALCHILD_SIT_TAP_TOES, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_STALCHILD),
+        STATIC_POSE(STATIC_ANIM_STALCHILD_SWING, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_STALCHILD),
+        STATIC_POSE(STATIC_ANIM_STALCHILD_SALUTE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_STALCHILD),
+    },
+    [STATIC_STORY_ACTOR_MIKAU] = {
+        STATIC_POSE(STATIC_ANIM_MIKAU_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_MIKAU),
+        STATIC_POSE(STATIC_ANIM_MIKAU_GUITAR, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_MIKAU),
+    },
+    [STATIC_STORY_ACTOR_DARMANI] = {
+        STATIC_POSE(STATIC_ANIM_DARMANI_WAIT, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_DARMANI),
+        STATIC_POSE(STATIC_ANIM_DARMANI_FLY, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_DARMANI),
+    },
+
 };
 
 _Static_assert(sizeof(sDefinitions) / sizeof(sDefinitions[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a definition");
 _Static_assert(sizeof(sPoses) / sizeof(sPoses[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a pose row");
-enum { STATIC_STORY_DEFINITION_COUNT = 24, STATIC_STORY_POSE_ROW_COUNT = 24 };
+enum { STATIC_STORY_DEFINITION_COUNT = 27, STATIC_STORY_POSE_ROW_COUNT = 27 };
 _Static_assert(STATIC_STORY_DEFINITION_COUNT == STATIC_STORY_ACTOR_MAX - 1,
                "Definition count must change with the actor registry");
 _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
@@ -219,7 +242,8 @@ _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
 int StaticStoryActor_IsParam(int16_t params) {
     uint16_t prefix = (uint16_t)params & 0xFF00;
 
-    return prefix == STATIC_STORY_ACTOR_LEGACY_PARAM_PREFIX || prefix == STATIC_STORY_ACTOR_EXPANDED_PARAM_PREFIX;
+    return prefix == STATIC_STORY_ACTOR_LEGACY_PARAM_PREFIX || prefix == STATIC_STORY_ACTOR_EXPANDED_PARAM_PREFIX ||
+           prefix == STATIC_STORY_ACTOR_REGIONAL_PARAM_PREFIX;
 }
 
 StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
@@ -227,6 +251,9 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
     uint16_t id = (uint16_t)params & 0x000F;
     StaticStoryActorType type;
 
+    if (prefix == STATIC_STORY_ACTOR_REGIONAL_PARAM_PREFIX) {
+        return id == 1 ? STATIC_STORY_ACTOR_MIKAU : id == 2 ? STATIC_STORY_ACTOR_DARMANI : STATIC_STORY_ACTOR_NONE;
+    }
     if (prefix == STATIC_STORY_ACTOR_EXPANDED_PARAM_PREFIX) {
         switch (id) {
             case 1:
@@ -257,6 +284,8 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
                 return STATIC_STORY_ACTOR_ANJU;
             case 14:
                 return STATIC_STORY_ACTOR_MONKEY;
+            case 15:
+                return STATIC_STORY_ACTOR_STALCHILD;
             default:
                 return STATIC_STORY_ACTOR_NONE;
         }
@@ -394,7 +423,9 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
 }
 
 bool StaticStoryActor_CanTalk(StaticStoryActorType type) {
-    return StaticStoryActor_GetDefinition(type) != NULL && type != STATIC_STORY_ACTOR_PHANTOM_GANON;
+    return StaticStoryActor_GetDefinition(type) != NULL && type != STATIC_STORY_ACTOR_PHANTOM_GANON &&
+           type != STATIC_STORY_ACTOR_STALCHILD && type != STATIC_STORY_ACTOR_MIKAU &&
+           type != STATIC_STORY_ACTOR_DARMANI;
 }
 
 void StaticStoryActor_NormalizePlacementRotation(int16_t* pitch, int16_t* yaw, int16_t* roll) {
@@ -524,6 +555,9 @@ StaticStoryResourceSource StaticStoryActor_GetResourceSource(StaticStoryActorTyp
         case STATIC_STORY_ACTOR_CHILD_KAFEI:
         case STATIC_STORY_ACTOR_ANJU:
         case STATIC_STORY_ACTOR_MONKEY:
+        case STATIC_STORY_ACTOR_STALCHILD:
+        case STATIC_STORY_ACTOR_MIKAU:
+        case STATIC_STORY_ACTOR_DARMANI:
             return STATIC_STORY_RESOURCE_MM_ARCHIVE;
         default:
             return STATIC_STORY_RESOURCE_OOT_OBJECT;

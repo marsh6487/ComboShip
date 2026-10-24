@@ -1338,11 +1338,20 @@ void ExtractEquips(nlohmann::json& sh) {
     }
     sh["cEquips"] = c;
     nlohmann::json d = nlohmann::json::array();
-    for (int b = 0; b < 4; b++) {
+    // Wire directions are physical Up/Down/Left/Right; MM's native slot order
+    // is Right/Left/Down/Up and must never leak into the departure payload.
+    static constexpr DpadEquipSlot kDpadWireOrder[] = {
+        EQUIP_SLOT_D_UP,
+        EQUIP_SLOT_D_DOWN,
+        EQUIP_SLOT_D_LEFT,
+        EQUIP_SLOT_D_RIGHT,
+    };
+    for (const auto b : kDpadWireOrder) {
         d.push_back(
             MmButtonCanonical(ExtButton_GetDpadItem(0, b), gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[0][b]));
     }
     sh["dEquips"] = d;
+    sh["dEquipsOrder"] = "UDLR";
 }
 
 // Inventory slot holding `item`, or -1 if this save does not have it. The ocarina is looked up by its
@@ -1416,14 +1425,26 @@ void ApplyEquips(const nlohmann::json& sh) {
         }
     }
     if (sh.contains("dEquips") && sh["dEquips"].is_array()) {
+        const auto order = sh.find("dEquipsOrder");
+        if (order != sh.end() && (!order->is_string() || *order != "UDLR")) {
+            return;
+        }
+        // Untagged pre-fix payloads arriving from OoT already used U/D/L/R.
+        static constexpr DpadEquipSlot kDpadWireOrder[] = {
+            EQUIP_SLOT_D_UP,
+            EQUIP_SLOT_D_DOWN,
+            EQUIP_SLOT_D_LEFT,
+            EQUIP_SLOT_D_RIGHT,
+        };
         for (int i = 0; i < 4 && i < (int)sh["dEquips"].size(); i++) {
             const auto& item = sh["dEquips"][i];
             if (!item.is_number_integer() || item < 0 || item > 0xFFFF) {
                 continue;
             }
-            ApplyOneButton(&gSaveContext.save.shipSaveInfo.dpadEquips.dpadItems[0][i],
-                           &gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[0][i],
-                           &gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][i], item.get<uint16_t>(), true);
+            const auto b = kDpadWireOrder[i];
+            ApplyOneButton(&gSaveContext.save.shipSaveInfo.dpadEquips.dpadItems[0][b],
+                           &gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[0][b],
+                           &gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][b], item.get<uint16_t>(), true);
         }
     }
 }
@@ -2008,6 +2029,7 @@ void NetResetBaseline(const nlohmann::json& sh) {
     // diff and in the verify hash, which is the whole bug this split exists to kill.
     sNetShared.erase("cEquips");
     sNetShared.erase("dEquips");
+    sNetShared.erase("dEquipsOrder");
     sNetFlat = sNetShared.flatten();
     sNetPrimed = false;
     sNetMismatchStreak = 0;
@@ -2292,6 +2314,7 @@ void FleetSync_ApplyArrival(int slot) {
             ApplyEquips(temp["shared"]);
             temp["shared"].erase("cEquips");
             temp["shared"].erase("dEquips");
+            temp["shared"].erase("dEquipsOrder");
             dirty = true;
             NetPoisonScan("arrival overlay");
             NetPoisonDump("arrival:after shared overlay");

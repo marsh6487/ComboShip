@@ -1,11 +1,19 @@
 #include "entrances/BlackMarketEntrance.h"
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "2s2h/Enhancements/Camera/ComboForestOcarina.h"
+#endif
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
 
 SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+}
+#endif
 namespace SOH {
 struct Scene {
     ActorEntry* spawn;
@@ -57,6 +65,8 @@ int main() {
     // different scene's camera manager behind. Both must bind this scene.
     ActorEntry forestSpawn = /* FOREST_SPAWN */;
     SOH::Scene forest{&forestSpawn, nullptr, 0, /* FOREST_HAS_CUTSCENES */};
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
     PlayState previous{};
     ActorCutscene previousList[1]{};
     for (int entry = 0; entry < 2; ++entry) {
@@ -70,7 +80,8 @@ int main() {
         OTRPlay_InitScene(&play, 0);
         assert(sCutsceneMgr.play == &play &&
                "private forest must initialize its camera manager before native camera setup");
-        assert(sSceneCutsceneCount == 0 && sWaitingCutsceneList[0] == 0 && sNextCutsceneList[0] == 0);
+        assert(sSceneCutsceneCount == 1 && sSceneCutsceneList[0].csCamId == CS_CAM_ID_GLOBAL_ITEM_OCARINA &&
+               sWaitingCutsceneList[0] == 0 && sNextCutsceneList[0] == 0);
         play.mainCamera.camId = CAM_ID_MAIN;
         play.mainCamera.eye = {10, 20, 30};
         CutsceneManager_StoreCamera(&play.mainCamera);

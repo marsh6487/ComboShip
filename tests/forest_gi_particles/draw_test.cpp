@@ -186,7 +186,7 @@ int main() {
     assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, true, basis)));
     play.roomCtx.curRoom.roomShape = nullptr;
     Reset(); DrawWoodsMysteryHexes(); CheckMesh(true);
-    assert(origin.x == WoodsMysteryMakeover::kMouthX && origin.z == WoodsMysteryMakeover::kMouthZ);
+    assert(origin.x == 216.0f && origin.y == 0.0f && origin.z == -216.0f);
     assert(EqualMesh(submitted, ForestGiParticles::Mystery(play.gameplayFrames, basis)));
     play.pauseCtx.state = 1;
     Reset(); DrawPortalFinish(); DrawWoodsMysteryHexes(); assert(!submissions);

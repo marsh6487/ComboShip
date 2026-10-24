@@ -28,6 +28,7 @@ struct Result {
   float right;
   bool changed;
   bool tooltip;
+  int markerVertices;
 };
 template <typename Draw>
 Result Frame(Draw draw, bool enabled, bool disabled, bool &value,
@@ -48,8 +49,11 @@ Result Frame(Draw draw, bool enabled, bool disabled, bool &value,
   Result result{};
   result.right = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
   {
+    const int beforeMarker = ImGui::GetWindowDrawList()->VtxBuffer.Size;
     WhatsNew::Scope highlight("gEnhancements.AlwaysThawedZorasDomain", label,
                               enabled, disabled);
+    result.markerVertices =
+        ImGui::GetWindowDrawList()->VtxBuffer.Size - beforeMarker;
     Check((GImGui->ColorStack.Size == colors + 1) == (enabled && !disabled),
           "only active controls get an accent");
     result.changed = draw(label, &value, disabled);
@@ -96,6 +100,8 @@ template <typename Draw> void Probe(Draw draw) {
   Check(clicked.changed && value,
         "highlighted native controls must still accept clicks");
   const auto disabled = Frame(draw, true, true, value);
+  Check(disabled.markerVertices > 0, "a gated new control still needs a "
+                                     "release marker without an input accent");
   hit = ImVec2(disabled.min.x + 8, (disabled.min.y + disabled.max.y) * 0.5f);
   Frame(draw, true, true, value, hit, true);
   const auto locked = Frame(draw, true, true, value, hit, false);
@@ -121,8 +127,147 @@ template <typename Draw> void Probe(Draw draw) {
   ImGui::DestroyContext();
 }
 
+static void ProbeRequestedInventory() {
+  // These are the user-facing integrations requested for the cumulative pass.
+  // Native controls, the Generate page and direct editors use the same lookup.
+  const char *requested[]{
+      "gRandoSettings.HyliasGrace",
+      "gRandoSettings.HyliasGraceRewards",
+      "gRando.Options.RO_HYLIAS_GRACE",
+      "gRando.Options.RO_HYLIAS_GRACE_REWARDS",
+      "gRandoSettings.RodOfSeasons",
+      "gRando.Options.RO_ROD_OF_SEASONS",
+      "gMods.TransformMasks.ChildDungeonGates",
+      "gMods.TransformMasks.OotGoronZora",
+      "gMods.WolfLink.UseHDModel",
+      "gEnhancements.Fixes.MMStreamedPositionalAudio",
+      "gRandoSettings.MQDungeons",
+      "gRandoSettings.MQDungeonCount",
+      "gRandoSettings.MQDungeonsSelection",
+      "gCombo.Rando.CrossDungeonEntrances",
+      "gCombo.Rando.ExpandedDungeonPool",
+      "gCombo.Rando.CrossBossEntrances",
+      "gCombo.Rando.CrossInteriorEntrances",
+      "gCombo.Rando.CrossShopEntrances",
+      "gCombo.Rando.CrossDoorInteriorEntrances",
+      "gCombo.Rando.CrossGrottoEntrances",
+      "gCombo.Rando.BlackMarketPricing",
+      "gCombo.Rando.BlackMarketDungeonUnlocks",
+      "gCombo.BlackMarket.RegularGrannyInterior",
+      "gCombo.BlackMarket.AnimatedItemSeals",
+      "gCheats.UnrestrictedItems",
+      "gEnhancements.Graphics.SpinStyle",
+      "gEnhancements.Graphics.ElementalSpinEffects",
+      "gEnhancements.Graphics.UseOotSkyTextures",
+      "gEnhancements.HideBackEquipment",
+      "gEnhancements.BottleShimmer",
+      "gEnhancements.DungeonItemColors",
+      "gEnhancements.SkijerNEI.UseVanillaHeldSwords",
+      "gAudioEditor.HyruleFieldNightMusic",
+      "gAudioEditor.HyruleFieldNightSequence",
+      "gAudioEditor.SeasonWeather.Season",
+      "gAudioEditor.SeasonWeather.Spring.RainMode",
+      "gAudioEditor.SeasonWeather.Spring.Blossoms",
+      "gAudioEditor.SeasonWeather.Summer.Enabled",
+      "gAudioEditor.SeasonWeather.Summer.Fluff",
+      "gAudioEditor.SeasonWeather.Summer.Fireflies",
+      "gAudioEditor.SeasonWeather.Summer.Sunbeams",
+      "gAudioEditor.SeasonWeather.Autumn.RainMode",
+      "gAudioEditor.SeasonWeather.Autumn.Leaves",
+      "gAudioEditor.SeasonWeather.Winter.Snow",
+      "gAudioEditor.SeasonWeather.Winter.Flurries",
+      "gAudioEditor.SeasonWeather.Winter.Mist",
+      "gAudioEditor.SeasonWeather.Winter.Aurora",
+      "gAudioEditor.GlobalOutdoorRain",
+      "gAudioEditor.GlobalOutdoorRainMode",
+      "gAudioEditor.GlobalOutdoorRainColor",
+      "gAudioEditor.GlobalOutdoorRainOvercast",
+      "gAudioEditor.WeatherAudioDiagnostics",
+      "gAudioEditor.ProximityWeatherThunder",
+      "gAudioEditor.ProximityWeatherThunderStyle",
+      "gAudioEditor.ProximityWeatherRainVolume",
+      "gAudioEditor.ProximityWeatherThunderVolume",
+      "gAudioEditor.ProximityWeatherThunderFrequency",
+      "gAudioEditor.MMWeather.Enabled",
+      "gAudioEditor.MMWeather.Mode",
+      "gAudioEditor.MMWeather.RainColor",
+      "gAudioEditor.MMWeather.Overcast",
+      "gAudioEditor.MMWeather.Thunder",
+      "gAudioEditor.MMWeather.RainVolume",
+      "gAudioEditor.MMWeather.ThunderVolume",
+      "gAudioEditor.MMWeather.ThunderFrequency",
+      "gAudioEditor.MMWeather.Season",
+      "gAudioEditor.MMWeather.Spring.RainMode",
+      "gAudioEditor.MMWeather.Spring.Blossoms",
+      "gAudioEditor.MMWeather.Autumn.RainMode",
+      "gAudioEditor.MMWeather.Autumn.Leaves",
+      "gAudioEditor.MMWeather.Winter.Snow",
+      "gAudioEditor.MMWeather.Winter.Flurries",
+      "gAudioEditor.MMWeather.Winter.Mist",
+      "gAudioEditor.MMWeather.Winter.Aurora",
+      "gEnhancements.Graphics.SummerAtmosphere.Enabled",
+      "gEnhancements.Graphics.SummerAtmosphere.Fluff",
+      "gEnhancements.Graphics.SummerAtmosphere.Fireflies",
+      "gEnhancements.Graphics.SummerAtmosphere.Sunbeams",
+  };
+  for (const auto *key : requested)
+    Check(WhatsNew::Find(key), key);
+  Check(!WhatsNew::Find("gMods.TransformMasks.InstantTransform"),
+        "the existing Instant Transform switch is no longer a release change");
+}
+
+static void ProbeTabs() {
+  ImGui::CreateContext();
+  auto &io = ImGui::GetIO();
+  io.IniFilename = nullptr;
+  io.DisplaySize = ImVec2(900, 600);
+  unsigned char *pixels;
+  int width, height;
+  io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+  const auto frame = [&](bool enabled) {
+    ImGui::NewFrame();
+    ImGui::SetNextWindowSize(ImVec2(850, 300));
+    ImGui::Begin("Tab probe", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::BeginTabBar("AudioTabs");
+    const int colors = GImGui->ColorStack.Size;
+    const ImVec4 normal = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    if (WhatsNew::BeginTabItem("Weather & Seasons", enabled)) {
+      Check(GImGui->ColorStack.Size == colors,
+            "a tab accent must be restored before drawing unrelated contents");
+      const auto after = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      Check(after.x == normal.x && after.y == normal.y && after.z == normal.z &&
+                after.w == normal.w,
+            "tab contents keep their native text color");
+      ImGui::EndTabItem();
+    }
+    auto *bar = GImGui->CurrentTabBar;
+    Check(bar->LastTabItemIdx >= 0, "the native tab is registered");
+    const ImGuiID id = bar->Tabs[bar->LastTabItemIdx].ID;
+    Check(bar->SelectedTabId == 0 || bar->SelectedTabId == id,
+          "the weather tab stays selected after native first-frame selection");
+    Check(GImGui->ColorStack.Size == colors,
+          "tab styling must balance the stack");
+    ImGui::EndTabBar();
+    ImGui::End();
+    ImGui::Render();
+    return id;
+  };
+  frame(false);
+  const auto original = frame(false);
+  Check(
+      frame(true) == original && frame(false) == original,
+      "What's New must preserve tab identity and selection when toggled live");
+  for (const auto *label :
+       {"Weather & Seasons", "Spring", "Summer", "Autumn", "Winter"})
+    Check(WhatsNew::Find(nullptr, label),
+          "every weather and season tab has an explicit release identity");
+  ImGui::DestroyContext();
+}
+
 int main() {
   try {
+    ProbeRequestedInventory();
+    ProbeTabs();
     std::set<std::string> keys;
     for (const auto &entry : WhatsNew::kControls) {
       Check(keys.insert(entry.key).second && entry.note[0],
@@ -137,8 +282,9 @@ int main() {
           "release lookup is not a prefix match");
     Check(!WhatsNew::Find("gSettings.Menu.Theme", "Black Market Appearance"),
           "an unrelated CVar owns its identity");
-    Check(WhatsNew::Find(nullptr, "Black Market Appearance"),
-          "custom sections have explicit identities");
+    Check(!WhatsNew::Find(nullptr, "Black Market Appearance"),
+          "the custom appearance container delegates release markers to its "
+          "individual controls");
     Probe([](const char *label, bool *value, bool disabled) {
       OotWidgets::CheckboxOptions options;
       options.disabled = disabled;

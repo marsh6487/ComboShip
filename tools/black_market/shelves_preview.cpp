@@ -10,6 +10,16 @@ int main(int argc,char** argv) {
         if (comma)std::printf(",");comma=true;
         std::printf("[[%d,%d,%d],[%d,%d,%d]]",b.low.x,b.low.y,b.low.z,b.high.x,b.high.y,b.high.z);
     }
+    std::printf("],\"corners\":[");comma=false;
+    for (const auto& b:kBoxes) {
+        if(comma)std::printf(",");comma=true;
+        std::printf("[");bool pointComma=false;
+        for(const auto& p:Corners(b)) {
+            if(pointComma)std::printf(",");pointComma=true;
+            std::printf("[%d,%d,%d]",p.x,p.y,p.z);
+        }
+        std::printf("]");
+    }
     std::printf("],\"vertices\":[");comma=false;
     for (const auto& v:Vertices(granny)) {
         if (comma)std::printf(",");comma=true;

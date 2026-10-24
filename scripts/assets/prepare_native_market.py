@@ -13,18 +13,23 @@ import native_market
 import market_interior
 import market_title
 import exit_door
+import mm_native_shop
 
 SOURCE = ROOT / "tools/native_market/bundled"
 
 
-def prepared_resources(bundle_directory=SOURCE):
-    return exit_door.apply(market_title.apply(market_interior.apply(native_market.read_bundle(bundle_directory))))
+def prepared_resources(bundle_directory=SOURCE, host=None):
+    if host not in (None, 'oot', 'mm'):
+        raise ValueError('native market host must be mm or oot')
+    resources = exit_door.apply(market_title.apply(market_interior.apply(native_market.read_bundle(bundle_directory))))
+    return mm_native_shop.apply(resources) if host == 'mm' else resources
 
 
 def prepare(output_root=ROOT, bundle_directory=SOURCE):
-    resources = prepared_resources(bundle_directory)
+    resources_by_game = {game: prepared_resources(bundle_directory, host=host)
+                         for game, host in (('soh', 'oot'), ('mm', 'mm'))}
     written = 0
-    for game in ("soh", "mm"):
+    for game, resources in resources_by_game.items():
         for name, data in sorted(resources.items()):
             target = Path(output_root) / game / "assets/custom" / name
             if target.is_file() and hashlib.sha256(target.read_bytes()).digest() == hashlib.sha256(data).digest():

@@ -27,21 +27,40 @@ def main():
         keeper=NativeKeeper(archive)
         triangles=np.concatenate([keeper.position_triangles(i) for i in range(keeper.frame_count)])
         room=np.array(room_faces(archive),float)
-    boxes=np.array(fixture['boxes'],float)
-    for index,box in enumerate(boxes):
+    corners=np.array(fixture['corners'],float)
+    # Use the actual rounded native vertices, rather than treating the source
+    # axis-aligned boxes as room coordinates after the bank rotation.
+    faces=((4,5,6,7),(1,0,3,2),(5,1,2,6),(0,4,7,3),(7,6,2,3),(0,1,5,4))
+    board_candidates=[]
+    for index,points in enumerate(corners):
+        low,high=points.min(0),points.max(0)
+        surface=np.array([points[[face[n] for n in indices]] for face in faces for indices in ((0,1,2),(0,2,3))])
         for slot,offer in enumerate(reserved):
-            assert not (np.all(box[1]>=offer[0]) and np.all(offer[1]>=box[0])),(index,slot,'shelf intersects selected item/seal envelope')
-        candidates=np.all(triangles.max(1)>=box[0],axis=1)&np.all(triangles.min(1)<=box[1],axis=1)
-        assert not any(triangle_box_intersects(face,box[0],box[1]) for face in triangles[candidates]),(index,'shelf intersects keeper pose')
-        if index%6!=3: # Bottom planks intentionally seat over the raised counter.
-            inner=box+[[.01,.01,.01],[-.01,-.01,-.01]]
-            candidates=np.all(room.max(1)>=inner[0],axis=1)&np.all(room.min(1)<=inner[1],axis=1)
-            assert not any(triangle_box_intersects(face,inner[0],inner[1]) for face in room[candidates]),(index,'shelf intersects retained room props')
+            assert not any(triangle_box_intersects(face,*offer) for face in surface), (index,slot,'shelf intersects selected item/seal envelope')
+        axes=np.column_stack((points[1]-points[0],points[3]-points[0],points[4]-points[0]))
+        inverse=np.linalg.inv(axes)
+        local=lambda values,origin=points[0].copy(),matrix=inverse.copy():(np.asarray(values)-origin)@matrix.T
+        bounds=local(points)
+        lo,hi=bounds.min(0),bounds.max(0)
+        # Exclude contact within 0.01 world units; retain all positive overlap.
+        epsilon=.01*np.linalg.norm(inverse,axis=1)
+        def contacts(values):
+            values=local(values)
+            candidate=np.all(values.max(1)>=lo+epsilon,axis=1)&np.all(values.min(1)<=hi-epsilon,axis=1)
+            return any(triangle_box_intersects(face,lo+epsilon,hi-epsilon) for face in values[candidate])
+        assert not contacts(triangles),(index,'shelf intersects keeper pose')
+        if index%6!=3:
+            assert not contacts(room),(index,'shelf intersects retained room props')
+        board_candidates.append((points,local,lo,hi))
     for slot,position in enumerate(shelves):
-        boards=[box for box in boxes if box[1,1]<reserved[slot,0,1] and box[0,0]<position[0]<box[1,0] and box[0,2]<position[2]<box[1,2]]
+        boards=[]
+        for points,local,lo,hi in board_candidates:
+            p=local(position)
+            if points[:,1].max()<reserved[slot,0,1] and lo[0]<p[0]<hi[0] and lo[2]<p[2]<hi[2]:
+                boards.append(points[:,1].max())
         assert boards,(slot,'item has no shelf beneath it')
-        assert reserved[slot,0,1]-max(box[1,1] for box in boards)<5,(slot,'shelf too far below the complete offer envelope')
-    a.output.write_text(json.dumps(dict(boxes=fixture['boxes'],shelves=shelves.tolist(),
+        assert reserved[slot,0,1]-max(boards)<5,(slot,'shelf too far below the complete offer envelope')
+    a.output.write_text(json.dumps(dict(local_boxes=fixture['boxes'],room_corners=fixture['corners'],shelves=shelves.tolist(),
         reserved_slot_envelopes=reserved.tolist(),keeper_frames=keeper.frame_count,
         physical_shelves_clear_items_and_keeper=True,native_runtime_proven=False),indent=2)+'\n')
     print('PASS physical shelves: every offer has a board; full selected item/seal envelopes and all keeper poses clear shared shelf geometry')

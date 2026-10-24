@@ -11,6 +11,8 @@
 #include <ship/utils/StrHash64.h>
 #include <fast/resource/factory/TextureFactory.h>
 #include <fast/resource/ResourceType.h>
+#include <fast/resource/type/DisplayList.h>
+#include <fast/resource/factory/DisplayListFactory.h>
 #include "soh/OTRGlobals.h"
 #include "soh/resource/importer/SkeletonFactory.h"
 #include "soh/resource/importer/SkeletonLimbFactory.h"
@@ -326,6 +328,42 @@ static void TestXmlSkeletonRetention(const std::shared_ptr<Ship::ResourceManager
     puts("PASS XML skeleton: limb retained across cache unload, released with skeleton");
 }
 
+static void TestRegionalResources() {
+    for (unsigned type = 25; type <= 27; ++type) {
+        for (unsigned pose = 0; pose < (type == 25 ? 5U : 2U); ++pose) {
+            MmNormalActorResources result{};
+            REQUIRE(MmAssets_LoadNormalActor(type, pose, &result));
+            REQUIRE(result.owner && result.skeleton && result.animation);
+            REQUIRE((result.propDisplayList != nullptr) == (type == 26 && pose == 1));
+            MmAssets_ReleaseNormalActor(result.owner);
+        }
+    }
+    {
+        const std::string prop = "objects/object_zog/object_zog_DL_0280A8";
+        auto original = MmAssets_LoadResourceObjectFromMmArchive(prop.c_str());
+        REQUIRE(original);
+        auto wrong = MmAssets_LoadResourceObjectFromMmArchive("objects/object_zog/object_zog_Tex_024750");
+        sMmResourceCache[prop] = wrong;
+        MmNormalActorResources result{};
+        REQUIRE(!MmAssets_LoadNormalActor(26, 1, &result) && !result.owner);
+        // A null cache entry reloads the real archive; it does not model a missing file.
+        sMmResourceCache[prop] = nullptr;
+        REQUIRE(MmAssets_LoadNormalActor(26, 1, &result));
+        MmAssets_ReleaseNormalActor(result.owner);
+        auto archive = sMmArchive;
+        auto manager = OTRGlobals::Instance->context->GetResourceManager();
+        sMmArchive = manager->GetArchiveManager()->AddArchive(std::getenv("MM_REGIONAL_MISSING_PROP_PACK"));
+        REQUIRE(sMmArchive);
+        sMmResourceCache.clear();
+        REQUIRE(!MmAssets_LoadNormalActor(26, 1, &result) && !result.owner);
+        REQUIRE(MmAssets_LoadNormalActor(26, 0, &result)); // same archive, prop-free idle still loads
+        MmAssets_ReleaseNormalActor(result.owner);
+        sMmArchive = archive;
+        sMmResourceCache.clear();
+    }
+    puts("PASS actual factories: nine regional poses, standard/flex contracts, correct/wrong/absent Mikau prop");
+}
+
 int main(int argc, char** argv) {
     REQUIRE(argc >= 2);
     auto context =
@@ -354,7 +392,18 @@ int main(int argc, char** argv) {
                                             static_cast<uint32_t>(Fast::ResourceType::Texture), 0));
     REQUIRE(loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryPlayerAnimationV0>(),
                                             RESOURCE_FORMAT_BINARY, "PlayerAnimation", 0x4F50414D, 0));
+    REQUIRE(loader->RegisterResourceFactory(std::make_shared<Fast::ResourceFactoryBinaryDisplayListV0>(),
+                                            RESOURCE_FORMAT_BINARY, "DisplayList",
+                                            static_cast<uint32_t>(Fast::ResourceType::DisplayList), 0));
     sMmArchive = manager->GetArchiveManager()->GetArchives()->at(0);
+    if (std::getenv("MM_VERIFY_REGIONAL_ONLY")) {
+        TestRegionalResources();
+        // Same headless shutdown boundary as the full fixture below: Context requires a Window.
+        sMmResourceCache.clear();
+        sMmArchive.reset();
+        std::fflush(nullptr);
+        std::_Exit(0);
+    }
     TestSkullKidSceneReentry(manager);
     TestSkullKidTextureReentry(manager);
     if (argc > 2)
@@ -362,6 +411,7 @@ int main(int argc, char** argv) {
     TestXmlSkeletonRetention(manager);
     TestAnjuNativeHierarchy(manager);
     TestAnjuNativeMetadata(manager);
+    TestRegionalResources();
     auto resolve = [manager](const std::string& path) { return manager->LoadResourceProcess(path); };
     unsigned loads = 0;
     for (bool alt : { false, true }) {

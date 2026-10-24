@@ -20,6 +20,7 @@
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "../../../src/code/concurrent_weather_audio.h"
 #include "soh/SohGui/UIWidgets.hpp"
+#include "../../../../combo/gui/WhatsNew.h"
 
 extern "C" {
 #include "sequence.h"
@@ -148,6 +149,8 @@ static void DrawHyruleFieldNightTrack() {
     const auto sequences = AudioCollection::Instance->GetAllSequences();
     int selected = AudioCollection::Instance->GetReplacementSequence(HYRULE_FIELD_NIGHT_MUSIC_ENTRY);
 
+    WhatsNew::Scope releaseHighlight(CVAR_AUDIO("HyruleFieldNightSequence"), "Hyrule Field Night Track",
+                                     CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
     ImGui::TextUnformatted("Hyrule Field Night Track");
     ImGui::SameLine(300.0f);
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -681,7 +684,7 @@ static void DrawWeatherOptions() {
     ImGui::TextWrapped("Configure each season below; opening a tab does not change the selected season.");
     if (ImGui::BeginTabBar("SeasonWeatherSettings")) {
         const auto drawSeason = [&](const char* name, size_t first, size_t last) {
-            if (ImGui::BeginTabItem(name)) {
+            if (WhatsNew::BeginTabItem(name, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
                 for (size_t i = first; i <= last; ++i) {
                     draw(seasonWeatherWidgets[i]);
                 }
@@ -806,7 +809,7 @@ void AudioEditor::DrawElement() {
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem("Weather & Seasons")) {
+        if (WhatsNew::BeginTabItem("Weather & Seasons", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
             if (ImGui::BeginChild("WeatherOptions", ImVec2(0, -8))) {
                 DrawWeatherOptions();
             }

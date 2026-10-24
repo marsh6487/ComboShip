@@ -72,7 +72,9 @@ inline NeiGi::Mesh Portal(uint32_t frame, bool packed, const NeiGi::Basis& camer
 }
 
 inline NeiGi::Mesh Mystery(uint32_t frame, const NeiGi::Basis& camera = {}) {
-    return Entrance(frame, 60.f, 66.f, 10.f, camera);
+    // Fit the accepted WoM black cap: about 55 units across each side and
+    // 115 high. Only emitter centers change; the NEI twinkle art is shared.
+    return Entrance(frame, 55.f, 60.f, 10.f, camera);
 }
 
 inline NeiGi::Mesh Mirror(uint32_t frame, const NeiGi::Basis& camera = {}) {

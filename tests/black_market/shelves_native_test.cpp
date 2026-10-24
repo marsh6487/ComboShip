@@ -25,6 +25,12 @@ int main() {
     assert(reinterpret_cast<DynaPolyActor*>(bg.actor)->bgId==0);
     const auto* mesh=bg.colHeader;
     assert(mesh && mesh->numVertices==16 && mesh->numPolygons==24 && mesh->surfaceTypeList);
+    for (int i=0;i<mesh->numVertices;++i) {
+        const auto& v=mesh->vtxList[i];
+        assert(mesh->minBounds.x<=v.x && v.x<=mesh->maxBounds.x);
+        assert(mesh->minBounds.y<=v.y && v.y<=mesh->maxBounds.y);
+        assert(mesh->minBounds.z<=v.z && v.z<=mesh->maxBounds.z);
+    }
     // Native cameras query dynamic floors too, including the shelf crowns.
     // Exercise the real surface-index and camera lookup without a null guard.
     const auto cameraIndex=SHELF_CAMERA_INDEX(&play.colCtx,&mesh->polyList[0],0);
@@ -37,9 +43,14 @@ int main() {
             assert(poly.vtxData[i]<16);
             const auto& v=mesh->vtxList[poly.vtxData[i]];
             const float plane=(poly.normal.x*v.x+poly.normal.y*v.y+poly.normal.z*v.z)/32767.f+poly.dist;
-            assert(std::abs(plane)<.01f);
+            // CollisionPoly stores a rounded integer plane distance.
+            assert(std::abs(plane)<.51f);
         }
-        const float cx=(box.low.x+box.high.x)*.5f,cy=(box.low.y+box.high.y)*.5f,cz=(box.low.z+box.high.z)*.5f;
+        float cx=0,cy=0,cz=0;
+        for (int i=0;i<8;++i) {
+            const auto& v=mesh->vtxList[bank*8+i];
+            cx+=v.x/8.f;cy+=v.y/8.f;cz+=v.z/8.f;
+        }
         assert((poly.normal.x*cx+poly.normal.y*cy+poly.normal.z*cz)/32767.f+poly.dist<0);
     }
     assert(fixture.Ensure(&play) && play.colCtx.dyna.bgActors[1].actor==nullptr);

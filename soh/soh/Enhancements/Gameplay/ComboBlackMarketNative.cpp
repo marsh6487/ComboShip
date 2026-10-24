@@ -73,7 +73,8 @@ s16 sGroundedReturnYaw = 0;
 u16 sGroundedReturnEntrance = ENTR_SKIEJER_FOREST;
 RespawnData sPreservedReturn;
 std::string sStatus;
-constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13,
+              kKeeperTalkText = 0x8F15, kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 int sKeeperActorId = -1;
 constexpr int kLimbCount = 24, kHeadLimb = 5;
 alignas(2) constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
@@ -88,10 +89,9 @@ BlackMarketKeeperAssets::NativeModel sNativeKeeper;
 bool sNativeKeeperReady = false;
 BlackMarketShelvesNative::Fixture sShelfFixture;
 constexpr Vec3f kShelves[8] = {
-    // Two framed shelf banks; keep all offers on one frontal plane.
-    // Upper anchors clear the physical middle board and selected-item seals.
-    { 35, 58, 110 },  { 35, 110, 110 },  { 70, 58, 110 },  { 70, 110, 110 },
-    { -35, 58, 110 }, { -35, 110, 110 }, { -70, 58, 110 }, { -70, 110, 110 }
+    // Native +/-30-degree bank planes; row changes keep one bank camera.
+    { 44.84456f, 58, 98.75f },  { 44.84456f, 110, 98.75f },  { 75.15544f, 58, 116.25f },  { 75.15544f, 110, 116.25f },
+    { -44.84456f, 58, 98.75f }, { -44.84456f, 110, 98.75f }, { -75.15544f, 58, 116.25f }, { -75.15544f, 110, 116.25f }
 };
 
 u32 Seed() {
@@ -393,6 +393,7 @@ bool LoadNativeKeeper() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    sBrowseKeeper = actor;
     SkelAnime_Update(&sKeeper.skel);
     if (sKeeper.timer > 0)
         --sKeeper.timer;
@@ -496,14 +497,18 @@ void MarketText(u16* textId, bool* fromTable) {
         return;
     }
     if (!Active() ||
-        (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
+        (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText &&
+         *textId != kKeeperTalkText && *textId != kKeeperHelpChoiceText && *textId != kKeeperHelpText))
         return;
-    const Page page = *textId == kWelcomeText   ? Page::Welcome
-                      : *textId == kConfirmText ? Page::Confirm
-                      : *textId == kResultText  ? Page::Result
-                                                : Page::Browse;
+    const Page page = *textId == kKeeperTalkText         ? Page::KeeperTalk
+                      : *textId == kKeeperHelpChoiceText ? Page::KeeperHelpChoice
+                      : *textId == kKeeperHelpText       ? Page::KeeperHelp
+                      : *textId == kWelcomeText          ? Page::Welcome
+                      : *textId == kConfirmText          ? Page::Confirm
+                      : *textId == kResultText           ? Page::Result
+                                                         : Page::Browse;
     BlackMarketText::Offer offer;
-    if (page != Page::Welcome) {
+    if (page == Page::Browse || page == Page::Confirm || page == Page::Result) {
         offer.item = Offer(sSelected);
         if (!offer.item && page != Page::Result)
             return;
@@ -531,7 +536,7 @@ void MarketText(u16* textId, bool* fromTable) {
     CustomMessage entry(BlackMarketText::Oot(page, offer, sStatus, gSaveContext.language));
     entry.AutoFormat();
     entry = CustomMessage(BlackMarketText::OotPages(entry.GetForCurrentLanguage(MF_RAW)));
-    if (page != Page::Welcome)
+    if (page == Page::Browse || page == Page::Confirm || page == Page::Result)
         entry.SetTextBoxPosition(TEXTBOX_POS_BOTTOM);
     entry.LoadIntoFont();
     *fromTable = false;
@@ -860,6 +865,7 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
+        InitBrowsingCameraScene(nullptr);
         CancelReceipt(true);
         GrannySceneBegin();
         sEntering = sDoorArmed = sTalking = false;
@@ -1056,6 +1062,17 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
     RememberTravel();
     Transition(play, ENTR_SKIEJER_MARKET);
     return COMBO_BLACK_MARKET_OOT_DOOR_ENTERED;
+}
+
+extern "C" int ComboBlackMarketNative_PrepareViewpointCamera(PlayState* play) {
+    if (!sTalking || play != gPlayState || OwnNativeBrowsingCamera(play))
+        return 1;
+    if (BrowsingMessage(play))
+        Message_CloseTextbox(play);
+    EndBrowsing(play);
+    // Skipping this dispatch is necessary even after restoring viewpoint 1:
+    // applying its original BG0 record would also mutate the foreign camera.
+    return 0;
 }
 
 extern "C" void ComboBlackMarketOot_NormalizeEntry(void) {

@@ -244,14 +244,16 @@ int main() {
         data->ArrayCount = data->Scalars.size();
         return data;
     };
-    for (const char* model : { "objects/object_sa/NativeNpcV1", "objects/object_ma1/NativeNpcV1" }) {
+    for (const char* model :
+         { "objects/object_sa/NativeNpcV1", "objects/object_ma1/NativeNpcV1", "objects/object_fa/YoungFadoNpcPOC1" }) {
         const std::string ns = model, scalePath = "alt/" + ns + "/DrawScale", rig = ns + "/Skel";
         SOH::SkeletonPatcher::skeletons[0].vanillaSkeletonPath = rig;
         resources["alt/" + rig] = Clip();
         assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
-        auto scale = drawScale(1.10f);
+        const float factor = ns == "objects/object_fa/YoungFadoNpcPOC1" ? 1.25f : 1.10f;
+        auto scale = drawScale(factor);
         resources[scalePath] = scale;
-        assert(std::abs(NativeNpcPose_GetDrawScale(limbs) - 1.10f) < 1e-6f);
+        assert(std::abs(NativeNpcPose_GetDrawScale(limbs) - factor) < 1e-6f);
         alt = false;
         assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
         alt = true;
@@ -278,11 +280,12 @@ int main() {
         assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
         resources.erase(scalePath);
     }
-    for (const char* unrelated : { "objects/object_ma1/gMalonChildSkel", "objects/object_sa/gSariaSkel",
-                                   "objects/object_ma2/NativeNpcV1/Skel", "objects/object_kw1/NativeNpcV1/Skel" }) {
+    for (const char* unrelated :
+         { "objects/object_ma1/gMalonChildSkel", "objects/object_sa/gSariaSkel", "objects/object_ma2/NativeNpcV1/Skel",
+           "objects/object_kw1/NativeNpcV1/Skel", "objects/object_fa/gFaSkel" }) {
         SOH::SkeletonPatcher::skeletons[0].vanillaSkeletonPath = unrelated;
         assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
     }
     assert(NativeNpcPose_GetDrawScale(nullptr) == 1.f);
-    puts("PASS production draw scale: opt-in Malon/Saria only, missing/invalid/Alt-off and unrelated fallback.");
+    puts("PASS production draw scale: opt-in Malon/Saria/Fado, missing/invalid/Alt-off and unrelated fallback.");
 }

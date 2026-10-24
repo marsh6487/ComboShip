@@ -984,19 +984,29 @@ void ApplyShared(const nlohmann::json& sh) {
 //      An id without its slot is a phantom button the rest of the game cannot resolve.
 void ExtractEquips(nlohmann::json& sh) {
     // Publish 0xFF for anything MM has no relative for, so the peer's rule 1 keeps its own button.
-    auto pub = [](uint16_t id) -> uint16_t {
+    auto pub = [](int btn) -> uint16_t {
+        const uint16_t id = ExtButton_GetItem(btn);
+        // A native stick always keeps its inventory slot. A zero byte with
+        // SLOT_NONE, or an EXT marker whose u16 shadow is zero, is not a valid
+        // stick equip. Do not turn that invalid local state into a real peer
+        // stick merely because the destination owns one. Leave the save alone.
+        if (id == ITEM_STICK && (gSaveContext.equips.cButtonSlots[btn - 1] == SLOT_NONE ||
+                                 gSaveContext.equips.buttonItems[btn] == ITEM_EXT_BUTTON)) {
+            return 0xFF;
+        }
         return (id == ITEM_NONE || FcEquip_OotToMm16(id) == 0xFF) ? (uint16_t)0xFF : id;
     };
     nlohmann::json c = nlohmann::json::array();
     for (int b = 1; b <= 3; b++) {
-        c.push_back(pub(ExtButton_GetItem(b)));
+        c.push_back(pub(b));
     }
     sh["cEquips"] = c;
     nlohmann::json d = nlohmann::json::array();
     for (int b = 4; b <= 7; b++) {
-        d.push_back(pub(ExtButton_GetItem(b)));
+        d.push_back(pub(b));
     }
     sh["dEquips"] = d;
+    sh["dEquipsOrder"] = "UDLR";
 }
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
@@ -1057,10 +1067,18 @@ void ApplyEquips(const nlohmann::json& sh) {
         }
     }
     if (sh.contains("dEquips") && sh["dEquips"].is_array()) {
+        const auto order = sh.find("dEquipsOrder");
+        if (order != sh.end() && (!order->is_string() || *order != "UDLR")) {
+            return;
+        }
+        // Old MM departures used native R/L/D/U order without a tag. Preserve
+        // in-flight temp files while new departures use physical U/D/L/R.
+        static constexpr int kLegacyMmButtons[] = { 7, 6, 5, 4 };
+        const bool canonicalOrder = order != sh.end();
         for (int i = 0; i < 4 && i < (int)sh["dEquips"].size(); i++) {
             const auto& item = sh["dEquips"][i];
             if (item.is_number_integer() && item >= 0 && item <= 0xFFFF) {
-                ApplyOneButton(4 + i, item.get<uint16_t>());
+                ApplyOneButton(canonicalOrder ? 4 + i : kLegacyMmButtons[i], item.get<uint16_t>());
             }
         }
     }
@@ -1629,6 +1647,7 @@ void NetResetBaseline(const nlohmann::json& sh) {
     // diff and in the verify hash, which is the whole bug this split exists to kill.
     sNetShared.erase("cEquips");
     sNetShared.erase("dEquips");
+    sNetShared.erase("dEquipsOrder");
     sNetFlat = sNetShared.flatten();
     sNetPrimed = false;
     sNetMismatchStreak = 0;
@@ -1914,6 +1933,7 @@ void FleetSync_ApplyArrival(int slot) {
             ApplyEquips(temp["shared"]);
             temp["shared"].erase("cEquips");
             temp["shared"].erase("dEquips");
+            temp["shared"].erase("dEquipsOrder");
             dirty = true;
             SPDLOG_INFO("[FleetSync] shared overlay applied (OoT)");
         } catch (const std::exception& e) {

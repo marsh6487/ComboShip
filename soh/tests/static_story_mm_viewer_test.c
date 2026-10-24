@@ -14,6 +14,8 @@
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "soh/ResourceManagerHelpers.h"
 
+void lusprintf(const char* file, int32_t line, int32_t level, const char* fmt, ...) {
+}
 void osSyncPrintfUnused(const char* format, ...) {
 }
 void FrameInterpolation_RecordOpenChild(const void* a, int b) {
@@ -256,7 +258,12 @@ s32 SkelAnime_InitFlex(PlayState* p, SkelAnime* s, FlexSkeletonHeader* h, Animat
     return 0; // The production function's return value is undefined; caller must inspect allocations.
 }
 s32 SkelAnime_Init(PlayState* p, SkelAnime* s, SkeletonHeader* h, AnimationHeader* a, Vec3s* j, Vec3s* m, s32 n) {
-    REQUIRE(false);
+    REQUIRE(h->limbCount == 19 && a == NULL && j == NULL && m == NULL);
+    ++initCalls;
+    s->limbCount = h->limbCount + 1;
+    s->dListCount = 0;
+    s->jointTable = calloc(s->limbCount, sizeof(Vec3s));
+    s->morphTable = allocationSuccess ? calloc(s->limbCount, sizeof(Vec3s)) : NULL;
     return 0;
 }
 void Animation_PlayLoopSetSpeed(SkelAnime* s, AnimationHeader* a, f32 speed) {
@@ -331,6 +338,19 @@ void Matrix_Pop(void) {
 void Matrix_RotateY(f32 y, u8 mode) {
     REQUIRE(mode == MTXMODE_APPLY);
 }
+static unsigned regionalXluDraws, regionalOpaDraws;
+void Gfx_SetupDL_25Xlu(GraphicsContext* gfx) {
+}
+Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* joints, s32 count, OverrideLimbDraw override,
+                        PostLimbDraw post, void* arg, Gfx* gfx) {
+    REQUIRE(drawing->staticState.type == 27 && arg == drawing && count == 17);
+    REQUIRE(gfx == play->state.gfxCtx->polyXlu.p);
+    REQUIRE(play->state.gfxCtx->polyOpa.p == commands);
+    REQUIRE(gfx[-2].words.w1 == (uintptr_t)eyes[1]);
+    REQUIRE(gfx[-1].words.w1 == 0xffffffB0U);
+    ++regionalXluDraws;
+    return gfx;
+}
 void Gfx_SetupDL_25Opa(GraphicsContext* gfx) {
 }
 void Graph_OpenDisps(Gfx** dList, GraphicsContext* gfx, const char* file, s32 line) {
@@ -351,6 +371,21 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
                                void* arg) {
     ++drawCalls;
     REQUIRE(arg == drawing);
+    if (drawing->staticState.type == 25 || drawing->staticState.type == 26) {
+        ++regionalOpaDraws;
+        if (drawing->staticState.type == 26 && drawing->staticState.pose == 1) {
+            REQUIRE(post);
+            Vec3s rot = { 0 };
+            Gfx* dl = NULL;
+            Gfx* before = play->state.gfxCtx->polyOpa.p;
+            post(play, 16, &dl, &rot, arg);
+            REQUIRE(play->state.gfxCtx->polyOpa.p == before);
+            post(play, 17, &dl, &rot, arg);
+            REQUIRE(play->state.gfxCtx->polyOpa.p == before + 2);
+            REQUIRE(before[1].words.w1 == (uintptr_t)umbrella);
+        }
+        return;
+    }
     if (drawing->staticState.type == STATIC_STORY_ACTOR_SKULL_KID) {
         const MmSkullKidDisplayLists* selected = &skullModels[altAssets];
         REQUIRE(drawing->staticState.skullKidHeadDL == selected->head);
@@ -828,6 +863,8 @@ static void testKokiriUpdateTiming(PlayState* play) {
 }
 
 static void testMonkeyAudio(PlayState* play) {
+    s16 savedRate = R_UPDATE_RATE;
+    R_UPDATE_RATE = 3;
     for (uint8_t pose = 0; pose < 3; ++pose) {
         EnViewer first, second;
         prepare(&first, STATIC_STORY_ACTOR_MONKEY, pose);
@@ -838,14 +875,15 @@ static void testMonkeyAudio(PlayState* play) {
         unsigned calls = monkeyCalls;
         EnViewer_Update(&first.actor, play);
         REQUIRE(monkeyCalls == calls + 1 && lastMonkeyPosition == &first.actor.projectedPos);
-        for (unsigned i = 0; i < 59; ++i)
+        for (unsigned tick = 1; tick < 90; ++tick) {
             EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 1); /* No per-frame retrigger or overlapping loop. */
-        for (unsigned i = 0; i < 43; ++i)
-            EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 2); /* Continues calling while the room stays loaded. */
+            /* The native guide's nine-frame walk emits at frame 1 each cycle,
+             * even when the placed actor displays a longer scratching pose. */
+            REQUIRE(monkeyCalls == calls + 1 + tick / 9);
+        }
+        calls = monkeyCalls;
         EnViewer_Update(&second.actor, play);
-        REQUIRE(monkeyCalls == calls + 3 && lastMonkeyPosition == &second.actor.projectedPos);
+        REQUIRE(monkeyCalls == calls + 1 && lastMonkeyPosition == &second.actor.projectedPos);
         REQUIRE(first.actor.world.pos.y == 345 && first.actor.home.pos.y == 345);
 
         unsigned stops = monkeyStops;
@@ -856,35 +894,35 @@ static void testMonkeyAudio(PlayState* play) {
         REQUIRE(monkeyStops == stops + 1);
         play->pauseCtx.state = 0;
         EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 4);
+        REQUIRE(monkeyCalls == calls + 2);
 
         ++play->roomCtx.curRoom.num;
         EnViewer_Update(&first.actor, play);
         REQUIRE(monkeyStops == stops + 2 && lastMonkeyStop == &first.actor.projectedPos);
         for (unsigned i = 0; i < 120; ++i)
             EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 4);
+        REQUIRE(monkeyCalls == calls + 2);
         --play->roomCtx.curRoom.num;
         EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 5);
+        REQUIRE(monkeyCalls == calls + 3);
         play->transitionTrigger = TRANS_TRIGGER_START;
         EnViewer_Update(&first.actor, play);
         REQUIRE(monkeyStops == stops + 3);
         play->transitionTrigger = TRANS_TRIGGER_OFF;
         EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 6);
+        REQUIRE(monkeyCalls == calls + 4);
         play->transitionMode = 1;
         EnViewer_Update(&first.actor, play);
         REQUIRE(monkeyStops == stops + 4);
         play->transitionMode = TRANS_MODE_OFF;
         EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 7);
+        REQUIRE(monkeyCalls == calls + 5);
         play->csCtx.state = 1;
         EnViewer_Update(&first.actor, play);
         REQUIRE(monkeyStops == stops + 5);
         play->csCtx.state = CS_STATE_IDLE;
         EnViewer_Update(&first.actor, play);
-        REQUIRE(monkeyCalls == calls + 8);
+        REQUIRE(monkeyCalls == calls + 6);
 
         EnViewer_Destroy(&first.actor, play);
         REQUIRE(monkeyStops == stops + 6 && lastMonkeyStop == &first.actor.projectedPos);
@@ -893,6 +931,38 @@ static void testMonkeyAudio(PlayState* play) {
         EnViewer_Destroy(&second.actor, play);
         REQUIRE(monkeyStops == stops + 7 && lastMonkeyStop == &second.actor.projectedPos);
     }
+    for (s16 rate = 1; rate <= 2; ++rate) {
+        EnViewer slow;
+        prepare(&slow, STATIC_STORY_ACTOR_MONKEY, 1);
+        slow.actor.room = play->roomCtx.curRoom.num;
+        EnViewerStatic_WaitForObjects(&slow, play);
+        R_UPDATE_RATE = rate;
+        unsigned expected = monkeyCalls;
+        for (unsigned tick = 1; tick <= 57; ++tick) {
+            /* Hand-derived frame-1 crossings for the native nine-frame loop. */
+            if ((rate == 1 && (tick == 3 || tick == 30 || tick == 57)) ||
+                (rate == 2 && (tick == 2 || tick == 15 || tick == 29 || tick == 42 || tick == 56))) {
+                ++expected;
+            }
+            EnViewer_Update(&slow.actor, play);
+            REQUIRE(monkeyCalls == expected);
+        }
+        EnViewer_Destroy(&slow.actor, play);
+    }
+    R_UPDATE_RATE = 3;
+    EnViewer interrupted;
+    prepare(&interrupted, STATIC_STORY_ACTOR_MONKEY, 0);
+    interrupted.actor.room = play->roomCtx.curRoom.num;
+    EnViewerStatic_WaitForObjects(&interrupted, play);
+    EnViewer_Update(&interrupted.actor, play);
+    REQUIRE(interrupted.staticState.monkeySfxActive);
+    monkeyAudioAvailable = false;
+    for (unsigned tick = 0; tick < 9; ++tick)
+        EnViewer_Update(&interrupted.actor, play);
+    unsigned interruptedStops = monkeyStops;
+    EnViewer_Destroy(&interrupted.actor, play);
+    REQUIRE(monkeyStops == interruptedStops + 1 && lastMonkeyStop == &interrupted.actor.projectedPos);
+    monkeyAudioAvailable = true;
     EnViewer unavailable;
     prepare(&unavailable, STATIC_STORY_ACTOR_MONKEY, 2);
     EnViewerStatic_WaitForObjects(&unavailable, play);
@@ -910,14 +980,35 @@ static void testMonkeyAudio(PlayState* play) {
     EnViewer_Destroy(&unavailable.actor, play);
     REQUIRE(monkeyCalls == calls && monkeyStops == stops);
     loadSuccess = true;
-    puts("PASS monkey audio: all three poses, repeat gaps, independent instances, room/pause/transition/cutscene stop, "
+    R_UPDATE_RATE = savedRate;
+    puts("PASS monkey audio: all three poses, continuous native nine-frame cadence, independent instances, "
+         "room/pause/transition/cutscene stop, "
          "idempotent destroy and unavailable-resource cleanup");
 }
 
+static void TestRegionalDraw(PlayState* play) {
+    EnViewer actor = { 0 };
+    drawing = &actor;
+    actor.staticState.initialized = true;
+    actor.isVisible = true;
+    actor.staticState.eyeIndex = 1;
+    actor.staticState.mmEyeTextures[1] = eyes[1];
+    for (unsigned type = 25; type <= 27; type++) {
+        actor.staticState.type = type;
+        actor.staticState.pose = type == 26 ? 1 : 0;
+        actor.skin.skelAnime.dListCount = type == 27 ? 17 : 20;
+        actor.staticState.mmPropDL = umbrella;
+        play->state.gfxCtx->polyOpa.p = commands;
+        play->state.gfxCtx->polyXlu.p = commands + 100;
+        EnViewerStatic_Draw(&actor, play);
+    }
+    REQUIRE(regionalOpaDraws == 2 && regionalXluDraws == 1);
+}
 int main(void) {
     static PlayState play;
     static GraphicsContext gfx;
     play.state.gfxCtx = &gfx;
+    TestRegionalDraw(&play);
     testKokiriUpdateTiming(&play);
     EnViewer skull = { 0 };
     skull.staticState.type = STATIC_STORY_ACTOR_SKULL_KID;
@@ -1067,5 +1158,18 @@ int main(void) {
     puts("PASS compiled production viewer init/update/draw/free: 10 poses, independent state, root preservation, face "
          "order, typed-load and partial-allocation failure");
     testMonkeyAudio(&play);
+    loadSuccess = allocationSuccess = true;
+    for (unsigned type = 25; type <= 27; type++)
+        for (unsigned pose = 0; pose < (type == 25 ? 5 : 2); pose++) {
+            EnViewer a;
+            prepare(&a, type, pose);
+            a.actor.params = (type == 25 ? 0x7E0F : type == 26 ? 0x7D01 : 0x7D02) | (pose << 4);
+            EnViewerStatic_WaitForObjects(&a, &play);
+            REQUIRE(a.staticState.initialized && a.skin.skelAnime.limbCount == (type == 26 ? 23 : 20));
+            REQUIRE(a.skin.skelAnime.dListCount == (type == 25 ? 0 : type == 26 ? 20 : 17));
+            EnViewer_Destroy(&a.actor, &play);
+        }
+    puts("PASS nine regional viewer init/free paths: real standard versus flex selection");
+
     return 0;
 }

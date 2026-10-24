@@ -2325,23 +2325,30 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
         cursorItem = pauseCtx->cursorItem[PAUSE_ITEM];
         cursorSlot = pauseCtx->cursorSlot[PAUSE_ITEM];
 
+        // Empty sub-pages leave the native cursor on a page arrow. Keep the
+        // inventory-page button available there so other owned items remain
+        // reachable. Use the shoulder not owned by native tab switching.
+        bool ngcMode = CVarGetInteger(CVAR_ENHANCEMENT("NGCKaleidoSwitcher"), 0) != 0;
+        s16 freedBtn = ngcMode ? BTN_Z : BTN_L;
+        bool switchedInventoryPage = false;
+        if ((pauseCtx->debugState == 0) && ExtInv_CanSwitchPage() && (ExtInv_GetMaxPages() > 1) &&
+            CHECK_BTN_ALL(input->press.button, freedBtn) && !IsItemCycling() && !sGustOverlayActive &&
+            !sArrowWheelOverlayActive) {
+            ExtInv_SwitchPage();
+            cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
+            if ((pauseCtx->cursorSpecialPos != 0) || (cursorItem == ITEM_NONE)) {
+                cursorItem = PAUSE_ITEM_NONE;
+            }
+            pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
+            pauseCtx->nameDisplayTimer = 0;
+            Audio_PlaySoundGeneral(NA_SE_SY_HP_RECOVER, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            moveCursorResult = 2;
+            switchedInventoryPage = true;
+        }
+
         if (pauseCtx->cursorSpecialPos == 0) {
             pauseCtx->cursorColorSet = 4;
-
-            // Inventory sub-page switch (vanilla / custom items / MM masks).
-            // It uses whichever shoulder button is NOT bound to kaleido tab
-            // switching: tab switching (KaleidoScope_HandlePageToggles) uses L
-            // by default (NGCKaleidoSwitcher) and Z when the switcher is off, so
-            // this takes the freed button and the two never collide.
-            bool ngcMode = CVarGetInteger(CVAR_ENHANCEMENT("NGCKaleidoSwitcher"), 0) != 0;
-            s16 freedBtn = ngcMode ? BTN_Z : BTN_L;
-
-            if (ExtInv_CanSwitchPage() && CHECK_BTN_ALL(input->press.button, freedBtn) && !IsItemCycling()) {
-                ExtInv_SwitchPage();
-                Audio_PlaySoundGeneral(NA_SE_SY_HP_RECOVER, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-                moveCursorResult = 2;
-            }
 
             if (cursorItem == PAUSE_ITEM_NONE) {
                 pauseCtx->stickRelX = 40;
@@ -2585,7 +2592,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 index = cursorSlot * 4; // required to match?
                 KaleidoScope_SetCursorVtx(pauseCtx, index, pauseCtx->itemVtx);
 
-                if ((pauseCtx->debugState == 0) && (pauseCtx->state == 6) && (pauseCtx->unk_1E4 == 0)) {
+                if (!switchedInventoryPage && (pauseCtx->debugState == 0) && (pauseCtx->state == 6) &&
+                    (pauseCtx->unk_1E4 == 0)) {
                     KaleidoScope_HandleItemCycles(play);
                     u16 buttonsToCheck = BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT;
                     if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) &&

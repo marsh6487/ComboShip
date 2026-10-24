@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -20,18 +21,46 @@ extern "C" {
 #include "combo/render/SpinAttackNativeMaterial.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
-static Gfx xlu[2048], opa[32];
+static Gfx xlu[2048];
 alignas(16) static uint8_t allocation[32768];
+static Gfx *opa = (Gfx *)allocation;
 static size_t allocated;
 static size_t allocationCursor, submittedVertices;
-static uint32_t particleColor;
+static std::vector<uint32_t> particleColors;
+static std::vector<uint8_t> particleAlphas;
+static std::vector<Gfx *> submittedLists;
 static Gfx nativeList[8], privateList[2], brokenList[2];
+static Gfx accentNativeList[3][14];
 static uint8_t textureByte;
-static bool missing, malformed, cosmeticEdited;
+static bool missing, malformed, cosmeticEdited, accentMissing, accentMalformed,
+    allocationFailure;
 static GraphicsContext gfx;
 static PlayState play;
+static MtxF parentMatrix;
+static std::vector<std::pair<Mtx *, MtxF>> matrixSnapshots;
+static unsigned xluSetups, hiliteCalls;
 extern "C" {
+void Matrix_Get(MtxF *dest) { *dest = parentMatrix; }
+Mtx *Matrix_MtxFToMtx(MtxF *src, Mtx *dest) {
+  matrixSnapshots.emplace_back(dest, *src);
+  std::memset(dest, 0, sizeof(*dest));
+  return dest;
+}
+void gDPSetTileSizeLerp(Gfx *p, int tile, float u0, float v0, float r0,
+                       float b0, float u1, float v1, float r1, float b1) {
+  __gDPSetTileSizeLerp(p, tile, u0, v0, r0, b0, u1, v1, r1, b1);
+}
+void guLookAtHilite(Mtx *mtx, LookAt *look, Hilite *hilite, float, float,
+                    float, float, float, float, float, float, float, float,
+                    float, float, float, float, float, int32_t, int32_t) {
+  ++hiliteCalls;
+  std::memset(mtx, 0, sizeof(*mtx));
+  std::memset(look, 0, sizeof(*look));
+  std::memset(hilite, 0, sizeof(*hilite));
+}
 void *Graph_Alloc(GraphicsContext *, size_t size) {
+  if (allocationFailure)
+    return nullptr;
   allocated = size;
   assert(size <= sizeof(allocation));
   size_t at = allocationCursor;
@@ -41,12 +70,20 @@ void *Graph_Alloc(GraphicsContext *, size_t size) {
 }
 void gSPVertex(Gfx *p, uintptr_t vtx, int n, int v0) {
   submittedVertices += n;
-  const auto *first = (const Vtx *)vtx;
-  particleColor = (uint32_t)first->v.cn[0] << 16 |
-                  (uint32_t)first->v.cn[1] << 8 | first->v.cn[2];
   __gSPVertex(p, vtx, n, v0);
 }
-void gSPDisplayList(Gfx *p, Gfx *dl) { __gSPDisplayList(p, dl); }
+void gSPDisplayList(Gfx *p, Gfx *dl) {
+  submittedLists.push_back(dl);
+  if ((dl[0].words.w0 >> 24) == 0x33) {
+    uint32_t rgba = 0;
+    for (const Gfx *command = xlu; command < p; ++command)
+      if ((command->words.w0 >> 24) == 0xfa)
+        rgba = command->words.w1;
+    particleColors.push_back(rgba >> 8);
+    particleAlphas.push_back(rgba & 255);
+  }
+  __gSPDisplayList(p, dl);
+}
 int32_t CVarGetInteger(const char *key, int32_t fallback) {
   return cosmeticEdited && strstr(key, ".Changed") ? 1 : fallback;
 }
@@ -56,6 +93,16 @@ Color_RGB8 CVarGetColor24(const char *name, Color_RGB8 fallback) {
                         : fallback;
 }
 void *ResourceGetDataByName(const char *name) {
+  if (strstr(name, "gEff") && accentMissing)
+    return nullptr;
+  if (strstr(name, "gEff") && accentMalformed)
+    return brokenList;
+  if (strstr(name, "gEffFire2DL"))
+    return accentNativeList[0];
+  if (strstr(name, "gEffIceFragment1DL"))
+    return accentNativeList[1];
+  if (strstr(name, "gEffSparklesDL"))
+    return accentNativeList[2];
   if (missing && strstr(name, "cylinder"))
     return nullptr;
   if (!strncmp(name, "native", 6) || strstr(name, "gSpinAttackChargingDL"))
@@ -66,6 +113,8 @@ void *ResourceGetDataByName(const char *name) {
   return malformed ? brokenList : privateList;
 }
 size_t ResourceGetSizeByName(const char *name) {
+  if (strstr(name, "gEff"))
+    return accentMalformed ? sizeof(brokenList) : sizeof(accentNativeList[0]);
   return (!strncmp(name, "native", 6) || strstr(name, "gSpinAttackChargingDL"))
              ? sizeof(nativeList)
              : sizeof(privateList);
@@ -83,11 +132,11 @@ Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a,
 #ifdef HOST_MM
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
-void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
+void Gfx_SetupDL25_Xlu(GraphicsContext *) { ++xluSetups; }
 #else
 void Graph_OpenDisps(Gfx **, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, GraphicsContext *, const char *, s32) {}
-void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
+void Gfx_SetupDL_25Xlu(GraphicsContext *) { ++xluSetups; }
 #endif
 void FrameInterpolation_RecordOpenChild(const void *, int) {}
 void FrameInterpolation_RecordCloseChild() {}
@@ -96,7 +145,207 @@ void FrameInterpolation_RecordCloseChild() {}
 #include "combo/render/SpinAttackDraw.h"
 #include "spin_draw_production.inc"
 
+static size_t AccentDraws() {
+  size_t count = 0;
+  for (const auto *list : submittedLists)
+    count += (list[0].words.w0 >> 24) == 0x33;
+  return count;
+}
+
+static void CheckRestoredColors(uint32_t primary, uint32_t environment,
+                                uint8_t alpha) {
+  const Gfx *end = gfx.polyXlu.p;
+  assert(((end - 2)->words.w0 >> 24) == 0xfa);
+  assert((end - 2)->words.w1 == ((primary << 8) | alpha));
+  assert(((end - 1)->words.w0 >> 24) == 0xfb);
+  assert((end - 1)->words.w1 == ((environment << 8) | 128));
+  const Gfx *lastMatrix = nullptr;
+  for (const Gfx *command = xlu; command < end; ++command) {
+    assert((command->words.w0 >> 24) != 0xdb);
+    if ((command->words.w0 >> 24) == 0xda)
+      lastMatrix = command;
+  }
+  assert(lastMatrix && !matrixSnapshots.empty());
+  bool parentRestored = false;
+  for (auto it = matrixSnapshots.rbegin(); it != matrixSnapshots.rend(); ++it)
+    if (lastMatrix->words.w1 == (uintptr_t)it->first) {
+      assert(std::memcmp(&it->second, &parentMatrix, sizeof(parentMatrix)) == 0);
+      parentRestored = true;
+      break;
+    }
+  assert(parentRestored);
+}
+
+static void ResetDraw() {
+  gfx.polyXlu.p = xlu;
+  gfx.polyOpa.p = opa;
+  gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
+  submittedVertices = allocationCursor = xluSetups = hiliteCalls = 0;
+  submittedLists.clear();
+  particleColors.clear();
+  particleAlphas.clear();
+  matrixSnapshots.clear();
+}
+
+static void CheckNativeAccents() {
+  Gfx original[3][14];
+  std::memcpy(original, accentNativeList, sizeof(original));
+  for (int element = 1; element <= 3; ++element) {
+    for (int great = 0; great <= 1; ++great) {
+      ResetDraw();
+      const MtxF before = parentMatrix;
+      CwSpinAccents_Draw(&play, element, great, .3f, .5f);
+      const size_t count = great ? 24 : 12;
+      assert(AccentDraws() == count && submittedVertices == 0);
+      assert(matrixSnapshots.size() == count + 1);
+      assert(std::memcmp(&before, &parentMatrix, sizeof(before)) == 0);
+      assert(xluSetups == 2 && hiliteCalls == (element == 2 ? count : 0));
+      const Gfx *material = submittedLists[0];
+      assert(material != accentNativeList[element - 1]);
+      assert(material[1].words.w1 == (unsigned)element);
+      // Actual native texture/UV-bearing vertices, combiner, translucency and
+      // triangles survive. A missing texture, shade fan or wrong donor fails.
+      for (int i : {2, 3, 4, 5, 6, 7, 8, 12, 13})
+        assert(std::memcmp(material + i, original[element - 1] + i,
+                           sizeof(Gfx)) == 0);
+      assert((material[9].words.w0 >> 24) == 0xe7);
+      assert((material[10].words.w0 >> 24) == 0xe7);
+      if (element != 3) {
+        assert((material[11].words.w0 >> 24) == 0xde);
+        assert(material[11].words.w1 != 0x08000001);
+        const auto *scroll = (const Gfx *)material[11].words.w1;
+        assert((scroll[1].words.w0 >> 24) == G_SETTILESIZE_LERP);
+        assert((scroll[6].words.w0 >> 24) == G_SETTILESIZE_LERP);
+        assert((scroll[11].words.w0 >> 24) == 0xdf);
+        uint32_t startBits = scroll[7].words.w1, endBits = scroll[9].words.w1;
+        float start, end;
+        std::memcpy(&start, &startBits, sizeof(start));
+        std::memcpy(&end, &endBits, sizeof(end));
+        assert(end - start == (element == 1 ? -20 : 2));
+      }
+      for (const Gfx *command = xlu; command < gfx.polyXlu.p; ++command)
+        assert((command->words.w0 >> 24) != 0xdb); // No segment mutation.
+      assert(((gfx.polyXlu.p - 1)->words.w0 >> 24) == 0xda);
+      assert((gfx.polyXlu.p - 1)->words.w1 ==
+             (uintptr_t)matrixSnapshots[0].first); // Parent GPU matrix restored.
+      assert(particleColors[0] == (element == 1 ? 0xff8c2d
+                                : element == 2 ? 0x91e1ff : 0xfff2aa));
+      assert(particleAlphas[0] == 85); // Native material cannot replace the fade with 255.
+      ResetDraw();
+      CwSpinAccents_DrawCharge(&play, element, great, 0, 1);
+      assert(AccentDraws() == (great ? 8u : 4u));
+      const auto &first = matrixSnapshots[1].second;
+      assert(std::fabs(first.xw - (great ? -656.25f : -812.5f)) < .001f);
+      float centerY = first.yw + (element == 1 ? first.yy * 8000 : 0);
+      assert(std::fabs(centerY - .5f) < .001f);
+    }
+  }
+  assert(std::memcmp(original, accentNativeList, sizeof(original)) == 0);
+  // The burst's scroll phase advances by up to 2 per tick. Reusing it as a
+  // flame frame would jump dozens of animation frames and visibly flicker.
+  Gfx animation[12];
+  ResetDraw();
+  play.gameplayFrames = 10;
+  CwSpinAccents_Draw(&play, 1, 0, .3f, .5f);
+  const auto *nativeScroll = (const Gfx *)submittedLists[0][11].words.w1;
+  std::memcpy(animation, nativeScroll, sizeof(animation));
+  ResetDraw();
+  CwSpinAccents_Draw(&play, 1, 0, 1.7f, .5f);
+  nativeScroll = (const Gfx *)submittedLists[0][11].words.w1;
+  assert(std::memcmp(animation, nativeScroll, sizeof(animation)) == 0);
+  ResetDraw();
+  ++play.gameplayFrames;
+  CwSpinAccents_Draw(&play, 1, 0, 1.7f, .5f);
+  nativeScroll = (const Gfx *)submittedLists[0][11].words.w1;
+  assert(std::memcmp(animation, nativeScroll, sizeof(animation)) != 0);
+  play.gameplayFrames = 0;
+  Gfx uninspected[14], scroll[12];
+  std::memcpy(uninspected, accentNativeList[0], sizeof(uninspected));
+  uninspected[11].words.w1 = 0x09000000;
+  assert(!CwSpinAccents_NativeMaterial(nullptr, uninspected, 14, scroll));
+  uninspected[11].words.w0 = 0xda000003;
+  assert(!CwSpinAccents_NativeMaterial(nullptr, uninspected, 14, scroll));
+  assert(!CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 3, scroll));
+  assert(!CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 129, scroll));
+  ResetDraw();
+  CwSpinAccents_DrawLimited(&play, 1, 1, .3f, .5f, 8, 0xe61946);
+  assert(AccentDraws() == 8 && submittedLists[0][1].words.w1 == 3);
+  assert(particleColors[0] == 0xe61946); // Native crimson sparks, not red flame fans.
+  for (int failure = 0; failure < 3; ++failure) {
+    ResetDraw();
+    accentMissing = failure == 0;
+    accentMalformed = failure == 1;
+    if (failure == 2)
+      gfx.polyOpa.d = opa + 1;
+    const void *tail = gfx.polyOpa.d;
+    CwSpinAccents_Draw(&play, 1, 1, .3f, .5f);
+    assert(gfx.polyXlu.p == xlu && gfx.polyOpa.d == tail);
+    assert(submittedLists.empty() && matrixSnapshots.empty());
+  }
+  accentMissing = accentMalformed = false;
+#ifndef HOST_MM
+  ResetDraw();
+  allocationFailure = true;
+  CwSpinAccents_Draw(&play, 1, 1, .3f, .5f);
+  assert(gfx.polyXlu.p == xlu && submittedLists.empty());
+  allocationFailure = false;
+#endif
+  // Camera changes affect flame/sparkle orientation; a shard remains a 3D
+  // object in the scaled parent frame. Hand-computed rotated/scaled fixture.
+  MtxF parent = {}, camera = {}, model;
+  parent.xy = -3; parent.yx = 2; parent.zz = 4; parent.ww = 1;
+  parent.xw = 100; parent.yw = 200; parent.zw = 300;
+  camera.zx = -1; camera.yy = 1; camera.xz = 1; camera.ww = 1;
+  CwSpinAccentParticle p = {10, 20, 30, 16, 255, 255, 255, 255};
+  CwSpinAccents_NativeModel(&model, &parent, &camera, &p, 2, 0, 0);
+  assert(model.xw == 40 && model.yw == 220 && model.zw == 420);
+  assert(model.xy == -3 && model.yx == 2 && model.zz == 4);
+  CwSpinAccents_NativeModel(&model, &parent, &camera, &p, 2, .5f, 0);
+  assert(std::fabs(model.zx) > .1f && std::fabs(model.zy) > .1f);
+  p.size = 14;
+  CwSpinAccents_NativeModel(&model, &parent, &camera, &p, 3, 0, 0);
+  assert(model.xw == 40 && model.yw == 220 && model.zw == 420);
+  assert(model.xx == 0 && model.zx == -2 && model.yy == 3 && model.xz == 4);
+  p.size = 8;
+  CwSpinAccents_NativeModel(&model, &parent, &camera, &p, 1, 0, 0);
+  assert(std::fabs(model.yw - 196) < .001f);
+  assert(std::fabs(model.yw + model.yy * 8000 - 220) < .001f);
+  assert(model.xx == 0 && model.xy == 0 && model.yx == 0 && model.zx < 0);
+  ResetDraw();
+}
+
 int main() {
+  parentMatrix.xx = parentMatrix.yy = parentMatrix.zz = parentMatrix.ww = 1;
+  play.billboardMtxF = parentMatrix;
+  // Native effect fixtures retain hashed texture/UV-bearing geometry, native
+  // blend/combine commands and the flame/ice scroll call. Do not replace the
+  // renderer with a fake: inspect the production GBI it submits below.
+  for (int i = 0; i < 3; ++i) {
+    auto *dl = accentNativeList[i];
+    dl[0].words.w0 = 0x33000000;
+    dl[1].words.w1 = i + 1;
+    dl[2].words.w0 = 0x20900000;
+    dl[3].words.w0 = 0x12345678;
+    dl[3].words.w1 = 0x9abcdef0;
+    dl[4].words.w0 = 0x32004008;
+    dl[5].words.w0 = 0x98765432;
+    dl[5].words.w1 = 0x10fedcba;
+    dl[6].words.w0 = i == 2 ? 0xfc3097ff : 0xfc272c60;
+    dl[6].words.w1 = i == 2 ? 0x5ffefe38 : i ? 0x3514937f : 0x150ce37f;
+    dl[7].words.w0 = 0xe200001c;
+    dl[7].words.w1 = i == 1 ? 0x0c1849d8 : 0x0c184b50;
+    dl[8].words.w0 = 0xd9ffffff;
+    dl[8].words.w1 = i == 1 ? 0x000e0000 : 0;
+    dl[9].words.w0 = 0xfa000080;
+    dl[9].words.w1 = 0xaaffffff;
+    dl[10].words.w0 = 0xfb000000;
+    dl[10].words.w1 = 0x003264ff;
+    dl[11].words.w0 = i == 2 ? 0xe7000000 : 0xde000000;
+    dl[11].words.w1 = i == 2 ? 0 : 0x08000001;
+    dl[12].words.w0 = 0x06000204;
+    dl[12].words.w1 = 0x00000406;
+    dl[13].words.w0 = 0xdf000000;
+  }
   // Catch accidental global patching, lost geometry, bad expanded-op lengths,
   // unsupported branch handling, and overwriting the caller's alpha.
   Gfx source[8] = {}, copy[8], output[20];
@@ -139,6 +388,9 @@ int main() {
   gfx.polyOpa.p = opa;
   gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
   CwSpinAccents_Draw(&play, 2, 1, .3f, .5f);
+  // Regression: elemental accents must submit the native textured effect
+  // geometry. The former shade-only triangle fans never submit a donor DL.
+  assert(!submittedLists.empty());
   assert(gfx.polyOpa.p == opa && gfx.polyXlu.p > xlu);
 #ifdef HOST_MM
   allocated = allocation + sizeof(allocation) - (uint8_t *)gfx.polyOpa.d;
@@ -147,6 +399,7 @@ int main() {
   const auto end = gfx.polyXlu.p;
   CwSpinAccents_Draw(&play, 0, 1, .3f, .5f);
   assert(gfx.polyXlu.p == end);
+  CheckNativeAccents();
   std::memcpy(nativeList, copy, sizeof(nativeList));
   privateList[0].words.w0 = 0xE7000000;
   privateList[1].words.w0 = 0xDF000000;
@@ -172,6 +425,7 @@ int main() {
       gfx.polyXlu.p = xlu;
       gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
       submittedVertices = allocationCursor = 0;
+      submittedLists.clear();
       auto visual = CwSpinStyle_Resolve(style, 1, 2, 1);
       assert(CwSpinDraw_Charge(&play, visual, great, .25f, "native0"));
       assert((xlu[0].words.w1 >> 8) == 0x0A141E);
@@ -180,8 +434,12 @@ int main() {
 #else
       assert((xlu[1].words.w1 >> 8) == 0x46505A);
 #endif
-      assert(submittedVertices > 0 &&
-             submittedVertices <= (great ? 8u : 4u) * 9);
+      assert(AccentDraws() == (great ? 8u : 4u) && submittedVertices == 0);
+#ifdef HOST_MM
+      CheckRestoredColors(0x0a141e, 0x0a141e, 63);
+#else
+      CheckRestoredColors(0x0a141e, 0x46505a, 63);
+#endif
       gfx.polyXlu.p = xlu;
       gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
       allocationCursor = 0;
@@ -220,26 +478,43 @@ int main() {
     gfx.polyXlu.p = xlu;
     gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
     submittedVertices = allocationCursor = 0;
+    submittedLists.clear();
+    particleColors.clear();
     assert(EnMThunder_DrawChargeStyle(&thunder, &play));
-    assert(submittedVertices == 4 * 5);
-    assert(particleColor == (step < 2 ? 0xFF8C2D : 0x91E1FF));
+    assert(AccentDraws() == 4 && submittedVertices == 0);
+    assert(particleColors[0] == (step < 2 ? 0xFF8C2D : 0x91E1FF));
   }
   CwSpinAttack_Release(&thunder.spinStyle, 2, 1, 0x01000000, 0x800, 0x1000,
                        0x2000);
   CwSpinAttack_Preview(&thunder.spinStyle, 3, 1, 0);
   submittedVertices = allocationCursor = 0;
+  submittedLists.clear();
   gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
   assert(EnMThunder_DrawChargeStyle(&thunder, &play));
-  assert(thunder.spinStyle.element == 2 && submittedVertices == 0);
+  assert(thunder.spinStyle.element == 2 && AccentDraws() == 0);
   assert(CwSpinDraw_Charge(&play, arcane, 1, .25f, "native0"));
   for (int element = 0; element <= 3; ++element) {
     submittedVertices = allocationCursor = 0;
+    submittedLists.clear();
     gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
     CwSpinDraw_Accents(&play, CwSpinStyle_Resolve(7, 1, element, 1), 1, .4f,
                        .6f);
-    assert(submittedVertices > 0 && submittedVertices <= 24 * 9);
+    assert(AccentDraws() == (element ? 24u : 8u) && submittedVertices == 0);
+#ifdef HOST_MM
+    CheckRestoredColors(0x0a141e, 0x0a141e, 153);
+#else
+    CheckRestoredColors(0x0a141e, 0x46505a, 153);
+#endif
     assert(gfx.polyOpa.p == opa);
   }
+  ResetDraw();
+  accentMissing = true;
+  CwSpinDraw_Accents(&play, CwSpinStyle_Resolve(7, 1, 2, 1), 1, .4f, .6f);
+  assert(gfx.polyXlu.p == xlu && matrixSnapshots.empty());
+  assert(CwSpinDraw_Charge(&play, arcane, 1, .25f, "native0"));
+  assert(AccentDraws() == 0 && ((gfx.polyXlu.p - 1)->words.w0 >> 24) == 0xde);
+  accentMissing = false;
   std::puts("PASS real-header native material clones, alpha preservation, "
             "bounded XLU accent submission");
+  return 0;
 }

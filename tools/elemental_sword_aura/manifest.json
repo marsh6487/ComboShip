@@ -672,6 +672,120 @@
           65
         ]
       ]
+    },
+    "giants_knife/oot_adult": {
+      "source": "giants_knife",
+      "source_vertices_sha256": "aac2027bc348aed3dde6e3c37751dcf5e150047fbc99b7012e656d3d79f31ae9",
+      "held_matrix_sha256": "b1cf2d15a951fa7d68fb7c21cf98fa2a195f64131fd192333998f0d9a94913eb",
+      "blade_bounds": [
+        [
+          730,
+          5500
+        ],
+        [
+          6,
+          650
+        ],
+        [
+          -144,
+          -10
+        ]
+      ]
+    },
+    "giants_knife/oot_child": {
+      "source": "giants_knife",
+      "source_vertices_sha256": "aac2027bc348aed3dde6e3c37751dcf5e150047fbc99b7012e656d3d79f31ae9",
+      "held_matrix_sha256": "4e13205448f64bd1fb4a7faad6b19cb1bcff70f1396708cc030ba9659689530d",
+      "blade_bounds": [
+        [
+          730,
+          5500
+        ],
+        [
+          -105,
+          538
+        ],
+        [
+          -62,
+          71
+        ]
+      ]
+    },
+    "giants_knife/mm_human": {
+      "source": "giants_knife",
+      "source_vertices_sha256": "aac2027bc348aed3dde6e3c37751dcf5e150047fbc99b7012e656d3d79f31ae9",
+      "held_matrix_sha256": "4e13205448f64bd1fb4a7faad6b19cb1bcff70f1396708cc030ba9659689530d",
+      "blade_bounds": [
+        [
+          730,
+          5500
+        ],
+        [
+          -105,
+          538
+        ],
+        [
+          -62,
+          71
+        ]
+      ]
+    },
+    "broken_giants_knife/oot_adult": {
+      "source": "broken_giants_knife",
+      "source_vertices_sha256": "f1d151afd18c26e19bc45f83f384d685b54f34aac7ed0c96c19984a16fe69754",
+      "held_matrix_sha256": "b1cf2d15a951fa7d68fb7c21cf98fa2a195f64131fd192333998f0d9a94913eb",
+      "blade_bounds": [
+        [
+          730,
+          2499
+        ],
+        [
+          8,
+          648
+        ],
+        [
+          -144,
+          -10
+        ]
+      ]
+    },
+    "broken_giants_knife/oot_child": {
+      "source": "broken_giants_knife",
+      "source_vertices_sha256": "f1d151afd18c26e19bc45f83f384d685b54f34aac7ed0c96c19984a16fe69754",
+      "held_matrix_sha256": "4e13205448f64bd1fb4a7faad6b19cb1bcff70f1396708cc030ba9659689530d",
+      "blade_bounds": [
+        [
+          730,
+          2499
+        ],
+        [
+          -104,
+          536
+        ],
+        [
+          -62,
+          71
+        ]
+      ]
+    },
+    "broken_giants_knife/mm_human": {
+      "source": "broken_giants_knife",
+      "source_vertices_sha256": "f1d151afd18c26e19bc45f83f384d685b54f34aac7ed0c96c19984a16fe69754",
+      "held_matrix_sha256": "4e13205448f64bd1fb4a7faad6b19cb1bcff70f1396708cc030ba9659689530d",
+      "blade_bounds": [
+        [
+          730,
+          2499
+        ],
+        [
+          -104,
+          536
+        ],
+        [
+          -62,
+          71
+        ]
+      ]
     }
   },
   "native": {
