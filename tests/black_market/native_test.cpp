@@ -103,6 +103,7 @@ void SaveManager_SaveCurrentForCombo(bool) {
 }
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
 constexpr u16 kKeeperMenuText = 0x8F14, kKeeperTalkText = 0x8F15, kContinueText = 0x8F16;
+constexpr u16 kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 namespace CustomMessage {
 Entry last;
 void LoadCustomMessageIntoFont(Entry entry) { last = std::move(entry); }
@@ -472,7 +473,14 @@ int main(int argc, char** argv) {
     textId = kConfirmText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("\xC2I'll buy it\x11No thanks") != std::string::npos);
     textId = kWelcomeText; fromTable = true; MarketText(&textId,&fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find("Left / Right: browse items") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("Continue") != std::string::npos &&
+           CustomMessage::last.msg.find("Talk") == std::string::npos);
+    textId = kKeeperHelpChoiceText; fromTable = true; MarketText(&textId,&fromTable);
+    assert(!fromTable && CustomMessage::last.msg.find("How does this shop work?") != std::string::npos &&
+           CustomMessage::last.msg.find("Back") != std::string::npos);
+    textId = kKeeperHelpText; fromTable = true; MarketText(&textId,&fromTable);
+    assert(!fromTable && CustomMessage::last.msg.find("unique dungeon clears") != std::string::npos &&
+           CustomMessage::last.msg.find("empty bottle") != std::string::npos);
     TestDeferredPurchases();
     Reset();
     gSaveContext.save.entrance = COMBO_BLACK_MARKET_ENTRANCE;
