@@ -5,6 +5,9 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "black_market_shop_adapter.h"
 #include "global.h"
+extern "C" {
+#include "z64shrink_window.h"
+}
 #include "native_mm_shop_boundary.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"

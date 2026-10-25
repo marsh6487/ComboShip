@@ -80,6 +80,28 @@ The same preflight found two trace-source formatting differences. Pinned
 clang-format14.0.6 corrects only layout in those paths; no trace or shop behavior
 is changed. The actual material trace fixture passes after formatting.
 
+The first hosted run at public `31f6c4e` (`40234020449`) exposed integration
+gaps in the regression fixtures. World, equipment and items stopped when their
+shared extracted save code lacked the native MM equipment masks/writer now used
+by canonical Ikana removal. The fixture now compiles and links the exact native
+C definitions and header declarations for all three consumers. Original save,
+Mirror and Moon's Tear assertions remain; additive checks verify native nibble
+removal, unrelated shared bits and imported-skin preservation.
+
+The systems group's older Midna source check assumed only three blink call
+sites. The corrected check proves mutually exclusive quiet-shop/ordinary paths,
+retains ordinary/dialogue accounting and executes the actual update for exact
+timer/blink ticks and branch-specific idle audio. Deliberate skipped-blink and
+double-timer mutations fail. A follow-on native shop adapter fixture also now
+includes the native shrink-window API declaration required by the actual camera
+interface function; no fake window implementation or production change is added.
+
+Windows compile preflight, entrances and rendering passed on the first head.
+That head's failed regression groups do not authorize package delivery. Fixture
+corrections preserve all231 manifest task objects and all gameplay/asset bytes
+from the preflight child; a fresh complete hosted run on the corrected head and
+inspection of its matching Windows artifact are still required.
+
 All existing encoded parts and bundled payload identities are retained. New
 fallback icons are small native32px PNGs; no existing compressed part is
 recompressed or retransmitted. Any subsequent required asset change must retain
