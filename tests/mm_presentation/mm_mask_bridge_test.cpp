@@ -137,6 +137,8 @@ int matrixDepth=0,shimmerDraws=0;
 uint8_t shimmerColor[4]{};
 void Matrix_Push() {++matrixDepth;}
 void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}
+void Matrix_RotateZF(float, int) {assert(false && "mask/remains must not consume a shield roll");}
+void Matrix_RotateXF(float, int) {assert(false && "mask/remains must not consume a shield tilt");}
 void ComboDrawMaskShimmer(PlayState*,const char* root,const uint8_t color[4],const char* owner) {
  assert(root == nullptr && !strcmp(owner,"mm"));
  assert(matrixDepth==0);memcpy(shimmerColor,color,4);++shimmerDraws;

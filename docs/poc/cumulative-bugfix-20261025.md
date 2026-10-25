@@ -78,3 +78,36 @@ settings and the unchanged caustics pack, then the child-room control.
 Keep original game archives, saves and optional scene/model pack order separate.
 Do not promote or merge develop/master. Source/native verification does not
 establish game acceptance.
+
+## Full CI fixture follow-up
+
+The first public candidate `e90532fc57c05035c6f5e43df7dc3ff4dc720687`
+(tree `930affcd36b1cf10b762e9b526feb72f23bc4252`, run 40211073847)
+passed source/asset/format preflight and the entrance group. The separate
+Windows compile preflight 40211073846 passed. Five required groups exposed
+older fixture dependencies after the native Ikana integration; this run and
+any uploaded Windows artifact from it are ineligible for delivery.
+
+The failures were reproduced locally. Ten test/runner files now supply the
+current native API/pose declarations, with tripwire assertions when a mask,
+sword or unrelated editor path would incorrectly select the shield. All
+original non-shield behavior assertions remain. The old Solo fixture's retired
+worn-shield substring was replaced with the complete actual production
+availability query and native two-pass draw body. It checks strict optional
+archive loading, missing/incomplete/late pairs, registered combined ownership,
+deferred paths, texture bindings and matrix balance, while retaining Farore and
+Triforce receipt controls. Removing the real combined-mode guard makes that
+fixture fail, demonstrating the preserved safety contract.
+
+A broader native replay also caught a title fixture that omitted the new
+module-owned Arrival state. It now includes the exact production state
+declaration and retains all title request/consumption/hide/cutscene assertions:
+222 titled and 117 untitled scene cases, combined and standalone, pass.
+
+All ten focused fixture repairs pass; complete Solo (19 production-boundary
+suites), real-header GI/held/Combo compilation and the remaining original native
+entry/lifetime/forest commands pass. The existing native-forest suite still has
+15 explicit optional external-archive skips. Those optional observations remain
+unproved. All 25 CI-policy tests pass and all 227 required task commands are
+unchanged. Production source and every asset remain byte-identical to the
+first candidate; these corrections only repair integration fixtures.

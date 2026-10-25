@@ -127,6 +127,9 @@ int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
 int ResourceMgr_GetGiModelFitForGame(const char*, const char*, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetGiModelsFitForGame(const char*, const char* const*, int, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetDinSwordGiProfileForGame(const char*, const char*) { return 0; }
+int ResourceMgr_IsIkanaShieldGiAvailable() {
+    assert(false && "mask shimmer fixture must not query the native shield pair"); return 0;
+}
 int ResourceMgr_GetRewardSurfaceForGame(const char*, const char*, NeiGi::Mesh*) {
     assert(false && "mask shimmer fixture must not query reward geometry"); return 0;
 }
