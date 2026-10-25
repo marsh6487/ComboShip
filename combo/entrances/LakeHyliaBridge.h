@@ -116,9 +116,9 @@ inline std::vector<Quad> BuildWaterGeometry(float lakeSurface) {
     if (!HasInlet(lakeSurface))
         return water;
     water.reserve(kMaxWaterQuads);
-    const auto point = [&](float x, float y, bool far) {
+    const auto point = [&](float x, float y, bool farBank) {
         const auto bank = WetChannelAt(x, y);
-        return Point{ x, y, far ? bank.farZ : bank.nearZ };
+        return Point{ x, y, farBank ? bank.farZ : bank.nearZ };
     };
     const auto quad = [&](float x0, float y0, float x1, float y1) {
         water.push_back(

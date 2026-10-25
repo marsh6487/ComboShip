@@ -55,7 +55,7 @@ coverage issue and no Minor issue. The new CI coverage guard first failed on
 all four missing room regressions and the parser dependency, then passed after the
 required world group gained the existing room-material tests. The raw-segment
 regression remains required through the original native entry shell suite.
-The full CI policy suite passes 23 tests; the registry has 225 entries.
+The full CI policy suite passes 24 tests; the registry has 225 entries.
 `python3-pycparser` is installed for the actual native draw-exit flow runner.
 The Generate menu fixture also reproduced its missing room-material declaration;
 it now includes the actual production header and checks the new widget while
@@ -67,3 +67,26 @@ independently restorable recovery bundle retains the original local ancestry.
 Existing compressed texture/geometry pools are reused unchanged. No new encoded
 texture part or original game archive is introduced. These source/native checks
 do not establish full-build success or configured gameplay acceptance.
+
+## Windows compiler follow-up
+
+The first full Windows run compiled SoH and both port archives, then stopped
+in 2Ship on `LakeHyliaBridge.h:121`: MSVC C2760 at the ternary expression.
+The Windows SDK's empty `far` macro erased the new water lambda's parameter
+name. Subsequent diagnostics were parser cascades. A separate read-only CI job
+extracted the bounded compiler excerpt after the large log download failed.
+
+The production correction renames only that local parameter to `farBank`.
+All geometry, material and water-flow literals and function bodies are exact
+apart from that identifier. A regression compiles the actual shared header
+with exposed near/far macros, reproduces the original parse failure and passes
+after the rename. Full regional sanitizer and presentation syntax suites pass.
+
+Both Windows workflows now compile/run that regression against the actual
+Windows SDK before CMake configuration. The existing required regional suite
+also runs its portable macro control. CI policy pins that early ordering.
+The 2Ship build step retains its exit status and now emits a bounded compiler
+annotation, preserving both the first cause and the last diagnostics when
+the complete log is too large. The real MSVC replay and full final CI remain
+required before any Windows package is delivered. No failed-run package is a
+deliverable, and develop/master remain unmerged.

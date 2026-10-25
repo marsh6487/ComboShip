@@ -11,6 +11,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_shared_geometry_runs_with_the_windows_sdk_before_configuration(self):
+        command = "python -B tests/regional_passages/run_header_portability_tests.py --msvc --compiler cl"
+        for path, job in (("build.yml", "build"), ("probe-custom-tex-scroll.yml", "compile-libultraship")):
+            with self.subTest(workflow=path):
+                workflow = yaml.safe_load((ROOT / ".github/workflows" / path).read_text())
+                steps = workflow["jobs"][job]["steps"]
+                owners = [i for i, step in enumerate(steps) if command in step.get("run", "").splitlines()]
+                self.assertEqual(len(owners), 1)
+                configure = next(i for i, step in enumerate(steps) if step.get("name", "").startswith("Configure"))
+                self.assertLess(owners[0], configure)
+
     def test_native_market_lifetime_repairs_are_required_checks(self):
         tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
         required = (
