@@ -24,6 +24,15 @@ PlayState* gPlayState;
 GameState* gGameState;
 static PlayState play;
 static Player player;
+#ifndef MIRROR_OOT
+extern "C" {
+s16 sSceneCutsceneCount;
+ActorCutscene* CutsceneManager_GetCutsceneEntry(s16) {
+    assert(false); // These isolated Mirror cases have no prepared scene chain.
+    return nullptr;
+}
+}
+#endif
 static bool owned, blocked, pack = true;
 static bool pending, stow;
 static bool alternateModel;

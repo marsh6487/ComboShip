@@ -1,5 +1,7 @@
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
+#include "../../combo/menu/ComboIkanaShieldResources.h"
+#include "../../combo/ComboGameMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <fast/interpreter.h>
 #include <fast/resource/ResourceType.h>
@@ -21,6 +23,7 @@
 #include "resource/type/Array.h"
 #include "resource/type/Skeleton.h"
 #include "resource/type/PlayerAnimation.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 
 extern "C" {
 #include "variables.h"
@@ -40,6 +43,7 @@ extern "C" {
 #endif
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <string>
 #include <vector>
@@ -409,7 +413,32 @@ extern "C" char* ResourceMgr_LoadJPEG(char* data, size_t dataSize) {
 }
 
 extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
-    auto res = ResourceMgr_GetResourceByNameHandlingMQ(filePath);
+    if (filePath == nullptr) {
+        return nullptr;
+    }
+
+    std::shared_ptr<Ship::IResource> res;
+#ifdef COMBO_BUILD
+    // Pause-menu preflight must resolve the same owner as the renderer. A
+    // routed Ikana icon is not an OoT archive name, even when MM owns it and
+    // the following SETTIMG command could draw it correctly.
+    if (std::strncmp(filePath, "__OTR__@", 8) == 0) {
+        const char* gameStart = filePath + 8;
+        const char* colon = std::strchr(gameStart, ':');
+        if (colon == nullptr || colon == gameStart) {
+            return nullptr;
+        }
+        const auto owner = Ship::CrossRMRegistry::Get(std::string(gameStart, colon - gameStart));
+        if (owner == nullptr) {
+            return nullptr;
+        }
+        Ship::ResourceManagerScope scope(owner);
+        res = owner->LoadResource(std::string("__OTR__") + (colon + 1));
+    } else
+#endif
+    {
+        res = ResourceMgr_GetResourceByNameHandlingMQ(filePath);
+    }
 
     // The GBI wrappers reaching this (gSPInvalidateTexCache / gSPSegmentLoadRes) tolerate a null
     // address, so a resolve miss becomes a no-op instead of an AV on GetInitData(). pak_loader
@@ -426,7 +455,9 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
         return (char*)(std::static_pointer_cast<SOH::Array>(res))->Vertices.data();
     }
 
-    return (char*)ResourceMgr_GetResourceDataByNameHandlingMQ(filePath);
+    // Retain the already resolved owner; a second local lookup would reject
+    // the routed texture again. The draw still receives its original path.
+    return (char*)res->GetRawPointer();
 }
 
 extern "C" char* ResourceMgr_LoadIfDListByName(const char* filePath) {
@@ -1088,6 +1119,21 @@ extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const cha
     Ship::ResourceManagerScope scope(owner);
     const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
     return model && !model->Instructions.empty();
+}
+
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
+    if (Ship::CrossRMRegistry::Get("mm")) {
+        return ResourceMgr_IsGiModelAvailableForGame("mm", COMBO_IKANA_GI_OPA) &&
+               ResourceMgr_IsGiModelAvailableForGame("mm", COMBO_IKANA_GI_XLU);
+    }
+#ifdef COMBO_BUILD
+    if (gComboGameMode != COMBO_GAME_OOT)
+        return 0;
+#endif
+    // Solo OoT uses the optional MM archive without starting the other game.
+    // Strict graph resolution validates every nested DL, vertex and texture.
+    return MmAssets_IsAvailable() && MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_OPA) &&
+           MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_XLU);
 }
 
 #ifdef COMBO_BUILD

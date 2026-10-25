@@ -12,7 +12,10 @@
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
 #include "soh/Enhancements/Gameplay/ComboLostWoodsFountain.h"
+#include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
 #endif
 #include "gameplay/ComboFaroresWind.h"
 #include "gameplay/CrossGameTitleCard.h"
@@ -7329,6 +7332,17 @@ s32 Player_ActionHandler_Talk(Player* this, PlayState* play) {
         (CHECK_FLAG_ALL(lockOnActor->flags, ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_TALK_WITH_C_UP) ||
          (lockOnActor->naviEnemyId != 0xFF));
 
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_OOT, play->sceneNum, SCENE_SKIEJER_MARKET)) {
+        canTalkToLockOnWithCUp = false;
+        this->naviTextId = 0;
+        this->stateFlags2 &= ~PLAYER_STATE2_NAVI_ALERT;
+        lockOnActor = NULL;
+        if (talkOfferActor == this->naviActor)
+            talkOfferActor = NULL;
+    }
+#endif
+
     if (canTalkToLockOnWithCUp || (this->naviTextId != 0)) {
         // If `naviTextId` is negative and outside the 0x2XX range, talk to Navi instantly
         forceTalkToNavi = (this->naviTextId < 0) && ((ABS(this->naviTextId) & 0xFF00) != 0x200);
@@ -12538,7 +12552,11 @@ void Player_Init(Actor* thisx, PlayState* play2) {
     }
 
     const s32 crossGameTitleCard = Combo_SOH_HasCrossGameTitleCard();
-    if (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1)) {
+    if (
+#ifdef COMBO_BUILD
+        !ComboRegionalPassagesOot_IsArrivalPending(play) &&
+#endif
+        (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1))) {
         titleFileSize = scene->titleFile.vromEnd - scene->titleFile.vromStart;
         if (GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard)) {
             if ((gSaveContext.sceneLayer < 4) &&

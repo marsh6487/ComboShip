@@ -14,6 +14,7 @@ from run_time_pedestal_tests import block_from
 
 subprocess.run([sys.executable, '-B', str(ROOT / 'tests/lost_woods_entrance/run_vertical_scroll_tests.py')], check=True)
 subprocess.run([sys.executable, '-B', str(ROOT / 'tests/lost_woods_entrance/run_woodfall_tests.py')], check=True)
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/lost_woods_entrance/run_woodfall_draw_tests.py')], check=True)
 
 title = (ROOT / "mm/src/code/title_setup.c").read_text()
 port = (ROOT / "mm/2s2h/BenPort.cpp").read_text()

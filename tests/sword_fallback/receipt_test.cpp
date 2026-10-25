@@ -86,6 +86,9 @@ bool ResourceMgr_IsAltAssetsEnabled(){return mmOwner->alt;}
 /* RESOURCE_API */
 #include "combo/menu/ComboSwordGiLegacyFit.h"
 /* DECLARATIONS */
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
+ assert(false && "sword receipt must not query the native shield pair");return 0;
+}
 struct Actor {int id;struct{struct{int x;}rot;}home;};
 constexpr int ACTOR_EN_GIRLA=1,ACTOR_EN_ITEM00=2,PLAYER_FORM_HUMAN=0,PLAYER_FORM_GORON=1;
 int form=PLAYER_FORM_HUMAN;
@@ -155,6 +158,7 @@ void Randomizer_DrawTrueMasterSwordFlame(PlayState*){assert(false);}
 void Randomizer_DrawMarioMask(PlayState*,GetItemEntry*){assert(false);}
 void Randomizer_DrawExtSpiritBreastplate(PlayState*,GetItemEntry*){assert(false);}
 void Randomizer_DrawExtSagesTunic(PlayState*,GetItemEntry*){assert(false);}
+void Randomizer_DrawExtShieldOfIkana(PlayState*,GetItemEntry*){assert(false && "sword receipt selected a shield");}
 void Randomizer_DrawExtChampionsTunic(PlayState*,GetItemEntry*){assert(false);}
 void NeiGi_DrawSelectedSword(PlayState*,const char*,bool,bool){assert(false);}
 void GetItem_Draw(PlayState*,int){assert(false);}

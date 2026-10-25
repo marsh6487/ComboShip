@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "static_story_actor.h"
+int StaticStoryMm_GetFocusLimb(StaticStoryActorType type);
+float StaticStoryMm_GetFocusOffsetY(StaticStoryActorType type);
 
 typedef enum {
     STATIC_STORY_MM_TRACKING_NONE,
@@ -21,6 +23,8 @@ typedef struct {
 typedef enum {
     STATIC_STORY_MM_NORMAL_FLEX = 0,
     STATIC_STORY_MM_SCOPED_PLAYER_LOD = 1,
+    STATIC_STORY_MM_NORMAL_STANDARD = 2,
+    STATIC_STORY_MM_GHOST_FLEX = 3,
 } StaticStoryMmPresentationKind;
 
 typedef struct {
@@ -47,15 +51,17 @@ typedef struct {
     uint8_t mouthCount;
     uint8_t eyeSegment;
     uint8_t mouthSegment;
+    const char* propDisplayListPath;
+    uint8_t propLimb;
 } StaticStoryMmPresentation;
 
 const StaticStoryMmPresentation* StaticStoryMm_GetPresentation(StaticStoryActorType type, uint8_t pose);
 const char* StaticStoryMm_GetEyeTexturePath(StaticStoryActorType type, uint8_t eyeIndex);
 const char* StaticStoryMm_GetMouthTexturePath(StaticStoryActorType type, uint8_t mouthIndex);
-StaticStoryMmFace StaticStoryMm_ResolveFace(StaticStoryActorType type, uint8_t pose, float frame,
-                                           uint8_t blinkEye, bool tracking);
-bool StaticStoryMm_ResourcesComplete(const StaticStoryMmPresentation* presentation, bool hasSkeleton,
-                                     bool hasAnimation, bool hasSecondarySkeleton);
+StaticStoryMmFace StaticStoryMm_ResolveFace(StaticStoryActorType type, uint8_t pose, float frame, uint8_t blinkEye,
+                                            bool tracking);
+bool StaticStoryMm_ResourcesComplete(const StaticStoryMmPresentation* presentation, bool hasSkeleton, bool hasAnimation,
+                                     bool hasSecondarySkeleton);
 float StaticStoryMm_GetHoverOffset(uint16_t phase);
 float StaticStoryMm_ComposeHoverY(float authoredY, uint16_t phase);
 float StaticStoryMm_GetShapeYOffset(StaticStoryActorType type, uint8_t pose);
@@ -68,8 +74,8 @@ const char* StaticStoryMm_GetTatlDListPath(uint8_t limb);
 const char* StaticStoryMm_GetSkullKidLimbDisplayListPath(uint8_t limb);
 bool StaticStoryMm_UsesNativeFairyCompanion(StaticStoryActorType type);
 
-bool StaticStoryMm_SampleKafei(const int16_t* data, uint16_t frames, float* cursor, float step,
-                             void* joints, uint16_t* appearance);
+bool StaticStoryMm_SampleKafei(const int16_t* data, uint16_t frames, float* cursor, float step, void* joints,
+                               uint16_t* appearance);
 StaticStoryMmFace StaticStoryMm_KafeiFace(uint16_t appearance);
 
 #endif

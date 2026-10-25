@@ -4,6 +4,7 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "ComboSongDrawMM.h"
+#include "ComboIkanaShieldResources.h"
 #ifdef COMBO_BUILD
 #include "ComboGiReceiptTrace.h"
 #define COMBO_GI_RECEIPT_TRACE
@@ -159,9 +160,7 @@ bool HasMmLegacyGiMod(RandoItemId item) {
             second = "objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL";
             break;
         case RI_SHIELD_MIRROR:
-            opaque = "objects/object_gi_shield_3/gGiMirrorShieldEmptyDL";
-            second = "objects/object_gi_shield_3/gGiMirrorShieldDL";
-            break;
+            return ResourceMgr_IsIkanaShieldGiAvailable() != 0;
         case RI_OOT_EXT_MAGIC_CAPE:
             opaque = "objects/object_gi_clothes/gGiTunicCollarDL";
             second = "objects/object_gi_clothes/gGiTunicDL";

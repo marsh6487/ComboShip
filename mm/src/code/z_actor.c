@@ -37,6 +37,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/Gameplay/ComboForestSkullKid.h"
+#include "2s2h/Enhancements/Gameplay/ComboRegionalActors.h"
 
 // Skijer's NEI shared time control (mods/items/helpers/timestop_helper.c).
 // gChampionSlowFactor: 1.0f = normal, 0.0f = fully stopped, in between = slow motion.
@@ -4063,12 +4064,17 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     }
 
 #ifdef COMBO_BUILD
-    objectSlot = Object_GetSlot(&play->objectCtx, ComboForestSkullKid_ObjectId(index, params, profile->objectId));
+    objectSlot = Object_GetSlot(
+        &play->objectCtx,
+        ComboRegionalActors_ObjectId(index, params, ComboForestSkullKid_ObjectId(index, params, profile->objectId)));
 #else
     objectSlot = Object_GetSlot(&play->objectCtx, profile->objectId);
 #endif
     if ((objectSlot <= OBJECT_SLOT_NONE) ||
         ((profile->type == ACTORCAT_ENEMY) && Flags_GetClear(play, play->roomCtx.curRoom.num) &&
+#ifdef COMBO_BUILD
+         !ComboRegionalActors_IsPlaced(index, params) &&
+#endif
          (profile->id != ACTOR_BOSS_05))) {
         Actor_FreeOverlay(&gActorOverlayTable[index]);
         return NULL;

@@ -12,6 +12,10 @@ void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*) {}
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboIkanaShieldResources.h"
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
+ assert(false && "static item fixture must not select the native shield pair");return 0;
+}
 #include "combo/menu/ComboRewardGi.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemEffectColors.h"

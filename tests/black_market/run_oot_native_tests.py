@@ -9,6 +9,12 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--include", type=Path, action="append", default=[])
 parser.add_argument("--case", choices=("all", "door-marker", "door-entry", "door-return", "door-open", "door-exit", "receipt"), default="all")
 args = parser.parse_args()
+compile_env = dict(os.environ)
+if compile_env.get("COMBO_NEI_FIXTURE_CPATH"):
+    # The extracted real room cleanup owns ResourceManager-backed state; use
+    # its project-pinned header dependencies without changing dispatcher scope.
+    compile_env["CPATH"] = os.pathsep.join(filter(None, (
+        compile_env["COMBO_NEI_FIXTURE_CPATH"], compile_env.get("CPATH", ""))))
 source = (ROOT / "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp").read_text()
 signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               "void RememberTravel(", "bool MatchesTravel(", "void StageReturn(", "void Transition(",
@@ -19,7 +25,11 @@ signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               'extern "C" void ComboBlackMarketOot_NormalizeEntry(',
               'extern "C" void ComboBlackMarketOot_ReportClear(',
               'extern "C" int ComboBlackMarketOot_TryDoorEntrance(']
-body = "\n".join(block_from(source, source.index(s)) for s in signatures)
+# Resource-entry fixtures also extract the actual scene callback, which owns
+# cleanup of an attached room graph. Compile its real state and helpers.
+room_state = source[source.index("BlackMarketRoomMagic::Resources sRoomMagicResources;"):
+                    source.index("void BeginRoomMagic(")]
+body = room_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/oot_native_test.cpp").read_text().replace("/* PRODUCTION */", body)
@@ -42,5 +52,5 @@ with tempfile.TemporaryDirectory(prefix="market-oot-native-") as temp:
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
                     *["-I" + str(ROOT / p) for p in includes],
-                    *["-I" + str(p) for p in args.include], str(path), "-o", str(binary)], check=True)
-    subprocess.run([str(binary), args.case], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+                    *["-I" + str(p) for p in args.include], str(path), "-o", str(binary)], check=True, env=compile_env)
+    subprocess.run([str(binary), args.case], check=True, env={**compile_env, "ASAN_OPTIONS": "detect_leaks=0"})

@@ -9,6 +9,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #ifdef COMBO_BUILD
 #include "entrances/BlackMarketEntrance.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #endif
 
 #define DYNA_RAYCAST_FLOORS 1
@@ -4233,6 +4234,13 @@ extern u8 gMogmaMittsClimbActive;
 extern u8 Slate_IsClimbableBgId(s32 bgId); // Stasis and Cryonis, aggregated in item_sheikah_slate.c
 
 s32 SurfaceType_GetWallFlags(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId) {
+#ifdef COMBO_BUILD
+    // This owned invisible boundary separates the customer aisle from the
+    // shop's counter. Powers and cheats must not make it a climbable ladder.
+    if (ComboBlackMarket_IsCounterBarrier(colCtx, bgId)) {
+        return sWallFlags[SurfaceType_GetWallType(colCtx, poly, bgId)];
+    }
+#endif
     if (gMogmaMittsClimbActive || Slate_IsClimbableBgId(bgId) ||
         GameInteractor_Should(VB_BE_CLIMBABLE_SURFACE, false)) {
         return sWallFlags[SurfaceType_GetWallType(colCtx, poly, bgId)] | WALL_FLAG_3;

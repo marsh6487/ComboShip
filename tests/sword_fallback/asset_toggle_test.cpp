@@ -19,6 +19,7 @@ int32_t OOT_NeiAltAssetsEnabled(){return ootAlt;}
 int CVarGetInteger(const char* key,int){return !strcmp(key,"DinFireSword")&&dinFireSword;}
 const char* NeiResource_Route(const char* path){return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*){return mmLegacyMod;}
+int ResourceMgr_IsIkanaShieldGiAvailable(){assert(false && "sword toggle must not query the native shield pair");return 0;}
 std::set<std::string> resources;
 int32_t OOT_NeiEnsureGiBaseOwner(){return 1;}
 int32_t OOT_NeiResourceExists(const char* path){

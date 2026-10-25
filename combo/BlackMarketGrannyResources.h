@@ -13,6 +13,24 @@
 namespace BlackMarketGranny {
 inline constexpr char kErrorCvar[] = "gCombo.BlackMarket.GrannyLoadError";
 
+inline Vertices NativeVaporVertices(const std::shared_ptr<Ship::IResource>& resource) {
+    if (!resource || !resource->GetInitData())
+        return {};
+    const auto type = resource->GetInitData()->Type;
+    // Original OoT vertices are OARR/Vertex, newer archives may use OVTX.
+    // Consume only the pinned owner's public byte interface: game-specific
+    // Array RTTI must not cross the OoT/MM DLL boundary. Copy for validation;
+    // rendering still uses the unchanged native vertex hash in the private view.
+    if ((type != 0x4f415252 && type != 0x4f565458) || resource->GetPointerSize() != 56 * sizeof(Vtx))
+        return {};
+    const auto* bytes = resource->GetRawPointer();
+    if (!bytes)
+        return {};
+    auto vertices = std::make_shared<std::vector<Vtx>>(56);
+    std::memcpy(vertices->data(), bytes, 56 * sizeof(Vtx));
+    return { vertices->data(), vertices->size(), vertices };
+}
+
 inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner() {
     const auto context = Ship::Context::GetRawInstance();
     if (!context)
@@ -82,7 +100,7 @@ class Resources {
                 return std::dynamic_pointer_cast<Fast::Texture>(maps->LoadResource(path, true));
             };
             auto room = std::make_unique<Room>();
-            if (!room->Load(provider))
+            if (!room->Load(provider, true))
                 return Error(room->Error());
             auto view = native->CreateResourceView(archive);
             if (!view)
@@ -98,7 +116,16 @@ class Resources {
             mRoute = std::string("granny_") + host;
             mShelfPaths = { "__OTR__@" + game + ":" + BlackMarketShelves::kWoodTexture,
                             "__OTR__@" + game + ":" + BlackMarketShelves::kAtlasTexture };
+            auto vapor = std::make_unique<Vapor>();
+            auto vaporLeaf = std::dynamic_pointer_cast<Fast::DisplayList>(view->LoadResource(kVaporLeaf, true));
+            auto vaporVertices = NativeVaporVertices(view->LoadResource(kVaporVertices, true));
+            if (!vaporLeaf || !vaporVertices.data ||
+                !vapor->Load({ xlu->Instructions.data(), xlu->Instructions.size(), xlu },
+                             { vaporLeaf->Instructions.data(), vaporLeaf->Instructions.size(), vaporLeaf },
+                             vaporVertices))
+                return Error("Unsupported original Granny vapor layout.");
             mRoom = std::move(room);
+            mVapor = std::move(vapor);
             mXlu = std::move(xlu);
             mLights = std::move(metadata.lights);
             mDecorations = std::move(metadata.decorations);
@@ -113,7 +140,7 @@ class Resources {
         return mRoom ? mRoom->Opaque() : nullptr;
     }
     Gfx* Translucent() const {
-        return mXlu ? mXlu->Instructions.data() : nullptr;
+        return mVapor ? mVapor->Root() : nullptr;
     }
     const char* Route() const {
         return mRoute.c_str();
@@ -136,6 +163,7 @@ class Resources {
         mClearing = true;
         auto view = std::move(mNativeView);
         mRoom.reset();
+        mVapor.reset();
         mXlu.reset();
         mLights.clear();
         mDecorations.clear();
@@ -148,6 +176,7 @@ class Resources {
 
   private:
     std::unique_ptr<Room> mRoom;
+    std::unique_ptr<Vapor> mVapor;
     std::shared_ptr<Fast::DisplayList> mXlu;
     std::shared_ptr<Ship::ResourceManager> mNativeView;
     std::string mRoute;

@@ -13,6 +13,7 @@ extern "C" void gSPVertex(Gfx* packet,uintptr_t vertices,int count,int start) {
 }
 /* NATIVE COLLISION */
 #include "combo/BlackMarketShelvesNative.h"
+#include "combo/BlackMarketMmShopLayout.h"
 int main() {
     static PlayState play;
     static CollisionHeader scene;
@@ -25,6 +26,12 @@ int main() {
     assert(reinterpret_cast<DynaPolyActor*>(bg.actor)->bgId==0);
     const auto* mesh=bg.colHeader;
     assert(mesh && mesh->numVertices==16 && mesh->numPolygons==24 && mesh->surfaceTypeList);
+    for (int i=0;i<mesh->numVertices;++i) {
+        const auto& v=mesh->vtxList[i];
+        assert(mesh->minBounds.x<=v.x && v.x<=mesh->maxBounds.x);
+        assert(mesh->minBounds.y<=v.y && v.y<=mesh->maxBounds.y);
+        assert(mesh->minBounds.z<=v.z && v.z<=mesh->maxBounds.z);
+    }
     // Native cameras query dynamic floors too, including the shelf crowns.
     // Exercise the real surface-index and camera lookup without a null guard.
     const auto cameraIndex=SHELF_CAMERA_INDEX(&play.colCtx,&mesh->polyList[0],0);
@@ -37,9 +44,14 @@ int main() {
             assert(poly.vtxData[i]<16);
             const auto& v=mesh->vtxList[poly.vtxData[i]];
             const float plane=(poly.normal.x*v.x+poly.normal.y*v.y+poly.normal.z*v.z)/32767.f+poly.dist;
-            assert(std::abs(plane)<.01f);
+            // CollisionPoly stores a rounded integer plane distance.
+            assert(std::abs(plane)<.51f);
         }
-        const float cx=(box.low.x+box.high.x)*.5f,cy=(box.low.y+box.high.y)*.5f,cz=(box.low.z+box.high.z)*.5f;
+        float cx=0,cy=0,cz=0;
+        for (int i=0;i<8;++i) {
+            const auto& v=mesh->vtxList[bank*8+i];
+            cx+=v.x/8.f;cy+=v.y/8.f;cz+=v.z/8.f;
+        }
         assert((poly.normal.x*cx+poly.normal.y*cy+poly.normal.z*cz)/32767.f+poly.dist<0);
     }
     assert(fixture.Ensure(&play) && play.colCtx.dyna.bgActors[1].actor==nullptr);
@@ -108,5 +120,36 @@ int main() {
     fixture.Reset();play.colCtx.dyna={};
     for(auto& flags:play.colCtx.dyna.bgActorFlags)flags=1;
     assert(!fixture.Ensure(&play));
+    // The private MM display supplies its compact mesh and collision together.
+    // The original fixture above remains the default for OoT.
+    BlackMarketShelvesNative::Fixture compact(BlackMarketMmShopLayout::Vertices(false),
+        BlackMarketMmShopLayout::Vertices(true), BlackMarketMmShopLayout::CollisionCorners());
+    play.colCtx.dyna={};
+    assert(compact.Ensure(&play));
+    const auto* compactMesh=play.colCtx.dyna.bgActors[0].colHeader;
+    const auto corners=BlackMarketMmShopLayout::CollisionCorners();
+    for(int bank=0;bank<2;++bank)for(int i=0;i<8;++i) {
+        const auto& v=compactMesh->vtxList[bank*8+i];
+        const auto& expected=corners[bank][i];
+        assert(v.x==expected.x && v.y==expected.y && v.z==expected.z);
+    }
+    for(bool granny:{false,true}) {
+        head=commands.data();vertexLoads=0;
+        compact.Draw(head,granny,{wood,atlas});
+        assert(vertexLoads==12);
+        const auto& expected=BlackMarketMmShopLayout::Vertices(granny);
+        size_t index=0;
+        for(auto* packet=commands.data();packet<head;++packet)if((packet->words.w0>>24)==G_VTX) {
+            const auto* vertices=reinterpret_cast<const Vtx*>(packet->words.w1);
+            for(int i=0;i<24;++i,++index) {
+                const auto& a=vertices[i].v;const auto& b=expected[index];
+                assert(a.ob[0]==b.position.x && a.ob[1]==b.position.y && a.ob[2]==b.position.z);
+                assert(a.tc[0]==b.s && a.tc[1]==b.t);
+            }
+        }
+        assert(index==expected.size());
+    }
+    compact.Reset();play.colCtx.dyna={};
+    assert(compact.Ensure(&play) && play.colCtx.dyna.bgActors[0].colHeader==compactMesh);
     std::puts("PASS native shelves: real Dyna/camera lookup; immutable identical geometry; scrolling magical material, live/reset tint and uncolored stationary external Granny timber/velvet/trim; missing texture rejection; opaque GBI; re-entry/full-context failure");
 }

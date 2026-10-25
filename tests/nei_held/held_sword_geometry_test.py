@@ -1,6 +1,7 @@
 """Run serialized held sword matrices against the exact reviewed GI vertices."""
 from pathlib import Path
 from functools import lru_cache
+from collections import Counter
 import hashlib
 import json
 import struct
@@ -23,6 +24,8 @@ LANDMARKS = {
     "biggoron_sword": (-25.75, 166., 5500.),
     "great_fairy_sword": (-21.90625, 154.5, 5500.),
     "four_sword": (-15.40625, 78., 3389.),
+    "giants_knife": (-23.25, 152., 5500.),
+    "broken_giants_knife": (-23.25, 56.375, 2498.9301),
 }
 SOCKETS = {"oot_adult": (0., 328., -77.),
            "oot_child": (0., 216.22, 4.5),
@@ -85,8 +88,9 @@ def execute(path, wrist):
 class HeldSwordGeometry(unittest.TestCase):
     def test_exact_mesh_has_native_grip_axis_tip_and_balanced_matrix(self):
         for slug, (grip, tip, reach) in LANDMARKS.items():
-            source = "objects/nei_gi_redesign/" + slug + "/gi_dl"
-            native = matrix(ASSETS / "objects/nei_gi_redesign" / slug / "scale_mtx")
+            source = ("objects/nei_held_swords/broken_giants_knife/model/gi_dl" if slug == "broken_giants_knife"
+                      else "objects/nei_gi_redesign/" + slug + "/gi_dl")
+            native = matrix(ASSETS / Path(source).parent / "scale_mtx")
             for frame, socket in SOCKETS.items():
                 with self.subTest(sword=slug, frame=frame):
                     prefix = "objects/nei_held_swords/" + slug + "/" + frame + "/"
@@ -126,6 +130,8 @@ class HeldSwordGeometry(unittest.TestCase):
         # originals have no manifest hashes, so freeze their baseline blobs.
         originals = json.loads((ROOT / "tests/nei_held/held_sword_source_hashes.json").read_text())
         for slug in LANDMARKS:
+            if slug == "broken_giants_knife":
+                continue  # New derived candidate; protected source is checked below.
             record = json.loads((ROOT / "tools/nei_gi/CHECKPOINTS" / slug / "checkpoint.json").read_text())
             provenance = record.get("source_provenance", {})
             hashes = provenance.get("resource_sha256", originals["resource_sha256"].get(slug))
@@ -133,6 +139,53 @@ class HeldSwordGeometry(unittest.TestCase):
             for name, expected in hashes.items():
                 actual = hashlib.sha256((ASSETS / "objects/nei_gi_redesign" / slug / name).read_bytes()).hexdigest()
                 self.assertEqual(actual, expected, (slug, name))
+
+    def test_broken_knife_keeps_the_intact_grip_and_has_a_short_fractured_blade(self):
+        for frame in SOCKETS:
+            source = matrix(ASSETS / "objects/nei_held_swords/giants_knife" / frame / "grip_mtx")
+            broken = matrix(ASSETS / "objects/nei_held_swords/broken_giants_knife" / frame / "grip_mtx")
+            np.testing.assert_array_equal(source, broken)
+            _, rendered, _ = execute("objects/nei_held_swords/broken_giants_knife/" + frame + "/held_dl", np.eye(4))
+            self.assertGreater(rendered[:, 0].max(), 2497)
+            self.assertLessEqual(rendered[:, 0].max(), 2500)
+        source = ET.parse(ASSETS / "objects/nei_gi_redesign/giants_knife/mesh_opa_vtx").getroot()
+        broken = ET.parse(ASSETS / "objects/nei_held_swords/broken_giants_knife/model/mesh_opa_vtx").getroot()
+        protected = {tuple(sorted(v.attrib.items())) for v in source if int(v.get("Y")) < 742}
+        actual = {tuple(sorted(v.attrib.items())) for v in broken}
+        self.assertTrue(protected <= actual, "Guard, grip or lower blade changed")
+        self.assertEqual(max(int(v.get("Y")) for v in broken), 902)
+        # Outward-facing fracture normals distinguish the new metal cap from
+        # an open slice; the intact blade's long faces have near-zero Y normals.
+        self.assertTrue(any(int(v.get("G")) > 50 and 742 <= int(v.get("Y")) <= 902 for v in broken))
+        records = [tuple(int(v.get(k)) for k in ("X", "Y", "Z")) for v in broken]
+        cache, edges, material = {}, Counter(), ""
+        for command in ET.parse(ASSETS / "objects/nei_held_swords/broken_giants_knife/model/gi_dl").getroot():
+            if command.tag == "LoadTextureBlock":
+                material = Path(command.get("Path")).name
+            elif command.tag == "LoadVertices":
+                start, count = int(command.get("VertexOffset")), int(command.get("Count"))
+                cache = dict(enumerate(records[start:start + count]))
+            elif command.tag == "Triangle1" and material == "ordon_steel_tex":
+                tri = [cache[int(command.get(k))] for k in ("V00", "V01", "V02")]
+                if len(set(tri)) < 3:
+                    continue
+                for a, b in zip(tri, tri[1:] + tri[:1]):
+                    edges[tuple(sorted((a, b)))] += 1
+        self.assertTrue(edges)
+        self.assertTrue(all(count == 2 or (count == 1 and all(v[1] == 0 for v in edge))
+                            for edge, count in edges.items()), "Broken blade has an uncapped edge")
+
+    def test_fracture_interpolates_signed_lighting_normals(self):
+        rows = ET.parse(ASSETS / "objects/nei_held_swords/broken_giants_knife/model/mesh_opa_vtx").getroot()
+        normals = {}
+        for v in rows:
+            position = tuple(int(v.get(k)) for k in ("X", "Y", "Z"))
+            normal = tuple((int(v.get(k)) + 128) % 256 - 128 for k in ("R", "G", "B"))
+            normals.setdefault(position, set()).add(normal)
+        # Hand-calculated from the reviewed blade's source edges. Interpolating
+        # byte 238 as +238 instead of -18 incorrectly gives +96 / +39 here.
+        self.assertIn((-7, 1, 127), normals[(-45, 787, 28)])
+        self.assertIn((-3, 1, 127), normals[(-18, 316, 31)])
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@
 #include "BlackMarketEntry.h"
 #include "rando/BlackMarket.h"
 #include "ComboCapeReceiptChoice.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #if __has_include("BlackMarketText.h")
 #include "BlackMarketText.h"
 #endif
@@ -54,6 +55,8 @@ static int sSelected;
 static std::string sStatus;
 static PurchaseResult purchaseStatus = PurchaseResult::Ready;
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kKeeperMenuText = 0x8F14, kKeeperTalkText = 0x8F15, kContinueText = 0x8F16, kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
+static EnOssan* sNativeShop;
 static bool Interior() { return true; }
 static bool Active() { return sSession.Active(gSaveContext.fileNum); }
 static PurchaseResult Status(int) { return purchaseStatus; }
@@ -70,7 +73,8 @@ static std::string Body() {
 static std::string Open(u16 id) {
     play.msgCtx = {};
     Message_OpenText(&play, id);
-    if (id == kBrowseText || id == kConfirmText || id == kResultText)
+    if (id == kBrowseText || id == kConfirmText || id == kResultText ||
+        id == kKeeperMenuText || id == kKeeperTalkText || id == kContinueText)
       assert(play.msgCtx.textBoxPos == 3 &&
              "focused merchandise view reserves the native bottom textbox");
     play.msgCtx.textboxY = play.msgCtx.textboxYTarget; // Fully opened native textbox geometry.
@@ -133,23 +137,26 @@ static void TestReleaseContract() {
     play.msgCtx.textboxSegment = textboxSegments; // Native Message_Init-owned segment array.
     for (int conversation = 0; conversation < 3; ++conversation) {
         Message_StartTextbox(&play, kWelcomeText, &player.actor);
-        play.msgCtx.textboxY = play.msgCtx.textboxYTarget =
-            38; // Already-open native top welcome box.
+        // Begin with the authored keeper conversation's already-open native
+        // bottom box. ContinueTextbox inherits native layout; no old shared
+        // browsing-controller positioning helper participates in the MM path.
+        play.msgCtx.textboxY = play.msgCtx.textboxYTarget = 142;
         for (int row = 0; row < 3; ++row)
-          play.msgCtx.unk11FFE[row] = 58 + row * 12;
+          play.msgCtx.unk11FFE[row] = 162 + row * 12;
         Decode(0x19);
-        for (u16 id : { kBrowseText, kConfirmText, kBrowseText, kConfirmText, kResultText,
-                        kBrowseText, kWelcomeText }) {
+        for (u16 id : { kKeeperMenuText, kKeeperTalkText, kKeeperHelpChoiceText, kKeeperHelpText, kKeeperMenuText, kBrowseText,
+                        kConfirmText, kBrowseText, kConfirmText, kResultText,
+                        kBrowseText, kKeeperMenuText, kContinueText, kKeeperMenuText }) {
             play.msgCtx.choiceIndex = 1; // Decline must not leave a stale selection on re-confirm.
             sStatus = conversation == 1 ? "You need more rupees." : "Yours: Somaria: Statues.";
-            ContinueBrowsingText(&play, id);
+            Message_ContinueTextbox(&play, id);
             assert(play.msgCtx.msgMode == MSGMODE_TEXT_CONTINUING);
-            assert(play.msgCtx.textboxY == (id == kWelcomeText ? 38 : 142) &&
+            assert(play.msgCtx.textboxY == 142 &&
                    play.msgCtx.textboxYTarget == play.msgCtx.textboxY &&
-                   "merchandise continuation must move an existing top box "
-                   "below the focused row, then restore welcome");
-            Decode(id == kConfirmText ? 0xBF : 0x19, id == kConfirmText);
-            if (id == kConfirmText)
+                   "native shop continuation preserves its bottom textbox");
+            const bool choice = id == kConfirmText || id == kKeeperMenuText || id == kContinueText || id == kKeeperHelpChoiceText;
+            Decode(choice ? 0xBF : 0x19, choice);
+            if (choice)
                 assert(play.msgCtx.choiceIndex == 0);
         }
         Message_CloseTextbox(&play);
@@ -162,6 +169,34 @@ static void TestReleaseContract() {
         // No MessageContext reset here: the next iteration re-talks through native StartTextbox.
     }
     puts("PASS MM native Start/Continue/Close, ordinary closing reset and repeat-talk contract; actor/camera release is a separate native browsing fixture");
+}
+
+static void TestNativeShopPagesAndSelection() {
+    auto welcome = Open(kWelcomeText);
+    assert(welcome.find("Continue") != std::string::npos && welcome.find("Talk") == std::string::npos);
+    Decode(0x19, false, false, true);
+    auto body = Open(kKeeperMenuText);
+    assert(body.find("Talk to shopkeeper") != std::string::npos && body.find("Leave") != std::string::npos);
+    Decode(0xBF, true);
+    body = Open(kKeeperTalkText); assert(body.find("No guessing games") != std::string::npos); Decode(0x19);
+    body = Open(kKeeperHelpChoiceText);
+    assert(body.find("How does this shop work?") != std::string::npos && body.find("Back") != std::string::npos);
+    Decode(0xBF, true);
+    body = Open(kKeeperHelpText);
+    assert(body.find("unique dungeon clears") != std::string::npos && body.find("empty bottle") != std::string::npos);
+    Decode(0x19);
+    body = Open(kContinueText);
+    assert(body.find("Keep shopping?") != std::string::npos && body.find("Yes") != std::string::npos);
+    Decode(0xBF, true);
+    Select(*Find("nei.lantern"), 173);
+    sSession.market["stock"][1] = {{"key", "nei.whip"}, {"price", 88}, {"clears", 2}};
+    EnOssan native{}; native.cursorIndex = 1; sNativeShop = &native; sSelected = 0;
+    body = Open(kBrowseText); assert(sSelected == 1 && body.find("88 Rupees") != std::string::npos); Decode(0x19);
+    sSelected = 0; Open(kConfirmText); assert(sSelected == 1); Decode(0xBF, true);
+    assert(play.msgCtx.unk1206C == 88);
+    native.cursorIndex = 0; sSelected = 1; Open(kConfirmText); assert(sSelected == 0); Decode(0xBF, true);
+    assert(play.msgCtx.unk1206C == 173); sNativeShop = nullptr;
+    puts("PASS MM native keeper/talk/continue message states and actual EnOssan cursor-to-offer/price synchronization");
 }
 
 int main() {
@@ -232,6 +267,7 @@ int main() {
     Decode(0x19, false, false, true);
     Open(BlackMarketEntry::kUnavailableText);
     Decode(0xBF);
+    TestNativeShopPagesAndSelection();
     TestReleaseContract();
     puts("PASS actual MM MarketText, fixed metadata, prices/status/tier, native header/choice/event and font glyphs (ASan/UBSan)");
 }

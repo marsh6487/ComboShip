@@ -15,6 +15,10 @@ constexpr char kBridgeMesh[] = "__OTR__custom/cor_woods_mystery/poc1/room_1/geom
 constexpr float kMouthX = 110.0f;
 constexpr float kMouthZ = -110.0f;
 constexpr s16 kMouthYaw = -8192;
+// The accepted sleeve's black cap is at its back, about 150 units beyond
+// the mouth. Native baking retains this same cap; keep gameplay anchors intact.
+constexpr float kBlackPortalX = 216.0f;
+constexpr float kBlackPortalZ = -216.0f;
 
 inline bool OwnsBridgeMesh(const PlayState* play) {
     if (!play || play->sceneId != SCENE_26SARUNOMORI || play->roomCtx.curRoom.num != 1)

@@ -17,6 +17,21 @@ IMGUI = next((Path(path) for path in [os.environ.get("IMGUI_DIR", ""), *os.envir
 
 
 class WhatsNewTests(unittest.TestCase):
+    def run_probe(self, path):
+        self.assertIsNotNone(IMGUI, "Set IMGUI_DIR or CPATH to the pinned ImGui source directory")
+        environment = os.environ.copy()
+        environment["IMGUI_DIR"] = str(IMGUI.resolve())
+        subprocess.run(["python3", "-B", str(ROOT / path)], check=True, env=environment)
+
+    def test_audio_menu_navigation(self):
+        self.run_probe("tests/audio_menu/run_tests.py")
+
+    def test_cosmetic_effect_families(self):
+        self.run_probe("tests/cosmetics_ui/run_tests.py")
+
+    def test_generate_and_market_controls(self):
+        self.run_probe("tests/whats_new/run_generate_tests.py")
+
     def test_real_imgui_and_native_controls(self):
         self.assertIsNotNone(IMGUI, "Set IMGUI_DIR or CPATH to the pinned ImGui source directory")
         imgui = IMGUI

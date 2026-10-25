@@ -1,4 +1,5 @@
 #include "combo/BlackMarketKeeper.h"
+#include "combo/BlackMarketGraphicsArena.h"
 #include "global.h"
 #include "mm/2s2h/Enhancements/Gameplay/BlackMarketResources.h"
 #if __has_include("combo/BlackMarketKeeperAssets.h")
@@ -8,6 +9,7 @@ bool sNativeKeeperReady;
 #endif
 #ifndef OOT_KEEPER_TEST
 #include "overlays/actors/ovl_En_Takaraya/z_en_takaraya.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #endif
 #include <array>
 #include <cassert>
@@ -31,6 +33,18 @@ struct KeeperState {
   Vec3s joints[24], morphs[24];
   int eye, timer;
 } sKeeper;
+#ifndef OOT_KEEPER_TEST
+static std::array<Vec3s, TREASURE_CHEST_SHOP_GAL_LIMB_MAX> sKeeperJoints, sKeeperMorphs;
+static PlayState* sNativeShopPlay;
+static EnOssan* expectedShop;
+static s16 sBrowseCamera = CAM_ID_NONE;
+bool NativeShopOwnCamera(PlayState*) { return false; }
+extern "C" s16 Play_GetActiveCamId(PlayState*) { return CAM_ID_MAIN; }
+// Native cursor commands execute in native_mm_shop_actor_test.cpp. This fixture
+// exercises the separate Gal skeleton/head/eye presentation with no owned view.
+void EnOssan_DrawCursor(PlayState*, EnOssan*, f32, f32, f32, u8) { assert(false); }
+void EnOssan_DrawStickDirectionPrompts(PlayState*, EnOssan*) { assert(false); }
+#endif
 static FlexSkeletonHeader nativeSkeleton;
 static AnimationHeader nativeAnimation;
 static std::array<StandardLimb, 23> nativeLimbs;
@@ -87,9 +101,21 @@ extern "C" Gfx *MmAssets_LoadDisplayListGraphStrict(const char *path) {
 }
 extern "C" void MmAssets_EnsureStrictTextureBindings() { ++nativeBindings; }
 void KeeperUpdate(Actor *, PlayState *) {}
-void RecordInit(PlayState *, SkelAnime *, FlexSkeletonHeader *skeleton,
-                AnimationHeader *animation, Vec3s *, Vec3s *, int limbs) {
+void RecordInit(PlayState *, SkelAnime *skel, FlexSkeletonHeader *skeleton,
+                AnimationHeader *animation, Vec3s *joints, Vec3s *morphs, int limbs) {
   assert(limbs == 24);
+#ifndef OOT_KEEPER_TEST
+  assert(expectedShop && skel == &expectedShop->skelAnime);
+  assert(joints == sKeeperJoints.data() && morphs == sKeeperMorphs.data());
+  assert(joints != expectedShop->jointTable && morphs != expectedShop->morphTable &&
+         "Gal's 24 joints must never use the smaller native shop buffers");
+  for (int i = 0; i < limbs; ++i) {
+    joints[i] = {s16(i + 10), 20, 30};
+    morphs[i] = {s16(i + 40), 50, 60};
+  }
+  skel->jointTable = joints;
+  skel->morphTable = morphs;
+#endif
   if (expectCustom) {
     assert(
         std::strcmp(
@@ -156,6 +182,18 @@ extern "C" int ComboPlaceTitleCard_Show(PlayState *, TexturePtr, u8, u8) {
   ++titles;
   return 1;
 }
+#else
+// Title service boundaries used by the production presenter extracted below.
+// Its native title behavior is covered by the location-title fixtures.
+bool Safe(PlayState*) { return true; }
+extern "C" s32 Player_InCsMode(PlayState*) { return false; }
+int Combo_SOH_SwapCustomTitleCardPresentation(int value) {
+  static int current;
+  const int previous = current;
+  current = value;
+  return previous;
+}
+#define GameInteractor_Should(...) true
 #endif
 /* PRODUCTION */
 void Initialize(Actor *actor, PlayState *play) {
@@ -206,7 +244,11 @@ void Scenario(bool custom, bool partial, bool useAlt = false) {
 #ifdef OOT_KEEPER_TEST
   Actor keeper{};
 #else
-  EnTakaraya gal{};
+  EnOssan gal{};
+  expectedShop = &gal;
+  sNativeShopPlay = &play;
+  for (auto& joint : gal.jointTable) joint = {501, 502, 503};
+  for (auto& morph : gal.morphTable) morph = {701, 702, 703};
   Actor &keeper = gal.actor;
 #endif
   Initialize(&keeper, &play);
@@ -217,7 +259,11 @@ void Scenario(bool custom, bool partial, bool useAlt = false) {
 #ifdef OOT_KEEPER_TEST
   assert(sKeeper.timer == 90 && sKeeper.eye == 0);
 #else
-  assert(gal.timer == 90 && gal.eyeTexIndex == 0 && !sTalking);
+  assert(gal.blinkTimer == 90 && gal.eyeTexIndex == 0 && !sTalking);
+  assert(gal.blinkFunc == NativeKeeperBlink);
+  for (const auto& joint : gal.jointTable) assert(joint.x == 501 && joint.z == 503);
+  for (const auto& morph : gal.morphTable) assert(morph.x == 701 && morph.z == 703);
+  assert(sKeeperJoints.back().x == 33 && sKeeperMorphs.back().x == 63);
 #endif
   Gfx *nativeHead = &nativeGraph[4];
   Gfx *head = nativeHead;
@@ -261,6 +307,16 @@ void Scenario(bool custom, bool partial, bool useAlt = false) {
 #ifdef OOT_KEEPER_TEST
   else
     assert(nativeBindings == 4);
+#else
+  gal.eyeTexIndex = 0; gal.blinkTimer = 90;
+  for (int frame = 0; frame < 89; ++frame) NativeKeeperBlink(&gal);
+  assert(gal.eyeTexIndex == 0 && gal.blinkTimer == 1);
+  NativeKeeperBlink(&gal); assert(gal.eyeTexIndex == 1 && gal.blinkTimer == 2);
+  for (int eye : {2, 3, 0}) {
+    NativeKeeperBlink(&gal); NativeKeeperBlink(&gal);
+    assert(gal.eyeTexIndex == eye);
+  }
+  assert(gal.blinkTimer == 80);
 #endif
 }
 int main() {

@@ -11,6 +11,8 @@
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
 #endif
 #include "sword_element_message.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
@@ -8820,6 +8822,17 @@ s32 Player_ActionHandler_Talk(Player* this, PlayState* play) {
                 (lockOnActor != NULL) &&
                 (CHECK_FLAG_ALL(lockOnActor->flags, ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_TALK_WITH_C_UP) ||
                  (lockOnActor->hintId != TATL_HINT_ID_NONE));
+
+#ifdef COMBO_BUILD
+            if (ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE)) {
+                canTalkToLockOnWithCUp = false;
+                this->tatlTextId = 0;
+                this->stateFlags2 &= ~PLAYER_STATE2_200000;
+                lockOnActor = NULL;
+                if (talkOfferActor == this->tatlActor)
+                    talkOfferActor = NULL;
+            }
+#endif
 
             if (canTalkToLockOnWithCUp || (this->tatlTextId != 0)) {
                 //! @bug The comparison `((ABS_ALT(this->tatlTextId) & 0xFF00) != 0x10000)` always evaluates to `true`

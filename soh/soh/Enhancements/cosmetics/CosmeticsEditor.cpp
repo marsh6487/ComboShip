@@ -1,4 +1,6 @@
 #include "CosmeticsEditor.h"
+#include "../../../../combo/gui/CosmeticGrouping.h"
+#include "../../../../combo/gui/WhatsNew.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include "cosmeticsTypes.h"
 #include "authenticGfxPatches.h"
@@ -8,6 +10,7 @@
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "BlackMarketShelves.h"
+#include "BlackMarketRoomMagic.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #endif
@@ -445,6 +448,14 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
 #ifdef COMBO_BUILD
     COSMETIC_OPTION("World.BlackMarketShelves", "Black Market Shelves", COSMETICS_GROUP_WORLD,
         ColorRGBA8(BlackMarketShelves::kDefaultTint[0],BlackMarketShelves::kDefaultTint[1],BlackMarketShelves::kDefaultTint[2],255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomViolet", "Black Market Room Violet", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(165, 148, 230, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomTeal", "Black Market Room Teal", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(135, 194, 210, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomRose", "Black Market Room Rose", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(204, 170, 215, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomLavender", "Black Market Room Lavender", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(175, 160, 216, 255), false, true, false),
 #endif
     COSMETIC_OPTION("World.BlockOfTime",            "Block of Time",            COSMETICS_GROUP_WORLD,        ColorRGBA8(255, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("World.Moon",                   "Moon",                     COSMETICS_GROUP_WORLD,        ColorRGBA8(240, 255, 180, 255), false, true, true),
@@ -2228,13 +2239,18 @@ void RandomizeColor(CosmeticOption& cosmeticOption, bool manual) {
 }
 
 void DrawCosmeticRow(CosmeticOption& cosmeticOption) {
-    if (UIWidgets::CVarColorPicker(cosmeticOption.label.c_str(), cosmeticOption.cvar, cosmeticOption.defaultColor,
-                                   cosmeticOption.supportsAlpha, 0, THEME_COLOR)) {
-        CVarSetInteger((cosmeticOption.rainbowCvar), 0);
-        CVarSetInteger((cosmeticOption.changedCvar), 1);
-        ApplySideEffects(cosmeticOption);
-        ApplyOrResetCustomGfxPatches();
-        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    {
+        WhatsNew::Scope releaseHighlight(cosmeticOption.valuesCvar, cosmeticOption.label.c_str(),
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         CVarGetInteger(cosmeticOption.lockedCvar, 0) != 0);
+        if (UIWidgets::CVarColorPicker(cosmeticOption.label.c_str(), cosmeticOption.cvar, cosmeticOption.defaultColor,
+                                       cosmeticOption.supportsAlpha, 0, THEME_COLOR)) {
+            CVarSetInteger((cosmeticOption.rainbowCvar), 0);
+            CVarSetInteger((cosmeticOption.changedCvar), 1);
+            ApplySideEffects(cosmeticOption);
+            ApplyOrResetCustomGfxPatches();
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        }
     }
     // the longest option name
     ImGui::SameLine((ImGui::CalcTextSize("Message Light Blue (None No Shadow)").x * 1.0f) + 60.0f);
@@ -2299,9 +2315,16 @@ void DrawCosmeticGroup(CosmeticGroup cosmeticGroup) {
         ApplyOrResetCustomGfxPatches();
     }
     UIWidgets::Spacer();
+    CosmeticGrouping::EffectFamilyBoundary effectFamilies;
+    const bool separateEffects = cosmeticGroup == COSMETICS_GROUP_MAGIC || cosmeticGroup == COSMETICS_GROUP_ARROWS ||
+                                 cosmeticGroup == COSMETICS_GROUP_SPIN_ATTACK ||
+                                 cosmeticGroup == COSMETICS_GROUP_TRAILS;
     for (auto& [id, cosmeticOption] : cosmeticOptions) {
         if (cosmeticOption.group == cosmeticGroup &&
             (!cosmeticOption.advancedOption || CVarGetInteger(CVAR_COSMETIC("AdvancedMode"), 0))) {
+            if (separateEffects && effectFamilies.Before(id)) {
+                UIWidgets::Separator(true, true, 2.0f, 2.0f);
+            }
             DrawCosmeticRow(cosmeticOption);
         }
     }
@@ -2509,18 +2532,35 @@ void CosmeticsEditorWindow::DrawElement() {
 
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
 
+            ImGui::TextUnformatted("Appearance");
+            {
+                WhatsNew::Scope releaseHighlight("gEnhancements.BottleShimmer", "Bottle shimmer",
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+                UIWidgets::CVarCheckbox(
+                    "Bottle shimmer", "gEnhancements.BottleShimmer",
+                    UIWidgets::CheckboxOptions()
+                        .Color(THEME_COLOR)
+                        .Tooltip("Add three subtle drifting motes around potions, bottled fairies and Poes."));
+            }
+            {
+                WhatsNew::Scope releaseHighlight("gEnhancements.SkijerNEI.UseVanillaHeldSwords",
+                                                 "Use Vanilla Held Swords",
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+                UIWidgets::CVarCheckbox(
+                    "Use Vanilla Held Swords", "gEnhancements.SkijerNEI.UseVanillaHeldSwords",
+                    UIWidgets::CheckboxOptions()
+                        .DefaultValue(false)
+                        .Color(THEME_COLOR)
+                        .Tooltip("Use the original held sword models in both games (the legacy model for Four Sword). "
+                                 "Turn off to keep the authored models. Selected custom models retain priority. "
+                                 "Changes apply immediately and do not affect pickup or shop models."));
+            }
+            UIWidgets::Separator(true, true, 2.0f, 2.0f);
+
             DrawCosmeticGroup(COSMETICS_GROUP_LINK);
             DrawCosmeticGroup(COSMETICS_GROUP_GLOVES);
             DrawCosmeticGroup(COSMETICS_GROUP_MIRRORSHIELD);
             DrawCosmeticGroup(COSMETICS_GROUP_EQUIPMENT);
-            UIWidgets::CVarCheckbox(
-                "Use Vanilla Held Swords", "gEnhancements.SkijerNEI.UseVanillaHeldSwords",
-                UIWidgets::CheckboxOptions()
-                    .DefaultValue(false)
-                    .Color(THEME_COLOR)
-                    .Tooltip("Use the original held sword models in both games (the legacy model for Four Sword). "
-                             "Turn off to keep the authored models. Selected custom models retain priority. "
-                             "Changes apply immediately and do not affect pickup or shop models."));
             DrawCosmeticGroup(COSMETICS_GROUP_SWORDS);
             DrawCosmeticGroup(COSMETICS_GROUP_CONSUMABLE);
             ImGui::EndTabItem();
@@ -2534,10 +2574,24 @@ void CosmeticsEditorWindow::DrawElement() {
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem("Keys")) {
+        if (WhatsNew::BeginTabItem("Keys", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
 
             ImGui::BeginDisabled(CVarGetInteger(CVAR_SETTING("DisableChanges"), 0));
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
+
+            {
+                WhatsNew::Scope releaseHighlight("gEnhancements.DungeonItemColors", "Dungeon item colours",
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                                 CVarGetInteger(CVAR_SETTING("DisableChanges"), 0) != 0);
+                UIWidgets::CVarCheckbox(
+                    "Dungeon item colours", "gEnhancements.DungeonItemColors",
+                    UIWidgets::CheckboxOptions()
+                        .Color(THEME_COLOR)
+                        .Tooltip("Use each dungeon's colour on its small keys, boss keys, maps and compass bodies. "
+                                 "Colours apply to vanilla and replacement dungeon items in either game. "
+                                 "Shuffled items keep their owning dungeon's colour; compass glass stays clear. "
+                                 "Independent emblem colours also apply to an edited boss-key gem."));
+            }
 
             if (UIWidgets::Button("Give all keys dungeon-specific colors",
                                   UIWidgets::ButtonOptions().Color(THEME_COLOR).Size(UIWidgets::Sizes::Inline))) {
@@ -2554,19 +2608,23 @@ void CosmeticsEditorWindow::DrawElement() {
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem("Effects")) {
+        if (WhatsNew::BeginTabItem("Effects", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
 
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
 
             DrawCosmeticGroup(COSMETICS_GROUP_MAGIC);
             DrawCosmeticGroup(COSMETICS_GROUP_ARROWS);
-            UIWidgets::CVarCheckbox(
-                "Elemental impact sounds", CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
-                UIWidgets::CheckboxOptions()
-                    .Color(THEME_COLOR)
-                    .Tooltip(
-                        "Use flame ignition, ice breaking, and a light-arrow hit sound for elemental arrow impacts. "
-                        "Turn off to use the original impact sounds."));
+            {
+                WhatsNew::Scope releaseHighlight(CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
+                                                 "Elemental impact sounds",
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+                UIWidgets::CVarCheckbox("Elemental impact sounds", CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
+                                        UIWidgets::CheckboxOptions()
+                                            .Color(THEME_COLOR)
+                                            .Tooltip("Use flame ignition, ice breaking, and a light-arrow hit sound "
+                                                     "for elemental arrow impacts. "
+                                                     "Turn off to use the original impact sounds."));
+            }
             UIWidgets::Spacer();
             DrawCosmeticGroup(COSMETICS_GROUP_SPIN_ATTACK);
             DrawCosmeticGroup(COSMETICS_GROUP_TRAILS);
@@ -2591,7 +2649,7 @@ void CosmeticsEditorWindow::DrawElement() {
 
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("World & NPCs")) {
+        if (WhatsNew::BeginTabItem("World & NPCs", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
 
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
 

@@ -10,7 +10,7 @@ static void TestInteriorExitDoor() {
 #endif
     };
     const auto prepare = [&] {
-        Reset(); entry = {}; door = {}; sTalking = false;
+        Reset(); entry = {}; door = {}; sTalking = false; sDoorCollision.releases = 0;
         entry.id = -ACTOR_EN_DOOR;
         entry.sides[0].room = 0; entry.sides[1].room = -1;
         entry.pos = { -10, 0, 420 };
@@ -59,7 +59,7 @@ static void TestInteriorExitDoor() {
     NativeCaller(&player, &play, &door.knobDoor);
     assert(play.nextEntrance == destinationBefore && vanillaDoors == 0);
 #endif
-    assert(sReturnPending && play.transitionTrigger == TRANS_TRIGGER_START &&
+    assert(sDoorCollision.releases == 1 && sReturnPending && play.transitionTrigger == TRANS_TRIGGER_START &&
            "native interior Open must use the already working return transition");
     assert(sSession.market == marketBefore && sSession.state.purchased == stateBefore && grants == 0 && writes == 0);
     for (float z : { 381.f, 401.f, 419.f, 439.f }) {
@@ -96,7 +96,7 @@ static void TestInteriorExitDoor() {
         assert(!door.knobDoor.requestOpen && doorErrors == 1 && vanillaDoors == 0);
         assert(player.actionFunc != Player_Action_36);
 #endif
-        assert(!sReturnPending && play.transitionTrigger == TRANS_TRIGGER_OFF && grants == 0 && writes == 0 &&
+        assert(sDoorCollision.releases == 0 && !sReturnPending && play.transitionTrigger == TRANS_TRIGGER_OFF && grants == 0 && writes == 0 &&
                "native blocked-Open cleanup must not leave an opening animation or start a transition");
     }
     prepare();

@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 2
 
       - name: Install regression dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-venv
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pycparser python3-venv
 
       - name: Install pinned UI rasterizer
         run: |
@@ -39,6 +39,8 @@ jobs:
           git fetch --no-tags --depth=1 origin c0181856968dd6f3869be0d1aa240743091fd6a8
           # Match libultraship's ImGui dependency for the real save-editor draw fixture.
           git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
+          # The direct Ikana editor click test compiles this pinned input engine.
+          echo "IMGUI_DIR=$RUNNER_TEMP/combo-nei-imgui" >> "$GITHUB_ENV"
           # The real SaveEditor headers also reach ResourceManager and GuiTexture.
           # Use the same pins as libultraship/cmake/dependencies/common.cmake.
           git clone --depth=1 --branch v4.1.0 https://github.com/bshoshany/thread-pool.git "$RUNNER_TEMP/combo-nei-thread-pool"
