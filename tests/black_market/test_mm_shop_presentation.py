@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify private MM basket layout identity, closure and original preservation."""
+"""Verify private MM display layout identity, closure and original preservation."""
 from pathlib import Path
 import re
 import struct
@@ -21,7 +21,7 @@ class PrivateMmPresentation(unittest.TestCase):
         cls.original = mm_native_shop.apply(native_market.read_bundle(ROOT / 'tools/native_market/bundled'))
         cls.candidate = presentation.apply(cls.original)
 
-    def test_only_mm_room_mesh_changes_and_six_private_owners_are_added(self):
+    def test_only_mm_room_mesh_changes_and_private_owners_are_added(self):
         self.assertEqual(set(self.candidate) - set(self.original), set(presentation.CLONES.values()))
         self.assertEqual({name for name in self.original if self.original[name] != self.candidate[name]},
                          {mm_native_shop.ROOM})
@@ -42,16 +42,50 @@ class PrivateMmPresentation(unittest.TestCase):
             b = list(ET.fromstring(self.candidate[presentation.CLONES[name]]))
             parts = presentation.market_interior.vertex_components(self.original,
                         f'{presentation.GEOMETRY}_tri_{suffix}')
-            expected = {index: dx for bounds, dx, _, _ in moves for part in parts
+            expected = {index: delta for bounds, delta, _, _ in moves for part in parts
                         if part['bounds'] == bounds for index in part['indices']}
             self.assertEqual(len(a), len(b))
             for index, (first, last) in enumerate(zip(a, b)):
                 values = dict(first.attrib)
                 if index in expected:
-                    values['X'] = str(int(values['X']) + expected[index])
+                    for axis, offset in zip('XYZ', expected[index]):
+                        values[axis] = str(int(values[axis]) + offset)
                     moved += 1
                 self.assertEqual(values, last.attrib)
-        self.assertEqual(moved, 558)
+        self.assertEqual(moved, 804)
+
+    def test_complete_left_cauldron_clears_lower_stock_and_stays_inside_wall(self):
+        # The original connected pieces are the cauldron body, top attachment,
+        # long implement and liquid. Do not move only the first obstructing
+        # triangle or leave contents floating in their old location.
+        pieces = {
+            2: [[[-120, 0, 0], [-62, 54, 54]], [[-103, 60, 42], [-92, 62, 53]]],
+            6: [[[-104, 51, 27], [-53, 62, 53]]],
+            18: [[[-114, 51, 2], [-69, 51, 47]]],
+        }
+        displacements = set()
+        for suffix, bounds in pieces.items():
+            name = f'{presentation.GEOMETRY}_vtx_{suffix}'
+            original = list(ET.fromstring(self.original[name]))
+            candidate = list(ET.fromstring(self.candidate[presentation.CLONES[name]]))
+            parts = presentation.market_interior.vertex_components(self.original,
+                        f'{presentation.GEOMETRY}_tri_{suffix}')
+            for box in bounds:
+                matches = [part for part in parts if part['bounds'] == box]
+                self.assertEqual(len(matches), 1)
+                indices = matches[0]['indices']
+                xs = [int(candidate[index].get('X')) for index in indices]
+                zs = [int(candidate[index].get('Z')) for index in indices]
+                # Actual room wall is X=-160; the lower outer offer's complete
+                # .18 FrameFit/native seal reservation starts at X=-87.2039.
+                self.assertGreater(min(xs), -160)
+                self.assertLess(max(xs), -87.2039)
+                # The outer shelf ends at Z48; the customer barrier is Z130.
+                self.assertGreater(min(zs), 48)
+                self.assertLess(max(zs), 130)
+                displacements.update(tuple(int(candidate[index].get(axis)) - int(original[index].get(axis))
+                                           for axis in 'XYZ') for index in indices)
+        self.assertEqual(len(displacements), 1, 'all four pieces must remain one rigid cauldron')
 
     def test_actual_mm_mesh_has_a_closed_resource_graph(self):
         data = mm_native_shop.native_commands(self.candidate[mm_native_shop.ROOM])[10]
@@ -78,13 +112,18 @@ class PrivateMmPresentation(unittest.TestCase):
         self.assertNotIn(presentation.ROOM_ROOT, seen)
 
     def test_changed_component_identity_is_rejected(self):
-        malformed = dict(self.original)
-        name = f'{presentation.GEOMETRY}_vtx_17'
-        root = ET.fromstring(malformed[name])
-        root[527].set('Y', '0')
-        malformed[name] = ET.tostring(root)
-        with self.assertRaisesRegex(ValueError, 'component identity'):
-            presentation.apply(malformed)
+        for suffix, moves in presentation.MOVES.items():
+            with self.subTest(suffix=suffix):
+                malformed = dict(self.original)
+                name = f'{presentation.GEOMETRY}_vtx_{suffix}'
+                root = ET.fromstring(malformed[name])
+                parts = presentation.market_interior.vertex_components(self.original,
+                            f'{presentation.GEOMETRY}_tri_{suffix}')
+                part = next(part for part in parts if part['bounds'] == moves[0][0])
+                root[next(iter(part['indices']))].set('Y', '-1000')
+                malformed[name] = ET.tostring(root)
+                with self.assertRaisesRegex(ValueError, 'component identity'):
+                    presentation.apply(malformed)
 
     def test_runtime_requires_every_generated_private_owner(self):
         source = (ROOT / 'combo/BlackMarketMmShopScene.h').read_text()

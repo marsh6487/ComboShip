@@ -512,7 +512,8 @@ void RegisterNEIMenu() {
         { NEI_SEASONS_ROD, "Rod" },
         { NEI_SEASONS_GATED, "Gated" },
     };
-    mSohMenu->AddWidget(seasonsPath, "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
+    mSohMenu
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMasks"), "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
         .CVar(seasonsModeCvar)
         .RaceDisable(false)
         .PreFunc(
@@ -528,7 +529,7 @@ void RegisterNEIMenu() {
                               "Winter: Ice Cavern's final Sheik check or Snowhead.\n"
                               "This choice is saved with the seed; menu edits apply to the next seed.\n"
                               "Season abilities are optional in the solver."));
-    mSohMenu->AddWidget(seasonsPath, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
+    mSohMenu->AddWidgetAfter(seasonsPath, seasonsModeCvar, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
         .CVar(startingRodCvar)
         .RaceDisable(false)
         .PreFunc(

@@ -100,7 +100,7 @@ class MmNativeShopScene(unittest.TestCase):
     def setUpClass(cls):
         cls.original = prepare_native_market.prepared_resources()
 
-    def test_scene_contains_native_fixed1_cameras_and_linked_cutscenes(self):
+    def test_scene_contains_private_oot_data4_cameras_and_linked_cutscenes(self):
         module = shop_module(self)
         result = module.apply(self.original)
         commands = module.native_commands(result[SCENE])
@@ -111,12 +111,12 @@ class MmNativeShopScene(unittest.TestCase):
         cameras = []
         for _ in range(4):
             setting, count = struct.unpack_from('<HH', commands[2], offset)
-            self.assertEqual((setting, count), (0x1F, 3))
+            self.assertEqual((setting, count), (0x5B, 3))
             cameras.append(struct.unpack_from('<9h', commands[2], offset + 4))
             offset += 4 + 6 * count
         self.assertEqual(offset, len(commands[2]))
         self.assertEqual(cameras, [tuple(row) for row in module.contract()['CameraRecords']])
-        self.assertEqual([row[6:] for row in cameras], [(-1, -1, -1)] + [(-1, 75, -1)] * 3)
+        self.assertEqual([row[6:] for row in cameras], [(-1, 3, -1)] * 4)
         self.assertEqual(struct.unpack_from('<I', commands[27])[0], 4)
         self.assertEqual(len(commands[27]), 4 + 4 * 16)
         self.assertEqual([struct.unpack_from('<5h2Bh2B', commands[27], 4 + i * 16) for i in range(4)], [

@@ -11,6 +11,24 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_native_market_lifetime_repairs_are_required_checks(self):
+        tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
+        required = (
+            "tests/black_market/test_room_magic_assets.py",
+            "tests/black_market/run_room_magic_tests.py",
+            "tests/black_market/run_room_magic_loader_tests.py",
+            "tests/black_market/run_room_magic_draw_exit_tests.py",
+            "tests/black_market/run_interior_effects_native_tests.py",
+        )
+        for runner in required:
+            with self.subTest(runner=runner):
+                owners = [task for task in tasks if f"python3 -B {runner}" in task["run"].splitlines()]
+                self.assertEqual(len(owners), 1, f"required native lifetime regression is not registered once: {runner}")
+                self.assertEqual(owners[0]["suite"], "world")
+        steps = yaml.safe_load((ROOT / ".github/workflows/regressions.yml").read_text())["jobs"]["regression"]["steps"]
+        installs = "\n".join(step.get("run", "") for step in steps)
+        self.assertIn("python3-pycparser", installs)
+
     def test_platforms_and_every_test_group_finish_independently(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/build-artifacts.yml").read_text())
         checks = workflow["jobs"]["checks"]

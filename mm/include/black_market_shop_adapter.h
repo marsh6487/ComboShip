@@ -29,6 +29,9 @@ typedef struct ComboBlackMarketShopAdapter {
     // Optional private conversation while the native action faces the keeper.
     // Return true to resume the native keeper menu; false retains this action.
     s32 (*keeperDialogue)(struct EnOssan*, PlayState*);
+    // Private OoT shop camera: pivot the existing owned camera and report when
+    // its native turn completes. NULL retains MM's linked-cutscene behavior.
+    s32 (*turnCamera)(struct EnOssan*, PlayState*, f32 targetDegrees);
 } ComboBlackMarketShopAdapter;
 
 #ifdef __cplusplus

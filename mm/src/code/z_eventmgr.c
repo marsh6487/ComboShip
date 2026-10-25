@@ -583,6 +583,12 @@ s32 CutsceneManager_IsCurrentActor(Actor* actor) {
     return (actor != NULL) && (sCutsceneMgr.csId != CS_ID_NONE) && (sCutsceneMgr.targetActor == actor);
 }
 
+s32 CutsceneManager_IsCurrentCamera(PlayState* play) {
+    return (play != NULL) && (sCutsceneMgr.play == play) && (sCutsceneMgr.csId != CS_ID_NONE) &&
+           (Play_GetActiveCamId(play) == sCutsceneMgr.subCamId) &&
+           CutsceneManager_CameraMatches(sCutsceneMgr.subCamId, sCutsceneOwnedCamera, sCutsceneOwnedCameraUid);
+}
+
 s32 CutsceneManager_EndForActor(PlayState* play, Actor* actor) {
     s32 ended = false;
     s32 i;

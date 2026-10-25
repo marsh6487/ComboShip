@@ -32,6 +32,18 @@
   {
     "suite": "items",
     "origin": "gate",
+    "name": "Native OoT Magic Mirror pickup message completion",
+    "run": "python3 -B tests/magic_mirror/run_receipt_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native OoT Black Market button glyph colors",
+    "run": "python3 -B tests/black_market/run_oot_button_glyph_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
     "name": "Fast pickup text and receipt regressions",
     "run": "python3 -B tests/item_receipts/run_message_replace_tests.py\npython3 -B tests/item_receipts/run_message_replace_tests.py --sanitize\npython3 -B tests/item_receipts/run_chateau_receipt_tests.py\npython3 -B tests/item_receipts/run_chateau_receipt_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_item_receipt_tests.py --layout-only --sanitizers"
   },
@@ -363,7 +375,19 @@
     "suite": "world",
     "origin": "nei",
     "name": "Native Black Market shop actor, scenes and dialogue formatting",
-    "run": "python3 -B tests/black_market/native_mm_shop_adapter_tests.py\npython3 -B tests/black_market/native_mm_scene_runtime_tests.py\npython3 -B tests/black_market/test_mm_native_shop_scene.py\npython3 -B tests/black_market/run_keeper_dialogue_oot_formatter_tests.py"
+    "run": "python3 -B tests/black_market/oot_shop_camera_parity_tests.py\npython3 -B tests/black_market/run_counter_barrier_native_tests.py\npython3 -B tests/black_market/test_mm_shop_presentation.py\npython3 -B tests/black_market/native_mm_shop_adapter_tests.py\npython3 -B tests/black_market/native_mm_scene_runtime_tests.py\npython3 -B tests/black_market/test_mm_native_shop_scene.py\npython3 -B tests/black_market/run_keeper_dialogue_oot_formatter_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Black Market optional room assets and native draw ownership",
+    "run": "python3 -B tests/black_market/test_room_magic_assets.py\npython3 -B tests/black_market/run_room_magic_tests.py\npython3 -B tests/black_market/run_room_magic_loader_tests.py\npython3 -B tests/black_market/run_room_magic_draw_exit_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Black Market raw segment restoration after reset",
+    "run": "python3 -B tests/black_market/run_interior_effects_native_tests.py"
   },
   {
     "suite": "world",

@@ -773,6 +773,18 @@ void EnOssan_TalkToShopkeeper(EnOssan* this, PlayState* play) {
 }
 
 void EnOssan_LookToLeftShelf(EnOssan* this, PlayState* play) {
+    const ComboBlackMarketShopAdapter* adapter = EnOssan_GetShopAdapter(this, play);
+
+    if ((adapter != NULL) && (adapter->turnCamera != NULL)) {
+        if (adapter->turnCamera(this, play, 30.0f)) {
+            EnOssan_UpdateCursorPos(play, this);
+            EnOssan_SetupAction(this, EnOssan_BrowseLeftShelf);
+            Message_ContinueTextbox(play, this->items[this->cursorIndex]->actor.textId);
+        } else {
+            this->stickAccumX = 0;
+        }
+        return;
+    }
     if (this->cutsceneState == ENOSSAN_CUTSCENESTATE_PLAYING) {
         CutsceneManager_Stop(this->csId);
         this->cutsceneState = ENOSSAN_CUTSCENESTATE_STOPPED;
@@ -800,6 +812,18 @@ void EnOssan_LookToLeftShelf(EnOssan* this, PlayState* play) {
 }
 
 void EnOssan_LookToRightShelf(EnOssan* this, PlayState* play) {
+    const ComboBlackMarketShopAdapter* adapter = EnOssan_GetShopAdapter(this, play);
+
+    if ((adapter != NULL) && (adapter->turnCamera != NULL)) {
+        if (adapter->turnCamera(this, play, -30.0f)) {
+            EnOssan_UpdateCursorPos(play, this);
+            EnOssan_SetupAction(this, EnOssan_BrowseRightShelf);
+            Message_ContinueTextbox(play, this->items[this->cursorIndex]->actor.textId);
+        } else {
+            this->stickAccumX = 0;
+        }
+        return;
+    }
     if (this->cutsceneState == ENOSSAN_CUTSCENESTATE_PLAYING) {
         CutsceneManager_Stop(this->csId);
         this->cutsceneState = ENOSSAN_CUTSCENESTATE_STOPPED;
@@ -1051,6 +1075,14 @@ void EnOssan_BrowseRightShelf(EnOssan* this, PlayState* play) {
 }
 
 void EnOssan_LookToShopkeeperFromShelf(EnOssan* this, PlayState* play) {
+    const ComboBlackMarketShopAdapter* adapter = EnOssan_GetShopAdapter(this, play);
+
+    if ((adapter != NULL) && (adapter->turnCamera != NULL)) {
+        if (adapter->turnCamera(this, play, 0.0f)) {
+            EnOssan_StartShopping(play, this);
+        }
+        return;
+    }
     if (this->cutsceneState == ENOSSAN_CUTSCENESTATE_PLAYING) {
         CutsceneManager_Stop(this->csId);
         this->cutsceneState = ENOSSAN_CUTSCENESTATE_STOPPED;

@@ -157,8 +157,8 @@ const std::vector<Vtx>& RockVertices() {
 }
 void CaveDraw(Actor* actor, PlayState* play) {
     if (!Available(play) || reinterpret_cast<CaveActor*>(actor) != sCave ||
-        !NeiGi_CanDrawLayers(play, 3 + (Geometry().water.size() * 4 * sizeof(Vtx) + sizeof(Mtx) - 1) / sizeof(Mtx),
-                             Geometry().solid.size() * 2 + 40, Geometry().water.size() * 2 + 40))
+        !NeiGi_CanDrawLayers(play, 3 + (Lake::kMaxWaterQuads * 4 * sizeof(Vtx) + sizeof(Mtx) - 1) / sizeof(Mtx),
+                             Geometry().solid.size() * 2 + 40, Lake::kMaxWaterQuads * 3 + 40))
         return;
     const auto& vertices = RockVertices();
     OPEN_DISPS(play->state.gfxCtx);
@@ -170,7 +170,9 @@ void CaveDraw(Actor* actor, PlayState* play) {
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH);
     gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_MODULATEI);
+    // SetupDL25 uses two cycles. Keep this tile's modulation through cycle2;
+    // repeating TEXEL0 there instead reads the inherited scene's second tile.
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_PASS2);
     const char* stone =
         RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeStone, ResourceMgr_FileExists);
     gDPLoadTextureBlock(POLY_OPA_DISP++, stone, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 64, 0, G_TX_WRAP, G_TX_WRAP, 5, 6,
@@ -187,33 +189,51 @@ void CaveDraw(Actor* actor, PlayState* play) {
     WaterBox* water = nullptr;
     const bool inlet =
         WaterBox_GetSurface1(play, &play->colCtx, -1900, 3757, &waterY, &water) && Lake::HasInlet(waterY);
-    const float streamY = Lake::StreamHeight(waterY);
+    const auto waterMesh = inlet ? Lake::BuildWaterGeometry(waterY) : std::vector<Lake::Quad>{};
     auto* stream =
-        inlet ? static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, Geometry().water.size() * 4 * sizeof(Vtx))) : nullptr;
+        inlet ? static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, waterMesh.size() * 4 * sizeof(Vtx))) : nullptr;
     if (stream) {
-        const s16 scroll = (play->gameplayFrames * 24) % 2048;
+        const char* waterTexture =
+            RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeWater, ResourceMgr_FileExists);
+        const bool customWater =
+            waterTexture == RegionalBridgeMaterials::OverridePath(RegionalBridgeMaterials::Material::LakeWater);
+        // Preserve the existing replacement pack's logical I8 64x64 contract;
+        // the actual native lake wave tile is RGBA16 32x32.
+        const float tilePeriod = (customWater ? 64.f : 32.f) * 32;
+        const float scroll = (play->gameplayFrames % 54) * (tilePeriod / 54);
         size_t index = 0;
-        for (const auto& q : Geometry().water)
+        for (const auto& q : waterMesh)
             for (auto p : { q.a, q.b, q.c, q.d }) {
-                p.y = streamY;
-                // T=(X+time)*scale => a fixed crest moves toward negativeX,
-                // visibly INTO the cave, toward the deep navy shimmer.
-                stream[index++] =
-                    Vertex(p, 190, (p.z - 3747) * 48, static_cast<s16>((p.x - Lake::kBackX) * 24 + scroll));
+                // Increasing path distance runs outward, then vertically
+                // downward. X alone cannot animate the falling water face.
+                stream[index++] = Vertex(p, 255, (p.z - 3757) * (tilePeriod / 48),
+                                         s16(Lake::WaterFlowDistance(p) * (tilePeriod / 96) - scroll));
             }
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
         gSPComboRMPush(POLY_XLU_DISP++, "oot");
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
-        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 90, 155, 205, 185);
+        gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-        const char* waterTexture =
-            RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeWater, ResourceMgr_FileExists);
-        gDPLoadTextureBlock(POLY_XLU_DISP++, waterTexture, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0, G_TX_WRAP, G_TX_WRAP, 6,
-                            6, G_TX_NOLOD, G_TX_NOLOD);
+        if (customWater) {
+            gDPLoadTextureBlock(POLY_XLU_DISP++, waterTexture, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0, G_TX_WRAP, G_TX_WRAP,
+                                6, 6, G_TX_NOLOD, G_TX_NOLOD);
+        } else {
+            gDPLoadTextureBlock(POLY_XLU_DISP++, waterTexture, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP,
+                                G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+        }
         for (size_t i = 0; i < index; i += 4) {
+            const auto& q = waterMesh[i / 4];
+            const float x = (q.a.x + q.d.x) / 2;
+            const float light = std::clamp((x - Lake::kBackX) / (-1825 - Lake::kBackX), 0.f, 1.f);
+            const bool falling = std::fabs(q.d.x - q.a.x) < .001f;
+            const u8 shade = u8(140 + 80 * light);
+            // Standard fog uses vertex alpha for its fog factor. Primitive
+            // alpha retains water opacity in fog. A uniform curtain avoids
+            // horizontal opacity bands across its separate falling quads.
+            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, shade, shade, shade, falling ? 180 : u8(120 + 35 * light));
             gSPVertex(POLY_XLU_DISP++, (uintptr_t)&stream[i], 4, 0);
             gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
         }

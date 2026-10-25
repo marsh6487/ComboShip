@@ -124,7 +124,10 @@ inline std::string Oot(Page page, const Offer& offer, const std::string& result,
         case Page::Unavailable:
             return "My wares aren't ready yet.&Come back soon!";
         case Page::Welcome:
-            return "Left / Right: browse items&\x9F Talk to shopkeeper&\xA0 Leave\x0B";
+            // OoT's I4 button glyphs inherit the text color; unlike MM they
+            // have no automatic button tint. Keep the native message palette
+            // (and its cosmetics), then restore normal text after each glyph.
+            return "Left / Right: browse items&%b\x9F%w Talk to shopkeeper&%g\xA0%w Leave\x0B";
         case Page::KeeperTalk:
         case Page::KeeperHelp:
             return KeeperCopy(page) + "\x0B";
@@ -140,7 +143,7 @@ inline std::string Oot(Page page, const Offer& offer, const std::string& result,
             return Result(offer, result) + "\x0B";
         case Page::Browse:
             return title + "&" + Status(offer) + "&(" + std::to_string(offer.slot + 1) +
-                   "/8) \x9F Select   \xA0 Back\x0B";
+                   "/8) %b\x9F%w Select   %g\xA0%w Back\x0B";
     }
     return {};
 }

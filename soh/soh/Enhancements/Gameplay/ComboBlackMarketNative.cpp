@@ -12,6 +12,7 @@
 #include "BlackMarketEntry.h"
 #include "BlackMarketExitDoor.h"
 #include "BlackMarketGrannyResources.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketBrowsing.h"
 #include "BlackMarketReceipt.h"
 #include "BlackMarketText.h"
@@ -188,6 +189,46 @@ void DrawGrannyRoom() {
                                                1023 - (tick * 6) % 1024, 16, 256, 0, -3, 0, -6),
                             sGrannyResources.Route());
     sGrannyEntry = { frame, frame + 5 };
+}
+BlackMarketRoomMagic::Resources sRoomMagicResources;
+MeshHeader sRoomMagicShape{};
+PolygonDlist sRoomMagicEntry{};
+MeshHeader* sRoomMagicOriginal = nullptr;
+PlayState* sRoomMagicPlay = nullptr;
+void RestoreRoomMagic() {
+    // Restore only the live room we attached. A scene load may have reused the
+    // PlayState address or installed another shape since the previous draw.
+    auto* play = gPlayState;
+    if (play && play == sRoomMagicPlay && play->roomCtx.curRoom.meshHeader == &sRoomMagicShape)
+        play->roomCtx.curRoom.meshHeader = sRoomMagicOriginal;
+    sRoomMagicPlay = nullptr;
+    sRoomMagicOriginal = nullptr;
+    sRoomMagicEntry = {};
+}
+void ClearRoomMagic() {
+    RestoreRoomMagic();
+    sRoomMagicResources.Clear();
+}
+void BeginRoomMagic() {
+    RestoreRoomMagic();
+    auto* play = gPlayState;
+    if (!Interior() || sGrannyActive || play->roomCtx.curRoom.num != 0 ||
+        !CVarGetInteger(BlackMarketRoomMagic::kCvar, 0))
+        return;
+    auto* shape = play->roomCtx.curRoom.meshHeader;
+    if (!shape || shape->base.type != 0 || shape->polygon0.num != 1 || !shape->polygon0.start ||
+        !BlackMarketRoomMagic::MatchesSource(static_cast<PolygonDlist*>(shape->polygon0.start)->opa, true) ||
+        !sRoomMagicResources.Prepare("oot"))
+        return;
+    sRoomMagicResources.SetPalette(BlackMarketRoomMagic::ReadPalette(true));
+    sRoomMagicEntry = *static_cast<PolygonDlist*>(shape->polygon0.start);
+    sRoomMagicEntry.opa = sRoomMagicResources.Opaque();
+    sRoomMagicShape = *shape;
+    sRoomMagicShape.polygon0.start = &sRoomMagicEntry;
+    sRoomMagicShape.polygon0.end = &sRoomMagicEntry + 1;
+    sRoomMagicOriginal = shape;
+    sRoomMagicPlay = play;
+    play->roomCtx.curRoom.meshHeader = &sRoomMagicShape;
 }
 bool Safe(PlayState* play) {
     return play && play->state.running && gSaveContext.gameMode == GAMEMODE_NORMAL &&
@@ -863,6 +904,7 @@ void RegisterNativeMarket() {
     SaveManager::Instance->AddSaveFunction("blackMarket", 1, SaveMarket, true, SECTION_PARENT_NONE);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>(BindSolo);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
+        ClearRoomMagic();
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
         InitBrowsingCameraScene(nullptr);
@@ -874,8 +916,14 @@ void RegisterNativeMarket() {
         if (scene == SCENE_SKIEJER_MARKET)
             sSelected = 0;
     });
-    Ship::CrossRMRegistry::RegisterTeardownListener([] { sGrannyResources.Clear(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>(DrawGrannyRoom);
+    Ship::CrossRMRegistry::RegisterTeardownListener([] {
+        ClearRoomMagic();
+        sGrannyResources.Clear();
+    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>([] {
+        DrawGrannyRoom();
+        BeginRoomMagic();
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(ApplyGrannyInterior);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(PlayerUpdate);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(MarketText);
@@ -886,11 +934,13 @@ void RegisterNativeMarket() {
         PresentTitle();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>([] {
+        RestoreRoomMagic();
         DrawMarket();
         DrawBrowseCursor();
         DrawExterior();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
+        ClearRoomMagic();
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
         CancelReceipt();
@@ -899,6 +949,11 @@ void RegisterNativeMarket() {
 }
 RegisterShipInitFunc init(RegisterNativeMarket);
 } // namespace
+
+extern "C" void ComboBlackMarketOot_RestoreRoomAfterDraw(PlayState* play) {
+    if (play && play == gPlayState && play == sRoomMagicPlay)
+        RestoreRoomMagic();
+}
 
 extern "C" bool ComboBlackMarketOot_TryFixedReceiptGrant(PlayState* play, GetItemEntry entry) {
     return FixedMarketGrant(play, entry);

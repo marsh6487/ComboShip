@@ -14,6 +14,7 @@
 #include "BlackMarketGraphicsArena.h"
 #include "BlackMarketKeeper.h"
 #include "BlackMarketGrannyResources.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketMmShopScene.h"
 #include "BlackMarketReceipt.h"
 #include "2s2h/CustomItem/CustomItem.h"
@@ -69,6 +70,8 @@ void Player_Action_35(Player* player, PlayState* play);
 void Player_Action_36(Player* player, PlayState* play);
 }
 #include "BlackMarketShelvesNative.h"
+#include "BlackMarketMmShopLayout.h"
+#include "BlackMarketCounterBarrier.h"
 #include "BlackMarketInteriorEffects.h"
 #include "BlackMarketKeeperAssets.h"
 
@@ -101,10 +104,13 @@ alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 constexpr Vec3f kShelves[8] = {
     // Native +/-30-degree bank planes; row changes keep one bank camera.
-    { 44.84456f, 58, 98.75f },  { 44.84456f, 110, 98.75f },  { 75.15544f, 58, 116.25f },  { 75.15544f, 110, 116.25f },
-    { -44.84456f, 58, 98.75f }, { -44.84456f, 110, 98.75f }, { -75.15544f, 58, 116.25f }, { -75.15544f, 110, 116.25f }
+    { 44.84456f, 52, 28.75f },  { 44.84456f, 84, 28.75f },  { 75.15544f, 52, 46.25f },  { 75.15544f, 84, 46.25f },
+    { -44.84456f, 52, 28.75f }, { -44.84456f, 84, 28.75f }, { -75.15544f, 52, 46.25f }, { -75.15544f, 84, 46.25f }
 };
-BlackMarketShelvesNative::Fixture sShelfFixture;
+BlackMarketShelvesNative::Fixture sShelfFixture{ BlackMarketMmShopLayout::Vertices(false),
+                                                 BlackMarketMmShopLayout::Vertices(true),
+                                                 BlackMarketMmShopLayout::CollisionCorners() };
+BlackMarketCounterBarrier::Fixture sCounterBarrier;
 Vec3f sSoloReturn = { 184, 0, -300 };
 s16 sSoloReturnYaw = -16384;
 u16 sSoloReturnEntrance = COMBO_SOLO_FOREST_MM_ENTRANCE;
@@ -223,6 +229,45 @@ void DrawGrannyRoom() {
                                                1023 - (tick * 6) % 1024, 16, 256, 0, -3, 0, -6),
                             sGrannyResources.Route());
     sGrannyEntry = { frame, frame + 5 };
+}
+BlackMarketRoomMagic::Resources sRoomMagicResources;
+RoomShape sRoomMagicShape{};
+RoomShapeDListsEntry sRoomMagicEntry{};
+RoomShape* sRoomMagicOriginal = nullptr;
+PlayState* sRoomMagicPlay = nullptr;
+void RestoreRoomMagic() {
+    // Restore only the live room we attached. A scene load may have reused the
+    // PlayState address or installed another shape since the previous draw.
+    auto* play = gPlayState;
+    if (play && play == sRoomMagicPlay && play->roomCtx.curRoom.roomShape == &sRoomMagicShape)
+        play->roomCtx.curRoom.roomShape = sRoomMagicOriginal;
+    sRoomMagicPlay = nullptr;
+    sRoomMagicOriginal = nullptr;
+    sRoomMagicEntry = {};
+}
+void ClearRoomMagic() {
+    RestoreRoomMagic();
+    sRoomMagicResources.Clear();
+}
+void BeginRoomMagic() {
+    RestoreRoomMagic();
+    auto* play = gPlayState;
+    if (!Interior() || sGrannyActive || play->roomCtx.curRoom.num != 0 ||
+        !CVarGetInteger(BlackMarketRoomMagic::kCvar, 0))
+        return;
+    auto* shape = play->roomCtx.curRoom.roomShape;
+    if (!shape || shape->base.type != 0 || shape->normal.numEntries != 1 || !shape->normal.entries ||
+        !BlackMarketRoomMagic::MatchesSource(shape->normal.entries->opa, false) || !sRoomMagicResources.Prepare("mm"))
+        return;
+    sRoomMagicResources.SetPalette(BlackMarketRoomMagic::ReadPalette(false));
+    sRoomMagicEntry = *shape->normal.entries;
+    sRoomMagicEntry.opa = sRoomMagicResources.Opaque();
+    sRoomMagicShape = *shape;
+    sRoomMagicShape.normal.entries = &sRoomMagicEntry;
+    sRoomMagicShape.normal.entriesEnd = &sRoomMagicEntry + 1;
+    sRoomMagicOriginal = shape;
+    sRoomMagicPlay = play;
+    play->roomCtx.curRoom.roomShape = &sRoomMagicShape;
 }
 void RememberTravel() {
     sTravelSlot = gSaveContext.fileNum;
@@ -351,6 +396,12 @@ void CancelReceipt(bool destroying = false) {
     if (!destroying && actor)
         Actor_Kill(actor);
 }
+bool ReceiptPlacementIdle() {
+    const auto& current = GameInteractor::Instance->currentEvent;
+    const auto* receipt = std::get_if<GIEventGiveItem>(&current);
+    const bool ownReceipt = receipt && receipt->giveItem == GiveMarketReceipt && receipt->param == sReceipt.ticket;
+    return GameInteractor::Instance->events.empty() && (std::holds_alternative<GIEventNone>(current) || ownReceipt);
+}
 void OfferMarketReceipt(PlayState* play, Player* player) {
     // Yield to the ordinary event queue without ever changing its ownership.
     if (sReceiptActor || !GameInteractor::Instance->events.empty() ||
@@ -455,6 +506,7 @@ bool CustomKeeperAvailable() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    sCounterBarrier.Ensure(play);
     MonitorBrowsing();
     auto* shop = reinterpret_cast<EnOssan*>(actor);
     if (sNativeShop != shop || sNativeShopPlay != play)
@@ -555,7 +607,7 @@ bool NativeShopSceneReady(PlayState* play) {
     for (int i = 0; i < 4; ++i) {
         const auto& cam = cameras->csCamera[i];
         const auto& cs = cutscenes->entries[i];
-        if (cam.setting != CAM_SET_FIXED1 || cam.count != 3 || !cam.actorCsCamFuncData ||
+        if (cam.setting != CAM_SET_BLACK_MARKET_OOT || cam.count != 3 || !cam.actorCsCamFuncData ||
             std::memcmp(cam.actorCsCamFuncData, BlackMarketMmShopScene::kCameraRecords[i], 9 * sizeof(s16)) ||
             cs.priority != BlackMarketMmShopScene::kFirstPriority + i || cs.length != -1 ||
             cs.csCamId != BlackMarketMmShopScene::kCutsceneCameras[i] || cs.scriptIndex != CS_SCRIPT_ID_NONE ||
@@ -754,6 +806,7 @@ void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selec
 }
 
 void DrawShelves(PlayState* play) {
+    sCounterBarrier.Ensure(play);
     if (!sShelfFixture.Ensure(play))
         return;
     OPEN_DISPS(play->state.gfxCtx);
@@ -794,9 +847,7 @@ void DrawMarket() {
             continue;
         Actor& display = stock->actor;
         Matrix_Push();
-        Matrix_Translate(display.world.pos.x,
-                         display.world.pos.y + 2.0f * std::sin((play->gameplayFrames + slot * 7) * .04f),
-                         display.world.pos.z, MTXMODE_NEW);
+        Matrix_Translate(display.world.pos.x, display.world.pos.y, display.world.pos.z, MTXMODE_NEW);
         Matrix_RotateYS(stock->rotY + play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);
         Matrix_Scale(display.scale.x, display.scale.y, display.scale.z, MTXMODE_APPLY);
         Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
@@ -850,8 +901,10 @@ void PlayerUpdate(Actor* actor) {
     }
 }
 void SceneInit(s8 scene, s8 spawn) {
+    ClearRoomMagic();
     CancelReceipt(true);
     sShelfFixture.Reset();
+    sCounterBarrier.Reset();
     if (sNativeShopPlay != gPlayState || scene != COMBO_BLACK_MARKET_SCENE)
         EndBrowsing(gPlayState, true);
     GrannySceneBegin();
@@ -962,8 +1015,14 @@ void RegisterMarket() {
     sSceneEntranceTable[ENTR_SCENE_UNSET_09].table = spawns;
     sSceneEntranceTable[ENTR_SCENE_UNSET_09].name = (char*)"SKIEJER_MARKET";
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(SceneInit);
-    Ship::CrossRMRegistry::RegisterTeardownListener([] { sGrannyResources.Clear(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldStart>(DrawGrannyRoom);
+    Ship::CrossRMRegistry::RegisterTeardownListener([] {
+        ClearRoomMagic();
+        sGrannyResources.Clear();
+    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldStart>([] {
+        DrawGrannyRoom();
+        BeginRoomMagic();
+    });
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorInit>(
         ACTOR_EN_OSSAN, [](Actor* actor, bool* should) {
             if (!Interior() || actor->params != BlackMarketMmShopScene::kKeeperParams)
@@ -1002,6 +1061,7 @@ void RegisterMarket() {
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(ACTOR_PLAYER, PlayerUpdate);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(MarketText);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>([] {
+        RestoreRoomMagic();
         DrawMarket();
         DrawExterior();
     });
@@ -1011,7 +1071,9 @@ void RegisterMarket() {
         PresentTitle();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
+        ClearRoomMagic();
         sShelfFixture.Reset();
+        sCounterBarrier.Reset();
         EndBrowsing(gPlayState, true);
         sNativeShopSceneResource.reset();
         CancelReceipt(true);
@@ -1043,6 +1105,11 @@ void RegisterMarket() {
 }
 RegisterShipInitFunc init(RegisterMarket);
 } // namespace
+
+extern "C" void ComboBlackMarket_RestoreRoomAfterDraw(PlayState* play) {
+    if (play && play == gPlayState && play == sRoomMagicPlay)
+        RestoreRoomMagic();
+}
 
 extern "C" const ComboBlackMarketShopAdapter* ComboBlackMarketShop_GetAdapter(EnOssan* shop, PlayState* play) {
     return shop && shop == sNativeShop && play == sNativeShopPlay && Interior() && shop->actor.id == ACTOR_EN_OSSAN &&

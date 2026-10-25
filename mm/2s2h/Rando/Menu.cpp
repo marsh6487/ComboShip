@@ -1,4 +1,5 @@
 #include "Rando/Rando.h"
+#include "../../../combo/gui/WhatsNew.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
 #include "Rando/Spoiler/Spoiler.h"
@@ -1338,48 +1339,76 @@ static void DrawItemPoolTab() {
     UIWidgets::BeginCard("itemPoolNei");
     ImGui::SeparatorText("NEI & Cross-Game");
     NeiRando_DrawSetAllButtons();
-    CVarCheckbox(
-        "Shuffle NEI Custom Items", Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar,
-        CheckboxOptions({ { .tooltip = "Adds Skijer's NEI custom items (the page-2 inventory) to the item pool:\n"
-                                       "Whip, Spinner, the three elemental Rods, Deku Leaf, Time Gate, Beetle,\n"
-                                       "Switch Hook, Mogma Mitts, Gust Jar, Ball and Chain, Dominion Rod, the six\n"
-                                       "Dual Cane skills, and more.\n\n"
-                                       "These are not considered by logic yet." } }));
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Shuffle NEI Custom Items", Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar,
+            CheckboxOptions({ { .tooltip = "Adds Skijer's NEI custom items (the page-2 inventory) to the item pool:\n"
+                                           "Whip, Spinner, the three elemental Rods, Deku Leaf, Time Gate, Beetle,\n"
+                                           "Switch Hook, Mogma Mitts, Gust Jar, Ball and Chain, Dominion Rod, the six\n"
+                                           "Dual Cane skills, and more.\n\n"
+                                           "These are not considered by logic yet." } }));
+    }
     // Cross-game categories: OoT items in a SOLO MM seed, no combo needed. In combo these come
     // through the combo's own supply, so the checkboxes only affect solo seeds.
-    CVarCheckbox(
-        "Add OoT Items", Rando::StaticData::Options[RO_SHUFFLE_OOT_GEAR].cvar,
-        CheckboxOptions({ { .tooltip = "Adds OoT gear to a solo-MM pool: the Master Sword and Biggoron's Sword\n"
-                                       "chains, Stick/Nut Capacity, Open Chests, Progressive Strength and the\n"
-                                       "ship-vanilla Roc's Feather.\n\nNot considered by logic." } }));
-    CVarCheckbox(
-        "Add OoT Equipment", Rando::StaticData::Options[RO_SHUFFLE_OOT_EQUIPMENT].cvar,
-        CheckboxOptions({ { .tooltip = "Adds the extended-equipment page to a solo-MM pool: Cane of Byrna, Four\n"
-                                       "Sword, Trident, the three shields, the three tunics, the three boots,\n"
-                                       "the Magic Cape and the progressive Roc.\n\nNot considered by logic." } }));
-    CVarCheckbox(
-        "Add OoT Songs & Quest Items", Rando::StaticData::Options[RO_SHUFFLE_OOT_QUEST].cvar,
-        CheckboxOptions({ { .tooltip = "Adds OoT's songs, the six medallions, the three spiritual stones and the\n"
-                                       "Stone of Agony to a solo-MM pool.\n\nNot considered by logic." } }));
-    CVarCheckbox("Add OoT Masks", Rando::StaticData::Options[RO_SHUFFLE_OOT_MASKS].cvar,
-                 CheckboxOptions({ { .tooltip = "Adds the Skull, Spooky and Gerudo masks to a solo-MM pool.\n\n"
-                                                "Not considered by logic." } }));
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_OOT_GEAR].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Add OoT Items", Rando::StaticData::Options[RO_SHUFFLE_OOT_GEAR].cvar,
+            CheckboxOptions({ { .tooltip = "Adds OoT gear to a solo-MM pool: the Master Sword and Biggoron's Sword\n"
+                                           "chains, Stick/Nut Capacity, Open Chests, Progressive Strength and the\n"
+                                           "ship-vanilla Roc's Feather.\n\nNot considered by logic." } }));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_OOT_EQUIPMENT].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Add OoT Equipment", Rando::StaticData::Options[RO_SHUFFLE_OOT_EQUIPMENT].cvar,
+            CheckboxOptions({ { .tooltip = "Adds the extended-equipment page to a solo-MM pool: Cane of Byrna, Four\n"
+                                           "Sword, Trident, the three shields, the three tunics, the three boots,\n"
+                                           "the Magic Cape and the progressive Roc.\n\nNot considered by logic." } }));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_OOT_QUEST].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Add OoT Songs & Quest Items", Rando::StaticData::Options[RO_SHUFFLE_OOT_QUEST].cvar,
+            CheckboxOptions({ { .tooltip = "Adds OoT's songs, the six medallions, the three spiritual stones and the\n"
+                                           "Stone of Agony to a solo-MM pool.\n\nNot considered by logic." } }));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_OOT_MASKS].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox("Add OoT Masks", Rando::StaticData::Options[RO_SHUFFLE_OOT_MASKS].cvar,
+                     CheckboxOptions({ { .tooltip = "Adds the Skull, Spooky and Gerudo masks to a solo-MM pool.\n\n"
+                                                    "Not considered by logic." } }));
+    }
     // Crossover Items: no inventory cell, so they get their own gates rather than riding
     // RO_SHUFFLE_NEI_ITEMS. Each one unlocks its form on the equipment page's Crossover sub-page.
-    if (CVarCheckbox(
-            "Include Pikachu Pokeball", Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar,
-            CheckboxOptions({ { .tooltip = "Adds the Pikachu Pokeball to the pool. Finding it unlocks PIKACHU\n"
-                                           "MODE on the equipment page's Crossover Items sub-page.\n"
-                                           "2Ship has no Pikachu transformation yet — the form selects but Link\n"
-                                           "does not change.\n\nNot considered by logic." } }))) {
-        NeiRando_EnableCrossover();
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (CVarCheckbox(
+                "Include Pikachu Pokeball", Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar,
+                CheckboxOptions({ { .tooltip = "Adds the Pikachu Pokeball to the pool. Finding it unlocks PIKACHU\n"
+                                               "MODE on the equipment page's Crossover Items sub-page.\n"
+                                               "2Ship has no Pikachu transformation yet — the form selects but Link\n"
+                                               "does not change.\n\nNot considered by logic." } }))) {
+            NeiRando_EnableCrossover();
+        }
     }
-    if (CVarCheckbox(
-            "Include Mario Mask", Rando::StaticData::Options[RO_CROSSOVER_MARIO_MASK].cvar,
-            CheckboxOptions({ { .tooltip = "Adds the Mario Mask to the pool. Finding it unlocks MARIO MODE on\n"
-                                           "the equipment page's Crossover Items sub-page.\n\n"
-                                           "Not considered by logic." } }))) {
-        NeiRando_EnableCrossover();
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_CROSSOVER_MARIO_MASK].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (CVarCheckbox(
+                "Include Mario Mask", Rando::StaticData::Options[RO_CROSSOVER_MARIO_MASK].cvar,
+                CheckboxOptions({ { .tooltip = "Adds the Mario Mask to the pool. Finding it unlocks MARIO MODE on\n"
+                                               "the equipment page's Crossover Items sub-page.\n\n"
+                                               "Not considered by logic." } }))) {
+            NeiRando_EnableCrossover();
+        }
     }
     if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar, RO_GENERIC_OFF)) {
         static std::unordered_map<int32_t, const char*> graceOptions = {
@@ -1390,18 +1419,29 @@ static void DrawItemPoolTab() {
         // Combo's worker can retry both source pools. Hold this shared policy
         // stable until generation completes, including when general sync is Off.
         ImGui::BeginDisabled(CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
-        UIWidgets::CVarCombobox(
-            "Hylia's Grace", Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, &graceOptions,
-            UIWidgets::ComboboxOptions()
-                .DefaultIndex(RO_GRACE_OFF)
-                .Tooltip("On: include fairy flight in the seed. Off: exclude it.\n"
-                         "Gated: include it, but require the selected number of collected dungeon rewards to cast.\n"
-                         "Counts OoT stones/medallions and MM boss remains; magic is still required.\n"
-                         "The MM reachability solver does not use fairy flight."));
+        {
+            WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, nullptr,
+                                             CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                             CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+            UIWidgets::CVarCombobox(
+                "Hylia's Grace", Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, &graceOptions,
+                UIWidgets::ComboboxOptions()
+                    .DefaultIndex(RO_GRACE_OFF)
+                    .Tooltip(
+                        "On: include fairy flight in the seed. Off: exclude it.\n"
+                        "Gated: include it, but require the selected number of collected dungeon rewards to cast.\n"
+                        "Counts OoT stones/medallions and MM boss remains; magic is still required.\n"
+                        "The MM reachability solver does not use fairy flight."));
+        }
         if (CVarGetInteger(Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, RO_GRACE_OFF) == RO_GRACE_GATED) {
-            UIWidgets::CVarSliderInt("Grace Dungeon Rewards Required",
-                                     Rando::StaticData::Options[RO_HYLIAS_GRACE_REWARDS].cvar,
-                                     UIWidgets::IntSliderOptions().Min(0).Max(13).DefaultValue(4));
+            {
+                WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_HYLIAS_GRACE_REWARDS].cvar, nullptr,
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                                 CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+                UIWidgets::CVarSliderInt("Grace Dungeon Rewards Required",
+                                         Rando::StaticData::Options[RO_HYLIAS_GRACE_REWARDS].cvar,
+                                         UIWidgets::IntSliderOptions().Min(0).Max(13).DefaultValue(4));
+            }
         }
         ImGui::EndDisabled();
         // Bomb Arrows have no inventory slot any more — they are the last entry of the bow's
@@ -1412,14 +1452,18 @@ static void DrawItemPoolTab() {
             { RO_BOMB_ARROWS_BOMB_BAG, "Bomb Bag" },
             { RO_BOMB_ARROWS_SHUFFLED, "Shuffled" },
         };
-        UIWidgets::CVarCombobox("Shuffle Bomb Arrows", Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar,
-                                &bombArrowModeOptions,
-                                UIWidgets::ComboboxOptions().Tooltip(
-                                    "How Bomb Arrows are obtained. They sit at the end of the bow's element wheel,\n"
-                                    "next to the medallion arrows — they have no inventory slot of their own.\n\n"
-                                    "Off: never granted on their own (the Twilight Upgrade still unlocks them).\n"
-                                    "Bomb Bag: granted the moment you own any bomb bag.\n"
-                                    "Shuffled: a real randomizer item."));
+        {
+            WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, nullptr,
+                                             CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+            UIWidgets::CVarCombobox(
+                "Shuffle Bomb Arrows", Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, &bombArrowModeOptions,
+                UIWidgets::ComboboxOptions().Tooltip(
+                    "How Bomb Arrows are obtained. They sit at the end of the bow's element wheel,\n"
+                    "next to the medallion arrows — they have no inventory slot of their own.\n\n"
+                    "Off: never granted on their own (the Twilight Upgrade still unlocks them).\n"
+                    "Bomb Bag: granted the moment you own any bomb bag.\n"
+                    "Shuffled: a real randomizer item."));
+        }
         CVarSetInteger("gMods.BombArrows.Mode",
                        CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, RO_BOMB_ARROWS_OFF));
 
@@ -1428,15 +1472,19 @@ static void DrawItemPoolTab() {
             { RO_WAND_SINGLE_ITEM, "Single item" },
             { RO_WAND_ELEMENTAL_SHUFFLE, "Elemental shuffle" },
         };
-        UIWidgets::CVarCombobox(
-            "Elemental Wand", Rando::StaticData::Options[RO_ELEMENTAL_WAND_SHUFFLE].cvar, &wandModeOptions,
-            UIWidgets::ComboboxOptions().Tooltip(
-                "Six rods - Sand, Tornado, Water, Meteor, Storm and the Shadow Scepter - share ONE\n"
-                "inventory cell and one wheel (the cell Bomb Arrows vacated).\n\n"
-                "Medallions: one wand in the pool; a rod works once you own its OoT medallion.\n"
-                "Single item: one wand in the pool; finding it unlocks all six rods.\n"
-                "Elemental shuffle: the six rods are separate items; the first found also grants\n"
-                "the wand itself."));
+        {
+            WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_ELEMENTAL_WAND_SHUFFLE].cvar, nullptr,
+                                             CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+            UIWidgets::CVarCombobox(
+                "Elemental Wand", Rando::StaticData::Options[RO_ELEMENTAL_WAND_SHUFFLE].cvar, &wandModeOptions,
+                UIWidgets::ComboboxOptions().Tooltip(
+                    "Six rods - Sand, Tornado, Water, Meteor, Storm and the Shadow Scepter - share ONE\n"
+                    "inventory cell and one wheel (the cell Bomb Arrows vacated).\n\n"
+                    "Medallions: one wand in the pool; a rod works once you own its OoT medallion.\n"
+                    "Single item: one wand in the pool; finding it unlocks all six rods.\n"
+                    "Elemental shuffle: the six rods are separate items; the first found also grants\n"
+                    "the wand itself."));
+        }
     }
     // Starting Rod is independent of the NEI pool; its mode must remain selectable
     // when only the starting item is enabled.
@@ -1446,21 +1494,31 @@ static void DrawItemPoolTab() {
         { NEI_SEASONS_ROD, "Rod" },
         { NEI_SEASONS_GATED, "Gated" },
     };
-    UIWidgets::CVarCombobox(
-        "Rod of Seasons", Rando::StaticData::Options[RO_ROD_OF_SEASONS].cvar, &seasonsOptions,
-        UIWidgets::ComboboxOptions()
-            .DefaultIndex(NEI_SEASONS_INDIVIDUAL)
-            .Tooltip("Rod: one pickup unlocks all four seasons.\n"
-                     "Individual seasons: four pickups; the first grants the Rod.\n"
-                     "Gated: one Rod; seasons unlock on completed dungeon/event checks in either game.\n"
-                     "Spring: Windmill Song of Storms check OR Jabu OR Water Temple OR Great Bay.\n"
-                     "Summer: Fire Temple OR Stone Tower. Autumn: Forest Temple OR Woodfall.\n"
-                     "Winter: Ice Cavern's final Sheik check OR Snowhead. Gates apply only in Gated mode.\n"
-                     "Seasons are not used by the reachability solver."));
-    CVarCheckbox("Start with Rod of Seasons", Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar,
-                 CheckboxOptions({ { .tooltip = "Start with the Rod even when the NEI pool is disabled.\n"
-                                                "Rod mode grants all seasons; Individual and Gated\n"
-                                                "keep their normal unlock rules." } }));
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_ROD_OF_SEASONS].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+        UIWidgets::CVarCombobox(
+            "Rod of Seasons", Rando::StaticData::Options[RO_ROD_OF_SEASONS].cvar, &seasonsOptions,
+            UIWidgets::ComboboxOptions()
+                .DefaultIndex(NEI_SEASONS_INDIVIDUAL)
+                .Tooltip("Rod: one pickup unlocks all four seasons.\n"
+                         "Individual seasons: four pickups; the first grants the Rod.\n"
+                         "Gated: one Rod; seasons unlock on completed dungeon/event checks in either game.\n"
+                         "Spring: Windmill Song of Storms check OR Jabu OR Water Temple OR Great Bay.\n"
+                         "Summer: Fire Temple OR Stone Tower. Autumn: Forest Temple OR Woodfall.\n"
+                         "Winter: Ice Cavern's final Sheik check OR Snowhead. Gates apply only in Gated mode.\n"
+                         "Seasons are not used by the reachability solver."));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+        CVarCheckbox("Start with Rod of Seasons", Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar,
+                     CheckboxOptions({ { .tooltip = "Start with the Rod even when the NEI pool is disabled.\n"
+                                                    "Rod mode grants all seasons; Individual and Gated\n"
+                                                    "keep their normal unlock rules." } }));
+    }
     ImGui::EndDisabled();
     UIWidgets::EndCard();
 
@@ -1843,12 +1901,17 @@ static void DrawHintsTab() {
     f32 halfHeight = ImGui::GetContentRegionAvail().y / 2 - (ImGui::GetStyle().ItemSpacing.y * 2);
     ImGui::BeginChild("randoHintsColumn1", ImVec2(columnWidth, 0));
     if (!Combo_IsCombinedGame()) {
-        CVarCheckbox("Maps and Compasses Give Information",
-                     Rando::StaticData::Options[RO_MAPS_COMPASSES_GIVE_INFORMATION].cvar,
-                     CheckboxOptions(
-                         { { .tooltip = "Compasses reveal the saved boss reward. Maps describe the dungeon entrance. "
-                                        "Read the information on collection or with C-Up on an owned Map or Compass. "
-                                        "This rule is saved with the next generated seed." } }));
+        {
+            WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_MAPS_COMPASSES_GIVE_INFORMATION].cvar,
+                                             nullptr, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+            CVarCheckbox(
+                "Maps and Compasses Give Information",
+                Rando::StaticData::Options[RO_MAPS_COMPASSES_GIVE_INFORMATION].cvar,
+                CheckboxOptions(
+                    { { .tooltip = "Compasses reveal the saved boss reward. Maps describe the dungeon entrance. "
+                                   "Read the information on collection or with C-Up on an owned Map or Compass. "
+                                   "This rule is saved with the next generated seed." } }));
+        }
     }
     CVarCheckbox(
         "Spider House", Rando::StaticData::Options[RO_HINTS_SPIDER_HOUSES].cvar,

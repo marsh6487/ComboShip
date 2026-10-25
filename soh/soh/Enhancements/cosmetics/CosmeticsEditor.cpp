@@ -10,6 +10,7 @@
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "BlackMarketShelves.h"
+#include "BlackMarketRoomMagic.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #endif
@@ -447,6 +448,14 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
 #ifdef COMBO_BUILD
     COSMETIC_OPTION("World.BlackMarketShelves", "Black Market Shelves", COSMETICS_GROUP_WORLD,
         ColorRGBA8(BlackMarketShelves::kDefaultTint[0],BlackMarketShelves::kDefaultTint[1],BlackMarketShelves::kDefaultTint[2],255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomViolet", "Black Market Room Violet", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(165, 148, 230, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomTeal", "Black Market Room Teal", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(135, 194, 210, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomRose", "Black Market Room Rose", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(204, 170, 215, 255), false, true, false),
+    COSMETIC_OPTION("World.BlackMarketRoomLavender", "Black Market Room Lavender", COSMETICS_GROUP_WORLD,
+                    ColorRGBA8(175, 160, 216, 255), false, true, false),
 #endif
     COSMETIC_OPTION("World.BlockOfTime",            "Block of Time",            COSMETICS_GROUP_WORLD,        ColorRGBA8(255, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("World.Moon",                   "Moon",                     COSMETICS_GROUP_WORLD,        ColorRGBA8(240, 255, 180, 255), false, true, true),

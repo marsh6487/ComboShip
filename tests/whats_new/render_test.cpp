@@ -92,6 +92,13 @@ template <typename Draw> void Probe(Draw draw) {
   const auto highlighted = Frame(draw, true, false, value);
   Check(original.id == highlighted.id && !value,
         "styling alone must not toggle a setting");
+  Check(highlighted.markerVertices == 0,
+        "color-only highlights must not submit marker text");
+  Check(original.min.x == highlighted.min.x &&
+            original.min.y == highlighted.min.y &&
+            original.max.x == highlighted.max.x &&
+            original.max.y == highlighted.max.y,
+        "highlights must preserve the complete native control rectangle");
   ImVec2 hit(highlighted.min.x + 8,
              (highlighted.min.y + highlighted.max.y) * 0.5f);
   Frame(draw, true, false, value, hit);
@@ -100,8 +107,8 @@ template <typename Draw> void Probe(Draw draw) {
   Check(clicked.changed && value,
         "highlighted native controls must still accept clicks");
   const auto disabled = Frame(draw, true, true, value);
-  Check(disabled.markerVertices > 0, "a gated new control still needs a "
-                                     "release marker without an input accent");
+  Check(disabled.markerVertices == 0,
+        "disabled controls must not gain marker text");
   hit = ImVec2(disabled.min.x + 8, (disabled.min.y + disabled.max.y) * 0.5f);
   Frame(draw, true, true, value, hit, true);
   const auto locked = Frame(draw, true, true, value, hit, false);
@@ -110,20 +117,24 @@ template <typename Draw> void Probe(Draw draw) {
   const auto off = Frame(draw, false, false, value);
   Check(off.min.x == original.min.x && off.min.y == original.min.y,
         "off restores the original layout");
-  // Both original native labels fit here. The marker must respect a narrow
-  // column.
+  // Highlighting must preserve geometry even at narrow-column wrap boundaries.
   for (int windowWidth = 250; windowWidth <= 340; ++windowWidth) {
+    const auto native = Frame(draw, false, false, value, ImVec2(-100, -100),
+                              false, windowWidth);
     const auto narrow =
         Frame(draw, true, false, value, ImVec2(-100, -100), false, windowWidth);
+    Check(narrow.min.x == native.min.x && narrow.min.y == native.min.y &&
+              narrow.max.x == native.max.x && narrow.max.y == native.max.y,
+          "highlighting must not move or resize a narrow native control");
     Check(narrow.max.x <= narrow.right + 1,
           "a release marker must not push native controls outside a narrow "
           "column");
   }
-  // Hover the marker, which is the first non-interactive text item in this
-  // window.
-  Frame(draw, true, false, value, ImVec2(30, 31));
-  const auto hover = Frame(draw, true, false, value, ImVec2(30, 31));
-  Check(hover.tooltip, "hovering the release marker shows its change note");
+  const auto help = Frame(draw, true, false, value);
+  hit = ImVec2(help.min.x + 8, (help.min.y + help.max.y) * 0.5f);
+  Frame(draw, true, false, value, hit);
+  const auto hover = Frame(draw, true, false, value, hit);
+  Check(hover.tooltip, "highlighted controls keep their native tooltip");
   ImGui::DestroyContext();
 }
 
@@ -137,6 +148,27 @@ static void ProbeRequestedInventory() {
       "gRando.Options.RO_HYLIAS_GRACE_REWARDS",
       "gRandoSettings.RodOfSeasons",
       "gRando.Options.RO_ROD_OF_SEASONS",
+      "gRando.Options.RO_STARTING_ROD_OF_SEASONS",
+      "gEnhancements.Graphics.OotLocationTitleCards",
+      "gEnhancements.MidnaCompanionMM",
+      "gEnhancements.MidnaCompanion",
+      "gEnhancements.ChestStyleMatchesContentsMM",
+      "gEnhancements.ChestSizeMatchesContentsMM",
+      "gCheats.DropsDontDie",
+      "gEnhancements.DinFireSword",
+      "gRandoSettings.SkijerCustomItems",
+      "gRandoSettings.ShuffleBombArrows",
+      "gRandoSettings.ElementalWandShuffle",
+      "gRando.Options.RO_SHUFFLE_NEI_ITEMS",
+      "gRando.Options.RO_SHUFFLE_OOT_GEAR",
+      "gRando.Options.RO_SHUFFLE_OOT_EQUIPMENT",
+      "gRando.Options.RO_SHUFFLE_OOT_QUEST",
+      "gRando.Options.RO_SHUFFLE_OOT_MASKS",
+      "gRando.Options.RO_SHUFFLE_BOMB_ARROWS",
+      "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE",
+      "gRando.Options.RO_CROSSOVER_POKEBALL",
+      "gRando.Options.RO_CROSSOVER_MARIO_MASK",
+      "gRando.Options.RO_MAPS_COMPASSES_GIVE_INFORMATION",
       "gMods.TransformMasks.ChildDungeonGates",
       "gMods.TransformMasks.OotGoronZora",
       "gMods.WolfLink.UseHDModel",
@@ -288,17 +320,21 @@ int main() {
     Probe([](const char *label, bool *value, bool disabled) {
       OotWidgets::CheckboxOptions options;
       options.disabled = disabled;
+      options.tooltip = "Native setting help";
       return OotWidgets::Checkbox(label, value, options);
     });
     Probe([](const char *label, bool *value, bool disabled) {
       MmWidgets::CheckboxOptions options;
       options.disabled = disabled;
+      options.tooltip = "Native setting help";
       return MmWidgets::Checkbox(label, value, options);
     });
     Probe([](const char *label, bool *value, bool disabled) {
       ImGui::BeginDisabled(disabled);
       const bool changed = ImGui::Checkbox(label, value);
       ImGui::EndDisabled();
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Native setting help");
       return changed;
     });
     std::cout

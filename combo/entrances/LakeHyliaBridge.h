@@ -57,14 +57,91 @@ inline constexpr Point kOpeningSection[] = { { 0, kOpeningBaseY, -kOpeningHalfWi
 // back cap, ten units in front, without moving the departure/return mouth.
 inline constexpr float kShimmerFront = kBackX - kMouth.x + 10;
 inline constexpr float kFullWaterY = -1313, kDrainedWaterY = -1993, kChannelFloorY = -1333;
-inline constexpr float kStreamHalfWidth = 10;
-// The native lake feeds this visual inlet only while it reaches the trough.
-// Drained setups have a dry cave: native waterboxes and progression stay intact.
+struct ChannelSection {
+    float x, nearZ, farZ;
+};
+// An eroded side course leaves the central route (z3717 +/-20) dry. The
+// lakeward end flares through an open notch in the authored apron.
+inline constexpr ChannelSection kChannel[] = { { kBackX, 3746, 3785 }, { -2191, 3742, 3789 },    { -2145, 3747, 3794 },
+                                               { -2099, 3740, 3789 },  { -2053, 3744, 3794 },    { -2007, 3740, 3797 },
+                                               { -1961, 3745, 3793 },  { kFacadeX, 3741, 3791 }, { -1870, 3740, 3798 },
+                                               { -1825, 3738, 3810 } };
+inline constexpr float kChannelBankInset = 4;
+inline ChannelSection ChannelAt(float x) {
+    for (size_t i = 1; i < sizeof(kChannel) / sizeof(kChannel[0]); ++i) {
+        if (x > kChannel[i].x)
+            continue;
+        const auto a = kChannel[i - 1], b = kChannel[i];
+        const float t = std::clamp((x - a.x) / (b.x - a.x), 0.f, 1.f);
+        return { x, a.nearZ + (b.nearZ - a.nearZ) * t, a.farZ + (b.farZ - a.farZ) * t };
+    }
+    auto result = kChannel[sizeof(kChannel) / sizeof(kChannel[0]) - 1];
+    result.x = x;
+    return result;
+}
+inline ChannelSection WetChannelAt(float x, float surfaceY) {
+    auto result = ChannelAt(x);
+    const float inset = kChannelBankInset * std::clamp((kMouth.y - surfaceY) / (kMouth.y - kChannelFloorY), 0.f, 1.f);
+    result.nearZ += inset;
+    result.farZ -= inset;
+    return result;
+}
+// Retain the established dry variant when the native lake is drained. The
+// short outflow must not be extended down through the exposed lake bed.
 inline bool HasInlet(float lakeSurface) {
     return std::isfinite(lakeSurface) && lakeSurface >= kChannelFloorY + 2;
 }
 inline float StreamHeight(float lakeSurface) {
-    return std::clamp(lakeSurface + 1, kChannelFloorY + 3, kFullWaterY + 1);
+    return std::clamp(lakeSurface, kChannelFloorY + 2, kFullWaterY);
+}
+inline constexpr float kStreamLipX = -1825, kStreamJoinX = kStreamLipX + 1;
+inline constexpr float kStreamSourceY = kMouth.y - 1, kStreamLipY = kMouth.y - 3;
+inline constexpr float kStreamFallTopY = kStreamLipY - .5f;
+inline constexpr size_t kMaxWaterQuads = 27 + 1 + 8;
+inline float ChannelSurfaceHeight(float x) {
+    const float t = std::clamp((x - kBackX) / (kStreamLipX - kBackX), 0.f, 1.f);
+    return kStreamSourceY + (kStreamLipY - kStreamSourceY) * t;
+}
+inline float WaterFlowDistance(Point p) {
+    if (p.x <= kStreamLipX)
+        return p.x - kBackX;
+    const float channel = kStreamLipX - kBackX;
+    if (p.y >= kStreamFallTopY)
+        return channel + std::hypot(p.x - kStreamLipX, p.y - kStreamLipY);
+    const float edge = std::hypot(kStreamJoinX - kStreamLipX, kStreamFallTopY - kStreamLipY);
+    return channel + edge + kStreamFallTopY - p.y;
+}
+inline std::vector<Quad> BuildWaterGeometry(float lakeSurface) {
+    std::vector<Quad> water;
+    if (!HasInlet(lakeSurface))
+        return water;
+    water.reserve(kMaxWaterQuads);
+    const auto point = [&](float x, float y, bool far) {
+        const auto bank = WetChannelAt(x, y);
+        return Point{ x, y, far ? bank.farZ : bank.nearZ };
+    };
+    const auto quad = [&](float x0, float y0, float x1, float y1) {
+        water.push_back(
+            { point(x0, y0, false), point(x0, y0, true), point(x1, y1, true), point(x1, y1, false), 170, false });
+    };
+    // Follow every stone-bank bend before crossing the lip. The descending
+    // surface is fed from the cave, rather than set to one level by the lake.
+    for (size_t i = 1; i < sizeof(kChannel) / sizeof(kChannel[0]); ++i) {
+        const float a = kChannel[i - 1].x, b = kChannel[i].x;
+        for (int j = 0; j < 3; ++j) {
+            const float x0 = a + (b - a) * j / 3, x1 = a + (b - a) * (j + 1) / 3;
+            quad(x0, ChannelSurfaceHeight(x0), x1, ChannelSurfaceHeight(x1));
+        }
+    }
+    // Turn over the edge, then fall at a fixed X against the front face.
+    // The receiving lake determines the bottom; there is no horizontal fan.
+    quad(kStreamLipX, kStreamLipY, kStreamJoinX, kStreamFallTopY);
+    const float contactY = StreamHeight(lakeSurface);
+    const int falls = std::clamp(int(std::ceil((kStreamFallTopY - contactY) / 4)), 1, 8);
+    for (int i = 0; i < falls; ++i)
+        quad(kStreamJoinX, kStreamFallTopY + (contactY - kStreamFallTopY) * i / falls, kStreamJoinX,
+             kStreamFallTopY + (contactY - kStreamFallTopY) * (i + 1) / falls);
+    return water;
 }
 inline Geometry BuildGeometry() {
     Geometry mesh;
@@ -76,20 +153,25 @@ inline Geometry BuildGeometry() {
     auto reverseQuad = [&](Point a, Point b, Point c, Point d, unsigned char shade = 170, bool collision = true) {
         quad(a, d, c, b, shade, collision);
     };
-    auto top = [&](float x0, float x1, float z0, float z1, float y, unsigned char shade = 160) {
-        quad({ x0, y, z0 }, { x0, y, z1 }, { x1, y, z1 }, { x1, y, z0 }, shade);
-    };
-    // Two solid shelves, central walking floor, and a narrow recessed stream
-    // on the south side. Every travel/return point uses the central dry floor.
-    for (float x0 = kBackX; x0 < kFacadeX; x0 += 46) {
-        const float x1 = std::min(x0 + 46, kFacadeX);
-        top(x0, x1, 3627, 3747, kMouth.y);
-        top(x0, x1, 3767, 3807, kMouth.y);
-        top(x0, x1, 3747, 3767, kChannelFloorY, 80);
-        reverseQuad({ x0, kMouth.y, 3747 }, { x1, kMouth.y, 3747 }, { x1, kChannelFloorY, 3747 },
-                    { x0, kChannelFloorY, 3747 }, 90);
-        reverseQuad({ x0, kChannelFloorY, 3767 }, { x1, kChannelFloorY, 3767 }, { x1, kMouth.y, 3767 },
-                    { x0, kMouth.y, 3767 }, 90);
+    // Fit each floor/bank segment to the same channel profile. The inset bed
+    // forms visible stone sides; water meets those sides below the dry lip.
+    for (size_t i = 1; i < sizeof(kChannel) / sizeof(kChannel[0]); ++i) {
+        const auto a = kChannel[i - 1], b = kChannel[i];
+        const float north = a.x >= kFacadeX ? 3615 : 3627;
+        const float south = a.x >= kFacadeX ? 3815 : 3807;
+        quad({ a.x, kMouth.y, north }, { a.x, kMouth.y, a.nearZ }, { b.x, kMouth.y, b.nearZ }, { b.x, kMouth.y, north },
+             160);
+        quad({ a.x, kMouth.y, a.farZ }, { a.x, kMouth.y, south }, { b.x, kMouth.y, south }, { b.x, kMouth.y, b.farZ },
+             135);
+        quad({ a.x, kChannelFloorY, a.nearZ + kChannelBankInset }, { a.x, kChannelFloorY, a.farZ - kChannelBankInset },
+             { b.x, kChannelFloorY, b.farZ - kChannelBankInset }, { b.x, kChannelFloorY, b.nearZ + kChannelBankInset },
+             75);
+        reverseQuad({ a.x, kMouth.y, a.nearZ }, { b.x, kMouth.y, b.nearZ },
+                    { b.x, kChannelFloorY, b.nearZ + kChannelBankInset },
+                    { a.x, kChannelFloorY, a.nearZ + kChannelBankInset }, 90);
+        reverseQuad({ a.x, kChannelFloorY, a.farZ - kChannelBankInset },
+                    { b.x, kChannelFloorY, b.farZ - kChannelBankInset }, { b.x, kMouth.y, b.farZ },
+                    { a.x, kMouth.y, a.farZ }, 90);
     }
     // A 322-unit hollow rock vault, progressively darker at its deep end.
     for (int ring = 0; ring < 7; ++ring) {
@@ -124,9 +206,6 @@ inline Geometry BuildGeometry() {
     }
     // Modest shore apron and vertical rock skirt. The native basin rises to
     // within20 units of its north lip; its embedded base never forms a ramp.
-    top(kFacadeX, -1825, 3615, 3747, kMouth.y);
-    top(kFacadeX, -1825, 3767, 3815, kMouth.y);
-    top(kFacadeX, -1825, 3747, 3767, kChannelFloorY, 90);
     for (float z : { 3615.f, 3815.f }) {
         const Point a{ kRockJoinX, kPlinthBaseY, z }, b{ -1825, kPlinthBaseY, z }, c{ -1825, kMouth.y, z },
             d{ kRockJoinX, kMouth.y, z };
@@ -135,21 +214,29 @@ inline Geometry BuildGeometry() {
         else
             quad(a, b, c, d, 125);
     }
-    reverseQuad({ -1825, kMouth.y, 3615 }, { -1825, kPlinthBaseY, 3615 }, { -1825, kPlinthBaseY, 3815 },
+    const auto intake = ChannelAt(-1825);
+    // Leave a real lake-connected opening above the bed rather than drawing
+    // water through the solid vertical front of the apron.
+    reverseQuad({ -1825, kMouth.y, 3615 }, { -1825, kPlinthBaseY, 3615 }, { -1825, kPlinthBaseY, intake.nearZ },
+                { -1825, kMouth.y, intake.nearZ }, 120);
+    reverseQuad({ -1825, kChannelFloorY, intake.nearZ + kChannelBankInset }, { -1825, kPlinthBaseY, intake.nearZ },
+                { -1825, kPlinthBaseY, intake.farZ }, { -1825, kChannelFloorY, intake.farZ - kChannelBankInset }, 80);
+    reverseQuad({ -1825, kMouth.y, intake.farZ }, { -1825, kPlinthBaseY, intake.farZ }, { -1825, kPlinthBaseY, 3815 },
                 { -1825, kMouth.y, 3815 }, 120);
+    // Close the small beveled corners below the open water slot. A midpoint
+    // splits each triangular cap into two valid collision/draw triangles.
+    const float middleY = (kPlinthBaseY + kChannelFloorY) / 2;
+    reverseQuad({ -1825, kMouth.y, intake.nearZ }, { -1825, kPlinthBaseY, intake.nearZ },
+                { -1825, middleY, intake.nearZ + kChannelBankInset / 2 },
+                { -1825, kChannelFloorY, intake.nearZ + kChannelBankInset }, 120);
+    quad({ -1825, kMouth.y, intake.farZ }, { -1825, kPlinthBaseY, intake.farZ },
+         { -1825, middleY, intake.farZ - kChannelBankInset / 2 },
+         { -1825, kChannelFloorY, intake.farZ - kChannelBankInset }, 120);
     // The native lab bank stays untouched. Access uses the existing lake/shore
     // and standard ledge behavior; no switchback, landing or raised support slab.
-    // Stream quads are rebuilt at the actual level by the native provider.
-    for (int i = 0; i < 8; ++i) {
-        float x0 = kBackX + float(i) * (-1825 - kBackX) / 8;
-        float x1 = kBackX + float(i + 1) * (-1825 - kBackX) / 8;
-        mesh.water.push_back({ { x0, kFullWaterY + 1, 3747 },
-                               { x0, kFullWaterY + 1, 3767 },
-                               { x1, kFullWaterY + 1, 3767 },
-                               { x1, kFullWaterY + 1, 3747 },
-                               170,
-                               false });
-    }
+    // Preview/control geometry at the full lake level. The draw provider uses
+    // the same builder with the current native water surface.
+    mesh.water = BuildWaterGeometry(kFullWaterY);
     return mesh;
 }
 } // namespace ComboLakeHylia

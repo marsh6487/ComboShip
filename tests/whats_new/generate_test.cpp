@@ -1,6 +1,7 @@
 // The actual Generate/appearance expressions and callbacks are extracted into
 // includes. Only config storage, pack availability and saving are fixtures.
 #include "gui/WhatsNew.h"
+#include "BlackMarketRoomMagic.h"
 #include <imgui_internal.h>
 #include <algorithm>
 #include <iostream>
@@ -116,7 +117,8 @@ namespace Fixture {
 constexpr const char* labels[] = {
     "Cross-Game Dungeon Entrances", "Expanded Dungeon Pool", "Cross-Game Boss Entrances",
     "Cross-Game Interiors", "Cross-Game Shops", "Cross-Game Door Interiors", "Cross-Game Grottos and Graves",
-    "Pricing##BlackMarket", "Dungeon Purchase Unlocks", "Regular Granny Interior", "Animated Item Seals",
+    "Pricing##BlackMarket", "Dungeon Purchase Unlocks", "Regular Granny Interior", "Magical Room Materials",
+    "Animated Item Seals",
 };
 constexpr const char* bossKey = "gCombo.Rando.CrossBossEntrances";
 const Row& Find(const FrameResult& frame, const char* label) {
@@ -175,7 +177,7 @@ void Seed(bool highlights, bool gated = false) {
 void CheckFrame(const FrameResult& frame, bool highlighted, const FrameResult& ordinary,
                 std::initializer_list<const char*> disabledLabels = {}) {
     const ImVec4 normal = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-    Check(frame.rows.size() == std::size(labels), "all eleven production controls render exactly once");
+    Check(frame.rows.size() == std::size(labels), "all production controls render exactly once");
     for (const auto* label : labels) {
         const auto& row = Find(frame, label);
         const auto count = std::count_if(frame.rows.begin(), frame.rows.end(), [label](const Row& current) {
@@ -186,16 +188,18 @@ void CheckFrame(const FrameResult& frame, bool highlighted, const FrameResult& o
             return std::string(label) == gated;
         });
         Check(row.disabled == disabled, std::string(label) + " has its expected native input gate");
-        const auto expected = highlighted && !disabled ? WhatsNew::Accent(WhatsNew::Kind::New) : normal;
+        const bool releaseOwned = std::string(label) != "Magical Room Materials";
+        const auto expected = highlighted && releaseOwned && !disabled ? WhatsNew::Accent(WhatsNew::Kind::New) : normal;
         Check(SameColor(row.text, expected), std::string(label) + " has its expected native text accent");
         Check(row.id == row.originalId && row.id == Find(ordinary, label).id,
               std::string(label) + " retains its original native ID");
         Check(row.min.x < row.max.x && row.min.y < row.max.y, std::string(label) + " has a usable native input rect");
+        const auto& baseline = Find(ordinary, label);
+        Check(row.min.x == baseline.min.x && row.min.y == baseline.min.y &&
+                  row.max.x == baseline.max.x && row.max.y == baseline.max.y,
+              std::string(label) + " keeps its complete native rectangle with highlights on");
     }
-    // Each NEW is three visible glyphs, four vertices each. This also detects
-    // accidental duplicate scopes while the observers detect duplicate widgets.
-    Check(frame.markerVertices == (highlighted ? int(std::size(labels)) * 3 * 4 : 0),
-          "each requested control has exactly one gold NEW marker when enabled");
+    Check(frame.markerVertices == 0, "color-only highlights never submit extra gold marker glyphs");
 }
 
 void Click(const char* label) {
@@ -232,8 +236,11 @@ void Probe() {
         return;
 
     Seed(true, true);
+    config[WhatsNew::kEnabledCvar] = 0;
+    const auto ordinaryGated = Frame();
+    config[WhatsNew::kEnabledCvar] = 1;
     const auto gated = Frame();
-    CheckFrame(gated, true, ordinary,
+    CheckFrame(gated, true, ordinaryGated,
                {"Expanded Dungeon Pool", "Cross-Game Door Interiors", "Regular Granny Interior"});
     Check(Find(gated, "Expanded Dungeon Pool").disabled, "expanded pool is disabled while dungeon shuffle is off");
     Check(Find(gated, "Cross-Game Door Interiors").disabled, "door interiors are disabled by broad interiors");
@@ -256,8 +263,11 @@ void Probe() {
 
     Seed(true, true);
     config[BlackMarketGranny::kCvar] = 1;
+    config[WhatsNew::kEnabledCvar] = 0;
+    const auto ordinarySaved = Frame();
+    config[WhatsNew::kEnabledCvar] = 1;
     const auto saved = Frame();
-    CheckFrame(saved, true, ordinary, {"Expanded Dungeon Pool", "Cross-Game Door Interiors"});
+    CheckFrame(saved, true, ordinarySaved, {"Expanded Dungeon Pool", "Cross-Game Door Interiors"});
     Check(!Find(saved, "Regular Granny Interior").disabled, "saved Granny remains editable after its pack is removed");
     Click("Regular Granny Interior");
     Check(writes == std::vector<std::pair<std::string, int>>{{BlackMarketGranny::kCvar, 0}} && saves == 1,
@@ -285,5 +295,5 @@ int main() {
     ImGui::DestroyContext();
     if (Fixture::failures)
         return 1;
-    std::cout << "PASS real ImGui Generate/Black Market: 11 single markers, stable IDs/off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
+    std::cout << "PASS real ImGui Generate/Black Market: 11 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
 }

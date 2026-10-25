@@ -10,9 +10,16 @@ class Fixture {
     Fixture& operator=(const Fixture&) = delete;
     Fixture(Fixture&&) = delete;
     Fixture& operator=(Fixture&&) = delete;
-    Fixture() {
+    Fixture()
+        : Fixture(BlackMarketShelves::Vertices(false), BlackMarketShelves::Vertices(true),
+                  { BlackMarketShelves::Corners(BlackMarketShelves::kCollision[0]),
+                    BlackMarketShelves::Corners(BlackMarketShelves::kCollision[1]) }) {
+    }
+    Fixture(const std::vector<BlackMarketShelves::Vertex>& standardVertices,
+            const std::vector<BlackMarketShelves::Vertex>& grannyVertices,
+            const std::array<std::array<BlackMarketShelves::Point, 8>, 2>& collisionCorners) {
         for (int granny = 0; granny < 2; ++granny) {
-            const auto& source = BlackMarketShelves::Vertices(granny);
+            const auto& source = granny ? grannyVertices : standardVertices;
             for (size_t i = 0; i < source.size(); ++i) {
                 const auto& s = source[i];
                 auto& v = mVertices[granny][i].v;
@@ -26,8 +33,7 @@ class Fixture {
             }
         }
         size_t vertex = 0, poly = 0;
-        for (const auto& box : BlackMarketShelves::kCollision) {
-            const auto corners = BlackMarketShelves::Corners(box);
+        for (const auto& corners : collisionCorners) {
             for (int i = 0; i < 8; ++i)
                 mCollisionVertices[vertex + i] = { corners[i].x, corners[i].y, corners[i].z };
             for (const auto& face : BlackMarketShelves::kFaces)

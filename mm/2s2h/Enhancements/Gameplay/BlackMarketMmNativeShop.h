@@ -1,11 +1,61 @@
 // Included in BlackMarket.cpp's private namespace after the transaction policy.
-// Native EnOssan owns every shop action; these are scene/presentation and
-// transaction boundaries, never a second input or camera state machine.
+// Native EnOssan owns every shop action and item tween. The private adapter
+// supplies OoT camera-turn behavior, room presentation and transaction policy.
 EnOssan* sNativeShop = nullptr;
 PlayState* sNativeShopPlay = nullptr;
 s16 sBrowseCamera = CAM_ID_NONE, sBrowseParent = CAM_ID_NONE, sBrowseCameraUid = -1;
 Camera* sBrowseCameraPtr = nullptr;
 std::array<Vec3s, TREASURE_CHEST_SHOP_GAL_LIMB_MAX> sKeeperJoints{}, sKeeperMorphs{};
+struct CustomerAnchor {
+    PlayState* play = nullptr;
+    Player* player = nullptr;
+    Camera* camera = nullptr;
+    s16 cameraUid = -1;
+    uint16_t receipt = 0;
+    Vec3f position{};
+} sCustomerAnchor;
+
+bool NativeCustomerGrounded(PlayState* play, const Player* player) {
+    // The invisible wall is at Z130; the counter is behind it. Talking stays
+    // within the native 100-unit offer range on the actual customer floor.
+    return play && player && player->actor.world.pos.z >= BlackMarketCounterBarrier::kCustomerMinZ &&
+           (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && player->actor.floorBgId == BGCHECK_SCENE &&
+           player->actor.floorPoly && player->actor.floorPoly->normal.y >= 32000 && player->actor.floorHeight >= -8.f &&
+           player->actor.floorHeight <= 8.f && std::abs(player->actor.world.pos.y - player->actor.floorHeight) <= 2.f &&
+           !(player->stateFlags1 & (PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000));
+}
+void RestoreNativeCustomer(PlayState* play, Player* player) {
+    if (sCustomerAnchor.play != play || sCustomerAnchor.player != player ||
+        sCustomerAnchor.receipt != sReceipt.ticket || NativeCustomerGrounded(play, player) ||
+        Play_GetActiveCamId(play) != CAM_ID_MAIN || play->cameraPtrs[CAM_ID_MAIN] != sCustomerAnchor.camera ||
+        sCustomerAnchor.camera->uid != sCustomerAnchor.cameraUid || CutsceneManager_GetCurrentCsId() != CS_ID_NONE ||
+        !ReceiptPlacementIdle() ||
+        (player->stateFlags1 & (PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000)))
+        return;
+    Vec3f probe = sCustomerAnchor.position;
+    probe.y += 20.f;
+    CollisionPoly* floor = nullptr;
+    s32 bg = BGCHECK_SCENE;
+    const auto height = BgCheck_EntityRaycastFloor5_3(play, &play->colCtx, &floor, &bg, &player->actor, &probe);
+    if (!floor || bg != BGCHECK_SCENE || floor->normal.y < 32000 || height < -8.f || height > 8.f ||
+        std::abs(height - sCustomerAnchor.position.y) > 2.f)
+        return;
+    auto position = sCustomerAnchor.position;
+    position.y = height;
+    player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = position;
+    player->actor.velocity = player->actor.colChkInfo.displacement = {};
+    player->actor.speed = player->speedXZ = player->pushedSpeed = 0.f;
+    player->fallStartHeight = height;
+    player->fallDistance = 0;
+    player->actor.floorHeight = height;
+    player->actor.floorPoly = floor;
+    player->actor.floorBgId = bg;
+    player->actor.wallPoly = nullptr;
+    player->actor.wallBgId = BGCHECK_SCENE;
+    player->actor.bgCheckFlags &=
+        ~(BGCHECKFLAG_WALL | BGCHECKFLAG_CEILING | BGCHECKFLAG_GROUND_LEAVE | BGCHECKFLAG_PLAYER_WALL_INTERACT);
+    player->actor.bgCheckFlags |= BGCHECKFLAG_GROUND;
+}
 
 void InitKeeper(Actor* actor);
 void KeeperUpdate(Actor* actor, PlayState* play);
@@ -60,6 +110,7 @@ void EndBrowsing(PlayState* play, bool destroying = false) {
             }
     }
     ForgetNativeShopCamera();
+    sCustomerAnchor = {};
     sTalking = false;
     if (destroying) {
         sNativeShop = nullptr;
@@ -86,6 +137,25 @@ void MonitorBrowsing() {
     if (!play || play != sNativeShopPlay || gGameState != &play->state) {
         EndBrowsing(nullptr, true);
         return;
+    }
+    if (sReceipt.pending && sCustomerAnchor.play == play) {
+        auto* player = GET_PLAYER(play);
+        const auto currentCs = CutsceneManager_GetCurrentCsId();
+        const bool ownShopCamera = NativeShopOwnCamera(play) && CutsceneManager_IsCurrentActor(&sNativeShop->actor) &&
+                                   Play_GetActiveCamId(play) == sBrowseCamera;
+        // The player clears GET_ITEM before the manager's deferred Stop ends.
+        // Native cutscene actor and camera identity cover that legitimate tail.
+        const bool ownItemHandoff =
+            player && currentCs != CS_ID_NONE && currentCs == play->playerCsIds[PLAYER_CS_ID_ITEM_GET] &&
+            CutsceneManager_IsCurrentActor(&player->actor) && CutsceneManager_IsCurrentCamera(play);
+        if (!ReceiptPlacementIdle() || play->cameraPtrs[CAM_ID_MAIN] != sCustomerAnchor.camera ||
+            sCustomerAnchor.camera->uid != sCustomerAnchor.cameraUid ||
+            (currentCs != CS_ID_NONE && !ownShopCamera && !ownItemHandoff) ||
+            (Play_GetActiveCamId(play) != CAM_ID_MAIN && !ownShopCamera && !ownItemHandoff)) {
+            // Observing a foreign owner retires the old position permanently.
+            // Its later release must never make a stale teleport eligible.
+            sCustomerAnchor = {};
+        }
     }
     const auto messageState = Message_GetState(&play->msgCtx);
     const bool interruptedDialogue =
@@ -140,34 +210,7 @@ void NativeStockUpdate(EnGirlA* item, PlayState* play) {
     EnGirlA_Update2(item, play);
     // Native Update2 restores .25 every frame. Apply the private display fit
     // after that update while retaining its focus, rotation and action logic.
-    Actor_SetScale(&item->actor, .32f);
-    // Keep the confirmation offer in the readable part of its native bank
-    // shot. Fixed1 still owns the camera and applies its authored .75 rate;
-    // only its private target height follows the native take/return tween.
-    // The bank's original target is restored as the item reaches its shelf.
-    auto* shop = sNativeShop;
-    const int slot = NativeStockSlot(item);
-    if (!shop || slot != shop->cursorIndex)
-        return;
-    const float t = shop->shopItemSelectedTween;
-    if (NativeShopOwnCamera(play) && Play_GetActiveCamId(play) == sBrowseCamera &&
-        CutsceneManager_IsCurrentActor(&shop->actor) && sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
-        (shop->csId == shop->lookToRightShelfCsId || shop->csId == shop->lookToLeftShelfCsId)) {
-        const auto& record = BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
-        const auto& position = item->actor.world.pos;
-        const float depth =
-            (position.x - record[0]) * Math_SinS(record[4]) + (position.z - record[2]) * Math_CosS(record[4]);
-        const float weight = std::min(1.f, t * 3.f);
-        const float height = position.y + 10.f - depth * .1636f;
-        const float target = record[1] + (height - record[1]) * weight;
-        // Compensate the fixed camera's one-step lag only for this vertical
-        // presentation binding. Otherwise native's final .75 -> 1 item step
-        // puts the offer across the letterbox/textbox for one frame. The
-        // camera's authored interpolation rate, rotation and FOV stay native.
-        const float rate = sBrowseCameraPtr->paramData.fixd1.roData.unk_04;
-        sBrowseCameraPtr->paramData.fixd1.rwData.eyePosRotTarget.pos.y =
-            t == 0.f || rate <= 0.f ? target : sBrowseCameraPtr->eye.y + (target - sBrowseCameraPtr->eye.y) / rate;
-    }
+    Actor_SetScale(&item->actor, BlackMarketMmShopLayout::kStockScale);
 }
 void InitNativeStock(Actor* actor, PlayState* play) {
     auto* item = reinterpret_cast<EnGirlA*>(actor);
@@ -189,8 +232,8 @@ void InitNativeStock(Actor* actor, PlayState* play) {
     actor->draw = nullptr; // Black Market's GI renderer draws this actual actor.
     actor->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED;
     actor->world.pos = actor->home.pos = kShelves[slot];
-    // Match the authored display envelope already reserved for these shelves.
-    Actor_SetScale(actor, .32f);
+    // Compact private MM shelves use a bounded native display fit.
+    Actor_SetScale(actor, BlackMarketMmShopLayout::kStockScale);
     Actor_SetFocus(actor, 5);
     NativeStockRefresh(play, item);
 }
@@ -224,7 +267,7 @@ s32 NativeKeeperInit(EnOssan* shop, PlayState* play) {
 s32 NativeKeeperCanTalk(EnOssan* shop, PlayState* play) {
     return NativeShopContext(play) && Safe(play) && !sReceipt.pending && !sTalking &&
            Play_GetActiveCamId(play) == CAM_ID_MAIN && NativeShopCameraCapacity(play) &&
-           shop->actor.xzDistToPlayer < 100.0f;
+           shop->actor.xzDistToPlayer < 100.0f && NativeCustomerGrounded(play, GET_PLAYER(play));
 }
 s32 NativeKeeperBeginTalk(EnOssan* shop, PlayState* play) {
     auto* player = GET_PLAYER(play);
@@ -234,6 +277,8 @@ s32 NativeKeeperBeginTalk(EnOssan* shop, PlayState* play) {
         return false;
     ForgetNativeShopCamera();
     sBrowseParent = CAM_ID_MAIN;
+    auto* main = play->cameraPtrs[CAM_ID_MAIN];
+    sCustomerAnchor = { play, player, main, main->uid, 0, player->actor.world.pos };
     sTalking = true;
     return true;
 }
@@ -257,6 +302,20 @@ void NativeKeeperStarted(EnOssan* shop, PlayState* play) {
     sBrowseCameraPtr = Play_GetCamera(play, sBrowseCamera);
     sBrowseCameraUid = sBrowseCameraPtr->uid;
     sBrowseParent = CAM_ID_MAIN;
+    Camera_SetOotShopFaceAngle(sBrowseCameraPtr, 0.0f);
+}
+s32 NativeTurnCamera(EnOssan* shop, PlayState* play, f32 targetDegrees) {
+    if (!NativeShopOwnCamera(play) || Play_GetActiveCamId(play) != sBrowseCamera ||
+        !CutsceneManager_IsCurrentActor(&shop->actor) || sBrowseCameraPtr->setting != CAM_SET_BLACK_MARKET_OOT)
+        return false;
+    // OoT EnOssan LookToLeft/RightShelf and LookFromShelfToShopkeeper:
+    // keep the eye fixed, approach by .5/max10 degrees, snap within .5.
+    auto angle = sBrowseCameraPtr->paramData.ootShop.faceAngle;
+    Math_ApproachF(&angle, targetDegrees, 0.5f, 10.0f);
+    if (std::abs(angle - targetDegrees) < 0.5f)
+        angle = targetDegrees;
+    Camera_SetOotShopFaceAngle(sBrowseCameraPtr, angle);
+    return angle == targetDegrees;
 }
 void NativeItemPositions(EnOssan* shop, s32 slot, Vec3f* shelf, Vec3f* selected) {
     if (slot < 0 || slot >= 8)
@@ -264,15 +323,13 @@ void NativeItemPositions(EnOssan* shop, s32 slot, Vec3f* shelf, Vec3f* selected)
     *shelf = kShelves[slot];
     const auto& target = BlackMarketMmShopScene::kSelectedTargets[slot >> 2];
     *selected = { target[0], target[1], target[2] };
-    // Leave the cabinet before changing rows. Native PositionSelectedItem
-    // multiplies this endpoint delta by t once more, yielding t^6 vertically
-    // with its unchanged action timing and horizontal take/return movement.
-    const float t = shop->shopItemSelectedTween;
-    selected->y = shelf->y + (selected->y - shelf->y) * t * t * t * t * t;
 }
 s32 NativeOfferReceipt(EnOssan* shop, PlayState*) {
     sSelected = shop->cursorIndex;
-    return Purchase();
+    if (!Purchase())
+        return false;
+    sCustomerAnchor.receipt = sReceipt.ticket;
+    return true;
 }
 s32 NativeReceiptAccepted(EnOssan*, PlayState*) {
     return !sReceipt.pending || !ReceiptContext() ? -1 : sReceipt.delivered ? 1 : 0;
@@ -281,8 +338,11 @@ s32 NativeReceiptComplete(EnOssan*, PlayState* play) {
     auto* player = GET_PLAYER(play);
     if (!sReceipt.pending || !sReceipt.delivered || !ReceiptContext() || !player || play->msgCtx.msgMode != 0 ||
         (player->stateFlags1 & PLAYER_STATE1_400) || Player_InBlockingCsMode(play, player) || !Safe(play) ||
-        Play_GetActiveCamId(play) != CAM_ID_MAIN)
+        Play_GetActiveCamId(play) != CAM_ID_MAIN || CutsceneManager_GetCurrentCsId() != CS_ID_NONE ||
+        !ReceiptPlacementIdle())
         return false;
+    RestoreNativeCustomer(play, player);
+    sCustomerAnchor.receipt = 0;
     CancelReceipt();
     return true;
 }
@@ -309,5 +369,5 @@ s32 NativeKeeperDialogue(EnOssan*, PlayState* play) {
 const ComboBlackMarketShopAdapter kNativeShopAdapter = {
     NativeKeeperInit,      NativeKeeperCanTalk,   NativeKeeperBeginTalk, NativeKeeperText,
     NativeKeeperCanStart,  NativeKeeperStarted,   NativeItemPositions,   NativeOfferReceipt,
-    NativeReceiptAccepted, NativeReceiptComplete, NativeKeeperDialogue
+    NativeReceiptAccepted, NativeReceiptComplete, NativeKeeperDialogue,  NativeTurnCamera
 };

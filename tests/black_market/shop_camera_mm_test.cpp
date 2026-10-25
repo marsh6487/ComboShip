@@ -4,6 +4,8 @@
 #include "combo/BlackMarketKeeper.h"
 #include "combo/BlackMarketKeeperAssets.h"
 #include "combo/BlackMarketMmShopScene.h"
+#include "combo/BlackMarketMmShopLayout.h"
+#include "mm/2s2h/Enhancements/Gameplay/BlackMarketCounterBarrier.h"
 #include "combo/BlackMarketReceipt.h"
 #include "combo/rando/BlackMarket.h"
 #include "objects/object_bg/object_bg.h"
@@ -16,6 +18,8 @@ GameState *gGameState;
 using namespace ComboRando::BlackMarket;
 static bool active = true, safe = true, purchaseAccepted, receiptContext = true,
             sceneReady = true;
+static bool placementIdle = true, customerFloorPresent = true, customerFloorDynamic;
+static CollisionPoly customerFloor;
 static bool sTalking, sCustomKeeper;
 static int sSelected, purchases, closes;
 static std::string sStatus;
@@ -39,6 +43,14 @@ PurchaseResult Status(int index) {
   return status[index];
 }
 bool ReceiptContext() { return receiptContext; }
+bool ReceiptPlacementIdle() { return placementIdle; }
+extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState*, CollisionContext*, CollisionPoly** floor,
+                                             s32* bg, Actor*, Vec3f* probe) {
+  assert(probe->z >= 132 && probe->y >= 20 && "receipt must probe the saved customer floor");
+  *floor = customerFloorPresent ? &customerFloor : nullptr;
+  *bg = customerFloorDynamic ? 0 : BGCHECK_SCENE;
+  return customerFloorPresent ? 0 : BGCHECK_Y_MIN;
+}
 void CancelReceipt(bool = false) { sReceipt.Cancel(); }
 bool Purchase() {
   ++purchases;
@@ -51,6 +63,9 @@ bool NativeShopSceneReady(PlayState *) { return sceneReady; }
 struct FixtureSceneLifetime {
   void reset() {}
 } sNativeShopSceneResource;
+// Actual barrier collision/registration and talk offers run in the dedicated
+// native barrier executable; this fixture controls that service boundary.
+struct FixtureCounterBarrier { bool Ensure(PlayState*) { return true; } } sCounterBarrier;
 /* PRODUCTION CONSTANTS */
 /* NATIVE STOCK UPDATE */
 /* PRODUCTION ADAPTER */
@@ -86,6 +101,10 @@ static void Reset() {
   gPlayState = &play;
   gGameState = &play.state;
   active = safe = receiptContext = sceneReady = true;
+  placementIdle = customerFloorPresent = true;
+  customerFloorDynamic = false;
+  customerFloor = {};
+  customerFloor.normal.y = 32767;
   talkAccepted = advance = purchaseAccepted = mirror = false;
   invert = 1;
   sReceipt = {};
@@ -107,7 +126,10 @@ static void Reset() {
   ResetArena();
   gSaveContext.save.day = 1;
   player.transformation = PLAYER_FORM_HUMAN;
-  player.actor.world.pos = {0, 0, 130};
+  player.actor.world.pos = {0, 0, 160};
+  player.actor.floorPoly = &customerFloor;
+  player.actor.floorBgId = BGCHECK_SCENE;
+  player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
   play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
   InitNativeCameraTable();
   Camera_Init(&mainCamera, &play.view, &play.colCtx, &play);
@@ -121,7 +143,7 @@ static void Reset() {
   for (int i = 0; i < 4; ++i) {
     std::memcpy(cameraData[i].data(), BlackMarketMmShopScene::kCameraRecords[i],
                 sizeof(cameraData[i]));
-    cameraInfo[i] = {CAM_SET_FIXED1, 3, cameraData[i].data()};
+    cameraInfo[i] = {CAM_SET_BLACK_MARKET_OOT, 3, cameraData[i].data()};
     cutscenes[i] = {s16(BlackMarketMmShopScene::kFirstPriority + i),
                     -1,
                     BlackMarketMmShopScene::kCutsceneCameras[i],
@@ -164,11 +186,11 @@ static void NativeFrame() {
       item.actor.update(&item.actor, &play);
   if (NativeShopOwnCamera(&play) &&
       Play_GetActiveCamId(&play) == sBrowseCamera) {
-    assert(sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
+    assert(sBrowseCameraPtr->setting == CAM_SET_BLACK_MARKET_OOT &&
            sBrowseCameraPtr->mode == CAM_MODE_NORMAL);
     assert(sCameraSettings[sBrowseCameraPtr->setting].cameraModes[0].funcId ==
-           CAM_FUNC_FIXED1);
-    assert(Camera_Fixed1(sBrowseCameraPtr));
+           CAM_FUNC_DATA4);
+    assert(Camera_Data4(sBrowseCameraPtr));
   }
   KeeperDraw(&shop.actor, &play);
   CutsceneManager_Update();
@@ -209,7 +231,7 @@ static void ReachSlot(int slot) {
       NativeFrame();
   }
   assert(shop.actionFunc == wanted && sTalking && NativeShopOwnCamera(&play));
-  assert(sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
+  assert(sBrowseCameraPtr->setting == CAM_SET_BLACK_MARKET_OOT &&
          sBrowseCameraPtr->roll == 0);
   if (slot >= 0)
     assert(shop.cursorIndex == slot);
@@ -224,6 +246,45 @@ static void ReturnKeeper() {
     Stick(right ? -80 : 80, 0);
   }
   ReachSlot(-1);
+}
+static void CheckOotPivotTiming() {
+  for (int side : {-1, 1}) {
+    Reset(); Talk(); ReachSlot(-1);
+    const auto *camera = sBrowseCameraPtr;
+    const auto uid = sBrowseCameraUid;
+    const auto eye = camera->eye;
+    const auto cs = CutsceneManager_GetCurrentCsId();
+    const auto look = side < 0 ? EnOssan_LookToLeftShelf : EnOssan_LookToRightShelf;
+    const auto browse = side < 0 ? EnOssan_BrowseLeftShelf : EnOssan_BrowseRightShelf;
+    Stick(side * 80, 0);
+    // OoT's .5 approach, maximum 10 degrees and .5 snap reaches a shelf
+    // in seven updates: 10, 20, 25, 27.5, 28.75, 29.375, 30 degrees.
+    constexpr float angles[] = {10, 20, 25, 27.5f, 28.75f, 29.375f, 30};
+    for (int frame = 0; frame < 7; ++frame) {
+      NativeFrame();
+      assert(camera->paramData.ootShop.faceAngle == -side * angles[frame]);
+      assert(sBrowseCameraPtr == camera && sBrowseCameraUid == uid &&
+             CutsceneManager_GetCurrentCsId() == cs &&
+             "OoT shelf pans retain one camera and cutscene owner");
+      assert(!std::memcmp(&eye, &camera->eye, sizeof(eye)) &&
+             "OoT shop camera pivots from a fixed eye");
+      assert(shop.actionFunc == (frame < 6 ? look : browse));
+      if (frame < 6) assert(!shop.drawCursor && shop.stickAccumX == 0);
+    }
+    NativeFrame();
+    Stick(-side * 80, 0);
+    assert(shop.actionFunc == EnOssan_LookToShopkeeperFromShelf);
+    constexpr float returning[] = {20, 10, 5, 2.5f, 1.25f, .625f, 0};
+    for (int frame = 0; frame < 7; ++frame) {
+      NativeFrame();
+      assert(sBrowseCameraPtr == camera && sBrowseCameraUid == uid &&
+             CutsceneManager_GetCurrentCsId() == cs);
+      assert(!std::memcmp(&eye, &camera->eye, sizeof(eye)));
+      assert(camera->paramData.ootShop.faceAngle == -side * returning[frame]);
+      assert(shop.actionFunc == (frame < 6 ? EnOssan_LookToShopkeeperFromShelf : EnOssan_FaceShopkeeper));
+    }
+  }
+  std::puts("MM OoT port: seven-frame native shelf turn, fixed eye and continuous camera ownership");
 }
 static void CheckLifecycle() {
   Reset();
@@ -387,6 +448,112 @@ static void SelectItem() {
   for (int i = 0; i < 6; ++i)
     NativeFrame();
   assert(shop.shopItemSelectedTween == 1);
+}
+static void CheckCustomerAccessAndReturn() {
+  for (int form = 0; form < 5; ++form) {
+    Reset(); player.transformation = form;
+    assert(NativeKeeperCanTalk(&shop, &play));
+    Talk(); ReachSlot(-1); Press(BTN_B);
+    assert(!sTalking && shop.actionFunc == EnOssan_Idle);
+  }
+  for (int invalid = 0; invalid < 6; ++invalid) {
+    Reset();
+    if (invalid == 0) player.actor.world.pos.z = 120;
+    if (invalid == 1) player.actor.world.pos.y = player.actor.floorHeight = 41;
+    if (invalid == 2) player.actor.floorBgId = 0;
+    if (invalid == 3) player.actor.bgCheckFlags = 0;
+    if (invalid == 4) player.stateFlags1 |= PLAYER_STATE1_200000;
+    if (invalid == 5) player.actor.floorPoly = nullptr;
+    talkAccepted = true; NativeFrame();
+    assert(!sTalking && shop.actionFunc == EnOssan_Idle && !sReceipt.pending);
+  }
+  for (int interruption = 0; interruption < 7; ++interruption) {
+    Reset(); Talk(); ReachSlot(-1);
+    Stick(80, 0); ReachSlot(0); NativeFrame(); SelectItem();
+    purchaseAccepted = true; Press(BTN_A, true);
+    sReceipt.delivered = true; NativeFrame();
+    assert(shop.actionFunc == EnOssan_SetupItemPurchased);
+    play.msgCtx.msgMode = 0;
+    player.stateFlags1 &= ~PLAYER_STATE1_400;
+    player.actor.world.pos = {75, 105, 76};
+    player.actor.prevPos = player.actor.home.pos = player.actor.world.pos;
+    player.actor.floorBgId = 0;
+    player.actor.velocity = {1, 2, 3};
+    player.actor.speed = player.speedXZ = player.pushedSpeed = 4;
+    if (interruption == 1) placementIdle = false;
+    if (interruption == 2) ++mainCamera.uid;
+    if (interruption == 3) customerFloorPresent = false;
+    if (interruption == 4) customerFloorDynamic = true;
+    if (interruption == 5) player.stateFlags1 |= PLAYER_STATE1_200000;
+    if (interruption == 6) sCustomerAnchor.receipt++;
+    NativeFrame();
+    if (interruption == 0) {
+      assert(player.actor.world.pos.x == 0 && player.actor.world.pos.y == 0 && player.actor.world.pos.z == 160);
+      assert(!std::memcmp(&player.actor.world.pos, &player.actor.prevPos, sizeof(Vec3f)) &&
+             !std::memcmp(&player.actor.world.pos, &player.actor.home.pos, sizeof(Vec3f)));
+      assert(player.actor.floorBgId == BGCHECK_SCENE && player.actor.floorPoly == &customerFloor);
+      assert(player.actor.velocity.x == 0 && player.actor.velocity.y == 0 && player.actor.velocity.z == 0 &&
+             player.actor.speed == 0 && player.speedXZ == 0 && player.pushedSpeed == 0);
+    } else {
+      assert(player.actor.world.pos.x == 75 && player.actor.world.pos.y == 105 && player.actor.world.pos.z == 76);
+      if (interruption == 1) {
+        assert(sReceipt.pending);
+        placementIdle = true;
+        NativeFrame();
+        assert(!sReceipt.pending && player.actor.world.pos.x == 75 &&
+               player.actor.world.pos.y == 105 && player.actor.world.pos.z == 76 &&
+               "foreign release must not revive the retired customer anchor");
+      }
+    }
+  }
+  // Native global TALK/DOOR keep the main camera and bypass the event queue.
+  // Their release must not revive a position captured before the foreign owner.
+  for (int owner = 0; owner < 6; ++owner) {
+    Reset(); Talk(); ReachSlot(-1);
+    Stick(80, 0); ReachSlot(0); NativeFrame(); SelectItem();
+    purchaseAccepted = true; Press(BTN_A, true);
+    sReceipt.delivered = true; NativeFrame();
+    assert(shop.actionFunc == EnOssan_SetupItemPurchased);
+    Actor foreignActor{};
+    const s16 cs = owner == 0 ? CS_ID_GLOBAL_TALK : owner == 1 ? CS_ID_GLOBAL_DOOR : 2;
+    play.playerCsIds[PLAYER_CS_ID_ITEM_GET] = 2;
+    player.talkActor = &foreignActor;
+    player.actor.world.pos = {75, 105, 76};
+    player.actor.floorBgId = 0;
+    play.msgCtx.msgMode = 1;
+    // A get-item flag and matching ID alone do not establish player ownership.
+    if (owner >= 2) player.stateFlags1 |= PLAYER_STATE1_400;
+    CutsceneManager_Start(cs, owner >= 3 ? &player.actor : &foreignActor);
+    s16 foreignCamera = CAM_ID_NONE;
+    if (owner == 4) {
+      foreignCamera = Play_CreateSubCamera(&play);
+      Play_ChangeCameraStatus(&play, foreignCamera, CAM_STATUS_ACTIVE);
+    }
+    if (owner == 5)
+      ++Play_GetCamera(&play, Play_GetActiveCamId(&play))->uid;
+    NativeFrame();
+    assert(sReceipt.pending && player.actor.world.pos.x == 75);
+    assert((sCustomerAnchor.play == &play) == (owner == 3));
+    CutsceneManager_Stop(cs);
+    // Player_Action_65 clears GET_ITEM before the keeper's update; manager End
+    // is deferred until after actor updates in this same frame.
+    play.msgCtx.msgMode = 0;
+    player.stateFlags1 &= ~PLAYER_STATE1_400;
+    NativeFrame();
+    assert(sReceipt.pending && (sCustomerAnchor.play == &play) == (owner == 3));
+    if (owner >= 4) {
+      if (foreignCamera != CAM_ID_NONE) Play_ClearCamera(&play, foreignCamera);
+      Play_ChangeCameraStatus(&play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
+    }
+    NativeFrame();
+    assert(!sReceipt.pending);
+    if (owner == 3)
+      assert(player.actor.world.pos.x == 0 && player.actor.world.pos.y == 0 && player.actor.world.pos.z == 160);
+    else
+      assert(player.actor.world.pos.x == 75 && player.actor.world.pos.y == 105 && player.actor.world.pos.z == 76 &&
+             "foreign native cutscene release must not revive the retired customer anchor");
+  }
+  std::puts("MM customer safety: all5 forms can talk from customer floor; counter/shelf/climb starts rejected; receipt returns to validated floor only under unchanged ownership, including native talk/door/item release");
 }
 static void CheckProductionReceipt() {
   Reset();
@@ -574,9 +741,8 @@ static void CheckAuthoredFraming() {
     for (int i = 0; i < 20; ++i)
       NativeFrame();
     const auto id = sBrowseCamera, uid = sBrowseCameraUid;
-    const auto snapshot = *sBrowseCameraPtr;
-    assert(snapshot.fov == 60 &&
-           std::abs(snapshot.paramData.fixd1.roData.unk_04 - .75f) < .0001f);
+    auto snapshot = *sBrowseCameraPtr;
+    assert(snapshot.fov == 60);
     const auto cameraRecord =
         BlackMarketMmShopScene::kCutsceneCameras[bank == 0 ? 2 : 1];
     const auto &record = BlackMarketMmShopScene::kCameraRecords[cameraRecord];
@@ -588,10 +754,13 @@ static void CheckAuthoredFraming() {
       NativeFrame();
       NativeFrame();
       assert(shop.drawCursor && sBrowseCamera == id && sBrowseCameraUid == uid);
-      assert(
-          !std::memcmp(&snapshot.eye, &sBrowseCameraPtr->eye, sizeof(Vec3f)) &&
-          !std::memcmp(&snapshot.at, &sBrowseCameraPtr->at, sizeof(Vec3f)) &&
-          snapshot.fov == sBrowseCameraPtr->fov);
+      assert(!std::memcmp(&snapshot.eye, &sBrowseCameraPtr->eye, sizeof(Vec3f)) &&
+             snapshot.fov == sBrowseCameraPtr->fov);
+      // Native Data4 can change the at-point distance. The viewing direction
+      // must stay fixed; comparing the at point itself rejects donor behavior.
+      const auto before = OLib_Vec3fDiffToVecGeo(&snapshot.eye, &snapshot.at);
+      const auto after = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
+      assert(std::abs(before.yaw - after.yaw) <= 1 && std::abs(before.pitch - after.pitch) <= 1);
       assert(shop.cursorPos.x - 24 > 8 && shop.cursorPos.x + 24 < 312 &&
              shop.cursorPos.y - 24 > 32 && shop.cursorPos.y + 24 < 142 &&
              "all4 native48px cursors must clear the actual32px letterbox and "
@@ -615,7 +784,7 @@ static void CheckAuthoredFraming() {
       mirror = false;
     }
   }
-  std::puts("MM production native shop: authored native60FOV/.75rate, "
+  std::puts("MM production native shop: ported OoT Data4 native60FOV, "
             "immutable bank view, actualall8 48px cursor projection/GBI above "
             "textbox and32px letterbox passed");
 }
@@ -679,9 +848,9 @@ static void CheckImmediateCannotBuyFraming() {
       for (int corner = 0; corner < 8; ++corner) {
         Actor marker{};
         marker.focus.pos = stock[slot].actor.world.pos;
-        marker.focus.pos.x += corner & 1 ? 17.368483f : -17.368483f;
-        marker.focus.pos.y += corner & 2 ? 27.962769f : -15.162769f;
-        marker.focus.pos.z += corner & 4 ? 16.968483f : -16.968483f;
+        marker.focus.pos.x += corner & 1 ? 12.048483f : -12.048483f;
+        marker.focus.pos.y += corner & 2 ? 17.282769f : -10.082769f;
+        marker.focus.pos.z += corner & 4 ? 11.648483f : -11.648483f;
         s16 x, y; Actor_GetScreenPos(&play, &marker, &x, &y);
         assert(x > 8 && x < 312 && y > 34 && y < 138 &&
                "immediate CannotBuy must retain the entire selected item/seal frame");
@@ -692,7 +861,7 @@ static void CheckImmediateCannotBuyFraming() {
     for (int frame = 0; frame < 12; ++frame) NativeFrame();
     const auto &record = BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
     assert(shop.shopItemSelectedTween == 0 &&
-           sBrowseCameraPtr->paramData.fixd1.rwData.eyePosRotTarget.pos.y == record[1]);
+           sBrowseCameraPtr->eye.y == record[1]);
   }
   std::puts("MM immediate first-complete-frame confirmation: all8 CannotBuy holds/return retain item/seal framing and restore native bank target");
 }
@@ -710,7 +879,21 @@ static void DumpSelectionPaths() {
       std::printf(",");
     std::printf("[");
     shop.cursorIndex = slot;
+    const auto eye = sBrowseCameraPtr->eye;
+    const auto direction = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
     auto printPosition = [&]() {
+      // The native tween stays linear on every axis, with no item-driven
+      // camera motion during take/return (including interpolation endpoints).
+      const auto& start = kShelves[slot];
+      const auto& end = BlackMarketMmShopScene::kSelectedTargets[slot >> 2];
+      const auto t = shop.shopItemSelectedTween;
+      const auto& itemPosition = stock[slot].actor.world.pos;
+      assert(std::abs(itemPosition.x - (start.x + (end[0] - start.x) * t)) < .0001f);
+      assert(std::abs(itemPosition.y - (start.y + (end[1] - start.y) * t)) < .0001f);
+      assert(std::abs(itemPosition.z - (start.z + (end[2] - start.z) * t)) < .0001f);
+      assert(!std::memcmp(&eye, &sBrowseCameraPtr->eye, sizeof(eye)));
+      const auto now = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
+      assert(std::abs(direction.pitch - now.pitch) <= 1 && std::abs(direction.yaw - now.yaw) <= 1);
       const auto &position = stock[slot].actor.world.pos;
       const auto &camera = *sBrowseCameraPtr;
       std::printf("{\"position\":[%.8f,%.8f,%.8f],\"eye\":[%.8f,%.8f,%.8f],\"at\":[%.8f,%.8f,%.8f],\"fov\":%.8f}",
@@ -721,7 +904,7 @@ static void DumpSelectionPaths() {
     for (int step = 0; step < 6; ++step) {
       EnOssan_TakeItemOffShelf(&shop);
       for (auto& item : stock) item.actor.update(&item.actor, &play);
-      Camera_Fixed1(sBrowseCameraPtr);
+      Camera_Data4(sBrowseCameraPtr);
       std::printf(",");
       printPosition();
     }
@@ -729,7 +912,7 @@ static void DumpSelectionPaths() {
     for (int step = 0; step < 6; ++step) {
       EnOssan_ReturnItemToShelf(&shop);
       for (auto& item : stock) item.actor.update(&item.actor, &play);
-      Camera_Fixed1(sBrowseCameraPtr);
+      Camera_Data4(sBrowseCameraPtr);
       std::printf(",");
       printPosition();
     }
@@ -1224,6 +1407,14 @@ static void CheckKeeperDialogue() {
   std::puts("MM optional native keeper intro/help/back/B retains camera; zero purchases/receipts");
 }
 int main(int argc, char **argv) {
+  if (argc == 2 && std::string(argv[1]) == "customer") {
+    CheckCustomerAccessAndReturn();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "oot-pivot") {
+    CheckOotPivotTiming();
+    return 0;
+  }
   if (argc == 2 && std::string(argv[1]) == "selection-paths") {
     DumpSelectionPaths();
     return 0;
@@ -1284,6 +1475,8 @@ int main(int argc, char **argv) {
     CheckLegacyNativeCameraBehavior();
     return 0;
   }
+  CheckCustomerAccessAndReturn();
+  CheckOotPivotTiming();
   CheckKeeperDialogue();
   CheckLifecycle();
   CheckAbortBoundaries();
@@ -1307,6 +1500,6 @@ int main(int argc, char **argv) {
   CheckNoFreeSubcamera();
   CheckQueuedPoolExhaustion();
   std::puts(
-      "MM production native EnOssan/EnGirlA + actual CutsceneManager/Fixed1 "
+      "MM production native EnOssan/EnGirlA + actual CutsceneManager/ported OoT Data4 "
       "integration passed; configured runtime unproven");
 }

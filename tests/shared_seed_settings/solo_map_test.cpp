@@ -4,6 +4,7 @@
 #include "Rando/Rando.h"
 #include "Rando/ItemReceiptText.h"
 #include "combo/ComboGameMode.h"
+#include "combo/gui/WhatsNew.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -23,6 +24,10 @@ static int donorCalls;
 static std::map<std::string, int> config;
 static std::vector<std::string> controls;
 namespace ImGui {
+// This fixture observes native hint routing; styling/input uses real Dear ImGui
+// in tests/whats_new.
+void PushStyleColor(ImGuiCol, const ImVec4&) {}
+void PopStyleColor(int) {}
 ImVec2 GetContentRegionAvail() { return {1000, 700}; }
 ImGuiStyle& GetStyle() { static ImGuiStyle style; return style; }
 bool BeginChild(const char*, const ImVec2&, ImGuiChildFlags, ImGuiWindowFlags) { return true; }

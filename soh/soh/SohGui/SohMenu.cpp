@@ -1,5 +1,6 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
+#include <cstring>
 
 #include "SohMenu.h"
 #include "soh/OTRGlobals.h" // ComboShip: EvalDisabledByIndex foreground guard mirrors Menu::DrawElement
@@ -78,6 +79,24 @@ WidgetInfo& SohMenu::AddWidget(WidgetPath& pathInfo, std::string widgetName, Wid
             widget.options = std::make_shared<WidgetOptions>();
     }
     return widget;
+}
+
+// Registration-time insertion, before Combo's menu export caches widget indices.
+// Reuse AddWidget's native options and keep every existing widget/callback intact.
+WidgetInfo& SohMenu::AddWidgetAfter(WidgetPath& pathInfo, const char* anchorCvar, std::string widgetName,
+                                    WidgetType widgetType) {
+    AddWidget(pathInfo, widgetName, widgetType);
+    auto& widgets =
+        menuEntries.at(pathInfo.sectionName).sidebars.at(pathInfo.sidebarName).columnWidgets.at(pathInfo.column);
+    const auto last = widgets.end() - 1;
+    const auto anchor = std::find_if(widgets.begin(), last, [anchorCvar](const WidgetInfo& widget) {
+        return anchorCvar && widget.cVar && std::strcmp(widget.cVar, anchorCvar) == 0;
+    });
+    if (anchor == last)
+        return widgets.back();
+    const auto insertion = anchor + 1;
+    std::rotate(insertion, last, widgets.end());
+    return *insertion;
 }
 
 SohMenu::SohMenu(const std::string& consoleVariable, const std::string& name)

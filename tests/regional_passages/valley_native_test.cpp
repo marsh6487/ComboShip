@@ -1,8 +1,11 @@
 #include "fast/resource/type/DisplayList.h"
 #include "fast/resource/type/Vertex.h"
+#include "ship/resource/ResourceManager.h"
 #include "global.h"
 #include "soh/ActorDB.h"
 #include <cassert>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <limits>
@@ -13,14 +16,39 @@
 #define osSyncPrintf(...) ((void)0)
 /* NATIVE_ENGINE */
 /* NATIVE_PRODUCTION */
+static std::vector<std::string> reports;
+extern "C" void lusprintf(const char*, int32_t, int32_t, const char* format, ...) {
+  char message[2048];
+  va_list arguments;
+  va_start(arguments, format);
+  std::vsnprintf(message, sizeof(message), format, arguments);
+  va_end(arguments);
+  reports.emplace_back(message);
+}
 SaveContext gSaveContext{};
 PlayState *gPlayState = nullptr;
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 }
 static std::map<std::string, std::shared_ptr<Ship::IResource>> resources;
+static std::map<std::string, std::shared_ptr<Ship::IResource>> foreignResources;
+static bool foreignActive = false;
 std::shared_ptr<Ship::IResource> ResourceLoad(const char *p) {
-  return resources[p];
+  return (foreignActive ? foreignResources : resources)[p];
+}
+// Keep the registered-owner boundary distinct from the globally active manager.
+// No archives or loader workers are needed to test the production selection.
+Ship::ResourceManager::ResourceManager() {}
+Ship::ResourceManager::~ResourceManager() {}
+static auto ootOwner = std::make_shared<Ship::ResourceManager>();
+std::shared_ptr<Ship::ResourceManager> Ship::CrossRMRegistry::GetOrActive(const std::string& name) {
+  assert(name == "oot");
+  return ootOwner;
+}
+std::shared_ptr<Ship::IResource> Ship::ResourceManager::LoadResource(
+    const std::string& path, bool, std::shared_ptr<Ship::ResourceInitData>) {
+  assert(this == ootOwner.get());
+  return resources[path];
 }
 // Keep the actual renderer's lookup and vertex submission boundaries small;
 // its command parsing and in-place cache mutation remain production code.
@@ -168,10 +196,25 @@ int main() {
   resources["scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"] = vertices;
   auto first = NativeBackdrop();
   resources[kBackdrop] = first;
-  assert(PrepareBackdrop() && !sDetailedRender);
+  foreignActive = true;
+  assert(PrepareBackdrop() && !sDetailedRender &&
+         "OoT backdrop preparation must use its registered owner while MM is active");
+  assert(foreignActive && "owner lookup must not change the globally active manager");
+  foreignActive = false;
   for (auto slot : kBackdropSlots)
     assert((first->Instructions[slot].words.w0 >> 24) == G_SPNOOP);
   assert(PrepareBackdrop());
+  // MM mounts a low-priority OoT companion in real combined sessions. It can
+  // own an identically named but distinct native list: never patch that copy.
+  RestoreBackdrop();
+  auto companionBackdrop = NativeBackdrop();
+  foreignResources[kBackdrop] = companionBackdrop;
+  foreignResources["scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"] = vertices;
+  foreignActive = true;
+  assert(PrepareBackdrop() && NativeBackdropLayout(companionBackdrop->Instructions));
+  for (auto slot : kBackdropSlots)
+    assert((first->Instructions[slot].words.w0 >> 24) == G_SPNOOP);
+  foreignActive = false;
   auto second = NativeBackdrop();
   resources[kBackdrop] = second;
   assert(PrepareBackdrop());
@@ -205,7 +248,10 @@ int main() {
   resources["scenes/shared/spot08_scene/spot08_room_0DL_002538_vtx_0"] =
       distant;
   resources[kBackdrop] = detailed;
+  foreignActive = true;
   assert(PrepareBackdrop() && sDetailedRender);
+  assert(foreignActive);
+  foreignActive = false;
   distant->VertexList[0].v.ob[1] = 300;
   assert(!PrepareBackdrop());
   resources[kBackdrop] = NativeBackdrop();
@@ -267,12 +313,21 @@ int main() {
   gSaveContext.gameMode = GAMEMODE_NORMAL;
   gSaveContext.fileNum = 0;
   assert(ComboFountainValley_Ready(&play));
+  assert(!reports.empty() && reports.back().find("status=native-patched") != std::string::npos);
+  const auto reportCount = reports.size();
+  assert(ComboFountainValley_Ready(&play) && reports.size() == reportCount &&
+         "stable readiness must not log every frame");
   assert(spawns == 1 && sCollision.numPolygons == 43);
   assert(ComboFountainValley_Ready(&play) && spawns == 1);
   auto *collisionBuffer = sCollision.polyList;
   auto *cameraBuffer = sCollision.cameraDataList;
   Destroy(&sActor->dyna.actor, &play);
   assert(!sActor);
+  resources[kBackdrop] = foreign;
+  assert(!ComboFountainValley_Ready(&play));
+  assert(reports.back().find("status=unrecognized-display-list") != std::string::npos);
+  assert(spawns == 1 && "a layout rejection must remain non-destructive");
+  resources[kBackdrop] = NativeBackdrop();
   assert(collisionBuffer[42].type == 0 &&
          cameraBuffer[0].cameraSType == CAM_SET_NONE);
   PlayState alt{};
@@ -290,6 +345,7 @@ int main() {
   resources[kBackdrop] = allocationFailureBackdrop;
   assert(!ComboFountainValley_Ready(&full));
   assert(!sActor);
+  assert(reports.back().find("status=collision-actor-unavailable") != std::string::npos);
   assert(NativeBackdropLayout(allocationFailureBackdrop->Instructions) &&
          "do not expose valley without registered collision");
   gComboGameMode = COMBO_GAME_OOT;
@@ -301,7 +357,9 @@ int main() {
   assert(nativeSurfaces[7].data[0] == 0x12345678);
   RestoreBackdrop();
   resources.clear();
-  std::cout << "PASS native collision registration, subset deduplication, "
+  foreignResources.clear();
+  std::cout << "PASS registered OoT owner selection with foreign active manager, "
+               "state-change readiness diagnostics, native collision registration, subset deduplication, "
                "unchanged scene data, load/destroy/reload, allocation failure "
                "and backdrop restore/reload/foreign guards\n";
 }

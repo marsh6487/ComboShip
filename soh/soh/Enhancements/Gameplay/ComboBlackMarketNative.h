@@ -11,6 +11,7 @@ enum {
 extern "C" {
 #endif
 void ComboBlackMarketOot_NormalizeEntry(void);
+void ComboBlackMarketOot_RestoreRoomAfterDraw(struct PlayState* play);
 void ComboBlackMarketOot_ReportClear(int boss, int slot);
 int ComboBlackMarketOot_TryDoorEntrance(struct PlayState* play, struct Actor* door);
 int ComboBlackMarketNative_PrepareViewpointCamera(struct PlayState* play);

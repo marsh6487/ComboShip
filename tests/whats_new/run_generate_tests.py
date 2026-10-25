@@ -54,7 +54,8 @@ def main():
         sanitizers = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
                       "-fno-pie", "-no-pie"] if os.environ.get("SANITIZE") else []
         command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                   *sanitizers, "-DIMGUI_DEFINE_MATH_OPERATORS=", "-I" + str(ROOT / "combo"),
+                   *sanitizers, "-DIMGUI_DEFINE_MATH_OPERATORS=", "-DF3DEX_GBI_2",
+                   "-I" + str(ROOT / "combo"), "-I" + str(ROOT / "libultraship/include"),
                    "-I" + str(imgui), "-I" + str(directory),
                    str(ROOT / "tests/whats_new/generate_test.cpp")]
         command += [str(imgui / name) for name in ("imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp")]

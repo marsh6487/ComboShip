@@ -155,7 +155,7 @@ float sNESFontWidths[160]{}; // Actual native widths/decoder are exercised by ru
 void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
 void EndBrowsing(PlayState*,bool = false) { sTalking = false; }
-struct ShelfFixtureStub { void Reset() {} } sShelfFixture;
+struct ShelfFixtureStub { void Reset() {} } sShelfFixture, sCounterBarrier;
 /* NATIVE_HALF_DAY_TABLE */
 /* PRODUCTION */
 
