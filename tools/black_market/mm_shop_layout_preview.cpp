@@ -32,8 +32,10 @@ int main(int argc, char** argv) {
     // This is the same universal derivation used by check_shop_layout.py;
     // actor bob is zero for this native OoT presentation.
     const auto extension = [](float half, float floor, float extra) {
-        return std::max((floor + 1.4f) / .875f,
-                        (std::max(half, floor) + 1.4f) / .875f - half) + extra + 1.f / 64;
+        const float padding = kSealPaddingScale;
+        return std::max((floor * padding + 1.4f * padding) / .875f,
+                        (std::max(half, floor * padding) + 1.4f * padding) / .875f - half) +
+               extra * padding + 1.f / 64;
     };
     const float ex = extension(radius, 2.4f, .85f);
     const float ey = extension(halfHeight, 3.2f, .85f);
@@ -56,7 +58,7 @@ int main(int argc, char** argv) {
                     hi[axis] = choice == 0 ? a : choice == 3 ? mid : b;
                 }
                 const auto mesh = BlackMarketVisual::BuildLock(
-                    {{lo[0], lo[1], lo[2]}, {hi[0], hi[1], hi[2]}, true}, 0, false);
+                    { { lo[0], lo[1], lo[2] }, { hi[0], hi[1], hi[2] }, true }, 0, false, kSealPaddingScale);
                 assert(mesh.valid);
                 for (const auto& vertex : mesh.vertices) {
                     const float point[3]{mesh.center.x + vertex.x / BlackMarketVisual::kLockVertexScale,
@@ -66,8 +68,9 @@ int main(int argc, char** argv) {
                         assert(point[axis] >= minimum[axis] && point[axis] <= maximum[axis]);
                 }
             }
-    std::printf("{\"stock_scale\":%.9g,\"envelope\":[[%.9g,%.9g,%.9g],[%.9g,%.9g,%.9g]],\"corners\":[",
-                kStockScale, minimum[0], minimum[1], minimum[2], maximum[0], maximum[1], maximum[2]);
+    std::printf("{\"stock_scale\":%.9g,\"seal_padding_scale\":%.9g,\"envelope\":[[%.9g,%.9g,%.9g],[%.9g,%.9g,%.9g]],"
+                "\"corners\":[",
+                kStockScale, kSealPaddingScale, minimum[0], minimum[1], minimum[2], maximum[0], maximum[1], maximum[2]);
     bool comma = false;
     for (const auto& corners : ShelfCorners()) {
         if (comma) std::printf(",");

@@ -81,7 +81,14 @@ static inline Gfx* CwSpinDraw_Clone(PlayState* play, const char* native, const c
     if (!source || !textures[0] || !textures[1])
         return NULL;
     size_t count = ResourceGetSizeByName(native) / sizeof(Gfx);
-    Gfx* copy = (Gfx*)CwSpinDraw_Alloc(play->state.gfxCtx, 2 * count * sizeof(Gfx));
+    size_t bytes = 2 * count * sizeof(Gfx);
+    uintptr_t head = (uintptr_t)play->state.gfxCtx->polyOpa.p;
+    uintptr_t tail = (uintptr_t)play->state.gfxCtx->polyOpa.d;
+    // OPEN_DISPS writes an OPA marker even for an XLU-only draw. OoT removes
+    // that marker without restoring its word, so keep it outside the clone.
+    if (tail < head || tail - head < ((bytes + 15) & ~(size_t)15) + sizeof(Gfx))
+        return NULL;
+    Gfx* copy = (Gfx*)CwSpinDraw_Alloc(play->state.gfxCtx, bytes);
     if (copy == NULL)
         return NULL;
     return CwSpinMaterial_Clone(copy, 2 * count, source, count, ResourceGetCrcByName(textures[0]),
@@ -112,10 +119,16 @@ static inline int CwSpinDraw_Burst(PlayState* play, CwSpinVisualSelection visual
     // Explicit styles need their authored shell, UV state and texture masks.
     // Only Native follows the currently selected host/custom shell.
     int nativeShape = visual.style == CW_SPIN_STYLE_NATIVE;
-    Gfx* disk =
-        nativeShape ? CwSpinDraw_Clone(play, nativeDisk, recipe.burstTex, palette) : CwSpinDraw_LoadDL(recipe.disk);
-    Gfx* cylinder = nativeShape ? CwSpinDraw_Clone(play, nativeCylinder, recipe.burstTex, palette)
-                                : CwSpinDraw_LoadDL(recipe.cylinder);
+    // The imported Ice/Light great shells still embed the Fire donor's second
+    // texture. Rebind their own sigil in a frame-owned copy of the authored
+    // shell, retaining its geometry, UVs, scrolling and level-specific shape.
+    int themedGreat = great && (visual.style == CW_SPIN_STYLE_ICE || visual.style == CW_SPIN_STYLE_LIGHT);
+    Gfx* disk = nativeShape || themedGreat
+                    ? CwSpinDraw_Clone(play, nativeShape ? nativeDisk : recipe.disk, recipe.burstTex, palette)
+                    : CwSpinDraw_LoadDL(recipe.disk);
+    Gfx* cylinder = nativeShape || themedGreat ? CwSpinDraw_Clone(play, nativeShape ? nativeCylinder : recipe.cylinder,
+                                                                  recipe.burstTex, palette)
+                                               : CwSpinDraw_LoadDL(recipe.cylinder);
     if (!disk || !cylinder)
         return 0;
     CwSpinDraw_SetColors(play, palette, alpha);

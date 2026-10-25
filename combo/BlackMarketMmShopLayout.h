@@ -8,28 +8,30 @@ namespace BlackMarketMmShopLayout {
 using BlackMarketShelves::Box;
 using BlackMarketShelves::Point;
 using BlackMarketShelves::Vertex;
-inline constexpr float kStockScale = .18f;
+inline constexpr float kStockScale = .27f;
+inline constexpr float kSealPaddingScale = .5f;
 // Bring the scene around the keeper rather than moving the shop eye back to
-// fit tall display banks. This rigid translation preserves the bank framing.
+// fit tall display banks. Move both banks 12 units toward the customer;
+// the compact upper row and short separator keep complete item/seal bounds clear.
 inline constexpr int16_t kOffsetY = -6;
-inline constexpr int16_t kOffsetZ = -70;
+inline constexpr int16_t kOffsetZ = -58;
 
 // Compact rows and a short front lip leave a clear straight path from both
 // rows to the native confirmation position. In particular, the upper offer
 // clears the middle board before descending through that board's height.
 inline constexpr std::array<Box, 12> kBoxes = { {
-    { { 14, 44, 80 }, { 18, 108, 83 } },
-    { { 88, 44, 80 }, { 92, 108, 83 } },
-    { { 18, 46, 80 }, { 88, 108, 83 } },
+    { { 14, 44, 80 }, { 18, 106, 83 } },
+    { { 88, 44, 80 }, { 92, 106, 83 } },
+    { { 18, 46, 80 }, { 88, 106, 83 } },
     { { 14, 44, 78 }, { 92, 46, 99 } },
-    { { 14, 76, 78 }, { 92, 77, 99 } },
-    { { 14, 108, 78 }, { 92, 111, 99 } },
-    { { -92, 44, 80 }, { -88, 108, 83 } },
-    { { -18, 44, 80 }, { -14, 108, 83 } },
-    { { -88, 46, 80 }, { -18, 108, 83 } },
+    { { 14, 76, 78 }, { 92, 77, 90 } },
+    { { 14, 106, 78 }, { 92, 109, 99 } },
+    { { -92, 44, 80 }, { -88, 106, 83 } },
+    { { -18, 44, 80 }, { -14, 106, 83 } },
+    { { -88, 46, 80 }, { -18, 106, 83 } },
     { { -92, 44, 78 }, { -14, 46, 99 } },
-    { { -92, 76, 78 }, { -14, 77, 99 } },
-    { { -92, 108, 78 }, { -14, 111, 99 } },
+    { { -92, 76, 78 }, { -14, 77, 90 } },
+    { { -92, 106, 78 }, { -14, 109, 99 } },
 } };
 
 inline auto ShelfCorners() {
@@ -46,8 +48,8 @@ inline auto ShelfCorners() {
 
 inline auto CollisionCorners() {
     constexpr std::array<Box, 2> volumes{ {
-        { { 14, 0, 78 }, { 92, 111, 99 } },
-        { { -92, 0, 78 }, { -14, 111, 99 } },
+        { { 14, 0, 78 }, { 92, 109, 99 } },
+        { { -92, 0, 78 }, { -14, 109, 99 } },
     } };
     auto result = std::array<std::array<Point, 8>, 2>{ BlackMarketShelves::Corners(volumes[0]),
                                                        BlackMarketShelves::Corners(volumes[1]) };

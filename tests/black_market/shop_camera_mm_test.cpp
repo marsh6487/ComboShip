@@ -813,12 +813,18 @@ static void CheckSelectedItemLegibility() {
     NativeFrame();
     ProjectNativeCamera(*sBrowseCameraPtr);
     const auto shelfPixels = ReferenceItemPixels(stock[slot].actor);
+    const auto shelfScale = stock[slot].actor.scale;
+    assert(
+        shelfPixels >= 16 &&
+        "shelf stock must remain visibly larger through actual native updates");
     SelectItem();
     ProjectNativeCamera(*sBrowseCameraPtr);
     const auto selectedPixels = ReferenceItemPixels(stock[slot].actor);
     std::fprintf(stderr, "slot%d shelf %.0fpx selected %.0fpx scale %.2f\n",
                  slot, shelfPixels, selectedPixels, stock[slot].actor.scale.y);
-    assert(selectedPixels >= 20 && selectedPixels >= 1.75f * shelfPixels &&
+    // The shelf display itself is now closer. Preserve the established
+    // absolute confirmation size and substantial additional enlargement.
+    assert(selectedPixels >= 20 && selectedPixels >= 1.5f * shelfPixels &&
            "confirmation must visibly enlarge merchandise, not leave it tiny");
     Press(BTN_B);
     for (int i = 0; i < 10; ++i)
@@ -826,9 +832,10 @@ static void CheckSelectedItemLegibility() {
     const auto &position = stock[slot].actor.world.pos;
     assert(position.x == kShelves[slot].x && position.y == kShelves[slot].y &&
            position.z == kShelves[slot].z && shop.shopItemSelectedTween == 0);
+    assert(!std::memcmp(&shelfScale, &stock[slot].actor.scale, sizeof(Vec3f)));
   }
   std::puts("MM selected-item legibility: all8 actual native selections enlarge "
-            "the reference mesh >=1.75x and >=20px; B restores shelf anchors");
+            "the reference mesh >=1.5x and >=20px; B restores shelf anchors");
 }
 static void CheckImmediateCannotBuyFraming() {
   for (int slot = 0; slot < 8; ++slot) {
@@ -848,9 +855,9 @@ static void CheckImmediateCannotBuyFraming() {
       for (int corner = 0; corner < 8; ++corner) {
         Actor marker{};
         marker.focus.pos = stock[slot].actor.world.pos;
-        marker.focus.pos.x += corner & 1 ? 12.048483f : -12.048483f;
-        marker.focus.pos.y += corner & 2 ? 17.282769f : -10.082769f;
-        marker.focus.pos.z += corner & 4 ? 11.648483f : -11.648483f;
+        marker.focus.pos.x += corner & 1 ? 12.967f : -12.967f;
+        marker.focus.pos.y += corner & 2 ? 19.810f : -9.010f;
+        marker.focus.pos.z += corner & 4 ? 12.767f : -12.767f;
         s16 x, y; Actor_GetScreenPos(&play, &marker, &x, &y);
         assert(x > 8 && x < 312 && y > 34 && y < 138 &&
                "immediate CannotBuy must retain the entire selected item/seal frame");

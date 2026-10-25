@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <vector>
 #ifndef OOT_LOCK_TEST
+#include "combo/BlackMarketMmShopLayout.h"
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #endif
 
@@ -230,7 +231,25 @@ int main() {
     assert(allocations == 1 && translations.size() == 1);
     assert(translations[0].x == 13 && translations[0].y == 30 && translations[0].z == 32);
     assert(scales.size() == 1 && scales[0] == 1.f / BlackMarketVisual::kLockVertexScale);
-    const auto expected = BlackMarketVisual::BuildLock(frame, play.gameplayFrames, true);
+    float sealHalfHeight = 0;
+    for (int i = 0; i < 64; ++i)
+        sealHalfHeight =
+            std::max(sealHalfHeight, std::abs(vertexAllocations[0][i].v.ob[1] / BlackMarketVisual::kLockVertexScale));
+#ifndef OOT_LOCK_TEST
+    assert(sealHalfHeight > 10 && sealHalfHeight <= 12.7f &&
+           "MM ribbons must wrap the item with compact padding for larger shelf stock");
+#else
+    assert(sealHalfHeight > 12.7f && "OoT must retain its original ribbon padding");
+#endif
+    const auto expected = BlackMarketVisual::BuildLock(frame, play.gameplayFrames, true,
+#ifdef OOT_LOCK_TEST
+                                                       1.f
+#else
+                                                       .5f
+#endif
+    );
+    assert(!BlackMarketVisual::BuildLock(frame, 0, false, 0).valid);
+    assert(!BlackMarketVisual::BuildLock(frame, 0, false, NAN).valid);
     for (int i = 0; i < 64; ++i) {
         const auto& actual = vertexAllocations[0][i].v; const auto& want = expected.vertices[i];
         assert(actual.ob[0] == want.x && actual.ob[1] == want.y && actual.ob[2] == want.z);

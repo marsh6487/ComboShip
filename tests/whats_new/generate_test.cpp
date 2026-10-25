@@ -188,8 +188,7 @@ void CheckFrame(const FrameResult& frame, bool highlighted, const FrameResult& o
             return std::string(label) == gated;
         });
         Check(row.disabled == disabled, std::string(label) + " has its expected native input gate");
-        const bool releaseOwned = std::string(label) != "Magical Room Materials";
-        const auto expected = highlighted && releaseOwned && !disabled ? WhatsNew::Accent(WhatsNew::Kind::New) : normal;
+        const auto expected = highlighted && !disabled ? WhatsNew::Accent(WhatsNew::Kind::New) : normal;
         Check(SameColor(row.text, expected), std::string(label) + " has its expected native text accent");
         Check(row.id == row.originalId && row.id == Find(ordinary, label).id,
               std::string(label) + " retains its original native ID");
@@ -295,5 +294,5 @@ int main() {
     ImGui::DestroyContext();
     if (Fixture::failures)
         return 1;
-    std::cout << "PASS real ImGui Generate/Black Market: 11 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
+    std::cout << "PASS real ImGui Generate/Black Market: 12 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
 }

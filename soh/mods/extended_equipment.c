@@ -907,7 +907,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     { dgItemIconCaneOfByrnaTex, dgItemIconFourSwordTex, dgItemIconTridentTex },
     // Shields
     { dgItemIconGoddessShieldTex, dgItemIconKiteShieldTex,
-      COMBO_IKANA_SHIELD_ICON }, // Shield of Ikana (MM mirror shield)
+      COMBO_IKANA_SHIELD_ICON_NATIVE }, // Shield of Ikana; runtime owner is selected below.
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots
@@ -919,6 +919,9 @@ void* ExtEquip_GetIcon(s16 equipType, u8 index) {
         return NULL;
     }
 
+    if (equipType == 1 && index == 3) {
+        return (void*)COMBO_IKANA_SHIELD_ICON;
+    }
     return (void*)sExtEquipIconPaths[equipType][index - 1];
 }
 

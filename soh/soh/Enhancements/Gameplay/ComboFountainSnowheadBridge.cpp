@@ -197,6 +197,9 @@ void Draw(Actor* actor, PlayState* play) {
             return points;
         }();
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        // SETUPDL_25 is opaque even on polyXlu; blend the sprite mask without
+        // writing its transparent billboard corners into the depth buffer.
+        gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2);
         gSPComboRMPush(POLY_XLU_DISP++, "oot");
         gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
         gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
@@ -245,6 +248,7 @@ void DrawLocalChill(Actor* actor, PlayState* play) {
         return;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2);
     gSPComboRMPush(POLY_XLU_DISP++, "oot");
     gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
     gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);

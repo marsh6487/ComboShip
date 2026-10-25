@@ -2,6 +2,18 @@
   {
     "suite": "world",
     "origin": "gate",
+    "name": "Native silver-rupee hooks preserve unregistered scene actors",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/silver_rupee/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Native Ikana GI priority, resource availability and pause icon routing",
+    "run": "python3 -B tests/ikana_gi/run_native_priority_tests.py\npython3 -B tests/ikana_gi/run_native_availability_tests.py\npython3 -B tests/oot_equipment_pause/run_ikana_icon_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
     "name": "Fast shared Granny UI and engine header regression",
     "run": "python3 -B tests/black_market/run_granny_header_tests.py"
   },

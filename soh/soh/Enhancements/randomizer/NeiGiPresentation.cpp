@@ -3,6 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
+#include "ComboIkanaShieldResources.h"
 #include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
@@ -703,6 +704,8 @@ bool HasResource(const char* path) {
 // The Lantern's old Poe actor mesh is also a stand-in. Generic Poe replacements
 // must not suppress its authored cage/glass; dedicated GI overrides stay live.
 bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
+    if (item.draw == Randomizer_DrawExtShieldOfIkana)
+        return ResourceMgr_IsIkanaShieldGiAvailable() != 0;
     // This progressive callback draws a Kokiri placeholder. The real Master
     // callback and MM foreign recipe use Temple geometry instead.
     if (!includeMmHost && item.draw == Randomizer_DrawProgressiveMasterSword)
@@ -733,7 +736,6 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
           "objects/object_gi_niwatori/gGiChickenEyesDL" },
         { "divine_shield", "oot", "objects/object_nei_divine_shield/g_divine_shield_dl" },
         { "sheikah_shield", "oot", "objects/object_nei_kite_shield/g_kite_shield_dl" },
-        { "shield_of_ikana", "mm", "objects/object_link_child/gLinkHumanMirrorShieldDL" },
         { "magic_cape", "oot", "objects/object_nei_magic_cape/gNeiMagicCapeDL",
           "objects/object_nei_magic_cape/gNeiMagicCapeWaveDL" },
         // Shared vanilla clothes packs replace the Goron/Zora tunic recipes,

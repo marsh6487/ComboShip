@@ -127,16 +127,16 @@ class NativeLock:
                         str(HERE / "lock_preview.cpp"), "-o", str(library)], check=True)
         self.native = C.CDLL(str(library))
         self.native.BlackMarketLock_Preview.argtypes = [C.POINTER(C.c_float), C.POINTER(C.c_float),
-                                                       C.c_uint, C.c_int, C.POINTER(C.c_float)]
+                                                       C.c_uint, C.c_int, C.c_float, C.POINTER(C.c_float)]
         self.native.BlackMarketLock_Preview.restype = C.c_int
         self.native.BlackMarketLock_Texture.restype = C.POINTER(C.c_uint8)
 
-    def vertices(self, minimum, maximum, tick, selected):
+    def vertices(self, minimum, maximum, tick, selected, padding_scale=1):
         low = np.ascontiguousarray(minimum, dtype=np.float32)
         high = np.ascontiguousarray(maximum, dtype=np.float32)
         rows = np.empty((96, 9), dtype=np.float32)
         count = self.native.BlackMarketLock_Preview(low.ctypes.data_as(C.POINTER(C.c_float)),
-                    high.ctypes.data_as(C.POINTER(C.c_float)), tick, selected,
+                    high.ctypes.data_as(C.POINTER(C.c_float)), tick, selected, padding_scale,
                     rows.ctypes.data_as(C.POINTER(C.c_float)))
         return np.ascontiguousarray(rows[:count])
 
@@ -344,6 +344,7 @@ def seal_arrays(stock, shelves, tick, selected=None, clears=0, models=None):
             continue
         matrix = item_pose(item, position, slot, tick, chosen)
         points = np.concatenate([transform(array, matrix)[:, :3] for _, array, _ in models[item["slug"]]])
-        vertices = native_lock().vertices(points.min(0), points.max(0), tick, chosen)
+        vertices = native_lock().vertices(points.min(0), points.max(0), tick, chosen,
+                                          shelf_fixture().get('seal_padding_scale', 1))
         if len(vertices): rows.append(vertices)
     return rows

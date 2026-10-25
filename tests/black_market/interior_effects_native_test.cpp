@@ -152,8 +152,13 @@ void CheckPackets(bool oot) {
 }
 int main() {
     Reset(); BlackMarketInteriorEffects::Draw(&play, true, false);
-    assert(flameLists == 2 && vertexLoads >= 40 &&
-           "the default interior must draw two decorative flames and sustained vapor from all four large cauldrons");
+    assert(flameLists == 2 && vertexLoads >= 20 && vertexLoads <= 24 &&
+           "MM keeps decorative flames and only the two entrance-side vapor emitters");
+    for (const auto& quad : quads) {
+        int z = 0;
+        for (const auto& vertex : quad) z += vertex.v.ob[2];
+        assert(z > 800 && "removed rear pots must not leave vapor crossing the shelf banks");
+    }
     assert(matrices.size() == 3 && scrolls == 2 && used < 8192);
     assert(used == BlackMarketInteriorEffects::kFrameTailBytes &&
            graphics.polyXlu.p - commands.data() <= BlackMarketInteriorEffects::kXluCommands);
@@ -205,7 +210,7 @@ int main() {
     Reset(); BlackMarketInteriorEffects::Draw(&play, true, false);
     assert(firstFrame.size() == quads.size() && std::memcmp(firstFrame.data(), quads.data(), quads.size()*sizeof(quads[0])) == 0 &&
            "pause/repeated draws at the same gameplay frame must not advance or mutate effects");
-    for (int pot = 0; pot < 4; ++pot) {
+    for (int pot = 2; pot < 4; ++pot) {
         float minY = 1000, maxY = -1000;
         int count = 0;
         for (const auto& quad : quads) {
@@ -253,7 +258,7 @@ int main() {
     graphics.polyXlu.d = commands.data() + BlackMarketInteriorEffects::kXluCommands;
     graphics.overlay.d = overlay.data() + 2;
     BlackMarketInteriorEffects::Draw(&play,true,false);
-    assert(flameLists == 2 && vertexLoads >= 40 && graphics.polyOpa.d >= graphics.polyOpa.p + 8 &&
+    assert(flameLists == 2 && vertexLoads >= 20 && graphics.polyOpa.d >= graphics.polyOpa.p + 8 &&
            graphics.polyXlu.p <= graphics.polyXlu.d && "the full declared frame budget must suffice without an overrun");
     Reset(); play.gameplayFrames = UINT32_MAX; BlackMarketInteriorEffects::Draw(&play,true,true);
     assert(flameLists == 2 && vertexLoads >= 40);
@@ -276,7 +281,7 @@ int main() {
         std::free(retired);
         BlackMarketInteriorEffects::Draw(&play, true, oot);
         CheckPackets(oot);
-        assert(flameLists == 2 && vertexLoads >= 40);
+        assert(flameLists == 2 && vertexLoads >= (oot ? 40 : 20));
     }
-    std::puts("PASS native interior effects: two pale-violet native fire lists/scrolls; full flame-shelf/item clearance; four sustained rising vapor columns; native host texture ownership; frame/pause determinism; default-only guards; allocation failure and frame wrap");
+    std::puts("PASS native interior effects: two pale-violet native fire lists/scrolls; full flame-shelf/item clearance; MM entry-only/OoT four-column vapor; native host texture ownership; frame/pause determinism; default-only guards; allocation failure and frame wrap");
 }

@@ -146,6 +146,8 @@ inline NeiGi::Mesh Shimmer(uint32_t frame, Host host, int route, const NeiGi::Ba
     // The largest original glow is radius7 at scale0.8. Six world units also
     // cover native1/16 packing, so every full twinkle stays inside the face.
     constexpr float inset = 6;
+    const bool valley = host == Host::Oot && route == COMBO_PORTAL_SNOWHEAD;
+    const size_t columns = valley ? 10 : 5;
     const float halfWidth = host == Host::Mm                  ? kShellHalfWidth
                             : route == COMBO_PORTAL_GREAT_BAY ? ComboLakeHylia::kOpeningHalfWidth
                                                               : ComboFountainSnowhead::kOpeningHalfWidth;
@@ -161,11 +163,17 @@ inline NeiGi::Mesh Shimmer(uint32_t frame, Host host, int route, const NeiGi::Ba
     for (size_t first = 0; first < mesh.count; first += ForestGiParticles::kTwinkleVertices) {
         const auto origin = mesh.vertices[first].p;
         const size_t index = first / ForestGiParticles::kTwinkleVertices;
-        const float x = (float((index * 3) % 5) * .5f - 1) * (halfWidth - inset);
+        // Keep the twenty source twinkles at their original size. Ten columns
+        // spread the Snowhead beacon between the asymmetric valley banks.
+        const float x = valley ? ComboFountainSnowhead::kShimmerMinAcross + inset +
+                                     float((index * 3) % columns) / float(columns - 1) *
+                                         (ComboFountainSnowhead::kShimmerMaxAcross -
+                                          ComboFountainSnowhead::kShimmerMinAcross - 2 * inset)
+                               : (float((index * 3) % 5) * .5f - 1) * (halfWidth - inset);
         // Check both billboard extents against the shared piecewise roof;
         // a round approximation would spill beyond the Lake's sloped corners.
         float floor = baseFloor;
-        if (host == Host::Oot && route == COMBO_PORTAL_SNOWHEAD) {
+        if (valley) {
             // Complete billboard footprint follows the actual open valley,
             // including camera depth packing, without changing NEI twinkle art.
             for (float across : { x - inset, x, x + inset })
@@ -176,7 +184,8 @@ inline NeiGi::Mesh Shimmer(uint32_t frame, Host host, int route, const NeiGi::Ba
                 }
         }
         const float ceiling = std::fmin(top(x - inset), top(x + inset)) - inset;
-        const NeiGi::Point center{ x, floor + inset + float(index / 5) / 3 * (ceiling - floor - inset), front };
+        const float row = float(index / columns) / (valley ? 1.f : 3.f);
+        const NeiGi::Point center{ x, floor + inset + row * (ceiling - floor - inset), front };
         for (size_t j = 0; j < ForestGiParticles::kTwinkleVertices; ++j)
             mesh.vertices[first + j].p = center + (mesh.vertices[first + j].p - origin);
     }

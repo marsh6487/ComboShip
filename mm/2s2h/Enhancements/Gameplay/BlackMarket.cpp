@@ -104,8 +104,8 @@ alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 constexpr Vec3f kShelves[8] = {
     // Native +/-30-degree bank planes; row changes keep one bank camera.
-    { 44.84456f, 52, 28.75f },  { 44.84456f, 84, 28.75f },  { 75.15544f, 52, 46.25f },  { 75.15544f, 84, 46.25f },
-    { -44.84456f, 52, 28.75f }, { -44.84456f, 84, 28.75f }, { -75.15544f, 52, 46.25f }, { -75.15544f, 84, 46.25f }
+    { 44.84456f, 52, 40.75f },  { 44.84456f, 76, 40.75f },  { 75.15544f, 52, 58.25f },  { 75.15544f, 76, 58.25f },
+    { -44.84456f, 52, 40.75f }, { -44.84456f, 76, 40.75f }, { -75.15544f, 52, 58.25f }, { -75.15544f, 76, 58.25f }
 };
 BlackMarketShelvesNative::Fixture sShelfFixture{ BlackMarketMmShopLayout::Vertices(false),
                                                  BlackMarketMmShopLayout::Vertices(true),
@@ -176,10 +176,12 @@ bool Active() {
 BlackMarketGranny::Resources sGrannyResources;
 bool sGrannyPending = false, sGrannyActive = false;
 RoomShape sGrannyShape{};
+RoomShape* sGrannyOriginal = nullptr;
 RoomShapeDListsEntry sGrannyEntry{};
 std::vector<EnvLightSettings> sGrannyLights;
 void GrannySceneBegin() {
     sGrannyActive = false;
+    sGrannyOriginal = nullptr;
     sGrannyPending = Interior() && CVarGetInteger(BlackMarketGranny::kCvar, 0) != 0;
 }
 void ApplyGrannyInterior() {
@@ -213,6 +215,7 @@ void ApplyGrannyInterior() {
     play->envCtx.lightSetting = 0;
     std::memcpy(&play->envCtx.lightSettings, sGrannyLights.data(), sizeof(EnvLightSettings));
     sGrannyShape.normal = { { ROOM_SHAPE_TYPE_NORMAL }, 1, &sGrannyEntry, &sGrannyEntry + 1 };
+    sGrannyOriginal = play->roomCtx.curRoom.roomShape;
     play->roomCtx.curRoom.roomShape = &sGrannyShape;
     sGrannyActive = true;
 }
@@ -628,7 +631,11 @@ bool NativeShopSceneReady(PlayState* play) {
             mesh = std::dynamic_pointer_cast<SOH::SetMesh>(command);
     if (!mesh || mesh->meshHeader.base.type != 0 || mesh->opaPaths.size() != 1 ||
         mesh->opaPaths[0] != std::string("__OTR__") + BlackMarketMmShopScene::kPresentationResources[0] ||
-        !mesh->xluPaths.empty() || static_cast<void*>(play->roomCtx.curRoom.roomShape) != mesh->GetPointer())
+        !mesh->xluPaths.empty())
+        return false;
+    const auto* loadedShape = play->roomCtx.curRoom.roomShape;
+    if (static_cast<const void*>(loadedShape) != mesh->GetPointer() &&
+        !(sGrannyActive && loadedShape == &sGrannyShape && static_cast<void*>(sGrannyOriginal) == mesh->GetPointer()))
         return false;
     sNativeShopSceneResource = std::move(scene);
     return true;
@@ -760,7 +767,7 @@ void MarketText(u16* textId, bool* fromTable) {
 
 void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selected) {
     using namespace BlackMarketVisual;
-    const auto mesh = BuildLock(frame, play->gameplayFrames, selected);
+    const auto mesh = BuildLock(frame, play->gameplayFrames, selected, BlackMarketMmShopLayout::kSealPaddingScale);
     if (!mesh.valid ||
         !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, kLockVertices * sizeof(Vtx) + sizeof(Mtx), 8, 64))
         return;
@@ -1078,6 +1085,7 @@ void RegisterMarket() {
         sNativeShopSceneResource.reset();
         CancelReceipt(true);
         sGrannyActive = sGrannyPending = false;
+        sGrannyOriginal = nullptr;
         sTitlePending = sTalking = sDoorArmed = false;
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnBossDefeated>([](s16 actor) {
@@ -1131,6 +1139,9 @@ extern "C" COMBO_EXPORT void MM_SetBlackMarketClearCallback(void (*callback)(int
 }
 extern "C" int ComboBlackMarket_IsInterior(void) {
     return Interior();
+}
+extern "C" int ComboBlackMarket_IsCounterBarrier(const CollisionContext* context, int bgId) {
+    return sCounterBarrier.Owns(context, bgId);
 }
 extern "C" void ComboBlackMarket_ResetState(void) {
     sSession.state = {};

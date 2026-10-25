@@ -19,9 +19,11 @@ extern "C" {
 #include "overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.h"
 }
 #include "combo/render/SpinAttackNativeMaterial.h"
+#include "shipped_resources.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 static Gfx xlu[2048];
+static Gfx debugOverlay[32];
 alignas(16) static uint8_t allocation[32768];
 static Gfx *opa = (Gfx *)allocation;
 static size_t allocated;
@@ -29,16 +31,17 @@ static size_t allocationCursor, submittedVertices;
 static std::vector<uint32_t> particleColors;
 static std::vector<uint8_t> particleAlphas;
 static std::vector<Gfx *> submittedLists;
-static Gfx nativeList[8], privateList[2], brokenList[2];
+static Gfx nativeList[8], privateList[6], brokenList[2];
 static Gfx accentNativeList[3][14];
 static uint8_t textureByte;
 static bool missing, malformed, cosmeticEdited, accentMissing, accentMalformed,
-    allocationFailure;
+    allocationFailure, faithfulArena;
 static GraphicsContext gfx;
 static PlayState play;
 static MtxF parentMatrix;
 static std::vector<std::pair<Mtx *, MtxF>> matrixSnapshots;
 static unsigned xluSetups, hiliteCalls;
+#include "spin_graph_production.inc"
 extern "C" {
 void Matrix_Get(MtxF *dest) { *dest = parentMatrix; }
 Mtx *Matrix_MtxFToMtx(MtxF *src, Mtx *dest) {
@@ -47,22 +50,28 @@ Mtx *Matrix_MtxFToMtx(MtxF *src, Mtx *dest) {
   return dest;
 }
 void gDPSetTileSizeLerp(Gfx *p, int tile, float u0, float v0, float r0,
-                       float b0, float u1, float v1, float r1, float b1) {
+                        float b0, float u1, float v1, float r1, float b1) {
   __gDPSetTileSizeLerp(p, tile, u0, v0, r0, b0, u1, v1, r1, b1);
 }
-void guLookAtHilite(Mtx *mtx, LookAt *look, Hilite *hilite, float, float,
+void guLookAtHilite(Mtx *mtx, LookAt *look, Hilite *hilite, float, float, float,
                     float, float, float, float, float, float, float, float,
-                    float, float, float, float, float, int32_t, int32_t) {
+                    float, float, float, float, int32_t, int32_t) {
   ++hiliteCalls;
   std::memset(mtx, 0, sizeof(*mtx));
   std::memset(look, 0, sizeof(*look));
   std::memset(hilite, 0, sizeof(*hilite));
 }
-void *Graph_Alloc(GraphicsContext *, size_t size) {
+void *Graph_Alloc(GraphicsContext *context, size_t size) {
   if (allocationFailure)
     return nullptr;
   allocated = size;
   assert(size <= sizeof(allocation));
+  if (faithfulArena) {
+    context->polyOpa.d = reinterpret_cast<Gfx *>(
+        reinterpret_cast<uint8_t *>(context->polyOpa.d) -
+        ((size + 15) & ~(size_t)15));
+    return context->polyOpa.d;
+  }
   size_t at = allocationCursor;
   allocationCursor += (size + 15) & ~(size_t)15;
   assert(allocationCursor <= sizeof(allocation));
@@ -105,6 +114,11 @@ void *ResourceGetDataByName(const char *name) {
     return accentNativeList[2];
   if (missing && strstr(name, "cylinder"))
     return nullptr;
+  if (shippedResources && IsShippedList(name)) {
+    if (malformed)
+      return brokenList;
+    return const_cast<Gfx *>(ShippedList(name).data());
+  }
   if (!strncmp(name, "native", 6) || strstr(name, "gSpinAttackChargingDL"))
     return nativeList;
   if (strstr(name, "burst0") || strstr(name, "burst1") ||
@@ -113,6 +127,9 @@ void *ResourceGetDataByName(const char *name) {
   return malformed ? brokenList : privateList;
 }
 size_t ResourceGetSizeByName(const char *name) {
+  if (shippedResources && IsShippedList(name))
+    return malformed ? sizeof(brokenList)
+                     : ShippedList(name).size() * sizeof(Gfx);
   if (strstr(name, "gEff"))
     return accentMalformed ? sizeof(brokenList) : sizeof(accentNativeList[0]);
   return (!strncmp(name, "native", 6) || strstr(name, "gSpinAttackChargingDL"))
@@ -120,6 +137,8 @@ size_t ResourceGetSizeByName(const char *name) {
              : sizeof(privateList);
 }
 uint64_t ResourceGetCrcByName(const char *name) {
+  if (shippedResources)
+    return ShippedResourceHash(name);
   return name[strlen(name) - 1] == '0' ? 0x1111222233334444ULL
                                        : 0x5555666677778888ULL;
 }
@@ -130,12 +149,28 @@ Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a,
 }
 #endif
 #ifdef HOST_MM
-void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
-void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
+void Graph_OpenDisps(Gfx **refs, Gfx *values, GraphicsContext *context,
+                     const char *file, s32 line) {
+  if (faithfulArena)
+    SpinTest_Graph_OpenDisps(refs, values, context, file, line);
+}
+void Graph_CloseDisps(Gfx **refs, Gfx *values, GraphicsContext *context,
+                      const char *file, s32 line) {
+  if (faithfulArena)
+    SpinTest_Graph_CloseDisps(refs, values, context, file, line);
+}
 void Gfx_SetupDL25_Xlu(GraphicsContext *) { ++xluSetups; }
 #else
-void Graph_OpenDisps(Gfx **, GraphicsContext *, const char *, s32) {}
-void Graph_CloseDisps(Gfx **, GraphicsContext *, const char *, s32) {}
+void Graph_OpenDisps(Gfx **refs, GraphicsContext *context, const char *file,
+                     s32 line) {
+  if (faithfulArena)
+    SpinTest_Graph_OpenDisps(refs, context, file, line);
+}
+void Graph_CloseDisps(Gfx **refs, GraphicsContext *context, const char *file,
+                      s32 line) {
+  if (faithfulArena)
+    SpinTest_Graph_CloseDisps(refs, context, file, line);
+}
 void Gfx_SetupDL_25Xlu(GraphicsContext *) { ++xluSetups; }
 #endif
 void FrameInterpolation_RecordOpenChild(const void *, int) {}
@@ -169,7 +204,8 @@ static void CheckRestoredColors(uint32_t primary, uint32_t environment,
   bool parentRestored = false;
   for (auto it = matrixSnapshots.rbegin(); it != matrixSnapshots.rend(); ++it)
     if (lastMatrix->words.w1 == (uintptr_t)it->first) {
-      assert(std::memcmp(&it->second, &parentMatrix, sizeof(parentMatrix)) == 0);
+      assert(std::memcmp(&it->second, &parentMatrix, sizeof(parentMatrix)) ==
+             0);
       parentRestored = true;
       break;
     }
@@ -178,6 +214,7 @@ static void CheckRestoredColors(uint32_t primary, uint32_t environment,
 
 static void ResetDraw() {
   gfx.polyXlu.p = xlu;
+  gfx.overlay.p = debugOverlay;
   gfx.polyOpa.p = opa;
   gfx.polyOpa.d = (Gfx *)(allocation + sizeof(allocation));
   submittedVertices = allocationCursor = xluSetups = hiliteCalls = 0;
@@ -185,6 +222,117 @@ static void ResetDraw() {
   particleColors.clear();
   particleAlphas.clear();
   matrixSnapshots.clear();
+}
+
+static void CheckShippedThemeBindings() {
+  static const char *names[] = {"",           "fire",      "ice",
+                                "light",      "lightning", "arcane",
+#ifdef HOST_MM
+                                "astral_mm",
+#else
+                                "astral_soh",
+#endif
+                                "dark_energy"};
+  shippedResources = true;
+  for (int style = 1; style < CW_SPIN_STYLE_COUNT; ++style) {
+    const std::string prefix =
+        std::string("objects/combo_spin/") + names[style] + "/";
+    for (int great = 0; great <= 1; ++great) {
+      const auto visual = CwSpinStyle_Resolve(style, 0, 0, 1);
+      const std::string disk = prefix + (great ? "disk_great" : "disk_regular");
+      const std::string cylinder =
+          prefix + (great ? "cylinder_great" : "cylinder_regular");
+      const auto beforeDisk = ShippedList(disk.c_str());
+      const auto beforeCylinder = ShippedList(cylinder.c_str());
+      ResetDraw();
+      assert(CwSpinDraw_Burst(&play, visual, great, .5f, "native0", "native1"));
+      assert(submittedLists.size() == 2);
+      for (int part = 0; part < 2; ++part) {
+        std::string first = prefix + "burst0";
+        std::string second = prefix + "burst1";
+        if (style == CW_SPIN_STYLE_ASTRAL) {
+#ifndef HOST_MM
+          first = prefix + "spin_astral_rupture_poc1/gAstralFlowTex";
+#endif
+          if (!great && !part)
+            second = prefix + "spin_astral_rupture_poc1/gAstralSigil1Tex";
+          else if (great)
+            second =
+                prefix + (part ? "spin_astral_rupture_poc1/gAstralCorona2Tex"
+                               : "spin_astral_rupture_poc1/gAstralSigil2Tex");
+        } else if (great && style != CW_SPIN_STYLE_ICE &&
+                   style != CW_SPIN_STYLE_LIGHT) {
+          second = prefix + "spin_lightning_mm_poc1/gSpinLightningLevel2Tex";
+        }
+        CheckShippedMaterial(submittedLists[part],
+                             part ? beforeCylinder : beforeDisk, first, second);
+      }
+      assert(std::memcmp(beforeDisk.data(), ShippedList(disk.c_str()).data(),
+                         beforeDisk.size() * sizeof(Gfx)) == 0);
+      assert(std::memcmp(beforeCylinder.data(),
+                         ShippedList(cylinder.c_str()).data(),
+                         beforeCylinder.size() * sizeof(Gfx)) == 0);
+      for (int failure = 0; failure < 2; ++failure) {
+        missing = failure == 0;
+        malformed = failure == 1;
+        ResetDraw();
+        assert(
+            !CwSpinDraw_Burst(&play, visual, great, .5f, "native0", "native1"));
+        assert(submittedLists.empty() && gfx.polyXlu.p == xlu);
+      }
+      missing = malformed = false;
+      if (great &&
+          (style == CW_SPIN_STYLE_ICE || style == CW_SPIN_STYLE_LIGHT)) {
+#ifndef HOST_MM
+        allocationFailure = true;
+        ResetDraw();
+        assert(
+            !CwSpinDraw_Burst(&play, visual, great, .5f, "native0", "native1"));
+        assert(submittedLists.empty() && gfx.polyXlu.p == xlu);
+        allocationFailure = false;
+#endif
+        ResetDraw();
+        gfx.polyOpa.p =
+            reinterpret_cast<Gfx *>(allocation + sizeof(allocation) / 2);
+        gfx.polyOpa.d = gfx.polyOpa.p + 1;
+        const auto *tail = gfx.polyOpa.d;
+        assert(
+            !CwSpinDraw_Burst(&play, visual, great, .5f, "native0", "native1"));
+        assert(submittedLists.empty() && gfx.polyXlu.p == xlu &&
+               gfx.polyOpa.d == tail);
+        // Exercise both native Open/CloseDisps bodies and real tail movement.
+        // OoT removes its temporary OPA marker without restoring the word,
+        // so a clone exactly touching the head must never be submitted damaged.
+        for (int headroom = 0; headroom <= 1; ++headroom) {
+          ResetDraw();
+          faithfulArena = true;
+          size_t bytes =
+              2 * (beforeDisk.size() + beforeCylinder.size()) * sizeof(Gfx);
+          gfx.polyOpa.p =
+              reinterpret_cast<Gfx *>(allocation + sizeof(allocation) - bytes) -
+              headroom;
+          const int drawn =
+              CwSpinDraw_Burst(&play, visual, great, .5f, "native0", "native1");
+          if (drawn) {
+            assert(submittedLists.size() == 2);
+            CheckShippedMaterial(submittedLists[0], beforeDisk,
+                                 prefix + "burst0", prefix + "burst1");
+            CheckShippedMaterial(submittedLists[1], beforeCylinder,
+                                 prefix + "burst0", prefix + "burst1");
+          } else {
+            assert(submittedLists.empty() && gfx.polyXlu.p == xlu);
+          }
+          if (headroom)
+            assert(drawn);
+          faithfulArena = false;
+        }
+      }
+    }
+  }
+  shippedResources = false;
+  ResetDraw();
+  std::puts("PASS actual shipped themes at both levels, authored shell "
+            "preservation and fallback");
 }
 
 static void CheckNativeAccents() {
@@ -226,11 +374,14 @@ static void CheckNativeAccents() {
       for (const Gfx *command = xlu; command < gfx.polyXlu.p; ++command)
         assert((command->words.w0 >> 24) != 0xdb); // No segment mutation.
       assert(((gfx.polyXlu.p - 1)->words.w0 >> 24) == 0xda);
-      assert((gfx.polyXlu.p - 1)->words.w1 ==
-             (uintptr_t)matrixSnapshots[0].first); // Parent GPU matrix restored.
-      assert(particleColors[0] == (element == 1 ? 0xff8c2d
-                                : element == 2 ? 0x91e1ff : 0xfff2aa));
-      assert(particleAlphas[0] == 85); // Native material cannot replace the fade with 255.
+      assert(
+          (gfx.polyXlu.p - 1)->words.w1 ==
+          (uintptr_t)matrixSnapshots[0].first); // Parent GPU matrix restored.
+      assert(particleColors[0] == (element == 1   ? 0xff8c2d
+                                   : element == 2 ? 0x91e1ff
+                                                  : 0xfff2aa));
+      assert(particleAlphas[0] ==
+             85); // Native material cannot replace the fade with 255.
       ResetDraw();
       CwSpinAccents_DrawCharge(&play, element, great, 0, 1);
       assert(AccentDraws() == (great ? 8u : 4u));
@@ -265,12 +416,15 @@ static void CheckNativeAccents() {
   assert(!CwSpinAccents_NativeMaterial(nullptr, uninspected, 14, scroll));
   uninspected[11].words.w0 = 0xda000003;
   assert(!CwSpinAccents_NativeMaterial(nullptr, uninspected, 14, scroll));
-  assert(!CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 3, scroll));
-  assert(!CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 129, scroll));
+  assert(
+      !CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 3, scroll));
+  assert(
+      !CwSpinAccents_NativeMaterial(nullptr, accentNativeList[0], 129, scroll));
   ResetDraw();
   CwSpinAccents_DrawLimited(&play, 1, 1, .3f, .5f, 8, 0xe61946);
   assert(AccentDraws() == 8 && submittedLists[0][1].words.w1 == 3);
-  assert(particleColors[0] == 0xe61946); // Native crimson sparks, not red flame fans.
+  assert(particleColors[0] ==
+         0xe61946); // Native crimson sparks, not red flame fans.
   for (int failure = 0; failure < 3; ++failure) {
     ResetDraw();
     accentMissing = failure == 0;
@@ -293,9 +447,17 @@ static void CheckNativeAccents() {
   // Camera changes affect flame/sparkle orientation; a shard remains a 3D
   // object in the scaled parent frame. Hand-computed rotated/scaled fixture.
   MtxF parent = {}, camera = {}, model;
-  parent.xy = -3; parent.yx = 2; parent.zz = 4; parent.ww = 1;
-  parent.xw = 100; parent.yw = 200; parent.zw = 300;
-  camera.zx = -1; camera.yy = 1; camera.xz = 1; camera.ww = 1;
+  parent.xy = -3;
+  parent.yx = 2;
+  parent.zz = 4;
+  parent.ww = 1;
+  parent.xw = 100;
+  parent.yw = 200;
+  parent.zw = 300;
+  camera.zx = -1;
+  camera.yy = 1;
+  camera.xz = 1;
+  camera.ww = 1;
   CwSpinAccentParticle p = {10, 20, 30, 16, 255, 255, 255, 255};
   CwSpinAccents_NativeModel(&model, &parent, &camera, &p, 2, 0, 0);
   assert(model.xw == 40 && model.yw == 220 && model.zw == 420);
@@ -318,7 +480,7 @@ static void CheckBurstTemporalMotion() {
   for (int element = 0; element <= 3; ++element) {
     for (int great = 0; great <= 1; ++great) {
       auto visual = CwSpinStyle_Resolve(element ? CW_SPIN_STYLE_LIGHTNING
-                                               : CW_SPIN_STYLE_DARK_ENERGY,
+                                                : CW_SPIN_STYLE_DARK_ENERGY,
                                         1, element, 1);
       ResetDraw();
       play.gameplayFrames = 10;
@@ -337,8 +499,8 @@ static void CheckBurstTemporalMotion() {
                          (a.yw - b.yw) * (a.yw - b.yw) +
                          (a.zw - b.zw) * (a.zw - b.zw)) < 350);
         const float axes[][6] = {{a.xx, a.yx, a.zx, b.xx, b.yx, b.zx},
-                                  {a.xy, a.yy, a.zy, b.xy, b.yy, b.zy},
-                                  {a.xz, a.yz, a.zz, b.xz, b.yz, b.zz}};
+                                 {a.xy, a.yy, a.zy, b.xy, b.yy, b.zy},
+                                 {a.xz, a.yz, a.zz, b.xz, b.yz, b.zz}};
         for (const auto &v : axes) {
           float from = 0, to = 0, midpoint = 0;
           for (int j = 0; j < 3; ++j) {
@@ -348,8 +510,8 @@ static void CheckBurstTemporalMotion() {
           }
           // The real frame interpolator lerps these matrix axes. A large
           // per-tick turn collapses a shard/sparkle between rendered frames.
-          assert(std::sqrt(midpoint) > .98f *
-                                             (std::sqrt(from) + std::sqrt(to)) * .5f);
+          assert(std::sqrt(midpoint) >
+                 .98f * (std::sqrt(from) + std::sqrt(to)) * .5f);
         }
       }
     }
@@ -445,27 +607,12 @@ int main() {
   CheckNativeAccents();
   CheckBurstTemporalMotion();
   std::memcpy(nativeList, copy, sizeof(nativeList));
-  privateList[0].words.w0 = 0xE7000000;
-  privateList[1].words.w0 = 0xDF000000;
-  for (auto style : {CW_SPIN_STYLE_ICE, CW_SPIN_STYLE_LIGHT}) {
-    for (int great = 0; great <= 1; ++great) {
-      ResetDraw();
-      // Their authored circular shells carry the texture masks and UV state.
-      // Cloning the native shell here discards that material/geometry graph.
-      assert(CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(style, 0, 0, 1),
-                              great, .5f, "native0", "native1"));
-      assert(submittedLists.size() == 2 && submittedLists[0] == privateList &&
-             submittedLists[1] == privateList);
-      assert(gfx.polyOpa.p == opa &&
-             gfx.polyOpa.d == (Gfx *)(allocation + sizeof(allocation)));
-      missing = true;
-      ResetDraw();
-      assert(!CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(style, 0, 0, 1),
-                               great, .5f, "native0", "native1"));
-      assert(submittedLists.empty() && gfx.polyXlu.p == xlu);
-      missing = false;
-    }
-  }
+  privateList[0].words.w0 = privateList[2].words.w0 = 0x20900000;
+  privateList[1].words.w0 = privateList[3].words.w0 = 0x12345678;
+  privateList[1].words.w1 = privateList[3].words.w1 = 0x9abcdef0;
+  privateList[4].words.w0 = 0xE7000000;
+  privateList[5].words.w0 = 0xDF000000;
+  CheckShippedThemeBindings();
   for (unsigned element = 1; element <= 3; ++element) {
     ResetDraw();
     assert(CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(0, 1, element, 1), 0,

@@ -39,9 +39,11 @@ struct LockMesh {
     bool valid = false;
 };
 
-inline LockMesh BuildLock(const Frame& frame, uint32_t tick, bool selected) {
+// Padding changes the clearance and ribbon thickness, preserving the captured
+// model's size. Ordinary callers retain the original fit at paddingScale=1.
+inline LockMesh BuildLock(const Frame& frame, uint32_t tick, bool selected, float paddingScale = 1.f) {
     LockMesh mesh;
-    if (!frame.valid)
+    if (!frame.valid || !Finite(paddingScale) || paddingScale <= 0)
         return mesh;
     const float low[] = { frame.minimum.x, frame.minimum.y, frame.minimum.z };
     const float high[] = { frame.maximum.x, frame.maximum.y, frame.maximum.z };
@@ -57,10 +59,10 @@ inline LockMesh BuildLock(const Frame& frame, uint32_t tick, bool selected) {
     if (!Finite(mesh.center))
         return mesh;
     mesh.color = selected ? std::array<uint8_t, 4>{ 220, 170, 255, 165 } : std::array<uint8_t, 4>{ 185, 120, 250, 140 };
-    const float rx = (std::max(half[0], 2.4f) + 1.4f) / .875f;
-    const float ry = (std::max(half[1], 3.2f) + 1.4f) / .875f;
-    const float rz = (std::max(half[2], 2.4f) + 1.4f) / .875f;
-    const float width = std::clamp(std::min(half[0], half[1]) * .07f, .5f, .85f);
+    const float rx = (std::max(half[0], 2.4f * paddingScale) + 1.4f * paddingScale) / .875f;
+    const float ry = (std::max(half[1], 3.2f * paddingScale) + 1.4f * paddingScale) / .875f;
+    const float rz = (std::max(half[2], 2.4f * paddingScale) + 1.4f * paddingScale) / .875f;
+    const float width = std::clamp(std::min(half[0], half[1]) * .07f, .5f * paddingScale, .85f * paddingScale);
     const float length = std::hypot(rx, ry);
     constexpr float corners[kLockSegments][2] = { { 1, .75f },   { .75f, 1 },   { -.75f, 1 }, { -1, .75f },
                                                   { -1, -.75f }, { -.75f, -1 }, { .75f, -1 }, { 1, -.75f } };
@@ -75,7 +77,7 @@ inline LockMesh BuildLock(const Frame& frame, uint32_t tick, bool selected) {
                 const float side = corner == 0 || corner == 3 ? -1.f : 1.f;
                 const float x = sign * rx * point[0] + side * wx;
                 const float y = ry * point[0] + side * wy;
-                const float z = (rz + loop * .45f) * point[1];
+                const float z = (rz + loop * .45f * paddingScale) * point[1];
                 mesh.vertices[(loop * kLockSegments + segment) * 4 + corner] = {
                     int16_t(std::lround(x * kLockVertexScale)), int16_t(std::lround(y * kLockVertexScale)),
                     int16_t(std::lround(z * kLockVertexScale)), int16_t(step * 512 + (loop ? -phase : phase)),

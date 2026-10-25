@@ -259,6 +259,13 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (raw.drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW &&
         (raw.neiEffect < 1 || raw.neiEffect > 3 || raw.dlistCount != 1 || raw.opCount != 0))
         return ComboForeignResolveOOT::Unknown;
+    if (raw.drawKind == CW_DRAW_KIND_SIMPLE) {
+        if (raw.opCount > 2)
+            return ComboForeignResolveOOT::Unknown;
+        for (int i = 0; i < raw.opCount; ++i)
+            if (raw.ops[i].op != CW_OP_ROTATE_X && raw.ops[i].op != CW_OP_ROTATE_Z)
+                return ComboForeignResolveOOT::Unknown;
+    }
     info.opCount = raw.opCount;
     memcpy(info.ops, raw.ops, sizeof(info.ops));
     info.stateDependent = raw.stateDependent != 0;
@@ -439,6 +446,17 @@ inline void MM_DrawForeignSimple(const ComboForeignDrawInfoOOT* info) {
     int32_t n = info->count;
     int32_t xs = (info->xluStart < 0 || info->xluStart > n) ? n : info->xluStart;
     GraphicsContext* gfxCtx = gPlayState->state.gfxCtx;
+    const bool pose = info->drawKind == CW_DRAW_KIND_SIMPLE && info->opCount > 0;
+    if (pose) {
+        Matrix_Push();
+        for (int i = 0; i < info->opCount; ++i) {
+            const auto& op = info->ops[i];
+            if (op.op == CW_OP_ROTATE_Z)
+                Matrix_RotateZF(op.a * (3.14159265358979323846f / 32768.f), MTXMODE_APPLY);
+            else if (op.op == CW_OP_ROTATE_X)
+                Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.f), MTXMODE_APPLY);
+        }
+    }
     OPEN_DISPS(gfxCtx);
     if (info->scale > 0.0f) {
         Matrix_Scale(info->scale, info->scale, info->scale, MTXMODE_APPLY);
@@ -484,6 +502,8 @@ inline void MM_DrawForeignSimple(const ComboForeignDrawInfoOOT* info) {
         }
     }
     CLOSE_DISPS(gfxCtx);
+    if (pose)
+        Matrix_Pop();
 }
 
 // Biggoron's / Broken Goron's Sword: seg8 OPA scroll (z_draw.c GetItem_DrawGoronSword).

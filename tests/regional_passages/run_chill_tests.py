@@ -21,8 +21,26 @@ ENV=dict(os.environ)
 if ENV.get('COMBO_NEI_FIXTURE_CPATH'):ENV['CPATH']=ENV['COMBO_NEI_FIXTURE_CPATH']+os.pathsep+ENV.get('CPATH','')
 source=(ROOT/'soh/soh/Enhancements/Gameplay/ComboFountainSnowheadBridge.cpp').read_text()
 production=block_from(source,source.index('bool Fountain('))
-if 'void DrawLocalChill('in source:production+='\n'+block_from(source,source.rindex('void DrawLocalChill('))
-else:production+='\nvoid DrawLocalChill(Actor*,PlayState*) {}\n'
+production+='\nvoid DrawLocalChill(Actor*,PlayState*);\n'+block_from(source,source.index('void Draw('))
+production+='\n'+block_from(source,source.rindex('void DrawLocalChill('))
+rcp=(ROOT/'soh/src/code/z_rcp.c').read_text()
+setup=block_from(rcp,rcp.index('Gfx sSetupDL['))+';\n'
+setup+='\n'.join(block_from(rcp,rcp.index(name)) for name in ('void Gfx_SetupDL_25Opa(', 'void Gfx_SetupDL_25Xlu('))
+wrappers=(ROOT/'soh/soh/GbiWrap.cpp').read_text()
+setup+='\n'+block_from(wrappers,wrappers.index('extern "C" void gSPDisplayList('))
+interpreter=(ROOT/'libultraship/src/fast/interpreter.cpp').read_text()
+header=(ROOT/'libultraship/include/fast/interpreter.h').read_text()
+combiner='\n'.join(block_from(header,header.index(name))+';' for name in (
+ 'enum {\n    SHADER_0', 'enum class ShaderOpts', 'struct ColorCombinerKey', 'struct ColorCombiner {', 'struct RGBA {'))
+combiner+='\n#define SHADER_OPT(opt) ((uint64_t)(1 << static_cast<int>(ShaderOpts::opt)))\n'
+live=interpreter[interpreter.index('void Interpreter::GfxDpSetCombineMode('):]
+shader='\n'.join(block_from(live,live.index(name)) for name in (
+ 'static inline uint32_t color_comb(', 'static inline uint32_t alpha_comb('))
+shader+='\n'+'\n'.join(block_from(interpreter,interpreter.index(name)) for name in (
+ 'void Interpreter::GenerateCC(', 'void Interpreter::GfxDpSetCombineMode(', 'bool gfx_set_combine_handler_rdp('))
+shader=shader.replace('Interpreter','MaskShader')
+packed_start=interpreter.index('for (int j = 0; j < numInputs; j++)')
+packed=block_from(interpreter,packed_start)
 ice=(ROOT/'soh/src/overlays/effects/ovl_Effect_Ss_Ice_Smoke/z_eff_ss_ice_smoke.c').read_text()
 scene=(ROOT/'soh/src/code/z_scene.c').read_text();lib=(ROOT/'soh/src/code/z_lib.c').read_text()
 def definition(src,head):
@@ -45,6 +63,8 @@ flags=['-w','-DCOMBO_BUILD','-DF3DEX_GBI_2','-DFMT_HEADER_ONLY','-fsanitize=addr
 with tempfile.TemporaryDirectory(prefix='snowhead-chill-')as td:
  td=Path(td);c=td/'native.c';c.write_text(native);o=td/'native.o'
  subprocess.run([os.environ.get('CC','cc'),'-std=gnu11',*flags,'-c',str(c),'-o',str(o)],check=True,env=ENV)
- cpp=td/'test.cpp';cpp.write_text((ROOT/'tests/regional_passages/chill_native_test.cpp').read_text().replace('/* PRODUCTION */',production));binary=td/'test'
+ fixture=(ROOT/'tests/regional_passages/chill_native_test.cpp').read_text()
+ for marker,value in [('NATIVE_SETUP',setup),('PRODUCTION',production),('NATIVE_COMBINER',combiner),('NATIVE_SHADER',shader),('NATIVE_PACKED_INPUTS',packed)]:fixture=fixture.replace('/* '+marker+' */',value)
+ cpp=td/'test.cpp';cpp.write_text(fixture);binary=td/'test'
  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags,str(cpp),str(o),'-o',str(binary)],check=True,env=ENV)
  subprocess.run([str(binary)],check=True,env={**ENV,'ASAN_OPTIONS':'detect_leaks=0'})

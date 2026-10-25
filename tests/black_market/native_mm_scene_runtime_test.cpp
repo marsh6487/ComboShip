@@ -67,6 +67,10 @@ std::shared_ptr<Ship::IResource> ResourceLoad(const char* name) {
     return altEnabled && altResource ? altResource : baseResource;
 }
 
+static bool sGrannyActive;
+static RoomShape sGrannyShape{};
+static RoomShape* sGrannyOriginal;
+
 /* PRODUCTION READINESS */
 
 struct SceneResources {
@@ -111,6 +115,9 @@ static SceneResources Reset() {
     sSceneCutsceneList = nullptr;
     sSceneCutsceneCount = 0;
     altEnabled = false;
+    sGrannyActive = false;
+    sGrannyShape = {};
+    sGrannyOriginal = nullptr;
     loads = enteredNativeCutscenes = 0;
     Require(activeManager == "foreign" && previousManagers.empty(), "resource manager scope leaked");
     auto resources = ReadScene();
@@ -317,6 +324,32 @@ static void RoomPresentationCases() {
     Reset(); altEnabled = true;
     GuardedNativeLookup(true, "native companion presentation with Alt enabled");
 }
+static void GrannyPresentationCases() {
+    Reset();
+    sGrannyOriginal = play.roomCtx.curRoom.roomShape;
+    play.roomCtx.curRoom.roomShape = &sGrannyShape;
+    sGrannyActive = true;
+    GuardedNativeLookup(true, "owned Granny shape preserves validated native shop initialization");
+    Reset();
+    sGrannyOriginal = play.roomCtx.curRoom.roomShape;
+    play.roomCtx.curRoom.roomShape = &sGrannyShape;
+    GuardedNativeLookup(false, "inactive Granny replacement cannot bypass room identity");
+    Reset();
+    sGrannyActive = true;
+    play.roomCtx.curRoom.roomShape = &sGrannyShape;
+    GuardedNativeLookup(false, "Granny replacement without the original owner is rejected");
+    Reset();
+    RoomShape foreign{};
+    sGrannyActive = true;
+    sGrannyOriginal = &foreign;
+    play.roomCtx.curRoom.roomShape = &sGrannyShape;
+    GuardedNativeLookup(false, "Granny from another room is rejected");
+    Reset();
+    sGrannyActive = true;
+    sGrannyOriginal = play.roomCtx.curRoom.roomShape;
+    play.roomCtx.curRoom.roomShape = &foreign;
+    GuardedNativeLookup(false, "foreign replacement after Granny activation is rejected");
+}
 int main(int argc, char** argv) {
     try {
         Require(argc == 4, "expected prepared native camera, cutscene and mesh command files");
@@ -328,6 +361,7 @@ int main(int argc, char** argv) {
         CameraAndCutsceneCases();
         SelectedResourceAndLifetimeCases();
         RoomPresentationCases();
+        GrannyPresentationCases();
         std::cout << "PASS exact production MM scene readiness: " << cases
                   << " typed/count/metadata/pointer/Alt/lifetime cases before real native GetCutscenes\n";
         return 0;

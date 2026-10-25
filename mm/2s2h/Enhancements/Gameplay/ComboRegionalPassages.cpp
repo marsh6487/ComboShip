@@ -18,12 +18,21 @@ struct Passage {
 } sRegional;
 PlayState* sEntrancePlay = nullptr;
 unsigned sEntranceCount = 0;
+struct Arrival {
+    const Placement* placement = nullptr;
+    int slot = -1, entrance = -1;
+    u32 seed = 0;
+} sArrival;
+// Scene resources are cached across owl warps. Keep the bridge-only start
+// params in a module-owned copy, alive through native player initialization.
+ActorEntry sArrivalSpawn{};
 } // namespace
 
 extern "C" void ComboRegionalPassagesMm_Reset(void) {
     sRegional = {};
     sEntrancePlay = nullptr;
     sEntranceCount = 0;
+    sArrival = {};
 }
 extern "C" void ComboRegionalPassagesMm_ReadEntrances(PlayState* play, unsigned count) {
     // Scene headers can reuse the same PlayState arena. The next spawn command
@@ -34,6 +43,8 @@ extern "C" void ComboRegionalPassagesMm_ReadEntrances(PlayState* play, unsigned 
 }
 extern "C" void ComboRegionalPassagesMm_ReadSpawns(PlayState* play, const ActorEntry* entries, unsigned count) {
     sRegional = {};
+    const auto arrival = sArrival;
+    sArrival = {};
     if (!Combo_IsCombinedGame() || !play || !entries || !play->setupEntranceList || !count || sEntrancePlay != play)
         return;
     const auto* placement = ComboMmRegional::ForScene(play->sceneId);
@@ -42,8 +53,20 @@ extern "C" void ComboRegionalPassagesMm_ReadSpawns(PlayState* play, const ActorE
     const auto native = play->setupEntranceList[placement->entrance];
     if (native.spawn >= count || native.room != placement->room)
         return;
-    // The native entrance chooses arrival/start animation/camera. The authored
-    // endpoint never follows spawn mutations or searches for a nearby wall.
+    if (arrival.placement == placement && arrival.slot == gSaveContext.fileNum &&
+        arrival.seed == gSaveContext.save.shipSaveInfo.rando.finalSeed &&
+        arrival.entrance == gSaveContext.save.entrance && play->curSpawn == placement->entrance &&
+        gSaveContext.gameMode == GAMEMODE_NORMAL && ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) &&
+        gSaveContext.respawnFlag == 0 && gSaveContext.save.cutsceneIndex == 0 &&
+        gSaveContext.save.shipSaveInfo.pauseSaveEntrance == -1 && !gSaveContext.save.isOwlSave &&
+        play->linkActorEntry == &entries[native.spawn] &&
+        PLAYER_GET_START_MODE(play->linkActorEntry) == PLAYER_START_MODE_OWL) {
+        sArrivalSpawn = *play->linkActorEntry;
+        sArrivalSpawn.params = PLAYER_PARAMS(sArrivalSpawn.params, PLAYER_START_MODE_F);
+        play->linkActorEntry = &sArrivalSpawn;
+    }
+    // Retain the native entrance pose/camera. Only the queued Snowhead handoff
+    // replaces owl flight; the authored return mouth never follows spawn edits.
     sRegional.play = play;
     sRegional.placement = placement;
     sRegional.slot = gSaveContext.fileNum;
@@ -80,8 +103,8 @@ extern "C" int ComboRegionalPassagesMm_ApplyArrival(int route) {
         return 0;
     const auto* placement =
         ComboMmRegional::ForArrival(route, CHECK_WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE));
-    // These native approach records own floor, facing, start animation and
-    // camera. No respawn coordinates or cycle/progression flags are rewritten.
+    // These native approach records own floor, facing and camera. No respawn
+    // coordinates or cycle/progression flags are rewritten.
     gSaveContext.save.entrance = placement->scene == SCENE_IKANAMAE   ? ENTRANCE(ROAD_TO_IKANA, placement->entrance)
                                  : placement->scene == SCENE_30GYOSON ? ENTRANCE(GREAT_BAY_COAST, placement->entrance)
                                  : placement->scene == SCENE_10YUKIYAMANOMURA2
@@ -91,11 +114,14 @@ extern "C" int ComboRegionalPassagesMm_ApplyArrival(int route) {
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     gSaveContext.cutsceneTrigger = 0;
     // A portal checkpoint retains its ordinary resume marker. This explicit
-    // destination replaces that resume, so let Player_Init dispatch the native
-    // entrance start mode (including the mountain owl approach), not mode D.
+    // destination replaces that resume, so use the bridge's normal start mode
+    // rather than inheriting the saved-session marker's stationary mode D.
     gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
     gSaveContext.save.isOwlSave = false;
     gSaveContext.respawnFlag = 0;
+    sArrival = route == COMBO_PORTAL_SNOWHEAD ? Arrival{ placement, gSaveContext.fileNum, gSaveContext.save.entrance,
+                                                         gSaveContext.save.shipSaveInfo.rando.finalSeed }
+                                              : Arrival{};
     return 1;
 }
 #endif

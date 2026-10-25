@@ -14,6 +14,8 @@ inline constexpr int16_t kLetterboxSize = 32;
 inline constexpr const char* kPresentationResources[] = {
     "custom/skiejer_market/mm_shop_presentation_v1/room",
     "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548",
+    "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548_tri_0",
+    "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548_vtx_0",
     "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548_tri_15",
     "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548_vtx_15",
     "custom/skiejer_market/mm_shop_presentation_v1/geometry/mahouya_room_0DL_006548_tri_17",
@@ -44,7 +46,7 @@ inline constexpr int16_t kCutsceneCameras[4] = { 0, 2, 3, 1 };
 // Straight native shelf-to-selection motion: room endpoints only, right then
 // left bank. Camera eye, pitch and FOV do not follow the selected item.
 inline constexpr float kSelectedTargets[2][3] = {
-    { 38.0f, 53.0f, 96.0f },
-    { -38.0f, 53.0f, 96.0f },
+    { 39.25982f, 53.0f, 92.0f },
+    { -39.25982f, 53.0f, 92.0f },
 };
 } // namespace BlackMarketMmShopScene

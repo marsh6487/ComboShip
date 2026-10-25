@@ -33,9 +33,13 @@ inline void DrawAppearance() {
             ImGui::TextWrapped("Regular interior unavailable: %s Black Market room retained.", error);
     }
     bool magicalRoom = CVarGetInteger(BlackMarketRoomMagic::kCvar, 0) != 0;
-    if (ImGui::Checkbox("Magical Room Materials", &magicalRoom)) {
-        CVarSetInteger(BlackMarketRoomMagic::kCvar, magicalRoom ? 1 : 0);
-        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    {
+        WhatsNew::Scope releaseHighlight(BlackMarketRoomMagic::kCvar, "Magical Room Materials",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (ImGui::Checkbox("Magical Room Materials", &magicalRoom)) {
+            CVarSetInteger(BlackMarketRoomMagic::kCvar, magicalRoom ? 1 : 0);
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        }
     }
     ImGui::SetItemTooltip("Use the original scrolling magical room materials. Applies immediately; turn off to restore "
                           "the static room. Four World cosmetic colors control the room independently of shelves. "

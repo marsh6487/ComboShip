@@ -10,6 +10,10 @@
 #include <vector>
 #ifndef COUNTER_BARRIER_DISABLED
 #include "mm/2s2h/Enhancements/Gameplay/BlackMarketCounterBarrier.h"
+static BlackMarketCounterBarrier::Fixture sCounterBarrier;
+/* PRODUCTION BARRIER GUARD */
+#else
+extern "C" int ComboBlackMarket_IsCounterBarrier(const CollisionContext*, int) { return false; }
 #endif
 
 // Native internal entry point: the same dynamic wall resolver used by MM's
@@ -18,11 +22,15 @@ extern "C" s32 BgCheck_SphVsDynaWall(CollisionContext*, u16, f32*, f32*, Vec3f*,
                                      CollisionPoly**, s32*, Actor*);
 static std::vector<void*> allocations;
 static int talkQueues;
+static bool climbCheat;
+static s32 climbableSlateBg = -1;
 extern "C" {
 uintptr_t gSegments[16]{};
 u8 gMogmaMittsClimbActive = 0;
-u8 Slate_IsClimbableBgId(s32) { return false; }
-bool GameInteractor_Should(GIVanillaBehavior, uint32_t result, ...) { return result; }
+u8 Slate_IsClimbableBgId(s32 bg) { return bg == climbableSlateBg; }
+bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) {
+    return behavior == VB_BE_CLIMBABLE_SURFACE ? climbCheat : result;
+}
 bool Player_InCsMode(PlayState*) { return false; }
 void CutsceneManager_Queue(s16 id) { assert(id == CS_ID_GLOBAL_TALK); ++talkQueues; }
 void* THA_AllocTailAlign(TwoHeadArena*, size_t size, uintptr_t) {
@@ -129,7 +137,7 @@ int main(int argc, char** argv) {
     std::array<float, 6> floorBefore{};
     for (size_t i = 0; i < floorPoints.size(); ++i) floorBefore[i] = Floor(play, floorPoints[i]);
 #ifndef COUNTER_BARRIER_DISABLED
-    BlackMarketCounterBarrier::Fixture barrier;
+    auto& barrier = sCounterBarrier;
     assert(!barrier.Ensure(nullptr));
     const auto arenaAllocations = allocations.size();
     const auto bgActorCount = play.actorCtx.actorLists[ACTORCAT_BG].length;
@@ -176,6 +184,20 @@ int main(int argc, char** argv) {
         assert(!SurfaceType_CheckWallFlag2(&play.colCtx, poly, front.bg));
         assert(SurfaceType_GetBgCamIndex(&play.colCtx, poly, front.bg) == 0);
         assert(BgCheck_GetBgCamSettingImpl(&play.colCtx, 0, front.bg) == CAM_SET_NONE);
+        const auto ordinary = Line(play, { 0, 60, 135 }, { 200, 60, 135 });
+        assert(ordinary.hit && ordinary.bg == BGCHECK_SCENE);
+        for (int source = 0; source < 3; ++source) {
+            gMogmaMittsClimbActive = source == 0;
+            climbCheat = source == 1;
+            climbableSlateBg = source == 2 ? front.bg : -1;
+            assert(!(SurfaceType_GetWallFlags(&play.colCtx, poly, front.bg) & WALL_FLAG_3) &&
+                   "climbing powers must not turn the invisible counter barrier into a ladder");
+            if (source == 2) climbableSlateBg = BGCHECK_SCENE;
+            assert(SurfaceType_GetWallFlags(&play.colCtx, ordinary.poly, ordinary.bg) & WALL_FLAG_3);
+        }
+        gMogmaMittsClimbActive = 0;
+        climbCheat = false;
+        climbableSlateBg = -1;
     }
     // Probe the real raised counter ledge the player could previously mount.
     // Its floor stays at Y41, but the native forward probe at ledge + 5 now

@@ -14,6 +14,27 @@ import mm_native_shop
 import mm_shop_presentation as presentation
 import native_market
 
+REAR_PIECES = {
+    0: [([[49, 37, 24], [97, 37, 72]], 25, 36)],
+    2: [([[-120, 0, 0], [-62, 54, 54]], 116, 106),
+        ([[-103, 60, 42], [-92, 62, 53]], 20, 16),
+        ([[42, 0, 20], [105, 39, 79]], 94, 88)],
+    6: [([[-104, 51, 27], [-53, 62, 53]], 80, 60)],
+    18: [([[-114, 51, 2], [-69, 51, 47]], 30, 36)],
+}
+
+def triangle_indices(data):
+    cache, faces = {}, []
+    for node in ET.fromstring(data):
+        if node.tag == 'LoadVertices':
+            start, offset, count = [int(node.get(key)) for key in ('VertexBufferIndex', 'VertexOffset', 'Count')]
+            cache.update({start+i: offset+i for i in range(count)})
+        elif node.tag in ('Triangle1', 'Triangles2'):
+            for face in range(2 if node.tag == 'Triangles2' else 1):
+                faces.append((tuple(cache[int(node.get(f'V{face}{i}'))] for i in range(3)),
+                              int(node.get(f'Flag{face}', '0'))))
+    return faces
+
 
 class PrivateMmPresentation(unittest.TestCase):
     @classmethod
@@ -52,40 +73,22 @@ class PrivateMmPresentation(unittest.TestCase):
                         values[axis] = str(int(values[axis]) + offset)
                     moved += 1
                 self.assertEqual(values, last.attrib)
-        self.assertEqual(moved, 804)
+        self.assertEqual(moved, 558)
 
-    def test_complete_left_cauldron_clears_lower_stock_and_stays_inside_wall(self):
-        # The original connected pieces are the cauldron body, top attachment,
-        # long implement and liquid. Do not move only the first obstructing
-        # triangle or leave contents floating in their old location.
-        pieces = {
-            2: [[[-120, 0, 0], [-62, 54, 54]], [[-103, 60, 42], [-92, 62, 53]]],
-            6: [[[-104, 51, 27], [-53, 62, 53]]],
-            18: [[[-114, 51, 2], [-69, 51, 47]]],
-        }
-        displacements = set()
-        for suffix, bounds in pieces.items():
-            name = f'{presentation.GEOMETRY}_vtx_{suffix}'
-            original = list(ET.fromstring(self.original[name]))
-            candidate = list(ET.fromstring(self.candidate[presentation.CLONES[name]]))
-            parts = presentation.market_interior.vertex_components(self.original,
-                        f'{presentation.GEOMETRY}_tri_{suffix}')
-            for box in bounds:
-                matches = [part for part in parts if part['bounds'] == box]
-                self.assertEqual(len(matches), 1)
-                indices = matches[0]['indices']
-                xs = [int(candidate[index].get('X')) for index in indices]
-                zs = [int(candidate[index].get('Z')) for index in indices]
-                # Actual room wall is X=-160; the lower outer offer's complete
-                # .18 FrameFit/native seal reservation starts at X=-87.2039.
-                self.assertGreater(min(xs), -160)
-                self.assertLess(max(xs), -87.2039)
-                # The outer shelf ends at Z48; the customer barrier is Z130.
-                self.assertGreater(min(zs), 48)
-                self.assertLess(max(zs), 130)
-                displacements.update(tuple(int(candidate[index].get(axis)) - int(original[index].get(axis))
-                                           for axis in 'XYZ') for index in indices)
-        self.assertEqual(len(displacements), 1, 'all four pieces must remain one rigid cauldron')
+    def test_rear_cauldron_bodies_contents_and_attachments_are_removed_without_other_faces(self):
+        for suffix, pieces in REAR_PIECES.items():
+            name = f'{presentation.GEOMETRY}_tri_{suffix}'
+            parts = presentation.market_interior.vertex_components(self.original, name)
+            removed = set()
+            for bounds, count, triangles in pieces:
+                part = next(part for part in parts if part['bounds'] == bounds)
+                self.assertEqual((len(part['indices']), part['triangles']), (count, triangles))
+                removed.update(part['indices'])
+            before = triangle_indices(self.original[name])
+            after = triangle_indices(self.candidate.get(presentation.CLONES.get(name, name), b'<DisplayList/>'))
+            expected = [face for face in before if not any(v in removed for v in face[0])]
+            self.assertEqual(len(before)-len(expected), sum(piece[2] for piece in pieces))
+            self.assertEqual(after, expected, f'pot remnants or unrelated face loss in group {suffix}')
 
     def test_actual_mm_mesh_has_a_closed_resource_graph(self):
         data = mm_native_shop.native_commands(self.candidate[mm_native_shop.ROOM])[10]

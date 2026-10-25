@@ -1,3 +1,4 @@
+#include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
@@ -5738,6 +5739,24 @@ extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char*
         return NeiAssetPriority::GetGiModelBounds("mm", "mm", paths, count, minimum, maximum);
     }
     return NeiAssetPriority::GetGiModelBounds("mm", game, paths, count, minimum, maximum);
+}
+
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
+    auto owner = Ship::CrossRMRegistry::Get("mm");
+#ifndef COMBO_BUILD
+    if (!owner)
+        if (const auto context = Ship::Context::GetRawInstance())
+            owner = context->GetResourceManager();
+#endif
+    if (!owner)
+        return 0;
+    Ship::ResourceManagerScope scope(owner);
+    for (const char* path : { COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU }) {
+        const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
+        if (!model || model->Instructions.empty())
+            return 0;
+    }
+    return 1;
 }
 
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll) {

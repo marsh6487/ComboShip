@@ -48,9 +48,15 @@ def main():
                             "-c", str(source), "-o", str(obj)], check=True)
             objects.append(str(obj))
         test = work / "test.o"
+        production = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
+        guard = block_from(production, production.index('extern "C" int ComboBlackMarket_IsCounterBarrier('))
+        fixture = (ROOT / "tests/black_market/counter_barrier_native_test.cpp").read_text().replace(
+            "/* PRODUCTION BARRIER GUARD */", guard)
+        test_source = work / "test.cpp"
+        test_source.write_text(fixture)
         subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *common,
                         *(["-DCOUNTER_BARRIER_DISABLED"] if args.without_barrier else []),
-                        "-c", str(ROOT / "tests/black_market/counter_barrier_native_test.cpp"), "-o", str(test)], check=True)
+                        "-c", str(test_source), "-o", str(test)], check=True)
         binary = work / "test"
         subprocess.run([os.environ.get("CXX", "c++"), *objects, str(test), "-Wl,--gc-sections",
                         "-fsanitize=address,undefined", "-no-pie", "-lm", "-o", str(binary)], check=True)

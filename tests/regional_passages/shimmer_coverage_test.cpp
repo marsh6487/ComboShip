@@ -68,12 +68,24 @@ std::vector<Point2> LakeOpening() {
 std::vector<Point2> SnowheadOpening() {
   std::vector<Point2> points;
   using namespace ComboFountainSnowhead;
-  for (float across : {-kOpeningHalfWidth, kOpeningHalfWidth}) {
-    float floor = 0;
-    assert(
-        ComboFountainValley::FloorAt(kMouth.x - kShimmerFront, across, &floor));
-    points.push_back({across, floor - kMouth.y});
-    points.push_back({across, kOpeningHeight});
+  // Independently intersect the authored floor triangles with the shimmer
+  // plane. A doorway-width constant would let a narrow beacon test itself.
+  const float plane = kMouth.x - kShimmerFront;
+  for (const auto &triangle : ComboFountainValley::kTriangles) {
+    if (!triangle.floor)
+      continue;
+    const ComboFountainValley::Point vertices[] = {
+        triangle.a, triangle.b, triangle.c};
+    for (unsigned i = 0; i < 3; ++i) {
+      const auto a = vertices[i], b = vertices[(i + 1) % 3];
+      if (a.x == b.x || plane < std::min(a.x, b.x) ||
+          plane > std::max(a.x, b.x))
+        continue;
+      const float along = (plane - a.x) / (b.x - a.x);
+      const float across = a.z + along * (b.z - a.z);
+      points.push_back({across, a.y + along * (b.y - a.y) - kMouth.y});
+      points.push_back({across, kOpeningHeight});
+    }
   }
   return Hull(points);
 }
@@ -157,6 +169,26 @@ int main() {
         const auto fitted = RegionalPassagePresentation::Shimmer(
             frame, face.host, face.route, camera);
         assert(fitted.count == 1440);
+        if (face.host == Host::Oot && face.route == 7) {
+          std::vector<float> columns;
+          for (size_t first = 0; first < fitted.count; first += 72)
+            columns.push_back(fitted.vertices[first].p.x);
+          std::sort(columns.begin(), columns.end());
+          const auto banks = std::minmax_element(
+              face.boundary.begin(), face.boundary.end(),
+              [](Point2 a, Point2 b) { return a.x < b.x; });
+          if (columns.front() > banks.first->x + 20 ||
+              columns.back() < banks.second->x - 20) {
+            std::fprintf(stderr,
+                         "FAIL valley-wide shimmer: centers %g..%g, "
+                         "actual banks %g..%g\n", columns.front(),
+                         columns.back(), banks.first->x, banks.second->x);
+            assert(false && "shimmer must reach both valley banks");
+          }
+          for (size_t i = 1; i < columns.size(); ++i)
+            assert(columns[i] - columns[i - 1] < 80 &&
+                   "valley-wide shimmer must not leave large horizontal gaps");
+        }
         for (size_t i = 0; i < fitted.count; ++i) {
           const auto p = Packed(fitted.vertices[i].p);
           bool contained = Inside(face.boundary, p);
@@ -166,7 +198,6 @@ int main() {
                 ComboFountainValley::FloorAt(
                     ComboFountainSnowhead::kMouth.x - p.z, p.x, &y) &&
                 p.y + ComboFountainSnowhead::kMouth.y >= y - .01f &&
-                std::fabs(p.x) <= ComboFountainSnowhead::kOpeningHalfWidth &&
                 p.y <= ComboFountainSnowhead::kOpeningHeight;
           }
           if (!contained || p.z <= face.cap) {

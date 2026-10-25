@@ -11,6 +11,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_cumulative_native_ikana_and_silver_repairs_are_required(self):
+        tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
+        required = (
+            ("python3 -B tests/ikana_gi/run_native_priority_tests.py", "items"),
+            ("python3 -B tests/ikana_gi/run_native_availability_tests.py", "items"),
+            ("python3 -B tests/oot_equipment_pause/run_ikana_icon_tests.py", "items"),
+            ("ASAN_OPTIONS=detect_leaks=0 python3 -B tests/silver_rupee/run_tests.py --sanitize", "world"),
+        )
+        for command, suite in required:
+            with self.subTest(command=command):
+                owners = [task for task in tasks if command in task["run"].splitlines()]
+                self.assertEqual(len(owners), 1, f"native regression must remain required exactly once: {command}")
+                self.assertEqual(owners[0]["suite"], suite)
+
     def test_shared_geometry_runs_with_the_windows_sdk_before_configuration(self):
         command = "python -B tests/regional_passages/run_header_portability_tests.py --msvc --compiler cl"
         for path, job in (("build.yml", "build"), ("probe-custom-tex-scroll.yml", "compile-libultraship")):

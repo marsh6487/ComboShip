@@ -158,6 +158,25 @@ int main() {
          !gSaveContext.save.isOwlSave);
   gSaveContext.save.cutsceneIndex = 0xFFF0;
   assert(NativeStartMode(&player) == PLAYER_START_MODE_D);
+  const auto readPlayerSpawn = [&](const Placement *profile) {
+    play.sceneId = profile->scene;
+    play.curSpawn = profile->entrance;
+    auto &entry = entries[profile->entrance];
+    entry.pos = {s16(profile->nativeArrival.pos.x),
+                 s16(profile->nativeArrival.pos.y),
+                 s16(profile->nativeArrival.pos.z)};
+    entry.rot = {0, profile->nativeArrival.yaw, 0};
+    entry.params = PLAYER_PARAMS(
+        0xFF, profile->route == 7 ? PLAYER_START_MODE_OWL : PLAYER_START_MODE_F);
+    const auto nativeEntry = entry;
+    play.linkActorEntry = &entry;
+    ComboRegionalPassagesMm_ReadEntrances(&play, 10);
+    ComboRegionalPassagesMm_ReadSpawns(&play, entries, 9);
+    assert(!std::memcmp(&entry, &nativeEntry, sizeof(entry)) &&
+           "bridge arrivals must not mutate the cached native spawn");
+    player.actor.params = play.linkActorEntry->params;
+    return *play.linkActorEntry;
+  };
   for (int slot = 0; slot < 3; ++slot)
     for (int route = 5; route <= 7; ++route)
       for (int season = 0; season < 2; ++season)
@@ -173,10 +192,19 @@ int main() {
           const auto top = gSaveContext.respawn[RESPAWN_MODE_TOP],
                      ret = gSaveContext.respawn[RESPAWN_MODE_RETURN];
           assert(ComboRegionalPassagesMm_ApplyArrival(route));
-          player.actor.params = PLAYER_PARAMS(
-              0xFF, route == 7 ? PLAYER_START_MODE_OWL : PLAYER_START_MODE_F);
-          assert(NativeStartMode(&player) ==
-                 (route == 7 ? PLAYER_START_MODE_OWL : PLAYER_START_MODE_F));
+          const auto *profile = ForArrival(route, season);
+          const auto start = readPlayerSpawn(profile);
+          assert(NativeStartMode(&player) == PLAYER_START_MODE_F &&
+                 "every regional bridge must use an ordinary arrival, not owl flight");
+          if (route == 7) {
+            assert(start.pos.x == -649 && start.pos.y == 8 &&
+                   start.pos.z == -196 && start.rot.y == 20388 &&
+                   "normal arrival must keep the dry native mountain landing");
+            // A later ordinary owl warp using the same cached scene must
+            // keep the original owl mode: the bridge exception is one-shot.
+            readPlayerSpawn(profile);
+            assert(NativeStartMode(&player) == PLAYER_START_MODE_OWL);
+          }
           assert(gSaveContext.save.shipSaveInfo.pauseSaveEntrance == -1 &&
                  gSaveContext.save.cutsceneIndex == 0);
           assert(!std::memcmp(&top, &gSaveContext.respawn[RESPAWN_MODE_TOP],
@@ -185,9 +213,47 @@ int main() {
                               sizeof(ret)));
           assert(gSaveContext.save.playerForm == form);
         }
+  // Abandoned or superseded handoffs cannot change a later ordinary owl
+  // arrival, even when the same scene/resource/PlayState arena is reused.
+  for (int cancel = 0; cancel < 9; ++cancel) {
+    gSaveContext.fileNum = 0;
+    gSaveContext.save.shipSaveInfo.rando.finalSeed = 1234;
+    WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE >> 8) = 0;
+    assert(ComboRegionalPassagesMm_ApplyArrival(COMBO_PORTAL_SNOWHEAD));
+    const Placement *profile = &kMountainWinter;
+    switch (cancel) {
+    case 0: ComboRegionalPassagesMm_Reset(); break;
+    case 1: gSaveContext.fileNum = 1; break;
+    case 2: ++gSaveContext.save.shipSaveInfo.rando.finalSeed; break;
+    case 3: ++gSaveContext.save.entrance; break;
+    case 4: gSaveContext.respawnFlag = 2; break;
+    case 5: gSaveContext.save.isOwlSave = true; break;
+    case 6: profile = &kMountainSpring; break;
+    case 7: gSaveContext.save.cutsceneIndex = 0xFFF0; break;
+    case 8:
+      gSaveContext.save.shipSaveInfo.pauseSaveEntrance =
+          ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8);
+      break;
+    }
+    readPlayerSpawn(profile);
+    assert(PLAYER_GET_START_MODE(play.linkActorEntry) == PLAYER_START_MODE_OWL);
+    gSaveContext.fileNum = 0;
+    gSaveContext.save.shipSaveInfo.rando.finalSeed = 1234;
+    gSaveContext.save.entrance = ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8);
+    gSaveContext.respawnFlag = 0;
+    gSaveContext.save.isOwlSave = false;
+    gSaveContext.save.cutsceneIndex = 0;
+    gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+    readPlayerSpawn(&kMountainWinter);
+    assert(NativeStartMode(&player) == PLAYER_START_MODE_OWL &&
+           "cancelled bridge start must not leak into a later matching owl warp");
+  }
   puts("PASS extracted native Player_Init start decision: ordinary pause "
        "resume/cutscene controls; explicit regional checkpoint arrivals "
-       "dispatch native F/OWL for all routes, slots, forms and seasons");
+       "dispatch normal F for all routes, slots, forms and seasons; genuine "
+       "owl warps retain OWL and cached spawn art/poses remain unchanged");
+  puts("PASS bridge arrival cancellation: reset, slot/seed, destination, "
+       "respawn, owl save, scene, cutscene and pause-resume priority");
 #endif
   for (int mode : {COMBO_GAME_OOT, COMBO_GAME_MM}) {
     gComboGameMode = mode;

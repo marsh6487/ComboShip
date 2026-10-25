@@ -8,6 +8,8 @@ namespace ComboMmRegional {
 // supports the shell/apron; no scene mesh, floor, water or exit is replaced.
 // Rendering and mouth tests share this pose; native arrival uses the same
 // profile's original entrance, keeping its camera and player-start machinery.
+// Explicit Snowhead bridge arrivals substitute normal F start params in a
+// private spawn copy; the native cached owl entry remains unchanged.
 struct Placement {
     int scene, route, entrance, room;
     ComboRegional::Pose mouth, nativeArrival;

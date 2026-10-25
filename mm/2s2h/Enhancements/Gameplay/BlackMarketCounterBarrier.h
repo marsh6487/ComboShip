@@ -43,13 +43,19 @@ class Fixture {
         DynaPolyActor_Init(&mOwner, 0);
     }
 
+    bool Owns(const CollisionContext* context, s32 bgId) const {
+        if (!context || bgId < 0 || bgId >= BG_ACTOR_MAX)
+            return false;
+        const auto& dyna = context->dyna;
+        return (dyna.bgActorFlags[bgId] & BGACTOR_IN_USE) && !(dyna.bgActorFlags[bgId] & BGACTOR_1) &&
+               dyna.bgActors[bgId].actor == &mOwner.actor && dyna.bgActors[bgId].colHeader == &mCollision;
+    }
+
     int OwnedBgId(const PlayState* play) const {
         if (!play)
             return -1;
-        const auto& dyna = play->colCtx.dyna;
         for (int id = 0; id < BG_ACTOR_MAX; ++id) {
-            if ((dyna.bgActorFlags[id] & BGACTOR_IN_USE) && !(dyna.bgActorFlags[id] & BGACTOR_1) &&
-                dyna.bgActors[id].actor == &mOwner.actor && dyna.bgActors[id].colHeader == &mCollision)
+            if (Owns(&play->colCtx, id))
                 return id;
         }
         return -1;

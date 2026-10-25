@@ -27,6 +27,10 @@ inline const Point kMouth = Grounded(1840, 0);
 inline const Point kReturn = Grounded(1740, 0);
 constexpr float kOpeningHalfWidth = 100, kOpeningHeight = 180;
 constexpr float kShimmerFront = 10;
+// Visual cross-section of the whole valley, independent of the travel trigger.
+// These bounds retain floor support through the full six-unit billboard depth:
+// world X1824..1836 has a common floor span of Z-293.846..360.074.
+constexpr float kShimmerMinAcross = -293, kShimmerMaxAcross = 360;
 // Looking east into the valley, the southern bank is on the right. This
 // independent waterline scramble avoids the Ice Cavern apron entirely.
 inline constexpr Point kStations[] = { { 1000, 0, 850 },  { 1250, 70, 700 }, { 1400, 130, 500 }, { 1450, 180, 300 },
