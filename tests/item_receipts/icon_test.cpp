@@ -53,7 +53,7 @@ int main() {
     assert(std::strstr(icon.path, "Bow") && icon.width == 32);
     icon = {};
     assert(OOT_FillItemIconInfo(RG_EXT_SHIELD_OF_IKANA, &icon) == 1);
-    assert(std::strcmp(icon.path, "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex") == 0);
+    assert(std::strcmp(icon.path, "__OTR__textures/icon_item_custom/gItemIconShieldOfIkanaTex") == 0);
     assert(icon.width == 32 && icon.height == 32 && !icon.isIA8);
     gItemIcons[4] = (void*)"__OTR__textures/icon_item_static/gItemIconLongshotTex";
     const int before = liveReads;

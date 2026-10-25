@@ -58,7 +58,7 @@ def native_engine_source(observe=False):
     prefix += "\n".join(function(trig, signature) for signature in ("s16 sins(", "s16 coss("))
     prefix += "\n".join(function(lib, signature) for signature in (
         "f32 Math_SinS(", "f32 Math_CosS(", "void Math_Vec3f_Copy(", "void* Lib_SegmentedToVirtual(",
-        "void Math_ApproachF(", "s16 Math_SmoothStepToS("))
+        "void Math_ApproachF(", "s16 Math_SmoothStepToS(", "s32 Math_StepToIImpl(", "void Math_StepToIGet("))
     prefix += function(skin, "void SkinMatrix_Vec3fMtxFMultXYZW(")
     prefix += "\n".join(function(actor, signature) for signature in (
         "PosRot Actor_GetFocus(", "PosRot Actor_GetWorld(", "PosRot Actor_GetWorldPosShapeRot(",
@@ -68,7 +68,7 @@ def native_engine_source(observe=False):
         "VecSph OLib_Vec3fToVecSph(", "VecGeo OLib_Vec3fToVecGeo(",
         "VecGeo OLib_Vec3fDiffToVecGeo(", "Vec3f OLib_AddVecGeoToVec3f("))
     prefix += "\n".join(function(camera, signature) for signature in (
-        "s16 Camera_SetStateFlag(", "s16 Camera_UnsetStateFlag(", "f32 Camera_fabsf(",
+        "void Camera_UpdateInterface(", "s16 Camera_SetStateFlag(", "s16 Camera_UnsetStateFlag(", "f32 Camera_fabsf(",
         "f32 Camera_ScaledStepToCeilF(", "s16 Camera_ScaledStepToCeilS(",
         "void Camera_ScaledStepToCeilVec3f(", "void Camera_SetUpdateRatesSlow(",
         "void Camera_SetUpdateRatesFastPitch(", "Vec3f Camera_Vec3sToVec3f(",
@@ -149,7 +149,45 @@ def build_source():
         "void EnGirlA_DoNothing(", "s32 EnGirlA_TrySetMaskItemDescription(",
         "void EnGirlA_Update2(", "void EnGirlA_Update("))
     fixture = (ROOT / "tests/black_market/shop_camera_mm_test.cpp").read_text()
-    fixture = fixture.replace("/* NATIVE MM SUPPORT */", (ROOT / "tests/black_market/native_mm_shop_support.h").read_text())
+    # Exercise the real hook registry and Actor_Draw dispatch block. With the
+    # baseline's absent registration this intentionally leaves the actor visible.
+    hooks = "\n".join(block_from(source, match.start()) + ");" for match in re.finditer(
+        r"GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorDraw>", source))
+    interactor = (ROOT / "mm/2s2h/GameInteractor/GameInteractor.cpp").read_text()
+    gate = function(interactor, "bool GameInteractor_ShouldActorDraw(")
+    actor_source = (ROOT / "mm/src/code/z_actor.c").read_text()
+    dispatch = block_from(actor_source, actor_source.index("if (GameInteractor_ShouldActorDraw(actor))"))
+    fixture = fixture.replace("/* PRODUCTION PLAYER DRAW HOOK */", gate +
+        "\nvoid RegisterPlayerDrawHook() {\n" + hooks + "\n}\n" +
+        "void DrawPlayerBoundary(Actor* actor) { auto* play = gPlayState;\n" + dispatch + "\n}\n")
+    support = (ROOT / "tests/black_market/native_mm_shop_support.h").read_text()
+    shrink = (ROOT / "mm/src/code/z_shrink_window.c").read_text()
+    native_shrink = '#include "z64shrink_window.h"\n'
+    native_shrink += shrink[shrink.index("typedef struct {"):shrink.index("void ShrinkWindow_Letterbox_SetSizeTarget")]
+    for signature in ("void ShrinkWindow_Letterbox_SetSizeTarget(", "s32 ShrinkWindow_Letterbox_GetSizeTarget(",
+                      "void ShrinkWindow_Letterbox_SetSize(", "s32 ShrinkWindow_Letterbox_GetSize(",
+                      "void ShrinkWindow_Init(", "void ShrinkWindow_Update("):
+        body = function(shrink, signature)
+        if "SetSizeTarget(" in signature:
+            body = body.replace("{", "{\nlastLetterbox = target; ++letterboxCalls;", 1)
+        native_shrink += body + "\n"
+    support = support.replace(function(support, 'extern "C" void ShrinkWindow_Letterbox_SetSizeTarget('), native_shrink)
+    fixture = fixture.replace("/* NATIVE MM SUPPORT */", support)
+    inspection_hooks = "\n".join(block_from(source, match.start()) + ");" for match in re.finditer(
+        r"GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldVanillaBehavior>", source))
+    view = (ROOT / "mm/src/code/z_view.c").read_text()
+    boundary = '#undef GameInteractor_Should\n' + function(interactor, "bool GameInteractor_Should(")
+    boundary += "\nvoid RegisterInspectionLetterboxHook() {\n" + inspection_hooks + "\n}\n"
+    boundary += 's32 gScreenWidth = 320, gScreenHeight = 240;\n'
+    boundary += 'extern "C" int16_t OTRGetRectDimensionFromLeftEdge(float value) { return value; }\n'
+    boundary += 'extern "C" int16_t OTRGetRectDimensionFromRightEdge(float value) { return value; }\n'
+    boundary += function(view, "void View_SetScissor(") + "\n"
+    boundary += function(view, "void View_ApplyLetterbox(") + "\n"
+    boundary += function(shrink, "void ShrinkWindow_Draw(") + "\n"
+    user_bars = (ROOT / "mm/2s2h/Enhancements/Graphics/DisableBlackBars.cpp").read_text()
+    boundary += function(user_bars, "void RegisterDisableBlackBars(").replace(
+        "CVAR", 'CVarGetInteger("gEnhancements.Graphics.DisableBlackBars", 0)') + "\n"
+    fixture = fixture.replace("/* INSPECTION LETTERBOX BOUNDARY */", boundary)
     return fixture.replace("/* NATIVE CAMERA AND MANAGER */", native_engine_source(observe=True)).replace(
         "/* PRODUCTION CONSTANTS */", constants).replace("/* NATIVE STOCK UPDATE */", re.sub(r"\bthis\b", "self", item)).replace(
         "/* PRODUCTION ADAPTER */", production)
@@ -189,8 +227,9 @@ def check_selection_clearance(binary, temporary):
     relative = np.array(fixture['envelope'], dtype=float)
     paths = json.loads(subprocess.check_output([str(binary), 'selection-paths'], text=True,
                                               env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'}))
-    assert len(paths) == 8
-    for slot, frames in enumerate(paths):
+    assert len(paths) == 5 * 8
+    for case, frames in enumerate(paths):
+        form, slot = divmod(case, 8)
         for first, last in zip(frames, frames[1:]):
             start, end = np.array(first['position']), np.array(last['position'])
             # Each hull encloses the entire interval, including linear render
@@ -202,7 +241,7 @@ def check_selection_clearance(binary, temporary):
                 for name, triangles, minimum, maximum in geometry:
                     candidates = np.all(maximum >= low, axis=1) & np.all(minimum <= high, axis=1)
                     assert not any(triangle_box_intersects(face, low, high) for face in triangles[candidates]), (
-                        slot, name, 'native selection/return interval crosses geometry', a, b)
+                        form, slot, name, 'native selection/return interval crosses geometry', a, b)
                 # Use the real ported Data4 poses. Bound rendering
                 # interpolation at 1/32-frame resolution.
                 from check_browsing_frame import project
@@ -215,9 +254,9 @@ def check_selection_clearance(binary, temporary):
                     projected = np.array([project(corner, view) for corner in
                                           itertools.product(*zip(*(relative + point)))])
                     lo, hi = projected.min(0), projected.max(0)
-                    assert lo[0] > 8 and hi[0] < 312 and lo[1] > 34 and hi[1] < 138, (
-                        slot, 'actual native camera selection/return clips UI', fraction, lo, hi, view)
-    print(f'PASS all8 native selection/return paths: full private item/seal envelopes clear '
+                    assert lo[0] > 8 and hi[0] < 312 and lo[1] > max(first['visibleTop'], last['visibleTop']) and hi[1] < 138, (
+                        form, slot, 'actual native camera selection/return clips UI', fraction, lo, hi, view)
+    print(f'PASS all5 forms/all8 native selection/return paths: full private item/seal envelopes clear '
           f'{len(room)} actual room and {len(boards)} shelf triangles, including frame interpolation')
 
 

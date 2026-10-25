@@ -45,8 +45,10 @@ inline constexpr int16_t kCutsceneCameras[4] = { 0, 2, 3, 1 };
 
 // Straight native shelf-to-selection motion: room endpoints only, right then
 // left bank. Camera eye, pitch and FOV do not follow the selected item.
+// Inspection temporarily suppresses native letterbox clipping; this endpoint
+// retains the complete authored item/seal envelope above the unchanged textbox.
 inline constexpr float kSelectedTargets[2][3] = {
-    { 39.25982f, 53.0f, 92.0f },
-    { -39.25982f, 53.0f, 92.0f },
+    { 31.04f, 51.66f, 106.24f },
+    { -31.04f, 51.66f, 106.24f },
 };
 } // namespace BlackMarketMmShopScene

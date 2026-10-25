@@ -135,7 +135,11 @@ int main() {
     auto mm = std::make_shared<ResourceManager>();
     mm->observeOwner = true;
     CrossRMRegistry::owners["mm"] = mm;
-    const char* native = "icon_item_static_yar/gItemIconMirrorShieldTex";
+    const char* native = "textures/icon_item_custom/gItemIconShieldOfIkanaTex";
+    // Competing original Mirror mods must not override Ikana's private resource.
+    host->files["textures/icon_item_static/gItemIconShieldMirrorTex"] = std::make_shared<Fast::Texture>('O');
+    host->files["icon_item_static_yar/gItemIconMirrorShieldTex"] = std::make_shared<Fast::Texture>('X');
+    mm->files["icon_item_static_yar/gItemIconMirrorShieldTex"] = std::make_shared<Fast::Texture>('M');
     auto vanilla = std::make_shared<Fast::Texture>('V');
     auto hd = std::make_shared<Fast::Texture>('H', 512);
     auto wrongHost = std::make_shared<Fast::Texture>('X');
@@ -177,7 +181,7 @@ int main() {
     CrossRMRegistry::owners.erase("mm");
     gComboGameMode = COMBO_GAME_OOT;
     const auto soloIcon = const_cast<char*>(COMBO_IKANA_SHIELD_ICON);
-    assert(!std::strcmp(soloIcon, "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex") &&
+    assert(!std::strcmp(soloIcon, "__OTR__textures/icon_item_custom/gItemIconShieldOfIkanaTex") &&
            "runtime Solo OoT must use the local canonical MM icon instead of an absent MM owner");
     assert(PauseProbe(soloIcon) == soloIcon);
     CwItemReceiptPresentation receipt{};
@@ -190,7 +194,7 @@ int main() {
     CrossRMRegistry::owners["mm"] = mm;
     gComboGameMode = COMBO_GAME_MM;
     assert(!std::strcmp(COMBO_IKANA_SHIELD_ICON,
-                        "__OTR__@mm:icon_item_static_yar/gItemIconMirrorShieldTex"));
+                        "__OTR__@mm:textures/icon_item_custom/gItemIconShieldOfIkanaTex"));
     assert(PauseProbe(const_cast<char*>(COMBO_IKANA_SHIELD_ICON)));
     gComboGameMode = COMBO_GAME_BOTH;
     std::puts("PASS: vanilla/HD Ikana pause drawing, MM ownership, independent Alt states, context restoration, missing-resource rejection and routed DL/array probes");

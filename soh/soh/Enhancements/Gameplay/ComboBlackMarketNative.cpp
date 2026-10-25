@@ -11,6 +11,11 @@
 #include "BlackMarketNativeResources.h"
 #include "BlackMarketEntry.h"
 #include "BlackMarketExitDoor.h"
+#include "BlackMarketDoorCollision.h"
+extern "C" {
+#include "overlays/actors/ovl_En_Door/z_en_door.h"
+void EnDoor_Idle(EnDoor*, PlayState*);
+}
 #include "BlackMarketGrannyResources.h"
 #include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketBrowsing.h"
@@ -133,6 +138,36 @@ bool Active() {
     return Interior() && sSession.Active(gSaveContext.fileNum);
 }
 
+BlackMarketDoorCollision::Fixture<true> sDoorCollision;
+void SyncShopDoorCollision() {
+    auto* play = gPlayState;
+    if (!play || gGameState != &play->state || !play->state.running)
+        return;
+    // Custom native Open starts its transition immediately. Keep its explicit
+    // release for the whole handoff even if the actor is still idle this frame.
+    if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF) {
+        sDoorCollision.Release(play);
+        return;
+    }
+    Actor* closed = nullptr;
+    if (Interior())
+        closed = const_cast<Actor*>(BlackMarketExitDoor::Live<true>(play));
+    else if (Exterior(play)) {
+        OotBlackMarketDoorNative::Pose pose;
+        if (OotBlackMarketDoorNative::Find(play, pose))
+            for (auto* actor = play->actorCtx.actorLists[ACTORCAT_DOOR].head; actor; actor = actor->next)
+                if (OotBlackMarketDoorNative::Matches(actor, pose) && actor->update && actor->draw) {
+                    closed = actor;
+                    break;
+                }
+    }
+    if (closed) {
+        const auto* native = reinterpret_cast<const EnDoor*>(closed);
+        if (native->actionFunc != EnDoor_Idle || native->playerIsOpening)
+            closed = nullptr;
+    }
+    sDoorCollision.Ensure(play, closed);
+}
 BlackMarketGranny::Resources sGrannyResources;
 bool sGrannyPending = false, sGrannyActive = false;
 MeshHeader sGrannyShape{};
@@ -906,6 +941,7 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
         ClearRoomMagic();
         sShelfFixture.Reset();
+        sDoorCollision.Reset();
         EndBrowsing(gPlayState, true);
         InitBrowsingCameraScene(nullptr);
         CancelReceipt(true);
@@ -920,6 +956,9 @@ void RegisterNativeMarket() {
         ClearRoomMagic();
         sGrannyResources.Clear();
     });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(
+        ACTOR_EN_DOOR, [](void*) { SyncShopDoorCollision(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(SyncShopDoorCollision);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>([] {
         DrawGrannyRoom();
         BeginRoomMagic();
@@ -942,6 +981,7 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
         ClearRoomMagic();
         sShelfFixture.Reset();
+        sDoorCollision.Reset();
         EndBrowsing(gPlayState, true);
         CancelReceipt();
         sTitlePending = sTalking = sDoorArmed = sGrannyActive = sGrannyPending = false;
@@ -1076,6 +1116,7 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
             player->doorType != PLAYER_DOORTYPE_HANDLE || player->actionFunc != Player_Action_80845EF8 ||
             gSaveContext.health <= 0)
             return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+        sDoorCollision.Release(play);
         RememberTravel();
         sReturnPending = true;
         Transition(play, sReturnEntrance);
@@ -1107,6 +1148,7 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
         return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
     }
     LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_ENTERED, "native_open");
+    sDoorCollision.Release(play);
     // The native save worker must finish before publishing a new return point.
     SaveManager::Instance->ThreadPoolWait();
     sReturnPos = OotBlackMarketDoorNative::Outside(placed);

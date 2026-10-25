@@ -1,6 +1,7 @@
 #ifdef COMBO_BUILD
 #include "ComboRegionalPassages.h"
 #include "ComboGameMode.h"
+#include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #include "entrances/MmRegionalBridgePlacements.h"
 
 namespace {
@@ -64,9 +65,11 @@ extern "C" void ComboRegionalPassagesMm_ReadSpawns(PlayState* play, const ActorE
         sArrivalSpawn = *play->linkActorEntry;
         sArrivalSpawn.params = PLAYER_PARAMS(sArrivalSpawn.params, PLAYER_START_MODE_F);
         play->linkActorEntry = &sArrivalSpawn;
+        ComboForestArrivalCamera_Queue(COMBO_PORTAL_SNOWHEAD);
     }
-    // Retain the native entrance pose/camera. Only the queued Snowhead handoff
-    // replaces owl flight; the authored return mouth never follows spawn edits.
+    // Keep native player initialization and the cached owl pose intact. Only a
+    // matched Snowhead handoff queues the transactional exterior reveal; its
+    // floor/camera failure retains this dry native landing.
     sRegional.play = play;
     sRegional.placement = placement;
     sRegional.slot = gSaveContext.fileNum;

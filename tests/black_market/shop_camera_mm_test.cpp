@@ -1,4 +1,5 @@
 /* NATIVE MM SUPPORT */
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "combo/BlackMarketEntry.h"
 #include "combo/BlackMarketGraphicsArena.h"
 #include "combo/BlackMarketKeeper.h"
@@ -69,6 +70,54 @@ struct FixtureCounterBarrier { bool Ensure(PlayState*) { return true; } } sCount
 /* PRODUCTION CONSTANTS */
 /* NATIVE STOCK UPDATE */
 /* PRODUCTION ADAPTER */
+static GameInteractor drawHooks;
+GameInteractor* GameInteractor::Instance = &drawHooks;
+extern "C" u8 Hourglass_ShouldDrawGray(Actor*) { return false; }
+extern "C" void Hourglass_PushGray(PlayState*) { assert(false); }
+extern "C" void Hourglass_PopGray(PlayState*) { assert(false); }
+extern "C" void GameInteractor_ExecuteOnActorDraw(Actor*) {}
+/* PRODUCTION PLAYER DRAW HOOK */
+/* INSPECTION LETTERBOX BOUNDARY */
+static float lastFrameVisibleTop;
+static float NativeVisibleTop() {
+  // Run the real native scissor and rectangle writers in private command
+  // buffers, preserving the shop's cursor GBI and the actual view/projection.
+  GraphicsContext scratch{};
+  std::array<Gfx, 64> opa{}, xlu{}, overlay{};
+  scratch.polyOpa.p = opa.data();
+  scratch.polyOpa.d = opa.data() + opa.size();
+  scratch.polyXlu.p = xlu.data();
+  scratch.polyXlu.d = xlu.data() + xlu.size();
+  scratch.overlay.p = overlay.data();
+  scratch.overlay.d = overlay.data() + overlay.size();
+  View view = play.view;
+  view.gfxCtx = &scratch;
+  view.viewport = {0, 240, 0, 320};
+  const auto snapshot = view;
+  const auto current = ShrinkWindow_Letterbox_GetSize();
+  const auto target = ShrinkWindow_Letterbox_GetSizeTarget();
+  const auto visibleSize = std::clamp(current, 0, 120);
+  View_ApplyLetterbox(&view);
+  ShrinkWindow_Draw(&scratch);
+  int scissors = 0, rectangles = 0;
+  for (auto *p = opa.data(); p < scratch.polyOpa.p; ++p)
+    if ((p->words.w0 >> 24) == G_SETSCISSOR) {
+      ++scissors;
+      assert((p->words.w0 & 0xFFF) == u32(visibleSize * 4));
+    }
+  for (auto *p = overlay.data(); p < scratch.overlay.p; ++p)
+    if ((p->words.w0 >> 24) == G_FILLWIDERECT)
+      ++rectangles;
+  assert(!std::memcmp(&snapshot, &view, sizeof(View)));
+  assert(current == ShrinkWindow_Letterbox_GetSize() &&
+         target == ShrinkWindow_Letterbox_GetSizeTarget());
+  if (!scissors) {
+    assert(scratch.polyXlu.p == xlu.data() && !rectangles);
+    return 2;
+  }
+  assert(scissors == 1 && rectangles == (current > 0 ? 4 : 0));
+  return visibleSize + 2;
+}
 
 extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *state, s16 id, f32 x,
                               f32 y, f32 z, s16, s16, s16, s32 params) {
@@ -98,6 +147,10 @@ static void Reset() {
   stock = {};
   graphics = {};
   gSaveContext = {};
+  ShrinkWindow_Init();
+  userDisableBlackBars = false;
+  RegisterDisableBlackBars();
+  play.state.framerateDivisor = 3;
   gPlayState = &play;
   gGameState = &play.state;
   active = safe = receiptContext = sceneReady = true;
@@ -126,6 +179,7 @@ static void Reset() {
   ResetArena();
   gSaveContext.save.day = 1;
   player.transformation = PLAYER_FORM_HUMAN;
+  player.actor.id = ACTOR_PLAYER;
   player.actor.world.pos = {0, 0, 160};
   player.actor.floorPoly = &customerFloor;
   player.actor.floorBgId = BGCHECK_SCENE;
@@ -184,6 +238,7 @@ static void NativeFrame() {
   for (auto &item : stock)
     if (item.actor.update)
       item.actor.update(&item.actor, &play);
+  ShrinkWindow_Update(play.state.framerateDivisor);
   if (NativeShopOwnCamera(&play) &&
       Play_GetActiveCamId(&play) == sBrowseCamera) {
     assert(sBrowseCameraPtr->setting == CAM_SET_BLACK_MARKET_OOT &&
@@ -191,8 +246,10 @@ static void NativeFrame() {
     assert(sCameraSettings[sBrowseCameraPtr->setting].cameraModes[0].funcId ==
            CAM_FUNC_DATA4);
     assert(Camera_Data4(sBrowseCameraPtr));
+    Camera_UpdateInterface(sCameraInterfaceFlags);
   }
   KeeperDraw(&shop.actor, &play);
+  lastFrameVisibleTop = NativeVisibleTop();
   CutsceneManager_Update();
   CutsceneManager_ClearWaiting();
   play.state.input[0] = {};
@@ -578,6 +635,7 @@ static void CheckProductionReceipt() {
   assert(shop.actionFunc == EnOssan_BuyItemWithFanfare && sReceipt.pending &&
          purchases == 2);
   assert(!sTalking && !(player.stateFlags2 & PLAYER_STATE2_20000000));
+  assert(GameInteractor_ShouldActorDraw(&player.actor) && "native receipt releases replacement rendering");
   assert(CutsceneManager_GetCurrentCsId() == CS_ID_NONE &&
          Play_GetActiveCamId(&play) == CAM_ID_MAIN);
   for (int i = 0; i < 3; ++i)
@@ -800,131 +858,304 @@ static float ReferenceItemPixels(const Actor &item) {
   Actor_GetScreenPos(&play, &marker, &x, &top);
   return std::abs(bottom - top);
 }
-static void CheckSelectedItemLegibility() {
-  for (int slot = 0; slot < 8; ++slot) {
+static void CheckInspectionLetterboxBoundary() {
+  auto begin = [](int form, int slot) {
     Reset();
+    player.transformation = form;
     Talk();
     ReachSlot(-1);
     Stick(slot < 4 ? 80 : -80, 0);
     ReachSlot(slot < 4 ? 0 : 4);
-    for (int i = 0; i < 20; ++i)
+    for (int frame = 0; frame < 20; ++frame)
       NativeFrame();
     shop.cursorIndex = slot;
-    NativeFrame();
-    ProjectNativeCamera(*sBrowseCameraPtr);
-    const auto shelfPixels = ReferenceItemPixels(stock[slot].actor);
-    const auto shelfScale = stock[slot].actor.scale;
-    assert(
-        shelfPixels >= 16 &&
-        "shelf stock must remain visibly larger through actual native updates");
-    SelectItem();
-    ProjectNativeCamera(*sBrowseCameraPtr);
-    const auto selectedPixels = ReferenceItemPixels(stock[slot].actor);
-    std::fprintf(stderr, "slot%d shelf %.0fpx selected %.0fpx scale %.2f\n",
-                 slot, shelfPixels, selectedPixels, stock[slot].actor.scale.y);
-    // The shelf display itself is now closer. Preserve the established
-    // absolute confirmation size and substantial additional enlargement.
-    assert(selectedPixels >= 20 && selectedPixels >= 1.5f * shelfPixels &&
-           "confirmation must visibly enlarge merchandise, not leave it tiny");
-    Press(BTN_B);
-    for (int i = 0; i < 10; ++i)
+    assert(NativeVisibleTop() == 34);
+    Press(BTN_A);
+    assert(shop.actionFunc == EnOssan_SelectItem &&
+           shop.shopItemSelectedTween == 0);
+    assert(NativeVisibleTop() == 2 && "native scissor and bars must release "
+                                      "before the first selected motion");
+  };
+  for (int form = 0; form < 5; ++form)
+    for (int slot = 0; slot < 8; ++slot) {
+      begin(form, slot);
+      const auto eye = sBrowseCameraPtr->eye;
+      for (int frame = 0; frame < 6; ++frame) {
+        NativeFrame();
+        assert(lastFrameVisibleTop == 2);
+      }
+      assert(shop.shopItemSelectedTween == 1 &&
+             ShrinkWindow_Letterbox_GetSizeTarget() == 32 &&
+             ShrinkWindow_Letterbox_GetSize() == 32);
+      Press(BTN_B);
+      assert(lastFrameVisibleTop == 2);
+      for (int frame = 0; frame < 6; ++frame) {
+        NativeFrame();
+        assert(lastFrameVisibleTop == 2);
+      }
+      assert(shop.shopItemSelectedTween == 0 && NativeVisibleTop() == 2);
       NativeFrame();
-    const auto &position = stock[slot].actor.world.pos;
-    assert(position.x == kShelves[slot].x && position.y == kShelves[slot].y &&
-           position.z == kShelves[slot].z && shop.shopItemSelectedTween == 0);
-    assert(!std::memcmp(&shelfScale, &stock[slot].actor.scale, sizeof(Vec3f)));
+      assert(NativeVisibleTop() == 34 &&
+             !std::memcmp(&eye, &sBrowseCameraPtr->eye, sizeof(eye)));
+      // Accepted receipt resets tween0 while the selected actor still draws
+      // at its endpoint through the final frame of the owned shop camera.
+      begin(form, slot);
+      for (int frame = 0; frame < 6; ++frame)
+        NativeFrame();
+      purchaseAccepted = true;
+      Press(BTN_A, true);
+      assert(sReceipt.pending && shop.shopItemSelectedTween == 0 &&
+             lastFrameVisibleTop == 2);
+      assert(!NativeShopOwnCamera(&play) && NativeVisibleTop() == 34);
+    }
+  for (int edge = 0; edge < 18; ++edge) {
+    begin(PLAYER_FORM_HUMAN, 0);
+    for (int frame = 0; frame < 6; ++frame)
+      NativeFrame();
+    Actor other{};
+    PlayState otherPlay{};
+    GameState otherGame{};
+    if (edge == 0)
+      play.pauseCtx.state = PAUSE_STATE_MAIN;
+    if (edge == 1)
+      ++gSaveContext.save.shipSaveInfo.rando.finalSeed;
+    if (edge == 2)
+      ++gSaveContext.fileNum;
+    if (edge == 3)
+      shop.cursorIndex = 1;
+    if (edge == 4)
+      stock[0].actor.update = nullptr;
+    if (edge == 5) {
+      const auto cs = shop.csId;
+      CutsceneManager_Stop(cs);
+      CutsceneManager_Update();
+      CutsceneManager_ClearWaiting();
+      assert(CutsceneManager_StartWithPlayerCsAndSetFlag(cs, &other) == cs);
+    }
+    if (edge == 6) {
+      const auto foreign = Play_CreateSubCamera(&play);
+      Play_ChangeCameraStatus(&play, foreign, CAM_STATUS_ACTIVE);
+    }
+    if (edge == 7)
+      ++sBrowseCameraPtr->uid;
+    if (edge == 8)
+      sBrowseCameraPtr->setting = CAM_SET_FIXED1;
+    if (edge == 9)
+      gPlayState = &otherPlay;
+    if (edge == 10)
+      gGameState = &otherGame;
+    if (edge == 11)
+      play.transitionTrigger = TRANS_TRIGGER_START;
+    if (edge == 12)
+      active = false;
+    if (edge == 13)
+      shop.actor.destroy(&shop.actor, &play);
+    if (edge == 14)
+      shop.items[0] = &stock[1];
+    if (edge == 15)
+      play.state.running = false;
+    if (edge == 16)
+      safe = false;
+    if (edge == 17)
+      play.gameOverCtx.state = static_cast<decltype(play.gameOverCtx.state)>(1);
+    assert(
+        NativeVisibleTop() == 34 &&
+        "foreign/paused/stale inspection must retain native letterbox policy");
+    // A mismatch observed during native update cannot re-arm the same Select
+    // action under a different seed/file/slot; only a new selection may arm.
+    if (edge >= 1 && edge <= 3) {
+      NativeFrame();
+      assert(NativeVisibleTop() == 34);
+    }
   }
-  std::puts("MM selected-item legibility: all8 actual native selections enlarge "
-            "the reference mesh >=1.5x and >=20px; B restores shelf anchors");
+  // Run the actual existing DisableBlackBars registration/CVar boundary.
+  // The shop hook must never override another hook's true result.
+  begin(PLAYER_FORM_HUMAN, 0);
+  userDisableBlackBars = true;
+  RegisterDisableBlackBars();
+  EndBrowsing(&play);
+  assert(NativeVisibleTop() == 2 && userDisableBlackBars);
+  userDisableBlackBars = false;
+  RegisterDisableBlackBars();
+  assert(NativeVisibleTop() == 34 && !userDisableBlackBars);
+  std::puts(
+      "MM inspection letterbox: real VB registry, native view scissor/black "
+      "rectangle writers, all5 forms/all8 take/return/receipt first-frame, "
+      "current/target32 and external CVar preserved; "
+      "pause/seed/file/slot/item/owner/UID/scene/destroy controls passed");
+}
+static void CheckSelectedItemLegibility() {
+  for (int form = 0; form < 5; ++form) {
+    for (int slot = 0; slot < 8; ++slot) {
+      Reset();
+      player.transformation = form;
+      Talk();
+      ReachSlot(-1);
+      Stick(slot < 4 ? 80 : -80, 0);
+      ReachSlot(slot < 4 ? 0 : 4);
+      for (int i = 0; i < 20; ++i)
+        NativeFrame();
+      shop.cursorIndex = slot;
+      NativeFrame();
+      ProjectNativeCamera(*sBrowseCameraPtr);
+      const auto shelfPixels = ReferenceItemPixels(stock[slot].actor);
+      const auto shelfPosition = stock[slot].actor.world.pos;
+      const auto shelfScale = stock[slot].actor.scale;
+      assert(shelfScale.x == .27f && shelfScale.y == .27f && shelfScale.z == .27f);
+      assert(shelfPixels >= 16 && "shelf stock must remain visibly larger "
+                                  "through actual native updates");
+      SelectItem();
+      ProjectNativeCamera(*sBrowseCameraPtr);
+      const auto selectedPixels = ReferenceItemPixels(stock[slot].actor);
+      assert(!std::memcmp(&shelfScale, &stock[slot].actor.scale, sizeof(Vec3f)));
+      const auto distance = [&](Vec3f point) {
+        return OLib_Vec3fDist(&sBrowseCameraPtr->eye, &point);
+      };
+      std::fprintf(stderr,
+                   "form%d slot%d shelf %.0fpx/%.3f units selected %.0fpx/%.3f "
+                   "units scale %.2f\n",
+                   form, slot, shelfPixels, distance(shelfPosition),
+                   selectedPixels, distance(stock[slot].actor.world.pos),
+                   stock[slot].actor.scale.y);
+      assert(selectedPixels >= 35 && selectedPixels >= 1.9f * shelfPixels &&
+             distance(stock[slot].actor.world.pos) <= 64 &&
+             "inspection must bring selected stock visibly closer with its "
+             "actual native projection");
+      // The shelf display itself is now closer. Preserve the established
+      // absolute confirmation size and substantial additional enlargement.
+      assert(
+          selectedPixels >= 20 && selectedPixels >= 1.5f * shelfPixels &&
+          "confirmation must visibly enlarge merchandise, not leave it tiny");
+      Press(BTN_B);
+      for (int i = 0; i < 10; ++i)
+        NativeFrame();
+      const auto &position = stock[slot].actor.world.pos;
+      assert(position.x == kShelves[slot].x && position.y == kShelves[slot].y &&
+             position.z == kShelves[slot].z && shop.shopItemSelectedTween == 0);
+      assert(
+          !std::memcmp(&shelfScale, &stock[slot].actor.scale, sizeof(Vec3f)));
+    }
+  }
+  std::puts("MM selected-item legibility: all5 forms/all8 native selections "
+            "project >=35px and >=1.9x shelf size within64 units; B restores "
+            "exact shelf "
+            "anchors and scale");
 }
 static void CheckImmediateCannotBuyFraming() {
-  for (int slot = 0; slot < 8; ++slot) {
-    Reset(); Talk(); ReachSlot(-1);
-    Stick(slot < 4 ? 80 : -80, 0); ReachSlot(slot < 4 ? 0 : 4);
-    for (int i = 0; i < 20; ++i) NativeFrame();
-    shop.cursorIndex = slot;
-    Press(BTN_A);
-    for (int i = 0; i < 5; ++i) NativeFrame();
-    assert(shop.shopItemSelectedTween < 1.f);
-    // Confirm on the very frame the native tween first reaches 1; there is
-    // no idle SelectItem frame to refresh a camera target after that step.
-    Press(BTN_A, true);
-    assert(shop.actionFunc == EnOssan_CannotBuy);
-    for (int frame = 0; frame < 12; ++frame) {
-      ProjectNativeCamera(*sBrowseCameraPtr);
-      for (int corner = 0; corner < 8; ++corner) {
-        Actor marker{};
-        marker.focus.pos = stock[slot].actor.world.pos;
-        marker.focus.pos.x += corner & 1 ? 12.967f : -12.967f;
-        marker.focus.pos.y += corner & 2 ? 19.810f : -9.010f;
-        marker.focus.pos.z += corner & 4 ? 12.767f : -12.767f;
-        s16 x, y; Actor_GetScreenPos(&play, &marker, &x, &y);
-        assert(x > 8 && x < 312 && y > 34 && y < 138 &&
-               "immediate CannotBuy must retain the entire selected item/seal frame");
+  for (int form = 0; form < 5; ++form) {
+    for (int slot = 0; slot < 8; ++slot) {
+      Reset();
+      player.transformation = form;
+      Talk();
+      ReachSlot(-1);
+      Stick(slot < 4 ? 80 : -80, 0);
+      ReachSlot(slot < 4 ? 0 : 4);
+      for (int i = 0; i < 20; ++i)
+        NativeFrame();
+      shop.cursorIndex = slot;
+      Press(BTN_A);
+      for (int i = 0; i < 5; ++i)
+        NativeFrame();
+      assert(shop.shopItemSelectedTween < 1.f);
+      // Confirm on the very frame the native tween first reaches 1; there is
+      // no idle SelectItem frame to refresh a camera target after that step.
+      Press(BTN_A, true);
+      assert(shop.actionFunc == EnOssan_CannotBuy);
+      for (int frame = 0; frame < 12; ++frame) {
+        ProjectNativeCamera(*sBrowseCameraPtr);
+        for (int corner = 0; corner < 8; ++corner) {
+          Actor marker{};
+          marker.focus.pos = stock[slot].actor.world.pos;
+          marker.focus.pos.x += corner & 1 ? 12.967f : -12.967f;
+          marker.focus.pos.y += corner & 2 ? 19.810f : -9.010f;
+          marker.focus.pos.z += corner & 4 ? 12.767f : -12.767f;
+          s16 x, y;
+          Actor_GetScreenPos(&play, &marker, &x, &y);
+          assert(x > 8 && x < 312 && y > NativeVisibleTop() && y < 138 &&
+                 "immediate CannotBuy must retain the entire selected "
+                 "item/seal frame");
+        }
+        NativeFrame();
       }
-      NativeFrame();
+      Press(BTN_A, true);
+      for (int frame = 0; frame < 12; ++frame)
+        NativeFrame();
+      const auto &record =
+          BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
+      assert(shop.shopItemSelectedTween == 0 &&
+             sBrowseCameraPtr->eye.y == record[1]);
     }
-    Press(BTN_A, true);
-    for (int frame = 0; frame < 12; ++frame) NativeFrame();
-    const auto &record = BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
-    assert(shop.shopItemSelectedTween == 0 &&
-           sBrowseCameraPtr->eye.y == record[1]);
   }
-  std::puts("MM immediate first-complete-frame confirmation: all8 CannotBuy holds/return retain item/seal framing and restore native bank target");
+  std::puts("MM immediate first-complete-frame confirmation: all5 forms/all8 "
+            "CannotBuy holds/return retain item/seal framing and restore "
+            "native bank target");
 }
 static void DumpSelectionPaths() {
   std::printf("[");
-  for (int slot = 0; slot < 8; ++slot) {
-    Reset();
-    Talk();
-    ReachSlot(-1);
-    Stick(slot < 4 ? 80 : -80, 0);
-    ReachSlot(slot < 4 ? 0 : 4);
-    for (int i = 0; i < 20; ++i)
-      NativeFrame();
-    if (slot)
-      std::printf(",");
-    std::printf("[");
-    shop.cursorIndex = slot;
-    const auto eye = sBrowseCameraPtr->eye;
-    const auto direction = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
-    auto printPosition = [&]() {
-      // The native tween stays linear on every axis, with no item-driven
-      // camera motion during take/return (including interpolation endpoints).
-      const auto& start = kShelves[slot];
-      const auto& end = BlackMarketMmShopScene::kSelectedTargets[slot >> 2];
-      const auto t = shop.shopItemSelectedTween;
-      const auto& itemPosition = stock[slot].actor.world.pos;
-      assert(std::abs(itemPosition.x - (start.x + (end[0] - start.x) * t)) < .0001f);
-      assert(std::abs(itemPosition.y - (start.y + (end[1] - start.y) * t)) < .0001f);
-      assert(std::abs(itemPosition.z - (start.z + (end[2] - start.z) * t)) < .0001f);
-      assert(!std::memcmp(&eye, &sBrowseCameraPtr->eye, sizeof(eye)));
-      const auto now = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
-      assert(std::abs(direction.pitch - now.pitch) <= 1 && std::abs(direction.yaw - now.yaw) <= 1);
-      const auto &position = stock[slot].actor.world.pos;
-      const auto &camera = *sBrowseCameraPtr;
-      std::printf("{\"position\":[%.8f,%.8f,%.8f],\"eye\":[%.8f,%.8f,%.8f],\"at\":[%.8f,%.8f,%.8f],\"fov\":%.8f}",
-                  position.x, position.y, position.z, camera.eye.x, camera.eye.y, camera.eye.z,
-                  camera.at.x, camera.at.y, camera.at.z, camera.fov);
-    };
-    printPosition();
-    for (int step = 0; step < 6; ++step) {
-      EnOssan_TakeItemOffShelf(&shop);
-      for (auto& item : stock) item.actor.update(&item.actor, &play);
-      Camera_Data4(sBrowseCameraPtr);
-      std::printf(",");
+  for (int form = 0; form < 5; ++form) {
+    for (int slot = 0; slot < 8; ++slot) {
+      Reset();
+      player.transformation = form;
+      Talk();
+      ReachSlot(-1);
+      Stick(slot < 4 ? 80 : -80, 0);
+      ReachSlot(slot < 4 ? 0 : 4);
+      for (int i = 0; i < 20; ++i)
+        NativeFrame();
+      if (form || slot)
+        std::printf(",");
+      std::printf("[");
+      shop.cursorIndex = slot;
+      const auto eye = sBrowseCameraPtr->eye;
+      const auto direction =
+          OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye, &sBrowseCameraPtr->at);
+      auto printPosition = [&]() {
+        // The native tween stays linear on every axis, with no item-driven
+        // camera motion during take/return (including interpolation endpoints).
+        const auto &start = kShelves[slot];
+        const auto &end = BlackMarketMmShopScene::kSelectedTargets[slot >> 2];
+        const auto t = shop.shopItemSelectedTween;
+        const auto &itemPosition = stock[slot].actor.world.pos;
+        assert(std::abs(itemPosition.x - (start.x + (end[0] - start.x) * t)) <
+               .0001f);
+        assert(std::abs(itemPosition.y - (start.y + (end[1] - start.y) * t)) <
+               .0001f);
+        assert(std::abs(itemPosition.z - (start.z + (end[2] - start.z) * t)) <
+               .0001f);
+        assert(!std::memcmp(&eye, &sBrowseCameraPtr->eye, sizeof(eye)));
+        const auto now = OLib_Vec3fDiffToVecGeo(&sBrowseCameraPtr->eye,
+                                                &sBrowseCameraPtr->at);
+        assert(std::abs(direction.pitch - now.pitch) <= 1 &&
+               std::abs(direction.yaw - now.yaw) <= 1);
+        const auto &position = stock[slot].actor.world.pos;
+        const auto &camera = *sBrowseCameraPtr;
+        std::printf("{\"position\":[%.8f,%.8f,%.8f],\"eye\":[%.8f,%.8f,%.8f],"
+                    "\"at\":[%.8f,%.8f,%.8f],\"fov\":%.8f,\"visibleTop\":%.0f}",
+                    position.x, position.y, position.z, camera.eye.x,
+                    camera.eye.y, camera.eye.z, camera.at.x, camera.at.y,
+                    camera.at.z, camera.fov, NativeVisibleTop());
+      };
       printPosition();
+      Press(BTN_A);
+      std::printf(","); printPosition();
+      for (int step = 0; step < 6; ++step) {
+        NativeFrame();
+        std::printf(",");
+        printPosition();
+      }
+      assert(shop.shopItemSelectedTween == 1);
+      Press(BTN_B);
+      std::printf(","); printPosition();
+      for (int step = 0; step < 6; ++step) {
+        NativeFrame();
+        std::printf(",");
+        printPosition();
+      }
+      assert(shop.shopItemSelectedTween == 0);
+      NativeFrame(); std::printf(","); printPosition();
+      assert(NativeVisibleTop() == 34);
+      std::printf("]");
     }
-    assert(shop.shopItemSelectedTween == 1);
-    for (int step = 0; step < 6; ++step) {
-      EnOssan_ReturnItemToShelf(&shop);
-      for (auto& item : stock) item.actor.update(&item.actor, &play);
-      Camera_Data4(sBrowseCameraPtr);
-      std::printf(",");
-      printPosition();
-    }
-    assert(shop.shopItemSelectedTween == 0);
-    std::printf("]");
   }
   std::puts("]");
 }
@@ -1413,7 +1644,76 @@ static void CheckKeeperDialogue() {
   }
   std::puts("MM optional native keeper intro/help/back/B retains camera; zero purchases/receipts");
 }
+static void CheckPlayerDrawBoundary() {
+  static int submitted = 0;
+  const auto visible = [&] {
+    player.actor.draw = [](Actor*, PlayState*) { ++submitted; };
+    const int before = submitted;
+    DrawPlayerBoundary(&player.actor);
+    return submitted != before;
+  };
+  // The native actor dispatch is before every native/replacement player body.
+  // Replacing the callback represents the native, adult/custom and Wolf/Mario
+  // submissions without mocking the actual draw gate or hook registry.
+  for (int side : {-1, 1}) {
+    Reset();
+    assert(visible() && "ordinary gameplay player remains drawable");
+    Talk();
+    assert(!visible() && "accepted shop talk must suppress the actual player draw dispatch");
+    ReachSlot(-1);
+    assert(!visible());
+    Stick(side * 80, 0);
+    for (int frame = 0; frame < 10; ++frame) {
+      NativeFrame();
+      assert(!visible() && "turning and extreme shelf browse must hide replacement bodies");
+    }
+    NativeFrame(); SelectItem();
+    assert(!visible() && "native selection keeps replacement player models hidden");
+    Reset(); Talk(); ReachSlot(-1);
+    play.msgCtx.choiceIndex = 0;
+    Press(BTN_A, true);
+    assert(shop.actionFunc == EnOssan_TalkToShopkeeper && !visible());
+    Press(BTN_B);
+    assert(!visible());
+    Press(BTN_B);
+    assert(visible() && "B exit restores the player without changing its draw pointer");
+    Reset(); Talk(); ReachSlot(-1);
+    player.stateFlags2 &= ~PLAYER_STATE2_20000000;
+    assert(visible() && "native receipt hide-bit release restores player presentation");
+    player.stateFlags2 |= PLAYER_STATE2_20000000;
+    sReceipt.pending = true;
+    assert(visible() && "receipt ownership must never suppress the get-item presentation");
+    sReceipt.pending = false;
+    assert(!visible());
+    active = false;
+    assert(visible() && "another scene/session cannot inherit the shop draw filter");
+    active = true;
+    Actor other = player.actor;
+    const int before = submitted;
+    DrawPlayerBoundary(&other);
+    assert(submitted == before + 1 && "only the actual player is hidden");
+    EndBrowsing(&play);
+    assert(visible());
+    Reset(); Talk(); ReachSlot(-1);
+    NativeKeeperDestroyed(&shop.actor, &play);
+    assert(visible() && "destroyed keeper releases player presentation");
+  }
+  std::puts("MM shop player draw: real hook registry/Actor_Draw boundary suppresses browse/turn/keeper models and releases receipt/B/interrupt/destroy; foreign actor unaffected");
+}
 int main(int argc, char **argv) {
+  RegisterPlayerDrawHook();
+  RegisterInspectionLetterboxHook();
+  if (argc == 2 && std::string(argv[1]) == "inspection") {
+    CheckInspectionLetterboxBoundary();
+    CheckSelectedItemLegibility();
+    CheckImmediateCannotBuyFraming();
+    return 0;
+  }
+  if (argc == 2 && std::string(argv[1]) == "player-draw") {
+    CheckPlayerDrawBoundary();
+    return 0;
+  }
+
   if (argc == 2 && std::string(argv[1]) == "customer") {
     CheckCustomerAccessAndReturn();
     return 0;
@@ -1426,6 +1726,7 @@ int main(int argc, char **argv) {
     DumpSelectionPaths();
     return 0;
   }
+  CheckPlayerDrawBoundary();
   std::setbuf(stdout, nullptr);
   if (argc == 2 && std::string(argv[1]) == "receipt") {
     CheckProductionReceipt();
@@ -1493,6 +1794,7 @@ int main(int argc, char **argv) {
   CheckProductionReceipt();
   CheckDestructionWithForeignOwnerAndReceipt();
   CheckAuthoredFraming();
+  CheckInspectionLetterboxBoundary();
   CheckSelectedItemLegibility();
   CheckImmediateCannotBuyFraming();
   CheckForeignCameraTakeover();

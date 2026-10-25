@@ -15,6 +15,16 @@ struct CustomerAnchor {
     Vec3f position{};
 } sCustomerAnchor;
 
+struct NativeInspection {
+    EnOssan* shop = nullptr;
+    EnGirlA* item = nullptr;
+    PlayState* play = nullptr;
+    uint32_t seed = 0;
+    int file = 0, slot = -1;
+    bool settled = false;
+} sNativeInspection;
+bool sNativeWasSelecting = false;
+
 bool NativeCustomerGrounded(PlayState* play, const Player* player) {
     // The invisible wall is at Z130; the counter is behind it. Talking stays
     // within the native 100-unit offer range on the actual customer floor.
@@ -110,6 +120,8 @@ void EndBrowsing(PlayState* play, bool destroying = false) {
             }
     }
     ForgetNativeShopCamera();
+    sNativeInspection = {};
+    sNativeWasSelecting = false;
     sCustomerAnchor = {};
     sTalking = false;
     if (destroying) {
@@ -130,6 +142,51 @@ bool NativeShopCameraAvailable(PlayState* play) {
            CutsceneManager_IsCurrentActor(&sNativeShop->actor) && NativeShopOwnCamera(play) &&
            Play_GetActiveCamId(play) == sBrowseCamera;
 }
+bool NativeInspectionCamera(PlayState* play) {
+    return play && play->state.running && Safe(play) && gGameState == &play->state && NativeShopContext(play) &&
+           !IS_PAUSED(&play->pauseCtx) && sNativeShop && NativeShopOwnCamera(play) &&
+           Play_GetActiveCamId(play) == sBrowseCamera && sBrowseCameraPtr->setting == CAM_SET_BLACK_MARKET_OOT &&
+           CutsceneManager_IsCurrentActor(&sNativeShop->actor);
+}
+bool NativeInspectionOwnsView(PlayState* play) {
+    const auto& state = sNativeInspection;
+    return state.shop && state.shop == sNativeShop && state.play == play && NativeInspectionCamera(play) &&
+           state.file == gSaveContext.fileNum && state.seed == gSaveContext.save.shipSaveInfo.rando.finalSeed &&
+           state.slot >= 0 && state.slot < 8 && state.slot == state.shop->cursorIndex &&
+           state.item == state.shop->items[state.slot] && state.item && state.item->actor.update;
+}
+void UpdateNativeInspection(EnOssan* shop, PlayState* play) {
+    const bool selecting = shop->actionFunc == EnOssan_SelectItem;
+    const bool beginning = selecting && !sNativeWasSelecting;
+    sNativeWasSelecting = selecting;
+    if (sNativeInspection.shop && !NativeInspectionOwnsView(play))
+        sNativeInspection = {};
+    if (beginning && NativeInspectionCamera(play) && shop == sNativeShop && shop->cursorIndex < 8) {
+        const int slot = shop->cursorIndex;
+        auto* item = shop->items[slot];
+        if (item && item->actor.update)
+            sNativeInspection = {
+                shop, item, play, gSaveContext.save.shipSaveInfo.rando.finalSeed, gSaveContext.fileNum, slot, false
+            };
+    }
+    if (!sNativeInspection.shop)
+        return;
+    const auto& position = sNativeInspection.item->actor.world.pos;
+    const auto& shelf = kShelves[sNativeInspection.slot];
+    // A successful purchase resets tween0 before its selected actor is moved.
+    // Keep that last owned-camera frame unobstructed until native handoff.
+    if (selecting || shop->actionFunc == EnOssan_CannotBuy || shop->shopItemSelectedTween != 0.f ||
+        position.x != shelf.x || position.y != shelf.y || position.z != shelf.z) {
+        sNativeInspection.settled = false;
+    } else if (sNativeInspection.settled) {
+        sNativeInspection = {};
+    } else {
+        // One settled frame keeps restored bars clear of render interpolation
+        // from the final return interval. Native shelf anchors remain exact.
+        sNativeInspection.settled = true;
+    }
+}
+
 void MonitorBrowsing() {
     if (!sNativeShop || sNativeShop->actionFunc == EnOssan_InitShop || sNativeShop->actionFunc == EnOssan_Idle)
         return;

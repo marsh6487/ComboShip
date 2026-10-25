@@ -32,6 +32,9 @@ struct Resources {
 PlayState* gPlayState;
 static bool interior = true, sGrannyActive = false;
 bool Interior() { return interior && gPlayState; }
+#ifndef OOT_ROOM_MAGIC_TEST
+void TraceRoomMagic(const char*, RoomShape* = nullptr, bool = false) {}
+#endif
 /* PRODUCTION */
 #ifdef OOT_ROOM_MAGIC_TEST
 using Shape = MeshHeader;

@@ -1,5 +1,7 @@
 """Offline native binary-collision checks for fixed MM profiles; no engine/gameplay proof.
-Usage: python tests/regional_passages/mm_collision_test.py /path/to/native/mm.o2r
+Usage: python tests/regional_passages/mm_collision_test.py /path/to/native/mm.o2r [camera-poses.txt]
+Generate optional exact poses with COMBO_SNOWHEAD_POSES=/path/camera-poses.txt
+python tests/lost_woods_entrance/run_portal_camera_tests.py (fresh output file).
 Requires numpy. Input is read-only; no scene/actor resource is changed.
 """
 from pathlib import Path
@@ -94,5 +96,37 @@ for row,name in zip(rows,['IKANAMAE','30GYOSON','10YUKIYAMANOMURA','10YUKIYAMANO
     q=a*(1-t)+b*t;floor=s.floor(q[0],q[2],q[1]);assert floor is not None and abs(floor-8)<.1
     for prop,radius in props:assert np.linalg.norm((q-prop)[[0,2]])>radius+27
  print('PASS native MM collision:',name,'entrance',int(entrance),'mouth',mouth.tolist(),'resource',s.resource)
+if len(sys.argv)>2:
+ # Consume actual production-camera/native-form outputs, rather than copy the
+ # production placement or arm calculation into an independent Python oracle.
+ poses=[list(map(float,row.split())) for row in Path(sys.argv[2]).read_text().splitlines()]
+ assert {(int(row[0]),int(row[1])) for row in poses}=={(season,form) for season in range(2) for form in range(5)}
+ for row in poses:
+  season,form=map(int,row[:2]);s=Scene('10YUKIYAMANOMURA2' if season else '10YUKIYAMANOMURA')
+  foot=np.array(row[2:5]);at=np.array(row[5:8]);eye=np.array(row[8:11])
+  direction=foot-np.array([-396.76031,8,-322.01703]);direction[1]=0;direction/=np.linalg.norm(direction)
+  assert np.linalg.norm((foot-np.array([-396.76031,8,-322.01703]))[[0,2]])>110
+  # Full27-unit footprint, plus the ordinary F entry's maximum40-unit walk
+  # at its usual2-unit approach speed. Native input/speed variants remain a
+  # runtime test; no actor or collision is removed to force clearance.
+  for depth in np.linspace(0,40,17):
+   center=foot+direction*depth
+   for angle in np.linspace(0,math.tau,17):
+    sample=center+np.array([math.sin(angle)*27,0,math.cos(angle)*27])
+    floor=s.floor(sample[0],sample[2],sample[1]);assert floor is not None and abs(floor-8)<.1,(season,form,'landing floor',sample)
+    assert s.line(sample+[0,1,0],sample+[0,137,0]) is None,(season,form,'landing ceiling',sample)
+   for prop,radius in props:assert np.linalg.norm((center-prop)[[0,2]])>radius+27
+  for depth in np.linspace(0,40,17):
+   # Also retain a one-unit margin beyond the exact production eye ray.
+   shifted_at=at+direction*depth;shifted_eye=eye+direction*depth
+   extended_eye=shifted_eye+(shifted_eye-shifted_at)/np.linalg.norm(shifted_eye-shifted_at)
+   assert s.line(shifted_at,extended_eye) is None,(season,form,'native presentation eye ray',depth)
+  # Portal frame remains geometrically visible from the exact eye. Start a
+  # little in front of its wall-backed plane, avoiding surface precision noise.
+  for width in [-68,0,68]:
+   for height in [1,68,136]:
+    target=mouth+right*width+direction*2+np.array([0,height,0])
+    assert s.line(eye,target) is None,(season,form,'portal visibility',width,height)
+ print('PASS exact Snowhead production camera/native-form poses:',len(poses),'samples; winter/spring dry27-radius landing and40-unit ordinary walk, props/headroom, eye rays and full portal frame')
 print('Input SHA256',hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
 print('Static triangle sampling only; native camera, all-form movement, Alt assets and gameplay acceptance remain untested.')

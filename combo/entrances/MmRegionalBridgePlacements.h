@@ -9,7 +9,9 @@ namespace ComboMmRegional {
 // Rendering and mouth tests share this pose; native arrival uses the same
 // profile's original entrance, keeping its camera and player-start machinery.
 // Explicit Snowhead bridge arrivals substitute normal F start params in a
-// private spawn copy; the native cached owl entry remains unchanged.
+// private spawn copy; the native cached owl entry remains unchanged. The
+// one-shot camera presentation then places Link on the dry exterior apron
+// only after current floor and camera clearance both succeed.
 struct Placement {
     int scene, route, entrance, room;
     ComboRegional::Pose mouth, nativeArrival;
@@ -30,6 +32,9 @@ inline constexpr Placement kGreatBay{
 inline constexpr Placement kMountainWinter{
     0x50, COMBO_PORTAL_SNOWHEAD, 8, 0, { { -396.76031f, 8, -322.01703f }, -1362 }, { { -649, 8, -196 }, 20388 }, 110
 };
+// Outside the return arm radius (110), clear of native owl/snowballs, and
+// inside the read-only native dry apron sampling in both seasonal scenes.
+inline constexpr float kMountainPortalArrivalDepth = 140.0f;
 inline constexpr Placement kMountainSpring{ 0x5A, COMBO_PORTAL_SNOWHEAD, 8,
                                             0,    kMountainWinter.mouth, kMountainWinter.nativeArrival,
                                             110 };

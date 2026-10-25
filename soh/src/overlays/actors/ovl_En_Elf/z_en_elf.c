@@ -5,6 +5,10 @@
  */
 
 #include "z_en_elf.h"
+#ifdef COMBO_BUILD
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#endif
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include <assert.h>
 #include <stdio.h>
@@ -12,6 +16,15 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/audio/MidnaAudio.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+
+static s32 EnElf_BlackMarketQuiet(const EnElf* fairy, const PlayState* play) {
+#ifdef COMBO_BUILD
+    return fairy->actor.params == FAIRY_NAVI &&
+           ComboBlackMarket_FairyQuiet(COMBO_GAME_OOT, play->sceneNum, SCENE_SKIEJER_MARKET);
+#else
+    return false;
+#endif
+}
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -899,6 +912,22 @@ void func_80A03CF8(EnElf* this, PlayState* play) {
     f32 xScale;
     f32 distFromLinksHead;
 
+    if (EnElf_BlackMarketQuiet(this, play)) {
+        // Preserve the companion's model, bob animation and native lights, but
+        // keep its attention at Link while the private shop owns interaction.
+        if (this->unk_2A8 != 0)
+            func_80A01C38(this, 0);
+        this->unk_2C0 = 100;
+        SkelAnime_Update(&this->skelAnime);
+        this->func_2C8(this, play);
+        nextPos = player->bodyPartsPos[8];
+        func_80A03148(this, &nextPos, 0.0f, 3.0f, 0.2f);
+        Math_SmoothStepToF(&this->actor.scale.x, 0.008f, 0.3f, 0.00080000004f, 0.000080000005f);
+        EnElf_UpdateLights(this, play);
+        this->actor.shape.rot.y = this->unk_2BC;
+        return;
+    }
+
     func_80A0461C(this, play);
     func_80A03AB0(this, play);
 
@@ -1431,6 +1460,19 @@ void func_80A053F0(Actor* thisx, PlayState* play) {
     s32 pad;
     Player* player = GET_PLAYER(play);
     EnElf* this = (EnElf*)thisx;
+
+    if (EnElf_BlackMarketQuiet(this, play)) {
+        player->naviTextId = 0;
+        player->stateFlags2 &= ~PLAYER_STATE2_NAVI_ALERT;
+        thisx->flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
+        this->fairyFlags &= ~(0x10 | 0x20);
+        this->elfMsg = NULL;
+        this->actionFunc(this, play);
+        this->timer++;
+        EnElf_UpdateMidnaBlink(this);
+        MidnaAudio_UpdateIdle(false);
+        return;
+    }
 
     if (player->naviTextId == 0) {
         if (player->focusActor == NULL) {

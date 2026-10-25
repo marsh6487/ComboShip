@@ -5,11 +5,24 @@
  */
 
 #include "z_en_elf.h"
+#ifdef COMBO_BUILD
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#endif
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <stdio.h>
 #include "2s2h/BenGui/CosmeticEditor.h"
+
+static s32 EnElf_BlackMarketQuiet(const EnElf* fairy, const PlayState* play) {
+#ifdef COMBO_BUILD
+    return fairy->actor.params == FAIRY_TYPE_0 &&
+           ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE);
+#else
+    return false;
+#endif
+}
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -941,6 +954,22 @@ void func_8088E850(EnElf* this, PlayState* play) {
     f32 distFromLinksHead;
     u32 cueChannel;
 
+    if (EnElf_BlackMarketQuiet(this, play)) {
+        // Preserve the companion's model, bob animation and native lights, but
+        // keep its attention at Link while the private shop owns interaction.
+        if (this->unk_244 != 0)
+            func_8088C51C(this, 0);
+        this->unk_25C = 100;
+        SkelAnime_Update(&this->skelAnime);
+        this->unk_26C(this, play);
+        nextPos = player->bodyPartsPos[PLAYER_BODYPART_HAT];
+        func_8088DB4C(this, &nextPos, 0.0f, 3.0f, 0.2f);
+        Math_SmoothStepToF(&this->actor.scale.x, 0.008f, 0.3f, 0.00080000004f, 0.000080000005f);
+        func_8088E60C(this, play);
+        this->actor.shape.rot.y = this->unk_258;
+        return;
+    }
+
     func_8088F214(this, play);
     func_8088E5A8(this, play);
     xScale = 0.0f;
@@ -1512,6 +1541,19 @@ void func_8089010C(Actor* thisx, PlayState* play) {
     s32 pad;
     EnElf* this = (EnElf*)thisx;
     Player* player = GET_PLAYER(play);
+    if (EnElf_BlackMarketQuiet(this, play)) {
+        player->tatlTextId = 0;
+        player->stateFlags2 &= ~PLAYER_STATE2_200000;
+        thisx->flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
+        this->fairyFlags &= ~(0x10 | 0x20);
+        this->elfMsg = NULL;
+        this->actionFunc(this, play);
+        this->timer++;
+        EnElf_UpdateMidnaBlink(this, play);
+        MMMidnaAudio_UpdateIdle(false);
+        return;
+    }
+
     u16 temp_v0 = QuestHint_GetTatlTextId(play);
 
     if (temp_v0 != this->unk_266) {

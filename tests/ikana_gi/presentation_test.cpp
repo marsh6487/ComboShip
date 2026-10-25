@@ -171,7 +171,7 @@ int main(){
     auto oot = std::make_shared<Ship::ResourceManager>(),
          mm = std::make_shared<Ship::ResourceManager>();
     Ship::CrossRMRegistry::owners = {{"oot", oot}, {"mm", mm}};
-    constexpr char iconPath[] = "icon_item_static_yar/gItemIconMirrorShieldTex";
+    constexpr char iconPath[] = "textures/icon_item_custom/gItemIconShieldOfIkanaTex";
     auto own = std::make_shared<Ship::Resource>();
     own->name = "MM Mirror Shield";
     auto wrong = std::make_shared<Ship::Resource>();

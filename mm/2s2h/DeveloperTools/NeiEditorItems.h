@@ -12,6 +12,10 @@ extern "C" {
 namespace NeiEditor {
 
 inline bool IsItem(RandoItemId id) {
+    // MM's native Mirror Shield is the canonical Shield of Ikana identity.
+    // Its name does not have the RI_OOT_EXT_ prefix used by its siblings.
+    if (id == RI_SHIELD_MIRROR)
+        return true;
     const auto item = Rando::StaticData::Items.find(id);
     if (item == Rando::StaticData::Items.end() || !item->second.spoilerName) {
         return false;
@@ -138,6 +142,8 @@ inline bool IsOwned(RandoItemId id) {
                Nei_GetOwnedItem(SLOT_ELEMENTAL_WAND) == ITEM_ELEMENTAL_WAND;
     }
     switch (id) {
+        case RI_SHIELD_MIRROR:
+            return ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 3);
         case RI_OOT_NEI_BOMB_ARROWS:
             return nei->bombArrowsOwned != 0;
         case RI_OOT_NEI_SHOVEL:
@@ -235,6 +241,14 @@ inline bool RestoreOwnedHost(RandoItemId id) {
 inline bool Grant(RandoItemId id) {
     if (!IsItem(id)) {
         return false;
+    }
+    if (id == RI_SHIELD_MIRROR) {
+        if (IsOwned(id))
+            return false;
+        // An editor ownership edit uses the same setter as the equipment grid.
+        // It must not equip the native shield or replay a received pickup.
+        ExtEquip_GiveItem(EQUIP_TYPE_SHIELD, 3);
+        return true;
     }
     const bool restored = RestoreOwnedHost(id);
     const int wand = WandMode(id);

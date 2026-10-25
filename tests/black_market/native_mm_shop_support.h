@@ -42,6 +42,7 @@ static std::vector<std::string> trace;
 static std::vector<std::string> nativeCalls;
 static u16 lastAAction, lastHud;
 static int lastLetterbox, hudCalls, letterboxCalls;
+static bool userDisableBlackBars;
 
 extern "C" u8 FixtureMessageState(MessageContext *) { return messageState; }
 extern "C" s32 FixtureAdvance(PlayState *) { return advance; }
@@ -160,6 +161,8 @@ extern "C" int GameInteractor_InvertControl(GIInvertType type) {
   return invert;
 }
 extern "C" int CVarGetInteger(const char *name, int fallback) {
+  if (std::strcmp(name, "gEnhancements.Graphics.DisableBlackBars") == 0)
+    return userDisableBlackBars;
   return std::strcmp(name, "gModes.MirroredWorld.State") == 0 ? mirror
                                                               : fallback;
 }

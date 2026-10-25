@@ -33,6 +33,8 @@ PlayState* gPlayState;
 GameState* gGameState;
 using namespace ComboRando::BlackMarket;
 Session sSession;
+// Native collision ownership is exercised by run_door_collision_native_tests.py.
+struct DoorCollisionBoundary { int releases=0; void Release(PlayState*) { ++releases; } void Reset() {} } sDoorCollision;
 uint16_t sClears;
 bool sEntering, sReturnPending, sDoorArmed, sTitlePending, sTalking;
 bool sResumeFromMarket;

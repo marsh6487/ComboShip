@@ -30,6 +30,9 @@ extern "C" s32 BgCheck_EntityLineTest1(CollisionContext *, Vec3f *, Vec3f *,
                                        s32, s32 *) {
   return 0;
 }
+extern "C" void ComboForestArrivalCamera_Queue(int route) {
+  assert(route == COMBO_PORTAL_SNOWHEAD);
+}
 /* PRODUCTION */
 /* NATIVE_START */
 int main() {

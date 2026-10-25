@@ -24,24 +24,38 @@ inline Palette ReadPalette(bool oot) {
 
 class Resources {
   public:
+    struct PreparationTrace {
+        const char* reason = "skipped";
+        const void* owner = nullptr;
+        const void* root = nullptr;
+        bool alt = false;
+    };
+    const PreparationTrace& LastPreparation() const {
+        return mPreparation;
+    }
     bool Prepare(const char* host) {
+        mPreparation = {};
         try {
             // Copied textures use @host routes, which require a registered owner.
             const auto owner = Ship::CrossRMRegistry::Get(host);
+            mPreparation.owner = owner.get();
             if (!owner)
-                return Unavailable();
+                return Unavailable("no-owner");
             const bool alt = owner->IsAltAssetsEnabled();
+            mPreparation.alt = alt;
             const auto archive = owner->GetArchiveManager();
             // An unrelated Alt room needs its matching variant. Never put a
             // base-room material graph over a custom Alt room's geometry.
             if (alt && archive->HasFile(std::string("alt/") + SourceRoom(std::strcmp(host, "oot") == 0)) &&
                 !archive->HasFile(std::string("alt/") + kRoom))
-                return Unavailable();
+                return Unavailable("source-alt-unpaired");
             if (!archive->HasFile(kRoom) && !(alt && archive->HasFile(std::string("alt/") + kRoom)))
-                return Unavailable();
+                return Unavailable("graph-absent");
             auto root = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(kRoom));
+            mPreparation.root = root.get();
             if (!root)
-                return Unavailable();
+                return Unavailable("root-not-display-list");
+            mPreparation.reason = "ready";
             if (mRoom && mOwner == owner && mRoot == root && mAlt == alt && mHost == host)
                 return true;
             Clear();
@@ -62,14 +76,14 @@ class Resources {
             };
             auto room = std::make_unique<Room>();
             if (!room->Load(provider))
-                return Unavailable();
+                return Unavailable("graph-invalid");
             mRoom = std::move(room);
             mOwner = owner;
             mRoot = std::move(root);
             mAlt = alt;
             mHost = host;
             return true;
-        } catch (const std::exception&) { return Unavailable(); }
+        } catch (const std::exception&) { return Unavailable("exception"); }
     }
     Gfx* Opaque() const {
         return mRoom ? mRoom->Opaque() : nullptr;
@@ -87,7 +101,9 @@ class Resources {
     }
 
   private:
-    bool Unavailable() {
+    PreparationTrace mPreparation;
+    bool Unavailable(const char* reason) {
+        mPreparation.reason = reason;
         Clear();
         return false;
     }

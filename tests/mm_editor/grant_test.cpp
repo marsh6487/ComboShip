@@ -78,6 +78,20 @@ static void reset() {
 }
 
 int main() {
+    reset();
+    gSaveContext.save.saveInfo.equips.equipment = EQUIP_VALUE_SHIELD_MIRROR << 4;
+    const auto nativeIkanaBefore = gSaveContext.save.saveInfo;
+    const auto untouched = *Nei_Save();
+    REQUIRE(NeiEditor::IsItem(RI_SHIELD_MIRROR));
+    REQUIRE(!NeiEditor::IsOwned(RI_SHIELD_MIRROR));
+    REQUIRE(memcmp(&untouched, Nei_Save(), sizeof(untouched)) == 0);
+    REQUIRE(NeiEditor::Grant(RI_SHIELD_MIRROR));
+    REQUIRE(ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 3));
+    REQUIRE(Nei_Save()->shieldOwned & FC_SHIELD_IKANA);
+    REQUIRE(!NeiEditor::Grant(RI_SHIELD_MIRROR));
+    REQUIRE(memcmp(&nativeIkanaBefore, &gSaveContext.save.saveInfo, sizeof(nativeIkanaBefore)) == 0);
+    puts("PASS current editor Ikana catalog, explicit ownership grant and duplicate safety");
+
     for (int rule = WAND_RANDO_MEDALLIONS; rule <= WAND_RANDO_ELEMENTAL; ++rule) {
         wandRule = rule;
         reset();
