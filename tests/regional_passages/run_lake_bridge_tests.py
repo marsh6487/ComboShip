@@ -6,13 +6,16 @@ ROOT=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--scene-dir','--evidence',dest='scene_dir',type=Path,help='Opt-in extracted scene tree for the full1050-poly evidence check')
 p.add_argument('--sanitize',action='store_true')
+p.add_argument('--provider-ref',help='Read-only draw/provider regression control at this git ref')
 p.add_argument('--native-only',action='store_true',help='With --scene-dir, run only full native collision; do not infer Alt coverage')
 p.add_argument('--texture-archive',type=Path,help='Read-only donor archive to verify the native stone resource format/tile byte extent')
 p.add_argument('--native-case',choices=['all','camera','shell'],default='all',help='Isolate native review regressions; default runs both')
 a=p.parse_args()
 if a.native_only and not a.scene_dir:
     p.error('--native-only requires --scene-dir')
-provider=(ROOT/'soh/soh/Enhancements/Gameplay/ComboLakeHyliaBridge.cpp').read_text()
+provider_path='soh/soh/Enhancements/Gameplay/ComboLakeHyliaBridge.cpp'
+provider=(subprocess.check_output(['git','show',a.provider_ref+':'+provider_path],cwd=ROOT,text=True)
+          if a.provider_ref else (ROOT/provider_path).read_text())
 loads=re.findall(r'gDPLoadTextureBlock\(POLY_OPA_DISP\+\+,\s*([A-Za-z0-9_]+),\s*'
                  r'(G_IM_FMT_\w+),\s*(G_IM_SIZ_\w+),\s*(\d+),\s*(\d+),\s*0,\s*'
                  r'G_TX_WRAP,\s*G_TX_WRAP,\s*(\d+),\s*(\d+)',provider)
@@ -108,8 +111,6 @@ with tempfile.TemporaryDirectory(prefix='lake-bridge-') as temp:
     subprocess.run(command+[str(ROOT/'tests/regional_passages/lake_bridge_test.cpp'),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
 
-# Run the production actor/provider with the engine's actual DynaPoly registration
-# and destruction functions. Rendering/resource lookup is a separate native compile.
 def function(source,signature):
     start=0
     while True:
@@ -123,6 +124,71 @@ def function(source,signature):
         elif source[end]=='}':depth-=1
         end+=1
     return source[start:end]
+paths=['combo','combo/menu','soh','soh/soh','soh/include','soh/include/PR','soh/src','soh/assets','libultraship/include']
+
+# Exercise the actual draw callback as well: geometry/physics-only execution
+# cannot detect malformed GBI, dead vertex pointers or a bad native setup list.
+graph=(ROOT/'soh/src/code/graph.c').read_text()
+arena=(ROOT/'soh/src/code/TwoHeadArena.c').read_text()
+rcp=(ROOT/'soh/src/code/z_rcp.c').read_text()
+wrappers=(ROOT/'soh/soh/GbiWrap.cpp').read_text()
+renderer=(ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text()
+interpreter=(ROOT/'libultraship/src/fast/interpreter.cpp').read_text()
+draw='\n'.join(function(provider,signature) for signature in (
+    'const Lake::Geometry& Geometry(', 'bool Available(', 'Vtx Vertex(',
+    'const std::vector<Vtx>& RockVertices(', 'void CaveDraw('))
+native_graph='\n'.join(function(arena,signature) for signature in (
+    'void* THA_AllocEnd(', 'Gfx* THGA_AllocEnd('))
+native_graph+='\n'+'\n'.join(function(graph,signature) for signature in (
+    'void* Graph_Alloc(', 'void Graph_OpenDisps(', 'void Graph_CloseDisps('))
+native_graph+='\n'+rcp[rcp.index('Gfx sSetupDL['):rcp.index('\n};',rcp.index('Gfx sSetupDL['))+3]
+native_graph+='\n'+'\n'.join(function(rcp,signature) for signature in (
+    'void Gfx_SetupDL_25Opa(', 'void Gfx_SetupDL_25Xlu('))
+native_gbi='\n'.join(function(wrappers,signature) for signature in (
+    'extern "C" void gSPDisplayList(', 'extern "C" void gSPVertex('))
+first=renderer.index('struct NeiGi_ArenaBudget {')
+native_arena=renderer[first:renderer.index('// Child meshes',first)]
+native_arena+='\nextern "C" '+function(renderer,'bool NeiGi_CanDrawLayers(')
+native_interpreter='\n'.join(function(interpreter,signature) for signature in (
+    'void* Interpreter::SegAddr(', 'bool gfx_vtx_handler_f3dex2(',
+    'void Interpreter::GenerateCC(', 'void Interpreter::GfxDpSetCombineMode(',
+    'void Interpreter::GfxDpSetOtherMode(', 'void Interpreter::GfxSpSetOtherMode(',
+    'bool gfx_set_combine_handler_rdp(', 'bool gfx_rdp_set_other_mode_rdp(',
+    'bool gfx_othermode_l_handler_f3dex2(', 'void Interpreter::GfxDpSetPrimColor(',
+    'bool gfx_set_prim_color_handler_rdp('))
+# An obsolete implementation with these names survives inside a block comment.
+# Select the live helpers following the production combine-mode setter.
+combine_source=interpreter[interpreter.index('void Interpreter::GfxDpSetCombineMode('):]
+native_interpreter='\n'.join(function(combine_source,signature) for signature in (
+    'static inline uint32_t color_comb(', 'static inline uint32_t alpha_comb('))+'\n'+native_interpreter
+interpreter_header=(ROOT/'libultraship/include/fast/interpreter.h').read_text()
+native_combiner='\n'.join(function(interpreter_header,signature)+';' for signature in (
+    'enum {\n    SHADER_0', 'enum class ShaderOpts', 'struct ColorCombinerKey', 'struct ColorCombiner {', 'struct RGBA {'))
+native_combiner+='\n#define SHADER_OPT(opt) ((uint64_t)(1 << static_cast<int>(ShaderOpts::opt)))\n'
+source=(ROOT/'tests/regional_passages/lake_render_test.cpp').read_text()
+packed_start=interpreter.index('for (int j = 0; j < numInputs; j++)')
+packed_end=interpreter.index('{',packed_start)+1
+depth=1
+while depth:
+    depth+=(interpreter[packed_end]=='{')-(interpreter[packed_end]=='}')
+    packed_end+=1
+for marker,value in (('NATIVE_GRAPH',native_graph),('NATIVE_GBI',native_gbi),
+                     ('NATIVE_ARENA',native_arena),('PRODUCTION_DRAW',draw),
+                     ('NATIVE_INTERPRETER',native_interpreter),
+                     ('NATIVE_COMBINER_DEFINITIONS',native_combiner),
+                     ('NATIVE_PACKED_INPUTS', interpreter[packed_start:packed_end])):
+    source=source.replace('/* '+marker+' */',value)
+with tempfile.TemporaryDirectory(prefix='lake-render-') as temporary:
+    temporary=Path(temporary);cpp=temporary/'test.cpp';cpp.write_text(source);binary=temporary/'test'
+    command=[os.environ.get('CXX','c++'),'-std=c++20','-fpermissive','-w','-DF3DEX_GBI_2','-DCOMBO_BUILD',
+             '-DFMT_HEADER_ONLY','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
+             *['-I'+str(ROOT/p) for p in paths]]
+    if a.sanitize:command+=['-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-no-pie']
+    subprocess.run(command+[str(cpp),'-o',str(binary)],check=True)
+    subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
+
+# Run the production actor/provider with the engine's actual DynaPoly registration
+# and destruction functions. Rendering/resource lookup is a separate native compile.
 body=provider[provider.index('namespace {'):provider.index('void CaveDraw(')]
 register=provider[provider.index('void RegisterCave()'):provider.index('} // namespace')]
 # Exclude only the draw callback from the native physics fixture. Formatting

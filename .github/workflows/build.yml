@@ -44,6 +44,9 @@ jobs:
       - name: Verify game picker with Windows SDK before configuring
         run: python -B tests/solo_games/selection_test.py --msvc --compiler cl
 
+      - name: Verify shared geometry with Windows SDK before configuring
+        run: python -B tests/regional_passages/run_header_portability_tests.py --msvc --compiler cl
+
       - name: Verify blue-warp hook with MSVC before configuring
         run: python -B tests/cross_dungeon/oot_blue_warp_hook_test.py --msvc --compiler cl
 
@@ -157,7 +160,25 @@ jobs:
             exit $sohBuildExitCode
           }
       - name: Build 2ship
-        run: cmake --build build/x64 --target 2ship --config Release
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $mmBuildLog = Join-Path $env:RUNNER_TEMP "2ship-build.log"
+          cmake --build build/x64 --target 2ship --config Release 2>&1 | Tee-Object -FilePath $mmBuildLog
+          $mmBuildExitCode = $LASTEXITCODE
+          if ($mmBuildExitCode -ne 0) {
+            $diagnosticLines = @(Get-Content $mmBuildLog |
+              Where-Object { $_ -match '(?i)(error C[0-9]{4}|fatal error|LNK[0-9]{4}|MSB[0-9]{4}|: error )' })
+            if ($diagnosticLines.Count -gt 40) {
+              $diagnosticLines = @($diagnosticLines | Select-Object -First 20) + @($diagnosticLines | Select-Object -Last 20)
+            }
+            if (-not $diagnosticLines) {
+              $diagnosticLines = Get-Content $mmBuildLog | Select-Object -Last 40
+            }
+            $diagnostic = ($diagnosticLines -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows 2Ship build diagnostic::$diagnostic"
+            exit $mmBuildExitCode
+          }
       # Headless seed validator (pulls libultraship/soh/2ship as deps, already built above). Uploaded
       # below so validate-seed.yml can download it from develop instead of doing its own build.
       # Nothing else depends on it, so it is skipped unless a caller asks for the validator.

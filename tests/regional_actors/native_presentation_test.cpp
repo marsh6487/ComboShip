@@ -27,7 +27,13 @@ void Actor_SetScale(Actor *a, f32 s) { a->scale = {s, s, s}; }
 void ActorShape_Init(ActorShape *a, f32 y, ActorShadowFunc, f32) {
   a->yOffset = y;
 }
-void Actor_SetFocus(Actor *, f32) {}
+void Actor_SetFocus(Actor *a, f32 y) { a->focus.pos = a->world.pos; a->focus.pos.y += y; }
+void Matrix_MultVec3f(Vec3f* offset, Vec3f* target) {
+  *target = {12, 17 + .01f * offset->y, 67};
+}
+void Scene_SetRenderModeXlu(PlayState* play, s32 index, u32 flags) {
+  assert(index == 0 && flags == 1);
+}
 s32 SkelAnime_Update(SkelAnime *) {
   ++updates;
   return 0;
@@ -59,9 +65,13 @@ Mtx *Matrix_Finalize(GraphicsContext *) {
   static Mtx m;
   return &m;
 }
-void SkelAnime_DrawOpa(PlayState *, void **, Vec3s *, OverrideLimbDrawOpa,
-                       PostLimbDrawOpa, Actor *a) {
+void SkelAnime_DrawOpa(PlayState *play, void **, Vec3s *, OverrideLimbDrawOpa,
+                       PostLimbDrawOpa post, Actor *a) {
   assert(a->id == ACTOR_EN_RAIL_SKB);
+  assert(post);
+  Vec3s rot{}; Gfx* list = nullptr;
+  post(play, STALCHILD_LIMB_HEAD, &list, &rot, a);
+  assert(a->focus.pos.y == 17);
   ++opaDraw;
 }
 void SkelAnime_DrawFlexOpa(PlayState *p, void **, Vec3s *, s32 count,
@@ -72,6 +82,8 @@ void SkelAnime_DrawFlexOpa(PlayState *p, void **, Vec3s *, s32 count,
   Gfx *start = p->state.gfxCtx->polyOpa.p;
   Vec3s r{};
   Gfx *d = nullptr;
+  post(p, OBJECT_ZOG_LIMB_09, &d, &r, a);
+  assert(a->focus.pos.y == 27);
   post(p, 16, &d, &r, a);
   assert(start == p->state.gfxCtx->polyOpa.p);
   post(p, 17, &d, &r, a);
@@ -79,11 +91,15 @@ void SkelAnime_DrawFlexOpa(PlayState *p, void **, Vec3s *, s32 count,
          start + (((a->params >> 4) & 15) ? 2 : 0));
 }
 Gfx *SkelAnime_DrawFlex(PlayState *p, void **, Vec3s *, s32 count,
-                        OverrideLimbDraw, PostLimbDraw, Actor *a, Gfx *g) {
+                        OverrideLimbDraw, PostLimbDraw post, Actor *a, Gfx *g) {
   assert(a->id == ACTOR_EN_GG && count == 17);
   ++xluDraw;
   assert(p->state.gfxCtx->polyOpa.p == commands &&
          g[-1].words.w1 == 0xffffffB0U);
+  assert(post);
+  Vec3s rot{}; Gfx* list = nullptr;
+  post(p, OBJECT_GG_LIMB_04, &list, &rot, a, &g);
+  assert(a->focus.pos.y == 17);
   return g;
 }
 }
@@ -112,6 +128,7 @@ int main() {
       assert(a->update && a->draw && a->destroy);
       assert(!(a->flags & ACTOR_FLAG_REACT_TO_LENS));
       assert(a->category == ACTORCAT_NPC);
+      assert(a->flags & ACTOR_FLAG_ATTENTION_ENABLED);
       a->update(a, &p);
       assert(a->world.pos.x == 3 && a->world.pos.y == 4 && a->world.pos.z == 5);
       assert(a->shape.rot.x == 0 && a->shape.rot.y == 222 &&
@@ -119,6 +136,9 @@ int main() {
       gfx.polyOpa.p = commands;
       gfx.polyXlu.p = commands + 64;
       a->draw(a, &p);
+      const Vec3f focus = a->focus.pos;
+      a->update(a, &p);
+      assert(!std::memcmp(&focus, &a->focus.pos, sizeof(focus)));
       a->destroy(a, &p);
     }
     available = false;
@@ -130,5 +150,5 @@ int main() {
   missing = "DL_0280A8";
   assert(ComboRegionalActor_TryInit(expected, &p) && !expected->destroy);
   assert(killed == 4 && freed == 9 && normalInit == 5 && flexInit == 4 &&
-         opaDraw == 7 && xluDraw == 2 && updates == 9);
+         opaDraw == 7 && xluDraw == 2 && updates == 18);
 }

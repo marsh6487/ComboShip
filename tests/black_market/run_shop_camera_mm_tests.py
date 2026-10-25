@@ -2,12 +2,13 @@
 """Run actual native MM shop actions through the production adapter/camera path.
 
 The complete EnOssan C translation unit and actual EnGirlA update functions run.
-No CutsceneManager, Fixed1, mode/setting selection, camera allocation, or camera
+No CutsceneManager, Data4, mode/setting selection, camera allocation, or camera
 copy routine is replaced. The fixture controls input/messages, actor animation,
 player cs-action, HUD/audio, and an unobstructed collision-query boundary. This
 is native source integration evidence, not configured game/runtime evidence.
 """
 from pathlib import Path
+import json
 import os
 import re
 import subprocess
@@ -42,11 +43,13 @@ def native_engine_source(observe=False):
     prefix = data[:data.index("} CameraSetting;") + len("} CameraSetting;")]
     prefix += '\n#define CAM_SETTING_MODE_ENTRY(func, data) { func, ARRAY_COUNT(data), data }\n'
     for values, modes in (("D_801B5824", "sCamSetFixed1Modes"),
+                          ("sSetBlackMarketOotModeNormalData", "sCamSetBlackMarketOotModes"),
                           ("sSetCutscenesModeNormalData", "sCamSetFree0Modes")):
         prefix += array(data, "CameraModeValue " + values + "[")
         prefix += array(data, "CameraMode " + modes + "[")
     prefix += "CameraSetting sCameraSettings[CAM_SET_MAX]{};\nvoid InitNativeCameraTable() {\n"
-    for setting, modes in (("CAM_SET_FIXED1", "sCamSetFixed1Modes"), ("CAM_SET_FREE0", "sCamSetFree0Modes")):
+    for setting, modes in (("CAM_SET_FIXED1", "sCamSetFixed1Modes"), ("CAM_SET_FREE0", "sCamSetFree0Modes"),
+                           ("CAM_SET_BLACK_MARKET_OOT", "sCamSetBlackMarketOotModes")):
         entry = re.search(r"^\s*(\{[^\n]*" + modes + r"[^\n]*\}),", data, re.M).group(1)
         prefix += "sCameraSettings[" + setting + "] = " + entry + ";\n"
     prefix += "}\n" + array(data, "s16 sGlobalCamDataSettings[")
@@ -75,7 +78,8 @@ def native_engine_source(observe=False):
         "s32 Camera_ChangeSetting(", "s16 Camera_GetBgCamOrActorCsCamSetting(",
         "Vec3s* Camera_GetBgCamOrActorCsCamFuncData(", "s32 Camera_ChangeActorCsCamIndex(",
         "void Camera_Init(", "s32 Camera_ChangeStatus(", "s32 Camera_Copy(",
-        "s32 Camera_BgCheck(", "s32 Camera_Fixed1("))
+        "s32 Camera_BgCheck(", "s32 Camera_Fixed1(", "s32 Camera_Noop(",
+        "void Camera_SetOotShopFaceAngle(", "s32 Camera_Data4("))
     prefix += "\n".join(function(play, signature) for signature in (
         "s16 Play_CreateSubCamera(", "s16 Play_GetActiveCamId(", "s32 Play_ChangeCameraStatus(",
         "void Play_ClearCamera(", "Camera* Play_GetCamera(", "void Play_CopyCamera(",
@@ -151,6 +155,72 @@ def build_source():
         "/* PRODUCTION ADAPTER */", production)
 
 
+def check_selection_clearance(binary, temporary):
+    """Bound actual native forward/return frame intervals against room boards."""
+    import numpy as np
+    sys.path.insert(0, str(ROOT / 'scripts/assets'))
+    sys.path.insert(0, str(ROOT / 'tools/black_market'))
+    from prepare_native_market import prepared_resources
+    from keeper_lean import room_faces
+    from presentation_preview import triangle_box_intersects
+    import mm_shop_presentation
+
+    class Pack:
+        resources = prepared_resources(host='mm')
+        def read(self, name):
+            if name == mm_shop_presentation.ROOM_ROOT:
+                name = mm_shop_presentation.CLONES[name]
+            return self.resources[name]
+
+    room = np.array(room_faces(Pack()), dtype=float)
+    shelf_binary = Path(temporary) / 'shelves'
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-I' + str(ROOT),
+                    str(ROOT / 'tools/black_market/mm_shop_layout_preview.cpp'), '-o', str(shelf_binary)], check=True)
+    fixture = json.loads(subprocess.check_output([str(shelf_binary)], text=True))
+    faces = ((4, 5, 6, 7), (1, 0, 3, 2), (5, 1, 2, 6),
+             (0, 4, 7, 3), (7, 6, 2, 3), (0, 1, 5, 4))
+    boards = np.array([np.array(points)[[face[n] for n in indices]]
+                       for points in fixture['corners'] for face in faces
+                       for indices in ((0, 1, 2), (0, 2, 3))], dtype=float)
+    geometry = [('room', room), ('shelves', boards)]
+    geometry = [(name, triangles, triangles.min(1), triangles.max(1)) for name, triangles in geometry]
+    # Authored FrameFit envelope plus actual BuildLock minimum radii/margins.
+    # Arbitrary external replacement models are not bounded by this proof.
+    relative = np.array(fixture['envelope'], dtype=float)
+    paths = json.loads(subprocess.check_output([str(binary), 'selection-paths'], text=True,
+                                              env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'}))
+    assert len(paths) == 8
+    for slot, frames in enumerate(paths):
+        for first, last in zip(frames, frames[1:]):
+            start, end = np.array(first['position']), np.array(last['position'])
+            # Each hull encloses the entire interval, including linear render
+            # interpolation between native updates. Subdivision reduces false positives.
+            for step in range(32):
+                a = start + (end - start) * step / 32
+                b = start + (end - start) * (step + 1) / 32
+                low, high = np.minimum(a, b) + relative[0], np.maximum(a, b) + relative[1]
+                for name, triangles, minimum, maximum in geometry:
+                    candidates = np.all(maximum >= low, axis=1) & np.all(minimum <= high, axis=1)
+                    assert not any(triangle_box_intersects(face, low, high) for face in triangles[candidates]), (
+                        slot, name, 'native selection/return interval crosses geometry', a, b)
+                # Use the real ported Data4 poses. Bound rendering
+                # interpolation at 1/32-frame resolution.
+                from check_browsing_frame import project
+                import itertools
+                for fraction, point in ((step / 32, a), ((step + 1) / 32, b)):
+                    view = {key: (np.array(first[key]) + fraction *
+                                  (np.array(last[key]) - first[key])).tolist()
+                            for key in ('eye', 'at')}
+                    view['fov'] = first['fov']
+                    projected = np.array([project(corner, view) for corner in
+                                          itertools.product(*zip(*(relative + point)))])
+                    lo, hi = projected.min(0), projected.max(0)
+                    assert lo[0] > 8 and hi[0] < 312 and lo[1] > 34 and hi[1] < 138, (
+                        slot, 'actual native camera selection/return clips UI', fraction, lo, hi, view)
+    print(f'PASS all8 native selection/return paths: full private item/seal envelopes clear '
+          f'{len(room)} actual room and {len(boards)} shelf triangles, including frame interpolation')
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="market-mm-native-camera-") as temporary:
         cpp = Path(temporary) / "mm.cpp"
@@ -164,6 +234,8 @@ def main():
         subprocess.run(command, check=True)
         subprocess.run([str(binary), *sys.argv[1:]], check=True,
                        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+        if len(sys.argv) == 1:
+            check_selection_clearance(binary, temporary)
 
 
 if __name__ == "__main__":

@@ -66,56 +66,20 @@ int main() {
   gPlayState = &p;
   p.state.running = true;
   p.roomCtx.curRoom.segment = (void *)1;
-  Player player{};
-  p.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 0);
-  ready = true;
-  floorAvailable = false;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 0);
-  floorAvailable = true;
-  blocked = true;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 0);
-  blocked = false;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 1 && spawned[0].params == 0x7D02);
-  assert(spawned[0].world.pos.x == 1740 && spawned[0].world.pos.y == 292 &&
-         spawned[0].world.pos.z == 150);
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 1);
-  p.pauseCtx.state = 1;
-  ComboRegionalActorsOot_Update();
-  assert(spawned[0].update);
-  p.pauseCtx.state = 0;
   Actor authored{};
   authored.id = ACTOR_EN_VIEWER;
-  authored.params = 0x7D12;
+  authored.params = 0x7E1F;
   authored.update = Alive;
-  authored.next = p.actorCtx.actorLists[ACTORCAT_NPC].head;
   p.actorCtx.actorLists[ACTORCAT_NPC].head = &authored;
-  ComboRegionalActorsOot_Update();
-  assert(!spawned[0].update && spawnCount == 1 && authored.update);
-  endpointRoute = 6;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 3);
-  assert(spawned[1].params == 0x7D11 && spawned[2].params == 0x7E0C);
-  assert(spawned[1].world.pos.x == -2005 && spawned[1].world.pos.y == -1305 &&
-         spawned[1].world.pos.z == 3673);
-  assert(spawned[2].world.pos.x == -2105 && spawned[2].world.pos.z == 3653);
-  gComboGameMode = COMBO_GAME_OOT;
-  ComboRegionalActorsOot_Update();
-  assert(!spawned[1].update && !spawned[2].update && authored.update);
-  gComboGameMode = COMBO_GAME_MM;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 3);
-  gComboGameMode = COMBO_GAME_BOTH;
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 5);
-  Actor_Kill(&spawned[3]);
-  ComboRegionalActorsOot_Update();
-  assert(spawnCount == 5); // no repeated missing-resource spawns
-  puts("PASS native OoT placement update: delayed endpoint/floor, obstruction, "
-       "authored override, paired Lulu, pause, modes and no respawn churn");
+  for (int mode : {COMBO_GAME_OOT, COMBO_GAME_MM, COMBO_GAME_BOTH})
+    for (int route : {5, 6, 7})
+      for (int tick = 0; tick < 120; ++tick) {
+        gComboGameMode = mode;
+        endpointRoute = route;
+        ready = true;
+        ComboRegionalActorsOot_Update();
+        assert(spawnCount == 0 && authored.update == Alive);
+        assert(p.actorCtx.actorLists[ACTORCAT_NPC].head == &authored);
+      }
+  puts("PASS regional scenes: no automatic catalogue actors; Prelude-authored actor preserved");
 }

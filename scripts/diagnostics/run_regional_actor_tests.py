@@ -16,7 +16,7 @@ loader=(ROOT/'soh/mods/transformation_masks/assets/mm_asset_loader.cpp').read_te
 table=re.search(r'static Gfx sMmOpaqueRenderModeDL\[\] = \{.*?\n\};',loader,re.S).group(0)
 fixture=fixture.replace('/* PRODUCTION_OPAQUE_RENDER_MODE */',table+'\n'+function(loader,'MmAssets_GetOpaqueRenderMode'))
 names=['EnViewer_Update','EnViewer_Destroy','EnViewer_StaticSelectSkullKidModel','EnViewerStatic_WaitForObjects','EnViewerStatic_Update','EnViewer_StaticGreatFairyEyeIndex','EnViewer_StaticGreatFairyOverrideLimbDraw','EnViewer_DrawStaticGreatFairy','EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw','EnViewer_StaticAnjuPostLimbDraw','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid','EnViewerStatic_Draw']
-if 'static void EnViewer_StaticMikauPostLimbDraw' in viewer: names.insert(names.index('EnViewer_DrawStaticMmActor'),'EnViewer_StaticMikauPostLimbDraw')
+names[names.index('EnViewer_DrawStaticMmActor'):names.index('EnViewer_DrawStaticMmActor')] = ['EnViewer_StaticMikauPostLimbDraw', 'EnViewer_StaticRegionalPostLimbDraw', 'EnViewer_StaticRegionalPostLimbDrawXlu']
 table=re.search(r'static EnViewerDrawFunc sDrawFuncs\[\] = \{.*?\n\};',viewer,re.S).group(0)
 fixture=fixture.replace('/* PRODUCTION_VIEWER_FUNCTIONS */','\n'.join(function(viewer,n) for n in names)+table+function(viewer,'EnViewer_Draw'))
 with tempfile.TemporaryDirectory(prefix='regional-actors-') as d:
@@ -30,8 +30,7 @@ with tempfile.TemporaryDirectory(prefix='regional-actors-') as d:
         print('PASS regional/native viewer: '+('combo' if combo else 'solo'))
 
 source=(ROOT/'soh/soh/Enhancements/Gameplay/ComboRegionalActors.cpp').read_text()
-core=source.split('namespace {',1)[1].split('void RegisterRegionalActors()',1)[0]
-fixture=(ROOT/'tests/regional_actors/oot_placement_test.cpp').read_text().replace('/* PRODUCTION_RUNTIME */','namespace {\n'+core+'}\n'+function(source,'ComboRegionalActorsOot_Update'))
+fixture=(ROOT/'tests/regional_actors/oot_placement_test.cpp').read_text().replace('/* PRODUCTION_RUNTIME */',function(source,'ComboRegionalActorsOot_Update'))
 with tempfile.TemporaryDirectory(prefix='regional-placement-') as d:
     path=Path(d)/'placement.cpp';path.write_text(fixture)
     obj=Path(d)/'catalog.o'

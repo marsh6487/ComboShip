@@ -470,6 +470,9 @@ extern "C" int ComboRegionalPassagesOot_AtDeparture(PlayState* play, const Vec3f
     CaptureOrigin();
     return sRegional.route;
 }
+extern "C" int ComboRegionalPassagesOot_IsArrivalPending(PlayState* play) {
+    return Bound() && play && play == gPlayState && sArrivalRoute && SceneRoute(play->sceneNum) == sArrivalRoute;
+}
 extern "C" int ComboRegionalPassagesOot_ApplyArrival(int route) {
     if (!Bound() || !ComboRegionalPassages_IsRoute(route))
         return 0;

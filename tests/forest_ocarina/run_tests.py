@@ -35,6 +35,7 @@ def build_source():
     native = data[:data.index("} CameraSetting;") + len("} CameraSetting;")]
     native += "\n#define CAM_SETTING_MODE_ENTRY(func, data) { func, ARRAY_COUNT(data), data }\n"
     native += "#define CAM_SETTING_MODE_NULL {0, 0, nullptr}\n"
+    native += array((ROOT / "mm/src/code/z_inventory.c").read_text(), "u32 gBitFlags[")
     for name in ("D_801B53EC", "D_801B5410", "D_801B5434", "D_801B5458", "D_801B547C",
                  "sSetCutscenesModeNormalData", "sSetNormal0ModeNormalData"):
         native += array(data, "CameraModeValue " + name + "[")
@@ -62,10 +63,13 @@ def build_source():
                                    "Camera_SetUpdateRatesFastPitch", "Camera_SetFocalActorAtOffset", "Camera_GetFocalActorHeight",
                                    "Camera_ResetActionFuncState", "func_800DF498", "Camera_ChangeModeFlags", "Camera_ChangeSettingFlags",
                                    "Camera_ChangeSetting", "Camera_GetBgCamOrActorCsCamSetting", "Camera_ChangeActorCsCamIndex",
-                                   "Camera_Init", "Camera_ChangeStatus", "Camera_Copy", "Camera_CalcXZAngle", "Camera_KeepOn4")),
+                                   "Camera_Init", "Camera_ChangeStatus", "Camera_Copy", "Camera_CalcXZAngle", "Camera_KeepOn4",
+                                   "Camera_UpdateInterface")),
         ("mm/src/code/z_play.c", ("Play_CreateSubCamera", "Play_GetActiveCamId", "Play_ChangeCameraStatus", "Play_ClearCamera",
                                  "Play_GetCamera", "Play_CopyCamera", "Play_GetActorCsCamSetting", "Play_AssignPlayerCsIdsFromScene")),
-        ("mm/src/overlays/actors/ovl_player_actor/z_player.c", ("func_808323C0",)),
+        ("mm/src/overlays/actors/ovl_player_actor/z_player.c", ("func_808323C0", "func_808525C4", "Player_Action_63")),
+        ("mm/src/code/z_parameter.c", ("Interface_SetHudVisibility", "Interface_UpdateButtonAlphasByStatus",
+                                      "Interface_UpdateButtonAlphas", "Interface_UpdateHudAlphas")),
     ):
         bodies = functions((ROOT / path).read_text(), set(names))
         assert set(bodies) == set(names), (path, set(names) - set(bodies))
@@ -73,9 +77,27 @@ def build_source():
     native = array(play, "s16 sPlayerCsIdToCsCamId[") + native
     manager = re.sub(r"^#include[^\n]*", "", (ROOT / "mm/src/code/z_eventmgr.c").read_text(), flags=re.M)
     native += manager
+    message = (ROOT / "mm/src/code/z_message.c").read_text()
+    for name in ("D_801D028C", "sOcarinaSongFlagsMap"):
+        native += array(message, "u16 " + name + "[")
+    native += "\n".join(functions(message, {"Message_DisplayOcarinaStaffImpl", "Message_DisplayOcarinaStaff"}).values())
+    parameter = (ROOT / "mm/src/code/z_parameter.c").read_text()
+    hud_update = functions(parameter, {"Interface_Update"})["Interface_Update"]
+    native += "\nvoid NativeHudFrame(PlayState* play) { InterfaceContext* interfaceCtx = &play->interfaceCtx; s16 dimmingAlpha, risingAlpha;\n"
+    native += block_from(hud_update, hud_update.index("    switch (gSaveContext.nextHudVisibility)")) + "\n}\n"
+    mirror = (ROOT / "combo/gameplay/MagicMirrorRuntime.inc.h").read_text()
+    mirror_state = mirror[mirror.index("struct Context {"):mirror.index("void QueueArrival()")]
+    mirror_names = ("QueueArrival", "Mode", "Locate", "ArrivalDestination", "Landing", "PrepareArrival", "FinishArrival")
+    mirror_functions = functions(mirror, set(mirror_names))
+    native += "\n#ifdef COMBO_BUILD\n#define COMBO_MAGIC_MIRROR_MM\nnamespace MirrorRuntime {\n"
+    native += mirror_state + "\n" + "\n".join(mirror_functions[name] for name in mirror_names)
+    native += "\n}\n#undef COMBO_MAGIC_MIRROR_MM\n#endif\n"
     for name in ("ComboBlackMarket_PrepareSpawn",):
         native += "#ifdef COMBO_BUILD\n" + functions(startup, {name})[name] + "\n#endif\n"
     native += block_from(startup, startup.index('extern "C" void OTRPlay_InitScene('))
+    # This native function contains a commented-out opening brace.
+    room_startup = re.sub(r"//[^\n]*", "", startup)
+    native += block_from(room_startup, room_startup.index('extern "C" s32 OTRfunc_800973FC('))
     native = re.sub(r"\bthis\b", "self", native)
     normalization = re.search(r"    actor->csId = csId & 0x7F;.*?\n    }", actor, re.S)[0]
     fixture = (ROOT / "tests/forest_ocarina/native_test.cpp").read_text()
@@ -87,6 +109,10 @@ def build_source():
         spawn = native_forest.read_actor_list(commands[0])[0]
         literal = "{" + str(spawn[0]) + ",{" + ",".join(map(str, spawn[1:4])) + "},{" + ",".join(map(str, spawn[4:7])) + "}," + str(spawn[7]) + "}"
         fixture = fixture.replace("/* " + marker + " SPAWN */", literal)
+        for room in range(3):
+            room_commands = native_forest.read_scene(resources[native_forest.SCENES[mode] + f"_room_{room}"])
+            assert 27 not in room_commands, "A room-authored cutscene list needs an explicit ownership control"
+            assert native_forest.read_mesh(room_commands[10])["type"] == 2
     return fixture
 
 

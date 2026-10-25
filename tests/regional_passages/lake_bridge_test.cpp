@@ -88,12 +88,45 @@ int main() {
   assert(kMouth.x + kShimmerFront == kBackX + 10);
   auto mesh = BuildGeometry();
   assert(mesh.solid.size() > 60 && mesh.water.size() >= 6);
+  assert(mesh.water.front().a.y > mesh.water.back().c.y + 1 &&
+         "the stream must descend from the cave to the receiving lake");
+  bool outsideSpill = false;
+  bool verticalCurtain = false;
+  for (const auto& q : mesh.water) {
+    assert(q.d.x >= q.a.x && q.d.y <= q.a.y + .0001f && q.c.y == q.d.y && q.a.y == q.b.y);
+    outsideSpill |= q.a.x >= -1825 && q.d.y < q.a.y - .01f;
+    verticalCurtain |= q.a.x > -1825 && std::fabs(q.d.x - q.a.x) < .001f && q.d.y < q.a.y - 1;
+    assert(q.a.x <= -1823 && q.d.x <= -1823 && "the outlet must fall at the edge, not extend into a runout");
+  }
+  assert(outsideSpill && "a falling outflow must extend beyond the authored front lip");
+  assert(verticalCurtain && "the water must turn downward over the front edge into a vertical curtain");
+  assert(std::fabs(mesh.water.back().c.y - kFullWaterY) < .001f &&
+         "the outflow must join the actual lake level");
   std::vector<Triangle> injected;
   for (const auto &q : mesh.solid)
     if (q.collides) {
       injected.push_back({q.a, q.b, q.c});
       injected.push_back({q.a, q.c, q.d});
     }
+  assert(Clear(injected, {-1800, -1311, 3757}, {-1840, -1311, 3757}) &&
+         "the outward stream must pass through an open outlet to the lake");
+  for (float z : {3739.f, 3809.f})
+    assert(!Clear(injected, {-1824, -1350, z}, {-1826, -1350, z}) &&
+           "the intake bevel must close against the solid front below the water slot");
+  float widestWater = 0;
+  for (const auto& q : mesh.water)
+    widestWater = std::max(widestWater, std::fabs(q.b.z - q.a.z));
+  assert(widestWater >= 36 && "the inlet must read as a watercourse rather than a twenty-unit stripe");
+  for (const auto& q : mesh.water)
+    for (float along : {0.f, .25f, .5f, .75f, 1.f})
+      for (float across : {.01f, .99f}) {
+        const float x = q.a.x + (q.d.x - q.a.x) * along;
+        const float nearZ = q.a.z + (q.d.z - q.a.z) * along;
+        const float farZ = q.b.z + (q.c.z - q.b.z) * along;
+        const float z = nearZ + (farZ - nearZ) * across;
+        assert(Floor(injected, x, z, kMouth.y + 1) <= q.a.y + .1f &&
+               "water must remain inside its actual solid banks at every bend");
+      }
   assert(Floor(injected, -1815, 3975, -1000) == -32768 &&
          "bank switchback and giant side-support assembly must be absent");
   for (const auto &q : mesh.solid)
@@ -156,7 +189,9 @@ int main() {
     }
     Walk(*evidence, injected, kApron, kMouth);
     Walk(*evidence, injected, kMouth, {kMouth.x + 100, kMouth.y, kMouth.z});
-    Walk(*evidence, injected, {-2185, -1305, 3787}, {-1925, -1305, 3787});
+    // The widened south-side channel occupies the former decorative rim.
+    // Both directions of the real dry route retain a full body-width reserve.
+    Walk(*evidence, injected, kMouth, kApron);
     // Deep tunnel is wholly lakeward of intact bank x=-2245; the lab is above.
     assert(kBackX > -2245 && kFacadeX - kBackX >= 300);
     for (float x : {-2185.f, -2085.f, -1985.f}) {
@@ -176,7 +211,7 @@ int main() {
   assert(!HasInlet(kChannelFloorY) &&
          !HasInlet(std::numeric_limits<float>::quiet_NaN()));
   assert(!HasInlet(kDrainedWaterY));
-  assert(StreamHeight(kFullWaterY) == kFullWaterY + 1);
+  assert(StreamHeight(kFullWaterY) == kFullWaterY);
   assert(StreamHeight(kDrainedWaterY) < kMouth.y &&
          StreamHeight(kDrainedWaterY) > kChannelFloorY);
   assert(StreamHeight(kFullWaterY) < kMouth.y);

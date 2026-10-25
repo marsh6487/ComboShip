@@ -2,7 +2,6 @@
 
 // Release-specific presentation only. Keep the actual widget labels, IDs, CVars,
 // callbacks and gameplay defaults intact. Replace this inventory for the next release.
-#include <algorithm>
 #include <cstring>
 #include <imgui.h>
 
@@ -10,7 +9,7 @@ namespace WhatsNew {
 inline constexpr char kEnabledCvar[] = "gSettings.Menu.WhatsNew";
 inline constexpr char kToggleTooltip[] =
     "Highlight this cumulative release's new controls in gold and updated controls in cyan. "
-    "Hover a NEW or UPDATED marker to see what changed. Turn off to restore normal menu styling.";
+    "Color only: controls keep their normal labels and layout. Turn off to restore normal menu styling.";
 
 enum class Kind { New, Updated };
 struct Entry {
@@ -20,6 +19,42 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.Graphics.OotLocationTitleCards", Kind::New,
+      "Use native OoT-style lettering and fades for MM location cards, with optional HD pack support." },
+    { "gEnhancements.MidnaCompanionMM", Kind::New, "Replace Tatl with the installed Midna companion and sounds." },
+    { "gEnhancements.MidnaCompanion", Kind::New, "Replace Navi with the installed Midna companion and sounds." },
+    { "gEnhancements.ChestStyleMatchesContentsMM", Kind::New,
+      "Show MM chest contents with the installed chest models." },
+    { "gEnhancements.ChestSizeMatchesContentsMM", Kind::New,
+      "Size MM chests by their contents independently of style." },
+    { "gCheats.DropsDontDie", Kind::Updated, "Keep collectible drops from timing out in both games." },
+    { "gEnhancements.DinFireSword", Kind::Updated, "Use the integrated animated fire material on Din's drawn sword." },
+    { "gRandoSettings.SkijerCustomItems", Kind::Updated, "Include the integrated custom inventory items in the seed." },
+    { "gRandoSettings.SW97Spells", Kind::Updated, "Include the integrated sage spells in the seed." },
+    { "gRandoSettings.MmMasksAll", Kind::Updated, "Include the installed MM masks in OoT's item pool." },
+    { "gRandoSettings.MmMasksTransform", Kind::Updated, "Include the MM transformation masks in OoT's item pool." },
+    { "gRandoSettings.MmSongs", Kind::Updated, "Include the MM songs in OoT's item pool." },
+    { "gRandoSettings.ExtEquipment", Kind::Updated, "Include integrated extended equipment in OoT's item pool." },
+    { "gRandoSettings.NeiWeaponUpgrades", Kind::Updated, "Include integrated weapon upgrades in OoT's item pool." },
+    { "gRandoSettings.ShuffleBombArrows", Kind::Updated, "Choose how Bomb Arrows are obtained in the seed." },
+    { "gRandoSettings.ElementalWandShuffle", Kind::Updated, "Choose how the Elemental Wand's six rods unlock." },
+    { "gRandoSettings.CrossoverPokeball", Kind::Updated, "Include the Pikachu Pokeball crossover unlock in the seed." },
+    { "gRandoSettings.CrossoverMarioMask", Kind::Updated, "Include the Mario Mask crossover unlock in the seed." },
+    { "gRando.Options.RO_SHUFFLE_NEI_ITEMS", Kind::Updated,
+      "Include the integrated custom inventory items in MM's pool." },
+    { "gRando.Options.RO_SHUFFLE_OOT_GEAR", Kind::Updated, "Include OoT gear in a solo-MM item pool." },
+    { "gRando.Options.RO_SHUFFLE_OOT_EQUIPMENT", Kind::Updated,
+      "Include OoT extended equipment in a solo-MM item pool." },
+    { "gRando.Options.RO_SHUFFLE_OOT_QUEST", Kind::Updated,
+      "Include OoT songs and quest items in a solo-MM item pool." },
+    { "gRando.Options.RO_SHUFFLE_OOT_MASKS", Kind::Updated, "Include OoT masks in a solo-MM item pool." },
+    { "gRando.Options.RO_SHUFFLE_BOMB_ARROWS", Kind::Updated, "Choose how Bomb Arrows are obtained in the seed." },
+    { "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE", Kind::Updated, "Choose how the Elemental Wand's six rods unlock." },
+    { "gRando.Options.RO_CROSSOVER_POKEBALL", Kind::Updated,
+      "Include the Pikachu Pokeball crossover unlock in the seed." },
+    { "gRando.Options.RO_CROSSOVER_MARIO_MASK", Kind::Updated, "Include the Mario Mask crossover unlock in the seed." },
+    { "gRando.Options.RO_MAPS_COMPASSES_GIVE_INFORMATION", Kind::Updated,
+      "Read saved entrance and boss-reward information from MM maps and compasses." },
     { "gCosmetics.Custom.DinFireShieldCore.Value", Kind::New,
       "Integrated effect and Black Market colors are editable here; related color channels stay together." },
     { "gCosmetic.Custom.DinFireShieldCore.Color", Kind::New,
@@ -374,6 +409,7 @@ inline constexpr Entry kControls[]{
 // These custom sections have no backing CVar. Never use substring/prefix matching:
 // an older unrelated control must not inherit a release marker by accident.
 inline constexpr Entry kSections[]{
+    { "Midna Sound Effects", Kind::New, "Assign the installed Midna companion sounds to individual events." },
     { "Weather & Seasons", Kind::New, "Seasonal presentation and outdoor weather controls are grouped here." },
     { "Spring", Kind::New, "Spring rain and falling-petal presentation controls." },
     { "Summer", Kind::New, "Summer drifting fluff, nighttime fireflies and optional sunbeams." },
@@ -418,44 +454,20 @@ inline bool BeginTabItem(const char* label, bool enabled) {
     const bool open = ImGui::BeginTabItem(label);
     ImGui::PopStyleColor();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s: %s", entry->kind == Kind::New ? "NEW" : "UPDATED", entry->note);
+        ImGui::SetTooltip("%s", entry->note);
     return open;
 }
 
-// The marker is a non-interactive text item before the real widget. The original
-// widget stays the last item for its tooltip, callbacks and keyboard navigation.
-// A scope also restores the color on native early returns and exceptions.
+// Styling never submits an item or changes layout/last-item state. The native
+// widget owns its caption, tooltip and navigation. Restore color on every exit.
 class Scope {
   public:
     Scope(const char* cvar, const char* label, bool enabled, bool disabled = false) {
         const Entry* entry = enabled ? Find(cvar, label) : nullptr;
-        if (!entry)
+        if (!entry || disabled)
             return;
-        const ImVec4 normal = ImGui::GetStyle().Colors[ImGuiCol_Text];
         ImGui::PushStyleColor(ImGuiCol_Text, Accent(entry->kind));
-        const char* marker = entry->kind == Kind::New ? "NEW" : "UPDATED";
-        const auto& style = ImGui::GetStyle();
-        // Native checkboxes push eight pixels of vertical padding per side,
-        // enlarging their square after this shared measurement.
-        const float controlWidth = std::max(ImGui::GetFrameHeight(), ImGui::GetTextLineHeight() + 16.0f);
-        const float inlineWidth = label ? ImGui::CalcTextSize(label, nullptr, true).x + ImGui::CalcTextSize(marker).x +
-                                              controlWidth + style.ItemInnerSpacing.x * 3.0f
-                                        : 0.0f;
-        const bool inlineMarker = label && inlineWidth <= ImGui::GetContentRegionAvail().x;
-        ImGui::TextUnformatted(marker);
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::PushStyleColor(ImGuiCol_Text, normal);
-            ImGui::SetTooltip("%s: %s", marker, entry->note);
-            ImGui::PopStyleColor();
-        }
-        if (inlineMarker)
-            ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-        // Gated integrations remain discoverable, but their actual controls
-        // retain the native disabled text and input behavior.
-        if (disabled)
-            ImGui::PopStyleColor();
-        else
-            mActive = true;
+        mActive = true;
     }
     ~Scope() {
         if (mActive)

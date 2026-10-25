@@ -1662,6 +1662,10 @@ void Play_DrawMain(PlayState* this) {
     }
 
 SkipPostWorldDraw:
+#ifdef COMBO_BUILD
+    // Pause/capture branches can bypass the general world-draw end hook.
+    ComboBlackMarket_RestoreRoomAfterDraw(this);
+#endif
 
     if ((this->view.unk164 != 0) && !gDbgCamEnabled) {
         Camera_Update(GET_ACTIVE_CAM(this));

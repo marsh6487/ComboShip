@@ -10,7 +10,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/ShipInit.hpp"
 #include "soh/frame_interpolation.h"
-#include "libultraship/bridge/resourcebridge.h"
+#include "ship/resource/ResourceManager.h"
 #include "fast/resource/type/DisplayList.h"
 #include "fast/resource/type/Vertex.h"
 #include <algorithm>
@@ -25,6 +25,11 @@ constexpr const char* kBackdrop = "scenes/shared/spot08_scene/spot08_room_0DL_00
 std::shared_ptr<Fast::DisplayList> sPatched;
 std::array<Gfx, 4> sOriginal{};
 bool sDetailedRender = false;
+const char* sBackdropState = "not-checked";
+std::shared_ptr<Fast::DisplayList> sObservedBackdrop;
+size_t sObservedVertices = 0;
+const void* sObservedOwner = nullptr;
+
 void RestoreBackdrop() {
     if (sPatched && sPatched->Instructions.size() == 45)
         for (size_t i = 0; i < kBackdropSlots.size(); ++i)
@@ -32,30 +37,46 @@ void RestoreBackdrop() {
     sPatched.reset();
 }
 bool PrepareBackdrop() {
-    auto list = std::dynamic_pointer_cast<Fast::DisplayList>(ResourceLoad(kBackdrop));
+    // Match the render graph's OoT namespace even if a UI/foreign draw has
+    // temporarily selected MM's manager. Never mutate the global active owner.
+    const auto owner = Ship::CrossRMRegistry::GetOrActive("oot");
+    sObservedOwner = owner.get();
+    const auto load = [&](const char* path) { return owner ? owner->LoadResource(path) : nullptr; };
+    auto list = std::dynamic_pointer_cast<Fast::DisplayList>(load(kBackdrop));
+    sObservedBackdrop = list;
+    sObservedVertices = 0;
     if (!list) {
+        sBackdropState = "missing-display-list";
         RestoreBackdrop();
         return false;
     }
-    if (list == sPatched)
+    if (list == sPatched) {
+        sBackdropState = "native-patched";
         return true;
+    }
     RestoreBackdrop();
     sDetailedRender = false;
-    if (NativeBackdropLayout(list->Instructions)) {
+    auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(load("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
+    sObservedVertices = vertices ? vertices->VertexList.size() : 0;
+    const auto vertexBase = vertices ? reinterpret_cast<uintptr_t>(vertices->GetPointer()) : 0;
+    if (NativeBackdropLayout(list->Instructions, vertexBase)) {
         // Verify the actual referenced vertex resource as well as command words.
-        auto vertices =
-            std::dynamic_pointer_cast<Fast::Vertex>(ResourceLoad("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
         constexpr Point expected[] = { { 2008, 145, 50 },   { 2049, 250, 448 },  { 2052, 718, 488 },
                                        { 2008, 614, 50 },   { 1969, 716, -382 }, { 1967, 250, -348 },
                                        { 1931, 961, -408 }, { 1928, 565, -370 }, { 1968, 462, 50 },
                                        { 1968, 862, 50 },   { 2012, 566, 488 },  { 2013, 966, 497 } };
-        if (!vertices || vertices->VertexList.size() < 12)
+        if (!vertices || vertices->VertexList.size() < 12) {
+            sBackdropState = "missing-native-vertices";
             return false;
+        }
         for (size_t i = 0; i < 12; ++i) {
             const auto& v = vertices->VertexList[i].v;
-            if (v.ob[0] != expected[i].x || v.ob[1] != expected[i].y || v.ob[2] != expected[i].z)
+            if (v.ob[0] != expected[i].x || v.ob[1] != expected[i].y || v.ob[2] != expected[i].z) {
+                sBackdropState = "foreign-native-vertices";
                 return false;
+            }
         }
+        sBackdropState = "native-patched";
         sPatched = list;
         for (size_t i = 0; i < kBackdropSlots.size(); ++i) {
             sOriginal[i] = list->Instructions[kBackdropSlots[i]];
@@ -72,15 +93,22 @@ bool PrepareBackdrop() {
         if ((c.words.w0 >> 24) == 0x27 && c.words.w1 &&
             std::strcmp(reinterpret_cast<const char*>(c.words.w1), leaf) == 0)
             callsLeaf = true;
-    if (!callsLeaf)
+    if (!callsLeaf) {
+        sBackdropState = "unrecognized-display-list";
         return false;
-    auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(
-        ResourceLoad("scenes/shared/spot08_scene/spot08_room_0DL_002538_vtx_0"));
-    if (!vertices || vertices->VertexList.empty())
+    }
+    vertices = std::dynamic_pointer_cast<Fast::Vertex>(load("scenes/shared/spot08_scene/spot08_room_0DL_002538_vtx_0"));
+    sObservedVertices = vertices ? vertices->VertexList.size() : 0;
+    if (!vertices || vertices->VertexList.empty()) {
+        sBackdropState = "missing-detailed-vertices";
         return false;
+    }
     for (const auto& v : vertices->VertexList)
-        if (v.v.ob[1] < 1000)
+        if (v.v.ob[1] < 1000) {
+            sBackdropState = "low-detailed-vertices";
             return false;
+        }
+    sBackdropState = "detailed-canopy";
     sDetailedRender = true;
     return true;
 }
@@ -104,6 +132,40 @@ bool Fountain(const PlayState* play) {
     return play && Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL &&
            ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) && play->sceneNum == SCENE_ZORAS_FOUNTAIN &&
            play->roomCtx.curRoom.num == 0;
+}
+// Report state changes only: a rejected visual-layout guard also withholds the
+// ascent actor and shortcut. Keep the exact rejection observable in pack reports
+// without weakening the guard or flooding the log on every draw/player update.
+struct ReadinessReport {
+    const PlayState* play = nullptr;
+    const void* backdrop = nullptr;
+    const void* owner = nullptr;
+    const char* status = nullptr;
+    int age = -1;
+    int layer = -1;
+};
+ReadinessReport sLastReport;
+void ReportReadiness(PlayState* play, const char* status) {
+    if (!play || play->sceneNum != SCENE_ZORAS_FOUNTAIN)
+        return;
+    if (sLastReport.play == play && sLastReport.backdrop == sObservedBackdrop.get() &&
+        sLastReport.owner == sObservedOwner && sLastReport.status == status &&
+        sLastReport.age == gSaveContext.linkAge && sLastReport.layer == gSaveContext.sceneLayer)
+        return;
+    sLastReport = {
+        play, sObservedBackdrop.get(), sObservedOwner, status, gSaveContext.linkAge, gSaveContext.sceneLayer
+    };
+    const auto metadata = sObservedBackdrop ? sObservedBackdrop->GetInitData() : nullptr;
+    const auto count = sObservedBackdrop ? sObservedBackdrop->Instructions.size() : 0;
+    const auto operand = [&](size_t slot) -> uintptr_t {
+        return slot < count ? sObservedBackdrop->Instructions[slot].words.w1 : 0;
+    };
+    LUSLOG_INFO("[SnowheadValley] status=%s backdrop=%s owner=%p room=%d age=%d layer=%d file=%d mode=%d "
+                "commands=%zu vertices=%zu vtx25=%zx vtx40=%zx actorId=%d actor=%p bgId=%d collision=%p",
+                status, metadata ? metadata->Path.c_str() : kBackdrop, sObservedOwner, play->roomCtx.curRoom.num,
+                gSaveContext.linkAge, gSaveContext.sceneLayer, gSaveContext.fileNum, gSaveContext.gameMode, count,
+                sObservedVertices, operand(25), operand(40), sActorId, static_cast<void*>(sActor),
+                sActor ? sActor->dyna.bgId : -1, static_cast<void*>(play->colCtx.colHeader));
 }
 bool SamePoint(const Vec3s& v, const Point& p) {
     return v.x == p.x && v.y == p.y && v.z == p.z;
@@ -234,7 +296,7 @@ void Draw(Actor*, PlayState* play) {
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BACK);
     gSPTexture(POLY_OPA_DISP++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
     gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_NONE);
-    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATERGBA, G_CC_MODULATERGBA);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATERGBA, G_CC_PASS2);
     for (bool floor : { false, true }) {
         if (!floor && sDetailedRender)
             continue; // Keep the existing detailed walls and their UVs.
@@ -282,6 +344,7 @@ void Ensure(PlayState* play) {
     Actor_Spawn(&play->actorCtx, play, sActorId, 0, 0, 0, 0, 0, 0, 0);
 }
 void Register() {
+    LUSLOG_INFO("[SnowheadValley] hooks registered");
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>([] { Ensure(gPlayState); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>([] {
         if (Fountain(gPlayState))
@@ -294,16 +357,26 @@ void Register() {
         sActor = nullptr;
         sOwner = nullptr;
         sSceneCollision = nullptr;
+        sObservedBackdrop.reset();
+        sObservedOwner = nullptr;
+        sLastReport = {};
     });
 }
 RegisterShipInitFunc valleyInit(Register);
 } // namespace
 extern "C" int ComboFountainValley_Ready(PlayState* play) {
-    if (!Fountain(play) || !PrepareBackdrop())
+    if (!Fountain(play)) {
+        ReportReadiness(play, "scene-guard");
         return 0;
+    }
+    if (!PrepareBackdrop()) {
+        ReportReadiness(play, sBackdropState);
+        return 0;
+    }
     Ensure(play);
     const bool ready =
         sActor && sOwner == play && sActor->dyna.actor.update && sSceneCollision == play->colCtx.colHeader;
+    ReportReadiness(play, ready ? sBackdropState : "collision-actor-unavailable");
     if (!ready)
         RestoreBackdrop(); // Never expose the native opening without its fitted collision.
     return ready;

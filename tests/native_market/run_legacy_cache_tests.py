@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory(prefix="market-legacy-cache-") as temporary:
 #include <set>
 #include <string>
 #include "combo/BlackMarketNativeResources.h"
+#include "combo/BlackMarketMmShopScene.h"
 #include "mm/2s2h/Enhancements/Gameplay/BlackMarketResources.h"
 #include "combo/BlackMarketEntry.h"
 std::set<std::string> cache;
@@ -34,6 +35,7 @@ bool CustomKeeperAvailable() {return false;}
 bool LoadNativeKeeper() {return false;}
 /* PRODUCTION */
 int main() {
+/* PRIVATE_MM_CLONES */
  for(const char* path:kBlackMarketResources) {
   // OTRExtScanner drops the final extension. Typed members add a suffix;
   // the builder's raw manifest.json member instead loses its .json suffix.
@@ -54,7 +56,8 @@ int main() {
  }
  puts("PASS legacy manifest cache key; scene/room/collision required; stock and optional art independent");
 }
-'''.replace("/* PRODUCTION */", body).replace("/* HOST */", "Mm" if host == "mm" else "Oot")
+'''.replace("/* PRODUCTION */", body).replace("/* HOST */", "Mm" if host == "mm" else "Oot").replace(
+    "/* PRIVATE_MM_CLONES */", 'for(const char* path:BlackMarketMmShopScene::kPresentationResources)cache.insert(path);' if host == 'mm' else '')
         cpp, binary = Path(temporary)/(host+".cpp"), Path(temporary)/host
         cpp.write_text(fixture)
         subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-I"+str(ROOT), str(cpp), "-o", str(binary)], check=True)

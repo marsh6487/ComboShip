@@ -39,6 +39,7 @@ bool sBuilt = false;
 SnowheadActor* sActor = nullptr;
 PlayState* sOwner = nullptr;
 int sActorId = -1;
+bool sSpawnReported = false;
 bool Fountain(const PlayState* play) {
     return play && Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL &&
            ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) && play->sceneNum == SCENE_ZORAS_FOUNTAIN &&
@@ -132,6 +133,8 @@ void Init(Actor* actor, PlayState* play) {
     self->snowTick = 0;
     Build();
     self->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, actor, &sCollision);
+    LUSLOG_INFO("[SnowheadBridge] collision actor initialized: age=%d layer=%d bgId=%d polygons=%u",
+                gSaveContext.linkAge, gSaveContext.sceneLayer, self->dyna.bgId, unsigned(sCollision.numPolygons));
     if (self->dyna.bgId < 0 || self->dyna.bgId >= BG_ACTOR_MAX) {
         Actor_Kill(actor);
         return;
@@ -166,7 +169,9 @@ void Draw(Actor* actor, PlayState* play) {
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BACK);
     gSPComboRMPush(POLY_OPA_DISP++, "oot");
     gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_MODULATEI);
+    // Retain this material through the native two-cycle setup; repeating
+    // TEXEL0 in cycle2 would sample the preceding scene's second tile.
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_PASS2);
     for (size_t i = 0; i < sMesh.count; ++i) {
         const char* texture = RegionalBridgeMaterials::Resolve(sMesh.triangles[i].material, ResourceMgr_FileExists);
         gDPLoadTextureBlock(POLY_OPA_DISP++, texture, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP, G_TX_WRAP, 5,
@@ -193,7 +198,7 @@ void Draw(Actor* actor, PlayState* play) {
         }();
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
         gSPComboRMPush(POLY_XLU_DISP++, "oot");
-        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
         gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPLoadTextureBlock(POLY_XLU_DISP++, gDust5Tex, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP, 5,
@@ -241,7 +246,7 @@ void DrawLocalChill(Actor* actor, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPComboRMPush(POLY_XLU_DISP++, "oot");
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
     gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gDPLoadTextureBlock(POLY_XLU_DISP++, gDust5Tex, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP, 5, 5,
@@ -288,13 +293,19 @@ void Ensure(PlayState* play) {
         init.draw = Draw;
         sActorId = ActorDB::Instance->AddEntry(init).entry.id;
     }
-    Actor_Spawn(&play->actorCtx, play, sActorId, 0, 0, 0, 0, 0, 0, 0);
+    Actor* spawned = Actor_Spawn(&play->actorCtx, play, sActorId, 0, 0, 0, 0, 0, 0, 0);
+    if (!sSpawnReported) {
+        LUSLOG_INFO("[SnowheadBridge] spawn requested: actorId=%d actor=%p", sActorId, static_cast<void*>(spawned));
+        sSpawnReported = true;
+    }
 }
 void Register() {
+    LUSLOG_INFO("[SnowheadBridge] hooks registered");
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>([] { Ensure(gPlayState); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
         sActor = nullptr;
         sOwner = nullptr;
+        sSpawnReported = false;
     });
 }
 RegisterShipInitFunc snowheadBridgeInit(Register);

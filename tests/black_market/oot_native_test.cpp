@@ -7,6 +7,7 @@
 #include "rando/BlackMarket.h"
 #include "BlackMarketKeeper.h"
 #include "BlackMarketReceipt.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketBrowsing.h"
 #include "soh/ActorDB.h"
 #include "Enhancements/Gameplay/ComboBlackMarketNative.h"

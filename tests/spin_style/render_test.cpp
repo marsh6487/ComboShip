@@ -314,6 +314,49 @@ static void CheckNativeAccents() {
   ResetDraw();
 }
 
+static void CheckBurstTemporalMotion() {
+  for (int element = 0; element <= 3; ++element) {
+    for (int great = 0; great <= 1; ++great) {
+      auto visual = CwSpinStyle_Resolve(element ? CW_SPIN_STYLE_LIGHTNING
+                                               : CW_SPIN_STYLE_DARK_ENERGY,
+                                        1, element, 1);
+      ResetDraw();
+      play.gameplayFrames = 10;
+      CwSpinDraw_Accents(&play, visual, great, 0, 1);
+      const auto previous = matrixSnapshots;
+      ResetDraw();
+      ++play.gameplayFrames;
+      // Both native burst actors advance their texture counter by 2*alpha.
+      CwSpinDraw_Accents(&play, visual, great, 2, 1);
+      const size_t particles = element ? (great ? 24 : 12) : (great ? 8 : 4);
+      assert(previous.size() == matrixSnapshots.size() &&
+             matrixSnapshots.size() == particles + 1);
+      for (size_t i = 1; i < matrixSnapshots.size(); ++i) {
+        const MtxF &a = previous[i].second, &b = matrixSnapshots[i].second;
+        assert(std::sqrt((a.xw - b.xw) * (a.xw - b.xw) +
+                         (a.yw - b.yw) * (a.yw - b.yw) +
+                         (a.zw - b.zw) * (a.zw - b.zw)) < 350);
+        const float axes[][6] = {{a.xx, a.yx, a.zx, b.xx, b.yx, b.zx},
+                                  {a.xy, a.yy, a.zy, b.xy, b.yy, b.zy},
+                                  {a.xz, a.yz, a.zz, b.xz, b.yz, b.zz}};
+        for (const auto &v : axes) {
+          float from = 0, to = 0, midpoint = 0;
+          for (int j = 0; j < 3; ++j) {
+            from += v[j] * v[j];
+            to += v[j + 3] * v[j + 3];
+            midpoint += (v[j] + v[j + 3]) * (v[j] + v[j + 3]) * .25f;
+          }
+          // The real frame interpolator lerps these matrix axes. A large
+          // per-tick turn collapses a shard/sparkle between rendered frames.
+          assert(std::sqrt(midpoint) > .98f *
+                                             (std::sqrt(from) + std::sqrt(to)) * .5f);
+        }
+      }
+    }
+  }
+  ResetDraw();
+}
+
 int main() {
   parentMatrix.xx = parentMatrix.yy = parentMatrix.zz = parentMatrix.ww = 1;
   play.billboardMtxF = parentMatrix;
@@ -400,9 +443,37 @@ int main() {
   CwSpinAccents_Draw(&play, 0, 1, .3f, .5f);
   assert(gfx.polyXlu.p == end);
   CheckNativeAccents();
+  CheckBurstTemporalMotion();
   std::memcpy(nativeList, copy, sizeof(nativeList));
   privateList[0].words.w0 = 0xE7000000;
   privateList[1].words.w0 = 0xDF000000;
+  for (auto style : {CW_SPIN_STYLE_ICE, CW_SPIN_STYLE_LIGHT}) {
+    for (int great = 0; great <= 1; ++great) {
+      ResetDraw();
+      // Their authored circular shells carry the texture masks and UV state.
+      // Cloning the native shell here discards that material/geometry graph.
+      assert(CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(style, 0, 0, 1),
+                              great, .5f, "native0", "native1"));
+      assert(submittedLists.size() == 2 && submittedLists[0] == privateList &&
+             submittedLists[1] == privateList);
+      assert(gfx.polyOpa.p == opa &&
+             gfx.polyOpa.d == (Gfx *)(allocation + sizeof(allocation)));
+      missing = true;
+      ResetDraw();
+      assert(!CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(style, 0, 0, 1),
+                               great, .5f, "native0", "native1"));
+      assert(submittedLists.empty() && gfx.polyXlu.p == xlu);
+      missing = false;
+    }
+  }
+  for (unsigned element = 1; element <= 3; ++element) {
+    ResetDraw();
+    assert(CwSpinDraw_Burst(&play, CwSpinStyle_Resolve(0, 1, element, 1), 0,
+                            .5f, "native0", "native1"));
+    assert(submittedLists.size() == 2 && submittedLists[0] != privateList &&
+           submittedLists[1] != privateList);
+    assert(std::memcmp(nativeList, copy, sizeof(nativeList)) == 0);
+  }
   const auto beforeFallback = gfx.polyXlu.p;
   auto noLayer = CwSpinStyle_Resolve(0, 1, 0, 1);
   assert(!CwSpinDraw_Burst(&play, noLayer, 0, .5f, "native0", "native1"));

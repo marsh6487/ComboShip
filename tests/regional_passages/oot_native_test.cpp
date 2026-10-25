@@ -474,7 +474,13 @@ int main() {
     const auto preserved = gSaveContext.respawn[RESPAWN_MODE_RETURN];
     assert(ComboRegionalPassagesOot_ApplyArrival(5));
     Scene(SCENE_GRAVEYARD);
+    assert(ComboRegionalPassagesOot_IsArrivalPending(&play));
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(nullptr));
+    PlayState otherPlay{};
+    otherPlay.sceneNum = SCENE_GRAVEYARD;
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(&otherPlay));
     interactor.update();
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(&play));
     const auto staged = gSaveContext.respawn[RESPAWN_MODE_RETURN];
     assert(staged.playerParams == 0x04FF && staged.pos.x == 22 &&
            staged.pos.y == 120);

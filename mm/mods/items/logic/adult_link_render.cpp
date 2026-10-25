@@ -126,7 +126,10 @@ static const char* sLimbNearDL[ADULT_LINK_LIMB_COUNT] = {
     /* 16 RightShoulder */ ALB("gLinkAdultRightShoulderNearDL"),
     /* 17 RightArm      */ ALB("gLinkAdultRightArmNearDL"),
     /* 18 RightHand     */ ALB("gLinkAdultRightHandNearDL"),
-    /* 19 SwordAndSheath*/ NULL, // driven by the override at PLAYER_LIMB_SHEATH instead
+    // Keep the source limb non-NULL even when the final override hides its mesh.
+    // MM's flex walker reserves hidden source-DL matrices; the head/shoulders
+    // address the following torso matrix at its canonical segment-0D slot 17.
+    /* 19 SwordAndSheath*/ ALB("gLinkAdultSheathNearDL"),
     /* 20 Torso         */ ALB("gLinkAdultTorsoNearDL"),
 };
 
@@ -634,7 +637,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             if (sIsMod) {
                 *dList = skelDL; // the mod's own sword+sheath mesh on the back
             } else {
-                // Base skeleton has no sheath mesh (limb 19 = NULL) — pick the back setup from the EQUIPPED
+                // Pick the back setup from the EQUIPPED
                 // sword/shield, mirroring MM's real sheath logic (z_player_lib.c:3233), NOT the hand-type
                 // enum. Sword-on-back only if a sword is equipped AND sheathed (not in hand); shield-on-back
                 // only if a shield is equipped AND not raised. This kills the old "always Master Sword +

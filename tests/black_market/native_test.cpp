@@ -9,6 +9,7 @@
 #include "rando/BlackMarket.h"
 #include "BlackMarketText.h"
 #include "BlackMarketReceipt.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "sword_element_message.h"
@@ -155,7 +156,7 @@ float sNESFontWidths[160]{}; // Actual native widths/decoder are exercised by ru
 void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
 void EndBrowsing(PlayState*,bool = false) { sTalking = false; }
-struct ShelfFixtureStub { void Reset() {} } sShelfFixture;
+struct ShelfFixtureStub { void Reset() {} } sShelfFixture, sCounterBarrier;
 /* NATIVE_HALF_DAY_TABLE */
 /* PRODUCTION */
 

@@ -46,6 +46,7 @@ int main(int argc, char **) {
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
 #define SS_NULL 0xFFFF
+extern "C" void lusprintf(const char*, int32_t, int32_t, const char*, ...) {}
 uintptr_t gSegments[16]{};
 extern "C" PosRot *Actor_GetWorldPosShapeRot(PosRot *p, Actor *a) {
   p->pos = a->world.pos;

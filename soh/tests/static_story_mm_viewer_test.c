@@ -339,15 +339,26 @@ void Matrix_RotateY(f32 y, u8 mode) {
     REQUIRE(mode == MTXMODE_APPLY);
 }
 static unsigned regionalXluDraws, regionalOpaDraws;
+static Vec3f posedFocus = { 12, 17, 67 };
+void Matrix_MultVec3f(Vec3f* source, Vec3f* destination) {
+    *destination = posedFocus;
+    destination->x += source->x * .01f;
+    destination->y += source->y * .01f;
+    destination->z += source->z * .01f;
+}
 void Gfx_SetupDL_25Xlu(GraphicsContext* gfx) {
 }
 Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* joints, s32 count, OverrideLimbDraw override,
                         PostLimbDraw post, void* arg, Gfx* gfx) {
-    REQUIRE(drawing->staticState.type == 27 && arg == drawing && count == 17);
+    REQUIRE(drawing->staticState.type == 27 && arg == drawing && count == 17 && post);
     REQUIRE(gfx == play->state.gfxCtx->polyXlu.p);
     REQUIRE(play->state.gfxCtx->polyOpa.p == commands);
     REQUIRE(gfx[-2].words.w1 == (uintptr_t)eyes[1]);
     REQUIRE(gfx[-1].words.w1 == 0xffffffB0U);
+    Vec3s rotation = { 0 };
+    Gfx* list = NULL;
+    post(play, 4, &list, &rotation, arg, &gfx);
+    REQUIRE(drawing->actor.focus.pos.y == posedFocus.y);
     ++regionalXluDraws;
     return gfx;
 }
@@ -373,6 +384,18 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
     REQUIRE(arg == drawing);
     if (drawing->staticState.type == 25 || drawing->staticState.type == 26) {
         ++regionalOpaDraws;
+        REQUIRE(post != NULL);
+        Vec3s focusRotation = { 0 };
+        Gfx* focusList = NULL;
+        post(play, drawing->staticState.type == 25 ? 11 : 9, &focusList, &focusRotation, arg);
+        REQUIRE(drawing->actor.focus.pos.x == posedFocus.x && drawing->actor.focus.pos.z == posedFocus.z);
+        REQUIRE(drawing->actor.focus.pos.y == posedFocus.y + (drawing->staticState.type == 26 ? 10 : 0));
+        if (drawing->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+            REQUIRE((commands[0].words.w0 & 0xffff) == 0x0C * 4);
+            REQUIRE(commands[0].words.w1 == (uintptr_t)MmAssets_GetOpaqueRenderMode());
+            /* Native Mikau limbs call G_DL_INDEX with segment C, index 2. */
+            REQUIRE((MmAssets_GetOpaqueRenderMode()[2].words.w0 >> 24) == G_ENDDL);
+        }
         if (drawing->staticState.type == 26 && drawing->staticState.pose == 1) {
             REQUIRE(post);
             Vec3s rot = { 0 };
@@ -477,7 +500,8 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
     REQUIRE(commands[faceCommands].words.w1 == 0xffffffffU);
     const StaticStoryMmPresentation* p =
         StaticStoryMm_GetPresentation(drawing->staticState.type, drawing->staticState.pose);
-    unsigned firstFace = drawing->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN;
+    unsigned firstFace = drawing->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN ||
+                         drawing->staticState.type == STATIC_STORY_ACTOR_MIKAU;
     REQUIRE(faceCommands == firstFace + (p->eyeCount != 0) + (p->mouthCount != 0));
     if (firstFace) {
         REQUIRE((commands[0].words.w0 & 0xffff) == 0x0C * 4);
@@ -993,16 +1017,18 @@ static void TestRegionalDraw(PlayState* play) {
     actor.isVisible = true;
     actor.staticState.eyeIndex = 1;
     actor.staticState.mmEyeTextures[1] = eyes[1];
-    for (unsigned type = 25; type <= 27; type++) {
-        actor.staticState.type = type;
-        actor.staticState.pose = type == 26 ? 1 : 0;
-        actor.skin.skelAnime.dListCount = type == 27 ? 17 : 20;
-        actor.staticState.mmPropDL = umbrella;
-        play->state.gfxCtx->polyOpa.p = commands;
-        play->state.gfxCtx->polyXlu.p = commands + 100;
-        EnViewerStatic_Draw(&actor, play);
-    }
-    REQUIRE(regionalOpaDraws == 2 && regionalXluDraws == 1);
+    for (unsigned type = 25; type <= 27; type++)
+        for (unsigned pose = 0; pose < (type == 25 ? 5 : 2); ++pose) {
+            actor.staticState.type = type;
+            actor.staticState.pose = pose;
+            actor.actor.focus.pos = (Vec3f){ -999, 55, -999 };
+            actor.skin.skelAnime.dListCount = type == 27 ? 17 : 20;
+            actor.staticState.mmPropDL = umbrella;
+            play->state.gfxCtx->polyOpa.p = commands;
+            play->state.gfxCtx->polyXlu.p = commands + 100;
+            EnViewerStatic_Draw(&actor, play);
+        }
+    REQUIRE(regionalOpaDraws == 7 && regionalXluDraws == 2);
 }
 int main(void) {
     static PlayState play;
@@ -1167,6 +1193,9 @@ int main(void) {
             EnViewerStatic_WaitForObjects(&a, &play);
             REQUIRE(a.staticState.initialized && a.skin.skelAnime.limbCount == (type == 26 ? 23 : 20));
             REQUIRE(a.skin.skelAnime.dListCount == (type == 25 ? 0 : type == 26 ? 20 : 17));
+            a.actor.focus.pos = (Vec3f){ 12, 17, 67 };
+            EnViewerStatic_Update(&a, &play);
+            REQUIRE(a.actor.focus.pos.x == 12 && a.actor.focus.pos.y == 17 && a.actor.focus.pos.z == 67);
             EnViewer_Destroy(&a.actor, &play);
         }
     puts("PASS nine regional viewer init/free paths: real standard versus flex selection");

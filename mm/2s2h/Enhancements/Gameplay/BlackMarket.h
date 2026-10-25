@@ -16,6 +16,7 @@ extern "C" {
 int ComboBlackMarket_IsInterior(void);
 void ComboBlackMarket_ResetState(void);
 void ComboBlackMarket_NormalizeEntry(void);
+void ComboBlackMarket_RestoreRoomAfterDraw(struct PlayState* play);
 void ComboBlackMarket_ApplyResume(int resume);
 int ComboBlackMarket_TryDoorEntrance(struct PlayState* play, struct Actor* door);
 int ComboBlackMarket_IsAuthoredDoor(struct PlayState* play, struct Actor* door);

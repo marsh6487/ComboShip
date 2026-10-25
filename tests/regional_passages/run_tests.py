@@ -24,10 +24,12 @@ def build(host,name,source):
         if result.returncode: raise SystemExit(result.stderr[:8000])
         subprocess.run([str(binary)],check=True,env={**ENV,'ASAN_OPTIONS':'detect_leaks=0'})
 
+subprocess.run([sys.executable, str(ROOT / 'tests/regional_passages/run_header_portability_tests.py')], check=True, env=ENV)
 build('', 'geometry', (ROOT/'tests/regional_passages/geometry_test.cpp').read_text())
 # Fixed providers and endpoint owners exercise actual native actors and start
 # modes in focused fixtures. Keep the shared handoff/boot priority probes below.
 for runner, accepts_sanitize in (
+    ("run_bridge_combiner_tests.py", True),
     ("run_mm_fixed_tests.py", True),
     ("run_ikana_tests.py", True),
     ("run_lake_bridge_tests.py", True),

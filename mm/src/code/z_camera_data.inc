@@ -3518,6 +3518,17 @@ CameraMode sCamSetDungeon4Modes[] = {
     CAM_SETTING_MODE_ENTRY(CAM_FUNC_PARALLEL1, sSetNormal0ModeDekuFlyZData),       // CAM_MODE_DEKUFLYZ
 };
 
+// OoT shop Data4(-40, 60, 0x3F00), scoped to the custom MM Black Market.
+CameraModeValue sSetBlackMarketOotModeNormalData[] = {
+    { -40, CAM_DATA_Y_OFFSET },
+    { 60, CAM_DATA_FOV },
+    { CAM_INTERFACE_FLAGS(CAM_LETTERBOX_LARGE, CAM_HUD_VISIBILITY_IGNORE, 0), CAM_DATA_INTERFACE_FLAGS },
+};
+
+CameraMode sCamSetBlackMarketOotModes[] = {
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_DATA4, sSetBlackMarketOotModeNormalData),
+};
+
 CameraSetting sCameraSettings[] = {
     { 0x00000000, 0x00000000, NULL },                              // CAM_SET_NONE
     { 0x3FFFFFFF, 0x00000005, sCamSetNormal0Modes },               // CAM_SET_NORMAL0
@@ -3610,6 +3621,7 @@ CameraSetting sCameraSettings[] = {
     { 0x03FFFFFF, 0x00000005, sCamSetNorm4Modes },                 // CAM_SET_NORMAL4
     { 0x0000002F, 0x00000005, sCamSetElegyShellModes },            // CAM_SET_ELEGY_SHELL
     { 0x03FFFFFF, 0x00000005, sCamSetDungeon4Modes },              // CAM_SET_DUNGEON4
+    { 0x00000001, 0x80000005, sCamSetBlackMarketOotModes },        // CAM_SET_BLACK_MARKET_OOT
 };
 
 s16 sGlobalCamDataSettings[] = {

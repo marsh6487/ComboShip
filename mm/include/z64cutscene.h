@@ -841,6 +841,7 @@ s16 CutsceneManager_Start(s16 csId, Actor* actor);
 s16 CutsceneManager_Stop(s16 csId);
 s16 CutsceneManager_GetCurrentCsId(void);
 s32 CutsceneManager_IsCurrentActor(Actor* actor);
+s32 CutsceneManager_IsCurrentCamera(struct PlayState* play);
 s32 CutsceneManager_EndForActor(struct PlayState* play, Actor* actor);
 ActorCutscene* CutsceneManager_GetCutsceneEntry(s16 csId);
 s16 CutsceneManager_GetAdditionalCsId(s16 csId);

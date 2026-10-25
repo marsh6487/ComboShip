@@ -94,7 +94,7 @@ if os.environ.get("MM_VERIFY_STAGE") != "resource":
     fixture=fixture.replace('/* PRODUCTION_OPAQUE_RENDER_MODE */',table+'\n'+function(loader,'MmAssets_GetOpaqueRenderMode'))
     functions=['EnViewer_Update','EnViewer_Destroy','EnViewer_StaticSelectSkullKidModel','EnViewerStatic_WaitForObjects','EnViewerStatic_Update',
                'EnViewer_StaticGreatFairyEyeIndex','EnViewer_StaticGreatFairyOverrideLimbDraw','EnViewer_DrawStaticGreatFairy',
-               'EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw','EnViewer_StaticAnjuPostLimbDraw','EnViewer_StaticMikauPostLimbDraw','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid',
+               'EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw','EnViewer_StaticAnjuPostLimbDraw','EnViewer_StaticMikauPostLimbDraw','EnViewer_StaticRegionalPostLimbDraw','EnViewer_StaticRegionalPostLimbDrawXlu','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid',
                'EnViewerStatic_Draw']
     draw_table=re.search(r'static EnViewerDrawFunc sDrawFuncs\[\] = \{.*?\n\};',viewer,re.S).group(0)
     fixture=fixture.replace('/* PRODUCTION_VIEWER_FUNCTIONS */','\n'.join(function(viewer,n) for n in functions) + '\n' + draw_table + '\n' + function(viewer,'EnViewer_Draw'))

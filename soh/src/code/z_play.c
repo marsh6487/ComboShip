@@ -1863,6 +1863,10 @@ void Play_Draw(PlayState* play) {
     }
 
 Play_Draw_skip:
+#ifdef COMBO_BUILD
+    // Pause/capture branches can bypass the general world-draw end hook.
+    ComboBlackMarketOot_RestoreRoomAfterDraw(play);
+#endif
 
     FrameTiming_EndNamedSpan("play_draw", "finish_setup", drawPhase);
     drawPhase = FrameTiming_BeginSpan();

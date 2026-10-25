@@ -115,6 +115,18 @@ int main(int argc, char** argv) {
         checkOtherForm();
         puts("PASS physical D-pad: Up/Down/Left/Right items and native slots preserved");
         return 0;
+    } else if (!strcmp(mode,"keep-local")) {
+        ownDirections();
+        setC(1,NATIVE_STICK,NATIVE_STICK_SLOT); setD(1,NATIVE_STICK,NATIVE_STICK_SLOT);
+        setC(2,0x0223,0xFF); setD(2,0x0223,ROD_D_SLOT);
+        const auto before=gSaveContext;
+        nlohmann::json sh={{"cEquips",nlohmann::json::array({0xFF,0xFF,0xFF})},
+                           {"dEquips",nlohmann::json::array({0xFF,0xFF,0xFF,0xFF})},
+                           {"dEquipsOrder","UDLR"}};
+        ApplyEquips(sh);
+        assert(!memcmp(&before,&gSaveContext,sizeof(before)) &&
+               "empty peer payload must retain valid local native sticks and full custom IDs");
+        puts("PASS empty peer payload preserves legitimate native C/Down sticks and local full custom IDs");
     } else if (!strcmp(mode,"extract")) {
         setC(1,0xD0,WAND_SLOT); setC(2,0x0223,0xFF);
         setD(0,0x0223,ROD_D_SLOT);
@@ -309,7 +321,7 @@ def main():
             subprocess.run([os.environ.get("CXX","c++"),*flags,str(source),"-o",str(binary)],check=True)
             binaries[host]=binary
             env=dict(os.environ,ASAN_OPTIONS="detect_leaks=0",UBSAN_OPTIONS="halt_on_error=1")
-            for mode in ("extract","apply","mirror","policy","metadata") + (("zero-source",) if host=="soh" else ()):
+            for mode in ("extract","apply","mirror","policy","metadata","keep-local") + (("zero-source",) if host=="soh" else ()):
                 result=subprocess.run([str(binary),mode],env=env)
                 failures += bool(result.returncode)
                 print(host,mode,"FAIL" if result.returncode else "PASS",flush=True)

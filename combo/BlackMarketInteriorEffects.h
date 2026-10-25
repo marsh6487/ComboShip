@@ -163,6 +163,10 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
     head = Gfx_SetupDL(head, 25);
     gDPSetPrimColor(head++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(head++, 128, 128, 128, 128);
-    gSPSegment(head++, 0x08, gSegments[8]);
+    // This is a raw CPU segment value, not a resource-name argument. Pause can
+    // leave its retired icon buffer here after reset/scene teardown; the public
+    // wrapper probes that address for an OTR signature and can read freed memory.
+    // Emit the existing segment value directly, without dereferencing it.
+    __gSPSegment(head++, 0x08, gSegments[8]);
 }
 } // namespace BlackMarketInteriorEffects
