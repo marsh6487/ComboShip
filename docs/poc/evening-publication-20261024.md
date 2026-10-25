@@ -90,3 +90,13 @@ annotation, preserving both the first cause and the last diagnostics when
 the complete log is too large. The real MSVC replay and full final CI remain
 required before any Windows package is delivered. No failed-run package is a
 deliverable, and develop/master remain unmerged.
+
+The next hosted world replay exposed one test-environment difference: those
+older native entry drivers did not consume `COMBO_NEI_FIXTURE_CPATH`, although
+their newly compiled actual ResourceManager state requires the project's pinned
+thread-pool header. A control with the valid pinned header supplied reproduces
+the original missing-header failure. Both drivers now extend only their own
+compile environment from that existing pin; the dispatcher retains its original
+scope. Native dual-host entry assertions and all 24 CI policy tests pass with
+the narrower CI-style include environment. Production and asset bytes are
+unchanged by this fixture-environment correction.
