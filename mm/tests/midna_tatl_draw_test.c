@@ -187,6 +187,13 @@ s32 Cutscene_GetCueChannel(PlayState* play, u16 type) {
 void func_8088F9E4(Actor* fairy, PlayState* play) {
 }
 
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+static int marketScene, browsingHidden;
+
 /* PRODUCTION_MIDNA_DRAW */
 
 static void checkCase(int fairyType, int present, int loaded, int hiddenState, int hiddenFlag, int firstPerson,
@@ -201,6 +208,8 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
     gfx.polyXlu.p = commands;
     gfx.polyOpa.d = allocated + 4;
     play.state.gfxCtx = &gfx;
+    play.sceneId = marketScene ? COMBO_BLACK_MARKET_SCENE : SCENE_00KEIKOKU;
+    player.stateFlags2 = browsingHidden ? (1u << 29) : 0;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
     player.currentMask = giantMask ? PLAYER_MASK_GIANT : PLAYER_MASK_NONE;
     player.tatlActor = fairyType == FAIRY_TYPE_0 ? &fairy.actor : NULL;
@@ -351,6 +360,25 @@ static void checkVisibleClock(void) {
 }
 
 int main(void) {
+#ifdef COMBO_BUILD
+    for (int mode = COMBO_GAME_BOTH; mode <= COMBO_GAME_MM; ++mode) {
+        gComboGameMode = mode;
+        for (int inside = 0; inside <= 1; ++inside) {
+            marketScene = inside;
+            for (int hidden = 0; hidden <= 1; ++hidden) {
+                browsingHidden = hidden;
+                const int suppressed = inside && hidden && mode != COMBO_GAME_OOT;
+                checkCase(FAIRY_TYPE_0, 0, 1, 0, 0, 0, 1, 0, !suppressed);
+                enabled = 1;
+                checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, !suppressed, 0);
+                checkCase(FAIRY_TYPE_1, 1, 1, 0, 0, 0, 1, 0, 1);
+            }
+        }
+    }
+    marketScene = browsingHidden = 0;
+    gComboGameMode = COMBO_GAME_BOTH;
+#endif
+
     enabled = 0;
     checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, 0, 1);
     enabled = 1;

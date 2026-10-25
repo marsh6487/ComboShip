@@ -153,6 +153,13 @@ Gfx* SkelAnime_DrawSkeleton2(PlayState* play, SkelAnime* skel, OverrideLimbDrawO
     return gfx;
 }
 
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+static int marketScene, browsingHidden;
+
 /* PRODUCTION_MIDNA_DRAW */
 
 static void checkCase(int fairyType, int present, int loaded, int hiddenState, int hiddenFlag, int firstPerson,
@@ -166,6 +173,8 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
     memset(commands, 0, sizeof(commands));
     gfx.polyXlu.p = commands;
     play.state.gfxCtx = &gfx;
+    play.sceneNum = marketScene ? SCENE_SKIEJER_MARKET : SCENE_MARKET_DAY;
+    player.stateFlags2 = browsingHidden ? (1u << 29) : 0;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
     player.stateFlags1 = firstPerson ? PLAYER_STATE1_FIRST_PERSON : 0;
     fairy.actor.params = fairyType;
@@ -305,6 +314,26 @@ static void checkVisibleClock(void) {
 }
 
 int main(void) {
+#ifdef COMBO_BUILD
+    for (int mode = COMBO_GAME_BOTH; mode <= COMBO_GAME_MM; ++mode) {
+        gComboGameMode = mode;
+        for (int inside = 0; inside <= 1; ++inside) {
+            marketScene = inside;
+            for (int hidden = 0; hidden <= 1; ++hidden) {
+                browsingHidden = hidden;
+                const int suppressed = inside && hidden && mode != COMBO_GAME_MM;
+                checkCase(FAIRY_NAVI, 0, 1, 0, 0, 0, 1, 0, !suppressed);
+                midnaEnabled = 1;
+                checkCase(FAIRY_NAVI, 1, 1, 0, 0, 0, 1, !suppressed, 0);
+                checkCase(FAIRY_HEAL, 1, 1, 0, 0, 0, 1, 0, 1);
+                midnaEnabled = 0;
+            }
+        }
+    }
+    marketScene = browsingHidden = 0;
+    gComboGameMode = COMBO_GAME_BOTH;
+#endif
+
     /* An installed pack is inactive until explicitly enabled; disabling also
      * restores the native halo without touching actor or player state. */
     checkCase(FAIRY_NAVI, 1, 1, 0, 0, 0, 1, 0, 1);

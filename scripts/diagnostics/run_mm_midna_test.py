@@ -24,6 +24,7 @@ def main():
     lights = (ROOT / 'mm/src/code/z_lights.c').read_text()
     draw = ''.join(function(lights, name) for name in ('Lights_PointSetInfo', 'Lights_PointNoGlowSetInfo',
                      'Lights_PointGlowSetInfo', 'Lights_PointSetColorAndRadius'))
+    draw += function(source, 'EnElf_BlackMarketQuiet')
     for name in ('EnElf_UpdateMidnaBlink', 'func_8088E60C', 'EnElf_Update', 'EnElf_DrawMidnaShimmer',
                  'EnElf_GetMidnaBlinkModel', 'EnElf_TryDrawMidna', 'EnElf_Draw'):
         if name + '(' in source:

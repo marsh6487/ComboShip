@@ -1786,6 +1786,12 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
     Gfx* dListHead;
     Player* player = GET_PLAYER(play);
 
+    // The shop hides Link while browsing; keep the companion out of that same
+    // view before either the native fairy or replacement model emits a draw.
+    if (EnElf_BlackMarketQuiet(this, play) && (player->stateFlags2 & (1u << 29))) {
+        return;
+    }
+
     if ((this->unk_2A8 != 8) && !(this->fairyFlags & 8)) {
         if (!(player->stateFlags1 & PLAYER_STATE1_FIRST_PERSON) || (kREG(90) < this->actor.projectedPos.z)) {
             if (EnElf_TryDrawMidna(this, play)) {

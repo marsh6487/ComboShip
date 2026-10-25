@@ -1837,6 +1837,12 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
     s32 pad;
     s32 pad2;
 
+    // The shop hides Link while browsing; keep the companion out of that same
+    // view before either the native fairy or replacement model emits a draw.
+    if (EnElf_BlackMarketQuiet(this, play) && (player->stateFlags2 & (1u << 29))) {
+        return;
+    }
+
     if (player->currentMask != PLAYER_MASK_GIANT) {
         if (!(this->fairyFlags & 8) &&
             (!Cutscene_IsCueInChannel(play, CS_CMD_ACTOR_CUE_201) ||

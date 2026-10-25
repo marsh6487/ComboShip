@@ -26,10 +26,11 @@ if 'static void EnElf_TraceMidnaFrame(' in source:
     production += function(source, 'EnElf_TraceMidnaFrame')
 if 'static s32 EnElf_TryDrawMidna(' in source:
     production += function(source, 'EnElf_TryDrawMidna')
+production += function(source, 'EnElf_BlackMarketQuiet')
 production += function(source, 'EnElf_Draw')
 fixture = (ROOT / 'soh/tests/midna_navi_draw_test.c').read_text().replace(
     '/* PRODUCTION_MIDNA_DRAW */', production)
-flags = ['-std=gnu2x', '-DF3DEX_GBI_2', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
+flags = ['-DCOMBO_BUILD', '-Icombo', '-std=gnu2x', '-DF3DEX_GBI_2', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
          '-Werror=implicit-function-declaration', '-Wno-int-conversion',
          '-Wno-incompatible-pointer-types', '-Wno-discarded-qualifiers',
          '-Ilibultraship/include', '-Isoh/include', '-Isoh/src', '-Isoh/assets', '-Isoh', '-Isoh/mods']

@@ -287,6 +287,9 @@ void InitNativeStock(Actor* actor, PlayState* play) {
     item->restockFunc = NativeStockRefresh;
     actor->update = EnGirlA_Update;
     actor->draw = nullptr; // Black Market's GI renderer draws this actual actor.
+    // Match native EnGirlA_InitItem: stock is selected through the shop cursor,
+    // never through Tatl's independent attention/lock-on system.
+    actor->flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     actor->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED;
     actor->world.pos = actor->home.pos = kShelves[slot];
     // Compact private MM shelves use a bounded native display fit.

@@ -127,8 +127,11 @@ extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *state, s16 id, f32 x,
   item = {};
   item.actor.id = id;
   item.actor.params = params;
+  item.actor.flags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY;
   item.actor.world.pos = {x, y, z};
   InitNativeStock(&item.actor, state);
+  assert(!(item.actor.flags & ACTOR_FLAG_ATTENTION_ENABLED));
+  assert(item.actor.flags & ACTOR_FLAG_FRIENDLY);
   return &item.actor;
 }
 static void ResetArena() {
