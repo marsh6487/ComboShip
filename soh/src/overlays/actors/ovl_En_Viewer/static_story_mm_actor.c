@@ -1,8 +1,22 @@
 #include "static_story_mm_actor.h"
+#include "../../../../../combo/actors/RegionalActorFocus.h"
 
 #include <stddef.h>
 #include <math.h>
 #include <string.h>
+
+static unsigned StaticStoryMm_FocusFamily(StaticStoryActorType type) {
+    return type == STATIC_STORY_ACTOR_STALCHILD ? COMBO_FOCUS_STALCHILD
+           : type == STATIC_STORY_ACTOR_MIKAU   ? COMBO_FOCUS_MIKAU
+           : type == STATIC_STORY_ACTOR_DARMANI ? COMBO_FOCUS_DARMANI
+                                                : 0;
+}
+int StaticStoryMm_GetFocusLimb(StaticStoryActorType type) {
+    return ComboRegionalFocus_Limb(StaticStoryMm_FocusFamily(type));
+}
+float StaticStoryMm_GetFocusOffsetY(StaticStoryActorType type) {
+    return ComboRegionalFocus_OffsetY(StaticStoryMm_FocusFamily(type));
+}
 
 #define STATIC_STORY_MM_TAU 6.28318530717958647692f
 #define STATIC_STORY_MM_HOVER_AMPLITUDE 10.0f

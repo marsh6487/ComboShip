@@ -120,8 +120,8 @@ template <class Commands> inline bool NativeBackdropLayout(const Commands& c, ui
         return c[i].words.w0 == 0x3200600c &&
                (c[i].words.w1 == offset || (vertexBase && c[i].words.w1 == vertexBase + offset));
     };
-    return vertex(25, 0) && eq(26, 0x5e7003a0, 0x9feb4255) && vertex(40, 0x60) &&
-           eq(41, 0x5e7003a0, 0x9feb4255) && eq(27, 0x06000204, 0x00000406) && eq(28, 0x06080a00, 0x00080006) &&
-           eq(42, 0x06000204, 0x00000406) && eq(43, 0x0604080a, 0x00040a06) && eq(44, 0xdf000000, 0);
+    return vertex(25, 0) && eq(26, 0x5e7003a0, 0x9feb4255) && vertex(40, 0x60) && eq(41, 0x5e7003a0, 0x9feb4255) &&
+           eq(27, 0x06000204, 0x00000406) && eq(28, 0x06080a00, 0x00080006) && eq(42, 0x06000204, 0x00000406) &&
+           eq(43, 0x0604080a, 0x00040a06) && eq(44, 0xdf000000, 0);
 }
 } // namespace ComboFountainValley

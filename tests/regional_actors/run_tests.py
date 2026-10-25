@@ -15,6 +15,7 @@ run([sys.executable,'scripts/diagnostics/run_regional_actor_tests.py'])
 if len(sys.argv)>1:
     run([sys.executable,'tests/regional_actors/archive_test.py',sys.argv[1]])
     run([sys.executable,'tests/regional_actors/run_resource_test.py',sys.argv[1]])
+    run([sys.executable,'tests/regional_actors/pose_focus_test.py',sys.argv[1]])
 
     terrain_root = os.environ.get('COMBO_REGIONAL_GEOMETRY_ROOT')
     if not terrain_root and (ROOT/'combo/entrances/FountainValley.h').exists():

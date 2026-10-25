@@ -773,6 +773,7 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
         Actor_SetObjectDependency(play, &this->actor);
     }
     Actor_SetScale(&this->actor, definition->scale);
+    Actor_SetFocus(&this->actor, definition->focusHeight);
     const StaticStoryGanonPresentation* ganonPresentation =
         StaticStoryGanon_GetPresentation((StaticStoryActorType)this->staticState.type);
     // Saria's narrower interaction collider should not shrink her visual shadow.
@@ -950,7 +951,8 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
         Collider_UpdateCylinder(&this->actor, &this->staticState.collider);
         CollisionCheck_SetOC(play, &play->colChkCtx, &this->staticState.collider.base);
     }
-    Actor_SetFocus(&this->actor, definition->focusHeight);
+    if (!StaticStoryMm_GetFocusLimb((StaticStoryActorType)this->staticState.type))
+        Actor_SetFocus(&this->actor, definition->focusHeight);
     if (canInteract) {
         EnViewerStatic_OfferTalk(this, play);
         EnViewerStatic_UpdateTracking(this, play);
@@ -2235,6 +2237,20 @@ static void EnViewer_StaticMikauPostLimbDraw(PlayState* play, s32 limbIndex, Gfx
     }
 }
 
+static void EnViewer_StaticRegionalPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    EnViewer* this = (EnViewer*)thisx;
+    StaticStoryActorType type = (StaticStoryActorType)this->staticState.type;
+    if (limbIndex == StaticStoryMm_GetFocusLimb(type)) {
+        Vec3f offset = { 0, StaticStoryMm_GetFocusOffsetY(type), 0 };
+        Matrix_MultVec3f(&offset, &this->actor.focus.pos);
+    }
+    if (type == STATIC_STORY_ACTOR_MIKAU)
+        EnViewer_StaticMikauPostLimbDraw(play, limbIndex, dList, rot, thisx);
+}
+static void EnViewer_StaticRegionalPostLimbDrawXlu(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx,
+                                                   Gfx** gfx) {
+    EnViewer_StaticRegionalPostLimbDraw(play, limbIndex, dList, rot, thisx);
+}
 static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
     if (!this->staticState.initialized)
         return;
@@ -2265,14 +2281,15 @@ static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
         gSPSegment(POLY_XLU_DISP++, presentation->eyeSegment, (uintptr_t)this->staticState.mmEyeTextures[face.eye]);
         gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 176);
         POLY_XLU_DISP = SkelAnime_DrawFlex(play, this->skin.skelAnime.skeleton, this->skin.skelAnime.jointTable,
-                                           this->skin.skelAnime.dListCount, NULL, NULL, this, POLY_XLU_DISP);
+                                           this->skin.skelAnime.dListCount, NULL,
+                                           EnViewer_StaticRegionalPostLimbDrawXlu, this, POLY_XLU_DISP);
         CLOSE_DISPS(play->state.gfxCtx);
         return;
     }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    if (this->staticState.type == STATIC_STORY_ACTOR_MIKAU)
-        postLimbDraw = EnViewer_StaticMikauPostLimbDraw;
+    if (StaticStoryMm_GetFocusLimb((StaticStoryActorType)this->staticState.type))
+        postLimbDraw = EnViewer_StaticRegionalPostLimbDraw;
     if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN ||
         this->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
         /* Mikau's native lists call segment C, command 2. Establish MM's
