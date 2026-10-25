@@ -109,8 +109,9 @@ static inline int CwSpinDraw_Burst(PlayState* play, CwSpinVisualSelection visual
         return 0;
     CwSpinResourceRecipe recipe = CwSpinStyle_Resources(visual.style, visual.nativeMaterialElement, great);
     CwSpinPalette palette = CwSpinDraw_Palette(visual, great, 0);
-    int nativeShape = visual.style == CW_SPIN_STYLE_NATIVE || visual.style == CW_SPIN_STYLE_ICE ||
-                      visual.style == CW_SPIN_STYLE_LIGHT;
+    // Explicit styles need their authored shell, UV state and texture masks.
+    // Only Native follows the currently selected host/custom shell.
+    int nativeShape = visual.style == CW_SPIN_STYLE_NATIVE;
     Gfx* disk =
         nativeShape ? CwSpinDraw_Clone(play, nativeDisk, recipe.burstTex, palette) : CwSpinDraw_LoadDL(recipe.disk);
     Gfx* cylinder = nativeShape ? CwSpinDraw_Clone(play, nativeCylinder, recipe.burstTex, palette)
@@ -148,14 +149,18 @@ static inline int CwSpinDraw_Charge(PlayState* play, CwSpinVisualSelection visua
 
 static inline void CwSpinDraw_Accents(PlayState* play, CwSpinVisualSelection visual, int great, float phase,
                                       float alpha) {
+    // The burst texture counter advances up to 2 per gameplay tick. Particle
+    // motion uses the charge preview's 0.05-per-tick scale, avoiding large
+    // matrix turns that collapse shards/sparkles during frame interpolation.
+    float motionPhase = phase * 0.025f;
     size_t budget = great ? 24 : 12;
     int drawn = 0;
     if (visual.style == CW_SPIN_STYLE_DARK_ENERGY) {
         size_t sparks = great ? 8 : 4;
-        drawn |= CwSpinAccents_DrawLimited(play, 1, great, phase, alpha, sparks, 0xE61946);
+        drawn |= CwSpinAccents_DrawLimited(play, 1, great, motionPhase, alpha, sparks, 0xE61946);
         budget -= sparks;
     }
-    drawn |= CwSpinAccents_DrawLimited(play, visual.accentElement, great, phase, alpha, budget, 0);
+    drawn |= CwSpinAccents_DrawLimited(play, visual.accentElement, great, motionPhase, alpha, budget, 0);
     if (drawn)
         CwSpinDraw_SetColors(play, CwSpinDraw_Palette(visual, great, 0), alpha);
 }

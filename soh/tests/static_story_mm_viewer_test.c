@@ -355,7 +355,7 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* joints, s32 cou
     REQUIRE(play->state.gfxCtx->polyOpa.p == commands);
     REQUIRE(gfx[-2].words.w1 == (uintptr_t)eyes[1]);
     REQUIRE(gfx[-1].words.w1 == 0xffffffB0U);
-    Vec3s rotation = {0};
+    Vec3s rotation = { 0 };
     Gfx* list = NULL;
     post(play, 4, &list, &rotation, arg, &gfx);
     REQUIRE(drawing->actor.focus.pos.y == posedFocus.y);
@@ -385,7 +385,7 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
     if (drawing->staticState.type == 25 || drawing->staticState.type == 26) {
         ++regionalOpaDraws;
         REQUIRE(post != NULL);
-        Vec3s focusRotation = {0};
+        Vec3s focusRotation = { 0 };
         Gfx* focusList = NULL;
         post(play, drawing->staticState.type == 25 ? 11 : 9, &focusList, &focusRotation, arg);
         REQUIRE(drawing->actor.focus.pos.x == posedFocus.x && drawing->actor.focus.pos.z == posedFocus.z);
@@ -1018,16 +1018,16 @@ static void TestRegionalDraw(PlayState* play) {
     actor.staticState.eyeIndex = 1;
     actor.staticState.mmEyeTextures[1] = eyes[1];
     for (unsigned type = 25; type <= 27; type++)
-      for (unsigned pose = 0; pose < (type == 25 ? 5 : 2); ++pose) {
-        actor.staticState.type = type;
-        actor.staticState.pose = pose;
-        actor.actor.focus.pos = (Vec3f){-999, 55, -999};
-        actor.skin.skelAnime.dListCount = type == 27 ? 17 : 20;
-        actor.staticState.mmPropDL = umbrella;
-        play->state.gfxCtx->polyOpa.p = commands;
-        play->state.gfxCtx->polyXlu.p = commands + 100;
-        EnViewerStatic_Draw(&actor, play);
-    }
+        for (unsigned pose = 0; pose < (type == 25 ? 5 : 2); ++pose) {
+            actor.staticState.type = type;
+            actor.staticState.pose = pose;
+            actor.actor.focus.pos = (Vec3f){ -999, 55, -999 };
+            actor.skin.skelAnime.dListCount = type == 27 ? 17 : 20;
+            actor.staticState.mmPropDL = umbrella;
+            play->state.gfxCtx->polyOpa.p = commands;
+            play->state.gfxCtx->polyXlu.p = commands + 100;
+            EnViewerStatic_Draw(&actor, play);
+        }
     REQUIRE(regionalOpaDraws == 7 && regionalXluDraws == 2);
 }
 int main(void) {
@@ -1193,7 +1193,7 @@ int main(void) {
             EnViewerStatic_WaitForObjects(&a, &play);
             REQUIRE(a.staticState.initialized && a.skin.skelAnime.limbCount == (type == 26 ? 23 : 20));
             REQUIRE(a.skin.skelAnime.dListCount == (type == 25 ? 0 : type == 26 ? 20 : 17));
-            a.actor.focus.pos = (Vec3f){12, 17, 67};
+            a.actor.focus.pos = (Vec3f){ 12, 17, 67 };
             EnViewerStatic_Update(&a, &play);
             REQUIRE(a.actor.focus.pos.x == 12 && a.actor.focus.pos.y == 17 && a.actor.focus.pos.z == 67);
             EnViewer_Destroy(&a.actor, &play);
