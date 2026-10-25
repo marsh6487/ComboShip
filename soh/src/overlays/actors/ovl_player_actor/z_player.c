@@ -13,6 +13,7 @@
 #include "gameplay/MagicMirrorPlayer.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include "soh/Enhancements/Gameplay/ComboLostWoodsFountain.h"
+#include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
 #endif
 #include "gameplay/ComboFaroresWind.h"
 #include "gameplay/CrossGameTitleCard.h"
@@ -12538,7 +12539,11 @@ void Player_Init(Actor* thisx, PlayState* play2) {
     }
 
     const s32 crossGameTitleCard = Combo_SOH_HasCrossGameTitleCard();
-    if (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1)) {
+    if (
+#ifdef COMBO_BUILD
+        !ComboRegionalPassagesOot_IsArrivalPending(play) &&
+#endif
+        (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1))) {
         titleFileSize = scene->titleFile.vromEnd - scene->titleFile.vromStart;
         if (GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard)) {
             if ((gSaveContext.sceneLayer < 4) &&

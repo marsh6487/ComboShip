@@ -108,8 +108,6 @@ with tempfile.TemporaryDirectory(prefix='lake-bridge-') as temp:
     subprocess.run(command+[str(ROOT/'tests/regional_passages/lake_bridge_test.cpp'),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
 
-# Run the production actor/provider with the engine's actual DynaPoly registration
-# and destruction functions. Rendering/resource lookup is a separate native compile.
 def function(source,signature):
     start=0
     while True:
@@ -123,6 +121,49 @@ def function(source,signature):
         elif source[end]=='}':depth-=1
         end+=1
     return source[start:end]
+paths=['combo','combo/menu','soh','soh/soh','soh/include','soh/include/PR','soh/src','soh/assets','libultraship/include']
+
+# Exercise the actual draw callback as well: geometry/physics-only execution
+# cannot detect malformed GBI, dead vertex pointers or a bad native setup list.
+graph=(ROOT/'soh/src/code/graph.c').read_text()
+arena=(ROOT/'soh/src/code/TwoHeadArena.c').read_text()
+rcp=(ROOT/'soh/src/code/z_rcp.c').read_text()
+wrappers=(ROOT/'soh/soh/GbiWrap.cpp').read_text()
+renderer=(ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text()
+interpreter=(ROOT/'libultraship/src/fast/interpreter.cpp').read_text()
+draw='\n'.join(function(provider,signature) for signature in (
+    'const Lake::Geometry& Geometry(', 'bool Available(', 'Vtx Vertex(',
+    'const std::vector<Vtx>& RockVertices(', 'void CaveDraw('))
+native_graph='\n'.join(function(arena,signature) for signature in (
+    'void* THA_AllocEnd(', 'Gfx* THGA_AllocEnd('))
+native_graph+='\n'+'\n'.join(function(graph,signature) for signature in (
+    'void* Graph_Alloc(', 'void Graph_OpenDisps(', 'void Graph_CloseDisps('))
+native_graph+='\n'+rcp[rcp.index('Gfx sSetupDL['):rcp.index('\n};',rcp.index('Gfx sSetupDL['))+3]
+native_graph+='\n'+'\n'.join(function(rcp,signature) for signature in (
+    'void Gfx_SetupDL_25Opa(', 'void Gfx_SetupDL_25Xlu('))
+native_gbi='\n'.join(function(wrappers,signature) for signature in (
+    'extern "C" void gSPDisplayList(', 'extern "C" void gSPVertex('))
+first=renderer.index('struct NeiGi_ArenaBudget {')
+native_arena=renderer[first:renderer.index('// Child meshes',first)]
+native_arena+='\nextern "C" '+function(renderer,'bool NeiGi_CanDrawLayers(')
+native_interpreter='\n'.join(function(interpreter,signature) for signature in (
+    'void* Interpreter::SegAddr(', 'bool gfx_vtx_handler_f3dex2('))
+source=(ROOT/'tests/regional_passages/lake_render_test.cpp').read_text()
+for marker,value in (('NATIVE_GRAPH',native_graph),('NATIVE_GBI',native_gbi),
+                     ('NATIVE_ARENA',native_arena),('PRODUCTION_DRAW',draw),
+                     ('NATIVE_INTERPRETER',native_interpreter)):
+    source=source.replace('/* '+marker+' */',value)
+with tempfile.TemporaryDirectory(prefix='lake-render-') as temporary:
+    temporary=Path(temporary);cpp=temporary/'test.cpp';cpp.write_text(source);binary=temporary/'test'
+    command=[os.environ.get('CXX','c++'),'-std=c++20','-fpermissive','-w','-DF3DEX_GBI_2','-DCOMBO_BUILD',
+             '-DFMT_HEADER_ONLY','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
+             *['-I'+str(ROOT/p) for p in paths]]
+    if a.sanitize:command+=['-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-no-pie']
+    subprocess.run(command+[str(cpp),'-o',str(binary)],check=True)
+    subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
+
+# Run the production actor/provider with the engine's actual DynaPoly registration
+# and destruction functions. Rendering/resource lookup is a separate native compile.
 body=provider[provider.index('namespace {'):provider.index('void CaveDraw(')]
 register=provider[provider.index('void RegisterCave()'):provider.index('} // namespace')]
 # Exclude only the draw callback from the native physics fixture. Formatting

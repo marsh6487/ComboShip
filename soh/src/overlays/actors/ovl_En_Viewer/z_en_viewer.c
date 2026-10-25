@@ -2273,7 +2273,10 @@ static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     if (this->staticState.type == STATIC_STORY_ACTOR_MIKAU)
         postLimbDraw = EnViewer_StaticMikauPostLimbDraw;
-    if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN) {
+    if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN ||
+        this->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+        /* Mikau's native lists call segment C, command 2. Establish MM's
+         * opaque table before drawing; a previous OoT actor owns no such table. */
         gSPSegment(POLY_OPA_DISP++, 0x0C, MmAssets_GetOpaqueRenderMode());
     }
     if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {

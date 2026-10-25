@@ -41,10 +41,11 @@ bool PrepareBackdrop() {
         return true;
     RestoreBackdrop();
     sDetailedRender = false;
-    if (NativeBackdropLayout(list->Instructions)) {
+    auto vertices =
+        std::dynamic_pointer_cast<Fast::Vertex>(ResourceLoad("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
+    const auto vertexBase = vertices ? reinterpret_cast<uintptr_t>(vertices->GetPointer()) : 0;
+    if (NativeBackdropLayout(list->Instructions, vertexBase)) {
         // Verify the actual referenced vertex resource as well as command words.
-        auto vertices =
-            std::dynamic_pointer_cast<Fast::Vertex>(ResourceLoad("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
         constexpr Point expected[] = { { 2008, 145, 50 },   { 2049, 250, 448 },  { 2052, 718, 488 },
                                        { 2008, 614, 50 },   { 1969, 716, -382 }, { 1967, 250, -348 },
                                        { 1931, 961, -408 }, { 1928, 565, -370 }, { 1968, 462, 50 },
@@ -74,7 +75,7 @@ bool PrepareBackdrop() {
             callsLeaf = true;
     if (!callsLeaf)
         return false;
-    auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(
+    vertices = std::dynamic_pointer_cast<Fast::Vertex>(
         ResourceLoad("scenes/shared/spot08_scene/spot08_room_0DL_002538_vtx_0"));
     if (!vertices || vertices->VertexList.empty())
         return false;

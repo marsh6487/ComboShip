@@ -30,7 +30,11 @@ with tempfile.TemporaryDirectory(prefix='combo-valley-') as td:
     dyna=(ROOT/'soh/src/code/z_bg_item.c').read_text()
     native='extern "C" {\n'+'\n'.join(function(bg,name) for name in ('BgActor_SetActor','DynaPoly_IsBgIdBgActor','DynaPoly_SetBgActor','DynaPoly_GetActor','DynaPoly_DeleteBgActor'))+'\n'+function(dyna,'DynaPolyActor_Init')+'\n}'
     fixture=(ROOT/'tests/regional_passages/valley_native_test.cpp').read_text()
-    generated=Path(td)/'native.cpp';generated.write_text(fixture.replace('/* NATIVE_ENGINE */',native).replace('/* NATIVE_PRODUCTION */',body))
+    # The native hash-vertex handler caches resolved pointers into the display
+    # list itself. Exercise that production mutation before the valley guard.
+    renderer=function((ROOT/'libultraship/src/fast/interpreter.cpp').read_text(),
+                      'gfx_vtx_hash_handler_custom')
+    generated=Path(td)/'native.cpp';generated.write_text(fixture.replace('/* NATIVE_ENGINE */',native).replace('/* NATIVE_PRODUCTION */',body).replace('/* NATIVE_RENDERER */',renderer))
     env=dict(os.environ)
     if env.get('COMBO_NEI_FIXTURE_CPATH'):env['CPATH']=env['COMBO_NEI_FIXTURE_CPATH']+os.pathsep+env.get('CPATH','')
     paths=['soh','soh/soh','soh/include','soh/include/PR','soh/src','soh/assets','libultraship/include','combo','soh/soh/Enhancements/Gameplay']

@@ -373,6 +373,12 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
     REQUIRE(arg == drawing);
     if (drawing->staticState.type == 25 || drawing->staticState.type == 26) {
         ++regionalOpaDraws;
+        if (drawing->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+            REQUIRE((commands[0].words.w0 & 0xffff) == 0x0C * 4);
+            REQUIRE(commands[0].words.w1 == (uintptr_t)MmAssets_GetOpaqueRenderMode());
+            /* Native Mikau limbs call G_DL_INDEX with segment C, index 2. */
+            REQUIRE((MmAssets_GetOpaqueRenderMode()[2].words.w0 >> 24) == G_ENDDL);
+        }
         if (drawing->staticState.type == 26 && drawing->staticState.pose == 1) {
             REQUIRE(post);
             Vec3s rot = { 0 };
@@ -477,7 +483,8 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
     REQUIRE(commands[faceCommands].words.w1 == 0xffffffffU);
     const StaticStoryMmPresentation* p =
         StaticStoryMm_GetPresentation(drawing->staticState.type, drawing->staticState.pose);
-    unsigned firstFace = drawing->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN;
+    unsigned firstFace = drawing->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN ||
+                         drawing->staticState.type == STATIC_STORY_ACTOR_MIKAU;
     REQUIRE(faceCommands == firstFace + (p->eyeCount != 0) + (p->mouthCount != 0));
     if (firstFace) {
         REQUIRE((commands[0].words.w0 & 0xffff) == 0x0C * 4);

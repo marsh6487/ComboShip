@@ -110,11 +110,17 @@ inline bool BodyClearAt(float x, float z, float radius = 18) {
 // All six native room setups call this same list. These four commands are
 // precisely the eight low tree-screen triangles, not the distant tree canopy.
 inline constexpr std::array<size_t, 4> kBackdropSlots = { 27, 28, 42, 43 };
-template <class Commands> inline bool NativeBackdropLayout(const Commands& c) {
+template <class Commands> inline bool NativeBackdropLayout(const Commands& c, uintptr_t vertexBase = 0) {
     if (c.size() != 45)
         return false;
     const auto eq = [&](size_t i, uint32_t a, uint32_t b) { return c[i].words.w0 == a && c[i].words.w1 == b; };
-    return eq(25, 0x3200600c, 0) && eq(26, 0x5e7003a0, 0x9feb4255) && eq(40, 0x3200600c, 0x60) &&
+    // The renderer replaces each hash-vertex offset with its resolved pointer.
+    // Accept only the pointer belonging to the same verified vertex resource.
+    const auto vertex = [&](size_t i, uintptr_t offset) {
+        return c[i].words.w0 == 0x3200600c &&
+               (c[i].words.w1 == offset || (vertexBase && c[i].words.w1 == vertexBase + offset));
+    };
+    return vertex(25, 0) && eq(26, 0x5e7003a0, 0x9feb4255) && vertex(40, 0x60) &&
            eq(41, 0x5e7003a0, 0x9feb4255) && eq(27, 0x06000204, 0x00000406) && eq(28, 0x06080a00, 0x00080006) &&
            eq(42, 0x06000204, 0x00000406) && eq(43, 0x0604080a, 0x00040a06) && eq(44, 0xdf000000, 0);
 }

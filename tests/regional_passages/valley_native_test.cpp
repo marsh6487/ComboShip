@@ -22,6 +22,37 @@ static std::map<std::string, std::shared_ptr<Ship::IResource>> resources;
 std::shared_ptr<Ship::IResource> ResourceLoad(const char *p) {
   return resources[p];
 }
+// Keep the actual renderer's lookup and vertex submission boundaries small;
+// its command parsing and in-place cache mutation remain production code.
+struct VertexLookup {
+  void *GetResourceRawPointer(uint64_t hash) {
+    assert(hash == UINT64_C(0x5e7003a09feb4255));
+    return resources.at("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8")
+        ->GetRawPointer();
+  }
+};
+static VertexLookup *ActiveResMgr() {
+  static VertexLookup lookup;
+  return &lookup;
+}
+using F3DGfx = Gfx;
+using F3DVtx = Vtx;
+struct Interpreter {
+  void GfxSpVertex(unsigned count, unsigned offset, const F3DVtx *vertices) {
+    assert(count == 6 && offset == 0 && vertices);
+  }
+};
+#define C0(shift, width) ((cmd->words.w0 >> (shift)) & ((1U << (width)) - 1))
+/* NATIVE_RENDERER */
+#undef C0
+static void RenderBackdropVertices(Fast::DisplayList &list) {
+  Interpreter renderer;
+  for (size_t slot : {25, 40}) {
+    auto *command = &list.Instructions[slot];
+    gfx_vtx_hash_handler_custom(&renderer, &command);
+    assert(command == &list.Instructions[slot + 1]);
+  }
+}
 ActorDB::ActorDB() {}
 ActorDB::Entry::Entry() {}
 static ActorDB database;
@@ -147,8 +178,15 @@ int main() {
   assert(NativeBackdropLayout(first->Instructions));
   RestoreBackdrop();
   assert(NativeBackdropLayout(second->Instructions));
+  RenderBackdropVertices(*second);
+  const auto vertexBase = reinterpret_cast<uintptr_t>(vertices->GetPointer());
+  assert(second->Instructions[25].words.w1 == vertexBase);
+  assert(second->Instructions[40].words.w1 == vertexBase + 0x60);
+  assert(PrepareBackdrop() && !sDetailedRender &&
+         "the renderer's cached vertex operands must not hide Snowhead");
+  RestoreBackdrop();
   vertices->VertexList[0].v.ob[0]++;
-  assert(!PrepareBackdrop() && NativeBackdropLayout(second->Instructions));
+  assert(!PrepareBackdrop() && NativeBackdropLayout(second->Instructions, vertexBase));
   vertices->VertexList[0].v.ob[0]--;
   auto foreign = NativeBackdrop();
   foreign->Instructions[27].words.w0++;
