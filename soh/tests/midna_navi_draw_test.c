@@ -243,6 +243,10 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
 
 static void checkLights(int fairyType, int present, int loaded, int hidden, int expectType) {
     static PlayState play;
+    static Player player;
+    play.sceneNum = marketScene ? SCENE_SKIEJER_MARKET : SCENE_MARKET_DAY;
+    player.stateFlags2 = browsingHidden ? (1u << 29) : 0;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
     EnElf fairy = { 0 };
     fairy.actor.params = fairyType;
     fairy.unk_2A8 = hidden ? 8 : 0;
@@ -326,6 +330,9 @@ int main(void) {
                 midnaEnabled = 1;
                 checkCase(FAIRY_NAVI, 1, 1, 0, 0, 0, 1, !suppressed, 0);
                 checkCase(FAIRY_HEAL, 1, 1, 0, 0, 0, 1, 0, 1);
+                midnaEnabled = 0;
+                checkLights(FAIRY_NAVI, 0, 1, 0, suppressed ? LIGHT_POINT_NOGLOW : LIGHT_POINT_GLOW);
+                checkLights(FAIRY_HEAL, 0, 1, 0, LIGHT_POINT_GLOW);
                 midnaEnabled = 0;
             }
         }

@@ -942,6 +942,10 @@ void func_8088E60C(EnElf* this, PlayState* play) {
         MMMidnaResources_Load("objects/midna_navi/poc1/MidnaFloatDL") != NULL) {
         this->lightInfoGlow.type = LIGHT_POINT_NOGLOW;
     }
+    // The light-context halo is independent of the actor's draw callback.
+    if (EnElf_BlackMarketQuiet(this, play) && (GET_PLAYER(play)->stateFlags2 & (1u << 29))) {
+        this->lightInfoGlow.type = LIGHT_POINT_NOGLOW;
+    }
     this->unk_258 = Math_Atan2S_XY(this->actor.velocity.z, this->actor.velocity.x);
     Actor_SetScale(&this->actor, this->actor.scale.x);
 }

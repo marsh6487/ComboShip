@@ -14,6 +14,7 @@ source = source_path.read_text()
 lights = (ROOT / 'soh/src/code/z_lights.c').read_text()
 production = ''.join(function(lights, name) for name in (
     'Lights_PointSetInfo', 'Lights_PointNoGlowSetInfo', 'Lights_PointGlowSetInfo', 'Lights_PointSetColorAndRadius'))
+production += function(source, 'EnElf_BlackMarketQuiet')
 production += function(source, 'EnElf_UpdateLights')
 if 'static void EnElf_UpdateMidnaBlink(' in source:
     production += function(source, 'EnElf_UpdateMidnaBlink')
@@ -26,7 +27,6 @@ if 'static void EnElf_TraceMidnaFrame(' in source:
     production += function(source, 'EnElf_TraceMidnaFrame')
 if 'static s32 EnElf_TryDrawMidna(' in source:
     production += function(source, 'EnElf_TryDrawMidna')
-production += function(source, 'EnElf_BlackMarketQuiet')
 production += function(source, 'EnElf_Draw')
 fixture = (ROOT / 'soh/tests/midna_navi_draw_test.c').read_text().replace(
     '/* PRODUCTION_MIDNA_DRAW */', production)

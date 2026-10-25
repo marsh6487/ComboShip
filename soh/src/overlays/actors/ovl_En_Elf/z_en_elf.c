@@ -899,6 +899,10 @@ void EnElf_UpdateLights(EnElf* this, PlayState* play) {
                                 this->actor.world.pos.z, 255, 255, 255, glowLightRadius);
     }
 
+    // The light-context halo is independent of the actor's draw callback.
+    if (EnElf_BlackMarketQuiet(this, play) && (GET_PLAYER(play)->stateFlags2 & (1u << 29))) {
+        this->lightInfoGlow.type = LIGHT_POINT_NOGLOW;
+    }
     this->unk_2BC = Math_Atan2S(this->actor.velocity.z, this->actor.velocity.x);
 
     Actor_SetScale(&this->actor, this->actor.scale.x);

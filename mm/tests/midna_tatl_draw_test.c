@@ -287,9 +287,11 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
 
 static void checkLights(int fairyType, int present, int loaded, int hidden, int expectType) {
     static PlayState play;
-    EnElf fairy = { 0 };
-    Player player = { 0 };
+    static Player player;
+    play.sceneId = marketScene ? COMBO_BLACK_MARKET_SCENE : SCENE_00KEIKOKU;
+    player.stateFlags2 = browsingHidden ? (1u << 29) : 0;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    EnElf fairy = { 0 };
     cueId = 0;
     fairy.actor.params = fairyType;
     fairy.unk_244 = hidden ? 6 : 0;
@@ -372,6 +374,9 @@ int main(void) {
                 enabled = 1;
                 checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, !suppressed, 0);
                 checkCase(FAIRY_TYPE_1, 1, 1, 0, 0, 0, 1, 0, 1);
+                enabled = 0;
+                checkLights(FAIRY_TYPE_0, 0, 1, 0, suppressed ? LIGHT_POINT_NOGLOW : LIGHT_POINT_GLOW);
+                checkLights(FAIRY_TYPE_1, 0, 1, 0, LIGHT_POINT_GLOW);
             }
         }
     }
