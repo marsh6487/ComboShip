@@ -25,14 +25,16 @@ def function(source, name):
         depth += (source[i]=='{') - (source[i]=='}'); i += 1
     return source[m.start():i]+'\n'
 flags=['-std=gnu11','-DF3DEX_GBI_2','-DLOG_LEVEL_GAME_PRINTS=6','-DNDEBUG','-ffunction-sections','-fdata-sections',
-       '-Ilibultraship/include','-Isoh/include','-Isoh/src','-Isoh/assets','-Isoh','-Isoh/mods']
+       '-Ilibultraship/include','-Isoh/include','-Isoh/src','-Isoh/assets','-Isoh','-Isoh/mods','-Icombo','-Icombo/menu']
 viewer=(ROOT/'soh/src/overlays/actors/ovl_En_Viewer/z_en_viewer.c').read_text()
 loader=(ROOT/'soh/mods/transformation_masks/assets/mm_asset_loader.cpp').read_text()
 fixture=(ROOT/'soh/tests/static_story_mm_viewer_test.c').read_text()
 names=['EnViewer_Update','EnViewer_Destroy','EnViewer_StaticSelectSkullKidModel','EnViewerStatic_WaitForObjects','EnViewerStatic_Update',
        'EnViewer_StaticGreatFairyEyeIndex','EnViewer_StaticGreatFairyOverrideLimbDraw','EnViewer_DrawStaticGreatFairy',
        'EnViewer_StaticTreasureChestShopGalOverrideLimbDraw','EnViewer_StaticOrdinaryMmOverrideLimbDraw',
-       'EnViewer_StaticAnjuPostLimbDraw','EnViewer_StaticMikauPostLimbDraw','EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid','EnViewerStatic_Draw']
+       'EnViewer_StaticAnjuPostLimbDraw','EnViewer_StaticMikauPostLimbDraw',
+       'EnViewer_StaticRegionalPostLimbDraw','EnViewer_StaticRegionalPostLimbDrawXlu',
+       'EnViewer_DrawStaticMmActor','EnViewer_DrawStaticSkullKid','EnViewerStatic_Draw']
 table=re.search(r'static Gfx sMmOpaqueRenderModeDL\[\] = \{.*?\n\};',loader,re.S).group(0)
 fixture=fixture.replace('/* PRODUCTION_OPAQUE_RENDER_MODE */',table+'\n'+function(loader,'MmAssets_GetOpaqueRenderMode'))
 draw_table=re.search(r'static EnViewerDrawFunc sDrawFuncs\[\] = \{.*?\n\};',viewer,re.S).group(0)

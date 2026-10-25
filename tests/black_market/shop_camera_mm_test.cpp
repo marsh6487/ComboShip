@@ -9,6 +9,9 @@
 #include "objects/object_bg/object_bg.h"
 #include <sanitizer/asan_interface.h>
 
+extern "C" s32 EnOssan_TakeItemOffShelf(EnOssan *);
+extern "C" s32 EnOssan_ReturnItemToShelf(EnOssan *);
+
 GameState *gGameState;
 using namespace ComboRando::BlackMarket;
 static bool active = true, safe = true, purchaseAccepted, receiptContext = true,
@@ -616,6 +619,125 @@ static void CheckAuthoredFraming() {
             "immutable bank view, actualall8 48px cursor projection/GBI above "
             "textbox and32px letterbox passed");
 }
+static float ReferenceItemPixels(const Actor &item) {
+  // A 40-unit reference mesh is measured through the real actor projection,
+  // after native actions have moved the actual stock actor. This catches the
+  // previous tiny confirmation view, which the clipping-only test accepted.
+  Actor marker{};
+  marker.focus.pos = item.world.pos;
+  s16 x, bottom, top;
+  Actor_GetScreenPos(&play, &marker, &x, &bottom);
+  marker.focus.pos.y += 40 * item.scale.y;
+  Actor_GetScreenPos(&play, &marker, &x, &top);
+  return std::abs(bottom - top);
+}
+static void CheckSelectedItemLegibility() {
+  for (int slot = 0; slot < 8; ++slot) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    Stick(slot < 4 ? 80 : -80, 0);
+    ReachSlot(slot < 4 ? 0 : 4);
+    for (int i = 0; i < 20; ++i)
+      NativeFrame();
+    shop.cursorIndex = slot;
+    NativeFrame();
+    ProjectNativeCamera(*sBrowseCameraPtr);
+    const auto shelfPixels = ReferenceItemPixels(stock[slot].actor);
+    SelectItem();
+    ProjectNativeCamera(*sBrowseCameraPtr);
+    const auto selectedPixels = ReferenceItemPixels(stock[slot].actor);
+    std::fprintf(stderr, "slot%d shelf %.0fpx selected %.0fpx scale %.2f\n",
+                 slot, shelfPixels, selectedPixels, stock[slot].actor.scale.y);
+    assert(selectedPixels >= 20 && selectedPixels >= 1.75f * shelfPixels &&
+           "confirmation must visibly enlarge merchandise, not leave it tiny");
+    Press(BTN_B);
+    for (int i = 0; i < 10; ++i)
+      NativeFrame();
+    const auto &position = stock[slot].actor.world.pos;
+    assert(position.x == kShelves[slot].x && position.y == kShelves[slot].y &&
+           position.z == kShelves[slot].z && shop.shopItemSelectedTween == 0);
+  }
+  std::puts("MM selected-item legibility: all8 actual native selections enlarge "
+            "the reference mesh >=1.75x and >=20px; B restores shelf anchors");
+}
+static void CheckImmediateCannotBuyFraming() {
+  for (int slot = 0; slot < 8; ++slot) {
+    Reset(); Talk(); ReachSlot(-1);
+    Stick(slot < 4 ? 80 : -80, 0); ReachSlot(slot < 4 ? 0 : 4);
+    for (int i = 0; i < 20; ++i) NativeFrame();
+    shop.cursorIndex = slot;
+    Press(BTN_A);
+    for (int i = 0; i < 5; ++i) NativeFrame();
+    assert(shop.shopItemSelectedTween < 1.f);
+    // Confirm on the very frame the native tween first reaches 1; there is
+    // no idle SelectItem frame to refresh a camera target after that step.
+    Press(BTN_A, true);
+    assert(shop.actionFunc == EnOssan_CannotBuy);
+    for (int frame = 0; frame < 12; ++frame) {
+      ProjectNativeCamera(*sBrowseCameraPtr);
+      for (int corner = 0; corner < 8; ++corner) {
+        Actor marker{};
+        marker.focus.pos = stock[slot].actor.world.pos;
+        marker.focus.pos.x += corner & 1 ? 17.368483f : -17.368483f;
+        marker.focus.pos.y += corner & 2 ? 27.962769f : -15.162769f;
+        marker.focus.pos.z += corner & 4 ? 16.968483f : -16.968483f;
+        s16 x, y; Actor_GetScreenPos(&play, &marker, &x, &y);
+        assert(x > 8 && x < 312 && y > 34 && y < 138 &&
+               "immediate CannotBuy must retain the entire selected item/seal frame");
+      }
+      NativeFrame();
+    }
+    Press(BTN_A, true);
+    for (int frame = 0; frame < 12; ++frame) NativeFrame();
+    const auto &record = BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
+    assert(shop.shopItemSelectedTween == 0 &&
+           sBrowseCameraPtr->paramData.fixd1.rwData.eyePosRotTarget.pos.y == record[1]);
+  }
+  std::puts("MM immediate first-complete-frame confirmation: all8 CannotBuy holds/return retain item/seal framing and restore native bank target");
+}
+static void DumpSelectionPaths() {
+  std::printf("[");
+  for (int slot = 0; slot < 8; ++slot) {
+    Reset();
+    Talk();
+    ReachSlot(-1);
+    Stick(slot < 4 ? 80 : -80, 0);
+    ReachSlot(slot < 4 ? 0 : 4);
+    for (int i = 0; i < 20; ++i)
+      NativeFrame();
+    if (slot)
+      std::printf(",");
+    std::printf("[");
+    shop.cursorIndex = slot;
+    auto printPosition = [&]() {
+      const auto &position = stock[slot].actor.world.pos;
+      const auto &camera = *sBrowseCameraPtr;
+      std::printf("{\"position\":[%.8f,%.8f,%.8f],\"eye\":[%.8f,%.8f,%.8f],\"at\":[%.8f,%.8f,%.8f],\"fov\":%.8f}",
+                  position.x, position.y, position.z, camera.eye.x, camera.eye.y, camera.eye.z,
+                  camera.at.x, camera.at.y, camera.at.z, camera.fov);
+    };
+    printPosition();
+    for (int step = 0; step < 6; ++step) {
+      EnOssan_TakeItemOffShelf(&shop);
+      for (auto& item : stock) item.actor.update(&item.actor, &play);
+      Camera_Fixed1(sBrowseCameraPtr);
+      std::printf(",");
+      printPosition();
+    }
+    assert(shop.shopItemSelectedTween == 1);
+    for (int step = 0; step < 6; ++step) {
+      EnOssan_ReturnItemToShelf(&shop);
+      for (auto& item : stock) item.actor.update(&item.actor, &play);
+      Camera_Fixed1(sBrowseCameraPtr);
+      std::printf(",");
+      printPosition();
+    }
+    assert(shop.shopItemSelectedTween == 0);
+    std::printf("]");
+  }
+  std::puts("]");
+}
 static void CheckForeignCameraTakeover() {
   for (s16 requestedId : {s16(2), s16(3)}) {
     Reset();
@@ -1102,6 +1224,10 @@ static void CheckKeeperDialogue() {
   std::puts("MM optional native keeper intro/help/back/B retains camera; zero purchases/receipts");
 }
 int main(int argc, char **argv) {
+  if (argc == 2 && std::string(argv[1]) == "selection-paths") {
+    DumpSelectionPaths();
+    return 0;
+  }
   std::setbuf(stdout, nullptr);
   if (argc == 2 && std::string(argv[1]) == "receipt") {
     CheckProductionReceipt();
@@ -1167,6 +1293,8 @@ int main(int argc, char **argv) {
   CheckProductionReceipt();
   CheckDestructionWithForeignOwnerAndReceipt();
   CheckAuthoredFraming();
+  CheckSelectedItemLegibility();
+  CheckImmediateCannotBuyFraming();
   CheckForeignCameraTakeover();
   CheckOwnedSlotReuse();
   CheckOwnedSlotReuse(true);

@@ -130,7 +130,9 @@ def build_input(args, work):
     built = {host: {p.relative_to(prepared / host / "assets/custom").as_posix(): str(p)
                     for p in (prepared / host / "assets/custom").rglob("*") if p.is_file()}
              for host in ("mm", "soh")}
-    assert set(built["mm"]) == set(forest) | set(market) == set(built["soh"])
+    mm_market = prepare_native_market.prepared_resources(ROOT / "tools/native_market/bundled", host='mm')
+    assert set(built["mm"]) == set(forest) | set(mm_market)
+    assert set(built["soh"]) == set(forest) | set(market)
     # Keeper model/texture/vertex bytes come from the actual base owner. Other
     # stock forest resources remain indexed as real base files as well.
     base_needed = {name: data for name, data in base.items()
@@ -215,6 +217,8 @@ def build_and_run(host, work, input_path, includes=()):
     if marker is None:
         raise ValueError('native resource-entry fixture main is missing: ' + host)
     fixture = fixture[:marker.start()]
+    if host == 'mm':
+        fixture = '#include "BlackMarketMmShopScene.h"\n' + fixture
     # Remove the original fixture's policy doubles. The new executable always
     # calls the actual production readiness bodies and membership adapters.
     fixture = re.sub(r'extern "C" u8 ResourceMgr_FileExists\(const char\*\) \{ return destination; \}\n', "", fixture)

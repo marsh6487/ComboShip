@@ -1116,7 +1116,7 @@
     "suite": "render",
     "origin": "nei",
     "name": "tests/combo_button_transfer/run_tests.py --sanitize",
-    "run": "python3 -B tests/combo_button_transfer/run_tests.py --sanitize"
+    "run": "python3 -B tests/combo_button_transfer/run_tests.py --sanitize\npython3 -B tests/combo_button_transfer/run_age_tests.py"
   },
   {
     "suite": "equipment",
@@ -1338,7 +1338,7 @@
     "suite": "equipment",
     "origin": "gate",
     "name": "2Ship back equipment and OoT sky compatibility",
-    "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py"
+    "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py\npython3 -B tests/adult_mm_flex/run_tests.py"
   },
   {
     "suite": "equipment",

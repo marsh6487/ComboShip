@@ -136,6 +136,39 @@ s32 NativeStockCanBuy(PlayState*, EnGirlA* item) {
     }
     return CANBUY_RESULT_CANNOT_GET_NOW_2;
 }
+void NativeStockUpdate(EnGirlA* item, PlayState* play) {
+    EnGirlA_Update2(item, play);
+    // Native Update2 restores .25 every frame. Apply the private display fit
+    // after that update while retaining its focus, rotation and action logic.
+    Actor_SetScale(&item->actor, .32f);
+    // Keep the confirmation offer in the readable part of its native bank
+    // shot. Fixed1 still owns the camera and applies its authored .75 rate;
+    // only its private target height follows the native take/return tween.
+    // The bank's original target is restored as the item reaches its shelf.
+    auto* shop = sNativeShop;
+    const int slot = NativeStockSlot(item);
+    if (!shop || slot != shop->cursorIndex)
+        return;
+    const float t = shop->shopItemSelectedTween;
+    if (NativeShopOwnCamera(play) && Play_GetActiveCamId(play) == sBrowseCamera &&
+        CutsceneManager_IsCurrentActor(&shop->actor) && sBrowseCameraPtr->setting == CAM_SET_FIXED1 &&
+        (shop->csId == shop->lookToRightShelfCsId || shop->csId == shop->lookToLeftShelfCsId)) {
+        const auto& record = BlackMarketMmShopScene::kCameraRecords[slot < 4 ? 3 : 2];
+        const auto& position = item->actor.world.pos;
+        const float depth =
+            (position.x - record[0]) * Math_SinS(record[4]) + (position.z - record[2]) * Math_CosS(record[4]);
+        const float weight = std::min(1.f, t * 3.f);
+        const float height = position.y + 10.f - depth * .1636f;
+        const float target = record[1] + (height - record[1]) * weight;
+        // Compensate the fixed camera's one-step lag only for this vertical
+        // presentation binding. Otherwise native's final .75 -> 1 item step
+        // puts the offer across the letterbox/textbox for one frame. The
+        // camera's authored interpolation rate, rotation and FOV stay native.
+        const float rate = sBrowseCameraPtr->paramData.fixd1.roData.unk_04;
+        sBrowseCameraPtr->paramData.fixd1.rwData.eyePosRotTarget.pos.y =
+            t == 0.f || rate <= 0.f ? target : sBrowseCameraPtr->eye.y + (target - sBrowseCameraPtr->eye.y) / rate;
+    }
+}
 void InitNativeStock(Actor* actor, PlayState* play) {
     auto* item = reinterpret_cast<EnGirlA*>(actor);
     const int slot = NativeStockSlot(item);
@@ -145,7 +178,7 @@ void InitNativeStock(Actor* actor, PlayState* play) {
         return;
     }
     item->actionFunc = EnGirlA_DoNothing;
-    item->mainActionFunc = EnGirlA_Update2;
+    item->mainActionFunc = NativeStockUpdate;
     item->isInitialized = true;
     item->actor.textId = kBrowseText;
     item->choiceTextId = kConfirmText;
@@ -156,7 +189,8 @@ void InitNativeStock(Actor* actor, PlayState* play) {
     actor->draw = nullptr; // Black Market's GI renderer draws this actual actor.
     actor->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED;
     actor->world.pos = actor->home.pos = kShelves[slot];
-    Actor_SetScale(actor, .25f);
+    // Match the authored display envelope already reserved for these shelves.
+    Actor_SetScale(actor, .32f);
     Actor_SetFocus(actor, 5);
     NativeStockRefresh(play, item);
 }
@@ -224,12 +258,17 @@ void NativeKeeperStarted(EnOssan* shop, PlayState* play) {
     sBrowseCameraUid = sBrowseCameraPtr->uid;
     sBrowseParent = CAM_ID_MAIN;
 }
-void NativeItemPositions(EnOssan*, s32 slot, Vec3f* shelf, Vec3f* selected) {
+void NativeItemPositions(EnOssan* shop, s32 slot, Vec3f* shelf, Vec3f* selected) {
     if (slot < 0 || slot >= 8)
         return;
     *shelf = kShelves[slot];
     const auto& target = BlackMarketMmShopScene::kSelectedTargets[slot >> 2];
     *selected = { target[0], target[1], target[2] };
+    // Leave the cabinet before changing rows. Native PositionSelectedItem
+    // multiplies this endpoint delta by t once more, yielding t^6 vertically
+    // with its unchanged action timing and horizontal take/return movement.
+    const float t = shop->shopItemSelectedTween;
+    selected->y = shelf->y + (selected->y - shelf->y) * t * t * t * t * t;
 }
 s32 NativeOfferReceipt(EnOssan* shop, PlayState*) {
     sSelected = shop->cursorIndex;

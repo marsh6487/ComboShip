@@ -14,6 +14,7 @@ import market_interior
 import market_title
 import exit_door
 import mm_native_shop
+import mm_shop_presentation
 
 SOURCE = ROOT / "tools/native_market/bundled"
 
@@ -22,7 +23,7 @@ def prepared_resources(bundle_directory=SOURCE, host=None):
     if host not in (None, 'oot', 'mm'):
         raise ValueError('native market host must be mm or oot')
     resources = exit_door.apply(market_title.apply(market_interior.apply(native_market.read_bundle(bundle_directory))))
-    return mm_native_shop.apply(resources) if host == 'mm' else resources
+    return mm_shop_presentation.apply(mm_native_shop.apply(resources)) if host == 'mm' else resources
 
 
 def prepare(output_root=ROOT, bundle_directory=SOURCE):

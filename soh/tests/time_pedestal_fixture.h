@@ -58,6 +58,9 @@ typedef struct {
     u32 tempSwchFlags, tempCollectFlags;
 } RespawnData;
 typedef struct {
+    u16 items[8];
+} ExtButtonSaveInfo;
+typedef struct {
     s32 entranceIndex, linkAge, sceneLayer, respawnFlag;
     f32 entranceSpeed;
     u16 cutsceneIndex;
@@ -74,6 +77,7 @@ typedef struct {
     RespawnData respawn[3];
     struct {
         u8 maskMemory;
+        ExtButtonSaveInfo extButtons, childExtButtons, adultExtButtons;
     } ship;
 } SaveContext;
 struct Actor {
@@ -425,6 +429,8 @@ void BgTokiSwd_Destroy(Actor*, PlayState*);
 void BgTokiSwd_Draw(Actor*, PlayState*);
 void DinFireSword_DrawPedestal(PlayState*);
 void Inventory_SwapAgeEquipment(void);
+void ExtButton_SaveAgeItems(s32 age);
+void ExtButton_LoadAgeItems(s32 age);
 void Fixture_PlayDestroyAgeHandoff(PlayState*);
 void Fixture_HudRestore(PlayState*);
 void func_80084BF4(PlayState*, u16);
@@ -454,6 +460,7 @@ void Player_PlayVoiceSfx(Player*, u16);
 void Player_ProcessAnimSfxList(Player*, AnimSfxEntry*);
 extern Gfx *gPlayerLeftHandBgsDLs[], *gPlayerLeftHandClosedDLs[];
 extern Gfx* sPlayerRightHandClosedDLs[];
+extern Gfx *gPlayerLeftHandOpenDLs[], *sPlayerRightHandOpenDLs[];
 extern const char gLinkChildLeftHandHoldingMasterSwordDL[];
 extern const char gLinkAdultLeftHandHoldingMasterSwordNearDL[], gLinkAdultLeftHandHoldingMasterSwordFarDL[];
 void Fixture_ApplyLateHandOverrides(PlayState*, Player*, s32, Gfx**);
@@ -461,6 +468,9 @@ void Fixture_ApplyLateHandOverridesWithRot(PlayState*, Player*, s32, Gfx**, Vec3
 void Fixture_DrawPostHand(PlayState*, Player*, Gfx**);
 void DinFireSword_Draw(PlayState*, Player*);
 void* DinFireSword_HandDL(PlayState*, Player*, void*, u8, u8, u8);
+void DinFireSword_CopyHandModel(Player*, void*, void*);
+void DinFireSword_DrawHand(PlayState*, Player*, void*);
+u8 MmForm_IsNativeTransformationPlaying(PlayState*, Player*);
 void Player_ApplyLanternGrip(Player*, s32, Gfx**);
 void BossRemains_DrawOdolwaSword(PlayState*, Player*);
 Gfx* Player_ResolveLimbDLForDummyOrLocal(void*);
@@ -554,6 +564,7 @@ void Audio_SetCutsceneFlag(s32);
 #include <functional>
 #include <map>
 #include <string>
+#include <nlohmann/json.hpp>
 class SaveManager {
   public:
     static SaveManager* Instance;
@@ -565,6 +576,21 @@ class SaveManager {
     template <typename T> void LoadData(const char* key, T& value, T fallback) {
         auto found = data.find(prefix + key);
         value = found == data.end() ? fallback : static_cast<T>(found->second);
+    }
+    void LoadData(const char* key, nlohmann::json& value, const nlohmann::json& fallback) {
+        // The cumulative serializer validates raw JSON before narrowing sword
+        // elements. Reassemble this fixture's flattened array values for it.
+        value = fallback;
+        if (fallback.is_array()) {
+            for (size_t i = 0;; ++i) {
+                auto found = data.find(prefix + key + "/" + std::to_string(i) + "/");
+                if (found == data.end())
+                    break;
+                value.push_back(found->second);
+            }
+        } else if (auto found = data.find(prefix + key); found != data.end()) {
+            value = found->second;
+        }
     }
     template <typename F> void SaveArray(const char* key, size_t count, F fn) {
         auto parent = prefix;

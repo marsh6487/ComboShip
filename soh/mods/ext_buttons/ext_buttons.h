@@ -23,6 +23,8 @@ extern "C" {
 
 // Returns the effective item id for a button slot: the real u16 id from extButtons when the slot is
 // marked ITEM_EXT_BUTTON, otherwise the plain u8 buttonItems value (widened to u16).
+// A marker without a valid full custom ID is empty; zero must not become a stick.
+// Native C/D zero with SLOT_NONE is also empty; B and valid SLOT_STICK are preserved.
 u16 ExtButton_GetItem(s32 btn);
 
 // Equip an extended (u16) item to a button slot: marks buttonItems with ITEM_EXT_BUTTON and stores
@@ -31,6 +33,12 @@ void ExtButton_SetItem(s32 btn, u16 extId);
 
 // Clear a button slot: buttonItems -> ITEM_NONE, extButtons -> 0.
 void ExtButton_ClearItem(s32 btn);
+
+// Pair the native child/adult ItemEquips snapshots with their full custom IDs.
+// Store before changing the raw buttons; load only when restoring that age's buttons.
+void ExtButton_SaveAgeItems(s32 age);
+void ExtButton_LoadAgeItems(s32 age);
+void ExtButton_ResetSaveData(void);
 
 #ifdef __cplusplus
 }

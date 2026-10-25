@@ -41,6 +41,7 @@
 #include "2s2h/resource/type/Scene.h"
 #include "2s2h/resource/type/scenecommand/SetCsCamera.h"
 #include "2s2h/resource/type/scenecommand/SetActorCutsceneList.h"
+#include "2s2h/resource/type/scenecommand/SetMesh.h"
 int SaveManager_ReadSaveFile(const std::filesystem::path&, nlohmann::json&);
 extern "C" {
 #include "overlays/actors/ovl_En_Takaraya/z_en_takaraya.h"
@@ -143,6 +144,10 @@ void StageSoloReturn() {
 }
 
 bool PackAvailable() {
+    if (!std::all_of(std::begin(BlackMarketMmShopScene::kPresentationResources),
+                     std::end(BlackMarketMmShopScene::kPresentationResources),
+                     [](const char* path) { return ResourceMgr_FileExists(path); }))
+        return false;
     // The base scene needs its own host's geometry and native keeper. Visual
     // packs remain optional; complete legacy packs retain compatibility.
     return std::all_of(std::begin(kNativeBlackMarketMmResources), std::end(kNativeBlackMarketMmResources),
@@ -559,6 +564,20 @@ bool NativeShopSceneReady(PlayState* play) {
             cs.endCam != CS_END_CAM_0 || cs.letterboxSize != BlackMarketMmShopScene::kLetterboxSize)
             return false;
     }
+    // A legacy/Alt room can retain the same scene cameras while overriding
+    // the mesh with the old basket positions. Validate the actual selected
+    // room and loaded mesh pointer before native actions can begin.
+    auto room = std::dynamic_pointer_cast<SOH::Scene>(ResourceLoad(kRoom));
+    std::shared_ptr<SOH::SetMesh> mesh;
+    if (!room)
+        return false;
+    for (const auto& command : room->commands)
+        if (command && command->cmdId == SOH::SceneCommandID::SetMesh)
+            mesh = std::dynamic_pointer_cast<SOH::SetMesh>(command);
+    if (!mesh || mesh->meshHeader.base.type != 0 || mesh->opaPaths.size() != 1 ||
+        mesh->opaPaths[0] != std::string("__OTR__") + BlackMarketMmShopScene::kPresentationResources[0] ||
+        !mesh->xluPaths.empty() || static_cast<void*>(play->roomCtx.curRoom.roomShape) != mesh->GetPointer())
+        return false;
     sNativeShopSceneResource = std::move(scene);
     return true;
 }

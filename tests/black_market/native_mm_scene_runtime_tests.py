@@ -50,7 +50,8 @@ def main():
     parser.add_argument('--source', type=Path, default=ROOT / 'mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp')
     args = parser.parse_args()
     production = args.source.read_text()
-    body = re.search(r'^constexpr char kScene\[\] = [^;]+;', production, re.M)[0] + '\n'
+    body = '\n'.join(re.search(r'^constexpr char k' + name + r'\[\] = [^;]+;', production, re.M)[0]
+                     for name in ('Scene', 'Room')) + '\n'
     body += re.search(r'^std::shared_ptr<SOH::Scene> sNativeShopSceneResource;', production, re.M)[0] + '\n'
     body += function(production, 'bool NativeShopSceneReady(')
     fixture = (ROOT / 'tests/black_market/native_mm_scene_runtime_test.cpp').read_text().replace(
@@ -64,6 +65,8 @@ def main():
         'mm/2s2h/resource/importer/scenecommand/SetActorCutsceneListFactory.cpp',
         'mm/2s2h/resource/type/scenecommand/SetCsCamera.cpp',
         'mm/2s2h/resource/type/scenecommand/SetActorCutsceneList.cpp',
+        'mm/2s2h/resource/type/scenecommand/SetMesh.cpp',
+        'mm/2s2h/resource/importer/scenecommand/SetMeshFactory.cpp',
         'libultraship/src/ship/utils/binarytools/BinaryReader.cpp',
         'libultraship/src/ship/utils/binarytools/MemoryStream.cpp',
         'libultraship/src/ship/utils/binarytools/Stream.cpp',
@@ -76,7 +79,7 @@ def main():
         native.write_text(native_chain_source())
         logger = temporary / 'spdlog/spdlog.h'
         logger.parent.mkdir()
-        logger.write_text('#pragma once\n#define SPDLOG_TRACE(...)\n')
+        logger.write_text('#pragma once\n#define SPDLOG_TRACE(...)\n#define SPDLOG_ERROR(...)\n')
         paths = ('.', 'mm', 'mm/include', 'mm/include/PR', 'mm/src', 'mm/assets', 'mm/2s2h',
                  'libultraship/include', 'combo')
         include = ['-I' + str(temporary), *['-I' + str(ROOT / path) for path in paths]]
@@ -92,6 +95,10 @@ def main():
             path = temporary / f'command-{identity}.bin'
             path.write_bytes(struct.pack('<I', identity) + commands[identity])
             arguments.append(str(path))
+        room = mm_native_shop.native_commands(resources[mm_native_shop.ROOM])
+        path = temporary / 'mesh.bin'
+        path.write_bytes(struct.pack('<I', 10) + room[10])
+        arguments.append(str(path))
         subprocess.run([str(binary), *arguments], check=True,
                        env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})
 

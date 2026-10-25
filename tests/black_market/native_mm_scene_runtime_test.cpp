@@ -7,6 +7,8 @@
 #include "2s2h/resource/type/Scene.h"
 #include "2s2h/resource/type/scenecommand/SetCsCamera.h"
 #include "2s2h/resource/type/scenecommand/SetActorCutsceneList.h"
+#include "2s2h/resource/type/scenecommand/SetMesh.h"
+#include "2s2h/resource/importer/scenecommand/SetMeshFactory.h"
 #include "2s2h/resource/importer/scenecommand/SetCsCameraFactory.h"
 #include "2s2h/resource/importer/scenecommand/SetActorCutsceneListFactory.h"
 #include <libultraship/bridge/resourcebridge.h>
@@ -27,12 +29,15 @@ void EnOssan_GetCutscenes(EnOssan*, PlayState*);
 
 static PlayState play;
 static std::shared_ptr<Ship::IResource> baseResource, altResource;
+static std::shared_ptr<SOH::Scene> roomResource;
+static std::shared_ptr<SOH::SetMesh> roomMesh;
 static bool altEnabled;
 static std::string activeManager = "foreign";
 static std::vector<std::string> previousManagers;
 static int loads, enteredNativeCutscenes, cases;
 static const char* cameraPath;
 static const char* cutscenePath;
+static const char* meshPath;
 
 static void Require(bool condition, const std::string& reason) {
     if (!condition)
@@ -52,6 +57,10 @@ OwnRMScope::~OwnRMScope() {
 
 std::shared_ptr<Ship::IResource> ResourceLoad(const char* name) {
     Require(activeManager == "mm", "production guard did not acquire its own MM resource manager");
+    if (std::strcmp(name, "scenes/nonmq/skiejer_market/skiejer_market_room_0") == 0) {
+        ++loads;
+        return roomResource;
+    }
     Require(std::strcmp(name, "scenes/nonmq/skiejer_market/skiejer_market") == 0,
             "production guard requested a different scene");
     ++loads;
@@ -105,6 +114,11 @@ static SceneResources Reset() {
     loads = enteredNativeCutscenes = 0;
     Require(activeManager == "foreign" && previousManagers.empty(), "resource manager scope leaked");
     auto resources = ReadScene();
+    SOH::SetMeshFactory meshFactory;
+    roomMesh = std::dynamic_pointer_cast<SOH::SetMesh>(LoadCommand(meshPath, meshFactory));
+    roomResource = std::make_shared<SOH::Scene>(std::make_shared<Ship::ResourceInitData>());
+    roomResource->commands = {roomMesh};
+    play.roomCtx.curRoom.roomShape = reinterpret_cast<RoomShape*>(roomMesh->GetPointer());
     baseResource = resources.scene;
     Bind(resources);
     return resources;
@@ -121,7 +135,7 @@ static EnOssan GuardedNativeLookup(bool expected, const std::string& reason) {
         EnOssan_GetCutscenes(&shop, &play);
     }
     Require(ready == expected, reason);
-    Require(loads == 1 && activeManager == "foreign" && previousManagers.empty(),
+    Require(loads >= 1 && loads <= 2 && activeManager == "foreign" && previousManagers.empty(),
             reason + ": own-MM resource scope was not restored");
     if (expected) {
         Require(enteredNativeCutscenes == 1 && sNativeShopSceneResource,
@@ -289,15 +303,31 @@ static void SelectedResourceAndLifetimeCases() {
     ++cases;
 }
 
+static void RoomPresentationCases() {
+    Reset(); roomResource.reset();
+    GuardedNativeLookup(false, "missing selected MM room");
+    Reset(); roomResource->commands.clear();
+    GuardedNativeLookup(false, "missing typed room mesh");
+    Reset(); roomMesh->opaPaths[0] = "__OTR__custom/skiejer_market/room";
+    GuardedNativeLookup(false, "legacy or Alt basket mesh is not the private layout");
+    Reset(); play.roomCtx.curRoom.roomShape = nullptr;
+    GuardedNativeLookup(false, "selected room resource differs from the actually loaded mesh");
+    Reset(); roomMesh->xluPaths.push_back("foreign/extra");
+    GuardedNativeLookup(false, "unexpected room translucent graph");
+    Reset(); altEnabled = true;
+    GuardedNativeLookup(true, "native companion presentation with Alt enabled");
+}
 int main(int argc, char** argv) {
     try {
-        Require(argc == 3, "expected prepared native camera and cutscene command files");
+        Require(argc == 4, "expected prepared native camera, cutscene and mesh command files");
         cameraPath = argv[1];
         cutscenePath = argv[2];
+        meshPath = argv[3];
         ResourceTypeCases();
         RecordCountAndPointerCases();
         CameraAndCutsceneCases();
         SelectedResourceAndLifetimeCases();
+        RoomPresentationCases();
         std::cout << "PASS exact production MM scene readiness: " << cases
                   << " typed/count/metadata/pointer/Alt/lifetime cases before real native GetCutscenes\n";
         return 0;
