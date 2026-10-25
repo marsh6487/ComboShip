@@ -125,5 +125,22 @@ save, save hash, seed, notes or progress dump belongs in this repository.
 This user-directed save repair is separate from the general source validation,
 which continues to preserve legitimate native sticks and local-only assignments.
 
+The full native young-Epona save fixture also needs the actual
+`ExtButton_ResetSaveData` body and its declaration when it extracts SaveManager
+initialization. Those dependencies are now included. Its existing UBSan save
+and disk-roundtrip checks pass, with added stale-shadow checks confirming all
+24 active/child/adult shadow cells clear in all five new-file modes. No save
+types or production initialization behavior were replaced for this fixture.
+
+The native shared-slot UI fixture had encoded native Grace `0xA1` through the
+extended-item setter, creating a marker with an unsupported low-ID shadow. No
+supported native equip, sync, travel or wheel writer creates that pair. The
+fixture now executes the real native equip completion's final write and keeps
+the invalid-marker rejection check separately. It verifies C1 and physical
+D-pad Up/Down in both wheel directions, including raw item, slot, shadow and
+icon refreshes, plus valid native sticks and invalid zero/empty-slot input.
+Shared-slot core/UI/sync/save checks and the eight age groups pass; getter and
+input validation are unchanged.
+
 Configured runtime testing should equip different custom items on the same
 direction in both ages, travel/swap, save/reload, and verify each remains correct.

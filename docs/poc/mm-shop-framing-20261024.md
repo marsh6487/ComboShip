@@ -126,3 +126,12 @@ ordinary MM shops and OoT remain unchanged. User acceptance is still required
 before calling this runtime-proven or promoting it to an accepted master.
 
 Controller integration additionally compiled the complete changed MM `BlackMarket.cpp` translation unit with the native headers and MM precompiled-header inputs (16 existing compiler warnings). The integrated native camera/action sweep and all five resource isolation tests passed. This does not establish a linked executable or configured gameplay.
+
+CI portability followup: Ubuntu's external fmt9 reached the scene fixture through
+`SetMeshFactory -> Context.h -> spdlog/async.h`, outside its destructor-log stub,
+and failed at link before any scene assertions ran. The runner now explicitly
+uses fmt's header-only mode for its C++ compile. The unchanged ASan/UBSan fixture
+reproduced the link failure with external fmt11.2, then passed all 123 cases in
+both external and bundled configurations after the flag. Exact Ubuntu fmt9
+verification remains a CI check. Production code and fixture assertions are
+unchanged by this followup.

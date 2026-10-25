@@ -99,6 +99,40 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
         production += "\n" + "\n".join(function(ui, n) for n in (
             "KaleidoWheel_Run", "GraceHourglass_KaleidoCycle", "GraceHourglass_KaleidoHandle",
             *(n for n in slate_names if n != "KaleidoScope_ResetItemCycling"), *wand_names))
+        if host == "soh":
+            # Use the native completion's final item/slot write. Animation and
+            # duplicate-slot swapping are outside this wheel-selection fixture.
+            equip = function(ui, "KaleidoScope_UpdateItemEquip")
+            start = equip.index("            if (pauseCtx->equipTargetItem >= 0x0200)")
+            icon_call = "            Interface_LoadItemIcon1(play, targetButtonIndex);"
+            end = equip.index(icon_call, start) + len(icon_call)
+            production += r'''
+static void CompleteNativeButtonEquip(PlayState* play, s32 button, u16 item, u8 slot) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    pauseCtx->equipTargetCBtn = button - 1;
+    pauseCtx->equipTargetItem = item;
+    pauseCtx->equipTargetSlot = slot;
+    uint16_t targetButtonIndex = pauseCtx->equipTargetCBtn + 1;
+''' + equip[start:end] + r'''
+}
+static void CheckOotGraceButtons(u16 item, int refreshes) {
+    // OoT physical D-pad order is Up=4, Down=5, Left=6, Right=7.
+    for (s32 button : {1, 4, 5}) {
+        assert(ExtButton_GetItem(button) == item);
+        assert(gSaveContext.equips.buttonItems[button] == (item >= 0x200 ? ITEM_EXT_BUTTON : item));
+        assert(EXT_BUTTON_ITEM(button) == (item >= 0x200 ? item : 0));
+        assert(gSaveContext.equips.cButtonSlots[button - 1] == (item >= 0x200 ? SLOT_NONE : 41));
+        assert(icons[button] == refreshes);
+    }
+    assert(ExtButton_GetItem(2) == ITEM_BOW && ExtButton_GetItem(6) == EXT_ITEM_SHEIKAH_SLATE);
+    for (s32 button : {3, 7}) {
+        assert(ExtButton_GetItem(button) == ITEM_STICK);
+        assert(gSaveContext.equips.cButtonSlots[button - 1] == SLOT_STICK);
+        assert(EXT_BUTTON_ITEM(button) == 0);
+    }
+    assert(C_BTN_ITEM(2) == ITEM_STICK && DPAD_ITEM(3) == ITEM_STICK);
+}
+'''
         checks = r'''
 int main() {
     PlayState play{};
@@ -131,6 +165,7 @@ int main() {
         /* STICK_LEFT */
         GraceHourglass_KaleidoHandle(&play);
         assert(ExtInv_GetSlotItem(41) == first);
+        /* CHECK_RETURN_BUTTONS */
         /* STICK_ZERO */
         play.pauseCtx.cursorSlot[PAUSE_ITEM] = 16;
         play.pauseCtx.cursorItem[PAUSE_ITEM] = ITEM_NONE;
@@ -226,6 +261,7 @@ int main() {
 }
 '''
         if host == "mm":
+            checks = checks.replace("/* CHECK_RETURN_BUTTONS */", "")
             checks = checks.replace("/* SET_BUTTONS */", r'''
         ExtButton_SetItem(0, EQUIP_SLOT_C_LEFT, first);
         C_SLOT_EQUIP(0, EQUIP_SLOT_C_LEFT) = first >= 0x200 ? SLOT_NONE : 89;
@@ -256,19 +292,26 @@ int main() {
         else:
             checks = checks.replace("/* SET_BUTTONS */", r'''
         sGraceHourglassSelectorActive = 0;
-        ExtButton_SetItem(1, first);
-        gSaveContext.equips.cButtonSlots[0] = first >= 0x200 ? SLOT_NONE : 41;
-        gSaveContext.equips.buttonItems[2] = ITEM_BOW;
-        ExtButton_SetItem(4, first);
-        gSaveContext.equips.cButtonSlots[3] = first >= 0x200 ? SLOT_NONE : 41;
-        ExtButton_SetItem(5, EXT_ITEM_SHEIKAH_SLATE);
+        // Low-byte Grace is a raw native equip, never a full-ID marker.
+        ExtButton_SetItem(1, ITEM_HYLIAS_GRACE);
+        gSaveContext.equips.cButtonSlots[0] = SLOT_PHANTOM_HOURGLASS;
+        assert(ExtButton_GetItem(1) == ITEM_NONE);
+        for (s32 button : {1, 4, 5})
+            CompleteNativeButtonEquip(&play, button, first, SLOT_PHANTOM_HOURGLASS);
+        CompleteNativeButtonEquip(&play, 2, ITEM_BOW, SLOT_BOW);
+        CompleteNativeButtonEquip(&play, 6, EXT_ITEM_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE);
+        CompleteNativeButtonEquip(&play, 3, ITEM_STICK, SLOT_STICK);
+        CompleteNativeButtonEquip(&play, 7, ITEM_STICK, SLOT_STICK);
+        gSaveContext.equips.cButtonSlots[6] = SLOT_NONE;
+        assert(ExtButton_GetItem(7) == ITEM_NONE && DPAD_ITEM(3) == ITEM_NONE);
+        CompleteNativeButtonEquip(&play, 7, ITEM_STICK, SLOT_STICK);
+        std::memset(icons, 0, sizeof(icons));
+        CheckOotGraceButtons(first, 0);
 ''').replace("/* CHECK_BUTTONS */", r'''
         assert(ExtButton_GetItem(1) == next && ExtButton_GetItem(4) == next);
-        assert(gSaveContext.equips.cButtonSlots[0] == (next >= 0x200 ? SLOT_NONE : 41));
-        assert(gSaveContext.equips.cButtonSlots[3] == (next >= 0x200 ? SLOT_NONE : 41));
-        assert(ExtButton_GetItem(2) == ITEM_BOW && ExtButton_GetItem(5) == EXT_ITEM_SHEIKAH_SLATE);
-        assert(icons[1] == 1 && icons[4] == 1);
+        CheckOotGraceButtons(next, 1);
 ''')
+            checks = checks.replace("/* CHECK_RETURN_BUTTONS */", "CheckOotGraceButtons(first, 2);")
             checks = checks.replace("/* STICK_RIGHT */", "play.pauseCtx.stickRelX = 40;")
             checks = checks.replace("/* STICK_LEFT */", "play.pauseCtx.stickRelX = -40;")
             checks = checks.replace("/* STICK_ZERO */", "play.pauseCtx.stickRelX = 0;")

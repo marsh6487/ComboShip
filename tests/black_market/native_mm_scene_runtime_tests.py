@@ -87,7 +87,9 @@ def main():
                  '-fno-sanitize-recover=all', '-fno-omit-frame-pointer', '-no-pie']
         subprocess.run([os.environ.get('CC', 'cc'), '-std=c11', *flags, *include,
                         '-c', str(native), '-o', str(native_object)], check=True)
-        subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', *flags, *include,
+        # Context.h reaches spdlog/async.h beyond the logger stub. External
+        # distro fmt needs the same header-only mode as spdlog's bundled fmt.
+        subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-DFMT_HEADER_ONLY', *flags, *include,
                         str(cpp), *[str(ROOT / source) for source in sources], str(native_object),
                         '-o', str(binary)], check=True)
         arguments = []
