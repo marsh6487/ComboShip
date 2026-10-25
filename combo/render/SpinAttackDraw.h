@@ -81,7 +81,14 @@ static inline Gfx* CwSpinDraw_Clone(PlayState* play, const char* native, const c
     if (!source || !textures[0] || !textures[1])
         return NULL;
     size_t count = ResourceGetSizeByName(native) / sizeof(Gfx);
-    Gfx* copy = (Gfx*)CwSpinDraw_Alloc(play->state.gfxCtx, 2 * count * sizeof(Gfx));
+    size_t bytes = 2 * count * sizeof(Gfx);
+    uintptr_t head = (uintptr_t)play->state.gfxCtx->polyOpa.p;
+    uintptr_t tail = (uintptr_t)play->state.gfxCtx->polyOpa.d;
+    // OPEN_DISPS writes an OPA marker even for an XLU-only draw. OoT removes
+    // that marker without restoring its word, so keep it outside the clone.
+    if (tail < head || tail - head < ((bytes + 15) & ~(size_t)15) + sizeof(Gfx))
+        return NULL;
+    Gfx* copy = (Gfx*)CwSpinDraw_Alloc(play->state.gfxCtx, bytes);
     if (copy == NULL)
         return NULL;
     return CwSpinMaterial_Clone(copy, 2 * count, source, count, ResourceGetCrcByName(textures[0]),
@@ -109,12 +116,19 @@ static inline int CwSpinDraw_Burst(PlayState* play, CwSpinVisualSelection visual
         return 0;
     CwSpinResourceRecipe recipe = CwSpinStyle_Resources(visual.style, visual.nativeMaterialElement, great);
     CwSpinPalette palette = CwSpinDraw_Palette(visual, great, 0);
-    int nativeShape = visual.style == CW_SPIN_STYLE_NATIVE || visual.style == CW_SPIN_STYLE_ICE ||
-                      visual.style == CW_SPIN_STYLE_LIGHT;
-    Gfx* disk =
-        nativeShape ? CwSpinDraw_Clone(play, nativeDisk, recipe.burstTex, palette) : CwSpinDraw_LoadDL(recipe.disk);
-    Gfx* cylinder = nativeShape ? CwSpinDraw_Clone(play, nativeCylinder, recipe.burstTex, palette)
-                                : CwSpinDraw_LoadDL(recipe.cylinder);
+    // Explicit styles need their authored shell, UV state and texture masks.
+    // Only Native follows the currently selected host/custom shell.
+    int nativeShape = visual.style == CW_SPIN_STYLE_NATIVE;
+    // The imported Ice/Light great shells still embed the Fire donor's second
+    // texture. Rebind their own sigil in a frame-owned copy of the authored
+    // shell, retaining its geometry, UVs, scrolling and level-specific shape.
+    int themedGreat = great && (visual.style == CW_SPIN_STYLE_ICE || visual.style == CW_SPIN_STYLE_LIGHT);
+    Gfx* disk = nativeShape || themedGreat
+                    ? CwSpinDraw_Clone(play, nativeShape ? nativeDisk : recipe.disk, recipe.burstTex, palette)
+                    : CwSpinDraw_LoadDL(recipe.disk);
+    Gfx* cylinder = nativeShape || themedGreat ? CwSpinDraw_Clone(play, nativeShape ? nativeCylinder : recipe.cylinder,
+                                                                  recipe.burstTex, palette)
+                                               : CwSpinDraw_LoadDL(recipe.cylinder);
     if (!disk || !cylinder)
         return 0;
     CwSpinDraw_SetColors(play, palette, alpha);
@@ -141,18 +155,26 @@ static inline int CwSpinDraw_Charge(PlayState* play, CwSpinVisualSelection visua
     OPEN_DISPS(play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, charge);
     CLOSE_DISPS(play->state.gfxCtx);
-    CwSpinAccents_DrawCharge(play, visual.accentElement, great, play->gameplayFrames * 0.05f, alpha);
+    if (CwSpinAccents_DrawCharge(play, visual.accentElement, great, play->gameplayFrames * 0.05f, alpha))
+        CwSpinDraw_SetColors(play, palette, alpha);
     return 1;
 }
 
 static inline void CwSpinDraw_Accents(PlayState* play, CwSpinVisualSelection visual, int great, float phase,
                                       float alpha) {
+    // The burst texture counter advances up to 2 per gameplay tick. Particle
+    // motion uses the charge preview's 0.05-per-tick scale, avoiding large
+    // matrix turns that collapse shards/sparkles during frame interpolation.
+    float motionPhase = phase * 0.025f;
     size_t budget = great ? 24 : 12;
+    int drawn = 0;
     if (visual.style == CW_SPIN_STYLE_DARK_ENERGY) {
         size_t sparks = great ? 8 : 4;
-        CwSpinAccents_DrawLimited(play, 1, great, phase, alpha, sparks, 0xE61946);
+        drawn |= CwSpinAccents_DrawLimited(play, 1, great, motionPhase, alpha, sparks, 0xE61946);
         budget -= sparks;
     }
-    CwSpinAccents_DrawLimited(play, visual.accentElement, great, phase, alpha, budget, 0);
+    drawn |= CwSpinAccents_DrawLimited(play, visual.accentElement, great, motionPhase, alpha, budget, 0);
+    if (drawn)
+        CwSpinDraw_SetColors(play, CwSpinDraw_Palette(visual, great, 0), alpha);
 }
 #endif

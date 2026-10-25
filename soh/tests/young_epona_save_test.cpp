@@ -16,6 +16,7 @@
 #include "z64.h"
 #include "functions.h"
 #include "macros.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "soh/util.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
@@ -105,6 +106,24 @@ static void CheckYoungDefault() {
 static void SeedStaleYoungHorse() {
     gSaveContext.ship.youngHorseDataValid = 1;
     gSaveContext.ship.youngHorseData = { 99, { 111, 222, 333 }, 444 };
+}
+
+static void SeedStaleButtonShadows() {
+    for (auto* buttons :
+         { &gSaveContext.ship.extButtons, &gSaveContext.ship.childExtButtons, &gSaveContext.ship.adultExtButtons }) {
+        for (auto& item : buttons->items) {
+            item = 0x0223;
+        }
+    }
+}
+
+static void CheckButtonShadowsDefault() {
+    for (const auto* buttons :
+         { &gSaveContext.ship.extButtons, &gSaveContext.ship.childExtButtons, &gSaveContext.ship.adultExtButtons }) {
+        for (const auto item : buttons->items) {
+            Check(item == 0, "new-file initialization clears active, child and adult button shadows");
+        }
+    }
 }
 
 static json BaseFile(int version, json data) {
@@ -205,15 +224,19 @@ static void TestLegacyAndFileIsolation(SaveManager& manager) {
 static void TestNewFileModes(SaveManager& manager) {
     gSaveContext.fileNum = 0;
     SeedStaleYoungHorse();
+    SeedStaleButtonShadows();
     manager.InitFile(false);
     CheckYoungDefault();
+    CheckButtonShadowsDefault();
     CheckHorse(gSaveContext.horseData, SCENE_HYRULE_FIELD, -1840, 72, 5497, -0x6AD9,
                "normal creation retains vanilla adult horse start");
     for (int mode : { 0, 1, 2 }) {
         SeedStaleYoungHorse();
+        SeedStaleButtonShadows();
         debugSaveMode = mode;
         manager.InitFile(true);
         CheckYoungDefault();
+        CheckButtonShadowsDefault();
         CheckHorse(gSaveContext.horseData, SCENE_HYRULE_FIELD, -1840, 72, 5497, -0x6AD9,
                    "debug/maxed creation retains vanilla adult horse start");
         Check(gSaveContext.healthCapacity == (mode == 0   ? STARTING_HEALTH
@@ -222,9 +245,11 @@ static void TestNewFileModes(SaveManager& manager) {
               "fixture reaches the selected normal/debug/maxed initialization branch");
     }
     SeedStaleYoungHorse();
+    SeedStaleButtonShadows();
     gSaveContext.fileNum = 0xFF;
     manager.InitFile(true);
     CheckYoungDefault();
+    CheckButtonShadowsDefault();
     std::puts("PASS: normal, debug, maxed and title initialization clear prior young horse state");
 }
 

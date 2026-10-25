@@ -38,6 +38,11 @@ def main():
         if "void Combo_MM_RequestCrossGameTitleCard(" in boot:
             state += "\n" + function(boot, "void Combo_MM_RequestCrossGameTitleCard(")
     fixture = fixture.replace("/* REQUEST_STATE */", state)
+    regional = (ROOT / "mm/2s2h/Enhancements/Gameplay/ComboRegionalPassages.cpp").read_text()
+    arrival_start = regional.index("struct Arrival {")
+    arrival_end = regional.index("} sArrival;", arrival_start) + len("} sArrival;")
+    arrival_state = "namespace {\nusing ComboMmRegional::Placement;\n" + regional[arrival_start:arrival_end] + "\n}\n"
+    fixture = fixture.replace("/* REGIONAL_ARRIVAL */", arrival_state + function(regional, 'extern "C" int ComboRegionalPassagesMm_ApplyArrival('))
     fixture = fixture.replace("/* BOOT_BODY */", re.sub(r"\bthis\b", "self", function(boot, "void Setup_InitImpl(")))
     fixture = fixture.replace("/* ARRIVAL_BODY */", function(port, 'extern "C" void MM_ApplyComboPortalArrival('))
     fixture = fixture.replace("/* CUSTOM_TRANSITIONS */", "\n".join(function((ROOT / path).read_text(), signature)

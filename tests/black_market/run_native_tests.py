@@ -11,6 +11,12 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--case", choices=("all", "door-exit"), default="all")
 args = parser.parse_args()
+compile_env = dict(os.environ)
+if compile_env.get("COMBO_NEI_FIXTURE_CPATH"):
+    # Actual room cleanup reaches ResourceManager and its pinned thread-pool
+    # header, including when this native fixture is invoked by an older gate.
+    compile_env["CPATH"] = os.pathsep.join(filter(None, (
+        compile_env["COMBO_NEI_FIXTURE_CPATH"], compile_env.get("CPATH", ""))))
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 source = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
@@ -32,7 +38,11 @@ if "void RememberTravel(" in source:
 if 'extern "C" int ComboBlackMarket_IsAuthoredDoor(' in source:
     signatures.append('extern "C" int ComboBlackMarket_IsAuthoredDoor(')
 receipt_state = source[source.index("BlackMarketReceipt::State sReceipt;"):source.index("bool ReceiptContext(")]
-body = receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
+# Scene initialization owns room cleanup. Keep the real state and restore/clear
+# helpers with that extracted body rather than replacing cleanup with a stub.
+room_state = source[source.index("BlackMarketRoomMagic::Resources sRoomMagicResources;"):
+                    source.index("void BeginRoomMagic(")]
+body = room_state + "\n" + receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace("/* PRODUCTION */", body)
@@ -65,5 +75,5 @@ with tempfile.TemporaryDirectory(prefix="market-native-") as temp:
                 "libultraship/include", "combo", "combo/menu")
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     "-DFMT_HEADER_ONLY", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
-                    *["-I" + str(ROOT / p) for p in includes], str(path), "-o", str(binary)], check=True)
-    subprocess.run([str(binary), args.case], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+                    *["-I" + str(ROOT / p) for p in includes], str(path), "-o", str(binary)], check=True, env=compile_env)
+    subprocess.run([str(binary), args.case], check=True, env={**compile_env, "ASAN_OPTIONS": "detect_leaks=0"})

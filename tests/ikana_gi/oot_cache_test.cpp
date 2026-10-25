@@ -1,5 +1,7 @@
 // Execute the Ikana descriptor, real OoT export, and MM cache/latch lifecycle.
+#include "combo/menu/ComboIkanaShieldResources.h"
 #include "combo/menu/ComboItemDrawABI.h"
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() { return 1; }
 #include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include <cassert>
 #include <cstring>
@@ -83,16 +85,16 @@ enum class ComboForeignResolveOOT { Ok, Unknown, NotReady };
 /* FOREIGN_CACHE */
 void CheckPose(const ComboForeignDrawInfoOOT *info) {
   assert(info && info->appearanceDependent && info->stateDependent &&
-         info->opCount == 2);
-  assert(info->ops[0].op == CW_OP_ROTATE_Z &&
-         info->ops[1].op == CW_OP_ROTATE_X);
-  assert(info->ops[0].a == (donorAlt ? -16384.f : 0.f) &&
-         info->ops[1].a == (donorAlt ? 0.f : 16384.f));
-  assert(
-      !strcmp(info->dls[0],
-              "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL"));
-  assert(info->scale == .035f);
+         info->opCount == 1);
+  assert(info->drawKind == CW_DRAW_KIND_SIMPLE && info->count == 2 &&
+         info->xluStart == 1);
+  assert(info->ops[0].op == (donorAlt ? CW_OP_ROTATE_Z : CW_OP_ROTATE_X));
+  assert(info->ops[0].a == (donorAlt ? -16384.f : 16384.f));
+  assert(!strcmp(info->dls[0], COMBO_IKANA_GI_OPA_MM));
+  assert(!strcmp(info->dls[1], COMBO_IKANA_GI_XLU_MM));
+  assert(info->scale == 0.f);
 }
+
 int main() {
   OTRGlobals globals{&globals, &globals};
   OTRGlobals::Instance = &globals;

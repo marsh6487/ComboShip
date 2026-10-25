@@ -39,14 +39,15 @@ def preview(destination):
     output.save(destination / 'Native-and-Smooth-HD.png')
 
     rows = [(row['text'], native_assets.PREFIX + '1/' + row['id']) for row in manifest['titles']] + pairs[1:]
-    output = Image.new('RGB', (2160, ((len(rows) + 1) // 2) * 150), (40, 56, 48))
-    draw = ImageDraw.Draw(output)
-    for index, (text, key) in enumerate(rows):
-        x, y = (index % 2) * 1080, (index // 2) * 150
-        draw.text((x + 24, y + 5), text, font=font, fill='white')
-        image = artwork(hd[key])
-        output.paste(image, (x + (1080 - image.width) // 2, y + 35), image)
-    output.save(destination / 'All-69-Smooth-HD-Titles.png')
+    for label, resources in [('Native', native), ('Smooth-HD', hd)]:
+        output = Image.new('RGB', (2160, ((len(rows) + 1) // 2) * 150), (40, 56, 48))
+        draw = ImageDraw.Draw(output)
+        for index, (text, key) in enumerate(rows):
+            x, y = (index % 2) * 1080, (index // 2) * 150
+            draw.text((x + 24, y + 5), text, font=font, fill='white')
+            image = artwork(resources[key])
+            output.paste(image, (x + (1080 - image.width) // 2, y + 35), image)
+        output.save(destination / ('All-69-' + label + '-Titles.png'))
     print('PASS: previews rendered from 69 actual native/HD resource records')
 
 

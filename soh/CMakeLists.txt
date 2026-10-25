@@ -98,6 +98,17 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME static_story_mm_actor_test COMMAND static_story_mm_actor_test)
 
+    add_executable(static_story_regional_actor_test
+        tests/static_story_regional_actor_test.c
+        src/overlays/actors/ovl_En_Viewer/static_story_mm_actor.c
+        src/overlays/actors/ovl_En_Viewer/static_story_actor.c
+    )
+    target_include_directories(static_story_regional_actor_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(NOT WIN32)
+        target_link_libraries(static_story_regional_actor_test PRIVATE m)
+    endif()
+    add_test(NAME static_story_regional_actor_test COMMAND static_story_regional_actor_test)
+
     add_executable(static_story_monkey_test
         tests/static_story_monkey_test.c
         src/overlays/actors/ovl_En_Viewer/static_story_mm_actor.c

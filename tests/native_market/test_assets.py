@@ -157,12 +157,13 @@ class NativeMarketAssets(unittest.TestCase):
                              {p.name: p.read_bytes() for p in second.iterdir()})
             output = root / "output"
             prepared = prepare.prepared_resources(first)
+            prepared_by_game = {'soh': prepared, 'mm': prepare.prepared_resources(first, host='mm')}
             prepare.prepare(output, first)
             targets = [output / game / "assets/custom" / name
                        for game in ("soh", "mm") for name in prepared]
             for path in targets:
                 name = path.relative_to(output / path.relative_to(output).parts[0] / "assets/custom").as_posix()
-                self.assertEqual(path.read_bytes(), prepared[name])
+                self.assertEqual(path.read_bytes(), prepared_by_game[path.relative_to(output).parts[0]][name])
             times = {path: path.stat().st_mtime_ns for path in targets}
             prepare.prepare(output, first)
             self.assertEqual(times, {path: path.stat().st_mtime_ns for path in targets})

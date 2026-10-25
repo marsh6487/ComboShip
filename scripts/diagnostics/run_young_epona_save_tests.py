@@ -36,7 +36,9 @@ def main():
         "SaveManager::AddLoadFunction", "SaveManager::AddSaveFunction",
         "SaveManager::SaveToJsonObject", "SaveManager::LoadFromJsonObject",
     )
-    production = "\n\n".join(extract(source, name) for name in names)
+    buttons = (ROOT / "soh/mods/ext_buttons/ext_buttons.cpp").read_text()
+    production = extract(buttons, "ExtButton_ResetSaveData") + "\n\n"
+    production += "\n\n".join(extract(source, name) for name in names)
     production += "\n" + extract((ROOT / "soh/soh/util.cpp").read_text(), "SohUtils::CopyStringToCharArray")
     # Preserve the actual base registration and init registration, while leaving
     # thread creation and unrelated randomizer startup outside the fixture.

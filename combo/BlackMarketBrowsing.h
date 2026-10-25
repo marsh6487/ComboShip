@@ -2,7 +2,7 @@
 #include <cmath>
 
 namespace BlackMarketBrowsing {
-enum class Phase { Browse, Confirm, Result };
+enum class Phase { Browse, Confirm, Result, KeeperTalk, KeeperHelpChoice, KeeperHelp };
 struct Point {
     float x, y, z;
 };
@@ -11,18 +11,22 @@ struct View {
     float fov;
 };
 
-// The room's eight offers have two flat 2x2 banks. Slots 0/4 are the
-// inner bottom offers; odd slots are the upper row. -1 faces the keeper.
+// Scene-authored customer eye and pitch, shared by the native Data4 camera
+// and MM's linked actor cutscenes. A row/column change never changes the shot.
+inline constexpr Point kEye{ 0, 88, 253 };
+inline constexpr float kPitchDegrees = -13;
+inline float BankAngle(int slot) {
+    return slot < 0 ? 0 : slot < 4 ? 30 : -30;
+}
+inline View Turn(float angle, float fov) {
+    constexpr float radians = 3.14159265359f / 180;
+    return { kEye,
+             { kEye.x + 100 * std::sin(angle * radians), kEye.y + 100 * std::tan(kPitchDegrees * radians),
+               kEye.z - 100 * std::cos(angle * radians) },
+             fov };
+}
 inline View Target(int slot) {
-    if (slot < 0)
-        return { { 0, 76, 196 }, { 0, 61, 86 }, 46 };
-    // Turn from the accepted close customer eye, like native EnOssan's
-    // authored fixed-eye shop camera. Pitch follows the selected row rather
-    // than backing the camera behind Link to fit both rows simultaneously.
-    // The focused row and its cursor/seal clear the native bottom textbox.
-    constexpr float shelfZ = 110, bankX = (196 - shelfZ) * .57735026919f; // tan(30 degrees)
-    const float side = slot < 4 ? 1.0f : -1.0f;
-    return { { 0, 76, 196 }, { side * bankX, slot & 1 ? 98.f : 38.f, shelfZ }, 64 };
+    return Turn(BankAngle(slot), slot < 0 ? 46 : 72);
 }
 inline float Approach(float current, float target) {
     return std::abs(target - current) < .05f ? target : current + (target - current) * .4f;
@@ -51,6 +55,7 @@ struct State {
     int slot = -1, row = 0;
     Phase phase = Phase::Browse;
     View view = Target(-1);
+    float faceAngle = 0;
     Axis horizontal, vertical;
     void ResetInput() {
         horizontal = {};
@@ -78,14 +83,8 @@ struct State {
         return previous != slot;
     }
     void TickCamera() {
-        const View target = Target(slot);
-        view.eye.x = Approach(view.eye.x, target.eye.x);
-        view.eye.y = Approach(view.eye.y, target.eye.y);
-        view.eye.z = Approach(view.eye.z, target.eye.z);
-        view.at.x = Approach(view.at.x, target.at.x);
-        view.at.y = Approach(view.at.y, target.at.y);
-        view.at.z = Approach(view.at.z, target.at.z);
-        view.fov = Approach(view.fov, target.fov);
+        faceAngle = Approach(faceAngle, BankAngle(slot));
+        view = Turn(faceAngle, Approach(view.fov, slot < 0 ? 46 : 72));
     }
     bool CameraSettled() const {
         const View target = Target(slot);

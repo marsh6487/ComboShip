@@ -83,6 +83,13 @@ void disableBetaQuest();
 void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn);
 
 void Play_RequestViewpointBgCam(PlayState* play) {
+#ifdef COMBO_BUILD
+    // A later actor/hook can take the active camera after the keeper update.
+    // Release the shop before its scene viewpoint can configure that new owner.
+    if (!ComboBlackMarketNative_PrepareViewpointCamera(play)) {
+        return;
+    }
+#endif
     Camera_ChangeDataIdx(GET_ACTIVE_CAM(play), play->unk_1242B - 1);
 }
 
@@ -1856,6 +1863,10 @@ void Play_Draw(PlayState* play) {
     }
 
 Play_Draw_skip:
+#ifdef COMBO_BUILD
+    // Pause/capture branches can bypass the general world-draw end hook.
+    ComboBlackMarketOot_RestoreRoomAfterDraw(play);
+#endif
 
     FrameTiming_EndNamedSpan("play_draw", "finish_setup", drawPhase);
     drawPhase = FrameTiming_BeginSpan();

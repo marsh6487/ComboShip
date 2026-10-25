@@ -18,7 +18,7 @@ cpp=r'''
 #include <iostream>
 #include "ComboGameMode.h"
 extern "C"{int gComboGameMode=COMBO_GAME_OOT;}
-struct PlayState{int sceneNum=1;};struct GetItemEntry{};
+struct PlayState{int sceneNum=1;int gameplayFrames=0;};struct GetItemEntry{};
 constexpr int SCENE_GROTTOS=1,SCENE_FAIRYS_FOUNTAIN=2,PLAYER_IA_FARORES_WIND=1,RESPAWN_MODE_TOP=0,NA_SE_SY_ERROR=1;
 int errors=0,nativeAllowed=0,nativeDraws=0,peerDraws=0,peerCounts=0;
 struct {struct{int data=0;}respawn[1];struct{struct{struct{int triforcePiecesCollected=1;}randomizer;}data;}quest; }unused;
@@ -44,29 +44,78 @@ struct CustomMessage{
  void Replace(const std::string&,const std::string&){}void Replace(const std::string&,const CustomMessage&){}
 };
 '''
-draw=(ROOT/'soh/soh/Enhancements/randomizer/draw.cpp').read_text();shield=draw[draw.index('    Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);',draw.index('void Randomizer_DrawExtShieldOfIkana')):draw.index('    if (selected == NULL)',draw.index('void Randomizer_DrawExtShieldOfIkana'))]
 cpp+=r'''
-using u8=uint8_t;struct Gfx{int value=0;};Gfx nativeModel;int nativeLoads=0;
-Gfx* NeiGi_ModOverrideDL(const char*,bool){return nullptr;}
-bool ResourceMgr_IsGiModelAvailableForGame(const char*,const char*){return mmOwner;}
-void* TransformMasks_LoadMmDL(const char*){++nativeLoads;return &nativeModel;}
+#include <cstring>
+#include "menu/ComboIkanaShieldResources.h"
+using u8=uint8_t;using s16=int16_t;
+struct Gfx{const char* path=nullptr;};
+Gfx nativeOpaque{"opaque"},nativeTranslucent{"translucent"};
+int nativeLoads=0,shieldDraws=0,bindings=0,matrixDepth=0;
+bool optionalMm=true,opaquePresent=true,translucentPresent=true;
+bool MmAssets_IsAvailable(){return optionalMm;}
+bool ResourceMgr_IsGiModelAvailableForGame(const char* owner,const char* path){
+ assert(!std::strcmp(owner,"mm"));
+ if(!std::strcmp(path,COMBO_IKANA_GI_OPA))return mmOwner&&opaquePresent;
+ assert(!std::strcmp(path,COMBO_IKANA_GI_XLU));return mmOwner&&translucentPresent;
+}
+Gfx* MmAssets_LoadDisplayListGraphStrict(const char* path){
+ ++nativeLoads;assert(optionalMm);
+ if(!std::strcmp(path,COMBO_IKANA_GI_OPA))return opaquePresent?&nativeOpaque:nullptr;
+ assert(!std::strcmp(path,COMBO_IKANA_GI_XLU));return translucentPresent?&nativeTranslucent:nullptr;
+}
+void MmAssets_EnsureStrictTextureBindings(){++bindings;}
+void Matrix_Push(){++matrixDepth;}void Matrix_Pop(){assert(matrixDepth==1);--matrixDepth;}
+constexpr int MTXMODE_APPLY=1;
+void Matrix_RotateY(float,int mode){assert(mode==MTXMODE_APPLY);}
+void Matrix_RotateZ(float value,int mode){assert(value==0.2f&&mode==MTXMODE_APPLY);}
+void Matrix_RotateX(float value,int mode){assert(value==0.1f&&mode==MTXMODE_APPLY);}
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* owner,const char* path,float* tilt,float* roll){
+ assert(!std::strcmp(owner,"mm")&&!std::strcmp(path,COMBO_IKANA_GI_XLU));*tilt=0.1f;*roll=0.2f;return 1;
+}
+void NeiGi_ReportBlackMarketModel(const char* owner,const char* opa,const char* xlu){
+ assert(!std::strcmp(owner,"mm")&&!std::strcmp(opa,COMBO_IKANA_GI_OPA)&&!std::strcmp(xlu,COMBO_IKANA_GI_XLU));
+}
+void DrawMmGiModel(PlayState*,Gfx* opa,Gfx* xlu,bool shop){
+ assert(shop&&matrixDepth==1&&opa&&xlu&&opa!=xlu);
+ if(mmOwner){assert(!std::strcmp(opa->path,COMBO_IKANA_GI_OPA_MM)&&!std::strcmp(xlu->path,COMBO_IKANA_GI_XLU_MM));}
+ else{assert(opa==&nativeOpaque&&xlu==&nativeTranslucent);}
+ ++shieldDraws;
+}
 #define G_DL_OTR_FILEPATH 1
 #define G_DL_PUSH 1
-#define gDma1p(...) ((void)0)
-#define gSPEndDisplayList(...) ((void)0)
-'''+'Gfx* SelectShield(){\n'+shield+'return selected;\n}\n'
+#define gDma1p(packet,command,resource,...) ((packet)->path=(resource))
+#define gSPEndDisplayList(packet) ((packet)->path=nullptr)
+'''
+cpp+=extract('soh/soh/ResourceManagerHelpers.cpp','int ResourceMgr_IsIkanaShieldGiAvailable(')
+cpp+=extract('soh/soh/Enhancements/randomizer/draw.cpp','void Randomizer_DrawExtShieldOfIkana(')
 cpp+='void Spell(PlayState* play){int itemAction=PLAYER_IA_FARORES_WIND;bool isMedallionSpell=false;\n'+player[st:en]+'\n ++nativeAllowed;\n}\n'
 cpp+=extract('soh/soh/Enhancements/randomizer/draw.cpp','extern "C" void Randomizer_DrawMmGreatSpinAttack(')
 cpp+=extract('soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp','void BuildTriforcePieceMessage(')
 cpp+=r'''
 int main(){
  int failed=0;auto check=[&](bool v,const char* s){if(!v){++failed;std::cerr<<"FAIL "<<s<<"\n";}};
- PlayState p;check(SelectShield()==&nativeModel && nativeLoads==1,"solo Shield of Ikana retains optional native MM archive loader");Spell(&p);check(nativeAllowed==1 && errors==0,"solo Farore follows native restrictions");
+ PlayState p;Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==1&&nativeLoads>0&&bindings==1&&matrixDepth==0,"solo Shield of Ikana retains strict native MM pair and texture bindings");
+ const int soloLoads=nativeLoads;
+ Spell(&p);check(nativeAllowed==1 && errors==0,"solo Farore follows native restrictions");
  Randomizer_DrawMmGreatSpinAttack(&p,nullptr);check(nativeDraws==1 && peerDraws==0,"missing MM owner draws native fallback");
  CustomMessage msg;BuildTriforcePieceMessage(msg);check(msg.text.find("Courage")!=std::string::npos && peerCounts==0,"solo receipt ignores combined goal and peer count");
- gComboGameMode=COMBO_GAME_BOTH;check(SelectShield()==nullptr && nativeLoads==1,"combined shield never substitutes a native raw pointer");Spell(&p);check(errors==1,"combined Farore safety restriction retained");
+ gComboGameMode=COMBO_GAME_BOTH;Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==1&&nativeLoads==soloLoads,"combined shield without MM owner never substitutes an optional raw pointer");
+ Spell(&p);check(errors==1,"combined Farore safety restriction retained");
  mmOwner=true;Randomizer_DrawMmGreatSpinAttack(&p,nullptr);check(peerDraws==1,"available MM owner retains native effect");
  BuildTriforcePieceMessage(msg);check(peerCounts==1 && msg.text.find("Courage")==std::string::npos,"combined receipt retained");
+ Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==2&&nativeLoads==soloLoads&&matrixDepth==0,"combined owner uses deferred native passes without optional raw loads");
+ translucentPresent=false;Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==2&&nativeLoads==soloLoads,"incomplete combined pair stays unavailable");
+ mmOwner=false;gComboGameMode=COMBO_GAME_OOT;optionalMm=false;
+ Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==2&&nativeLoads==soloLoads,"missing optional archive stays unavailable without loading");
+ optionalMm=true;Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==2,"incomplete optional pair is never drawn");
+ translucentPresent=true;Randomizer_DrawExtShieldOfIkana(&p,nullptr);
+ check(shieldDraws==3&&bindings==2&&matrixDepth==0,"late optional pair availability retries and restores matrix scope");
  return failed?1:0;
 }
 '''

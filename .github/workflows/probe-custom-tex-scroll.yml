@@ -14,6 +14,7 @@ on:
       - 'combo/**'
       - 'upstream-pins.json'
       - 'tests/solo_games/**'
+      - 'tests/regional_passages/**'
       - 'tests/rom_setup/**'
       - '.github/workflows/build.yml'
       - '.github/workflows/probe-custom-tex-scroll.yml'
@@ -36,6 +37,9 @@ jobs:
 
       - name: Verify game picker with Windows SDK before configuring
         run: python -B tests/solo_games/selection_test.py --msvc --compiler cl
+
+      - name: Verify shared geometry with Windows SDK before configuring
+        run: python -B tests/regional_passages/run_header_portability_tests.py --msvc --compiler cl
 
       - name: Cache build dir (vcpkg + CMake)
         uses: actions/cache@v5

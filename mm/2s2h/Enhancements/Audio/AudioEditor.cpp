@@ -15,6 +15,7 @@
 #include "2s2h/BenGui/BenGui.hpp"
 #include "AudioCollection.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "../../../../combo/gui/WhatsNew.h"
 #include <random>
 #ifdef COMBO_BUILD
 #include "audio/SceneMusic.h"
@@ -723,6 +724,41 @@ void AudioEditor::InitElement() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(AudioPreview::Update);
 }
 
+static void DrawWeatherOptions() {
+    const auto draw = [](WidgetInfo& widget) {
+        BenGui::mBenMenu->MenuDrawItem(widget, ImGui::GetContentRegionAvail().x, THEME_COLOR);
+    };
+
+    ImGui::SeparatorText("Seasonal Presentation");
+    draw(seasonWeatherWidgets[0]);
+    ImGui::TextWrapped("Manual seasons affect outdoor presentation without unlocking the Rod or seasons. "
+                       "Native restores original game weather. Seasonal effects defer to story scenes.");
+    ImGui::TextWrapped("Configure each season below; opening a tab does not change the selected season.");
+    if (ImGui::BeginTabBar("SeasonWeatherSettings")) {
+        const auto drawSeason = [&](const char* name, size_t first, size_t last) {
+            if (WhatsNew::BeginTabItem(name, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
+                for (size_t i = first; i <= last; ++i) {
+                    draw(seasonWeatherWidgets[i]);
+                }
+                ImGui::EndTabItem();
+            }
+        };
+        drawSeason("Spring", 1, 2);
+        drawSeason("Summer", 3, 6);
+        drawSeason("Autumn", 7, 8);
+        drawSeason("Winter", 9, 12);
+        ImGui::EndTabBar();
+    }
+
+    ImGui::SeparatorText("Outdoor Rain");
+    for (auto& widget : weatherWidgets) {
+        draw(widget);
+    }
+    ImGui::TextWrapped("Outdoor Rain is an independent override: when enabled, it takes priority over "
+                       "Native weather and seasonal rain choices, including Off. It also overrides outdoor "
+                       "story weather restrictions. Indoor and underwater views are excluded.");
+}
+
 void AudioEditor::DrawElement() {
     AudioCollection::Instance->InitializeShufflePool();
 
@@ -774,34 +810,17 @@ void AudioEditor::DrawElement() {
                 BenGui::mBenMenu->MenuDrawItem(ovlDuration, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(voicePitchEnable, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(voicePitch, ImGui::GetContentRegionAvail().x, THEME_COLOR);
-                ImGui::Separator();
-                ImGui::TextUnformatted("MM Seasonal Weather");
-                BenGui::mBenMenu->MenuDrawItem(seasonWeatherWidgets[0], ImGui::GetContentRegionAvail().x, THEME_COLOR);
-                ImGui::TextWrapped("Manual seasons affect outdoor presentation without unlocking the Rod or seasons. "
-                                   "Native restores original game weather. Seasonal effects defer to story scenes.");
-                static const char* seasonNames[] = { "Spring", "Summer", "Autumn", "Winter" };
-                static const size_t seasonStarts[] = { 1, 3, 7, 9 };
-                static const size_t seasonEnds[] = { 3, 7, 9, 13 };
-                for (size_t season = 0; season < 4; ++season) {
-                    if (ImGui::CollapsingHeader(seasonNames[season])) {
-                        for (size_t widget = seasonStarts[season]; widget < seasonEnds[season]; ++widget) {
-                            BenGui::mBenMenu->MenuDrawItem(seasonWeatherWidgets[widget],
-                                                           ImGui::GetContentRegionAvail().x, THEME_COLOR);
-                        }
-                    }
-                }
-                ImGui::Separator();
-                ImGui::TextUnformatted("MM Outdoor Weather");
-                for (auto& widget : weatherWidgets) {
-                    BenGui::mBenMenu->MenuDrawItem(widget, ImGui::GetContentRegionAvail().x, THEME_COLOR);
-                }
-                ImGui::TextWrapped("Outdoor Rain is an independent override: when enabled, it takes priority over "
-                                   "Native weather and seasonal rain choices, including Off. It also overrides outdoor "
-                                   "story weather restrictions. Indoor and underwater views are excluded.");
             }
             ImGui::EndChild();
             ImGui::EndTable();
             ImGui::PopStyleVar(1);
+            ImGui::EndTabItem();
+        }
+        if (WhatsNew::BeginTabItem("Weather & Seasons", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0)) {
+            if (ImGui::BeginChild("WeatherOptions", ImVec2(0, -8))) {
+                DrawWeatherOptions();
+            }
+            ImGui::EndChild();
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Background Music")) {
@@ -1061,8 +1080,8 @@ void AudioEditor_UnlockAll() {
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
 }
 
-void AddAudioSearchWidget(WidgetInfo& widgetInfo) {
-    BenGui::mBenMenu->AddSearchWidget({ widgetInfo, "Enhancements", "Audio Editor", "Audio Options" });
+void AddAudioSearchWidget(WidgetInfo& widgetInfo, const char* tab = "Audio Options") {
+    BenGui::mBenMenu->AddSearchWidget({ widgetInfo, "Enhancements", "Audio Editor", tab });
 }
 
 void RegisterAudioWidgets() {
@@ -1087,6 +1106,7 @@ void RegisterAudioWidgets() {
                 .Color(THEME_COLOR)
                 .Tooltip("Persistent rain continues outdoors. Intermittent rain alternates showers and dry periods."));
     weatherWidgets[2] = { .name = "Outdoor Rain Color", .type = WidgetType::WIDGET_CUSTOM };
+    weatherWidgets[2].CVar(MM_WEATHER_CVAR("RainColor"));
     weatherWidgets[2].CustomFunction([](WidgetInfo&) {
         UIWidgets::CVarColorPicker("Outdoor Rain Color", MM_WEATHER_CVAR("RainColor"),
                                    Color_RGBA8{ 150, 255, 255, 255 }, false, nullptr, THEME_COLOR);
@@ -1133,7 +1153,7 @@ void RegisterAudioWidgets() {
                      .Color(THEME_COLOR)
                      .Tooltip("Higher values produce thunder more often during added rain."));
     for (auto& widget : weatherWidgets) {
-        AddAudioSearchWidget(widget);
+        AddAudioSearchWidget(widget, "Weather & Seasons");
     }
 
     static const std::unordered_map<int32_t, const char*> seasonChoices = {
@@ -1243,7 +1263,7 @@ void RegisterAudioWidgets() {
                      .Tooltip("Blue and green ribbons in the normal outdoor sky during Winter nights. "
                               "Fades in at dusk and out at dawn, independent of Winter Snow and Mist."));
     for (auto& widget : seasonWeatherWidgets) {
-        AddAudioSearchWidget(widget);
+        AddAudioSearchWidget(widget, "Weather & Seasons");
     }
 
     lowHpAlarm = { .name = "Mute Low HP Alarm", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
