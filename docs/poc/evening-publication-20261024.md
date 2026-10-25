@@ -52,9 +52,10 @@ product files' formatting; tokens and concatenated strings are preserved.
 
 Independent source review found no Critical issue, one Important missing-CI
 coverage issue and no Minor issue. The new CI coverage guard first failed on
-all five missing regressions and the parser dependency, then passed after the
-required world group gained the existing room-material and raw-segment tests.
-The full CI policy suite passes 22 tests; the registry has 226 entries.
+all four missing room regressions and the parser dependency, then passed after the
+required world group gained the existing room-material tests. The raw-segment
+regression remains required through the original native entry shell suite.
+The full CI policy suite passes 23 tests; the registry has 225 entries.
 `python3-pycparser` is installed for the actual native draw-exit flow runner.
 The Generate menu fixture also reproduced its missing room-material declaration;
 it now includes the actual production header and checks the new widget while

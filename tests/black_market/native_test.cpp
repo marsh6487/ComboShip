@@ -9,6 +9,7 @@
 #include "rando/BlackMarket.h"
 #include "BlackMarketText.h"
 #include "BlackMarketReceipt.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "sword_element_message.h"

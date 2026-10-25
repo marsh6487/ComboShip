@@ -386,12 +386,6 @@
   {
     "suite": "world",
     "origin": "nei",
-    "name": "Black Market raw segment restoration after reset",
-    "run": "python3 -B tests/black_market/run_interior_effects_native_tests.py"
-  },
-  {
-    "suite": "world",
-    "origin": "nei",
     "name": "tests/black_market/run_shelves_native_tests.py",
     "run": "python3 -B tests/black_market/run_shelves_native_tests.py"
   },

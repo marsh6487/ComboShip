@@ -19,7 +19,11 @@ signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               'extern "C" void ComboBlackMarketOot_NormalizeEntry(',
               'extern "C" void ComboBlackMarketOot_ReportClear(',
               'extern "C" int ComboBlackMarketOot_TryDoorEntrance(']
-body = "\n".join(block_from(source, source.index(s)) for s in signatures)
+# Resource-entry fixtures also extract the actual scene callback, which owns
+# cleanup of an attached room graph. Compile its real state and helpers.
+room_state = source[source.index("BlackMarketRoomMagic::Resources sRoomMagicResources;"):
+                    source.index("void BeginRoomMagic(")]
+body = room_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/oot_native_test.cpp").read_text().replace("/* PRODUCTION */", body)

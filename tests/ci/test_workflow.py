@@ -18,7 +18,6 @@ class WorkflowTests(unittest.TestCase):
             "tests/black_market/run_room_magic_tests.py",
             "tests/black_market/run_room_magic_loader_tests.py",
             "tests/black_market/run_room_magic_draw_exit_tests.py",
-            "tests/black_market/run_interior_effects_native_tests.py",
         )
         for runner in required:
             with self.subTest(runner=runner):
@@ -28,6 +27,15 @@ class WorkflowTests(unittest.TestCase):
         steps = yaml.safe_load((ROOT / ".github/workflows/regressions.yml").read_text())["jobs"]["regression"]["steps"]
         installs = "\n".join(step.get("run", "") for step in steps)
         self.assertIn("python3-pycparser", installs)
+
+    def test_reset_effect_lifetime_regression_remains_required_through_its_native_entry_suite(self):
+        tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
+        command = "bash scripts/diagnostics/run_oct20_bugfix_regressions.sh"
+        owners = [task for task in tasks if command in task["run"].splitlines()]
+        self.assertEqual(len(owners), 1)
+        self.assertEqual(owners[0]["suite"], "world")
+        entry_suite = (ROOT / "scripts/diagnostics/run_oct20_bugfix_regressions.sh").read_text()
+        self.assertIn("python3 -B tests/black_market/run_interior_effects_native_tests.py", entry_suite.splitlines())
 
     def test_platforms_and_every_test_group_finish_independently(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/build-artifacts.yml").read_text())

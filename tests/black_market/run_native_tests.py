@@ -32,7 +32,11 @@ if "void RememberTravel(" in source:
 if 'extern "C" int ComboBlackMarket_IsAuthoredDoor(' in source:
     signatures.append('extern "C" int ComboBlackMarket_IsAuthoredDoor(')
 receipt_state = source[source.index("BlackMarketReceipt::State sReceipt;"):source.index("bool ReceiptContext(")]
-body = receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
+# Scene initialization owns room cleanup. Keep the real state and restore/clear
+# helpers with that extracted body rather than replacing cleanup with a stub.
+room_state = source[source.index("BlackMarketRoomMagic::Resources sRoomMagicResources;"):
+                    source.index("void BeginRoomMagic(")]
+body = room_state + "\n" + receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace("/* PRODUCTION */", body)
