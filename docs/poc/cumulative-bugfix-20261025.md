@@ -111,3 +111,21 @@ entry/lifetime/forest commands pass. The existing native-forest suite still has
 unproved. All 25 CI-policy tests pass and all 227 required task commands are
 unchanged. Production source and every asset remain byte-identical to the
 first candidate; these corrections only repair integration fixtures.
+
+## Shared native MM renderer linkage
+
+Source816477c5/run40213437191 passed Linux, systems, entrances, equipment and
+items, but the rendering group reached a deeper full-module fixture without
+the newly required native-shield availability export. That missing link was
+reproduced locally. The shared renderer fixture now supplies a controlled
+native-pair availability boundary and preserves every existing authored-fallback
+case when the native pair is absent. With the native pair available, all four
+host/owner asset combinations decline authored geometry and retain Ikana's
+identity/shimmer. Pure descriptor queries still supply native fallback palette;
+the test checks identity and emitted graphics rather than forbidding those reads.
+
+The complete MM native runtime/dispatch/interpolation/held/use/action suite and
+all three renderer consumers (rewards, elemental arrows and air magic) pass.
+All34 remaining rendering-group tasks after that native module pass as well.
+This adds one shared fixture update; production, assets, registry commands and
+the final gate remain unchanged. A fresh complete exact-tree CI run is required.
