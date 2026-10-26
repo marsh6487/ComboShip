@@ -15,6 +15,9 @@
 #include "global.h"
 #include "mods/nei_save.h"
 #include "mods/ext_buttons/ext_buttons.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorItem.h"
+#endif
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #define private public
 #include "soh/SaveManager.h"
@@ -54,6 +57,8 @@ static void* ExtInv_GetItemIcon(u16 item) { assert(item != ITEM_NONE); return &h
 static void* PikaMode_ButtonIcon(s32, void* texture) { return texture; }
 extern "C" void Interface_DrawItemIconTexture(PlayState*, void*, s16) { ++icons; }
 extern "C" void Interface_DrawAmmoCount(PlayState*, s16, s16) { ++ammo; }
+// Equip completion reloads icons; rendering is outside this storage fixture.
+extern "C" void Interface_LoadItemIcon2(PlayState*, u16) {}
 extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
     return !std::strcmp(name, CVAR_ENHANCEMENT("DpadEquips")) ? 1 : fallback;
 }

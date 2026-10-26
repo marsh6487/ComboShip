@@ -47,6 +47,16 @@ parts = {
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),
 }
+collectible = function((ROOT / 'combo/menu/ComboCollectibleShimmerHost.h').read_text(),
+                       'ComboCollectibleShimmer_ProfileForDrawId')
+# This bounded dungeon fixture models only key/bottle draw IDs. Give the real
+# collectible classifier distinct IDs outside those rows, as with other
+# out-of-fixture item families, and retain the shared integer shimmer modes.
+collectible_ids = sorted(set(re.findall(r'GID_\w+', collectible)))
+parts['PRODUCER'] = ('#include "ComboCollectibleShimmer.h"\nenum {' +
+                     ','.join(name + '=' + str(1000+i) for i, name in enumerate(collectible_ids)) +
+                     '};\n#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n' + collectible +
+                     '\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n' + parts['PRODUCER'])
 native_names = ['GetItem_EmptyBottleShell', 'GetItem_FairyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
                 'GetItem_GetDungeonKeyModel', 'GetItem_TryDrawDungeonKey', 'GetItem_DrawDungeonItem', 'GetItem_DrawOpa0',
                 'GetItem_DrawOpa0Xlu1', 'GetItem_DrawCompass']

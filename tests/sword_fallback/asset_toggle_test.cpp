@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 using NeiGi::Kind;
 #define COMBO_EXPORT

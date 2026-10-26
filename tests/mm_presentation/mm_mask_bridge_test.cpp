@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "combo/menu/ComboRewardGi.h"
@@ -114,6 +115,10 @@ Gfx opa[64],xlu[64];
 struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;};
 GraphicsContext gfx;
 struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;} state; int gameplayFrames=0;};
+#include "combo/menu/ComboCollectibleShimmerDraw.h"
+extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState*, const uint8_t[4], const char*) {
+ assert(false && "mask bridge fixture unexpectedly selected collectible shimmer");
+}
 PlayState play;PlayState* gPlayState=&play;
 NeiGi::Basis NeiGi_CameraBasis(PlayState*) { return {}; }
 void NeiGi_DrawMesh(PlayState*, const NeiGi::Mesh&) { assert(0 && "mask dispatch must use its own palette overlay"); }

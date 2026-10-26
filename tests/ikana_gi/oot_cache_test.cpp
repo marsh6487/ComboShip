@@ -1,6 +1,7 @@
 // Execute the Ikana descriptor, real OoT export, and MM cache/latch lifecycle.
 #include "combo/menu/ComboIkanaShieldResources.h"
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() { return 1; }
 #include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include <cassert>

@@ -1,6 +1,7 @@
 // Execute the real MM native-fallback export and OoT OPS consumer.
 // Catalog, resource query and graphics services are fixture boundaries.
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
 #include "mm/include/z64item.h"

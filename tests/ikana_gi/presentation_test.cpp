@@ -2,6 +2,7 @@
 #include "combo/ComboGameMode.h"
 #include "combo/menu/ComboIkanaShieldResources.h"
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboItemIconOwnership.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <algorithm>

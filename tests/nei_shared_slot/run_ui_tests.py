@@ -10,6 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_mm_scene_randomization_tests import function
+from run_time_pedestal_tests import block_from
 
 
 def main():
@@ -105,7 +106,11 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
             equip = function(ui, "KaleidoScope_UpdateItemEquip")
             start = equip.index("            if (pauseCtx->equipTargetItem >= 0x0200)")
             icon_call = "            Interface_LoadItemIcon1(play, targetButtonIndex);"
-            end = equip.index(icon_call, start) + len(icon_call)
+            # Bound both assignment branches by braces, excluding the outer
+            # Mirror swap guard that surrounds this write in the native path.
+            assignment = block_from(equip, start)
+            else_start = equip.index("else", start + len(assignment))
+            assignment += " " + block_from(equip, else_start)
             production += r'''
 static void CompleteNativeButtonEquip(PlayState* play, s32 button, u16 item, u8 slot) {
     PauseContext* pauseCtx = &play->pauseCtx;
@@ -113,7 +118,7 @@ static void CompleteNativeButtonEquip(PlayState* play, s32 button, u16 item, u8 
     pauseCtx->equipTargetItem = item;
     pauseCtx->equipTargetSlot = slot;
     uint16_t targetButtonIndex = pauseCtx->equipTargetCBtn + 1;
-''' + equip[start:end] + r'''
+''' + assignment + "\n" + icon_call + r'''
 }
 static void CheckOotGraceButtons(u16 item, int refreshes) {
     // OoT physical D-pad order is Up=4, Down=5, Left=6, Right=7.

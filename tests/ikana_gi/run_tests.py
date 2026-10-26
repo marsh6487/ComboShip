@@ -64,7 +64,9 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
 
     exported=read('tests/ikana_gi/mm_export_test.cpp')
     mm=read('combo/menu/ComboItemDrawMM.h')
-    exported=exported.replace('/* MM_PRODUCER */','\n'.join(function(mm,name) for name in
+    collectible=read('combo/menu/ComboCollectibleShimmerHost.h')
+    profile='#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'+function(collectible,'ComboCollectibleShimmer_ProfileForDrawId')+'\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'
+    exported=exported.replace('/* MM_PRODUCER */',profile+'\n'.join(function(mm,name) for name in
         ('MM_Op','MM_OpV','MM_IsProgressiveItem','MM_IsStateDependentDraw','MM_IsSwordAppearanceDependent',
          'MM_FillElementalSpellDrawInfo','MM_FillItemDrawInfo','MM_GetItemDrawInfo')))
     native=read('mm/src/code/z_draw.c')

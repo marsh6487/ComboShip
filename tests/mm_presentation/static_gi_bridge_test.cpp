@@ -12,6 +12,8 @@ void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*) {}
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
+#include "z64item.h"
 #include "combo/menu/ComboIkanaShieldResources.h"
 extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
  assert(false && "static item fixture must not select the native shield pair");return 0;
@@ -31,7 +33,6 @@ struct Color_RGB8 {uint8_t r,g,b;};
 #define CVAR_ENHANCEMENT(x) x
 bool changedMagic=false, dinSelected=false;
 int CVarGetInteger(const char* name,int value) {return !strcmp(name,"Consumable.Magic.Changed") ? changedMagic : !strcmp(name,"DinFireSword") ? dinSelected : value;}
-constexpr int GID_MAGIC_SMALL=31, GID_MAGIC_LARGE=32;
 Color_RGB8 CVarGetColor24(const char*,Color_RGB8 c) {return c;}
 Color_RGB8 liveMagic{12,210,250};
 Color_RGB8 CwLiveCosmeticColor(const char*,Color_RGB8) {return liveMagic;}

@@ -61,11 +61,10 @@ def main():
     # Execute the native equip completion branch that writes the item together
     # with its inventory slot; animation/input handling is outside this probe.
     equip = function(kaleido, "KaleidoScope_UpdateItemEquip")
-    start = equip.index("            if (pauseCtx->equipTargetItem >= 0x0200)")
+    start = equip.index("            // If the item is on another button already, swap the two")
     end = equip.index("            Interface_LoadItemIcon1(play, targetButtonIndex);", start)
     production += "\nstatic void CompleteNativeButtonEquip(PlayState* play) {\n"
     production += "    PauseContext* pauseCtx = &play->pauseCtx;\n"
-    production += "    uint16_t targetButtonIndex = pauseCtx->equipTargetCBtn + 1;\n"
     production += equip[start:end] + "}\n"
     for index, label in enumerate(("C-Left", "C-Down", "C-Right", "DPad-Up", "DPad-Down", "DPad-Left", "DPad-Right"), 1):
         start = parameter.index(f"// {label} Button Icon & Ammo Count")
