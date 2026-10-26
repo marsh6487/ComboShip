@@ -33,6 +33,7 @@ for runner, accepts_sanitize in (
     ("run_mm_fixed_tests.py", True),
     ("run_ikana_tests.py", True),
     ("run_lake_bridge_tests.py", True),
+    ("run_lake_sand_tests.py", False),
     ("run_snowhead_bridge_tests.py", False),
 ):
     command = [sys.executable, str(ROOT / "tests/regional_passages" / runner)]

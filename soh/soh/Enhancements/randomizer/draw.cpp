@@ -103,6 +103,7 @@ extern SaveContext gSaveContext;
 }
 
 #include "ComboMaskShimmer.h"
+#include "ComboCollectibleShimmerHost.h"
 #include "ComboMorphaGi.h"
 #include "ComboItemEffectColors.h"
 #include "ComboSwordGiEffectFit.h"
@@ -1317,6 +1318,8 @@ extern "C" void Randomizer_DrawSilverRupee(PlayState* play, GetItemEntry* getIte
         }
     }
     CLOSE_DISPS(play->state.gfxCtx);
+    ComboCollectibleShimmer_DrawDrop(play, CW_COLLECTIBLE_SILVER,
+                                     CVarGetInteger("gEnhancements.NewDrops", 0) ? 1.0f : 20.0f);
 }
 
 extern "C" void Randomizer_DrawFishingPoleGI(PlayState* play, GetItemEntry* getItemEntry) {

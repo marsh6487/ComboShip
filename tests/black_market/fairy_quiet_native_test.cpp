@@ -20,8 +20,8 @@ extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 }
 static Vec3f movementTarget;
-static int blinks;
-static void Capture(EnElf *, Vec3f *target) { movementTarget = *target; }
+static int blinks, movementUpdates;
+static void Capture(EnElf *, Vec3f *target) { movementTarget = *target; ++movementUpdates; }
 static void Bob(EnElf *, PlayState *) {}
 static void Draw(Actor *, PlayState *) {}
 struct CUpCandidates {
@@ -78,6 +78,7 @@ GameInfo *gGameInfo = &info;
 #define EnElf_UpdateMidnaBlink(...) (++blinks)
 #endif
 #define SkelAnime_Update(...) (0)
+#define Lights_PointNoGlowSetInfo(...) ((void)0)
 #define EnElf_UpdateMidnaIdleAudio(...) ((void)0)
 #define Math_StepToF(...) (false)
 #define Environment_AdjustLights(...) (false)
@@ -169,18 +170,19 @@ int main() {
       } else if (!quiet)
         assert(candidates.cup == &fairy.actor &&
                "ordinary fairy interaction is preserved outside Black Market");
+      const int previousMovementUpdates = movementUpdates, previousBlinks = blinks;
 #ifdef FAIRY_QUIET_OOT
       func_80A053F0(&fairy.actor, &play);
 #else
       func_8089010C(&fairy.actor, &play);
 #endif
       if (quiet) {
-        assert(movementTarget.z == 200 &&
-               "shop companion quietly follows Link instead of merchandise "
-               "behind the counter");
+        assert(movementUpdates == previousMovementUpdates && blinks == previousBlinks &&
+               "hidden shop companion skips movement, targeting and blink updates");
         assert(!(fairy.actor.flags & ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED));
         assert(fairy.actor.draw == Draw && fairy.actor.scale.x > 0 &&
-               "cosmetic companion remains visible");
+               "shop keeps the draw callback and scale for ordinary behavior on exit; "
+               "the native draw entry guard suppresses the shop model");
       } else
         assert(movementTarget.z == 40 &&
                "outside-shop attention retains its ordinary target position");
@@ -188,8 +190,9 @@ int main() {
           keeper.flags == flags && merchandise.flags == stockFlags &&
           "quiet fairy never disables keeper or merchandise actor attention");
     }
-  assert(blinks == 9);
+  assert(blinks == 7);
   std::puts("PASS native fairy policy: real C-Up candidate selection preserves "
-            "keeper A; native companion update/follow stays by Link with "
-            "model/blink intact; normal attention restored outside shop");
+            "keeper A; shop companion skips movement/blink; native draw-entry "
+            "guards and zero-radius lights are covered by season_shop fixtures; "
+            "normal attention restored outside shop");
 }

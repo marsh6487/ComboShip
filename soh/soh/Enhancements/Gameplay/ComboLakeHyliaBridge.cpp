@@ -3,6 +3,7 @@
 #include "ComboGameMode.h"
 #include "render/RegionalBridgeMaterials.h"
 #include "entrances/LakeHyliaBridge.h"
+#include "entrances/LakeHyliaSurface.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "soh/ActorDB.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -30,6 +31,10 @@ PlayState* sCavePlay = nullptr;
 int sActorId = -1;
 const Lake::Geometry& Geometry() {
     static const auto geometry = Lake::BuildGeometry();
+    return geometry;
+}
+const Lake::SurfaceGeometry& SurfaceGeometry() {
+    static const auto geometry = Lake::BuildSurfaceGeometry();
     return geometry;
 }
 struct CaveCollision {
@@ -133,34 +138,51 @@ Vtx Vertex(Lake::Point p, u8 shade, s16 s, s16 t) {
     vertex.v.cn[3] = 255;
     return vertex;
 }
-const std::vector<Vtx>& RockVertices() {
+const std::vector<Vtx>& RockVertices(bool customStone = false, bool customSand = false) {
     static const auto vertices = [] {
-        std::vector<Vtx> result;
-        for (const auto& q : Geometry().solid) {
-            const float ux = q.b.x - q.a.x, uy = q.b.y - q.a.y, uz = q.b.z - q.a.z;
-            const float vx = q.d.x - q.a.x, vy = q.d.y - q.a.y, vz = q.d.z - q.a.z;
-            const float nx = std::fabs(uy * vz - uz * vy), ny = std::fabs(uz * vx - ux * vz),
-                        nz = std::fabs(ux * vy - uy * vx);
-            // Native bank-like texel density, anchored in world space. Adjacent
-            // cave rings continue the same rock instead of restarting moss bands.
-            const bool end = nx >= ny && nx >= nz;
-            const bool wall = end || nz >= ny;
-            for (const auto p : { q.a, q.b, q.c, q.d }) {
-                const float s = (end ? p.z - Lake::kMouth.z : p.x - Lake::kMouth.x) * 4;
-                const float t = (wall ? Lake::kMouth.y + Lake::kOpeningHeight - p.y : p.z - Lake::kMouth.z) * 8;
-                result.push_back(Vertex(p, q.shade, static_cast<s16>(s), static_cast<s16>(t)));
+        std::array<std::vector<Vtx>, 4> variants;
+        for (size_t variant = 0; variant < variants.size(); ++variant) {
+            auto& result = variants[variant];
+            for (bool sand : { false, true }) {
+                const auto& quads = sand ? SurfaceGeometry().sand : SurfaceGeometry().stone;
+                const float sScale = sand && !(variant & 2) ? 2.f : 4.f;
+                const float tScale = sand ? sScale : variant & 1 ? 8.f : 4.f;
+                for (const auto& q : quads) {
+                    const float ux = q.b.x - q.a.x, uy = q.b.y - q.a.y, uz = q.b.z - q.a.z;
+                    const float vx = q.d.x - q.a.x, vy = q.d.y - q.a.y, vz = q.d.z - q.a.z;
+                    const float nx = std::fabs(uy * vz - uz * vy), ny = std::fabs(uz * vx - ux * vz),
+                                nz = std::fabs(ux * vy - uy * vx);
+                    // Native bank-like texel density, anchored in world space. Adjacent
+                    // cave rings continue the same rock instead of restarting moss bands.
+                    const bool end = nx >= ny && nx >= nz;
+                    const bool wall = end || nz >= ny;
+                    for (const auto p : { q.a, q.b, q.c, q.d }) {
+                        const float s = (end ? p.z - Lake::kMouth.z : p.x - Lake::kMouth.x) * sScale;
+                        const float t =
+                            (wall ? Lake::kMouth.y + Lake::kOpeningHeight - p.y : p.z - Lake::kMouth.z) * tScale;
+                        result.push_back(Vertex(p, q.shade, static_cast<s16>(s), static_cast<s16>(t)));
+                    }
+                }
             }
         }
-        return result;
+        return variants;
     }();
-    return vertices;
+    return vertices[unsigned(customStone) | (unsigned(customSand) << 1)];
 }
 void CaveDraw(Actor* actor, PlayState* play) {
     if (!Available(play) || reinterpret_cast<CaveActor*>(actor) != sCave ||
         !NeiGi_CanDrawLayers(play, 3 + (Lake::kMaxWaterQuads * 4 * sizeof(Vtx) + sizeof(Mtx) - 1) / sizeof(Mtx),
-                             Geometry().solid.size() * 2 + 40, Lake::kMaxWaterQuads * 3 + 40))
+                             (SurfaceGeometry().stone.size() + SurfaceGeometry().sand.size()) * 2 + 64,
+                             Lake::kMaxWaterQuads * 3 + 40))
         return;
-    const auto& vertices = RockVertices();
+    const char* stone =
+        RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeStone, ResourceMgr_FileExists);
+    const char* sand =
+        RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeSand, ResourceMgr_FileExists);
+    const bool customStone =
+        stone == RegionalBridgeMaterials::OverridePath(RegionalBridgeMaterials::Material::LakeStone);
+    const bool customSand = sand == RegionalBridgeMaterials::OverridePath(RegionalBridgeMaterials::Material::LakeSand);
+    const auto& vertices = RockVertices(customStone, customSand);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPComboRMPush(POLY_OPA_DISP++, "oot");
@@ -173,11 +195,27 @@ void CaveDraw(Actor* actor, PlayState* play) {
     // SetupDL25 uses two cycles. Keep this tile's modulation through cycle2;
     // repeating TEXEL0 there instead reads the inherited scene's second tile.
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_PASS2);
-    const char* stone =
-        RegionalBridgeMaterials::Resolve(RegionalBridgeMaterials::Material::LakeStone, ResourceMgr_FileExists);
-    gDPLoadTextureBlock(POLY_OPA_DISP++, stone, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 64, 0, G_TX_WRAP, G_TX_WRAP, 5, 6,
-                        G_TX_NOLOD, G_TX_NOLOD);
-    for (size_t i = 0; i < vertices.size(); i += 4) {
+    if (customStone) {
+        // Preserve the established 32x64 optional stone replacement contract.
+        gDPLoadTextureBlock(POLY_OPA_DISP++, stone, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 64, 0, G_TX_WRAP, G_TX_WRAP, 5, 6,
+                            G_TX_NOLOD, G_TX_NOLOD);
+    } else {
+        gDPLoadTextureBlock(POLY_OPA_DISP++, stone, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP, G_TX_WRAP, 5, 5,
+                            G_TX_NOLOD, G_TX_NOLOD);
+    }
+    const size_t sandStart = SurfaceGeometry().stone.size() * 4;
+    for (size_t i = 0; i < sandStart; i += 4) {
+        gSPVertex(POLY_OPA_DISP++, (uintptr_t)&vertices[i], 4, 0);
+        gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+    }
+    if (customSand) {
+        gDPLoadTextureBlock(POLY_OPA_DISP++, sand, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP, G_TX_WRAP, 5, 5,
+                            G_TX_NOLOD, G_TX_NOLOD);
+    } else {
+        gDPLoadTextureBlock(POLY_OPA_DISP++, sand, G_IM_FMT_RGBA, G_IM_SIZ_16b, 16, 16, 0, G_TX_WRAP, G_TX_WRAP, 4, 4,
+                            G_TX_NOLOD, G_TX_NOLOD);
+    }
+    for (size_t i = sandStart; i < vertices.size(); i += 4) {
         gSPVertex(POLY_OPA_DISP++, (uintptr_t)&vertices[i], 4, 0);
         gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     }

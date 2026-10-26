@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build six drop-in regional textures; never reads or modifies a game archive."""
+"""Build optional drop-in regional textures; never modifies a game archive."""
 import argparse
 import json
 from pathlib import Path
@@ -10,6 +10,7 @@ from PIL import Image
 # key, stable path suffix, native logical width/height, native type/bytes, debug color
 MATERIALS = (
  ('LakeStone','lake_hylia/stone',32,64,2,2,(135,80,195)),
+ ('LakeSand','lake_hylia/sand',32,32,2,2,(190,165,112)),
  ('SnowheadStone','snowhead/stone',32,32,2,2,(80,125,175)),
  ('SnowheadSnow','snowhead/ascent_snow',32,32,2,2,(230,245,255)),
  ('SnowheadIce','snowhead/ice',32,32,2,2,(50,190,225)),

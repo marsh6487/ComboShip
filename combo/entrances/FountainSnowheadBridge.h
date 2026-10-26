@@ -23,14 +23,18 @@ inline Point Grounded(float x, float z) {
     ComboFountainValley::FloorAt(x, z, &y);
     return { x, y, z };
 }
-inline const Point kMouth = Grounded(1840, 0);
-inline const Point kReturn = Grounded(1740, 0);
+inline const Point kMouth = Grounded(3600, 0);
+inline const Point kReturn = Grounded(3500, 0);
 constexpr float kOpeningHalfWidth = 100, kOpeningHeight = 180;
 constexpr float kShimmerFront = 10;
 // Visual cross-section of the whole valley, independent of the travel trigger.
 // These bounds retain floor support through the full six-unit billboard depth:
-// world X1824..1836 has a common floor span of Z-293.846..360.074.
-constexpr float kShimmerMinAcross = -293, kShimmerMaxAcross = 360;
+// world X3584..3596 has a common floor span of Z-161.812..334.834.
+constexpr float kShimmerMinAcross = -161, kShimmerMaxAcross = 334;
+// Keep the local cold weather on the final 600 units of the valley walk.
+// Both effects share these fixed, floor-supported anchors; the ascent stays clear.
+inline const std::array<Point, 4> kWeatherAnchors = { Grounded(kMouth.x - 600, 0), Grounded(kMouth.x - 400, 0),
+                                                      Grounded(kMouth.x - 200, 0), kMouth };
 // Looking east into the valley, the southern bank is on the right. This
 // independent waterline scramble avoids the Ice Cavern apron entirely.
 inline constexpr Point kStations[] = { { 1000, 0, 850 },  { 1250, 70, 700 }, { 1400, 130, 500 }, { 1450, 180, 300 },

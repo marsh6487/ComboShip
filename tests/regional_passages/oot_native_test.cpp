@@ -598,6 +598,16 @@ int main() {
                                      : ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN;
     assert(ComboRegionalPassagesOot_Get(&play, &route, &mouth, &yaw) &&
            route == wanted);
+    if (wanted == 7) {
+      // Walking along the former entrance and the deep valley must not queue
+      // a departure before the new grounded threshold.
+      for (float x : {1820.f, 1840.f, 2400.f, 3200.f, 3500.f}) {
+        float floor;
+        assert(ComboFountainValley::FloorAt(x, 0, &floor));
+        Vec3f walking{x, floor, 0};
+        assert(ComboRegionalPassagesOot_AtDeparture(&play, &walking) == 0);
+      }
+    }
     auto f = ComboRegional::Forward(yaw);
     Vec3f p{mouth.x + f.x * 28, mouth.y, mouth.z + f.z * 28};
     assert(ComboRegionalPassagesOot_AtDeparture(&play, &p) == wanted);

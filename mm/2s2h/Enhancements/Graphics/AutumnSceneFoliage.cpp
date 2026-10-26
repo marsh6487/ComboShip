@@ -137,9 +137,9 @@ const std::vector<std::string>& RoadRandoGrassPaths() {
 }
 
 uint32_t RoadRandoGrassColor(std::string path, int selectedSeason, int sceneId) {
-    // Spring's grass blush applies throughout eligible outdoors. Retain the
-    // reviewed Road/Woods leaf-child scope for the other seasonal recipes.
-    if (sceneId != SCENE_24KEMONOMITI && sceneId != SCENE_26SARUNOMORI && selectedSeason != SEASON_SPRING)
+    // Eligibility is owned by MMWeather_FoliageSeasonForPlay. All three
+    // seasonal palettes reach only these reviewed foliage children outdoors.
+    if (selectedSeason != SEASON_SPRING && selectedSeason != SEASON_AUTUMN && selectedSeason != SEASON_WINTER)
         return 0;
     if (path.starts_with("alt/"))
         path.erase(0, 4);
@@ -310,6 +310,7 @@ size_t MaterialCommandLength(uint8_t opcode) {
         case G_GEOMETRYMODE:
         case G_ENDDL:
         case G_DL:
+        case G_RDPSETOTHERMODE: // Native combined other-mode packet (one word).
         case G_SETOTHERMODE_L:
         case G_SETOTHERMODE_H:
         case G_RDPLOADSYNC:
@@ -366,8 +367,12 @@ bool IsRoadForestPair(uint64_t primary, uint64_t secondary) {
 }
 
 std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN, int sceneId = -1,
-                              bool* onlyRoadForest = nullptr, const std::set<uint64_t>* moonTree = nullptr) {
+                              bool* onlyRoadForest = nullptr, const std::set<uint64_t>* moonTree = nullptr,
+                              std::set<uint64_t>* tintedImages = nullptr, bool coverageOnly = false) {
     std::vector<Gfx> result;
+    std::set<uint64_t> covered;
+    if (tintedImages != nullptr)
+        tintedImages->clear();
     uint32_t imageColor = 0;
     uint64_t imageHash = 0;
     bool tileSlot[8]{};
@@ -433,23 +438,34 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
                 ++end;
             }
             if (color != 0) {
+                changed = true;
+                if (tintedImages != nullptr)
+                    covered.insert(explicitLoads ? loadedImages[tileSlot[renderTile]] : imageHash);
+            }
+            if (color != 0 && !coverageOnly) {
                 result.push_back(gsSPGrayscale(SeasonTintMode(selectedSeason, sceneId)));
                 result.push_back(
                     gsDPSetGrayscaleColor(color >> 24, (color >> 16) & 255, (color >> 8) & 255, color & 255));
-                changed = true;
             }
-            result.insert(result.end(), source.begin() + i, source.begin() + end);
-            if (color != 0) {
+            if (!coverageOnly)
+                result.insert(result.end(), source.begin() + i, source.begin() + end);
+            if (color != 0 && !coverageOnly) {
                 result.push_back(gsSPGrayscale(false));
             }
             i = end;
             continue;
         }
-        result.insert(result.end(), source.begin() + i, source.begin() + i + length);
+        if (!coverageOnly)
+            result.insert(result.end(), source.begin() + i, source.begin() + i + length);
         if (opcode == G_ENDDL) {
             if (onlyRoadForest != nullptr && i + 1 == source.size())
                 *onlyRoadForest = roadTriangles && !otherTriangles;
-            return changed && i + 1 == source.size() ? result : std::vector<Gfx>{};
+            if (changed && i + 1 == source.size()) {
+                if (tintedImages != nullptr)
+                    *tintedImages = std::move(covered);
+                return result;
+            }
+            return {};
         }
         i += length;
     }
@@ -459,6 +475,11 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
 bool SameCommand(const Gfx& first, const Gfx& second) {
     return first.words.w0 == second.words.w0 && first.words.w1 == second.words.w1;
 }
+
+struct DrawCoverage {
+    std::set<uint64_t> images;
+    bool unclassifiedWrapper = false;
+};
 
 struct Variant {
     // As with the actor material caches, retain commands and their source for
@@ -473,6 +494,8 @@ struct Variant {
     // Observations belong to the source, not its season's immutable draw copy.
     std::shared_ptr<std::map<size_t, uintptr_t>> observedPointers = std::make_shared<std::map<size_t, uintptr_t>>();
     std::string forestPath;
+    std::set<uint64_t> coveredImages;
+    bool unclassifiedWrapper = false;
     bool reportedPointerWrites = false;
     bool reportedConflict = false;
 
@@ -680,6 +703,7 @@ struct SurfaceMaterial {
     bool blossomLift = false;
     bool springGrass = false;
     const char* palette = nullptr;
+    bool drawFallback = false;
 };
 constexpr SurfaceMaterial kSurfaceMaterials[] = {
 #ifdef COMBO_BUILD
@@ -736,9 +760,9 @@ constexpr SurfaceMaterial kSurfaceMaterials[] = {
     { "objects/object_mtoride/gWoodfallSceneryBranchAndLeavesTex", 0xB96848FF, SCENE_21MITURINMAE, false, false, true },
 };
 
-const std::vector<SurfaceMaterial>& SurfaceMaterials(int selectedSeason) {
+const std::vector<SurfaceMaterial>& SurfaceMaterials(int /*selectedSeason*/) {
     static const std::vector<SurfaceMaterial> original(std::begin(kSurfaceMaterials), std::end(kSurfaceMaterials));
-    static const auto spring = [] {
+    static const auto broader = [] {
         auto result = original;
         const auto grass = [](uint32_t color) { return color == 0xD99C45FF || color == 0xFFD078FF; };
         // Private ground/grass atlases already have selective image ownership.
@@ -748,20 +772,20 @@ const std::vector<SurfaceMaterial>& SurfaceMaterials(int selectedSeason) {
                 material.blossomLift = true;
             }
         }
-        // The ground materials were intentionally absent from Spring's draw
-        // palette. Reuse their reviewed identities as immutable pixel copies:
-        // grass becomes blush while mixed stone/bark and alpha stay exact.
+        // Query the same reviewed ground identities in all three seasons.
+        // Autumn/Winter retain an existing accepted draw treatment wherever
+        // available; these copies add coverage only when that route is absent.
         for (const auto& material : kMaterials) {
             if (!grass(material.color) || material.springGrass ||
                 std::any_of(result.begin(), result.end(),
                             [&](const auto& existing) { return std::string(existing.path) == material.path; }))
                 continue;
             result.push_back(
-                { material.path, material.color, material.scene, false, false, true, true, material.palette });
+                { material.path, material.color, material.scene, false, false, true, true, material.palette, true });
         }
         return result;
     }();
-    return selectedSeason == SEASON_SPRING ? spring : original;
+    return broader;
 }
 
 // Retain immutable originals and copies until renderer teardown, as with the
@@ -883,8 +907,9 @@ void RestoreSurfaceTextures() {
     sSurfaceBindings.clear();
 }
 
-void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::ResourceManager>& rm,
-                           int selectedSeason) {
+void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::ResourceManager>& rm, int selectedSeason,
+                           const DrawCoverage& drawCoverage) {
+    const auto& drawImages = drawCoverage.images;
     std::vector<SurfaceTextureBinding> active;
     bool roadPair = false;
     if (play->sceneId == SCENE_24KEMONOMITI) {
@@ -913,6 +938,22 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
         if ((material.scene != -1 && play->sceneId != material.scene) ||
             (material.altOnly && !rm->IsAltAssetsEnabled()) || (material.roadPairOnly && !roadPair))
             continue;
+        if (material.drawFallback && selectedSeason != SEASON_SPRING) {
+            if (drawCoverage.unclassifiedWrapper)
+                continue; // Preserve accepted wrappers without guessing unknown command lengths.
+            bool drawn = false;
+            for (const auto* suffix : { "", "_scene" }) {
+                std::string path = material.path;
+                if (path.starts_with("scenes/nonmq/"))
+                    path.insert(path.find('/', 13), suffix);
+                else if (*suffix != '\0')
+                    continue;
+                drawn |=
+                    drawImages.contains(CRC64(path.c_str())) || drawImages.contains(CRC64(("alt/" + path).c_str()));
+            }
+            if (drawn)
+                continue; // Preserve the accepted draw formula, including non-green samples.
+        }
         for (const auto* suffix : { "", "_scene" }) {
             for (const auto* prefix : { "", "alt/" }) {
                 if (*prefix != '\0' && !rm->IsAltAssetsEnabled()) {
@@ -985,6 +1026,106 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
     sSurfaceBindings = std::move(active);
 }
 
+struct LoadedDraw {
+    std::string path, resolved;
+    std::shared_ptr<Fast::DisplayList> resource;
+};
+
+// Materialize only the draws the existing update would load. Coverage and
+// installation must observe the same resource on the first cold Alt frame.
+std::vector<LoadedDraw> PrepareDraws(const std::shared_ptr<Ship::ResourceManager>& rm, int sceneId,
+                                     int selectedSeason) {
+    const auto archives = rm->GetArchiveManager();
+    std::vector<LoadedDraw> draws;
+    draws.reserve(sPaths.size());
+    for (const auto& path : sPaths) {
+        std::string resolved = path;
+        if (rm->IsAltAssetsEnabled()) {
+            const std::string altPath = "alt/" + path;
+            // A failed renderer Alt lookup leaves a null ArchiveManager entry.
+            // HasFile alone sees that key and would abandon the cached native
+            // draw. Only a real archive can supply a replacement or .meta alias.
+            const auto hasArchive = [&](const std::string& candidate) {
+                return archives->HasFile(candidate) && archives->GetArchiveFromFile(candidate) != nullptr;
+            };
+            if (hasArchive(altPath) || hasArchive(altPath + ".meta")) {
+                resolved = altPath;
+            }
+        }
+        auto loaded = rm->GetCachedResource(resolved, true);
+        if (loaded == nullptr && RoadRandoGrassColor(path, selectedSeason, sceneId) != 0) {
+            // Prepare only the explicit foliage children before the first actor
+            // draw; an outer grouped-grass tint must not reach a cold flower.
+            loaded = rm->LoadResource(resolved, true);
+        }
+        if (loaded == nullptr && resolved != path && rm->GetCachedResource(path, true) != nullptr) {
+            // Preload a cold Alt only when replacing an already-loaded scene
+            // list. Leave unrelated/unloaded rooms to the normal render path.
+            loaded = rm->LoadResource(resolved, true);
+        }
+        auto resource = std::dynamic_pointer_cast<Fast::DisplayList>(loaded);
+        if (resource == nullptr || resource->Instructions.empty()) {
+            continue;
+        }
+        draws.push_back({ path, resolved, std::move(resource) });
+    }
+    return draws;
+}
+
+// Keep existing draw tint authoritative. A shared image may appear in several
+// room roots: choose its original draw treatment once, rather than recoloring
+// cached pixels underneath an already accepted tinted draw. Reevaluate cold,
+// reloaded, Alt and aliased resources every update without retaining new draws.
+DrawCoverage CoveredDrawImages(const std::vector<LoadedDraw>& draws, int selectedSeason, int sceneId) {
+    DrawCoverage result;
+    if (selectedSeason == SEASON_SPRING)
+        return result;
+    for (const auto& draw : draws) {
+        const auto& path = draw.path;
+        const auto& resolved = draw.resolved;
+        const auto& resource = draw.resource;
+        const auto cached = CurrentVariants().find(resource.get());
+        if (cached != CurrentVariants().end()) {
+            result.images.insert(cached->second.coveredImages.begin(), cached->second.coveredImages.end());
+            result.unclassifiedWrapper |= cached->second.unclassifiedWrapper;
+            continue; // Immutable per-season variant already classified this draw.
+        }
+        const auto ignored = sIgnored.find(resource.get());
+        if (ignored != sIgnored.end() && ignored->second.lock() == resource)
+            continue;
+        const std::vector<Gfx>* source = &resource->Instructions;
+        for (const auto* cache : { &sVariants, &sWinterVariants, &sSpringVariants }) {
+            const auto found = cache->find(resource.get());
+            if (found != cache->end()) {
+                source = &found->second.original;
+                break;
+            }
+        }
+        std::set<uint64_t> images;
+        const auto moon = sMoonTreeMaterials.find(resolved);
+        BuildVariant(*source, selectedSeason, sceneId, nullptr,
+                     moon == sMoonTreeMaterials.end() ? nullptr : &moon->second, &images, true);
+        if (images.empty() &&
+            (ForestListColor(path, selectedSeason) || WholeListColor(path, selectedSeason, sceneId))) {
+            // Whole-list wrappers already own their child materials. Preserve
+            // every safely parsed image they enclose, including mixed roots.
+            for (size_t i = 0; i < source->size();) {
+                const auto op = uint8_t((*source)[i].words.w0 >> 24);
+                const auto length = MaterialCommandLength(op);
+                if (!length || i + length > source->size()) {
+                    result.unclassifiedWrapper = true;
+                    break;
+                }
+                if (op == G_SETTIMG_OTR_HASH)
+                    images.insert((uint64_t((*source)[i + 1].words.w0) << 32) | (*source)[i + 1].words.w1);
+                i += length;
+            }
+        }
+        result.images.insert(images.begin(), images.end());
+    }
+    return result;
+}
+
 void RestoreActive() {
     for (const auto* source : sActive) {
         CurrentVariants().at(source).Restore();
@@ -1036,7 +1177,6 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         sScene = -1;      // Rebuild Spring's broader replacement-grass path selection.
         sFoliageSeason = selectedSeason;
     }
-    UpdateSurfaceTextures(play, rm, selectedSeason);
     if (sScene != play->sceneId || sArchives != archives.get()) {
         RestoreActive();
         sScene = play->sceneId;
@@ -1075,8 +1215,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     paths.insert(kWoodfallTempleDL);
             }
         }
-        if (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI ||
-            selectedSeason == SEASON_SPRING) {
+        { // Reviewed foliage-only model children in every eligible outdoor scene.
             for (const auto& path : RoadRandoGrassPaths())
                 for (const auto* assetPrefix : { "", "alt/" }) {
                     const auto resolved = assetPrefix + path;
@@ -1086,37 +1225,14 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         }
         sPaths.assign(paths.begin(), paths.end());
     }
+    const auto draws = PrepareDraws(rm, play->sceneId, selectedSeason);
+    UpdateSurfaceTextures(play, rm, selectedSeason, CoveredDrawImages(draws, selectedSeason, play->sceneId));
     std::set<const Fast::DisplayList*> active;
     auto& variants = CurrentVariants();
-    for (const auto& path : sPaths) {
-        std::string resolved = path;
-        if (rm->IsAltAssetsEnabled()) {
-            const std::string altPath = "alt/" + path;
-            // A failed renderer Alt lookup leaves a null ArchiveManager entry.
-            // HasFile alone sees that key and would abandon the cached native
-            // draw. Only a real archive can supply a replacement or .meta alias.
-            const auto hasArchive = [&](const std::string& candidate) {
-                return archives->HasFile(candidate) && archives->GetArchiveFromFile(candidate) != nullptr;
-            };
-            if (hasArchive(altPath) || hasArchive(altPath + ".meta")) {
-                resolved = altPath;
-            }
-        }
-        auto loaded = rm->GetCachedResource(resolved, true);
-        if (loaded == nullptr && RoadRandoGrassColor(path, selectedSeason, play->sceneId) != 0) {
-            // Prepare only the explicit foliage children before the first actor
-            // draw; an outer grouped-grass tint must not reach a cold flower.
-            loaded = rm->LoadResource(resolved, true);
-        }
-        if (loaded == nullptr && resolved != path && rm->GetCachedResource(path, true) != nullptr) {
-            // Preload a cold Alt only when replacing an already-loaded scene
-            // list. Leave unrelated/unloaded rooms to the normal render path.
-            loaded = rm->LoadResource(resolved, true);
-        }
-        auto resource = std::dynamic_pointer_cast<Fast::DisplayList>(loaded);
-        if (resource == nullptr || resource->Instructions.empty()) {
-            continue;
-        }
+    for (const auto& draw : draws) {
+        const auto& path = draw.path;
+        const auto& resolved = draw.resolved;
+        const auto& resource = draw.resource;
         const bool freshCanopyLayout = SelectNativeCanopyLayout(path, resource, selectedSeason, variants);
         auto it = variants.find(resource.get());
         if (it == variants.end()) {
@@ -1147,10 +1263,12 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             const auto& original = other == nullptr || freshCanopyLayout ? resource->Instructions : other->original;
             const auto forestColor = ForestListColor(path, selectedSeason);
             const auto moonTree = sMoonTreeMaterials.find(resolved);
-            auto commands = forestColor != 0
-                                ? std::vector<Gfx>{}
-                                : BuildVariant(original, selectedSeason, play->sceneId, nullptr,
-                                               moonTree == sMoonTreeMaterials.end() ? nullptr : &moonTree->second);
+            std::set<uint64_t> imageCoverage;
+            auto commands =
+                forestColor != 0
+                    ? std::vector<Gfx>{}
+                    : BuildVariant(original, selectedSeason, play->sceneId, nullptr,
+                                   moonTree == sMoonTreeMaterials.end() ? nullptr : &moonTree->second, &imageCoverage);
             const auto wholeColor =
                 forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason, play->sceneId);
             if (commands.empty() && wholeColor == 0) {
@@ -1160,6 +1278,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 continue;
             }
             Variant variant{ resource, original, std::move(commands), {} };
+            variant.coveredImages = std::move(imageCoverage);
             if (other != nullptr) {
                 variant.observedPointers = other->observedPointers;
             }
@@ -1176,6 +1295,18 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                             static_cast<const void*>(resource.get()));
             }
             if (variant.commands.empty()) {
+                for (size_t i = 0; i < original.size();) {
+                    const auto op = uint8_t(original[i].words.w0 >> 24);
+                    const auto length = MaterialCommandLength(op);
+                    if (!length || i + length > original.size()) {
+                        variant.unclassifiedWrapper = true;
+                        break;
+                    }
+                    if (op == G_SETTIMG_OTR_HASH)
+                        variant.coveredImages.insert((uint64_t(original[i + 1].words.w0) << 32) |
+                                                     original[i + 1].words.w1);
+                    i += length;
+                }
                 // Execute the intact root as a pushed child, then restore the
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.

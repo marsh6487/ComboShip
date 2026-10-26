@@ -78,10 +78,10 @@ void State::Spawn(size_t index, const View& view) {
     p.orbit = p.kind == Kind::Firefly ? 6 + Random() * 16 : 2 + Random() * 4;
     p.drift = view.right * (p.kind == Kind::Mote ? 3 + Random() * 4 : Random() - 0.5f);
     p.drift.y += p.kind == Kind::Mote ? 1 + Random() * 2 : 0;
-    // Make the fine tuft readable against detailed foliage; widen firefly halos
-    // gently without increasing their peak opacity or adding another draw pass.
+    // Keep daytime tufts unchanged; broaden the night glow in the existing
+    // textured quad, with a fixed radius cap and no additional draw pass.
     p.radius =
-        std::clamp(depth * (p.kind == Kind::Mote ? 0.0045f : 0.0030f), 0.45f, p.kind == Kind::Mote ? 10.0f : 4.8f);
+        std::clamp(depth * (p.kind == Kind::Mote ? 0.0045f : 0.0036f), 0.45f, p.kind == Kind::Mote ? 10.0f : 5.8f);
     p.age = p.alpha = 0;
     ++p.generation;
 }
@@ -142,10 +142,10 @@ void State::Step(const Input& input, const View& view) {
         const float y = std::abs(Dot(relative, view.up)) / (depth * view.tanHalfFov);
         const float edge = Smooth((1.08f - std::max(x, y)) / 0.18f);
         const float pulse = 0.5f + 0.5f * std::sin(p.age * p.frequency + p.phase);
-        // Keep the dim phase readable and spend less of each pulse near dark,
-        // while retaining the same soft 0.94 peak and entry/edge/night fades.
+        // Lift the dim pulse and let its core reach full opacity at night.
+        // Entry, edge and day/night fades still govern the existing soft glow.
         p.alpha = Smooth(p.age / 0.8f) * edge *
-                  (p.kind == Kind::Mote ? daylight * (0.58f + 0.22f * pulse) : night * (0.30f + 0.64f * pulse));
+                  (p.kind == Kind::Mote ? daylight * (0.58f + 0.22f * pulse) : night * (0.48f + 0.52f * pulse));
     }
     initialized = true;
     BuildBeams(input, view, daylight);

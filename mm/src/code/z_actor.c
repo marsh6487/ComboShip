@@ -5,6 +5,10 @@
  */
 
 #include "z64actor.h"
+#ifdef COMBO_BUILD
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#endif
 #include "gameplay/ComboFaroresWind.h"
 #include "crash_actor_context.h"
 #include "z64door.h"
@@ -545,6 +549,12 @@ void Attention_Init(Attention* attention, Actor* actor, PlayState* play) {
 void Attention_Draw(Attention* attention, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Actor* actor; // used for both the reticle actor and arrow hover actor
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE)) {
+        return;
+    }
+#endif
 
     if (player->stateFlags1 & (PLAYER_STATE1_2 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_200 |
                                PLAYER_STATE1_400 | PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000)) {
@@ -4401,6 +4411,15 @@ void Attention_FindActor(PlayState* play, ActorContext* actorCtx, Actor** attent
                          Player* player) {
     u8* category;
     s32 i;
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE)) {
+        *attentionActorP = NULL;
+        *cameraDriftActorP = NULL;
+        actorCtx->attention.bgmEnemy = NULL;
+        return;
+    }
+#endif
 
     sNearestAttentionActor = sPrioritizedAttentionActor = sNearestCameraDriftActor = sPrioritizedCameraDriftActor =
         NULL;

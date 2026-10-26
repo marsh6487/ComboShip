@@ -1,3 +1,4 @@
+#include "ComboCollectibleShimmer.h"
 #include "CosmeticsEditor.h"
 #include "../../../../combo/gui/CosmeticGrouping.h"
 #include "../../../../combo/gui/WhatsNew.h"
@@ -620,6 +621,24 @@ extern "C" COMBO_EXPORT void OOT_SampleGiCosmeticColor(const char* valueCvar, ui
     outRGB[2] = color.b;
 }
 #endif
+
+extern "C" void OOT_SampleCollectibleShimmerColor(int32_t profile, uint8_t color[4]) {
+    const auto* palette = ComboCollectibleShimmer_Palette(0, profile);
+    if (!palette || !color)
+        return;
+    Color_RGB8 c = { palette->rgb[0], palette->rgb[1], palette->rgb[2] };
+    const bool changed = CVarGetInteger(palette->changed, 0) != 0;
+    if (changed)
+        c = CVarGetColor24(palette->value, c);
+    color[0] = c.r;
+    color[1] = c.g;
+    color[2] = c.b;
+    color[3] = 255;
+#ifdef COMBO_BUILD
+    if (changed)
+        OOT_SampleGiCosmeticColor(palette->value, palette->rgb[0], palette->rgb[1], palette->rgb[2], color);
+#endif
+}
 
 // Runs every frame to update rainbow hue, a potential future optimization is to only run this once or twice a second
 // and increase the speed of the rainbow hue rotation.
@@ -2541,6 +2560,18 @@ void CosmeticsEditorWindow::DrawElement() {
                     UIWidgets::CheckboxOptions()
                         .Color(THEME_COLOR)
                         .Tooltip("Add three subtle drifting motes around potions, bottled fairies and Poes."));
+            }
+            {
+                WhatsNew::Scope releaseHighlight("gEnhancements.CollectibleShimmer", "Rupee & Heart Shimmer",
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+                UIWidgets::CVarCheckbox(
+                    "Rupee & Heart Shimmer", "gEnhancements.CollectibleShimmer",
+                    UIWidgets::CheckboxOptions()
+                        .DefaultValue(false)
+                        .Color(THEME_COLOR)
+                        .Tooltip(
+                            "Add the authored NEI shimmer to rupees and 3D hearts, heart containers and heart pieces. "
+                            "Uses their current cosmetic colors."));
             }
             {
                 WhatsNew::Scope releaseHighlight("gEnhancements.SkijerNEI.UseVanillaHeldSwords",

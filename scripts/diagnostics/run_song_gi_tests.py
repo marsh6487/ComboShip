@@ -32,6 +32,14 @@ typedef struct {uint8_t r,g,b;} Color_RGB8;
 static int notes, stormOverlay;
 #define CVAR_COSMETIC(x) x
 int CVarGetInteger(const char* key,int value) {return value;}
+void Matrix_Push(void);
+void Matrix_Pop(void);
+void Matrix_Scale(float,float,float,int);
+enum { MTXMODE_APPLY = 1 };
+#include "combo/menu/ComboCollectibleShimmerHost.h"
+void OOT_SampleCollectibleShimmerColor(int32_t profile,uint8_t color[4]) {
+    assert(false && "song fixture unexpectedly sampled collectible colors");
+}
 Color_RGB8 CVarGetColor24(const char* key,Color_RGB8 value) {return value;}
 int ComboOotMaskShimmerColor(int id,uint8_t* color) {return false;}
 void ComboMaskShimmerColor(int id,uint8_t* color) {}

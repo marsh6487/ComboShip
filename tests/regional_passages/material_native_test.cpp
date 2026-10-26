@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
   Fast::ResourceFactoryBinaryTextureV1 factory;
   for (auto material :
        {Material::LakeStone, Material::SnowheadStone, Material::SnowheadSnow,
-        Material::SnowheadIce, Material::ValleySnow, Material::LakeWater}) {
+        Material::SnowheadIce, Material::ValleySnow, Material::LakeWater, Material::LakeSand}) {
     const char *path = OverridePath(material);
     auto init = std::make_shared<Ship::ResourceInitData>();
     init->Path = path + 7;
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     reader.reset();
     assert(texture->mImageBuffer && texture->ImageData[3] == 255);
   }
-  puts("PASS six replacement materials through real v1 factory and SETTIMG: "
+  puts("PASS seven replacement materials through real v1 factory and SETTIMG: "
        "dimensions, raw flags, byte/pixel scales, resource ownership and "
        "buffer lifetime");
 }

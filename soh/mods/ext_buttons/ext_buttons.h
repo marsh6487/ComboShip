@@ -34,6 +34,13 @@ void ExtButton_SetItem(s32 btn, u16 extId);
 // Clear a button slot: buttonItems -> ITEM_NONE, extButtons -> 0.
 void ExtButton_ClearItem(s32 btn);
 
+#ifdef COMBO_BUILD
+// Narrow pause-equip path for moves involving Magic Mirror. Preserves full IDs
+// while swapping/clearing the previous C/D mapping; caller reloads the target icon.
+// Returns false without changing anything when neither item is the Mirror.
+s32 ExtButton_EquipMagicMirror(PlayState* play, s32 btn, u16 item, u8 slot);
+#endif
+
 // Pair the native child/adult ItemEquips snapshots with their full custom IDs.
 // Store before changing the raw buttons; load only when restoring that age's buttons.
 void ExtButton_SaveAgeItems(s32 age);

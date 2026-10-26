@@ -167,11 +167,10 @@ static void SeasonScene_OnInitWaterTemple(void* refActor) {
 /**
  * Every other movable body of water, in any scene.
  *
- * Bg_Spot01_Idomizu, Bg_Mori_Idomizu and Bg_Haka_Water all follow Lake Hylia's shape: world.pos.y
- * IS the visible surface, and each one writes its OWN water boxes to match it every frame. So the
- * season only has to shift the actor and let it propagate — which is why this needs no table of
- * which box belongs to which scene. home.pos.y moves with it because their update functions ease
- * world.pos.y back toward home.
+ * Bg_Mori_Idomizu and Bg_Haka_Water propagate their visible surface into their own water boxes.
+ * Shift both world and home because their updates ease the surface back toward home. Kakariko's
+ * Bg_Spot01_Idomizu owns a separate target; its native init/update applies the same offset to both
+ * current and target levels so a season change cannot start the real well-draining animation.
  *
  * The shift is a fixed drop rather than a per-scene depth: nothing in the scene says how deep its
  * basin is, and a well and a lake both read as "drained" once the surface is well below the rim.
@@ -179,25 +178,27 @@ static void SeasonScene_OnInitWaterTemple(void* refActor) {
 #define SEASON_WATER_DROP 600.0f
 #define SEASON_WATER_RISE 100.0f
 
+extern "C" f32 SeasonScene_WaterLevelOffset(void) {
+    if (!SeasonScene_Active()) {
+        return 0.0f;
+    }
+    switch (Seasons_GetSeason()) {
+        case SEASON_SUMMER:
+            return -SEASON_WATER_DROP;
+        case SEASON_AUTUMN:
+            return SEASON_WATER_RISE;
+        default:
+            return 0.0f; // Spring keeps the vanilla level, Winter freezes what is there
+    }
+}
+
 static void SeasonScene_OnInitWaterActor(void* refActor) {
     Actor* self = static_cast<Actor*>(refActor);
 
-    if (!SeasonScene_Active()) {
-        return;
+    if (self->id == ACTOR_BG_SPOT01_IDOMIZU) {
+        return; // The native Kakariko well applies this offset to its target too.
     }
-
-    f32 delta = 0.0f;
-
-    switch (Seasons_GetSeason()) {
-        case SEASON_SUMMER:
-            delta = -SEASON_WATER_DROP;
-            break;
-        case SEASON_AUTUMN:
-            delta = SEASON_WATER_RISE;
-            break;
-        default:
-            return; // Spring keeps the vanilla level, Winter freezes what is there
-    }
+    f32 delta = SeasonScene_WaterLevelOffset();
 
     self->world.pos.y += delta;
     self->home.pos.y += delta;
@@ -270,7 +271,7 @@ extern "C" Path* SeasonBean_Path(PlayState* play) {
 // Winter: the soft soil's gold skulltula comes up on its own. unk_152 is the "bugs were dropped"
 // latch, the same one the NEI shovel flips when it digs a bean spot.
 static void SeasonScene_LatchSoftSoil(Actor* self) {
-    reinterpret_cast<ObjMakekinsuta*>(self)->unk_152 = 1;
+    reinterpret_cast<ObjMakekinsuta*>(self)->unk_152 = SOFT_SOIL_TRIGGER_SEASONAL;
 }
 
 static void SeasonScene_OnInitSoftSoil(void* refActor) {
@@ -802,6 +803,10 @@ void RegisterSeasonSceneEffects() {
     COND_ID_HOOK(OnActorInit, ACTOR_BG_HAKA_WATER, true, SeasonScene_OnInitWaterActor);
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>(SeasonScene_DrawGround);
+
+    // Restore while the outgoing scene still owns its collision allocation.
+    // The Rod reload can retire custom collision data before the next water tick.
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(SeasonScene_RestoreWaterBoxes);
 }
 
 static RegisterShipInitFunc initFuncSeasonScene(RegisterSeasonSceneEffects, {});

@@ -917,8 +917,8 @@ void func_80A03CF8(EnElf* this, PlayState* play) {
     f32 distFromLinksHead;
 
     if (EnElf_BlackMarketQuiet(this, play)) {
-        // Preserve the companion's model, bob animation and native lights, but
-        // keep its attention at Link while the private shop owns interaction.
+        // Fallback for direct action callers. The normal shop update returns
+        // before this action; its outer update/draw paths suppress lights/model.
         if (this->unk_2A8 != 0)
             func_80A01C38(this, 0);
         this->unk_2C0 = 100;
@@ -1471,9 +1471,12 @@ void func_80A053F0(Actor* thisx, PlayState* play) {
         thisx->flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
         this->fairyFlags &= ~(0x10 | 0x20);
         this->elfMsg = NULL;
-        this->actionFunc(this, play);
+        // The light context draws the halo independently of the companion mesh.
+        Lights_PointNoGlowSetInfo(&this->lightInfoGlow, thisx->world.pos.x, thisx->world.pos.y, thisx->world.pos.z, 255,
+                                  255, 255, 0);
+        Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, thisx->world.pos.x, thisx->world.pos.y, thisx->world.pos.z,
+                                  255, 255, 255, 0);
         this->timer++;
-        EnElf_UpdateMidnaBlink(this);
         MidnaAudio_UpdateIdle(false);
         return;
     }
@@ -1790,9 +1793,9 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
     Gfx* dListHead;
     Player* player = GET_PLAYER(play);
 
-    // The shop hides Link while browsing; keep the companion out of that same
-    // view before either the native fairy or replacement model emits a draw.
-    if (EnElf_BlackMarketQuiet(this, play) && (player->stateFlags2 & (1u << 29))) {
+    // Keep the companion hidden throughout the private shop, including browsing,
+    // before either the native fairy or replacement model emits a draw.
+    if (EnElf_BlackMarketQuiet(this, play)) {
         return;
     }
 

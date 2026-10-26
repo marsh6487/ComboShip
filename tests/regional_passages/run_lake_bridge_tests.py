@@ -19,16 +19,29 @@ provider=(subprocess.check_output(['git','show',a.provider_ref+':'+provider_path
 loads=re.findall(r'gDPLoadTextureBlock\(POLY_OPA_DISP\+\+,\s*([A-Za-z0-9_]+),\s*'
                  r'(G_IM_FMT_\w+),\s*(G_IM_SIZ_\w+),\s*(\d+),\s*(\d+),\s*0,\s*'
                  r'G_TX_WRAP,\s*G_TX_WRAP,\s*(\d+),\s*(\d+)',provider)
-assert loads == [('stone','G_IM_FMT_RGBA','G_IM_SIZ_16b','32','64','5','6')], \
-       f'Native bank rock must use its actual RGBA16 32x64 tile/masks, got {loads}'
+assert loads == [('stone','G_IM_FMT_RGBA','G_IM_SIZ_16b','32','64','5','6'),
+                 ('stone','G_IM_FMT_RGBA','G_IM_SIZ_16b','32','32','5','5'),
+                 ('sand','G_IM_FMT_RGBA','G_IM_SIZ_16b','32','32','5','5'),
+                 ('sand','G_IM_FMT_RGBA','G_IM_SIZ_16b','16','16','4','4')], \
+       f'Stone/sand must preserve separate native and replacement tile dimensions, got {loads}'
 if a.texture_archive:
     with zipfile.ZipFile(a.texture_archive) as archive:
-        path='scenes/shared/spot06_scene/spot06_sceneTex_00FEB8'
-        data=archive.read(path)
-        assert struct.unpack_from('<III',data,64)==(2,32,64)
-        version=struct.unpack_from('<I',data,8)[0]
-        assert len(data)-(92 if version==1 else 80)==32*64*2, 'native tile payload must fit the exact resource'
-    print('PASS native bank stone: unchanged donor RGBA16 32x64,4096-byte tile, masks5/6')
+        for suffix,width,height in (('010EB8',32,32),('00C2B8',16,16)):
+            path='scenes/shared/spot06_scene/spot06_sceneTex_'+suffix
+            data=archive.read(path)
+            typ,w,h=struct.unpack_from('<III',data,64)
+            version=struct.unpack_from('<I',data,8)[0]
+            assert typ==2, 'stone/sand fallbacks must retain native RGBA16 interpretation'
+            offset=92 if version==1 else 80
+            raw=version==1 and struct.unpack_from('<I',data,76)[0]&1
+            if raw:
+                hs,vs=struct.unpack_from('<ff',data,80)
+                assert width*2*hs==w*4 and height*vs==h, 'HD metadata must preserve the selected logical tile'
+                assert len(data)-offset==w*h*4
+            else:
+                assert (w,h)==(width,height)
+                assert len(data)-offset==width*height*2, 'native tile payload must fit the exact resource'
+    print('PASS current clean-stone 010EB8 32x32 and sand 00C2B8 16x16 resource identities/metadata/payloads')
 
 def collision(path):
     data=path.read_bytes(); offset=64
@@ -135,7 +148,7 @@ wrappers=(ROOT/'soh/soh/GbiWrap.cpp').read_text()
 renderer=(ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text()
 interpreter=(ROOT/'libultraship/src/fast/interpreter.cpp').read_text()
 draw='\n'.join(function(provider,signature) for signature in (
-    'const Lake::Geometry& Geometry(', 'bool Available(', 'Vtx Vertex(',
+    'const Lake::Geometry& Geometry(', 'const Lake::SurfaceGeometry& SurfaceGeometry(', 'bool Available(', 'Vtx Vertex(',
     'const std::vector<Vtx>& RockVertices(', 'void CaveDraw('))
 native_graph='\n'.join(function(arena,signature) for signature in (
     'void* THA_AllocEnd(', 'Gfx* THGA_AllocEnd('))

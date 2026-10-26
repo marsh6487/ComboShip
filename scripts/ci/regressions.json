@@ -1405,5 +1405,35 @@
     "origin": "gate",
     "name": "MM Black Market material context traces are bounded and observation only",
     "run": "python3 -B tests/black_market/run_room_material_trace_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Seasonal water ownership, quiet Winter emergence and native well targets",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_shop/native_regressions.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_water/lifetime_test.py soh/mods/season_scene.cpp --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Cross-scene material binding reuse preserves fallback and cache identity",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/caustic_binding/native_regressions.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Mirror button deduplication and single native cast chime",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/magic_mirror_followups/run.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Opt-in authored collectible shimmer and owner cosmetic palettes",
+    "run": "python3 -B tests/collectible_shimmer/native_regressions.py\npython3 -B tests/collectible_shimmer/renderer_regressions.py\npython3 -B tests/collectible_shimmer/draw_regressions.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Termina native floor packets and additive seasonal coverage",
+    "run": "ASAN_OPTIONS=detect_leaks=0 MM_FOLIAGE_TEST_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py --materials mm/tests/fixtures/termina_season_materials"
   }
 ]

@@ -36,6 +36,13 @@ struct PlayState {
     uint32_t gameplayFrames = 0;
     MtxF billboardMtxF;
 };
+#include "combo/menu/ComboCollectibleShimmerDraw.h"
+extern "C" void OOT_SampleCollectibleShimmerColor(int32_t, uint8_t[4]) {
+    assert(false && "fairy fixture unexpectedly sampled collectible colors");
+}
+extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState*, const uint8_t[4], const char*) {
+    assert(false && "fairy fixture unexpectedly drew collectible shimmer");
+}
 extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
     assert(false && "fairy fixture must not dispatch elemental arrows");
 }
@@ -164,7 +171,8 @@ struct ComboForeignDrawInfo {
     int opCount = 0;
     CwDrawOp ops[CW_DRAW_MAX_OPS] = {};
     float scale = 0, neiEffectCenter[3]{};
-    bool animOk = false, itemShimmer = true;
+    bool animOk = false;
+    int32_t itemShimmer = CW_ITEM_SHIMMER_LEGACY;
     uint8_t itemShimmerColor[4] = {255,160,235,255}, primColorXlu[4]{};
     CwItemAnimDrawInfo anim{};
 };

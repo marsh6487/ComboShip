@@ -19,6 +19,8 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerHost.h"
+
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboLiveCosmetics.h"
@@ -540,6 +542,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     if (rg >= RG_SHADOW_SILVER_BLADES && rg <= RG_GANONS_CASTLE_MQ_SILVER_SHADOW) {
         Color_RGB8 c = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.SilverRupee.Value"), { 255, 255, 255 });
         out->stateDependent = 2; // Keep palette / NewDrops selection live after the receipt is latched.
+        out->itemShimmer = ComboCollectibleShimmer_Color(CW_COLLECTIBLE_SILVER, out->itemShimmerColor);
         if (CVarGetInteger("gEnhancements.NewDrops", 0) != 0) {
             out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
             out->dlistCount = 2;
@@ -1113,8 +1116,11 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
     uint8_t nativeShimmerColor[4] = {};
-    if (GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor)) {
-        out->itemShimmer = 1;
+    const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor);
+    if (ComboCollectibleShimmer_ProfileForDrawId((s16)gi.gid) >= 0)
+        out->stateDependent = 2; // Refresh opt-in and owner palette even when shimmer was disabled.
+    if (nativeShimmer) {
+        out->itemShimmer = nativeShimmer;
         std::memcpy(out->itemShimmerColor, nativeShimmerColor, sizeof(nativeShimmerColor));
     }
     // Apply after native eligibility so dormant-owner rainbow sampling drives

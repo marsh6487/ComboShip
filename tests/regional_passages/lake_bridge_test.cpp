@@ -228,6 +228,7 @@ int main() {
 
 #include "ComboGameMode.h"
 #include "entrances/LakeHyliaBridge.h"
+#include "entrances/LakeHyliaSurface.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "global.h"
 #include "soh/Enhancements/Gameplay/ComboLakeHyliaBridge.h"
@@ -351,16 +352,17 @@ static void CameraControl(PlayState &play, CollisionHeader *collision) {
 }
 static void StoneUvControl() {
   const auto &rock = RockVertices();
-  assert(rock.size() == Geometry().solid.size() * 4);
+  const auto& surface = SurfaceGeometry();
+  assert(rock.size() == (surface.stone.size() + surface.sand.size()) * 4);
   // Adjacent north-wall rings share exact texture coordinates. Fragment-style
   // per-quad resets create repeated moss bands at every46-unit ring boundary.
   int shared = 0;
-  for (size_t i = 0; i < Geometry().solid.size(); ++i) {
-    const auto &q = Geometry().solid[i];
+  for (size_t i = 0; i < surface.stone.size(); ++i) {
+    const auto &q = surface.stone[i];
     if (q.a.z != 3627 || q.b.z != 3627 || q.c.z != 3627 || q.d.z != 3627)
       continue;
-    for (size_t j = i + 1; j < Geometry().solid.size(); ++j) {
-      const auto &r = Geometry().solid[j];
+    for (size_t j = i + 1; j < surface.stone.size(); ++j) {
+      const auto &r = surface.stone[j];
       if (r.a.z != 3627 || r.b.z != 3627 || r.c.z != 3627 || r.d.z != 3627)
         continue;
       for (int a = 0; a < 4; ++a)

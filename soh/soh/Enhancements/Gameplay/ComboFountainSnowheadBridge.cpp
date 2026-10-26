@@ -3,6 +3,7 @@
 #include "ComboGameMode.h"
 #include "ComboFountainValley.h"
 #include "render/RegionalSnow.h"
+#include "soh/Enhancements/Graphics/SeasonWinterMist.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #include "entrances/FountainSnowheadBridge.h"
@@ -157,6 +158,20 @@ void Update(Actor* actor, PlayState* play) {
 }
 void DrawLocalChill(Actor* actor, PlayState* play);
 
+// Use the actual view, rather than player distance alone: a camera can cross
+// an anchored particle while the player remains in the same place.
+float ParticleViewOpacity(PlayState* play, const Point& position, float radius) {
+    const auto& eye = play->view.eye;
+    const auto& at = play->view.lookAt;
+    const float dx = at.x - eye.x, dy = at.y - eye.y, dz = at.z - eye.z;
+    const float length = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (length < .001f)
+        return 0;
+    const float depth = ((position.x - eye.x) * dx + (position.y - eye.y) * dy + (position.z - eye.z) * dz) / length;
+    return RegionalSnow::DepthOpacity(depth, radius, std::max(0.f, play->view.zNear),
+                                      play->view.zFar > 200 ? play->view.zFar : 12800.f);
+}
+
 void Draw(Actor* actor, PlayState* play) {
     if (!Fountain(play) ||
         !NeiGi_CanDrawLayers(play, 3 + RegionalSnow::kCount, sMesh.count * 9 + 40, RegionalSnow::kCount * 7 + 40))
@@ -186,23 +201,18 @@ void Draw(Actor* actor, PlayState* play) {
     const auto* player = GET_PLAYER(play);
     if (player && play->state.running) {
         const auto& p = player->actor.world.pos;
-        static const std::array<Point, kStationCount + 4> anchors = [] {
-            std::array<Point, kStationCount + 4> points{};
-            for (size_t i = 0; i < kStationCount; ++i)
-                points[i] = kStations[i];
-            points[kStationCount] = kMouth;
-            points[kStationCount + 1] = Grounded(2400, 0);
-            points[kStationCount + 2] = Grounded(3200, 0);
-            points[kStationCount + 3] = Grounded(3800, 0);
-            return points;
-        }();
+        const auto& anchors = kWeatherAnchors;
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-        // SETUPDL_25 is opaque even on polyXlu; blend the sprite mask without
-        // writing its transparent billboard corners into the depth buffer.
-        gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2);
+        gDPPipeSync(POLY_XLU_DISP++);
+        gDPSetCycleType(POLY_XLU_DISP++, G_CYC_1CYCLE);
+        gDPSetRenderMode(POLY_XLU_DISP++, G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
         gSPComboRMPush(POLY_XLU_DISP++, "oot");
-        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
-        gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
+        // I8 dust contributes only alpha. Multiplying its dark intensity into
+        // RGB made the snow look like soot; scene fog must not recolor it.
+        gDPSetCombineLERP(POLY_XLU_DISP++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, TEXEL0, 0,
+                          PRIMITIVE, 0);
+        gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH | G_FOG);
+        gSPSetGeometryMode(POLY_XLU_DISP++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPLoadTextureBlock(POLY_XLU_DISP++, gDust5Tex, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP, 5,
                             5, G_TX_NOLOD, G_TX_NOLOD);
@@ -216,11 +226,15 @@ void Draw(Actor* actor, PlayState* play) {
             if (opacity <= 0)
                 continue;
             const auto flake = RegionalSnow::Flake(reinterpret_cast<SnowheadActor*>(actor)->snowTick, i);
-            Matrix_Translate(center.x + flake.x, center.y + flake.y, center.z + flake.z, MTXMODE_NEW);
+            const Point position = { center.x + flake.x, center.y + flake.y, center.z + flake.z };
+            const u8 alpha = u8(220 * opacity * flake.alpha * ParticleViewOpacity(play, position, 3.f));
+            if (!alpha)
+                continue;
+            Matrix_Translate(position.x, position.y, position.z, MTXMODE_NEW);
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
             gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                       G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 210, 237, 255, u8(220 * opacity * flake.alpha));
+            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 225, 242, 255, alpha);
             gSPVertex(POLY_XLU_DISP++, (uintptr_t)quad, 4, 0);
             gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
         }
@@ -231,16 +245,17 @@ void Draw(Actor* actor, PlayState* play) {
     DrawLocalChill(actor, play);
 }
 void DrawLocalChill(Actor* actor, PlayState* play) {
-    // Texture resources load directly through SETTIMG; no OBJECT_FZ bank is
-    // required. Reject stale owners and unavailable art before emitting packets.
+    // Winter's soft mesh uses no texture resource or OBJECT_FZ bank. Frame
+    // vertices come from polyOpa's tail, so reserve those bytes as matrices too.
+    constexpr size_t vertexMatrices = (SoHSeasonWinterMist::kVertexCount * sizeof(Vtx) + sizeof(Mtx) - 1) / sizeof(Mtx);
     if (!Fountain(play) || !play->state.running || !sActor || actor != &sActor->dyna.actor || sOwner != play ||
-        !actor->update || !GET_PLAYER(play) || !ResourceMgr_FileExists(dgDust5Tex + 7) ||
-        !NeiGi_CanDrawLayers(play, RegionalSnow::kChillCount, 0, RegionalSnow::kChillCount * 4 + 24))
+        !actor->update || !GET_PLAYER(play) ||
+        !NeiGi_CanDrawLayers(play, RegionalSnow::kChillCount * (1 + vertexMatrices), 0,
+                             RegionalSnow::kChillCount * 10 + 32))
         return;
     const auto& player = GET_PLAYER(play)->actor.world.pos;
     bool nearby = false;
-    for (size_t i = 0; i <= kStationCount; ++i) {
-        const auto center = i == kStationCount ? kMouth : kStations[i];
+    for (const auto& center : kWeatherAnchors) {
         nearby |=
             std::hypot(player.x - center.x, player.z - center.z) < 650 && std::fabs(player.y - center.y) * 3 < 650;
     }
@@ -248,31 +263,30 @@ void DrawLocalChill(Actor* actor, PlayState* play) {
         return;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_SURF2);
+    POLY_XLU_DISP = SoHSeasonWinterMist::Prepare(POLY_XLU_DISP);
     gSPComboRMPush(POLY_XLU_DISP++, "oot");
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPLoadTextureBlock(POLY_XLU_DISP++, gDust5Tex, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP, 5, 5,
-                        G_TX_NOLOD, G_TX_NOLOD);
-    static Vtx quad[4] = { VTX(-28, -10, 0, 0, 1024, 255, 255, 255, 255),
-                           VTX(28, -10, 0, 1024, 1024, 255, 255, 255, 255), VTX(28, 10, 0, 1024, 0, 255, 255, 255, 255),
-                           VTX(-28, 10, 0, 0, 0, 255, 255, 255, 255) };
+    const float dx = play->view.lookAt.x - play->view.eye.x;
+    const float dz = play->view.lookAt.z - play->view.eye.z;
+    const float length = std::hypot(dx, dz);
+    const float rightX = length > .001f ? -dz / length : 1.f;
+    const float rightZ = length > .001f ? dx / length : 0.f;
     for (size_t i = 0; i < RegionalSnow::kChillCount; ++i) {
-        const auto center = i % (kStationCount + 1) == kStationCount ? kMouth : kStations[i % (kStationCount + 1)];
+        const auto center = kWeatherAnchors[i % kWeatherAnchors.size()];
         const float opacity = RegionalSnow::Opacity(std::hypot(player.x - center.x, player.z - center.z)) *
                               RegionalSnow::Opacity(std::fabs(player.y - center.y) * 3);
         const auto puff = RegionalSnow::Chill(sActor->snowTick, i);
-        const u8 alpha = u8(120 * opacity * puff.alpha);
-        if (!alpha)
+        const float width = 180.f + float((i * 47) % 191), height = 10.f + float(i % 3) * 5.f;
+        const Point position = { center.x + puff.x, center.y + puff.y + height, center.z + puff.z };
+        const float alpha = .24f * opacity * puff.alpha * ParticleViewOpacity(play, position, height);
+        if (alpha < 1.f / 255)
             continue;
-        Matrix_Translate(center.x + puff.x, center.y + puff.y, center.z + puff.z, MTXMODE_NEW);
-        Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+        Matrix_Translate(position.x, position.y, position.z, MTXMODE_NEW);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 130, 205, 255, alpha);
-        gSPVertex(POLY_XLU_DISP++, (uintptr_t)quad, 4, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+        auto* vertices =
+            static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, sizeof(Vtx) * SoHSeasonWinterMist::kVertexCount));
+        SoHSeasonWinterMist::Vertices(vertices, rightX, rightZ, width, height, alpha);
+        POLY_XLU_DISP = SoHSeasonWinterMist::Draw(POLY_XLU_DISP, vertices);
     }
     gSPComboRMPop(POLY_XLU_DISP++);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);

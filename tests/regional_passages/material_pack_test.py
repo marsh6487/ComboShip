@@ -8,7 +8,7 @@ with tempfile.TemporaryDirectory(prefix='regional-pack-') as td:
  assert a.read_bytes()==b.read_bytes(),'archive must be deterministic'
  with zipfile.ZipFile(a) as z:
   paths=[n for n in z.namelist()if n.startswith('textures/')]
-  assert len(paths)==6
+  assert len(paths)==7
   for path in paths:
    data=z.read(path); assert struct.unpack_from('<II',data,4)==(0x4F544558,1)
    typ,w,h,flags,hs,vs,size=struct.unpack_from('<IIIIffI',data,64)
@@ -18,4 +18,4 @@ with tempfile.TemporaryDirectory(prefix='regional-pack-') as td:
    assert hs==4*4/nativebytes and vs==4
    assert nw*nativebytes*hs==w*4 and nh*vs==h and len(data)==92+size
    assert all(data[i]==255 for i in range(95,len(data),4))
- print('PASS deterministic six-material O2R: stable base paths, native logical tiles, raw RGBA32 metadata/HD byte strides')
+ print('PASS deterministic seven-material O2R: stable base paths, native logical tiles, raw RGBA32 metadata/HD byte strides')

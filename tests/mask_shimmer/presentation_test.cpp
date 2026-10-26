@@ -149,6 +149,21 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 #define COMBO_MASK_SHIMMER_HOST_MM
 #endif
 #include "ComboMaskShimmer.h"
+#ifdef HOST_MM
+#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#endif
+#include "ComboCollectibleShimmerHost.h"
+#ifdef HOST_MM
+#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#endif
+// The extracted native dispatcher now shares collectible eligibility. This
+// fixture keeps that separate opt-in disabled; palette sampling must stay idle.
+extern "C" void OOT_SampleCollectibleShimmerColor(int32_t, uint8_t[4]) {
+    assert(false && "mask fixture unexpectedly sampled collectible colors");
+}
+extern "C" void MM_SampleCollectibleShimmerColor(int32_t, uint8_t[4]) {
+    assert(false && "mask fixture unexpectedly sampled collectible colors");
+}
 #include "ComboItemEffectColors.h"
 #include "ComboBottleContents.h"
 /* PRODUCTION_FOREIGN_LINKAGE */

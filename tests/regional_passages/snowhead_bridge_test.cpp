@@ -1,4 +1,5 @@
 #include "entrances/FountainSnowheadBridge.h"
+#include "render/RegionalSnow.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -7,7 +8,7 @@ int main(int argc, char **) {
   using namespace ComboFountainSnowhead;
   auto mesh = BuildMesh();
   assert(mesh.count > 12 && mesh.count < 256);
-  assert(kMouth.x == 1840 && std::fabs(kMouth.y - 280.893f) < .01f &&
+  assert(kMouth.x == 3600 && std::fabs(kMouth.y - 225.984f) < .01f &&
          kMouth.z == 0 && kYaw == -16384);
   for (size_t i = 1; i < kStationCount; ++i) {
     auto a = kStations[i - 1], b = kStations[i];
@@ -60,7 +61,7 @@ extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 }
 static int adds = 0, deletes = 0, spawns = 0;
-static bool failDyna = false, valleyReady = true;
+static bool failDyna = false, valleyReady = true, inCutscene = false;
 extern "C" int ComboFountainValley_Ready(PlayState *) { return valleyReady; }
 static ActorDB::Entry fakeEntry;
 ActorDB::ActorDB() {}
@@ -90,7 +91,7 @@ extern "C" void DynaPoly_DeleteBgActor(PlayState *, DynaCollisionContext *dyna,
   dyna->bgActorFlags[id] = 0;
   ++deletes;
 }
-extern "C" s32 Player_InCsMode(PlayState *) { return false; }
+extern "C" s32 Player_InCsMode(PlayState *) { return inCutscene; }
 /* NATIVE_PRODUCTION */
 static SnowheadActor actors[8]{};
 extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *play, s16, f32, f32,
@@ -122,7 +123,7 @@ int main() {
   valleyReady = false;
   assert(!ComboFountainSnowheadBridge_Get(&play, &mouth, &yaw));
   valleyReady = true;
-  assert(mouth.x == 1840 && std::fabs(mouth.y - 280.893f) < .01f &&
+  assert(mouth.x == 3600 && std::fabs(mouth.y - 225.984f) < .01f &&
          mouth.z == 0 && yaw == -16384);
   // Native broad-phase bounds must include the entire final rounded mesh,
   // including the wider waterline cross-section and the high shoulder.
@@ -277,6 +278,10 @@ int main() {
   Update(&sActor->dyna.actor, &play);
   assert(sActor->snowTick == oldTick);
   play.pauseCtx.state = 0;
+  inCutscene = true;
+  Update(&sActor->dyna.actor, &play);
+  assert(sActor->snowTick == oldTick);
+  inCutscene = false;
   play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
   Update(&sActor->dyna.actor, &play);
   assert(sActor->snowTick == oldTick);

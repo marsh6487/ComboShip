@@ -9,7 +9,7 @@ int main() {
   std::set<std::string> paths;
   for (auto m :
        {Material::LakeStone, Material::SnowheadStone, Material::SnowheadSnow,
-        Material::SnowheadIce, Material::ValleySnow, Material::LakeWater}) {
+        Material::SnowheadIce, Material::ValleySnow, Material::LakeWater, Material::LakeSand}) {
     assert((reinterpret_cast<uintptr_t>(OverridePath(m)) & 1) == 0);
     assert((reinterpret_cast<uintptr_t>(FallbackPath(m)) & 1) == 0);
     assert(paths.insert(OverridePath(m)).second);

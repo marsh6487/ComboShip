@@ -94,8 +94,14 @@ def main():
     flags += shlex.split(os.environ.get("MM_FOLIAGE_TEST_CXXFLAGS", ""))
     with tempfile.TemporaryDirectory(prefix="mm-autumn-scene-foliage-") as temporary:
         build = Path(temporary)
+        # Count parser-only preflights in the extracted fixture; steady cached
+        # updates must not rescan/rebuild the large Termina/Moon display lists.
+        fixture_source = source[start:]
+        marker = "    std::set<uint64_t> covered;"
+        assert fixture_source.count(marker) == 1
+        fixture_source = fixture_source.replace(marker, marker + "\n    if (coverageOnly) ++sCoverageWalks;", 1)
         (build / "autumn_scene_foliage_production.inc").write_text(
-            '#ifdef COMBO_BUILD\n#include "WoodsMysteryNativeBridge.h"\n#endif\n' + source[start:])
+            '#ifdef COMBO_BUILD\n#include "WoodsMysteryNativeBridge.h"\n#endif\n' + fixture_source)
         renderer_functions = ["GfxExecStack::start", "GfxExecStack::stop", "GfxExecStack::currCmd",
                               "GfxExecStack::branch", "GfxExecStack::call", "GfxExecStack::ret",
                               "Interpreter::SegAddr", "gfx_check_image_signature",
@@ -191,7 +197,9 @@ def main():
                 fixtures += '{ const std::vector<Gfx> source = {\n'
                 fixtures += ",\n".join(f"Command(0x{a:08X}, 0x{b:08X})" for a, b in struct.iter_unpack("<II", data[72:]))
                 fixtures += '}; const auto variant = BuildVariant(source); assert(!variant.empty());\n'
-                fixtures += 'assert(Equal(RemoveTint(variant), source)); }\n'
+                fixtures += 'assert(Equal(RemoveTint(variant), source));\n'
+                logical = "scenes/nonmq/Z2_00KEIKOKU/" + path.name
+                fixtures += f'CheckActualGroundResource({json.dumps(logical)}, source); }}\n'
             fixtures += f'std::puts("PASS {len(material_paths)} actual serialized Termina bed materials and exact command preservation");\n'
         for path, texture, triangles, data in coverage_cases:
             if len(data) < 72 or data[4:8] != b"TLDO" or (len(data) - 72) % 8:

@@ -14,6 +14,10 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#include "ComboCollectibleShimmerHost.h"
+#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboSongDrawMM.h"
@@ -1181,7 +1185,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)it->second.drawId, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor) || out->itemShimmer;
+    const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
+    if (nativeShimmer)
+        out->itemShimmer = nativeShimmer;
+    if (ComboCollectibleShimmer_ProfileForDrawId((s16)it->second.drawId) >= 0)
+        out->stateDependent = 2; // Keep opt-in and owning-game color/rainbow live, including while disabled.
     if (it->second.drawId == GID_CHATEAU) {
         out->neiShimmer = static_cast<int32_t>(NeiGi::Kind::ChateauRomani) + 1;
     }

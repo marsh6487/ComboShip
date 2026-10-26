@@ -35,6 +35,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerDraw.h"
 #include "ComboRewardGi.h"
 #include "ComboMmNativeImports.h"
 #include "ComboFairyBottle.h"
@@ -72,7 +73,7 @@ struct ComboForeignDrawInfoOOT {
     int32_t count = 0;
     int32_t xluStart = -1; // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;    // extra uniform model scale; 0 = none (OOT rupees: 0.7)
-    bool itemShimmer = false;
+    int32_t itemShimmer = CW_ITEM_SHIMMER_NONE;
     uint8_t itemShimmerColor[4] = {};
     int32_t neiShimmer = 0;
     bool hasEnvColor = false;
@@ -270,7 +271,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     memcpy(info.ops, raw.ops, sizeof(info.ops));
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
-    info.itemShimmer = raw.itemShimmer != 0;
+    info.itemShimmer = raw.itemShimmer;
     info.neiShimmer = raw.neiShimmer;
     memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
@@ -1520,6 +1521,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
             NeiGi_DrawMesh(gPlayState, NeiGi::SampleShimmer(gPlayState->gameplayFrames, true,
                                                             NeiGi_CameraBasis(gPlayState), NeiGi::Kind::Pokeball));
+        else if (info->itemShimmer == CW_ITEM_SHIMMER_TINTED)
+            NeiGi_DrawTintedShimmerOverlay(gPlayState, info->itemShimmerColor, mmOwner ? "mm" : "oot");
         else
             ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, mmOwner ? "mm" : "oot");
     }

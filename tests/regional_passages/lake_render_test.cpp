@@ -4,6 +4,7 @@
 #include "global.h"
 #include "ComboGameMode.h"
 #include "entrances/LakeHyliaBridge.h"
+#include "entrances/LakeHyliaSurface.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "render/RegionalBridgeMaterials.h"
 #include "fast/lus_gbi.h"
@@ -19,6 +20,7 @@
 SaveContext gSaveContext{};
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static bool replacements;
+static bool stoneReplacement, sandReplacement;
 static float lakeWaterY;
 static size_t openChildren;
 static std::vector<Gfx> opa(8192), xlu(2048), overlay(64);
@@ -27,6 +29,10 @@ extern "C" void FrameInterpolation_RecordOpenChild(const void*, int) { ++openChi
 extern "C" void FrameInterpolation_RecordCloseChild() { assert(openChildren); --openChildren; }
 extern "C" u8 ResourceMgr_FileExists(const char* path) {
     assert(std::strncmp(path, "textures/comboship/regional/", 27) == 0);
+    if (std::strcmp(path, RegionalBridgeMaterials::OverridePath(RegionalBridgeMaterials::Material::LakeStone) + 7) == 0)
+        return stoneReplacement;
+    if (std::strcmp(path, RegionalBridgeMaterials::OverridePath(RegionalBridgeMaterials::Material::LakeSand) + 7) == 0)
+        return sandReplacement;
     return replacements;
 }
 extern "C" int ResourceMgr_OTRSigCheck(char* path) {
@@ -114,6 +120,13 @@ struct Interpreter {
         key.combine_mode = material.combine_mode;
         ColorCombiner comb{};
         GenerateCC(&comb, key);
+        if (!waterMaterial) {
+            const bool sand = std::strcmp(texture, RegionalBridgeMaterials::Resolve(
+                RegionalBridgeMaterials::Material::LakeSand, ResourceMgr_FileExists)) == 0;
+            assert(tileFormat == G_IM_FMT_RGBA && tileSize == G_IM_SIZ_16b);
+            assert(tileWidth == unsigned(sand ? (sandReplacement ? 32 : 16) : 32));
+            assert(tileHeight == unsigned(sand ? (sandReplacement ? 32 : 16) : (stoneReplacement ? 64 : 32)));
+        }
         if (waterMaterial) {
             for (uint8_t fogFactor : {uint8_t(0), uint8_t(64), uint8_t(255)}) {
                 PackInputs(&comb, fogFactor);
@@ -146,7 +159,7 @@ struct Interpreter {
     void GfxSpVertex(uint32_t count, uint32_t offset, const F3DVtx* pointer) {
         assert(count == 4 && offset == 0);
         const auto address = reinterpret_cast<uintptr_t>(pointer);
-        const auto& rock = RockVertices();
+        const auto& rock = RockVertices(stoneReplacement, sandReplacement);
         const auto rockBegin = reinterpret_cast<uintptr_t>(rock.data());
         const auto rockEnd = rockBegin + rock.size() * sizeof(Vtx);
         const auto tailBegin = reinterpret_cast<uintptr_t>(gfx->polyOpa.d);
@@ -207,9 +220,9 @@ static Counts Walk(Interpreter& interpreter, Gfx* begin, Gfx* end, int depth = 0
                 const auto* path = static_cast<const char*>(interpreter.SegAddr(command->words.w1));
                 assert(ResourceMgr_OTRSigCheck(const_cast<char*>(path)));
                 assert(std::strcmp(path, RegionalBridgeMaterials::Resolve(
-                    counts.vertices ? RegionalBridgeMaterials::Material::LakeWater :
-                                      RegionalBridgeMaterials::Material::LakeStone,
-                    ResourceMgr_FileExists)) == 0 ||
+                    RegionalBridgeMaterials::Material::LakeStone, ResourceMgr_FileExists)) == 0 ||
+                       std::strcmp(path, RegionalBridgeMaterials::Resolve(
+                           RegionalBridgeMaterials::Material::LakeSand, ResourceMgr_FileExists)) == 0 ||
                        std::strcmp(path, RegionalBridgeMaterials::Resolve(
                            RegionalBridgeMaterials::Material::LakeWater, ResourceMgr_FileExists)) == 0);
                 ++counts.textures;
@@ -278,11 +291,15 @@ int main() {
     play.colCtx.colHeader = &collision;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     s16 phaseZeroT = 0;
-    for (bool alt : {false, true})
+    for (bool stone : {false, true})
+      for (bool sand : {false, true})
+       for (bool alt : {false, true})
         for (float level : {Lake::kFullWaterY, Lake::kFullWaterY - 8, Lake::kChannelFloorY + 2,
                            Lake::kDrainedWaterY, Lake::kFullWaterY})
             for (u32 frame : {0u, 1u, 54u, 2047u, 2048u, 0xffffffffu}) {
                 replacements = alt;
+                stoneReplacement = stone;
+                sandReplacement = sand;
                 lakeWaterY = level;
                 play.gameplayFrames = frame;
                 auto initialize = [](TwoHeadGfxArena& arena, std::vector<Gfx>& commands) {
@@ -301,9 +318,10 @@ int main() {
                 interpreter.gfx = &gfx;
                 const auto rock = Walk(interpreter, opa.data(), gfx.polyOpa.p);
                 const auto water = Walk(interpreter, xlu.data(), gfx.polyXlu.p);
-                assert(rock.vertices == Geometry().solid.size() * 4);
-                assert(rock.triangles == Geometry().solid.size() * 2);
-                assert(rock.textures == 1 && rock.pushes == 1 && rock.pops == 1);
+                const auto quads = SurfaceGeometry().stone.size() + SurfaceGeometry().sand.size();
+                assert(rock.vertices == quads * 4);
+                assert(rock.triangles == quads * 2);
+                assert(rock.textures == 2 && rock.pushes == 1 && rock.pops == 1);
                 const bool inlet = Lake::HasInlet(level);
                 if (inlet) {
                     assert(interpreter.hasWater);
