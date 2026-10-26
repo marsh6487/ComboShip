@@ -89,7 +89,16 @@ std::unordered_map<RandomizerGet, RandomizerCheckArea> Rando::StaticData::silver
 };
 
 RandomizerGet SilverFromSwitchFlag(s16 switchFlag) {
-    bool isMQ = Rando::Context::GetInstance()->GetDungeonFromScene((SceneID)gPlayState->sceneNum)->IsMQ();
+    if (gPlayState == nullptr) {
+        return RG_NONE;
+    }
+    const auto ctx = Rando::Context::GetInstance();
+    const auto* dungeon = ctx ? ctx->GetDungeonFromScene((SceneID)gPlayState->sceneNum) : nullptr;
+    // Scene-editor puzzles can place silver trackers outside native dungeons.
+    if (dungeon == nullptr) {
+        return RG_NONE;
+    }
+    const bool isMQ = dungeon->IsMQ();
     switch (gPlayState->sceneNum) {
         case SCENE_DODONGOS_CAVERN:
             return RG_DODONGOS_CAVERN_MQ_SILVER;
@@ -160,7 +169,7 @@ RandomizerGet SilverFromSwitchFlag(s16 switchFlag) {
         default:
             break;
     }
-    assert(false); // no matching silver found
+    // An unregistered scene-editor switch keeps its native puzzle behavior.
     return RG_NONE;
 }
 
@@ -226,7 +235,8 @@ s8 Randomizer::SilverTotal(RandomizerGet rg) {
 }
 
 bool IsSilverCleared(RandomizerGet rg) {
-    return *Randomizer::SilverFieldFromSaveContext(&gSaveContext, rg) >= Randomizer::SilverTotal(rg);
+    const s8* count = Randomizer::SilverFieldFromSaveContext(&gSaveContext, rg);
+    return count != nullptr && *count >= Randomizer::SilverTotal(rg);
 }
 
 bool IsSilver(RandomizerGet rg) {
@@ -267,18 +277,23 @@ void RegisterShuffleSilver() {
             EnGSwitch* silver = va_arg(args, EnGSwitch*);
             auto silverIdentity =
                 OTRGlobals::Instance->gRandomizer->IdentifySilver(gPlayState->sceneNum, silver->actor.world.pos);
-            Flags_SetRandomizerInf(silverIdentity.randomizerInf);
-            Actor_Kill(&silver->actor);
-            *should = false;
+            if (silverIdentity.randomizerCheck != RC_UNKNOWN_CHECK && silverIdentity.randomizerInf != RAND_INF_MAX) {
+                Flags_SetRandomizerInf(silverIdentity.randomizerInf);
+                Actor_Kill(&silver->actor);
+                *should = false;
+            }
         }
     });
 
     COND_VB_SHOULD(VB_SILVER_COUNT_CHECK, shouldRegister, {
         EnGSwitch* silver = va_arg(args, EnGSwitch*);
-        *should = false;
-        if (IsSilverCleared(SilverFromSwitchFlag(silver->switchFlag))) {
-            SetSilverCleared(silver);
-            Actor_Kill(&silver->actor);
+        const auto group = SilverFromSwitchFlag(silver->switchFlag);
+        if (group != RG_NONE) {
+            *should = false;
+            if (IsSilverCleared(group)) {
+                SetSilverCleared(silver);
+                Actor_Kill(&silver->actor);
+            }
         }
     });
 
@@ -287,11 +302,12 @@ void RegisterShuffleSilver() {
         if (silver->type == ENGSWITCH_SILVER_RUPEE) {
             auto silverIdentity =
                 OTRGlobals::Instance->gRandomizer->IdentifySilver(gPlayState->sceneNum, silver->actor.world.pos);
-            *should = silverIdentity.randomizerCheck == RC_UNKNOWN_CHECK ||
-                      Flags_GetRandomizerInf(silverIdentity.randomizerInf);
-            if (!*should) {
-                *should = false;
-                silver->actor.draw = EnGSwitch_RandomizerDraw;
+            if (silverIdentity.randomizerCheck != RC_UNKNOWN_CHECK && silverIdentity.randomizerInf != RAND_INF_MAX) {
+                *should = Flags_GetRandomizerInf(silverIdentity.randomizerInf);
+                if (!*should) {
+                    *should = false;
+                    silver->actor.draw = EnGSwitch_RandomizerDraw;
+                }
             }
         } else if (silver->type == ENGSWITCH_SILVER_TRACKER &&
                    IsSilverCleared(SilverFromSwitchFlag(silver->switchFlag))) {

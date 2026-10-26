@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -64,9 +65,11 @@ extern "C" void gSPVertex(Gfx* packet, uintptr_t vertices, int count, int start)
     std::array<Vtx, 4> quad; std::memcpy(quad.data(), reinterpret_cast<void*>(vertices), sizeof(quad));
     quads.push_back(quad); ++vertexLoads; __gSPVertex(packet, vertices, count, start);
 }
-extern "C" void gSPSegment(void* packet, int segment, uintptr_t target) {
-    __gSPSegment(static_cast<Gfx*>(packet), segment, target);
+extern "C" char* ResourceMgr_LoadIfDListByName(char*) {
+    assert(false && "the effects only bind native frame lists, never resource-name strings");
+    return nullptr;
 }
+/* NATIVE SEGMENT WRAPPER */
 Gfx* MakeScroll(GraphicsContext*, s32 tile0, u32 x0, u32 y0, s32 w0, s32 h0, s32 tile1,
                 u32 x1, u32 y1, s32 w1, s32 h1, s32 dx0, s32 dy0, s32 dx1, s32 dy1) {
     assert(tile0 == 0 && tile1 == 1 && !x0 && !y0 && !x1 && y1 < 512);
@@ -101,7 +104,8 @@ void Reset() {
     graphics.overlay.p = overlay.data(); graphics.overlay.d = overlay.data() + overlay.size();
     play.billboardMtxF.xx = play.billboardMtxF.yy = play.billboardMtxF.zz = play.billboardMtxF.ww = 1;
     play.view.eye = {0, 80, 300};
-    gSegments[8] = 0x1234;
+    static std::array<char, 16> rawSegment{};
+    gSegments[8] = reinterpret_cast<uintptr_t>(rawSegment.data());
 }
 void CheckPackets(bool oot) {
     uint32_t geometry = G_LIGHTING | G_FOG | G_CULL_BOTH, high = 0, low = 0, prim = 0, env = 0;
@@ -148,8 +152,13 @@ void CheckPackets(bool oot) {
 }
 int main() {
     Reset(); BlackMarketInteriorEffects::Draw(&play, true, false);
-    assert(flameLists == 2 && vertexLoads >= 40 &&
-           "the default interior must draw two decorative flames and sustained vapor from all four large cauldrons");
+    assert(flameLists == 2 && vertexLoads >= 20 && vertexLoads <= 24 &&
+           "MM keeps decorative flames and only the two entrance-side vapor emitters");
+    for (const auto& quad : quads) {
+        int z = 0;
+        for (const auto& vertex : quad) z += vertex.v.ob[2];
+        assert(z > 800 && "removed rear pots must not leave vapor crossing the shelf banks");
+    }
     assert(matrices.size() == 3 && scrolls == 2 && used < 8192);
     assert(used == BlackMarketInteriorEffects::kFrameTailBytes &&
            graphics.polyXlu.p - commands.data() <= BlackMarketInteriorEffects::kXluCommands);
@@ -201,7 +210,7 @@ int main() {
     Reset(); BlackMarketInteriorEffects::Draw(&play, true, false);
     assert(firstFrame.size() == quads.size() && std::memcmp(firstFrame.data(), quads.data(), quads.size()*sizeof(quads[0])) == 0 &&
            "pause/repeated draws at the same gameplay frame must not advance or mutate effects");
-    for (int pot = 0; pot < 4; ++pot) {
+    for (int pot = 2; pot < 4; ++pot) {
         float minY = 1000, maxY = -1000;
         int count = 0;
         for (const auto& quad : quads) {
@@ -249,7 +258,7 @@ int main() {
     graphics.polyXlu.d = commands.data() + BlackMarketInteriorEffects::kXluCommands;
     graphics.overlay.d = overlay.data() + 2;
     BlackMarketInteriorEffects::Draw(&play,true,false);
-    assert(flameLists == 2 && vertexLoads >= 40 && graphics.polyOpa.d >= graphics.polyOpa.p + 8 &&
+    assert(flameLists == 2 && vertexLoads >= 20 && graphics.polyOpa.d >= graphics.polyOpa.p + 8 &&
            graphics.polyXlu.p <= graphics.polyXlu.d && "the full declared frame budget must suffice without an overrun");
     Reset(); play.gameplayFrames = UINT32_MAX; BlackMarketInteriorEffects::Draw(&play,true,true);
     assert(flameLists == 2 && vertexLoads >= 40);
@@ -259,5 +268,20 @@ int main() {
         if ((c->words.w0 >> 24) == G_SETTIMG)
             nativeOotSmoke |= std::strcmp(reinterpret_cast<const char*>(c->words.w1),"__OTR__objects/gameplay_keep/gDust1Tex") == 0;
     assert(nativeOotSmoke && "OoT must resolve its own native cloud texture without a cross-game archive dependency");
-    std::puts("PASS native interior effects: two pale-violet native fire lists/scrolls; full flame-shelf/item clearance; four sustained rising vapor columns; native host texture ownership; frame/pause determinism; default-only guards; allocation failure and frame wrap");
+    // Pause stores an icon buffer in CPU segment 8. Reset/scene teardown can
+    // free that buffer while leaving its address in the segment table. Copying
+    // the raw segment value into a GBI packet must not probe its old memory as
+    // a resource name. Exercise the real host wrapper and signature check.
+    for (bool oot : { false, true }) {
+        Reset();
+        auto* retired = static_cast<char*>(std::malloc(64));
+        assert(retired);
+        std::memset(retired, 0, 64);
+        gSegments[8] = reinterpret_cast<uintptr_t>(retired);
+        std::free(retired);
+        BlackMarketInteriorEffects::Draw(&play, true, oot);
+        CheckPackets(oot);
+        assert(flameLists == 2 && vertexLoads >= (oot ? 40 : 20));
+    }
+    std::puts("PASS native interior effects: two pale-violet native fire lists/scrolls; full flame-shelf/item clearance; MM entry-only/OoT four-column vapor; native host texture ownership; frame/pause determinism; default-only guards; allocation failure and frame wrap");
 }

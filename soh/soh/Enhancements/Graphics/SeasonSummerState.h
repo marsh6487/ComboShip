@@ -32,7 +32,7 @@ struct Input {
     Vec3 sunDirection;
 };
 enum class Kind { Mote, Firefly };
-constexpr size_t kMoteCount = 32, kFireflyCount = 56, kParticleCount = kMoteCount + kFireflyCount;
+constexpr size_t kMoteCount = 32, kFireflyCount = 96, kParticleCount = kMoteCount + kFireflyCount;
 struct Particle {
     Kind kind = Kind::Mote;
     Vec3 position, anchor, drift;

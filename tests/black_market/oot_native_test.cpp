@@ -7,6 +7,7 @@
 #include "rando/BlackMarket.h"
 #include "BlackMarketKeeper.h"
 #include "BlackMarketReceipt.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketBrowsing.h"
 #include "soh/ActorDB.h"
 #include "Enhancements/Gameplay/ComboBlackMarketNative.h"
@@ -31,6 +32,8 @@ extern "C" bool GameInteractor_Should(GIVanillaBehavior, uint32_t result, ...) {
 PlayState* gPlayState;
 using namespace ComboRando::BlackMarket;
 Session sSession;
+// Native collision ownership is exercised by run_door_collision_native_tests.py.
+struct DoorCollisionBoundary { int releases=0; void Release(PlayState*) { ++releases; } void Reset() {} } sDoorCollision;
 nlohmann::json sPendingSave;
 bool sFileLoadPending = true;
 u16 sClears;

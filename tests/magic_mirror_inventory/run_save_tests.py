@@ -12,7 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/nei_shared_slot"))
-from run_save_tests import extract, production_for
+from run_save_tests import build_native_equipment_dependency, extract, production_for
 
 MAIN = r'''
 int main() {
@@ -78,5 +78,6 @@ for host in ("mm", "soh"):
         cpp.write_text(fixture + MAIN)
         includes = ["-I" + str(p) for p in (path, ROOT, ROOT / host, ROOT / host / "include", ROOT / host / "include/PR", ROOT / host / "2s2h", ROOT / host / "assets", ROOT / "libultraship/include", ROOT / "combo")]
         flags = ["-std=c++20", "-O1", "-g", "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DLOG_LEVEL_GAME_PRINTS=0", "-DHOST_MM=" + str(int(host == "mm"))]
-        subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, str(cpp), "-o", str(binary)], cwd=ROOT, check=True)
+        native_objects = build_native_equipment_dependency(host, path, includes, flags)
+        subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, str(cpp), *native_objects, "-o", str(binary)], cwd=ROOT, check=True)
         subprocess.run([str(binary)], cwd=ROOT, env={**os.environ, "NEI_SAVE_TEST_DIRECTORY": str(path / "Save")}, check=True)

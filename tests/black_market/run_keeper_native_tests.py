@@ -21,6 +21,9 @@ with tempfile.TemporaryDirectory(prefix="market-keeper-native-") as temporary:
         constants = "\n".join(re.findall(r'(?:alignas\(2\) )?constexpr char k(?:Keeper|Idle|Card)\[\] = [^;]+;', source))
         helpers = re.finditer(r"(?:bool|void) (?:CustomKeeperAvailable|LoadNativeKeeper)\([^;{}]*\)\s*\{", source)
         bodies = [block_from(source, match.start()) for match in helpers]
+        if host == "mm":
+            native = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarketMmNativeShop.h").read_text()
+            bodies.append(block_from(native, native.index("void NativeKeeperBlink(")))
         bodies += [block_from(source, source.index(s)) for s in
                    ("s32 KeeperLimb(", "void KeeperDraw(", "void InitKeeper(" if host == "mm" else "void KeeperInit(")]
         if "void PresentTitle(" in source:

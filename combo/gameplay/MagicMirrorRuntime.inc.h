@@ -1,5 +1,8 @@
 // Included by each native adapter after its real engine headers and MirrorHost
 // boundaries. State is local to that engine; only permanent ownership is shared.
+#ifdef COMBO_MAGIC_MIRROR_MM
+extern "C" s16 sSceneCutsceneCount;
+#endif
 namespace MirrorRuntime {
 constexpr u16 kReceiptText = 0x3FEB, kPromptText = 0x3FEC;
 struct Context {
@@ -419,6 +422,15 @@ void PrepareArrival(PlayState* play) {
     sArrivalSpawn.pos = position;
     sArrivalSpawn.rot.y = yaw;
 #ifdef COMBO_MAGIC_MIRROR_MM
+    // Scene preparation supplied the player's missing unscripted ocarina chain.
+    // Landing changes the packed heading; keep that chain through Player_Init.
+    // Other source spawns retain Landing's native CS_ID_NONE sentinel.
+    if (play->curSpawn == 0 && sSceneCutsceneCount == 1 && (sArrivalOriginal->rot.y & 0x7F) == 0) {
+        const ActorCutscene* ocarina = CutsceneManager_GetCutsceneEntry(0);
+        if (ocarina && ocarina->csCamId == CS_CAM_ID_GLOBAL_ITEM_OCARINA && ocarina->scriptIndex == CS_SCRIPT_ID_NONE &&
+            ocarina->additionalCsId == CS_ID_NONE)
+            sArrivalSpawn.rot.y &= ~0x7F;
+    }
     sArrivalSpawn.id &= ~0x8000; // Actor_SpawnEntry must decode packed degrees.
     sArrivalSpawn.params = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D);
 #else

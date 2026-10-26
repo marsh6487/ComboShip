@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -23,6 +24,33 @@ static size_t Visible(const State& state, Kind kind) {
     return result;
 }
 
+// At a settled summer night the extra swarm must be visible, and even its
+// dim pulse must read against foliage. These checks exercise the actual state
+// consumed by the native renderer instead of checking tuning constants.
+static void AssertNightReadability(const State& state, const View& view) {
+    size_t visible = 0, central = 0;
+    float totalAlpha = 0, brightest = 0;
+    for (const auto& p : state.Particles()) {
+        if (p.kind != Kind::Firefly || !InView(p.position, view, 1.0f))
+            continue;
+        visible += p.alpha > 0.01f;
+        const auto relative = p.position - view.eye;
+        const float depth = Dot(relative, view.forward);
+        assert(p.radius / depth > 0.00245f); // Soft halo stays readable at the far tier.
+        const float x = std::abs(Dot(relative, view.right)) / (depth * view.tanHalfFov * view.aspect);
+        const float y = std::abs(Dot(relative, view.up)) / (depth * view.tanHalfFov);
+        if (std::max(x, y) < 0.90f && p.age >= 0.8f) {
+            ++central;
+            totalAlpha += p.alpha;
+            brightest = std::max(brightest, p.alpha);
+            assert(p.alpha >= 0.46f); // Entry/edge fading is deliberately excluded.
+        }
+    }
+    assert(visible >= 88 && visible <= 100); // Denser swarm with a fixed render budget.
+    assert(central >= 80 && totalAlpha / central > 0.70f);
+    assert(brightest > 0.98f);
+}
+
 int main() {
     State state;
     auto view = TestView();
@@ -42,6 +70,7 @@ int main() {
     state.Step(input, view);
     assert(Visible(state, Kind::Mote) == 0);
     assert(Visible(state, Kind::Firefly) >= 30);
+    AssertNightReadability(state, view);
     assert(NightWeight(18) > 0.49f && NightWeight(18) < 0.51f);
     assert(NightWeight(17) == 0 && NightWeight(19) == 1);
     assert(NightWeight(0) == NightWeight(24));
@@ -55,6 +84,21 @@ int main() {
         assert(Length(state.Particles()[i].position - frozen[i].position) == 0);
         assert(state.Particles()[i].alpha == frozen[i].alpha);
     }
+    // Time changes while paused must update night fading without moving or
+    // respawning the denser swarm. Dusk/dawn stay smooth and daytime stays clear.
+    for (const auto hour : { 17.0f, 18.0f, 19.0f, 5.0f, 6.0f, 7.0f }) {
+        input.hour = hour;
+        state.Step(input, view);
+        const float weight = hour == 18 || hour == 6 ? 0.5f : hour == 19 || hour == 5 ? 1.0f : 0.0f;
+        for (size_t i = 0; i < frozen.size(); ++i) {
+            const auto& p = state.Particles()[i];
+            assert(Length(p.position - frozen[i].position) == 0);
+            assert(p.generation == frozen[i].generation && p.age == frozen[i].age);
+            if (p.kind == Kind::Firefly)
+                assert(std::abs(p.alpha - frozen[i].alpha * weight) < 0.000001f);
+        }
+    }
+    input.hour = 23;
     input.paused = false;
 
     // Ordinary motion stays continuous; any recycle is separately identified
@@ -65,7 +109,7 @@ int main() {
         for (size_t i = 0; i < before.size(); ++i) {
             const auto& p = state.Particles()[i];
             assert(std::isfinite(p.position.x) && std::isfinite(p.position.y) && std::isfinite(p.position.z));
-            assert(p.radius > 0 && p.radius <= (p.kind == Kind::Mote ? 10.0f : 4.8f));
+            assert(p.radius > 0 && p.radius <= (p.kind == Kind::Mote ? 10.0f : 5.8f));
             assert(p.alpha >= 0 && p.alpha <= 1);
             if (p.generation == before[i].generation) {
                 assert(Length(p.position - before[i].position) < 8.0f);

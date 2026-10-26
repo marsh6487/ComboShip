@@ -164,6 +164,7 @@ typedef struct {
     void* eyes[8];
     void* mouths[4];
     const int16_t* playerFrames;
+    Gfx* propDisplayList;
 } MmNormalActorResources;
 bool MmAssets_LoadKafei(unsigned char pose, MmNormalActorResources* output);
 bool MmAssets_LoadNormalActor(int actorType, unsigned char pose, MmNormalActorResources* output);

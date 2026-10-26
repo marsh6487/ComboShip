@@ -169,7 +169,7 @@ static void DrawWoodsMysteryHexes() {
         play->pauseCtx.state != PAUSE_STATE_OFF)
         return;
     Matrix_Push();
-    Matrix_Translate(WoodsMysteryMakeover::kMouthX, 0.0f, WoodsMysteryMakeover::kMouthZ, MTXMODE_NEW);
+    Matrix_Translate(WoodsMysteryMakeover::kBlackPortalX, 0.0f, WoodsMysteryMakeover::kBlackPortalZ, MTXMODE_NEW);
     Matrix_RotateYS(WoodsMysteryMakeover::kMouthYaw, MTXMODE_APPLY);
     const auto mesh = ForestGiParticles::Mystery(play->gameplayFrames, NeiGi_CameraBasis(play));
     NeiGi_DrawWorldParticles(play, mesh);

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 static constexpr const char* kValue = "gCosmetics./* REGISTERED_OPTION */.Value";
 static constexpr const char* kChanged = "gCosmetics./* REGISTERED_OPTION */.Changed";
@@ -17,6 +18,10 @@ static GraphicsContext gfx;
 static PlayState play;
 static Mtx matrix;
 static float scale;
+static std::vector<float> matrixStack;
+static int shimmerDraws, sampledProfile;
+static float shimmerScale;
+static Color_RGB8 shimmerColor;
 
 extern "C" int32_t CVarGetInteger(const char* path, int32_t fallback) {
     const auto found = integers.find(path);
@@ -36,7 +41,7 @@ extern "C" Mtx* Matrix_NewMtx(GraphicsContext*, char*, s32) {
 extern "C" void Matrix_Scale(float x, float y, float z, u8) {
     if (x != y || y != z)
         std::abort();
-    scale = x;
+    scale *= x;
 }
 extern "C" void FrameInterpolation_RecordOpenChild(const void*, int) {
 }
@@ -53,6 +58,34 @@ extern "C" void gSPSegment(void* command, int segment, uintptr_t path) {
     __gSPSegment(command, segment, path);
 }
 
+// Execute the production shared drop policy; sampler and GPU submission remain
+// fixture boundaries, just like CVars and the native matrix allocation above.
+extern "C" void Matrix_Push() {
+    matrixStack.push_back(scale);
+}
+extern "C" void Matrix_Pop() {
+    if (matrixStack.empty())
+        std::abort();
+    scale = matrixStack.back();
+    matrixStack.pop_back();
+}
+#include "combo/menu/ComboCollectibleShimmerHost.h"
+extern "C" void OOT_SampleCollectibleShimmerColor(int32_t profile, uint8_t color[4]) {
+    sampledProfile = profile;
+    const Color_RGB8 chosen = CVarGetColor24(kValue, { 255, 255, 255 });
+    color[0] = chosen.r;
+    color[1] = chosen.g;
+    color[2] = chosen.b;
+    color[3] = 255;
+}
+extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState* current, const uint8_t color[4], const char* owner) {
+    if (current != &play || owner != nullptr || color[3] != 255)
+        std::abort();
+    ++shimmerDraws;
+    shimmerScale = scale;
+    shimmerColor = { color[0], color[1], color[2] };
+}
+
 /* NATIVE_DRAW */
 
 static void Require(bool value, const char* why) {
@@ -64,7 +97,8 @@ static void Require(bool value, const char* why) {
 static uint32_t Rgba(Color_RGB8 c) {
     return uint32_t(c.r) << 24 | uint32_t(c.g) << 16 | uint32_t(c.b) << 8 | 255;
 }
-static void Check(bool drops, bool changed, Color_RGB8 color) {
+static void Check(bool drops, bool changed, Color_RGB8 color, bool shimmer) {
+    integers["gEnhancements.CollectibleShimmer"] = shimmer;
     integers["gEnhancements.NewDrops"] = drops;
     integers[kChanged] = changed;
     colors[kValue] = color;
@@ -79,8 +113,19 @@ static void Check(bool drops, bool changed, Color_RGB8 color) {
     gfx.polyXlu.p = xlu;
     play.state.gfxCtx = &gfx;
     scale = 1;
+    shimmerDraws = 0;
+    sampledProfile = -1;
+    Require(matrixStack.empty(), "previous draw leaked a matrix scope");
     GetItemEntry entry{};
     Randomizer_DrawSilverRupee(&play, &entry);
+    Require(shimmerDraws == shimmer && sampledProfile == (shimmer ? CW_COLLECTIBLE_SILVER : -1),
+            "shared drop policy changed silver profile or disabled shimmer submission");
+    Require(matrixStack.empty() && scale == (drops ? 1.0f : .05f), "shimmer did not restore the native model matrix");
+    if (shimmer) {
+        Require(shimmerScale == 1.0f, "shimmer conversion did not normalize the native silver drop scale");
+        Require(shimmerColor.r == color.r && shimmerColor.g == color.g && shimmerColor.b == color.b,
+                "sampled silver palette did not reach the shimmer overlay");
+    }
     int inner = 0, outer = 0, drop = 0, gray = 0, grayColors = 0, segment = 0;
     uint32_t prim = 0, env = 0;
     auto stream = [&](Gfx* first, Gfx* last, bool translucent) {
@@ -134,7 +179,8 @@ int main() {
     for (bool drops : { false, true })
         for (bool changed : { false, true })
             for (Color_RGB8 color : { Color_RGB8{ 29, 147, 231 }, Color_RGB8{ 213, 72, 45 } })
-                Check(drops, changed, color);
+                for (bool shimmer : { false, true })
+                    Check(drops, changed, color, shimmer);
     std::puts("PASS native palette: registered colors/Changed reach both live models; segment8, shades and grayscale "
-              "restoration retained");
+              "restoration retained; shimmer off/on keeps silver palette, GI scale and matrix scope");
 }

@@ -1,7 +1,7 @@
 name: Build Artifacts
 
 # Preserve this filename/name: validate-seed.yml consumes successful develop runs.
-# Preflight releases builds and regression groups in one fail-fast matrix.
+# Preflight releases builds and regression groups in one independent matrix.
 # The stable `gate` job verifies every required result before the run is green.
 
 on:
@@ -128,8 +128,8 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.code == 'true'
     strategy:
-      # One required failure stops both platform builds and all other test groups.
-      fail-fast: true
+      # Finish every required check so one fixture failure cannot hide another.
+      fail-fast: false
       matrix:
         include:
           - check: windows

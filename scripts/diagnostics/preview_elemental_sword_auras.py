@@ -66,9 +66,11 @@ def main():
     core, flame, tight = [vertices(source, prefix + suffix) for suffix in ("Core", "Flame", "Tight")]
     canvas = np.zeros((730, 1140, 3), dtype=float) + np.array([13, 21, 34])
     settings = [
+        # Phase-zero primitive alpha from SwordAura_Material; vertex alpha and
+        # I8 intensity are applied separately by layer(), as in the combiner.
         ("Fire", "FireCore", "FireFlame", [255, 225, 122], [255, 43, 3], 1, .96),
-        ("Ice", "Ice", "Ice", [210, 245, 255], [54, 168, 255], 120 / 255, 190 / 255),
-        ("Light", "Light", "Light", [255, 255, 235], [255, 210, 106], 115 / 255, 165 / 255),
+        ("Ice", "Ice", "Ice", [210, 245, 255], [54, 168, 255], 200 / 255, 225 / 255),
+        ("Light", "Light", "Light", [255, 255, 235], [255, 210, 106], 185 / 255, 220 / 255),
     ]
     for index, (_, inner, outer, prim, env, inner_alpha, outer_alpha) in enumerate(settings):
         center = 190 + 380 * index

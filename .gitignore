@@ -107,6 +107,7 @@ x64/
 /vcpkg/
 # Superpowers brainstorming companion (local mockups)
 .superpowers/
+.worktrees/
 # Expanded losslessly from tools/spin_styles/bundled before archive generation.
 /soh/assets/custom/objects/combo_spin/
 /mm/assets/custom/objects/combo_spin/

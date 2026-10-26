@@ -22,7 +22,7 @@ def main():
              "-Werror=implicit-function-declaration"]
     flags += ["-I" + str(ROOT / p) for p in
               ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
-               "libultraship/include", "libultraship/src", "combo")]
+               "libultraship/include", "libultraship/src", "combo", "combo/menu")]
     cc = shlex.split(os.environ.get("CC", "cc"))
     with tempfile.TemporaryDirectory(prefix="mm-drop-lifetime-") as temporary:
         build = Path(temporary)

@@ -4,6 +4,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <ship/resource/ResourceManager.h>
 #ifdef COMBO_BUILD
+#include "2s2h/Enhancements/Camera/ComboForestOcarina.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "entrances/BlackMarketEntrance.h"
 #include "entrances/NativeForest.h"
@@ -62,6 +63,7 @@ extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
 #endif
     OTRScene_ExecuteCommands(play, (SOH::Scene*)play->sceneSegment);
 #ifdef COMBO_BUILD
+    ComboForestOcarina_PrepareScene(play);
     ComboBlackMarket_PrepareSpawn(play);
 #endif
     Play_InitEnvironment(play, play->skyboxId);

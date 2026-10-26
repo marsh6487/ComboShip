@@ -26,16 +26,19 @@ static void MagicMirrorPlayer_Action(Player* player, PlayState* play) {
 
 static void MagicMirrorPlayer_Start(PlayState* play, Player* player) {
     player->afterPutAwayFunc = NULL;
+    // Announce the actual animation start once, after any native put-away wait.
 #ifdef COMBO_MAGIC_MIRROR_MM
     Player_SetAction(play, player, MagicMirrorPlayer_Action, 0);
     player->stateFlags1 |= PLAYER_STATE1_20000000;
     PlayerAnimation_Change(play, &player->skelAnime, &gPlayerAnim_link_magic_kaze1, 1.25f, 0.0f,
                            Animation_GetLastFrame(&gPlayerAnim_link_magic_kaze1), ANIMMODE_ONCE, -4.0f);
+    Audio_PlaySfx(NA_SE_SY_TRE_BOX_APPEAR);
 #else
     Player_SetupAction(play, player, MagicMirrorPlayer_Action, 0);
     player->stateFlags1 |= PLAYER_STATE1_IN_CUTSCENE;
     LinkAnimation_Change(play, &player->skelAnime, &gPlayerAnim_link_magic_kaze1, 1.25f, 0.0f,
                          Animation_GetLastFrame(&gPlayerAnim_link_magic_kaze1), ANIMMODE_ONCE, -4.0f);
+    Sfx_PlaySfxCentered(NA_SE_SY_TRE_BOX_APPEAR);
 #endif
     MagicMirrorPlayer_StopMotion(player);
     // Native form controllers yield to the cast instead of holding its action.

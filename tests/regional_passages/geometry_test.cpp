@@ -77,6 +77,9 @@ int main() {
   good = {6, 0x3CC, 0, {{100, 0, 100}, 0}};
   assert(ValidOrigin(good, 0x57));
   assert(!ValidOrigin(good, 0x09));
+  good = {COMBO_PORTAL_SNOWHEAD, 0x3D4, 0, {{2150, 400, 0}, -16384}};
+  assert(ValidOrigin(good, 0x59));
+  assert(!ValidOrigin(good, 0x09));
   puts("PASS regional geometry: native-wall seating, footprint, "
        "dry/static/non-exit floor, occupancy and unchanged forest policy");
 }

@@ -108,6 +108,7 @@ void* Combo_ResolveSym(const char*,const char* name) {
 bool ResourceMgr_IsAltAssetsEnabled() {return true;}
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
+int ResourceMgr_IsIkanaShieldGiAvailable() {assert(false && "identity fixture must not select the native shield pair");return 0;}
 void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int pickup=0) {
     assert(!strcmp(owner,"mm") && kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
     ++fitCalls;

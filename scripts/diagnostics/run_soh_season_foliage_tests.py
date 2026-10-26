@@ -21,9 +21,9 @@ if args.spdlog_include:
     flags += ["-I" + str(args.spdlog_include)]
 if args.sanitize:
     flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
-for test in ["season_foliage_test", "season_foliage_binding_test"]:
+for test in ["season_foliage_test", "season_foliage_binding_test", "season_foliage_cohort_test"]:
     exe = args.output / test
-    boundary = ["-I" + str(root / "soh/tests/season_foliage_stubs")] if "binding" in test else []
+    boundary = ["-I" + str(root / "soh/tests/season_foliage_stubs")] if "binding" in test or "cohort" in test else []
     subprocess.run(["c++", *boundary, *flags, str(root / f"soh/tests/{test}.cpp"),
                     str(root / "libultraship/src/fast/resource/type/Texture.cpp"),
                     str(root / "libultraship/src/ship/resource/Resource.cpp"), "-o", str(exe)], check=True)

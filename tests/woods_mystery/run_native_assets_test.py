@@ -69,7 +69,10 @@ def signature(tri, remap=None):
     v=tri['v'].copy()
     if tri['texture'] in texture_map or tri['texture'] in texture_map.values():
         low=np.isin(v[:,1],[-3,-2]);v[low,1]+=4
-    return ((remap or {}).get(tri['texture'], tri['texture']), tuple(tri['tile']), bool(tri['lit']), tuple(v.reshape(-1)))
+    # The native mesh preview reader associates tile0's64x64 intensity extent
+    # with the last image,A1C0. Its actual RGBA16 sampler1 is32x32.
+    tile = (32, 32) if tri['texture'] == WALL else tuple(tri['tile'])
+    return ((remap or {}).get(tri['texture'], tri['texture']), tile, bool(tri['lit']), tuple(v.reshape(-1)))
 bridge = built.mesh(PREFIX + 'bridge')
 assert collections.Counter(signature(t) for t in bridge) == collections.Counter(signature(t, texture_map) for t in approved), 'Wood changed beyond the authorized low-floor displacement'
 assert collections.Counter(t['texture'].split('/')[-1] for t in bridge) == {'planks': 142, 'bark': 24, 'black': 28}
@@ -82,6 +85,7 @@ original = native.mesh(wall_path)
 replacement = built.mesh(PREFIX + 'wall')
 wall = [t for t in replacement if t['path'] == PREFIX + 'wall']
 assert all(t['texture'] == WALL and t['lit'] for t in wall), 'Native wall texture and lighting must survive'
+assert all(t['tile'] == (32, 32) for t in wall), 'A1C0 must retain its native32x32 sampler extent'
 present = collections.Counter(signature(t) for t in wall)
 protected = [t for t in original if not ((t['v'][:, 0] >= 80) & (t['v'][:, 2] <= -80)).all()]
 assert len(protected) == 80

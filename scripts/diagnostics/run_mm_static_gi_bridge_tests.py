@@ -30,7 +30,8 @@ fixture = fixture.replace('/* OWNER_HELPERS */', helpers)
 fixture = fixture.replace('/* OWNER_ALT_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiAltAssetsEnabled'))
 fixture = fixture.replace('/* OWNER_RESOURCE_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiResourceExists'))
 fixture = fixture.replace('/* OWNER_MAGIC_DESCRIPTOR */', function(owner, 'OOT_DescribeMagicJar'))
-fixture = fixture.replace('/* OWNER_DESCRIPTOR */', body + '\n' + function(owner, 'OOT_FillItemDrawInfo') + '\n' +
+collectible = (ROOT/'combo/menu/ComboCollectibleShimmerHost.h').read_text()
+fixture = fixture.replace('/* OWNER_DESCRIPTOR */', function(collectible, 'ComboCollectibleShimmer_ProfileForDrawId') + '\n' + body + '\n' + function(owner, 'OOT_FillItemDrawInfo') + '\n' +
                           function(owner, 'OOT_IsStateDependentDraw') + '\n' + function(owner, 'OOT_DrawDependency'))
 fixture = fixture.replace('/* OWNER_EXPORT */', function(owner, 'OOT_GetItemDrawInfo'))
 # Execute the exported English-name boundary using the catalog's actual enum

@@ -50,11 +50,13 @@ def main():
             "fast/resource/type/Texture.h": """#pragma once
 #include "ship/resource/Resource.h"
 namespace Fast {
-enum class TextureType { RGBA32bpp = 1, Palette8bpp = 4 };
+enum class TextureType { RGBA32bpp = 1, Palette4bpp = 3, Palette8bpp = 4 };
 class Texture {
   public:
     TextureType Type = TextureType::Palette8bpp;
     uint16_t Width = 64, Height = 32;
+    uint8_t* ImageData = nullptr;
+    uint32_t ImageDataSize = 0;
     std::shared_ptr<Ship::ResourceInitData> init = std::make_shared<Ship::ResourceInitData>();
     std::shared_ptr<Ship::ResourceInitData> GetInitData() { return init; }
 };
@@ -64,7 +66,7 @@ class Texture {
 #include <memory>
 #include <string>
 namespace Ship {
-class IResource;
+class IResource { public: inline static const std::string gAltAssetPrefix = "alt/"; };
 struct Archive { std::string path; const std::string& GetPath() { return path; } };
 struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
 }
@@ -96,6 +98,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxSpTri1Impl")
+        if "Interpreter::TryReusePreludeMaterialBinding(" in source:
+            names += ["Interpreter::GetBaseTexturePath", "Interpreter::TryReusePreludeMaterialBinding"]
         if "TraceAutumnForestDraw(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1Impl"), "AutumnForestLayer")
             names.insert(names.index("Interpreter::GfxSpTri1Impl"), "TraceAutumnForestDraw")

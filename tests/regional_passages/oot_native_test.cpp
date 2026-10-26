@@ -1,4 +1,5 @@
 #include "ComboGameMode.h"
+#include "entrances/IkanaGravePlacement.h"
 #include "entrances/RegionalPassages.h"
 #include "global.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -22,7 +23,10 @@ PlayState *gPlayState;
 EntranceInfo gEntranceTable[ENTR_MAX]{};
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int ComboLakeHyliaBridge_Get(PlayState *, Vec3f *, s16 *);
+int ComboFountainSnowheadBridge_Get(PlayState *, Vec3f *, s16 *);
 }
+#define CVAR_PREFIX_ENHANCEMENT "gEnhancements"
 static u32 seed = 77;
 static bool mq;
 extern "C" u32 ResourceMgr_IsSceneMasterQuest(s16) { return mq; }
@@ -108,6 +112,7 @@ struct ActorDB {
 static ActorDB database;
 ActorDB *ActorDB::Instance = &database;
 static std::vector<Actor *> allocated;
+static bool deferHoleInit;
 static int collisionRegistrations, collisionDeletes, chimes, slides,
     titleRequests;
 static CollisionPoly floorPoly{}, wallPoly{};
@@ -212,7 +217,17 @@ s32 Collider_SetCylinder(PlayState *, ColliderCylinder *, Actor *,
   return 0;
 }
 s32 Collider_DestroyCylinder(PlayState *, ColliderCylinder *) { return 0; }
-void BgHaka_IdleClosed(BgHaka *, PlayState *) {}
+void BgHaka_IdleClosed(BgHaka *, PlayState *);
+void BgHaka_Pull(BgHaka *, PlayState *);
+void BgHaka_IdleOpened(BgHaka *, PlayState *);
+void BgHaka_IdleLockedClosed(BgHaka *, PlayState *);
+void BgHaka_Update(Actor *, PlayState *);
+s32 CVarGetInteger(const char *, s32 fallback) { return fallback; }
+s32 Play_InCsMode(PlayState *) { return inCs; }
+s32 Flags_GetSwitch(PlayState *, s32) { return false; }
+void Message_StartTextbox(PlayState *, u16, Actor *) {}
+void func_800F5ACC(u16) {}
+#define GameInteractor_Should(hook, defaultValue, ...) (defaultValue)
 void BgHaka_Draw(Actor *, PlayState *) {}
 void DoorAna_WaitClosed(DoorAna *, PlayState *) {}
 void DoorAna_WaitOpen(DoorAna *, PlayState *) {}
@@ -231,6 +246,8 @@ static void *Combo_ResolveSym(const char *, const char *) {
 extern "C" Actor *Actor_Spawn(ActorContext *ctx, PlayState *play, s16 id, f32 x,
                               f32 y, f32 z, s16 rx, s16 ry, s16 rz,
                               s16 params) {
+  if (id == ACTOR_EN_POH)
+    return nullptr;
   assert(id >= 9000 && id < 9000 + database.profiles.size());
   const auto &p = database.profiles[id - 9000];
   auto *actor = static_cast<Actor *>(std::calloc(1, p.instanceSize));
@@ -246,7 +263,10 @@ extern "C" Actor *Actor_Spawn(ActorContext *ctx, PlayState *play, s16 id, f32 x,
   actor->draw = p.draw;
   actor->next = ctx->actorLists[p.category].head;
   ctx->actorLists[p.category].head = actor;
-  p.init(actor, play);
+  if (!deferHoleInit) {
+    p.init(actor, play);
+    actor->init = nullptr;
+  }
   return actor;
 }
 static int jumpCalls, cutsceneId, cutsceneDuration;
@@ -272,10 +292,59 @@ extern "C" s16 OnePointCutscene_Init(PlayState *, s16 id, s16 duration, Actor *,
 }
 /* NATIVE_GROTTO */
 /* PRODUCTION */
+static int lakeCalls, fountainCalls;
+extern "C" int ComboLakeHyliaBridge_Get(PlayState *, Vec3f *p, s16 *yaw) {
+  ++lakeCalls;
+  if (p)
+    *p = {100, 0, 200};
+  if (yaw)
+    *yaw = 0;
+  return 1;
+}
+extern "C" int ComboFountainSnowheadBridge_Get(PlayState *, Vec3f *p,
+                                               s16 *yaw) {
+  ++fountainCalls;
+  if (p)
+    *p = {ComboFountainSnowhead::kMouth.x, ComboFountainSnowhead::kMouth.y,
+          ComboFountainSnowhead::kMouth.z};
+  if (yaw)
+    *yaw = ComboFountainSnowhead::kYaw;
+  return 1;
+}
+namespace SOH {
+struct ISceneCommand {};
+struct SetEntranceList : ISceneCommand {
+  unsigned numEntrances;
+  EntranceEntry *values;
+  void *GetRawPointer() { return values; }
+};
+struct SetStartPositionList : ISceneCommand {
+  unsigned numStartPositions;
+  ActorEntry *values;
+  void *GetRawPointer() { return values; }
+};
+} // namespace SOH
+extern "C" {
+s16 gLinkObjectIds[2]{};
+s32 Object_Spawn(ObjectContext *, s16) { return 0; }
+void Math_Vec3f_Copy(Vec3f *dest, Vec3f *source) { *dest = *source; }
+}
+/* NATIVE_SCENE_COMMANDS */
+static void NativePlayerInitRespawn(PlayState *play, Player *self) {
+  Actor *thisx = &self->actor;
+  s32 respawnFlag = 0, respawnMode = 0;
+  /* NATIVE_RESPAWN */
+  if (PLAYER_GET_START_MODE(thisx) == PLAYER_START_MODE_GROTTO)
+    Player_StartMode_Grotto(play, self);
+  self->actor.init = nullptr;
+  // Native Play_Init clears this only after Actor_InitContext / Player_Init.
+  gSaveContext.respawnFlag = 0;
+}
 static PlayState play;
 static Player player;
 static BgHaka original;
 static DoorAna originalHole;
+static BgHaka neighbor;
 static ActorEntry entries[5]{};
 static EntranceEntry entrances[5]{};
 static CollisionHeader collision;
@@ -290,7 +359,7 @@ static void LoadFile(const nlohmann::json &disk = nullptr, int slot = 0) {
   gSaveContext.fileNum = slot;
   interactor.load(slot);
 }
-static void Scene(int scene) {
+static void Scene(int scene, bool deferGraveInit = false) {
   for (auto *actor : allocated) {
     if (actor->destroy)
       actor->destroy(actor, &play);
@@ -313,137 +382,280 @@ static void Scene(int scene) {
     entries[i] = {};
   }
   if (scene == SCENE_GRAVEYARD) {
+    play.roomCtx.curRoom.num = ComboRegional::IkanaGrave::kRoom;
+    entrances[0].room = ComboRegional::IkanaGrave::kRoom;
+    original.dyna.actor.home.pos =
+        original.dyna.actor.world.pos = {22, 120, -336};
     original.dyna.actor.id = ACTOR_BG_HAKA;
-    original.dyna.actor.update = Noop;
+    original.dyna.actor.update = BgHaka_Update;
+    original.dyna.actor.draw = BgHaka_Draw;
+    original.dyna.actor.room = ComboRegional::IkanaGrave::kRoom;
+    original.dyna.actor.init = BgHaka_Init;
+    if (!deferGraveInit) {
+      BgHaka_Init(&original.dyna.actor, &play);
+      original.dyna.actor.init = nullptr;
+    }
+    neighbor = {};
+    neighbor.dyna.actor.id = ACTOR_BG_HAKA;
+    neighbor.dyna.actor.home.pos = {-98, 120, -336};
+    neighbor.dyna.actor.update = Noop;
+    neighbor.dyna.actor.room = ComboRegional::IkanaGrave::kRoom;
+    original.dyna.actor.next = &neighbor.dyna.actor;
     originalHole.actor.id = ACTOR_DOOR_ANA;
     originalHole.actor.update = Noop;
     play.actorCtx.actorLists[ACTORCAT_BG].head = &original.dyna.actor;
     play.actorCtx.actorLists[ACTORCAT_ITEMACTION].head = &originalHole.actor;
   }
-  ComboRegionalPassagesOot_ReadEntrances(&play, 5);
-  ComboRegionalPassagesOot_ReadSpawns(&play, entries, 5);
+  SOH::SetEntranceList entranceCommand{{}, 5, entrances};
+  SOH::SetStartPositionList spawnCommand{{}, 5, entries};
+  Scene_CommandEntranceList(&play, &entranceCommand);
+  Scene_CommandSpawnList(&play, &spawnCommand);
 }
 int main() {
   gEntranceTable[ENTR_GRAVEYARD_ENTRANCE].scene = SCENE_GRAVEYARD;
   gEntranceTable[ENTR_LAKE_HYLIA_OUTSIDE_LAB].scene = SCENE_LAKE_HYLIA;
-  gEntranceTable[ENTR_ICE_CAVERN_ENTRANCE].scene = SCENE_ICE_CAVERN;
+  gEntranceTable[ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN].scene =
+      SCENE_ZORAS_FOUNTAIN;
   gSaveContext.gameMode = GAMEMODE_NORMAL;
   gSaveContext.health = 48;
   gSaveContext.rupees = 321;
   LoadFile();
-  Scene(SCENE_GRAVEYARD);
-  gSaveContext.entranceIndex = ENTR_GRAVEYARD_ENTRANCE;
-  const auto nativeGrave = original;
-  const auto nativeHole = originalHole;
   Vec3f mouth{};
   int route;
   s16 yaw;
-  assert(ComboRegionalPassagesOot_Get(&play, &route, &mouth, &yaw) &&
-         route == 5 && mouth.x == 150);
-  assert(collisionRegistrations == 1 &&
-         sRegional.grave->native.dyna.actor.scale.x == .1f);
-  assert(database.profiles[0].objectId == OBJECT_HAKA &&
-         database.profiles[0].destroy == BgHaka_Destroy &&
-         database.profiles[0].draw == BgHaka_Draw &&
-         database.profiles[1].draw == DoorAna_Draw);
-  auto *added = sRegional.grave;
-  added->native.dyna.unk_150 = -1;
-  player.stateFlags2 |= PLAYER_STATE2_MOVING_DYNAPOLY;
-  for (int frame = 0; frame < 120 && !added->native.state; ++frame)
-    GraveUpdate(&added->native.dyna.actor, &play);
-  assert(added->native.state == 1 &&
-         added->native.dyna.actor.minVelocityY == 60 && chimes == 1 &&
-         slides > 40);
-  assert(!(player.stateFlags2 & PLAYER_STATE2_MOVING_DYNAPOLY));
-  assert(added->native.state == 1 && added->native.dyna.unk_150 == 0);
-  player.stateFlags2 |= PLAYER_STATE2_MOVING_DYNAPOLY;
-  GraveUpdate(&added->native.dyna.actor, &play);
-  assert(player.stateFlags2 & PLAYER_STATE2_MOVING_DYNAPOLY);
-  added->native.dyna.unk_150 = 1;
-  GraveUpdate(&added->native.dyna.actor, &play);
-  assert(!(player.stateFlags2 & PLAYER_STATE2_MOVING_DYNAPOLY));
-  assert(!std::memcmp(&nativeGrave, &original, sizeof(original)) &&
-         !std::memcmp(&nativeHole, &originalHole, sizeof(originalHole)));
-  player.actor.world.pos = mouth;
-  for (int i = 0; i < 11; ++i)
-    HoleUpdate(sRegional.hole, &play);
-  assert(player.stateFlags1 & PLAYER_STATE1_FLOOR_DISABLED);
-  assert(ComboRegionalPassagesOot_OwnsGraveFall(&play));
-  player.actor.world.pos.y = -10;
-  assert(ComboRegionalPassagesOot_AtDeparture(&play, &player.actor.world.pos) ==
-         5);
+  for (int age : {0, 1})
+    for (bool day : {false, true}) {
+      gSaveContext.linkAge = age;
+      gSaveContext.dayTime = day ? 0x8000 : 0;
+      gSaveContext.nightFlag = !day;
+      gSaveContext.entranceIndex = ENTR_GRAVEYARD_ENTRANCE;
+      Scene(SCENE_GRAVEYARD);
+      const auto untouched = neighbor;
+      assert(ComboRegionalPassagesOot_Get(&play, &route, &mouth, &yaw) &&
+             route == 5);
+      assert(mouth.x == 22 && mouth.y == 120 && mouth.z == -336 && yaw == 0);
+      assert(sRegional.grave == &original &&
+             original.dyna.actor.update == BgHaka_Update);
+      assert(database.profiles.size() == 1 &&
+             allocated.size() == 1); // aperture only
+      assert(!ComboRegionalPassagesOot_AtDeparture(&play, &mouth));
+      original.dyna.unk_150 = -1;
+      player.stateFlags2 |= PLAYER_STATE2_MOVING_DYNAPOLY;
+      original.dyna.actor.update(&original.dyna.actor, &play);
+      if (age == 1 && day) {
+        assert(!original.state &&
+               original.actionFunc == BgHaka_IdleLockedClosed);
+        assert(!std::memcmp(&untouched, &neighbor, sizeof(neighbor)));
+        continue;
+      }
+      for (int frame = 0; frame < 120 && !original.state; ++frame)
+        original.dyna.actor.update(&original.dyna.actor, &play);
+      assert(original.state == 1 && original.dyna.actor.minVelocityY == 60);
+      assert(!std::memcmp(&untouched, &neighbor, sizeof(neighbor)));
+      player.actor.world.pos = mouth;
+      for (int i = 0; i < 12; ++i)
+        HoleUpdate(sRegional.hole, &play);
+      assert(ComboRegionalPassagesOot_OwnsGraveFall(&play));
+      player.actor.world.pos.y = mouth.y - 10;
+      assert(ComboRegionalPassagesOot_AtDeparture(
+                 &play, &player.actor.world.pos) == 5);
+      ComboRegionalPassagesOot_CancelDeparture();
+      assert(!(player.stateFlags1 & PLAYER_STATE1_FLOOR_DISABLED));
+    }
+  gSaveContext.linkAge = 0;
   manager.save(gSaveContext, 0, false);
   const auto disk = manager.written;
-  assert(disk["version"] == 1 && disk["seed"] == 77 &&
-         disk["origins"][0]["x"] == 150);
-  ComboRegionalPassagesOot_CancelDeparture();
-  assert(!(player.stateFlags1 & PLAYER_STATE1_FLOOR_DISABLED));
-  LoadFile(disk);
-  const auto progress = gSaveContext;
-  gSaveContext.respawn[RESPAWN_MODE_TOP].pos.y = 222;
-  const auto preserved = gSaveContext.respawn[RESPAWN_MODE_RETURN];
-  assert(ComboRegionalPassagesOot_ApplyArrival(5));
-  assert(gSaveContext.respawnFlag == 0 &&
-         gSaveContext.entranceIndex == ENTR_GRAVEYARD_ENTRANCE);
-  Scene(SCENE_GRAVEYARD);
-  interactor.update();
-  const auto arrival = gSaveContext.respawn[RESPAWN_MODE_RETURN];
-  assert(arrival.playerParams == 0x04FF && arrival.pos.x == 150 &&
-         gSaveContext.respawnFlag == 2);
-  assert(gSaveContext.health == progress.health &&
-         gSaveContext.rupees == progress.rupees &&
-         gSaveContext.respawn[RESPAWN_MODE_TOP].pos.y == 222);
-  player.actor.world.pos = arrival.pos;
-  Player_StartMode_Grotto(&play, &player);
-  assert(jumpCalls == 1 && jumpVelocity == 12 &&
-         !std::strcmp(jumpAnimation, gPlayerAnim_link_normal_jump));
-  assert(player.actionFunc == Player_Action_8084F9C0 &&
-         player.stateFlags1 & PLAYER_STATE1_IN_CUTSCENE);
-  assert(player.fallStartHeight == arrival.pos.y && cutsceneId == 5110 &&
-         cutsceneDuration == 40);
-  interactor.update();
-  assert(!std::memcmp(&preserved, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
-                      sizeof(preserved)));
-  ++seed;
-  assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
-  assert(!ComboRegionalPassagesOot_ApplyArrival(5));
-  --seed;
-  for (int route = 6; route <= 7; ++route) {
-    Scene(route == 6 ? SCENE_LAKE_HYLIA : SCENE_ICE_CAVERN);
-    gSaveContext.entranceIndex =
-        route == 6 ? ENTR_LAKE_HYLIA_OUTSIDE_LAB : ENTR_ICE_CAVERN_ENTRANCE;
-    assert(ComboRegionalPassagesOot_Get(&play, &route, &mouth, &yaw));
-    Vec3f trigger{mouth.x, 0, mouth.z - 28};
-    assert(ComboRegionalPassagesOot_AtDeparture(&play, &trigger) == route);
-    assert(ComboRegionalPassagesOot_ApplyArrival(route));
-    assert(gSaveContext.respawnFlag == 0);
-    Scene(route == 6 ? SCENE_LAKE_HYLIA : SCENE_ICE_CAVERN);
+  assert(disk["origins"][0]["x"] == 22 && disk["origins"][0]["room"] == 1);
+  for (int slot = 0; slot < 3; ++slot) {
+    LoadFile(disk, slot);
+    gSaveContext.respawn[RESPAWN_MODE_RETURN] = {};
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = {-999, 7, 888};
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].playerParams = 0x0EFF;
+    const auto preserved = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    assert(ComboRegionalPassagesOot_ApplyArrival(5));
+    Scene(SCENE_GRAVEYARD);
+    assert(ComboRegionalPassagesOot_IsArrivalPending(&play));
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(nullptr));
+    PlayState otherPlay{};
+    otherPlay.sceneNum = SCENE_GRAVEYARD;
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(&otherPlay));
     interactor.update();
-    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].playerParams == 0x0EFF);
-    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.z < mouth.z - 90);
+    assert(!ComboRegionalPassagesOot_IsArrivalPending(&play));
+    const auto staged = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    assert(staged.playerParams == 0x04FF && staged.pos.x == 22 &&
+           staged.pos.y == 120);
+    // Native Actor_UpdateAll keeps running throughout the source fade.
+    play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
+    for (int frame = 0; frame < 8; ++frame) {
+      interactor.update();
+      assert(!std::memcmp(&staged, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                          sizeof(staged)));
+    }
+    auto *oldAddress = &play;
+    interactor.destroy();
+    Scene(SCENE_GRAVEYARD);
+    assert(&play ==
+           oldAddress); // allocator may reuse exactly the source address
+    // Scene commands ran, but native Player_Init has not consumed RETURN yet.
+    player.actor.init = Noop;
     interactor.update();
+    assert(!std::memcmp(&staged, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                        sizeof(staged)));
+    NativePlayerInitRespawn(&play, &player);
+    assert(player.actor.params == 0x04FF && player.actor.world.pos.x == 22 &&
+           player.actor.world.pos.y == 120);
+    assert(jumpVelocity == 12 &&
+           !std::strcmp(jumpAnimation, gPlayerAnim_link_normal_jump));
+    assert(cutsceneId == 5110 && cutsceneDuration == 40);
+    interactor.update();
+    assert(!std::memcmp(&preserved, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                        sizeof(preserved)));
+    assert(ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
+    assert(original.state == 1 && original.actionFunc == BgHaka_IdleOpened);
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    player.stateFlags1 = 0;
+    for (int i = 0; i < 12; ++i)
+      HoleUpdate(sRegional.hole, &play);
+    assert(!ComboRegionalPassagesOot_OwnsGraveFall(&play));
+    player.actor.world.pos.z += 70;
+    HoleUpdate(sRegional.hole, &play);
+    player.actor.world.pos = staged.pos;
+    HoleUpdate(sRegional.hole, &play);
+    assert(ComboRegionalPassagesOot_OwnsGraveFall(&play));
+    ComboRegionalPassagesOot_CancelDeparture();
   }
-  Scene(SCENE_ICE_CAVERN);
-  entrances[0].room = 1;
-  entries[0].pos = {500, 0, 0};
-  play.roomCtx.curRoom.num = 1;
-  ComboRegionalPassagesOot_ReadSpawns(&play, entries, 5);
-  assert(ComboRegionalPassagesOot_Get(&play, nullptr, &mouth, nullptr) &&
-         std::fabs(mouth.x - 500) < .1f);
-  assert(sOrigins[2].room == 0);
-  // First visits, changed setup and invalid documents resolve loaded native
-  // floor.
+  LoadFile();
+  ++seed;
+  assert(!ComboRegionalPassagesOot_ApplyArrival(5));
+  assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
+  --seed;
+  // Actor_Spawn publishes init/update before the native object bank is ready.
   LoadFile();
   assert(ComboRegionalPassagesOot_ApplyArrival(5));
-  assert(gSaveContext.entranceIndex == ENTR_GRAVEYARD_ENTRANCE &&
-         gSaveContext.respawnFlag == 0);
+  Scene(SCENE_GRAVEYARD, true);
+  deferHoleInit = true;
+  interactor.update();
+  assert(sArrivalRoute == 5 && original.state == 0 && allocated.empty());
+  original.dyna.actor.init(&original.dyna.actor, &play);
+  original.dyna.actor.init = nullptr;
+  interactor.update();
+  assert(sArrivalRoute == 5 && original.state == 1 && allocated.size() == 1);
+  auto *pendingHole = allocated[0];
+  assert(pendingHole->init);
+  interactor.update();
+  assert(allocated.size() == 1 && sArrivalRoute == 5);
+  pendingHole->init(pendingHole, &play);
+  pendingHole->init = nullptr;
+  deferHoleInit = false;
+  interactor.update();
+  assert(sArrivalRoute == 0 && original.state == 1);
+  interactor.update();
+  // Object/actor readiness may lag arrival dispatch; the request must survive.
+  LoadFile();
+  assert(ComboRegionalPassagesOot_ApplyArrival(5));
+  Scene(SCENE_GRAVEYARD);
+  auto *pendingGraves = play.actorCtx.actorLists[ACTORCAT_BG].head;
+  play.actorCtx.actorLists[ACTORCAT_BG].head = nullptr;
+  interactor.update();
+  assert(sArrivalRoute == 5 && play.envCtx.fillScreen &&
+         play.transitionTrigger == TRANS_TRIGGER_OFF);
+  play.actorCtx.actorLists[ACTORCAT_BG].head = pendingGraves;
+  interactor.update();
+  assert(sArrivalRoute == 0 && play.transitionTrigger == TRANS_TRIGGER_START);
+  interactor.update();
+  // A genuinely missing fixed owner must not leave permanent black cover.
+  LoadFile();
+  assert(ComboRegionalPassagesOot_ApplyArrival(5));
+  Scene(SCENE_GRAVEYARD);
+  play.actorCtx.actorLists[ACTORCAT_BG].head = nullptr;
+  for (int frame = 0; frame < 301; ++frame)
+    interactor.update();
+  assert(sArrivalRoute == 0 && !play.envCtx.fillScreen);
+  // Scene-owned actors may unload and reload without a new PlayState.
+  Scene(SCENE_GRAVEYARD);
+  assert(ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
+  auto *oldHole = sRegional.hole;
+  oldHole->update = nullptr;
+  assert(ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr) &&
+         sRegional.hole != oldHole);
+  // Legacy saved points cannot move the fixed endpoint or affect new layouts.
+  auto oldCoordinates = disk;
+  oldCoordinates["origins"][0]["x"] = 10000;
+  LoadFile(oldCoordinates);
+  mq = true;
+  gSaveContext.linkAge = 1;
+  assert(ComboRegionalPassagesOot_ApplyArrival(5));
   Scene(SCENE_GRAVEYARD);
   interactor.update();
-  assert(play.transitionTrigger == TRANS_TRIGGER_START &&
-         gSaveContext.respawnFlag == 2);
-  assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].playerParams == 0x04FF &&
-         sRegional.grave->native.state == 1);
+  assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.x == 22);
   interactor.update();
+  mq = false;
+  gSaveContext.linkAge = 0;
+  for (int wanted : {6, 7}) {
+    Scene(wanted == 6 ? SCENE_LAKE_HYLIA : SCENE_ZORAS_FOUNTAIN);
+    gSaveContext.entranceIndex = wanted == 6
+                                     ? ENTR_LAKE_HYLIA_OUTSIDE_LAB
+                                     : ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN;
+    assert(ComboRegionalPassagesOot_Get(&play, &route, &mouth, &yaw) &&
+           route == wanted);
+    if (wanted == 7) {
+      // Walking along the former entrance and the deep valley must not queue
+      // a departure before the new grounded threshold.
+      for (float x : {1820.f, 1840.f, 2400.f, 3200.f, 3500.f}) {
+        float floor;
+        assert(ComboFountainValley::FloorAt(x, 0, &floor));
+        Vec3f walking{x, floor, 0};
+        assert(ComboRegionalPassagesOot_AtDeparture(&play, &walking) == 0);
+      }
+    }
+    auto f = ComboRegional::Forward(yaw);
+    Vec3f p{mouth.x + f.x * 28, mouth.y, mouth.z + f.z * 28};
+    assert(ComboRegionalPassagesOot_AtDeparture(&play, &p) == wanted);
+    const auto preservedBridgeReturn =
+        gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    assert(ComboRegionalPassagesOot_ApplyArrival(wanted));
+    assert(gSaveContext.entranceIndex ==
+           (wanted == 6 ? ENTR_LAKE_HYLIA_OUTSIDE_LAB
+                        : ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN));
+    Scene(wanted == 6 ? SCENE_LAKE_HYLIA : SCENE_ZORAS_FOUNTAIN);
+    interactor.update();
+    auto arrival = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    assert(arrival.playerParams == 0x0EFF);
+    assert(std::fabs(arrival.pos.x - (mouth.x + f.x * 100)) < .1f);
+    assert(std::fabs(arrival.pos.z - (mouth.z + f.z * 100)) < .1f);
+    if (wanted == 7) {
+      float floor;
+      assert(
+          ComboFountainValley::FloorAt(arrival.pos.x, arrival.pos.z, &floor));
+      assert(std::fabs(arrival.pos.y - floor) < .01f &&
+             std::fabs(arrival.pos.y - mouth.y) > 1);
+      ComboRegional::Point r{arrival.pos.x, arrival.pos.y, arrival.pos.z};
+      assert(!ComboRegional::InSnowheadMouth(sRegional.mouth, r));
+    }
+    play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
+    for (int frame = 0; frame < 8; ++frame) {
+      interactor.update();
+      assert(!std::memcmp(&arrival, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                          sizeof(arrival)));
+    }
+    interactor.destroy();
+    Scene(wanted == 6 ? SCENE_LAKE_HYLIA : SCENE_ZORAS_FOUNTAIN);
+    player.actor.init = Noop;
+    interactor.update();
+    assert(!std::memcmp(&arrival, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                        sizeof(arrival)));
+    NativePlayerInitRespawn(&play, &player);
+    assert(player.actor.params == 0x0EFF && player.actor.shape.rot.y == yaw);
+    assert(std::fabs(player.actor.world.pos.x - arrival.pos.x) < .1f &&
+           std::fabs(player.actor.world.pos.z - arrival.pos.z) < .1f);
+    interactor.update();
+    assert(!std::memcmp(&preservedBridgeReturn,
+                        &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                        sizeof(preservedBridgeReturn)));
+  }
+  assert(lakeCalls && fountainCalls);
+  Scene(SCENE_ICE_CAVERN);
+  assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
   LoadFile();
   assert(ComboRegionalPassagesOot_ApplyArrival(5));
   gSaveContext.respawnFlag = 3;
@@ -453,64 +665,29 @@ int main() {
   interactor.update();
   assert(sArrivalRoute == 0 && play.transitionTrigger == TRANS_TRIGGER_OFF &&
          gSaveContext.respawn[RESPAWN_MODE_TOP].pos.x == 444);
-  LoadFile(disk, 1);
+  // A higher-priority native arrival replacing RETURN owns its newer record.
+  LoadFile();
   assert(ComboRegionalPassagesOot_ApplyArrival(5));
-  assert(gSaveContext.respawnFlag == 0 &&
-         gSaveContext.entranceIndex == ENTR_GRAVEYARD_ENTRANCE);
-  LoadFile(disk);
-  gSaveContext.linkAge = 1;
-  assert(ComboRegionalPassagesOot_ApplyArrival(5) &&
-         gSaveContext.respawnFlag == 0);
-  gSaveContext.linkAge = 0;
-  LoadFile(disk);
-  mq = true;
-  assert(ComboRegionalPassagesOot_ApplyArrival(5) &&
-         gSaveContext.respawnFlag == 0);
-  mq = false;
-  auto invalid = disk;
-  invalid["origins"][0]["x"] = nullptr;
-  LoadFile(invalid);
-  assert(ComboRegionalPassagesOot_ApplyArrival(5) &&
-         gSaveContext.respawnFlag == 0);
-  LoadFile(disk);
-  gSaveContext.fileNum = 0xFF;
-  assert(!ComboRegionalPassagesOot_ApplyArrival(5));
-  gSaveContext.fileNum = 0;
-  for (int failure = 0; failure < 6; ++failure) {
-    Scene(SCENE_ICE_CAVERN);
-    wet = failure == 0;
-    exitFloor = failure == 1;
-    dynamicFloor = failure == 2;
-    missingWall = failure == 3;
-    apronObstacle = failure == 4;
-    lowCeiling = failure == 5;
-    assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
-  }
-  wet = exitFloor = dynamicFloor = missingWall = apronObstacle = lowCeiling =
-      false;
   Scene(SCENE_GRAVEYARD);
-  apronObstacle = true;
-  assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
-  apronObstacle = false;
+  interactor.update();
+  gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = {7, 8, 9};
+  const auto newerReturn = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+  gSaveContext.respawnFlag = 3;
+  Scene(SCENE_GRAVEYARD);
+  assert(!sReturnStaged && sArrivalRoute == 0);
+  assert(!std::memcmp(&newerReturn, &gSaveContext.respawn[RESPAWN_MODE_RETURN],
+                      sizeof(newerReturn)));
   for (int mode : {COMBO_GAME_OOT, COMBO_GAME_MM}) {
     gComboGameMode = mode;
-    const auto before = gSaveContext;
+    auto before = gSaveContext;
     assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
     assert(!ComboRegionalPassagesOot_ApplyArrival(7));
     assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
   }
   gComboGameMode = COMBO_GAME_BOTH;
-  Scene(SCENE_ICE_CAVERN);
-  assert(ComboRegionalPassagesOot_Get(&play,nullptr,nullptr,nullptr));
   interactor.destroy();
-  assert(!ComboRegionalPassagesOot_Get(&play,nullptr,nullptr,nullptr));
-  for (auto *actor : allocated) {
-    if (actor->destroy)
-      actor->destroy(actor, &play);
-    std::free(actor);
-  }
-  assert(collisionDeletes == collisionRegistrations);
-  puts("PASS regional OoT native endpoint: additional native "
-       "grave/collision/pull/hole, saved slot/seed origin, native jump/pop-out "
-       "action, cave returns and preserved checks/progress/Farore");
+  assert(!ComboRegionalPassagesOot_Get(&play, nullptr, nullptr, nullptr));
+  puts("PASS regional OoT native endpoint: exact existing grave, native "
+       "age/day pull and grotto return, neighbor preservation, retrigger gate, "
+       "provider delegation, slot/seed and Farore precedence");
 }

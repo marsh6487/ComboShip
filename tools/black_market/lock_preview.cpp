@@ -1,10 +1,11 @@
 // Offline adapter uses exactly the native quantized geometry and texture.
 #include "combo/BlackMarketLock.h"
-extern "C" int BlackMarketLock_Preview(const float minimum[3],const float maximum[3],
-                                      uint32_t tick,int selected,float* output) {
+extern "C" int BlackMarketLock_Preview(const float minimum[3], const float maximum[3], uint32_t tick, int selected,
+                                       float paddingScale, float* output) {
     using namespace BlackMarketVisual;
-    const auto mesh=BuildLock({{minimum[0],minimum[1],minimum[2]},
-                               {maximum[0],maximum[1],maximum[2]},true},tick,selected!=0);
+    const auto mesh =
+        BuildLock({ { minimum[0], minimum[1], minimum[2] }, { maximum[0], maximum[1], maximum[2] }, true }, tick,
+                  selected != 0, paddingScale);
     if(!mesh.valid) return 0;
     constexpr int indices[]={0,1,2,0,2,3};
     int count=0;
