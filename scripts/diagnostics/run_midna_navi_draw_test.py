@@ -36,18 +36,21 @@ flags = ['-DCOMBO_BUILD', '-Icombo', '-std=gnu2x', '-DF3DEX_GBI_2', '-DLOG_LEVEL
          '-Ilibultraship/include', '-Isoh/include', '-Isoh/src', '-Isoh/assets', '-Isoh', '-Isoh/mods']
 if 'midnaBlinkTimer' in source:
     flags.append('-DMIDNA_VISIBLE_CLOCK')
-    # The shop path returns before the ordinary update tail. Each live path
-    # must tick once; counting call sites alone cannot establish that contract.
+    # Shop companions are hidden and freeze movement/blink updates. Their timer
+    # and explicit idle-audio disable still run; ordinary paths retain one tick.
     update = function(source, 'func_80A053F0')
     quiet = block_from(update, update.index('if (EnElf_BlackMarketQuiet(this, play))'))
     ordinary = update.replace(quiet, '', 1)
     for branch in (quiet, ordinary):
         assert branch.count('this->timer++;') == 1
-        assert branch.count('EnElf_UpdateMidnaBlink(this);') == 1
+    assert quiet.count('EnElf_UpdateMidnaBlink(this);') == 0
+    assert quiet.count('this->actionFunc(this, play);') == 0
+    assert quiet.count('Lights_PointNoGlowSetInfo(') == 2
+    assert ordinary.count('EnElf_UpdateMidnaBlink(this);') == 1
     assert quiet.rstrip().endswith('return;\n    }')
     assert 'MidnaAudio_UpdateIdle(false);' in quiet
     assert 'EnElf_UpdateMidnaIdleAudio(this, play);' in ordinary
-    assert source.count('EnElf_UpdateMidnaBlink(this);') == 4
+    assert source.count('EnElf_UpdateMidnaBlink(this);') == 3
     for name in ('func_80A04F94', 'EnElf_Update'):
         update = function(source, name)
         assert update.count('this->timer++;') == 1
@@ -68,7 +71,10 @@ with tempfile.TemporaryDirectory(prefix='midna-navi-test-') as folder:
     # complete production update body. Blink rendering itself is tested above;
     # here its call counter catches missed/double ticks or shop fallthrough.
     clock = (ROOT / 'tests/black_market/fairy_quiet_native_test.cpp').read_text().split('/* PRODUCTION */')[0]
-    clock = clock.replace('static int blinks;', 'static int blinks, idleDisabled, idleUpdates;')
+    clock = clock.replace('static int blinks, movementUpdates;',
+                          'static int blinks, movementUpdates, idleDisabled, idleUpdates;')
+    clock = clock.replace('static void Bob(EnElf *, PlayState *) {}',
+                          'static void Bob(EnElf *, PlayState *) { ++movementUpdates; }')
     clock = clock.replace('#define MidnaAudio_UpdateIdle(...) ((void)0)',
                           '#define MidnaAudio_UpdateIdle(active) (idleDisabled += !(active))')
     clock = clock.replace('#define EnElf_UpdateMidnaIdleAudio(...) ((void)0)',
@@ -92,16 +98,17 @@ int main() {
             const bool quiet = inside && mode != COMBO_GAME_MM;
             for (int frame = 0; frame < 230; ++frame) {
                 const auto timer = fairy.timer;
-                const int blink = blinks, disabled = idleDisabled, idle = idleUpdates;
+                const int blink = blinks, movement = movementUpdates, disabled = idleDisabled, idle = idleUpdates;
                 func_80A053F0(&fairy.actor, &play);
                 assert(fairy.timer == u16(timer + 1));
-                assert(blinks == blink + 1);
+                assert(blinks == blink + !quiet);
+                assert(movementUpdates == movement + !quiet);
                 assert(idleDisabled == disabled + quiet);
                 assert(idleUpdates == idle + !quiet);
             }
         }
     }
-    std::puts("PASS: native Navi quiet/outside/reentry updates tick timer/blink exactly once and preserve idle-audio routing");
+    std::puts("PASS: native Navi shop suppresses movement/blink; ordinary/exit/reentry tick once and preserve idle-audio routing");
 }
 '''
     cppfile, clock_binary = folder/'clock.cpp', folder/'clock'

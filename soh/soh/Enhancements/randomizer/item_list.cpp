@@ -13,6 +13,8 @@
 using namespace Rando;
 
 #ifdef COMBO_BUILD
+#include "functions.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 // ComboShip: cross-game item-draw exports (OOT_GetItemDrawInfo / OOT_GetItemAnimDrawInfo). Bodies
 // live in the combo-owned header to keep the vendored footprint to this one include. Mirror of MM's
 // ComboItemDrawMM.h include, in the opposite direction.

@@ -325,13 +325,16 @@ int main(void) {
             marketScene = inside;
             for (int hidden = 0; hidden <= 1; ++hidden) {
                 browsingHidden = hidden;
-                const int suppressed = inside && hidden && mode != COMBO_GAME_MM;
+                // Whole-shop draw policy is independent of the browsing player flag.
+                const int suppressed = inside && mode != COMBO_GAME_MM;
                 checkCase(FAIRY_NAVI, 0, 1, 0, 0, 0, 1, 0, !suppressed);
                 midnaEnabled = 1;
                 checkCase(FAIRY_NAVI, 1, 1, 0, 0, 0, 1, !suppressed, 0);
                 checkCase(FAIRY_HEAL, 1, 1, 0, 0, 0, 1, 0, 1);
                 midnaEnabled = 0;
-                checkLights(FAIRY_NAVI, 0, 1, 0, suppressed ? LIGHT_POINT_NOGLOW : LIGHT_POINT_GLOW);
+                // Direct helper retains its browsing guard. The full quiet update
+                // zeroes both light radii before this helper can run.
+                checkLights(FAIRY_NAVI, 0, 1, 0, suppressed && hidden ? LIGHT_POINT_NOGLOW : LIGHT_POINT_GLOW);
                 checkLights(FAIRY_HEAL, 0, 1, 0, LIGHT_POINT_GLOW);
                 midnaEnabled = 0;
             }

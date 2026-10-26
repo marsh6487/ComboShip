@@ -37,6 +37,15 @@ static bool owned, blocked, pack = true;
 static bool pending, stow;
 static bool alternateModel;
 static int animationStarts, idleRestores;
+static int castChimes;
+#ifdef MIRROR_OOT
+extern "C" void Sfx_PlaySfxCentered(u16 sound) {
+#else
+extern "C" void Audio_PlaySfx(u16 sound) {
+#endif
+    assert(sound == NA_SE_SY_TRE_BOX_APPEAR);
+    ++castChimes;
+}
 static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
 static int auraDraws;
@@ -297,6 +306,7 @@ void Reset() {
     pending = stow = false;
     alternateModel = false;
     animationStarts = idleRestores = 0;
+    castChimes = 0;
     mirrorDraws = worldShimmerDraws = matrixDepth = 0;
     auraDraws = 0;
     auraScale = auraAlpha = 0;
@@ -836,6 +846,23 @@ void TestNativeChoiceLifecycle(bool combined) {
 }
 
 int main() {
+    Reset();
+    assert(!MagicMirrorPlayer_Begin(nullptr, &player));
+    assert(!MagicMirrorPlayer_Begin(&play, nullptr));
+    assert(castChimes == 0);
+    assert(MagicMirrorPlayer_Begin(&play, &player));
+    assert(castChimes == 1);
+    assert(!MagicMirrorPlayer_Begin(&play, &player));
+    player.actionFunc(&player, &play);
+    assert(castChimes == 1);
+    MagicMirrorPlayer_End(&play, &player);
+    assert(castChimes == 1);
+    Reset();
+    stow = true;
+    assert(MagicMirrorPlayer_Begin(&play, &player));
+    assert(castChimes == 0);
+    MagicMirrorPlayer_End(&play, &player);
+    assert(castChimes == 0);
     TestNativeChoiceLifecycle(false);
     TestNativeChoiceLifecycle(true);
     TestPromptOwnsInputDuringNativeStateChanges();
