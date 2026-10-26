@@ -35,9 +35,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="monkey-audio-") as temp:
         directory = Path(temp)
         native = (ROOT / "mm/src/overlays/actors/ovl_En_Mnk/z_en_mnk.c").read_text()
+        animation = (ROOT / "mm/src/code/z_skelanime.c").read_text()
         guide = (ROOT / "tests/monkey_audio/native_guide_test.c").read_text().replace(
             "/* NATIVE_GUIDE */", "\n".join(function(native, name) for name in (
                 "EnMnk_PlayWalkSfx", "EnMnk_Monkey_GuideThroughWoods")))
+        guide = guide.replace("/* NATIVE_ANIMATION */", "\n".join(function(animation, name) for name in (
+            "Animation_OnFrameImpl", "Animation_OnFrame", "SkelAnime_LoopFull")))
         guide_source = directory / "guide.c"
         guide_source.write_text(guide)
         guide_binary = directory / "guide"

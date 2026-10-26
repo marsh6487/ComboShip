@@ -28,7 +28,7 @@ for file,names in [
                              'func_800CB924','func_800CB950','func_800CBA7C',
                              'Camera_BgCheckInfo','Camera_ClampDist2','Camera_ClampLerpScale','Camera_CalcSlopeYAdj',
                              'Camera_CalcAtDefault','Camera_CalcDefaultPitch','Camera_CalcDefaultYaw','Camera_Normal1']),
-    ('mm/src/overlays/actors/ovl_player_actor/z_player.c',['func_80835324','Player_StartMode_E']),
+    ('mm/src/overlays/actors/ovl_player_actor/z_player.c',['func_80835324','Player_StartMode_E','Player_StartMode_F']),
 ]:
     bodies=functions((ROOT/file).read_text(),names)
     native.extend(re.sub(r'\bthis\b','self',bodies[name]) for name in names)
@@ -53,5 +53,5 @@ with tempfile.TemporaryDirectory(prefix='forest-portal-camera-') as temporary:
                                '-c',str(ROOT/file),'-o',str(obj)],capture_output=True,text=True)
         if result.returncode: raise SystemExit(result.stderr[:5000])
         objects.append(str(obj))
-    subprocess.run([os.environ.get('CXX','c++'),*flags,str(source),*objects,'-lm','-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,str(source),*objects,str(ROOT/'mm/2s2h/Enhancements/Gameplay/ComboRegionalPassages.cpp'),'-lm','-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))

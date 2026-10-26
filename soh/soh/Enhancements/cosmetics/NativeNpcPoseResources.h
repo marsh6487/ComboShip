@@ -15,7 +15,8 @@ inline std::string_view Canonical(std::string_view path) {
 
 inline std::string DrawScalePath(std::string_view skeleton) {
     skeleton = Canonical(skeleton);
-    if (skeleton != "objects/object_sa/NativeNpcV1/Skel" && skeleton != "objects/object_ma1/NativeNpcV1/Skel")
+    if (skeleton != "objects/object_sa/NativeNpcV1/Skel" && skeleton != "objects/object_ma1/NativeNpcV1/Skel" &&
+        skeleton != "objects/object_fa/YoungFadoNpcPOC1/Skel")
         return {};
     return std::string(skeleton.substr(0, skeleton.size() - 5)) + "/DrawScale";
 }

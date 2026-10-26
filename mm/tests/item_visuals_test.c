@@ -12,6 +12,19 @@
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
+#include <libultraship/bridge/consolevariablebridge.h>
+#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#include "ComboCollectibleShimmerHost.h"
+#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+
+// Collectible effects have their own enabled-path suite. Keep this fixture's
+// dungeon/bottle dispatch isolated while executing the real eligibility helper.
+void MM_SampleCollectibleShimmerColor(int32_t profile, uint8_t color[4]) {
+    assert(false && "item visuals fixture unexpectedly sampled collectible colors");
+}
+void NeiGi_DrawTintedShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    assert(false && "item visuals fixture unexpectedly drew collectible shimmer");
+}
 
 static Gfx sOpa[256], sXlu[256], sResource;
 static GraphicsContext sGfx;

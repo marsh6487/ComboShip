@@ -7,6 +7,9 @@
  */
 #include "ext_buttons.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorItem.h"
+#endif
 
 extern "C" {
 
@@ -97,6 +100,9 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
         slot = SLOT_BOW;
     }
     u8 displacedSlot = ExtButton_GetEquipSlot(button);
+#ifdef COMBO_BUILD
+    bool mirrorMoved = displaced == EXT_ITEM_MAGIC_MIRROR;
+#endif
     for (s32 other = PAUSE_EQUIP_C_LEFT; other <= PAUSE_EQUIP_D_UP; ++other) {
         if (other == button) {
             continue;
@@ -105,6 +111,15 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
         // EXT items in older C-button saves have SLOT_NONE: match their full id, never that slot.
         if ((item >= 0x0200 && otherItem == item) ||
             (item < 0x0200 && slot != SLOT_NONE && ExtButton_GetEquipSlot(other) == slot)) {
+#ifdef COMBO_BUILD
+            if (item == EXT_ITEM_MAGIC_MIRROR) {
+                // Heal old duplicate mappings without duplicating the displaced item.
+                ExtButton_WriteEquip(play, other, mirrorMoved ? ITEM_NONE : displaced,
+                                     mirrorMoved ? SLOT_NONE : displacedSlot);
+                mirrorMoved = true;
+                continue;
+            }
+#endif
             ExtButton_WriteEquip(play, other, displaced, displacedSlot);
             break;
         }

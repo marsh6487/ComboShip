@@ -4,6 +4,8 @@
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/GameInteractor/GameInteractor_VanillaBehavior.h"
 #include "global.h"
+#include "2s2h/Enhancements/Gameplay/ComboRegionalPassages.h"
+#include "entrances/MmRegionalBridgePlacements.h"
 #if __has_include("2s2h/Enhancements/Camera/ComboForestArrivalCamera.h")
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
@@ -92,7 +94,8 @@ extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState *, CollisionContext *,
   *poly = &floorPoly;
   *bg = BGCHECK_SCENE;
   floorPoly.normal.y = floorSteep ? 0 : 32767;
-  return floorMissing ? BGCHECK_Y_MIN : 0.0f;
+  return floorMissing ? BGCHECK_Y_MIN :
+      (ComboMmRegional::ForScene(gPlayState->sceneId) ? 8.0f : 0.0f);
 }
 extern "C" s32 BgCheck_CameraLineTest1(CollisionContext *, Vec3f *from,
                                        Vec3f *to, Vec3f *hit,
@@ -165,7 +168,7 @@ static bool NativeCameraShouldRun(GIVanillaBehavior flag, ...) {
 }
 static void SceneInit() {
   for (auto &hook : GameInteractor::OnSceneInit::callbacks)
-    hook(gPlayState->sceneId, 0);
+    hook(gPlayState->sceneId, gPlayState->curSpawn);
 }
 static void Destroy() {
   for (auto &hook : GameInteractor::OnPlayDestroy::callbacks)
@@ -307,6 +310,190 @@ static void CheckFraming(int route, int version) {
               player.actor.world.rot.y == player.actor.shape.rot.y,
           "native player facing caches must agree after portal placement");
 }
+static ActorEntry snowheadEntries[9];
+static EntranceEntry snowheadEntrances[10];
+static CollisionHeader snowheadCollision;
+static void ResetSnowhead(int season, int slot, int form) {
+  Reset(COMBO_PORTAL_SNOWHEAD, form);
+  ComboRegionalPassagesMm_Reset();
+  snowheadEntries[8] = {};
+  snowheadEntrances[8] = {8, 0};
+  const auto &profile = season ? ComboMmRegional::kMountainSpring
+                               : ComboMmRegional::kMountainWinter;
+  gSaveContext.fileNum = slot;
+  WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE >> 8) =
+      season ? (WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE & 0xFF) : 0;
+  gSaveContext.save.entrance = season ? ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 8)
+                                    : ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8);
+  gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+  play.sceneId = profile.scene;
+  play.curSpawn = 8;
+  play.roomCtx.curRoom.num = 0;
+  play.setupEntranceList = snowheadEntrances;
+  play.colCtx.colHeader = &snowheadCollision;
+  auto &entry = snowheadEntries[8];
+  entry.pos = {-649, 8, -196};
+  entry.rot.y = 20388;
+  entry.params = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_OWL);
+  play.linkActorEntry = &entry;
+  player.actor.world.pos = player.actor.prevPos = {-649, 8, -196};
+  player.yaw = player.actor.world.rot.y = player.actor.shape.rot.y = 20388;
+}
+static void ReadSnowhead() {
+  // Native Scene_CommandSpawnList assigns the cached entry before the hook.
+  play.linkActorEntry = &snowheadEntries[8];
+  ComboRegionalPassagesMm_ReadEntrances(&play, 10);
+  ComboRegionalPassagesMm_ReadSpawns(&play, snowheadEntries, 9);
+}
+static void TestSnowhead() {
+  for (int season = 0; season < 2; ++season)
+    for (int slot = 0; slot < 3; ++slot)
+      for (int form = 0; form < PLAYER_FORM_MAX; ++form) {
+        ResetSnowhead(season, slot, form);
+        const auto native = snowheadEntries[8];
+        Require(ComboRegionalPassagesMm_ApplyArrival(COMBO_PORTAL_SNOWHEAD),
+                "Snowhead portal request must use the native season entrance");
+        ReadSnowhead();
+        Require(PLAYER_GET_START_MODE(play.linkActorEntry) == PLAYER_START_MODE_F,
+                "portal arrival must keep the accepted ordinary F start");
+        Player_StartMode_F(&play, &player);
+        const auto saved = gSaveContext;
+        SceneInit();
+        Require(!NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+                "queued Snowhead portal must begin a front-facing reveal");
+        const auto &mouth = ComboMmRegional::kMountainWinter.mouth;
+        const auto outward = ComboRegional::Forward(mouth.yaw);
+        const Vec3f forward{outward.x, 0, outward.z};
+        const Vec3f anchor{mouth.pos.x, mouth.pos.y, mouth.pos.z};
+        const Vec3f delta = Sub(player.actor.world.pos, anchor);
+        Require(Dot(delta, forward) > 110 && Dot(delta, forward) <= 160.1f &&
+                    std::fabs(delta.x * forward.z - delta.z * forward.x) < .1f &&
+                    player.actor.world.pos.y == 8 && player.yaw == mouth.yaw &&
+                    player.actor.shape.rot.y == mouth.yaw &&
+                    player.actor.world.rot.y == mouth.yaw,
+                "Snowhead Link must stand on the dry exterior apron facing away from the mouth");
+        Require(Dot(Sub(play.mainCamera.eye, player.actor.world.pos), forward) > 100,
+                "Snowhead camera must stand in front of Link looking back toward the mouth");
+        const auto feet = Project(player.actor.world.pos, play.mainCamera);
+        auto headPoint = player.actor.world.pos;
+        headPoint.y += Player_GetHeight(&player);
+        auto topPoint = anchor;
+        topPoint.y += 136;
+        const auto head = Project(headPoint, play.mainCamera),
+                   top = Project(topPoint, play.mainCamera),
+                   bottom = Project(anchor, play.mainCamera);
+        if (!(feet.y > -.98f && head.y < .98f && top.y < .98f && bottom.y > -.98f))
+          std::fprintf(stderr, "Snowhead framing form%d feet%.3f head%.3f top%.3f bottom%.3f\n", form, feet.y, head.y, top.y, bottom.y);
+        Require(feet.z > 0 && head.z > 0 && top.z > head.z &&
+                    std::fabs(top.x) < .01f && feet.y > -.98f &&
+                    head.y < .98f && top.y < .98f && bottom.y > -.98f,
+                "all Snowhead forms and the whole portal must fit in the front view");
+        Require(!ComboRegionalPassagesMm_AtReturn(&play, &player.actor.world.pos),
+                "exterior Snowhead placement must not trigger immediate return");
+        Require(Dot(Sub(player.unk_3A0, player.actor.world.pos), forward) > 799.9f,
+                "ordinary F walking target must follow the relocated outward pose");
+        Require(!std::memcmp(&saved, &gSaveContext, sizeof(saved)) &&
+                    !std::memcmp(&native, &snowheadEntries[8], sizeof(native)),
+                "Snowhead presentation must preserve saves and cached owl pose");
+        // Optional exact native-form poses feed the read-only archive probe.
+        if (const char *path = std::getenv("COMBO_SNOWHEAD_POSES")) {
+          FILE *output = std::fopen(path, "a");
+          Require(output, "native pose evidence must be writable");
+          const auto &position = player.actor.world.pos;
+          const auto &at = play.mainCamera.at, &eye = play.mainCamera.eye;
+          std::fprintf(output, "%d %d %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",
+                       season, form, position.x, position.y, position.z,
+                       at.x, at.y, at.z, eye.x, eye.y, eye.z);
+          std::fclose(output);
+        }
+        // F's short automatic walk is followed, then input hands off smoothly.
+        player.actor.world.pos.x += forward.x * 2;
+        player.actor.world.pos.z += forward.z * 2;
+        Require(!NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+                "Snowhead reveal must follow ordinary arrival walking");
+        const auto eye = play.mainCamera.eye, at = play.mainCamera.at;
+        play.state.input[0].cur.stick_x = 30;
+        Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera) &&
+                    !std::memcmp(&eye, &play.mainCamera.eye, sizeof(eye)) &&
+                    !std::memcmp(&at, &play.mainCamera.at, sizeof(at)),
+                "Snowhead movement must release the current view without a snap");
+        play.state.input[0] = {};
+        const auto beforeEye = play.mainCamera.eye, beforeAt = play.mainCamera.at;
+        Camera_Normal1(&play.mainCamera);
+        Require(Dot(Sub(play.mainCamera.eye, player.actor.world.pos), forward) > 0 &&
+                    Distance(beforeEye, play.mainCamera.eye) < 50 &&
+                    Distance(beforeAt, play.mainCamera.at) < 10,
+                "native Snowhead NORMAL1 must settle from the released front view");
+        ReadSnowhead();
+        Require(PLAYER_GET_START_MODE(play.linkActorEntry) == PLAYER_START_MODE_OWL,
+                "consumed Snowhead request must preserve later ordinary owl visits");
+        SceneInit();
+        Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+                "consumed Snowhead presentation must never replay");
+      }
+  // These execute the actual queued spawn path, not a direct camera queue.
+  for (int kind = 0; kind < 10; ++kind) {
+    ResetSnowhead(0, 0, PLAYER_FORM_HUMAN);
+    if (kind != 0)
+      ComboRegionalPassagesMm_ApplyArrival(COMBO_PORTAL_SNOWHEAD);
+    switch (kind) {
+    case 1: ++gSaveContext.save.shipSaveInfo.rando.finalSeed; break;
+    case 2: gSaveContext.fileNum = 1; break;
+    case 3: ++gSaveContext.save.entrance; break;
+    case 4: play.sceneId = SCENE_10YUKIYAMANOMURA2; break;
+    case 5: gSaveContext.respawnFlag = 2; break;
+    case 6: gSaveContext.save.isOwlSave = true; break;
+    case 7: floorMissing = true; break;
+    case 8: floorSteep = true; break;
+    case 9: collisionFraction = .03f; break;
+    }
+    ReadSnowhead();
+    const auto originalPlayer = player;
+    const auto originalCamera = play.mainCamera;
+    SceneInit();
+    Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+            "normal owl, stale request or unsafe Snowhead reveal must keep native camera");
+    Require(!std::memcmp(&originalPlayer, &player, sizeof(player)) &&
+                !std::memcmp(&originalCamera, &play.mainCamera, sizeof(Camera)),
+            "failed Snowhead preparation must leave native player/camera intact");
+    SceneInit();
+    Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+            "failed Snowhead reveal must be consumed once");
+  }
+  for (int kind = 0; kind < 8; ++kind) {
+    ResetSnowhead(0, 0, PLAYER_FORM_HUMAN);
+    ComboRegionalPassagesMm_ApplyArrival(COMBO_PORTAL_SNOWHEAD);
+    ReadSnowhead(); // The request is now in the real camera queue.
+    switch (kind) {
+    case 0: play.curSpawn = 0; break;
+    case 1: play.roomCtx.curRoom.num = 1; break;
+    case 2: play.sceneId = SCENE_10YUKIYAMANOMURA2; break;
+    case 3: ++gSaveContext.save.entrance; break;
+    case 4: ++gSaveContext.save.shipSaveInfo.rando.finalSeed; break;
+    case 5: gSaveContext.fileNum = 1; break;
+    case 6: gComboGameMode = COMBO_GAME_MM; break;
+    case 7: ComboRegionalPassagesMm_Reset(); break;
+    }
+    const auto originalPlayer = player;
+    const auto originalCamera = play.mainCamera;
+    SceneInit();
+    Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera) &&
+                !std::memcmp(&originalPlayer, &player, sizeof(player)) &&
+                !std::memcmp(&originalCamera, &play.mainCamera, sizeof(Camera)),
+            "Snowhead scene-init must reject a superseded queued owner/spawn/slot/seed/scene/entrance");
+    gComboGameMode = COMBO_GAME_BOTH;
+    play.curSpawn = 8;
+    play.roomCtx.curRoom.num = 0;
+    play.sceneId = SCENE_10YUKIYAMANOMURA;
+    gSaveContext.save.entrance = ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8);
+    gSaveContext.save.shipSaveInfo.rando.finalSeed = 0x12345678;
+    gSaveContext.fileNum = 0;
+    SceneInit();
+    Require(NativeCameraShouldRun(VB_USE_CUSTOM_CAMERA, &play.mainCamera),
+            "rejected Snowhead scene-init request must stay consumed");
+  }
+  puts("PASS Snowhead queued-arrival camera: winter/spring, all slots/forms, dry apron/front projection, ordinary F target, cached owl/save preservation, consumed/mismatched/floor/camera controls");
+}
 int main() {
   GameInteractor::Instance->RegisterGameHookForID<
       GameInteractor::ShouldVanillaBehavior>(
@@ -318,6 +505,7 @@ int main() {
             "camera presentation must preserve varargs for other enhancements");
         va_end(copy);
       });
+  TestSnowhead();
   for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST})
     for (int version = 0; version < 9; ++version)
       for (int day = 1; day <= 3; ++day)

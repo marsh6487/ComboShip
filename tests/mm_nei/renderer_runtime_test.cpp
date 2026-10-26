@@ -7,6 +7,7 @@
 #include "2s2h/Rando/NeiUsedMagicPresentation.h"
 #include "ComboMaskShimmer.h"
 #include "ComboSongDrawMM.h"
+#include "ComboIkanaShieldResources.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "rod_runtime_test.cpp"
 #include <set>
@@ -15,6 +16,10 @@ extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char*,const char*,NeiGi
 #endif
 std::set<std::string> ownerBase, ownerAlt;
 bool ownerAltEnabled = false, mmAltEnabled = false, ownerRegistered = true;
+// Authored fallback cases below have no native shield graph. Its availability
+// is a controlled archive boundary; actual typed/owner queries have their own gate.
+static bool nativeShieldPairAvailable = false;
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() { return nativeShieldPairAvailable; }
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return mmAltEnabled; }
 static std::set<std::string> descriptorPaths;
 static int descriptorCalls;
@@ -263,6 +268,21 @@ int main() {
   };
   CwItemDrawInfo described{};
   assert(!MM_DescribeNeiGi(RI_BOW,&described) && descriptorCalls==0);
+  nativeShieldPairAvailable=true;
+  ownerBase.insert("__OTR__objects/nei_gi_redesign/shield_of_ikana/gi_dl");
+  ownerAlt.insert("__OTR__objects/nei_gi_redesign/shield_of_ikana/gi_dl");
+  for (bool ownerAssets : {false,true}) for (bool hostAssets : {false,true}) {
+    reset();ownerAltEnabled=ownerAssets;mmAltEnabled=hostAssets;
+    Gfx* beforeOpa=gfx.polyOpa.p;Gfx* beforeXlu=gfx.polyXlu.p;
+    assert(!MM_DescribeNeiGi(RI_SHIELD_MIRROR,&described));
+    assert(!MM_TryDrawNeiGi(RI_SHIELD_MIRROR));
+    assert(described.neiShimmer==int(NeiGi::Kind::IkanaShield)+1 && described.itemShimmer &&
+           "declined authored descriptors must retain native shield identity");
+    assert(gfx.polyOpa.p==beforeOpa && gfx.polyXlu.p==beforeXlu &&
+           "native shield availability must bypass authored geometry emission");
+  }
+  nativeShieldPairAvailable=false;
+  puts("PASS native MM shield priority with both asset states; authored fixture emission remains fallback only");
   for(auto [id,slug] : candidates) {
     const std::string raw=std::string("__OTR__objects/nei_gi_redesign/")+slug;
     const bool vanillaSword=NeiGi::IsSword(NeiGi::FindFrameBounds((raw+"/gi_dl").c_str())->effect);

@@ -14,7 +14,8 @@ import zipfile
 
 from native_assets import o2r as asset
 
-NAMESPACES = {"young-malon": "objects/object_ma1/NativeNpcV1", "saria": "objects/object_sa/NativeNpcV1"}
+NAMESPACES = {"young-malon": "objects/object_ma1/NativeNpcV1", "saria": "objects/object_sa/NativeNpcV1",
+              "young-fado": "objects/object_fa/YoungFadoNpcPOC1"}
 
 
 def scale_resource(factor):

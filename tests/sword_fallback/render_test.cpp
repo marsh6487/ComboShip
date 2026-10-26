@@ -14,6 +14,10 @@ extern "C" {
 #include "z64.h"
 }
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerDraw.h"
+extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState*, const uint8_t[4], const char*) {
+  assert(false && "sword fixture unexpectedly selected collectible shimmer");
+}
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "combo/menu/ComboRewardGi.h"

@@ -12,6 +12,8 @@ add_custom_target(
     DEPENDS "${COMBO_NATIVE_MARKET_ROOT}/scripts/assets/prepare_native_market.py"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/native_market.py"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/market_interior.py"
+            "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/room_magic.py"
+            "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/room_magic/provenance.json"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/prop_appearance.py"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/market_title.py"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/exit_door.py"

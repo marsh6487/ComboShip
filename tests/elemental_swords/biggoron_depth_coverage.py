@@ -64,7 +64,7 @@ def project(blade, core, tight, pixels, frame, degrees):
     # SwordAura_Material: frost TEXEL0 * SHADE * PRIMITIVE alpha. Nearest
     # sampling conservatively keeps the exact stored I8 minima; no scene light,
     # perspective, MSAA, interpolation, bilinear filtering or game RDP is modeled.
-    for layer, triangles, prim_alpha in (("core", core, 120 / 255), ("tight", tight, 190 / 255)):
+    for layer, triangles, prim_alpha in (("core", core, 200 / 255), ("tight", tight, 225 / 255)):
         for triangle in triangles:
             fragment = fragments(triangle, angle, center)
             if fragment is None:

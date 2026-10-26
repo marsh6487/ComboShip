@@ -39,11 +39,11 @@ static inline int ComboReceipt_CopyIcon(CwItemReceiptPresentation* p, const CwIt
         icon->height < 1 || icon->height > 64 || (icon->isIA8 != 0 && icon->isIA8 != 1) ||
         (icon->hasColor != 0 && icon->hasColor != 1))
         return 0;
-    if (ComboIconUsesMmOwnership(icon->path))
-        owner = "mm";
-    int n = !strncmp(icon->path, "__OTR__@", 8)
-                ? snprintf(p->iconPath, sizeof(p->iconPath), "%s", icon->path)
-                : snprintf(p->iconPath, sizeof(p->iconPath), "__OTR__@%s:%s", owner, icon->path + 7);
+    const int ikana = ComboIconUsesMmOwnership(icon->path);
+    const char* path = ikana ? COMBO_IKANA_SHIELD_ICON : icon->path;
+    int n = ikana || !strncmp(path, "__OTR__@", 8)
+                ? snprintf(p->iconPath, sizeof(p->iconPath), "%s", path)
+                : snprintf(p->iconPath, sizeof(p->iconPath), "__OTR__@%s:%s", owner, path + 7);
     if (n < 0 || (size_t)n >= sizeof(p->iconPath)) {
         p->iconPath[0] = '\0';
         return 0;

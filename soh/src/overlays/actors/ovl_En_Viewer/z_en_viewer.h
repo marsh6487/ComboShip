@@ -77,7 +77,7 @@ typedef struct {
     uint8_t talking;
     uint8_t tracking;
     uint8_t monkeySfxActive;
-    int16_t monkeySfxTimer;
+    int16_t monkeySfxPhase;
     int16_t blinkTimer;
     uint8_t luluHdBlinkPhase;
     int16_t luluHdBlinkTimer;
@@ -104,6 +104,7 @@ typedef struct {
     void* mmEyeTextures[8];
     void* mmMouthTextures[4];
     void* mmResourceOwner;
+    Gfx* mmPropDL;
     Gfx* anjuUmbrellaDL;
     const struct MmAnjuDisplayLists* anjuModel;
     uint8_t anjuBlinkPhase;

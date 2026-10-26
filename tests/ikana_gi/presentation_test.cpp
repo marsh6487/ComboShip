@@ -1,7 +1,9 @@
 // Execute production shield pose selectors and icon routes at graphics/loader seams.
-#include "combo/menu/ComboItemDrawABI.h"
-#include "combo/menu/ComboItemIconOwnership.h"
 #include "combo/ComboGameMode.h"
+#include "combo/menu/ComboIkanaShieldResources.h"
+#include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
+#include "combo/menu/ComboItemIconOwnership.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <algorithm>
 #include <cassert>
@@ -18,10 +20,14 @@ constexpr int RI_SHIELD_MIRROR=1, RG_EXT_SHIELD_OF_IKANA=1;
 struct Gfx {const char* route=nullptr;}; struct GraphicsContext {}; struct State { GraphicsContext* gfxCtx; };
 struct PlayState { State state; int gameplayFrames=0; }; struct GetItemEntry {};
 GraphicsContext ctx; PlayState play{{&ctx}}; PlayState* gPlayState=&play;
-Gfx commands[64], model, wrongHostModel; Gfx* opa=commands;
+Gfx commands[64], model, wrongHostModel;
+Gfx *opa = commands;
+Gfx *xlu = commands + 32;
 float poseX=0, poseZ=0, spin=0, scale=1, height=0, depth=0, width=0, chinY=0;
 bool flat=false, sideways=false, ootMod=false, canMeasure=true, useMod=true, donorAvailable=true;
 const char* drawnRoute=nullptr;
+std::vector<std::string> drawnPaths;
+int strictBindings = 0;
 std::string poseOwner;
 int failures=0;
 struct Pose {float x,z,scale;};
@@ -38,23 +44,36 @@ void Matrix_RotateXF(float angle,u8 mode){Matrix_RotateX(angle,mode);}
 void Matrix_Scale(float x,float,float,u8){scale*=x;}
 void* Matrix_NewMtx(GraphicsContext*,char*,int){return nullptr;}
 void Gfx_SetupDL_25Opa(GraphicsContext*){}
+void NeiGi_ReportBlackMarketModel(const char *, const char *, const char *) {}
 void record(const Gfx* selected=nullptr) {
-    drawnRoute=selected?selected->route:nullptr;
-    const bool selectedFlat=selected==&wrongHostModel?!flat:flat;
-    const float x=sideways?99.f:68.f;
-    const float vertical=sideways?68.f:99.f;
-    const float y=selectedFlat?2.f:vertical,z=selectedFlat?vertical:2.f;
-    const float tiltedY=std::abs(std::cos(poseX))*y+std::abs(std::sin(poseX))*z;
-    height=scale*(std::abs(std::sin(poseZ))*x+std::abs(std::cos(poseZ))*tiltedY);
-    width=scale*(std::abs(std::cos(poseZ))*x+std::abs(std::sin(poseZ))*tiltedY);
-    depth=scale*(std::abs(std::sin(poseX))*y+std::abs(std::cos(poseX))*z);
-    const float chinX=sideways?1.f:0.f;
-    const float chinAfterX=sideways?0.f:(selectedFlat?-std::sin(poseX):-std::cos(poseX));
-    chinY=std::sin(poseZ)*chinX+std::cos(poseZ)*chinAfterX;
+  const char *literal = reinterpret_cast<const char *>(selected);
+  drawnRoute = selected && !std::strncmp(literal, "__OTR__", 7) ? literal
+               : selected ? selected->route
+                          : nullptr;
+  if (drawnRoute)
+    drawnPaths.emplace_back(drawnRoute);
+  const bool selectedFlat = selected == &wrongHostModel ? !flat : flat;
+  const float x = sideways ? 99.f : 68.f;
+  const float vertical = sideways ? 68.f : 99.f;
+  const float y = selectedFlat ? 2.f : vertical,
+              z = selectedFlat ? vertical : 2.f;
+  const float tiltedY =
+      std::abs(std::cos(poseX)) * y + std::abs(std::sin(poseX)) * z;
+  height = scale * (std::abs(std::sin(poseZ)) * x +
+                    std::abs(std::cos(poseZ)) * tiltedY);
+  width = scale *
+          (std::abs(std::cos(poseZ)) * x + std::abs(std::sin(poseZ)) * tiltedY);
+  depth =
+      scale * (std::abs(std::sin(poseX)) * y + std::abs(std::cos(poseX)) * z);
+  const float chinX = sideways ? 1.f : 0.f;
+  const float chinAfterX =
+      sideways ? 0.f : (selectedFlat ? -std::sin(poseX) : -std::cos(poseX));
+  chinY = std::sin(poseZ) * chinX + std::cos(poseZ) * chinAfterX;
 }
 #define OPEN_DISPS(x) ((void)(x))
 #define CLOSE_DISPS(x) ((void)(x))
 #define POLY_OPA_DISP opa
+#define POLY_XLU_DISP xlu
 #define gSPMatrix(p,...) ((void)(p))
 #define gSPDisplayList(p,dl) ((void)(p),record(dl))
 constexpr int G_DL_OTR_FILEPATH=1,G_DL_PUSH=0;
@@ -84,10 +103,12 @@ void DescriptorPose(const CwItemDrawInfo& info){
     record();
 }
 void GetItem_Draw(PlayState*,int){record();}
-namespace Rando::StaticData { struct Item {int drawId=1;}; std::map<int,Item> Items; }
-/* OOT_NATIVE_DRAW */
-/* OOT_DESCRIPTOR */
-/* MM_NATIVE_DRAW */
+namespace Rando::StaticData {
+struct Item {
+  int drawId = 1;
+};
+std::map<int, Item> Items;
+} // namespace Rando::StaticData
 
 namespace Ship {
 struct Resource {std::string name;};
@@ -117,73 +138,149 @@ const char* NeiResource_Route(const char*){return "__OTR__@oot:icon_item_static_
 /* EQUIPMENT_SELECTOR */
 /* EQUIPMENT_TABLES */
 /* OOT_CATALOG_ICON */
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
+  return donorAvailable &&
+         (Ship::CrossRMRegistry::Get("mm") || gComboGameMode == COMBO_GAME_OOT);
+}
+Gfx *MmAssets_LoadDisplayListGraphStrict(const char *path) {
+  static Gfx optional[] = {{COMBO_IKANA_GI_OPA}, {COMBO_IKANA_GI_XLU}};
+  return !donorAvailable                          ? nullptr
+         : !std::strcmp(path, COMBO_IKANA_GI_OPA) ? &optional[0]
+                                                  : &optional[1];
+}
+void MmAssets_EnsureStrictTextureBindings() { ++strictBindings; }
+void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
+void Gfx_SetupDL25_Opa(GraphicsContext *) {}
+void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
+#define MATRIX_FINALIZE_AND_LOAD(p, ctx) ((void)(p), (void)(ctx))
+#define MM_FOREIGN_PIN_OPA() ((void)0)
+#define MM_FOREIGN_PIN_XLU() ((void)0)
+#define gDPSetTextureLUT(p, x) ((void)(p), (void)(x))
+#define gDPSetEnvColor(p, ...) ((void)(p))
+#define G_TT_NONE 0
+Gfx *MM_DrawForeignMagicJarDList(Gfx *output, const char *, const uint8_t *) {
+  return output;
+}
+/* MM_SIMPLE_INFO */
+/* MM_SIMPLE_CONSUMER */
+/* OOT_NATIVE_DRAW */
+/* OOT_DESCRIPTOR */
+/* MM_NATIVE_DRAW */
 
 int main(){
     play.gameplayFrames=17;
+    auto oot = std::make_shared<Ship::ResourceManager>(),
+         mm = std::make_shared<Ship::ResourceManager>();
+    Ship::CrossRMRegistry::owners = {{"oot", oot}, {"mm", mm}};
+    constexpr char iconPath[] = "textures/icon_item_custom/gItemIconShieldOfIkanaTex";
+    auto own = std::make_shared<Ship::Resource>();
+    own->name = "MM Mirror Shield";
+    auto wrong = std::make_shared<Ship::Resource>();
+    wrong->name = "wrong local shield";
+    mm->files[iconPath] = own;
+    oot->files[iconPath] = wrong;
+    active = oot;
     for(bool selectedSideways:{false,true})for(bool selectedFlat:{false,true}) {
-        sideways=selectedSideways;flat=selectedFlat;poseX=poseZ=0;scale=1;opa=commands;rotations.clear();
+        sideways = selectedSideways;
+        flat = selectedFlat;
+        poseX = poseZ = 0;
+        scale = 1;
+        opa = commands;
+        xlu = commands + 32;
+        rotations.clear();
+        drawnPaths.clear();
         Randomizer_DrawExtShieldOfIkana(&play,nullptr);
-        check(height>depth*10&&height>width&&chinY<-.99f,"OoT selected worn shield must face upright, chin down");
-        check(rotations==std::vector<int>({CW_OP_ROTATE_Z,CW_OP_ROTATE_X}),"OoT roll precedes X tilt");
-        check(std::abs(scale-.035f)<.00001f&&std::abs(spin-.34f)<.00001f,"OoT pickup scale and spin preserved");
-        poseX=poseZ=0;scale=1;rotations.clear();
-        DrawNativeIkanaGI();
-        check(height>depth*10&&height>width&&chinY<-.99f,"MM selected GI shield must face upright, chin down");
-        check(rotations==std::vector<int>({CW_OP_ROTATE_Z,CW_OP_ROTATE_X}),"MM roll precedes X tilt");
+        check(drawnPaths == std::vector<std::string>(
+                                {COMBO_IKANA_GI_OPA_MM, COMBO_IKANA_GI_XLU_MM}),
+              "OoT callback must draw native 2Ship GI OPA then XLU, never the "
+              "worn shield");
+        check(poseOwner == "mm" && scale == 1 &&
+                  std::abs(spin - .34f) < .00001f,
+              "native GI owner, scale and spin");
+        check(stack.empty(), "OoT native GI matrix stack balanced");
         CwItemDrawInfo info{};DescribeIkana(&info);
-        DescriptorPose(info);
-        check(height>depth*10&&height>width&&chinY<-.99f,"foreign selected worn shield must face upright, chin down");
-        check(rotations==std::vector<int>({CW_OP_ROTATE_Z,CW_OP_ROTATE_X}),"foreign roll precedes X tilt");
-        check(info.stateDependent==2,"foreign worn shield pose must refresh across Alt changes");
+        check(info.drawKind == CW_DRAW_KIND_SIMPLE && info.dlistCount == 2 &&
+                  info.xluStartIndex == 1 && info.scale == 0,
+              "foreign descriptor preserves native simple two-pass recipe and "
+              "scale");
+        check(!std::strcmp(info.dlists[0], COMBO_IKANA_GI_OPA_MM) &&
+                  !std::strcmp(info.dlists[1], COMBO_IKANA_GI_XLU_MM),
+              "foreign descriptor uses the actual 2Ship get-item paths");
+        ComboForeignDrawInfoOOT foreign{};
+        foreign.count = 2;
+        foreign.xluStart = 1;
+        foreign.scale = info.scale;
+        foreign.drawKind = info.drawKind;
+        foreign.opCount = info.opCount;
+        std::copy(std::begin(info.ops), std::end(info.ops),
+                  std::begin(foreign.ops));
+        foreign.dls[0] = info.dlists[0];
+        foreign.dls[1] = info.dlists[1];
+        poseX = poseZ = 0;
+        scale = 1;
+        rotations.clear();
+        drawnPaths.clear();
+        MM_DrawForeignSimple(&foreign);
+        check(drawnPaths == std::vector<std::string>(
+                                {COMBO_IKANA_GI_OPA_MM, COMBO_IKANA_GI_XLU_MM}),
+              "actual MM consumer submits both native GI passes");
+        check(height > depth * 10 && height > width && chinY < -.99f,
+              "actual MM consumer applies selected native GI pose");
+        std::vector<int> expected;
+        if (sideways)
+          expected.push_back(CW_OP_ROTATE_Z);
+        if (flat)
+          expected.push_back(CW_OP_ROTATE_X);
+        check(rotations == expected && stack.empty(),
+              "MM pose-only recipe has no extra spin and restores matrix");
+        check(info.stateDependent == 2,
+              "foreign native GI refreshes owner pose across Alt changes");
     }
-    check(stack.empty(),"shield matrix stack balanced");
-    sideways=false;ootMod=true;flat=false;poseX=poseZ=0;scale=1;
+    // A local worn-model replacement must not displace the get-item model.
+    ootMod = true;
+    useMod = true;
+    drawnPaths.clear();
     Randomizer_DrawExtShieldOfIkana(&play,nullptr);
-    check(poseOwner=="oot"&&height>depth*10,"OoT local replacement retains priority and owner");
-    CwItemDrawInfo local{};DescribeIkana(&local);
-    check(poseOwner=="oot"&&!std::strcmp(local.dlists[0],"__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"),
-          "foreign descriptor preserves the selected OoT local replacement");
-    canMeasure=false;poseX=poseZ=0;scale=1;flat=true;
-    Randomizer_DrawExtShieldOfIkana(&play,nullptr);
-    check(height>depth*10,"unreadable worn graph preserves its old 90-degree pose");
-    local={};DescribeIkana(&local);
-    DescriptorPose(local);
-    check(poseX==float(M_PI/2)&&poseZ==0,"unreadable foreign graph preserves its old 90-degree pose");
-    poseX=poseZ=0;scale=1;DrawNativeIkanaGI();
-    check(height<depth,"unreadable native graph preserves its original unrotated pose");
-    check(stack.empty(),"unreadable shield matrix stack balanced");
-    // An unscoped companion can load a different host shield at the same path.
-    // Queue the measured MM owner's graph and refresh its pose on every draw.
-    useMod=false;ootMod=false;canMeasure=true;
-    for(bool donorFlat:{true,false,true,false}) {
-        flat=donorFlat;poseX=poseZ=0;scale=1;opa=commands;
-        Randomizer_DrawExtShieldOfIkana(&play,nullptr);
-        check(height>depth*10,"native no-mod shield must draw the same upright MM geometry it measured");
-        check(drawnRoute&&!std::strcmp(drawnRoute,"__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL"),
-              "native no-mod shield keeps MM root/dependency ownership live across donor toggles");
-    }
-    donorAvailable=false;opa=commands;
-    Randomizer_DrawExtShieldOfIkana(&play,nullptr);
-    check(opa==commands,"missing MM shield must skip without borrowing host geometry");
-    useMod=true;donorAvailable=true;
-    auto oot=std::make_shared<Ship::ResourceManager>(),mm=std::make_shared<Ship::ResourceManager>();
-    Ship::CrossRMRegistry::owners={{"oot",oot},{"mm",mm}};
-    constexpr char path[]="icon_item_static_yar/gItemIconMirrorShieldTex";
-    auto own=std::make_shared<Ship::Resource>();own->name="MM Mirror Shield";
-    auto wrong=std::make_shared<Ship::Resource>();wrong->name="OoT Mirror Shield mod";
-    mm->files[path]=own;oot->files[path]=wrong;
-    active=oot;
-    check(ComboLoadTextureResource(COMBO_IKANA_SHIELD_ICON)==own,"Ikana icon must select MM while OoT is active");
-    check(ComboLoadTextureResource(OotCatalogIcon)==own,"OoT native dialogue catalog selects MM Ikana artwork");
-    check(active==oot,"routed icon must not change the active manager");
-    for(const auto* icon:{MmEquip::ExtEquip_GetIcon(1,3),OotEquip::ExtEquip_GetIcon(1,3)}) {
-        check(ComboLoadTextureResource(static_cast<const char*>(icon))==own,"both equipment grids must select MM Ikana artwork");
-    }
-    const auto* grid=static_cast<const char*>(KaleidoEquip_OotTex(COMBO_IKANA_SHIELD_ICON));
-    check(grid&&ComboLoadTextureResource(grid)==own,"MM grid must preserve the MM owner marker");
+    check(poseOwner == "mm" && drawnPaths.back() == COMBO_IKANA_GI_XLU_MM,
+          "local worn model cannot override native GI");
+    donorAvailable = false;
+    drawnPaths.clear();
+    Randomizer_DrawExtShieldOfIkana(&play, nullptr);
+    check(drawnPaths.empty(),
+          "unavailable native pair is left to the authored fallback selector");
+    donorAvailable = true;
+    gComboGameMode = COMBO_GAME_OOT;
+    Ship::CrossRMRegistry::owners.erase("mm");
+    drawnPaths.clear();
+    Randomizer_DrawExtShieldOfIkana(&play, nullptr);
+    check(drawnPaths == std::vector<std::string>(
+                            {COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU}) &&
+              strictBindings == 1,
+          "Solo OoT uses both strict optional-archive GI pointers and texture "
+          "bindings");
+    gComboGameMode = COMBO_GAME_BOTH;
+    Ship::CrossRMRegistry::owners["mm"] = mm;
+    check(ComboLoadTextureResource(COMBO_IKANA_SHIELD_ICON) == own,
+          "Ikana icon uses MM while OoT active");
+    check(ComboLoadTextureResource(OotCatalogIcon) == own,
+          "native receipt catalog keeps MM icon ownership");
+    for (const auto *icon :
+         {MmEquip::ExtEquip_GetIcon(1, 3), OotEquip::ExtEquip_GetIcon(1, 3)})
+      check(ComboLoadTextureResource(static_cast<const char *>(icon)) == own,
+            "both equipment getters retain MM icon");
+    gComboGameMode = COMBO_GAME_OOT;
+    for (const auto *icon :
+         {MmEquip::ExtEquip_GetIcon(1, 3), OotEquip::ExtEquip_GetIcon(1, 3)})
+      check(!std::strcmp(static_cast<const char *>(icon),
+                         COMBO_IKANA_SHIELD_ICON_NATIVE),
+            "runtime Solo OoT uses canonical local MM key");
+    gComboGameMode = COMBO_GAME_BOTH;
     nativeIconPresent=false;donorQueried=false;
-    grid=static_cast<const char*>(KaleidoEquip_OotTex(COMBO_IKANA_SHIELD_ICON));
-    check(!donorQueried&&grid&&ComboLoadTextureResource(grid)==own,"cold MM icon index must never borrow OoT icon");
-    std::cout<<"Ikana production pose and icon routes: "<<failures<<" failures\n";
+    const auto *grid =
+        static_cast<const char *>(KaleidoEquip_OotTex(COMBO_IKANA_SHIELD_ICON));
+    check(!donorQueried && grid && ComboLoadTextureResource(grid) == own,
+          "cold MM grid preserves MM ownership");
+    std::cout << "Native Ikana GI and icon integration: " << failures
+              << " failures\n";
     return failures?1:0;
 }

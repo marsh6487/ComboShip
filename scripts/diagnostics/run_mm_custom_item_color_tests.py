@@ -5,6 +5,7 @@ Real engine types, GBI commands and unchanged draw bodies run in the fixture;
 complete affected C files are also syntax checked with their real headers.
 """
 import os
+import argparse
 from pathlib import Path
 import shlex
 import subprocess
@@ -16,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sanitize", action="store_true")
+    args = parser.parse_args()
     selected = []
     paths = {
         "mm/src/code/z_draw.c": ["GetItem_DrawDListWithCosmetics", "GetItem_DrawRecoveryHeart",
@@ -38,6 +42,9 @@ def main():
     flags += ["-I" + str(ROOT / p) for p in
               ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
                "libultraship/include", "libultraship/src", "combo", "combo/menu")]
+    if args.sanitize:
+        flags += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                  "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
     cc = shlex.split(os.environ.get("CC", "cc"))
     with tempfile.TemporaryDirectory(prefix="mm-custom-item-color-") as temporary:
         build = Path(temporary)
@@ -45,7 +52,7 @@ def main():
         binary = build / "custom_item_color_test"
         subprocess.run([*cc, "-std=gnu11", *flags, "-I" + str(build),
                         str(ROOT / "mm/tests/custom_item_color_test.c"), "-o", str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
 
         for path in list(paths)[:3]:
             result = subprocess.run([*cc, "-std=gnu11", *flags, "-fsyntax-only",

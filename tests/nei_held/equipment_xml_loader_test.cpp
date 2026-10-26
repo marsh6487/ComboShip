@@ -5,8 +5,10 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <set>
 #include <string>
 #include <tinyxml2.h>
+#include <utility>
 
 #include "fast/resource/factory/DisplayListFactory.h"
 #include "fast/resource/type/DisplayList.h"
@@ -15,7 +17,12 @@ int main(int argc, char** argv) {
     assert(argc == 2);
     const std::filesystem::path assets = argv[1];
     Fast::ResourceFactoryXMLDisplayListV0 factory;
-    unsigned checked = 0;
+    const std::set<std::string> models = {
+        "kokiri_sword", "mm_kokiri_sword", "razor_sword", "gilded_sword", "master_sword", "true_master_sword",
+        "biggoron_sword", "great_fairy_sword", "four_sword", "giants_knife", "broken_giants_knife"
+    };
+    const std::set<std::string> frames = { "oot_adult", "oot_child", "mm_human" };
+    std::set<std::pair<std::string, std::string>> checked;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(assets / "objects/nei_held_swords")) {
         if (entry.path().filename() != "held_dl") {
             continue;
@@ -30,7 +37,11 @@ int main(int argc, char** argv) {
         auto loaded = std::dynamic_pointer_cast<Fast::DisplayList>(factory.ReadResource(file, init));
         assert(loaded);
         const std::string slug = entry.path().parent_path().parent_path().filename().string();
-        const std::string target = "objects/nei_gi_redesign/" + slug + "/gi_dl";
+        const std::string frame = entry.path().parent_path().filename().string();
+        assert(models.contains(slug) && frames.contains(frame));
+        const std::string target = slug == "broken_giants_knife"
+                                       ? "objects/nei_held_swords/broken_giants_knife/model/gi_dl"
+                                       : "objects/nei_gi_redesign/" + slug + "/gi_dl";
         unsigned calls = 0;
         for (const Gfx& instruction : loaded->Instructions) {
             if ((instruction.words.w0 >> 24) == G_DL_OTR_FILEPATH) {
@@ -45,8 +56,9 @@ int main(int argc, char** argv) {
                          entry.path().string().c_str());
             return 1;
         }
-        ++checked;
+        assert(checked.emplace(slug, frame).second);
     }
-    assert(checked == 27);
-    std::printf("PASS: engine XML loader emits the authored GI mesh call for all %u held sword wrappers\n", checked);
+    assert(checked.size() == models.size() * frames.size());
+    std::printf("PASS: engine XML loader emits the exact authored mesh call for all %zu held sword wrappers\n",
+                checked.size());
 }

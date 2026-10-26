@@ -82,9 +82,9 @@ def _record(face, alpha, width):
     return header + struct.pack('<IIIIffI', 1, width * 4, 96, 1, 16, 4, len(pixels)) + pixels
 
 
-def _card(text, width, font):
+def _card(text, width, font, extra_kerning=None):
     advance = lambda ch: 4 if ch == ' ' else font[ch][2]
-    kerning = {'ar': -1, 'et': -1}
+    kerning = extra_kerning or {}
     length = sum(map(advance, text)) + sum(kerning.get(text[i:i + 2], 0) for i in range(len(text) - 1))
     require(length <= width - 8, 'unwarped title bound')
     physical_width = width * 4
@@ -114,8 +114,11 @@ def resources(directory=ASSETS):
     manifest = json.loads((native_assets.ASSETS / 'manifest.json').read_text())
     require(set(font) == set(manifest['glyph_layout']) and
             all(font[ch][2] == manifest['glyph_layout'][ch]['advance'] for ch in font), 'native metrics parity')
-    result = {native_assets.PREFIX + '1/' + row['id']: _card(row['text'], 240, font) for row in manifest['titles']}
-    result[native_assets.PREFIX + 'market'] = _card("Skiejer's Black Market", 240, font)
+    kerning = manifest['pair_kerning']
+    result = {native_assets.PREFIX + '1/' + row['id']: _card(row['text'], 240, font, kerning)
+              for row in manifest['titles']}
+    result[native_assets.PREFIX + 'market'] = _card("Skiejer's Black Market", 240, font,
+                                                 {**kerning, **manifest.get('market_pair_kerning', {})})
     result[native_assets.PREFIX + 'lost_woods'] = _record(*forest, 144)
     require(set(result) == set(native_assets.resources()), 'native resource name parity')
     return result

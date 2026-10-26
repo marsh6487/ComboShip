@@ -12,6 +12,7 @@
 #include "extended_equipment.h"
 #include "../../combo/menu/ComboItemIconOwnership.h"
 #include "equipment/nei_equipment_presentation.h"
+#include "../soh/FleetShipCombo/FleetComboIds.h"
 #include "nei_save.h" // Skijer's NEI
 #include "transformation_masks/transformation_masks.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
@@ -376,6 +377,10 @@ u8 ExtEquip_HasItem(s16 equipType, u8 index) {
 void ExtEquip_GiveItem(s16 equipType, u8 index) {
     if (index == 0 || index > 3 || equipType < 0 || equipType > 3)
         return;
+    // Editing this cell must also update the shared owner, otherwise a later
+    // game switch can resurrect a removed shield or lose an explicit grant.
+    if (equipType == EQUIP_TYPE_SHIELD && index == 3)
+        Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
     Nei_Save()->extEquipOwnedBits |= ExtEquip_GetBit(equipType, index); // Skijer's NEI
 }
 
@@ -561,6 +566,8 @@ void ExtEquip_ResyncFromSave(void) {
 void ExtEquip_RemoveItem(s16 equipType, u8 index) {
     if (index == 0 || index > 3 || equipType < 0 || equipType > 3)
         return;
+    if (equipType == EQUIP_TYPE_SHIELD && index == 3)
+        Nei_Save()->shieldOwned &= ~FC_SHIELD_IKANA;
     Nei_Save()->extEquipOwnedBits &= ~ExtEquip_GetBit(equipType, index); // Skijer's NEI
     if (ExtEquip_GetCurrent(equipType) == index) {
         ExtEquip_SetSlot(equipType, 0);
@@ -907,7 +914,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     { dgItemIconCaneOfByrnaTex, dgItemIconFourSwordTex, dgItemIconTridentTex },
     // Shields
     { dgItemIconGoddessShieldTex, dgItemIconKiteShieldTex,
-      COMBO_IKANA_SHIELD_ICON }, // Shield of Ikana (MM mirror shield)
+      COMBO_IKANA_SHIELD_ICON_NATIVE }, // Shield of Ikana; runtime owner is selected below.
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots
@@ -919,6 +926,9 @@ void* ExtEquip_GetIcon(s16 equipType, u8 index) {
         return NULL;
     }
 
+    if (equipType == 1 && index == 3) {
+        return (void*)COMBO_IKANA_SHIELD_ICON;
+    }
     return (void*)sExtEquipIconPaths[equipType][index - 1];
 }
 

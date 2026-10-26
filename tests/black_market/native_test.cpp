@@ -9,12 +9,14 @@
 #include "rando/BlackMarket.h"
 #include "BlackMarketText.h"
 #include "BlackMarketReceipt.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "sword_element_message.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -31,6 +33,8 @@ PlayState* gPlayState;
 GameState* gGameState;
 using namespace ComboRando::BlackMarket;
 Session sSession;
+// Native collision ownership is exercised by run_door_collision_native_tests.py.
+struct DoorCollisionBoundary { int releases=0; void Release(PlayState*) { ++releases; } void Reset() {} } sDoorCollision;
 uint16_t sClears;
 bool sEntering, sReturnPending, sDoorArmed, sTitlePending, sTalking;
 bool sResumeFromMarket;
@@ -43,7 +47,8 @@ s16 sSoloReturnYaw = -8192;
 u16 sSoloReturnEntrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
 RespawnData sPreservedReturn;
 bool sReturnStaged = false;
-std::array<Actor, 8> sDisplays;
+EnOssan* sNativeShop = nullptr; // Native actor actions run in the dedicated shop fixture.
+PlayState* sNativeShopPlay = nullptr;
 std::string sStatus;
 bool pack = true, owned = false, usable = true, grantWorks = true, inCs = false;
 int grants, writes;
@@ -100,6 +105,8 @@ void SaveManager_SaveCurrentForCombo(bool) {
                   { "rupees", gSaveContext.save.saveInfo.playerData.rupees } };
 }
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kKeeperMenuText = 0x8F14, kKeeperTalkText = 0x8F15, kContinueText = 0x8F16;
+constexpr u16 kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 namespace CustomMessage {
 Entry last;
 void LoadCustomMessageIntoFont(Entry entry) { last = std::move(entry); }
@@ -147,10 +154,11 @@ void DrawMarketReceipt(Actor*, PlayState*) {}
 
 float sNESFontWidths[160]{}; // Actual native widths/decoder are exercised by run_text_codec_tests.py.
 // Room rendering is exercised separately by run_granny_native_tests.py.
+// Native camera setup has its own real-engine integration fixture.
 void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
 void EndBrowsing(PlayState*,bool = false) { sTalking = false; }
-struct ShelfFixtureStub { void Reset() {} } sShelfFixture;
+struct ShelfFixtureStub { void Reset() {} } sShelfFixture, sCounterBarrier;
 /* NATIVE_HALF_DAY_TABLE */
 /* PRODUCTION */
 
@@ -464,11 +472,18 @@ int main(int argc, char** argv) {
     Reset();
     u16 textId = kBrowseText; bool fromTable = true;
     MarketText(&textId, &fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Back") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Leave") != std::string::npos);
     textId = kConfirmText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("\xC2I'll buy it\x11No thanks") != std::string::npos);
     textId = kWelcomeText; fromTable = true; MarketText(&textId,&fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find("Left / Right: browse items") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("Continue") != std::string::npos &&
+           CustomMessage::last.msg.find("Talk") == std::string::npos);
+    textId = kKeeperHelpChoiceText; fromTable = true; MarketText(&textId,&fromTable);
+    assert(!fromTable && CustomMessage::last.msg.find("How does this shop work?") != std::string::npos &&
+           CustomMessage::last.msg.find("Back") != std::string::npos);
+    textId = kKeeperHelpText; fromTable = true; MarketText(&textId,&fromTable);
+    assert(!fromTable && CustomMessage::last.msg.find("unique dungeon clears") != std::string::npos &&
+           CustomMessage::last.msg.find("empty bottle") != std::string::npos);
     TestDeferredPurchases();
     Reset();
     gSaveContext.save.entrance = COMBO_BLACK_MARKET_ENTRANCE;

@@ -2475,6 +2475,7 @@ extern "C" {
 uint16_t Nei_GetOwnedItem(uint8_t slot);         // u16 store (NeiSaveData.ownedItems)
 void Nei_SetOwnedItem(uint8_t slot, uint16_t v); // u16 store (NeiSaveData.ownedItems)
 void ExtEquip_GiveItem(int16_t equipType, uint8_t index);
+void ExtEquip_RemoveItem(int16_t equipType, uint8_t index);
 uint8_t ExtEquip_HasItem(int16_t equipType, uint8_t index);
 void Nei_GiveAllOotItems(void);
 // Dual Cane (Somaria / Pacci) — item_cane_of_somaria.c. Cane_GiveSkill lights one of the six
@@ -2958,6 +2959,16 @@ static void DrawNeiTab() {
             ImGui::SameLine();
             ImGui::PushID(idx);
             bool owned = ExtEquip_HasItem(type, idx);
+            if (type == EQUIP_TYPE_SHIELD && idx == 3) {
+                if (ImGui::Checkbox("Shield of Ikana", &owned)) {
+                    if (owned)
+                        ExtEquip_GiveItem(type, idx);
+                    else
+                        ExtEquip_RemoveItem(type, idx);
+                }
+                ImGui::PopID();
+                continue;
+            }
             ImGui::BeginDisabled(owned);
             if (ImGui::Button(sNeiEquipPieceNames[type][idx - 1]) && !owned) {
                 ExtEquip_GiveItem(type, idx);

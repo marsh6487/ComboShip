@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project each selected row through the fixed-eye production camera poses."""
+"""Project all four offers in each steady native shelf-bank shot."""
 from pathlib import Path
 import argparse,hashlib,itertools,json,os,subprocess,tempfile
 import numpy as np
@@ -29,7 +29,8 @@ def main():
         bounds=[]
         for slot in slots:
             view=views['slots'][slot]
-            assert view['eye']==[0,76,196],(name,slot,'shop eye moved behind customer')
+            assert view['eye']==views['center']['eye'],(name,slot,'shop eye moves during bank turn')
+            assert view==views['slots'][slots.start],(name,slot,'cursor navigation changes the bank camera')
             points=np.array([project(point,view) for point in itertools.product(*zip(*layout['reserved_slot_envelopes'][slot]))])
             low,high=points.min(0),points.max(0)
             assert low[0]>8 and high[0]<312 and low[1]>8 and high[1]<138,(name,slot,'item/seal clips screen or native Y142 textbox',low,high)
@@ -40,7 +41,7 @@ def main():
     a.output.write_text(json.dumps(dict(views=views,bounds=proof,layout_sha256=hashlib.sha256(a.layout.read_bytes()).hexdigest(),
         source_sha256=hashlib.sha256((ROOT/'combo/BlackMarketBrowsing.h').read_bytes()).hexdigest(),
         native_textbox_y=142,aspect='4:3',runtime_proven=False,
-        scope='Each selected row uses its own fixed-eye view; conditional authored FrameFit item/seal envelope including selected scale and bob. Nonselected row cropping is intentional; arbitrary native/Alt models not covered.'),indent=2)+'\n')
-    print('PASS browsing framing: close fixed eye; all eight selected item/seal envelopes and cursors clear 4:3 screen and explicit bottom textbox')
+        scope='Every bank uses one native scene-authored pose for all four offers. Full conditional authored FrameFit item/seal envelopes include selected scale and bob. Arbitrary native/Alt models and configured gameplay remain unproven.'),indent=2)+'\n')
+    print('PASS native bank framing: fixed eye and steady four-offer banks; all eight item/seal envelopes and cursors clear 4:3 screen and explicit bottom textbox')
 
 if __name__=='__main__':main()

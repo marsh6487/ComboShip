@@ -210,7 +210,7 @@ static size_t Draw(PlayState& play) {
     const size_t commands = gfx.polyXlu.p - xlu;
     assert(commands < 2048);
     assert(stack == 0 && children == 0 && scopes == 0);
-    assert(matrices <= 96);
+    assert(matrices <= (season == SEASON_SUMMER ? 129 : 96)); // Summer dusk: 128 sprites plus optional beams.
     bool texture = true, depthTest = false;
     uint32_t geometry = G_LIGHTING | G_FOG | G_CULL_BACK | G_CULL_FRONT;
     uint32_t otherHigh = 0, otherLow = 0;
@@ -421,7 +421,7 @@ static void RainWithDisabledSkyPreservesParticles() {
     summerEffects[1] = 1;
     gSaveContext.dayTime = CLOCK_TIME(23, 0);
     Advance(play, 30);
-    assert(matrices == 56 && beamVertices == 0); // Fireflies also need no visible sky.
+    assert(matrices == 96 && beamVertices == 0); // Fireflies also need no visible sky.
     season = SEASON_WINTER;
     enabled = 0;
     winterEffects[0] = 0;
@@ -590,16 +590,16 @@ int main() {
     assert(matrices == 33 && beamVertices == 3 && allocatedVertices == 36);
     gSaveContext.dayTime = CLOCK_TIME(23, 0);
     Draw(play);
-    assert(matrices == 56 && beamVertices == 0);
+    assert(matrices == 96 && beamVertices == 0);
     summerEffects[2] = 0;
     gSaveContext.dayTime = CLOCK_TIME(18, 0);
     Draw(play);
-    assert(matrices > 56 && matrices <= 88);
+    assert(matrices > 96 && matrices <= 128);
     const auto dusk = translations;
     play.pauseCtx.state = 6;
     summerEffects[0] = 0;
     Draw(play);
-    assert(matrices > 0 && matrices <= 56);
+    assert(matrices > 0 && matrices <= 96);
     for (const auto& point : translations)
         assert(std::any_of(dusk.begin(), dusk.end(), [&](Vec3f p) { return Same(point, p); }));
     summerEffects[1] = 0;
@@ -756,7 +756,7 @@ int main() {
     std::puts("PASS winter renderer: snow-independent terrain mist and night-only blue/green aurora, pause/toggles, "
               "native camera frustum, full-night timing, alpha/depth material, clipping, native snow coexistence, "
               "gates and ownership");
-    std::puts("PASS native renderer:96leaf/petal,64snow,32seed/56firefly/3beam; command/matrix budget, texture "
+    std::puts("PASS native renderer:96leaf/petal,64snow,32seed/96firefly/3beam; command/matrix budget, texture "
               "restoration, pause/toggle/gates/reset, native actor/save/environment ownership");
 }
 #else

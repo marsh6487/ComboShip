@@ -54,7 +54,7 @@ void DrawRegionalPassage() {
     Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
     Matrix_RotateYS(yaw, MTXMODE_APPLY);
     DrawRegionalShell(play, route);
-    const auto mesh = RP::Shimmer(play->gameplayFrames, route, NeiGi_CameraBasis(play));
+    const auto mesh = RP::Shimmer(play->gameplayFrames, RP::Host::Mm, route, NeiGi_CameraBasis(play));
     NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
 }

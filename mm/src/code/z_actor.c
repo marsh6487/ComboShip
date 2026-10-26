@@ -5,6 +5,10 @@
  */
 
 #include "z64actor.h"
+#ifdef COMBO_BUILD
+#include "BlackMarketFairy.h"
+#include "entrances/BlackMarketEntrance.h"
+#endif
 #include "gameplay/ComboFaroresWind.h"
 #include "crash_actor_context.h"
 #include "z64door.h"
@@ -37,6 +41,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/Gameplay/ComboForestSkullKid.h"
+#include "2s2h/Enhancements/Gameplay/ComboRegionalActors.h"
 
 // Skijer's NEI shared time control (mods/items/helpers/timestop_helper.c).
 // gChampionSlowFactor: 1.0f = normal, 0.0f = fully stopped, in between = slow motion.
@@ -544,6 +549,12 @@ void Attention_Init(Attention* attention, Actor* actor, PlayState* play) {
 void Attention_Draw(Attention* attention, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Actor* actor; // used for both the reticle actor and arrow hover actor
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE)) {
+        return;
+    }
+#endif
 
     if (player->stateFlags1 & (PLAYER_STATE1_2 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_200 |
                                PLAYER_STATE1_400 | PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000)) {
@@ -4063,12 +4074,17 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     }
 
 #ifdef COMBO_BUILD
-    objectSlot = Object_GetSlot(&play->objectCtx, ComboForestSkullKid_ObjectId(index, params, profile->objectId));
+    objectSlot = Object_GetSlot(
+        &play->objectCtx,
+        ComboRegionalActors_ObjectId(index, params, ComboForestSkullKid_ObjectId(index, params, profile->objectId)));
 #else
     objectSlot = Object_GetSlot(&play->objectCtx, profile->objectId);
 #endif
     if ((objectSlot <= OBJECT_SLOT_NONE) ||
         ((profile->type == ACTORCAT_ENEMY) && Flags_GetClear(play, play->roomCtx.curRoom.num) &&
+#ifdef COMBO_BUILD
+         !ComboRegionalActors_IsPlaced(index, params) &&
+#endif
          (profile->id != ACTOR_BOSS_05))) {
         Actor_FreeOverlay(&gActorOverlayTable[index]);
         return NULL;
@@ -4395,6 +4411,15 @@ void Attention_FindActor(PlayState* play, ActorContext* actorCtx, Actor** attent
                          Player* player) {
     u8* category;
     s32 i;
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_MM, play->sceneId, COMBO_BLACK_MARKET_SCENE)) {
+        *attentionActorP = NULL;
+        *cameraDriftActorP = NULL;
+        actorCtx->attention.bgmEnemy = NULL;
+        return;
+    }
+#endif
 
     sNearestAttentionActor = sPrioritizedAttentionActor = sNearestCameraDriftActor = sPrioritizedCameraDriftActor =
         NULL;

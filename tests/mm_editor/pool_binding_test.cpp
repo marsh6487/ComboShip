@@ -49,6 +49,10 @@ extern "C" int ResourceMgr_IsModAssetForGame(const char *game, const char *path)
     return modPath == path;
 }
 const char *NeiResource_Route(const char *path) { return path; }
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
+    REQUIRE(false && "pool/editor bindings must not select the native shield pair");
+    return 0;
+}
 
 #include "pool_binding_production.inc"
 

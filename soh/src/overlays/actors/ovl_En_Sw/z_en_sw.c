@@ -7,6 +7,13 @@
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
+Actor* EnSw_SpawnFromSoil(Actor* soil, PlayState* play, s32 playChime) {
+    // Native soil births use zero rotZ. Carry the quiet intent on this spawn so
+    // deferred init and unrelated actors in pre-init callbacks cannot steal it.
+    return Actor_Spawn(&play->actorCtx, play, ACTOR_EN_SW, soil->world.pos.x, soil->world.pos.y, soil->world.pos.z, 0,
+                       soil->shape.rot.y, playChime ? 0 : ENSW_SOIL_QUIET_ROT_Z, (soil->params | 0x8000));
+}
+
 void EnSw_Init(Actor* thisx, PlayState* play);
 void EnSw_Destroy(Actor* thisx, PlayState* play);
 void EnSw_Update(Actor* thisx, PlayState* play);
@@ -222,6 +229,12 @@ void EnSw_Init(Actor* thisx, PlayState* play) {
     s32 phi_v0;
     Vec3f sp4C = { 0.0f, 0.0f, 0.0f };
     s32 pad;
+    s32 quietSoilSpawn = (thisx->params & 0x8000) && (thisx->home.rot.z == ENSW_SOIL_QUIET_ROT_Z);
+
+    if (quietSoilSpawn) {
+        // Actor_Init has copied the birth rotation into all four carriers.
+        thisx->home.rot.z = thisx->world.rot.z = thisx->shape.rot.z = thisx->focus.rot.z = 0;
+    }
 
     if (thisx->params & 0x8000) {
         phi_v0 = (((thisx->params - 0x8000) & 0xE000) >> 0xD) + 1;
@@ -269,7 +282,7 @@ void EnSw_Init(Actor* thisx, PlayState* play) {
         func_80B0C0CC(this, play, 1);
     }
 
-    if (((thisx->params & 0xE000) >> 0xD) >= 3) {
+    if (((thisx->params & 0xE000) >> 0xD) >= 3 && !quietSoilSpawn) {
         Audio_PlaySfxGeneral(NA_SE_SY_CORRECT_CHIME, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                              &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     }

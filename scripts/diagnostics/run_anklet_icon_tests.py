@@ -67,7 +67,7 @@ int main() {
 
 for host in ('soh', 'mm'):
     source = (ROOT / host / 'mods/extended_equipment.c').read_text()
-    paths = re.search(r'static const char\* sExtEquipIconPaths\[4\]\[3\] = \{.*?\};', source, re.S)[0]
+    paths = re.search(r'static\s+const\s+char\s*\*\s*sExtEquipIconPaths\[4\]\[3\] = \{.*?\};', source, re.S)[0]
     getter = functions(source)['ExtEquip_GetIcon']
     # SoH shares these existing asset-name macros through its generated asset
     # header; the focused header is enough for this resource lookup boundary.

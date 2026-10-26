@@ -12,6 +12,7 @@ int ComboRegionalPassagesOot_AtDeparture(PlayState* play, const Vec3f* position)
 int ComboRegionalPassagesOot_OwnsGraveFall(PlayState* play);
 void ComboRegionalPassagesOot_CancelDeparture(void);
 int ComboRegionalPassagesOot_ApplyArrival(int route);
+int ComboRegionalPassagesOot_IsArrivalPending(PlayState* play);
 #ifdef __cplusplus
 }
 #endif

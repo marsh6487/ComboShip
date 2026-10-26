@@ -10,7 +10,7 @@
 namespace BlackMarketText {
 using ComboRando::BlackMarket::Item;
 using ComboRando::BlackMarket::PurchaseResult;
-enum class Page { Unavailable, Welcome, Browse, Confirm, Result };
+enum class Page { Unavailable, Welcome, Browse, Confirm, Result, KeeperTalk, KeeperHelpChoice, KeeperHelp };
 struct Offer {
     const Item* item = nullptr;
     std::string name;
@@ -47,8 +47,31 @@ inline std::string Result(const Offer& offer, const std::string& status) {
     return status;
 }
 
+// Explicit three-line pages fit both native message windows. The host codec
+// supplies its own page, choice, button and EVENT controls.
+inline std::string KeeperCopy(Page page) {
+    switch (page) {
+        case Page::KeeperTalk:
+            return "No guessing games here.&Pick the treasure you want!";
+        case Page::KeeperHelpChoice:
+            return "Want a tip?";
+        case Page::KeeperHelp:
+            return "Each treasure shows its price.&Choose it, then confirm to buy.&No Rupees spent until you buy.^"
+                   "Seals need unique dungeon clears.&Each dungeon counts only once.&Clear more to open sealed offers.^"
+                   "Most offers can be bought once.&Bottle refills can be bought again,&but bring an empty bottle.";
+        default:
+            return {};
+    }
+}
+
 inline std::string Mm(Page page, const Offer& offer, const std::string& result, const float* widths) {
     std::string text;
+    if (page == Page::KeeperHelpChoice) {
+        text = ComboItemReceiptText::FromNeiMarkup(KeeperCopy(page));
+        ComboItemReceiptText::Wrap(text, widths, 160, 300.f);
+        return text + "\x11\x02\xC2How does this shop work?\x11"
+                      "Back\xBF";
+    }
     if (page == Page::Confirm) {
         text = ComboItemReceiptText::FromNeiMarkup("%r" + offer.name + ": " + std::to_string(offer.price) + " Rupees");
         ComboItemReceiptText::Wrap(text, widths, 160, 300.f);
@@ -67,11 +90,15 @@ inline std::string Mm(Page page, const Offer& offer, const std::string& result, 
             text = "My wares aren't ready yet.&Come back soon!";
             break;
         case Page::Welcome:
-            text = "Welcome to the Black Market.&Left / Right: browse items&\x9F Browse   \xA0 Leave";
+            text = "Welcome to the Black Market!&\x9F Continue   \xA0 Leave";
             break;
         case Page::Browse:
             text = "%r" + offer.name + ": " + std::to_string(offer.price) + " Rupees%w&" + Status(offer) + "&(" +
-                   std::to_string(offer.slot + 1) + "/8) \x9F Select   \xA0 Back";
+                   std::to_string(offer.slot + 1) + "/8) \x9F Select   \xA0 Leave";
+            break;
+        case Page::KeeperTalk:
+        case Page::KeeperHelp:
+            text = KeeperCopy(page);
             break;
         case Page::Result:
             text = Result(offer, result);
@@ -97,7 +124,15 @@ inline std::string Oot(Page page, const Offer& offer, const std::string& result,
         case Page::Unavailable:
             return "My wares aren't ready yet.&Come back soon!";
         case Page::Welcome:
-            return "Welcome to the Black Market.&Left / Right: browse items&\x9F Browse   \xA0 Leave\x0B";
+            // OoT's I4 button glyphs inherit the text color; unlike MM they
+            // have no automatic button tint. Keep the native message palette
+            // (and its cosmetics), then restore normal text after each glyph.
+            return "Left / Right: browse items&%b\x9F%w Talk to shopkeeper&%g\xA0%w Leave\x0B";
+        case Page::KeeperTalk:
+        case Page::KeeperHelp:
+            return KeeperCopy(page) + "\x0B";
+        case Page::KeeperHelpChoice:
+            return KeeperCopy(page) + "\x1B%gHow does this shop work?&Back%w\x09";
         case Page::Confirm:
             return title + "\x09\x1B%g" +
                    (language == 1   ? "Kaufen&Nicht kaufen"
@@ -108,7 +143,7 @@ inline std::string Oot(Page page, const Offer& offer, const std::string& result,
             return Result(offer, result) + "\x0B";
         case Page::Browse:
             return title + "&" + Status(offer) + "&(" + std::to_string(offer.slot + 1) +
-                   "/8) \x9F Select   \xA0 Back\x0B";
+                   "/8) %b\x9F%w Select   %g\xA0%w Back\x0B";
     }
     return {};
 }
