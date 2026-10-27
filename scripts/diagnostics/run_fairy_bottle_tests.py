@@ -97,6 +97,8 @@ def main():
     bodies += function(source, 'OOT_DrawForeignFairyBottle') + '\n'
     bodies += function(source, 'OOT_DrawForeignFairyContainer') + '\n'
     dispatch = function(source, 'OOT_DrawComboForeign')
+    bodies += 'extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "fairy dispatch selected Mirror"); }\n'
+    bodies += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(), 'ComboDrawMagicMirrorForeign') + '\n'
     for name in sorted(set(re.findall(r'\bOOT_DrawForeign\w+', dispatch)) -
                        {'OOT_DrawForeignFairyBottle', 'OOT_DrawForeignFairyContainer'}):
         bodies += 'template<class...T>void ' + name + '(T...) { assert(false); }\n'

@@ -77,6 +77,9 @@ bool showCutscene=true;
 bool donorAvailable=true;
 const char* latchedName="Deku Leaf";
 bool queued=true;
+RandoCheckId queuedCheck = RC_UNKNOWN;
+// Mirror token delivery is covered by the dedicated stump grant fixture.
+bool MagicMirror_CommitStumpRewardToken() { assert(false); return false; }
 namespace CustomMessage {
 struct Entry { uint8_t textboxType=0,textboxYPos=0,icon=0xFE; uint16_t nextMessageID=0xFFFF,firstItemCost=0xFFFF,secondItemCost=0xFFFF; bool autoFormat=true; std::string msg; bool capeVisibilityChoice=false; uint8_t swordElementTutorial=0; };
 Entry shown;

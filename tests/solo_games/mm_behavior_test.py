@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-DEPS = Path(os.environ.get('COMBO_TEST_DEPS', '/workspace/scratch/4288e889429f/build-deps')) / 'include'
+DEPS = Path(os.environ.get('COMBO_TEST_DEPS', str(ROOT / 'build-deps'))) / 'include'
 
 def block(source, marker):
     start = source.index(marker)
@@ -164,15 +164,26 @@ pool_program = COMMON + r'''
 #include <vector>
 using RandoCheckId=int;using RandoItemId=int;
 constexpr int RO_SHUFFLE_TRIFORCE_PIECES=0,RO_TRIFORCE_PIECES_REQUIRED=1,RO_TRIFORCE_PIECES_MAX=2;
-constexpr int RO_GENERIC_YES=1,RO_GENERIC_NO=0;
-struct RandoSaveInfo {uint32_t randoSaveOptions[3]={1,7,9};};
+constexpr int RO_GENERIC_YES=1,RO_GENERIC_NO=0,RO_GENERIC_ON=1,RO_SHUFFLE_MAGIC_MIRROR=3;
+struct RandoSaveInfo {uint32_t randoSaveOptions[4]={1,7,9,0};};
+int mirrorRequested=0,mirrorReads=0;
+int CVarGetInteger(const char* name,int fallback) {
+    assert(std::string(name)=="gRando.Generation.ShuffleMagicMirror" && fallback==0);
+    ++mirrorReads;return mirrorRequested;
+}
 int gMMComboGoalHunt=0,gMMComboGoalRequired=99,gMMComboGoalPieces=100;
 ''' + pool_prefix + '}\n' + r'''
 int main() {
     RandoSaveInfo info;std::vector<int> checks,items;
     GeneratePools(info,checks,items);
     assert(info.randoSaveOptions[0]==1 && info.randoSaveOptions[1]==7 && info.randoSaveOptions[2]==9);
+    assert(mirrorReads==0 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
     gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);assert(info.randoSaveOptions[0]==0);
+    assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+    mirrorRequested=1;gComboGameMode=COMBO_GAME_MM;GeneratePools(info,checks,items);
+    assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+    gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);
+    assert(mirrorReads==2 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==RO_GENERIC_ON);
     gMMComboGoalHunt=1;GeneratePools(info,checks,items);
     assert(info.randoSaveOptions[1]==99 && info.randoSaveOptions[2]==100);
     std::cout<<"MM native randomizer goals passed\n";

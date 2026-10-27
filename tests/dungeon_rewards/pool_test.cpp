@@ -6,6 +6,10 @@
 #include <cstdio>
 #include <memory>
 
+extern "C" int32_t CVarGetInteger(const char *, int32_t fallback) {
+  return fallback;
+}
+
 extern "C" {
 #ifdef COMBO_BUILD
 int gComboGameMode = COMBO_GAME_BOTH;

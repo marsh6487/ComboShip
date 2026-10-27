@@ -54,6 +54,7 @@ void Player_InitSlingshotIA(PlayState*, Player*) {}
 void Player_InitOotBoomerangIA(PlayState*, Player*) {}
 '''
     prefix += "\n#define RG_ELEMENTAL_WAND 1\n"
+    prefix += "#define EXPECTED_MIRROR_RG " + ("RI_OOT_NEI_MAGIC_MIRROR" if host == "mm" else "RG_MAGIC_MIRROR") + "\n"
     production = "\n".join(function(player, name) for name in ("Nei_SharedIA_UpperAction", "Nei_SharedIA_Init") if name + "(" in player)
     production += "\nstatic const NeiItem sNeiItems[] = {\n" + "\n".join(rows) + "\n};\n#define NEI_ITEMS_COUNT (sizeof(sNeiItems)/sizeof(sNeiItems[0]))\n"
     production += "\n".join(function(player, name) for name in ("Nei_FindByItem", "ExtPlayer_GetItemAction", "ExtPlayer_FindByIA", "ExtPlayer_GetItemActionUpdateFunc", "ExtPlayer_GetItemActionInitFunc"))
@@ -61,7 +62,7 @@ void Player_InitOotBoomerangIA(PlayState*, Player*) {}
 int main() {
     const auto* mirror = Nei_FindByItem(EXT_ITEM_MAGIC_MIRROR);
     assert(mirror && "Magic Mirror missing from production registry");
-    assert(mirror->slot == SLOT_MAGIC_MIRROR && mirror->rg == NEI_NO_RG && !mirror->drawFunc);
+    assert(mirror->slot == SLOT_MAGIC_MIRROR && mirror->rg == EXPECTED_MIRROR_RG && !mirror->drawFunc);
     assert(mirror->ageReq == AGE_REQ_NONE && mirror->modelGroup == PLAYER_MODELGROUP_DEFAULT);
     assert(mirror->ia == PLAYER_IA_ELEMENTAL_WAND && mirror->ia <= 127);
     assert(std::strcmp(static_cast<const char*>(mirror->iconTex), "__OTR__textures/icon_item_custom/gItemIconMagicMirrorTex") == 0);
@@ -78,7 +79,7 @@ int main() {
     assert(update(&p, &play) == 23);
     init(&play, &p);
     assert(wandUpdates == 1 && wandInits == 1 && genericUpdates == 1 && genericInits == 1);
-    puts("PASS travel actions: real descriptor, no rando item, signed action safe, neutral Mirror and unchanged Wand dispatch");
+    puts("PASS travel actions: real descriptor and native shuffle identity, signed action safe, neutral Mirror and unchanged Wand dispatch");
 }
 '''
     with tempfile.TemporaryDirectory(prefix="mirror-action-" + host + "-") as td:

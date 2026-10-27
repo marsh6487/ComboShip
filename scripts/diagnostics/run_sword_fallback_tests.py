@@ -16,7 +16,9 @@ ROOT = Path(__file__).resolve().parents[2]
 foreign = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
 info = foreign[foreign.index('struct ComboForeignDrawInfo {'):foreign.index('\n};',foreign.index('struct ComboForeignDrawInfo {'))+3]
 macros = foreign[foreign.index('#define COMBO_FOREIGN_MTX'):foreign.index('// Biggoron')]
-handlers = macros + '\n' + '\n'.join(function(foreign,name) for name in [
+mirror_helper = 'extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "sword dispatch selected Mirror"); }\n'
+mirror_helper += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(),'ComboDrawMagicMirrorForeign')
+handlers = macros + '\n' + mirror_helper + '\n' + '\n'.join(function(foreign,name) for name in [
     'OOT_RestoreForeignSegs','OOT_DrawForeignGoronSword','OOT_DrawForeignWeaponFlame',
     'OOT_DrawForeignMasterSword','OOT_DrawForeignCustomGi','OOT_DrawForeignSimple','OOT_DrawComboForeign'])
 flags=['-std=gnu++20','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DLOG_LEVEL_GAME_PRINTS=0',
@@ -54,7 +56,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId){assert(false);}
 '''
     mm_macros=mm[mm.index('#define MM_FOREIGN_PIN_OPA'):mm.index('inline void MM_RestoreForeignSegs')]
     mm_stubs='\n'.join('template<class...T> '+('bool ' if name=='MM_DrawForeignSilverRupee' else 'void ')+name+'(const ComboForeignDrawInfoOOT*,T...){assert(false);'+('return false;' if name=='MM_DrawForeignSilverRupee' else '')+'}' for name in mm_handlers)
-    mm_handlers_text=macros+'\n'+function(foreign,'OOT_RestoreForeignSegs')+'\n'+function(foreign,'OOT_DrawForeignWeaponFlame')+'\n'+mm_prefix
+    mm_handlers_text=macros+'\n'+mirror_helper+'\n'+function(foreign,'OOT_RestoreForeignSegs')+'\n'+function(foreign,'OOT_DrawForeignWeaponFlame')+'\n'+mm_prefix
     mm_handlers_text+='void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b){const uint8_t c[]={r,g,b,255};OOT_DrawForeignWeaponFlame(&play,c);}\n'
     mm_handlers_text+=mm_macros+'\n'+mm_stubs+'\n'+function(mm,'MM_DrawForeignCustomGi')+'\n'+function(mm,'MM_DrawForeignSimple')+'\n'+mm_dispatch
     mm_handlers_text+='\nvoid OOT_DrawComboForeign(PlayState*,GetItemEntry*,bool shop=false){MM_DrawComboForeign(1,shop);}\n'

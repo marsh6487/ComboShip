@@ -618,24 +618,32 @@ int main() {
           Load(forest, 0, mirror);
           Require(play.playerCsIds[PLAYER_CS_ID_ITEM_OCARINA] > CS_ID_NONE,
                   "playable forest supplies a native ocarina cutscene ID");
-          Require(sSceneCutsceneCount == 1 &&
+          Require(sSceneCutsceneCount == 2 &&
                       sSceneCutsceneList[0].scriptIndex == CS_SCRIPT_ID_NONE &&
-                      sSceneCutsceneList[0].additionalCsId == CS_ID_NONE &&
+                      sSceneCutsceneList[0].additionalCsId == 1 &&
                       sSceneCutsceneList[0].priority == 550,
-                  "only the missing native unscripted ocarina metadata is "
-                  "supplied");
+                  "missing native ocarina and pickup metadata form one "
+                  "unscripted chain");
           ActorCutscene expected = nativeChain[0];
-          expected.additionalCsId = CS_ID_NONE;
           expected.priority =
               550; // Native Play_AssignPlayerCsIdsFromScene normalization.
           Require(
               !std::memcmp(&sSceneCutsceneList[0], &expected, sizeof(expected)),
               "native ocarina camera/script/priority/timing/HUD/end fields are "
               "retained");
+          ActorCutscene pickup = nativeChain[1];
+          pickup.priority = 500;
+          pickup.additionalCsId = CS_ID_NONE;
+          Require(
+              play.playerCsIds[PLAYER_CS_ID_ITEM_GET] == 1 &&
+                  !std::memcmp(&sSceneCutsceneList[1], &pickup, sizeof(pickup)),
+              "pickup receives the native get-item camera with an "
+              "unscripted terminal entry");
           for (int id = 1; id < PLAYER_CS_ID_MAX; ++id)
-            Require(
-                play.playerCsIds[id] == CS_ID_NONE,
-                "unrelated missing player cutscene IDs retain their behavior");
+            if (id != PLAYER_CS_ID_ITEM_GET)
+              Require(play.playerCsIds[id] == CS_ID_NONE,
+                      "unrelated missing player cutscene IDs retain their "
+                      "behavior");
           const auto view = PlayAndCancel(form);
           if (!mirror)
             SameView(view, control);

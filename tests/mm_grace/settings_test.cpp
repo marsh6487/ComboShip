@@ -1,6 +1,7 @@
 #include "2s2h/Rando/Rando.h"
 #include "NeiGracePolicy.h"
 #include "NeiSeasonsPolicy.h"
+#include "combo/rando/MagicMirrorShuffle.h"
 #include "tests/test_require.h"
 #include <cstdio>
 #include <cstring>
