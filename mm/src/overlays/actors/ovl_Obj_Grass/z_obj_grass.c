@@ -485,16 +485,16 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     if (seasonal) {
         gDPSetGrayscaleColor(POLY_OPA_DISP++,
                              spring  ? 246
-                             : frost ? 229
-                                     : 217,
+                             : frost ? 220
+                                     : 242,
                              spring  ? 193
-                             : frost ? 237
-                                     : 156,
+                             : frost ? 236
+                                     : 104,
                              spring  ? 217
-                             : frost ? 243
-                                     : 69,
+                             : frost ? 245
+                                     : 70,
                              255);
-        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
+        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 2);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
@@ -513,7 +513,7 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
                     if (seasonal && (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI)) {
                         // Road/Woods randomizer leaf children release tint before their
                         // flowers. Re-enable it for a later native grass element.
-                        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
+                        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 2);
                     }
                     if (GameInteractor_Should(VB_OBJGRASS_OPA_DRAW_BE_OVERRIDDEN, true, this, grassElem, j)) {
                         rot.y = grassElem->rotY;
@@ -558,16 +558,16 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
     if (seasonal) {
         gDPSetGrayscaleColor(POLY_XLU_DISP++,
                              spring  ? 246
-                             : frost ? 229
-                                     : 217,
+                             : frost ? 220
+                                     : 242,
                              spring  ? 193
-                             : frost ? 237
-                                     : 156,
+                             : frost ? 236
+                                     : 104,
                              spring  ? 217
-                             : frost ? 243
-                                     : 69,
+                             : frost ? 245
+                                     : 70,
                              255);
-        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
+        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 2);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
@@ -580,7 +580,7 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
                 if ((grassElem->flags & OBJ_GRASS_ELEM_DRAW) && (grassElem->alpha > 0) && (grassElem->alpha < 255)) {
                     FrameInterpolation_RecordOpenChild(grassElem, 0);
                     if (seasonal && (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI)) {
-                        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
+                        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 2);
                     }
                     if (GameInteractor_Should(VB_OBJGRASS_XLU_DRAW_BE_OVERRIDDEN, true, this, grassElem)) {
                         rot.y = grassElem->rotY;

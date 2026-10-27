@@ -2,6 +2,7 @@
 #include "../../../combo/render/SpinAttackStyle.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
+#include "../../../combo/entrances/TempleSagesPolicy.h"
 #endif
 #include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
@@ -95,6 +96,15 @@ static const std::map<int32_t, const char*> timeTravelOptions = {
     { TIME_TRAVEL_ANY, "Any Ocarina" },
     { TIME_TRAVEL_ANY_MS, "Any Ocarina + Master Sword" },
 };
+
+#ifdef COMBO_BUILD
+static const std::map<int32_t, const char*> templeSagesTravelOptions = {
+    { int(TempleSages::TravelMode::Off), "Off" },
+    { int(TempleSages::TravelMode::DungeonRewards), "Dungeon rewards" },
+    { int(TempleSages::TravelMode::Free), "Free" },
+    { int(TempleSages::TravelMode::WarpSongs), "Warp songs" },
+};
+#endif
 
 static const std::map<int32_t, const char*> getItemManipulationOptions = {
     { GIM_DISABLED, "Disabled" },   { GIM_NTSC_1_0, "NTSC 1.0" },
@@ -479,6 +489,21 @@ void SohMenu::AddMenuEnhancements() {
                                            "while holding an object."));
 
     AddWidget(path, "Convenience", WIDGET_SEPARATOR_TEXT);
+#ifdef COMBO_BUILD
+    AddWidget(path, "Sages Chamber travel", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_ENHANCEMENT("TempleSagesTravel"))
+        .Options(ComboboxOptions()
+                     .ComboMap(templeSagesTravelOptions)
+                     .DefaultIndex(int(TempleSages::TravelMode::DungeonRewards))
+                     .Tooltip("Choose travel through the five Sages Chamber portals.\n"
+                              "Off: Keep Chamber decoration; hide destination return portals.\n"
+                              "Dungeon rewards: Require each portal's matching medallion.\n"
+                              "Free: All five portals are usable immediately.\n"
+                              "Warp songs: Require each portal's matching learned warp song.\n"
+                              "Gated portals stay dim until their required medallion or song is owned.\n"
+                              "All travel requires Yes/No confirmation. No dungeon rewards are granted.\n"
+                              "After changing modes on a portal, step off and enter again to travel."));
+#endif
     AddWidget(path, "Quit Fishing at Door", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("QuitFishingAtDoor"))
         .Options(CheckboxOptions().Tooltip(

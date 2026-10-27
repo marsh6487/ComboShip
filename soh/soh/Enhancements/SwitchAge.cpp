@@ -8,6 +8,7 @@ extern "C" {
 #include "functions.h"
 #include "mods/extended_equipment.h"
 #include "mods/nei_save.h"
+#include "mods/ext_buttons/ext_buttons.h"
 
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
@@ -112,9 +113,11 @@ int SwitchAge_HandleNonLogicEquipmentSwap(void) {
     // restore the other age's loadout when initialized, and validate ownership.
     ItemEquips* source = LINK_IS_ADULT ? &gSaveContext.adultEquips : &gSaveContext.childEquips;
     const ItemEquips* target = LINK_IS_ADULT ? &gSaveContext.childEquips : &gSaveContext.adultEquips;
+    ExtButton_SaveAgeItems(gSaveContext.linkAge);
     *source = gSaveContext.equips;
     if (target->equipment != 0) {
         gSaveContext.equips = *target;
+        ExtButton_LoadAgeItems(gPlayState->linkAgeOnLoad);
     }
     bool becomingAdult = gPlayState->linkAgeOnLoad == LINK_AGE_ADULT;
 

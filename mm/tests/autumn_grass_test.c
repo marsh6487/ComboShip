@@ -167,7 +167,7 @@ static void Kusa(void) {
                   !bush  ? gKusaSproutDL
                   : fade ? gKusaBushType2DL
                          : gKusaBushType1DL,
-                  native, count, 0xD99C45FF, 1);
+                  native, count, 0xF26846FF, 2);
             eligible = 0;
             Begin();
             draw(&grass.actor, &play);
@@ -204,7 +204,7 @@ static void GroupedGrass(void) {
         Begin();
         draw(&grass.actor, &play);
         Check(fade ? translucent : opaque, fade ? gfx.polyXlu.p : gfx.polyOpa.p, gObjGrass_D_809AAAE0, native, count,
-              0xD99C45FF, 1);
+              0xF26846FF, 2);
         assert(element->alpha == (fade ? 96 : 255));
         allowDraw = 0;
         Begin();
@@ -332,7 +332,7 @@ static void Winter(void) {
             Begin();
             cases[i].draw(cases[i].actor, &play);
             Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
-                  native, count, 0xE5EDF3FF, 3);
+                  native, count, 0xDCECF5FF, 3);
             eligible = 0;
             Begin();
             cases[i].draw(cases[i].actor, &play);
@@ -368,9 +368,9 @@ static void CarriedGrass(void) {
         } else {
             Check(opaque, gfx.polyOpa.p, gKusaBushType1DL, native, count,
                   selected == SEASON_SPRING   ? 0xF6C1D9FF
-                  : selected == SEASON_WINTER ? 0xE5EDF3FF
-                                              : 0xD99C45FF,
-                  selected == SEASON_AUTUMN ? 1 : 3);
+                  : selected == SEASON_WINTER ? 0xDCECF5FF
+                                              : 0xF26846FF,
+                  selected == SEASON_AUTUMN ? 2 : 3);
         }
     }
     eligible = 0;
@@ -412,7 +412,7 @@ static void MixedGroupedGrass(void) {
                 if (op == G_SETGRAYSCALE)
                     tinted = cmd->words.w1;
                 if (op == G_DL && cmd->words.w1 == (uintptr_t)gObjGrass_D_809AAAE0) {
-                    assert(tinted == (selected == SEASON_AUTUMN ? 1 : 3));
+                    assert(tinted == (selected == SEASON_AUTUMN ? 2 : 3));
                     ++nativeDraws;
                 }
             }

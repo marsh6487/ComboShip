@@ -6,7 +6,7 @@
   const smooth=x=>{x=clamp(x,0,1);return x*x*(3-2*x);};
   const view={eye:[0,100,0],forward:[0,0,1],right:[-1,0,0],up:[0,1,0],tanHalfFov:0.5773503,aspect:16/9};
   const nightWeight=hour=>{hour=(hour+24)%24;if(hour<5||hour>=19)return 1;if(hour<7)return 1-smooth((hour-5)/2);if(hour<17)return 0;return smooth((hour-17)/2);};
-  const moteCount=32,fireflyCount=56;
+  const moteCount=32,fireflyCount=96;
   class Motion {
     constructor(){this.particles=Array.from({length:moteCount+fireflyCount},()=>({alpha:0,generation:0}));this.reset();}
     reset(){this.particles.forEach(p=>p.alpha=0);this.beams=[];this.randomState=0x53554d52;this.elapsed=0;this.initialized=false;}
@@ -20,7 +20,7 @@
       p.anchor=add(add(add(view.eye,mul(view.forward,depth)),mul(view.right,x*depth*view.tanHalfFov*view.aspect)),mul(view.up,y*depth*view.tanHalfFov));
       p.position=p.anchor.slice();p.phase=this.random()*6.2831853;p.frequency=0.6+this.random()*0.5;p.orbit=p.kind?6+this.random()*16:2+this.random()*4;
       p.drift=mul(view.right,p.kind?this.random()-0.5:3+this.random()*4);p.drift[1]+=p.kind?0:1+this.random()*2;
-      p.radius=clamp(depth*(p.kind?0.0030:0.0045),0.45,p.kind?4.8:10);p.age=0;p.alpha=0;p.generation++;
+      p.radius=clamp(depth*(p.kind?0.0036:0.0045),0.45,p.kind?5.8:10);p.age=0;p.alpha=0;p.generation++;
     }
     step(input={}){
       const {eligible=true,paused=false,seconds=0.05,hour=12,dayVisibility=1,sunbeams=true}=input;
@@ -37,7 +37,7 @@
         const r=sub(p.position,view.eye),depth=Math.max(100,dot(r,view.forward));
         const x=Math.abs(dot(r,view.right))/(depth*view.tanHalfFov*view.aspect),y=Math.abs(dot(r,view.up))/(depth*view.tanHalfFov);
         const edge=smooth((1.08-Math.max(x,y))/0.18),pulse=0.5+0.5*Math.sin(p.age*p.frequency+p.phase);
-        p.alpha=smooth(p.age/0.8)*edge*(p.kind?night*(0.30+0.64*pulse):daylight*(0.58+0.22*pulse));
+        p.alpha=smooth(p.age/0.8)*edge*(p.kind?night*(0.48+0.52*pulse):daylight*(0.58+0.22*pulse));
       });
       this.initialized=true;this.beams=[];
       if(sunbeams&&daylight>0.01){

@@ -42,6 +42,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/Gameplay/ComboForestActors.h"
+#include "soh/Enhancements/Gameplay/ComboTempleSages.h"
 #include <assert.h>
 #include <string.h>
 
@@ -331,6 +332,12 @@ static AnimationHeader* EnViewerStatic_GetAnimation(uint16_t animation) {
             return &gPhantomGanonNeutralAnim;
         case STATIC_ANIM_ADULT_ZELDA_IDLE:
             return &gZelda2Anime2Anim_009FBC;
+        case STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED:
+            return &gZelda2Anime2Anim_003FF8;
+        case STATIC_ANIM_CHILD_ZELDA_IDLE:
+            return &gChildZeldaAnim_000654;
+        case STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED:
+            return &gChildZeldaAnim_01910C;
         default:
             return NULL;
     }
@@ -370,6 +377,11 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             break;
         case STATIC_SKELETON_ADULT_ZELDA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gZelda2Skel, NULL, NULL, NULL, 0);
+            break;
+        case STATIC_SKELETON_CHILD_ZELDA:
+            /* Use the public resource signature, like adult Zelda, so native
+             * ResourceMgr/SkeletonPatcher replacement and Alt selection apply. */
+            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gChildZeldaSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_DARUNIA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gDaruniaSkel, NULL, NULL, NULL, 0);
@@ -592,6 +604,7 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
                 return;
             }
             this->staticState.mmResourceOwner = resources.owner;
+            this->staticState.mmPropDL = resources.propDisplayList;
             skeleton = resources.skeleton;
             animation = resources.animation;
             this->staticState.mmPlayerFrames = resources.playerFrames;
@@ -664,7 +677,10 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
             Actor_Kill(&this->actor);
             return;
         }
-        SkelAnime_InitFlex(play, &this->skin.skelAnime, skeleton, NULL, NULL, NULL, 0);
+        if (presentation->kind == STATIC_STORY_MM_NORMAL_STANDARD)
+            SkelAnime_Init(play, &this->skin.skelAnime, (SkeletonHeader*)skeleton, NULL, NULL, NULL, 0);
+        else
+            SkelAnime_InitFlex(play, &this->skin.skelAnime, skeleton, NULL, NULL, NULL, 0);
         if (this->skin.skelAnime.jointTable == NULL || this->skin.skelAnime.morphTable == NULL) {
             SkelAnime_Free(&this->skin.skelAnime, play);
             this->skin.skelAnime.jointTable = NULL;
@@ -769,6 +785,7 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
         Actor_SetObjectDependency(play, &this->actor);
     }
     Actor_SetScale(&this->actor, definition->scale);
+    Actor_SetFocus(&this->actor, definition->focusHeight);
     const StaticStoryGanonPresentation* ganonPresentation =
         StaticStoryGanon_GetPresentation((StaticStoryActorType)this->staticState.type);
     // Saria's narrower interaction collider should not shrink her visual shadow.
@@ -848,14 +865,20 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
                 MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos);
                 this->staticState.monkeySfxActive = false;
             }
-            this->staticState.monkeySfxTimer = 0;
-        } else if (this->staticState.monkeySfxTimer > 0) {
-            --this->staticState.monkeySfxTimer;
+            this->staticState.monkeySfxPhase = 0;
         } else {
-            this->staticState.monkeySfxActive = MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos);
-            // Native MM one-shot through Sequence_0, with a 3–5 second gap
-            // at the native 20 Hz update rate. All poses share this hook.
-            this->staticState.monkeySfxTimer = Rand_S16Offset(60, 41);
+            // The Woods guide calls at frame 1 of its nine-frame walk loop.
+            // Track that clock independently of the displayed pose. Third-frame
+            // units match normal SoH animation's R_UPDATE_RATE / 3 without drift.
+            const s32 period = 9 * 3;
+            s32 previous = this->staticState.monkeySfxPhase;
+            s32 next = previous + R_UPDATE_RATE;
+            this->staticState.monkeySfxPhase = next % period;
+            if (((previous < 3) && (next >= 3)) || (next >= period + 3)) {
+                if (MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos)) {
+                    this->staticState.monkeySfxActive = true;
+                }
+            }
         }
     }
 
@@ -940,7 +963,8 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
         Collider_UpdateCylinder(&this->actor, &this->staticState.collider);
         CollisionCheck_SetOC(play, &play->colChkCtx, &this->staticState.collider.base);
     }
-    Actor_SetFocus(&this->actor, definition->focusHeight);
+    if (!StaticStoryMm_GetFocusLimb((StaticStoryActorType)this->staticState.type))
+        Actor_SetFocus(&this->actor, definition->focusHeight);
     if (canInteract) {
         EnViewerStatic_OfferTalk(this, play);
         EnViewerStatic_UpdateTracking(this, play);
@@ -1075,7 +1099,7 @@ void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
     EnViewerStaticTalkContext context;
 
     /* Model-only catalogue entries remain visible, collidable, and targetable without entering talk state. */
-    if (!StaticStoryActor_CanTalk(type)) {
+    if (!StaticStoryTalk_CanTalkPose(type, this->staticState.pose)) {
         this->actor.textId = 0;
         EnViewerStatic_RestorePlacementPose(this);
         return;
@@ -1100,8 +1124,8 @@ void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
         EnViewerStatic_GetTalkMessageState, EnViewerStatic_ShouldAdvanceTalk,   EnViewerStatic_CloseTalk,
         EnViewerStatic_ProcessTalkRequest,  EnViewerStatic_OfferTalkAtDistance,
     };
-    StaticStoryTalk_Update(type, &progression, definition->talkDistance, timePedestalOffered, &session, &operations,
-                           &context);
+    StaticStoryTalk_UpdateForPose(type, this->staticState.pose, &progression, definition->talkDistance,
+                                  timePedestalOffered, &session, &operations, &context);
     this->actor.textId = session.textId;
     this->staticState.talking = session.talking;
     this->staticState.tracking = session.tracking;
@@ -1904,6 +1928,34 @@ void EnViewer_DrawStaticAdultMalon(EnViewer* this, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static s32 EnViewer_StaticChildZeldaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
+                                                     Vec3s* rot, void* thisx) {
+    /* Match the ordinary child Zelda model contract: legs inside the skirt
+     * are hidden, with all other limbs supplied by the loaded skeleton. */
+    if (limbIndex >= 3 && limbIndex < 7) {
+        *dList = NULL;
+    }
+    return false;
+}
+
+void EnViewer_DrawStaticChildZelda(EnViewer* this, PlayState* play) {
+    static void* sEyes[] = { gChildZeldaEyeOpenTex, gChildZeldaEyeBlinkTex, gChildZeldaEyeShutTex };
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gChildZeldaMouthNeutralTex));
+    SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticChildZeldaOverrideLimbDraw, NULL, this);
+    CLOSE_DISPS(play->state.gfxCtx);
+#ifdef COMBO_BUILD
+    const StaticStoryPoseDescriptor* pose =
+        StaticStoryActor_ResolvePose(STATIC_STORY_ACTOR_CHILD_ZELDA, this->staticState.pose);
+    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA))
+        ComboTempleSages_DrawZeldaAura(&this->actor, play);
+#endif
+}
+
 static s32 EnViewer_StaticAdultZeldaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
                                                      Vec3s* rot, void* thisx, Gfx** gfx) {
     EnViewer* this = (EnViewer*)thisx;
@@ -1976,6 +2028,12 @@ void EnViewer_DrawStaticAdultZelda(EnViewer* this, PlayState* play) {
                                        this->skin.skelAnime.dListCount, EnViewer_StaticAdultZeldaOverrideLimbDraw, NULL,
                                        this, POLY_OPA_DISP);
     CLOSE_DISPS(play->state.gfxCtx);
+#ifdef COMBO_BUILD
+    const StaticStoryPoseDescriptor* pose =
+        StaticStoryActor_ResolvePose(STATIC_STORY_ACTOR_ADULT_ZELDA, this->staticState.pose);
+    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA))
+        ComboTempleSages_DrawZeldaAura(&this->actor, play);
+#endif
 }
 
 static s32 EnViewer_StaticDaruniaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
@@ -2213,6 +2271,32 @@ static void EnViewer_StaticAnjuPostLimbDraw(PlayState* play, s32 limbIndex, Gfx*
     }
 }
 
+static void EnViewer_StaticMikauPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    EnViewer* this = (EnViewer*)thisx;
+    const StaticStoryMmPresentation* presentation =
+        StaticStoryMm_GetPresentation(STATIC_STORY_ACTOR_MIKAU, this->staticState.pose);
+    if (presentation && limbIndex == presentation->propLimb && this->staticState.mmPropDL) {
+        OPEN_DISPS(play->state.gfxCtx);
+        gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_OPA_DISP++, this->staticState.mmPropDL);
+        CLOSE_DISPS(play->state.gfxCtx);
+    }
+}
+
+static void EnViewer_StaticRegionalPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    EnViewer* this = (EnViewer*)thisx;
+    StaticStoryActorType type = (StaticStoryActorType)this->staticState.type;
+    if (limbIndex == StaticStoryMm_GetFocusLimb(type)) {
+        Vec3f offset = { 0, StaticStoryMm_GetFocusOffsetY(type), 0 };
+        Matrix_MultVec3f(&offset, &this->actor.focus.pos);
+    }
+    if (type == STATIC_STORY_ACTOR_MIKAU)
+        EnViewer_StaticMikauPostLimbDraw(play, limbIndex, dList, rot, thisx);
+}
+static void EnViewer_StaticRegionalPostLimbDrawXlu(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx,
+                                                   Gfx** gfx) {
+    EnViewer_StaticRegionalPostLimbDraw(play, limbIndex, dList, rot, thisx);
+}
 static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
     if (!this->staticState.initialized)
         return;
@@ -2234,9 +2318,28 @@ static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
     } else if (presentation != NULL && presentation->frameCount != 0) {
         overrideLimbDraw = EnViewer_StaticOrdinaryMmOverrideLimbDraw;
     }
+    if (presentation && presentation->kind == STATIC_STORY_MM_GHOST_FLEX) {
+        OPEN_DISPS(play->state.gfxCtx);
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        StaticStoryMmFace face =
+            StaticStoryMm_ResolveFace((StaticStoryActorType)this->staticState.type, this->staticState.pose,
+                                      this->skin.skelAnime.curFrame, this->staticState.eyeIndex, false);
+        gSPSegment(POLY_XLU_DISP++, presentation->eyeSegment, (uintptr_t)this->staticState.mmEyeTextures[face.eye]);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 176);
+        POLY_XLU_DISP = SkelAnime_DrawFlex(play, this->skin.skelAnime.skeleton, this->skin.skelAnime.jointTable,
+                                           this->skin.skelAnime.dListCount, NULL,
+                                           EnViewer_StaticRegionalPostLimbDrawXlu, this, POLY_XLU_DISP);
+        CLOSE_DISPS(play->state.gfxCtx);
+        return;
+    }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN) {
+    if (StaticStoryMm_GetFocusLimb((StaticStoryActorType)this->staticState.type))
+        postLimbDraw = EnViewer_StaticRegionalPostLimbDraw;
+    if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN ||
+        this->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+        /* Mikau's native lists call segment C, command 2. Establish MM's
+         * opaque table before drawing; a previous OoT actor owns no such table. */
         gSPSegment(POLY_OPA_DISP++, 0x0C, MmAssets_GetOpaqueRenderMode());
     }
     if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {
@@ -2402,6 +2505,9 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
         case STATIC_STORY_ACTOR_ADULT_ZELDA:
             EnViewer_DrawStaticAdultZelda(this, play);
             break;
+        case STATIC_STORY_ACTOR_CHILD_ZELDA:
+            EnViewer_DrawStaticChildZelda(this, play);
+            break;
         case STATIC_STORY_ACTOR_SHEIK:
             EnViewer_DrawStaticSheik(this, play);
             break;
@@ -2441,6 +2547,9 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
         case STATIC_STORY_ACTOR_LULU:
         case STATIC_STORY_ACTOR_ANJU:
         case STATIC_STORY_ACTOR_MONKEY:
+        case STATIC_STORY_ACTOR_STALCHILD:
+        case STATIC_STORY_ACTOR_MIKAU:
+        case STATIC_STORY_ACTOR_DARMANI:
             EnViewer_DrawStaticMmActor(this, play);
             break;
         case STATIC_STORY_ACTOR_SKULL_KID:

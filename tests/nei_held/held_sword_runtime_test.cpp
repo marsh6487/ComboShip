@@ -139,6 +139,7 @@ static void swordHand(Player& player, int action, int item) {
 #else
     player.leftHandType = action == PLAYER_IA_SWORD_BIGGORON ? PLAYER_MODELTYPE_LH_BGS : PLAYER_MODELTYPE_LH_SWORD;
     gSaveContext.swordHealth = 8.f;
+    gSaveContext.bgsFlag = 1;
 #endif
 }
 static void expectAuthored(Player& player, int sword) {
@@ -148,7 +149,13 @@ static void expectAuthored(Player& player, int sword) {
            "Vanilla sword still lacks its redesigned progressive held model");
     assert(std::memcmp(&player, &before, sizeof(player)) == 0);
     assert(selected != original && (selected[0].words.w0 >> 24) == G_DL);
-    assert(registeredHand == selected && registeredAura == (sword == NEI_HELD_SWORD_FOUR ? -1 : sword));
+    const int aura = sword == NEI_HELD_SWORD_FOUR ? -1
+                     : sword == NEI_HELD_SWORD_GIANTS_KNIFE
+                         ? SWORD_AURA_GIANTS_KNIFE
+                     : sword == NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE
+                         ? SWORD_AURA_AUTHORED_BROKEN_GIANTS_KNIFE
+                         : sword;
+    assert(registeredHand == selected && registeredAura == aura);
     const Gfx* mesh = reinterpret_cast<const Gfx*>(selected[0].words.w1);
     assert((mesh[0].words.w0 >> 24) == G_DL_OTR_FILEPATH);
     std::string want = sNeiHeldSwordPaths[sword][frame()][0];
@@ -299,10 +306,7 @@ static void testVanillaHeldSetting() {
 #else
             swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_KNIFE);
             gSaveContext.swordHealth = 0;
-            for (int appearance : {0, 1}) {
-                vanillaHeldSwords = appearance;
-                expectUntouched(player);
-            }
+            expectAppearanceToggle(player, NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE);
 #endif
             swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
             for (int appearance : {0, 1}) {
@@ -319,10 +323,88 @@ static void testVanillaHeldSetting() {
     allResources();
 }
 
+#ifndef NEI_EQUIPMENT_MM
+static void knifeStateChecks() {
+  Player player{};
+  for (int age : {LINK_AGE_ADULT, LINK_AGE_CHILD}) {
+    for (int item : {ITEM_SWORD_BGS, ITEM_SWORD_KNIFE}) {
+      for (bool alternateEnabled : {false, true}) {
+        for (float health : {0.f, 8.f}) {
+          allResources();
+          altOn = alternateEnabled;
+          gSaveContext.linkAge = age;
+          swordHand(player, PLAYER_IA_SWORD_BIGGORON, item);
+          gSaveContext.bgsFlag = 0;
+          gSaveContext.swordHealth = health;
+          const SaveContext saved = gSaveContext;
+          const Player before = player;
+          Gfx *selected = original;
+          assert(WeaponUpgrade_ApplyHeldSwordDL(&selected, hand, &player, 12,
+                                                34, 56));
+          const Gfx *wrapper =
+              reinterpret_cast<const Gfx *>(selected[0].words.w1);
+          const std::string path =
+              reinterpret_cast<const char *>(wrapper[0].words.w1);
+          const char *wanted =
+              health <= 0.f ? "/broken_giants_knife/" : "/giants_knife/";
+          if (path.find(wanted) == std::string::npos)
+            std::cerr << "Knife state drew " << path << " instead of " << wanted
+                      << "\n";
+          assert(path.find(wanted) != std::string::npos);
+          assert(selected[1].words.w1 == reinterpret_cast<uintptr_t>(hand));
+          assert(std::memcmp(&player, &before, sizeof(player)) == 0);
+          assert(std::memcmp(&gSaveContext, &saved, sizeof(saved)) == 0);
+          const int model = health <= 0.f ? NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE
+                                          : NEI_HELD_SWORD_GIANTS_KNIFE;
+          expectAuthored(player, model);
+          // No incomplete donor graph may replace the native hand.
+          for (const char *const *p = sNeiHeldSwordResources[model]; *p; ++p) {
+            local.erase(*p);
+            donor.erase(*p);
+            shipped.erase(*p);
+            expectUntouched(player);
+            local.insert(*p);
+            donor.insert(*p);
+            shipped.insert(*p);
+          }
+          const char *custom = health <= 0.f
+                                   ? "__OTR__objects/object_custom_equip/"
+                                     "gCustomBrokenLongswordDL"
+                                   : "__OTR__objects/object_custom_equip/"
+                                     "gCustomBreakableLongswordDL";
+          expectCombinedHandPriority(player, model, custom);
+          expectCombinedHandPriority(
+              player, model,
+              "__OTR__objects/object_custom_equip/gCustomLongswordDL");
+          bodySelected = true;
+          expectUntouched(player);
+          bodySelected = false;
+          greatFairy = 1;
+          expectAuthored(player, NEI_HELD_SWORD_GREAT_FAIRY);
+          fairyLook = false;
+          expectAuthored(player, model);
+          fairyLook = true;
+          greatFairy = 0;
+          fourEquipped = true;
+          expectAuthored(player, NEI_HELD_SWORD_FOUR);
+          fourEquipped = false;
+          vanillaHeldSwords = 1;
+          expectUntouched(player);
+        }
+      }
+    }
+  }
+  allResources();
+}
+#endif
+
 int main() {
-    Player player{};
-    allResources();
-    swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
+#ifndef NEI_EQUIPMENT_MM
+  knifeStateChecks();
+#endif
+  Player player{};
+  allResources();
+  swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
 #ifdef NEI_EQUIPMENT_MM
     const int kokiri = NEI_HELD_SWORD_MM_KOKIRI;
 #else
@@ -487,14 +569,18 @@ int main() {
     swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_BGS);
     gSaveContext.swordHealth = 0; greatFairy = 0;
     fourEquipped = true; expectAuthored(player, NEI_HELD_SWORD_FOUR);
-    fourEquipped = false; expectAuthored(player, NEI_HELD_SWORD_BIGGORON);
+    fourEquipped = false;
+    expectAuthored(player, NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE);
     for (const char* path : {
              "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeDL",
              "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"})
-        expectCombinedHandPriority(player, NEI_HELD_SWORD_BIGGORON, path);
+      expectCombinedHandPriority(player, NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE,
+                                 path);
     swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_KNIFE);
-    gSaveContext.swordHealth = 0; expectUntouched(player);
-    gSaveContext.swordHealth = 8; expectAuthored(player, NEI_HELD_SWORD_BIGGORON);
+    gSaveContext.swordHealth = 0;
+    expectAuthored(player, NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE);
+    gSaveContext.swordHealth = 8;
+    expectAuthored(player, NEI_HELD_SWORD_GIANTS_KNIFE);
     swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI); gSaveContext.linkAge = LINK_AGE_CHILD;
     expectAuthored(player, NEI_HELD_SWORD_KOKIRI);
 #endif

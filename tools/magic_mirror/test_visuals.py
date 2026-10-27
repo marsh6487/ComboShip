@@ -3,12 +3,48 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import hashlib
+import json
+import struct
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class MagicMirrorVisualTests(unittest.TestCase):
+    def test_private_forest_cast_resources(self):
+        art = ROOT / 'tools/magic_mirror/cast'
+        manifest = json.loads((art/'manifest.json').read_text())
+        self.assertEqual(set(manifest), {'forest_seal', 'forest_wisp'})
+        for name, metadata in manifest.items():
+            with self.subTest(texture=name):
+                self.assertEqual(metadata['source_sha256'], hashlib.sha256((art/(name+'.png')).read_bytes()).hexdigest())
+                paths = [ROOT/host/'assets/custom/objects/magic_mirror'/name for host in ('soh', 'mm')]
+                raw = paths[0].read_bytes()
+                self.assertEqual(raw, paths[1].read_bytes())
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), metadata['resource_sha256'])
+                self.assertEqual(struct.unpack_from('<IIIIffI', raw, 64), (1, 512, 512, 1, 16., 16., 1048576))
+                self.assertEqual(len(raw), 1048668)
+                alpha = raw[95::4]
+                self.assertEqual(min(alpha), 0)
+                self.assertGreater(max(alpha), 200)
+                self.assertGreater(sum(a == 0 for a in alpha), len(alpha)//4)
+                self.assertTrue(all(a == 0 for a in alpha[:512] + alpha[-512:]))
+
+    def test_real_forest_reflection_native_parity(self):
+        directory = ROOT / 'tools/magic_mirror/reflection'
+        receipt = json.loads((directory/'forest-scene.json').read_text())
+        self.assertNotIn('source_library_file_id', receipt)
+        self.assertNotIn('source_name', receipt)
+        self.assertEqual(receipt['output_sha256'], hashlib.sha256((directory/'forest-scene.png').read_bytes()).hexdigest())
+        self.assertEqual(receipt['saria']['sprite_sha256'], hashlib.sha256((directory/'saria-silhouette.png').read_bytes()).hexdigest())
+        paths = [ROOT/game/'assets/custom/textures/magic_mirror/gMagicMirrorForestReflectionTex.rgb5a1.png'
+                 for game in ('soh','mm')]
+        self.assertEqual(paths[0].read_bytes(),paths[1].read_bytes())
+        image = Image.open(paths[0]).convert('RGBA')
+        self.assertEqual(image.size,(32,32))
+        self.assertEqual(image.getchannel('A').getextrema(),(255,255))
+
     def test_shared_mesh_behavior(self):
         header = ROOT / "combo/gameplay/MagicMirrorGeometry.h"
         self.assertTrue(header.exists(), "the shared native mirror mesh is missing")

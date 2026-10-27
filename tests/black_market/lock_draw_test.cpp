@@ -7,6 +7,10 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
+#ifndef OOT_LOCK_TEST
+#include "combo/BlackMarketMmShopLayout.h"
+#include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
+#endif
 
 using namespace ComboRando::BlackMarket;
 PlayState* gPlayState;
@@ -18,6 +22,12 @@ static std::array<Gfx, 64> overlayCommands;
 static std::vector<Vtx*> vertexAllocations;
 static std::vector<std::string> drawnKeys;
 static std::array<Actor, 8> sDisplays;
+#ifndef OOT_LOCK_TEST
+static EnOssan nativeShop;
+static std::array<EnGirlA, 8> nativeStock;
+static EnOssan* sNativeShop = &nativeShop;
+static PlayState* sNativeShopPlay;
+#endif
 static constexpr Vec3f kShelves[8] = {
     {72,64,48},{72,104,48},{120,64,48},{120,104,48},
     {-72,64,48},{-72,104,48},{-120,64,48},{-120,104,48}
@@ -61,7 +71,15 @@ void SubmitOffer(const Item& item) {
 }
 void DrawOffer(PlayState*, const Item& item) { SubmitOffer(item); }
 namespace ComboBlackMarketItems { int Id(const Item& item) { return int(&item - Catalog().data()); } }
-namespace Rando { void DrawResolvedItem(int id, int, Actor*) { SubmitOffer(Catalog()[id]); } }
+namespace Rando { void DrawResolvedItem(int id, int, Actor* actor) {
+#ifndef OOT_LOCK_TEST
+    bool owned = false;
+    for (int slot = 0; slot < 8; ++slot)
+        owned |= actor == &nativeStock[slot].actor && Offer(slot) && ComboBlackMarketItems::Id(*Offer(slot)) == id;
+    assert(owned && "render the real native actor for this seeded stock slot");
+#endif
+    SubmitOffer(Catalog()[id]);
+} }
 /* NATIVE_ALLOCATION */
 /* NATIVE_DEBUG */
 void* Allocate(size_t bytes) {
@@ -128,6 +146,15 @@ void Reset() {
     drawnKeys.clear(); allOffers = refillOffer = false; soldOutSlot = -1; sSelected = 3;
     translations.clear(); scales.clear(); active = interior = allocate = report = true;
     sTalking = true; sTitlePending = sGrannyActive = false;
+#ifndef OOT_LOCK_TEST
+    nativeShop = {}; nativeStock = {}; sNativeShopPlay = &play;
+    for (int i = 0; i < 8; ++i) {
+        nativeShop.items[i] = &nativeStock[i];
+        nativeStock[i].actor.world.pos = kShelves[i];
+        nativeStock[i].actor.scale = {.25f,.25f,.25f};
+        nativeStock[i].actor.update = [](Actor*, PlayState*) {};
+    }
+#endif
 }
 void CheckPackets(int effects) {
     int vertexBatches = 0, triangles = 0, syncs = 0;
@@ -204,7 +231,25 @@ int main() {
     assert(allocations == 1 && translations.size() == 1);
     assert(translations[0].x == 13 && translations[0].y == 30 && translations[0].z == 32);
     assert(scales.size() == 1 && scales[0] == 1.f / BlackMarketVisual::kLockVertexScale);
-    const auto expected = BlackMarketVisual::BuildLock(frame, play.gameplayFrames, true);
+    float sealHalfHeight = 0;
+    for (int i = 0; i < 64; ++i)
+        sealHalfHeight =
+            std::max(sealHalfHeight, std::abs(vertexAllocations[0][i].v.ob[1] / BlackMarketVisual::kLockVertexScale));
+#ifndef OOT_LOCK_TEST
+    assert(sealHalfHeight > 10 && sealHalfHeight <= 12.7f &&
+           "MM ribbons must wrap the item with compact padding for larger shelf stock");
+#else
+    assert(sealHalfHeight > 12.7f && "OoT must retain its original ribbon padding");
+#endif
+    const auto expected = BlackMarketVisual::BuildLock(frame, play.gameplayFrames, true,
+#ifdef OOT_LOCK_TEST
+                                                       1.f
+#else
+                                                       .5f
+#endif
+    );
+    assert(!BlackMarketVisual::BuildLock(frame, 0, false, 0).valid);
+    assert(!BlackMarketVisual::BuildLock(frame, 0, false, NAN).valid);
     for (int i = 0; i < 64; ++i) {
         const auto& actual = vertexAllocations[0][i].v; const auto& want = expected.vertices[i];
         assert(actual.ob[0] == want.x && actual.ob[1] == want.y && actual.ob[2] == want.z);
@@ -248,5 +293,17 @@ int main() {
     Reset(); interior = false; DrawMarket(); assert(draws == 0 && allocations == 0 && shelfDraws == 0 && interiorEffects == 0);
     Reset(); sGrannyActive = true; DrawMarket(); assert(interiorEffects == 0 && "Granny owns its existing flame/smoke path");
     Reset(); play.state.running = false; DrawMarket(); assert(draws == 0 && allocations == 0);
+#ifndef OOT_LOCK_TEST
+    Reset();
+    nativeStock[3].actor.world.pos = {123.25f, 77.5f, -99.0f};
+    nativeStock[3].actor.scale = {.27f,.27f,.27f};
+    DrawMarket();
+    assert(nativeStock[3].actor.world.pos.x == 123.25f && nativeStock[3].actor.world.pos.z == -99.0f);
+    bool sawNativePosition = false;
+    for (const auto& translation : translations)
+        sawNativePosition |= translation.x == 123.25f && translation.z == -99.0f;
+    assert(sawNativePosition && "draw must retain the native selected-item tween position");
+    assert(std::find(scales.begin(), scales.end(), .27f) != scales.end());
+#endif
     std::puts("PASS native market X: native unbounded allocation with OPA/matrix/command/overlay shortage guards, real GBI blend/depth/LUT/texture/combiner, 64 fitted vertices, locked-only capture and restored state");
 }

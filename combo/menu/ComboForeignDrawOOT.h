@@ -38,6 +38,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerDraw.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
@@ -50,7 +51,7 @@ struct ComboForeignDrawInfo {
     int32_t xluStart = -1;            // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;               // extra model scale; 0 = none (MM remains: 0.02)
     bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
-    bool itemShimmer = false;
+    int32_t itemShimmer = CW_ITEM_SHIMMER_NONE;
     uint8_t itemShimmerColor[4] = {};
     int32_t neiShimmer = 0;
     bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
@@ -174,7 +175,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.matAnimBillboard = raw.matAnimBillboard != 0;
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
-    info.itemShimmer = raw.itemShimmer != 0;
+    info.itemShimmer = raw.itemShimmer;
     info.neiShimmer = raw.neiShimmer;
     memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
@@ -1146,6 +1147,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
             NeiGi_DrawMesh(
                 play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play), NeiGi::Kind::Pokeball));
+        else if (info->itemShimmer == CW_ITEM_SHIMMER_TINTED)
+            NeiGi_DrawTintedShimmerOverlay(play, info->itemShimmerColor, "mm");
         else
             ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }

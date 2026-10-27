@@ -47,6 +47,7 @@ struct MaskedTexture { const void* replacementData=nullptr; };
 class Interpreter {
   public:
     Rdp state;Rdp* mRdp=&state;Backend backend;Backend* mRapi=&backend;
+    const ResourceStub* mPreludeMaterialBoundResources[2]={};
     std::map<std::string_view,MaskedTexture> mMaskedTextures;
     void Flush() {}
     void GfxDpSetTextureImage(uint32_t,uint32_t,uint32_t,const char*,uint32_t,RawTexMetadata,const void*);
@@ -324,10 +325,15 @@ int main() {
     for(int width:{16,32,64,128,192}) {
         auto& loaded=interpreter.mRdp->loaded_texture[0];loaded.line_size_bytes=loaded.full_image_line_size_bytes=width*4;
         loaded.size_bytes=loaded.orig_size_bytes=width*32*4;interpreter.mRdp->textures_changed[0]=true;
+        ResourceStub precedingMaterial;
+        interpreter.mPreludeMaterialBoundResources[0]=&precedingMaterial;
+        interpreter.mPreludeMaterialBoundResources[1]=&precedingMaterial;
         DrawPreview(&play);
         auto origin=NormalizedUV(0,0);auto far=NormalizedUV(composite.vertices[3].v.tc[0]/32.f,composite.vertices[3].v.tc[1]/32.f);
         check(origin[0]==0&&origin[1]==0&&far[0]==1&&far[1]==1,"production triangle UV normalization ignores preceding icon dimensions");
         check(cpuImports==0&&!interpreter.mRdp->textures_changed[0]&&interpreter.backend.lastFb==7,"framebuffer bind suppresses placeholder CPU texture imports");
+        check(!interpreter.mPreludeMaterialBoundResources[0]&&!interpreter.mPreludeMaterialBoundResources[1],
+              "framebuffer binding clears remembered material resources in both slots");
     }
     for(u16 button:{(u16)BTN_Z,(u16)BTN_R}) {
         play.pauseCtx.pageIndex=PAUSE_MASK;play.pauseCtx.mainState=PAUSE_MAIN_STATE_IDLE;play.pauseCtx.eye={64,0,0};

@@ -146,6 +146,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
 #include <algorithm>
 #include <unordered_set>
 #include "ComboMaskShimmer.h"
+#include "ComboCollectibleShimmerDraw.h"
 extern "C" { PlayState* gPlayState = &Fixture::play; }
 bool ownerAlt = false;
 extern "C" int32_t OOT_NeiAltAssetsEnabled(void) { return ownerAlt; }

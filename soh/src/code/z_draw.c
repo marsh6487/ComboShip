@@ -436,7 +436,12 @@ static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
 #include "ComboMaskShimmer.h"
 #include "ComboSongDraw.h"
 
+#include "ComboCollectibleShimmerHost.h"
+
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
+    const int collectible = ComboCollectibleShimmer_ColorForDrawId(drawId, color);
+    if (collectible)
+        return collectible;
     switch (drawId) {
         case GID_SONG_MINUET:
         case GID_SONG_BOLERO:
@@ -523,7 +528,10 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
     sDrawItemTable[drawId].drawFunc(play, drawId);
     if (itemShimmer) {
         Matrix_Pop();
-        ComboDrawMaskShimmer(play, NULL, maskColor, NULL);
+        if (itemShimmer == CW_ITEM_SHIMMER_TINTED)
+            NeiGi_DrawTintedShimmerOverlay(play, maskColor, NULL);
+        else
+            ComboDrawMaskShimmer(play, NULL, maskColor, NULL);
     }
 }
 

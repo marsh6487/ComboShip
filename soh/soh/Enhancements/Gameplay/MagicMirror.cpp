@@ -33,11 +33,27 @@ int Combo_SOH_CrossDungeonTransitionPending(void);
 u8 Sm64Mario_IsReady(void);
 }
 #include "gameplay/MagicMirrorDraw.inc.h"
+#include "gameplay/MagicMirrorCamera.inc.h"
 
 namespace MirrorRuntime {
 void FinishPickup(int token);
 }
 namespace MirrorHost {
+void UpdateCastCamera(PlayState* play, Player* player) {
+    ComboMagicMirrorCamera::Begin(play, player);
+}
+void ReleaseCastCamera(PlayState* play) {
+    ComboMagicMirrorCamera::Release(play);
+}
+void ForgetCastCamera() {
+    ComboMagicMirrorCamera::Forget();
+}
+void PlayActivationChime() {
+    Sfx_PlaySfxCentered(NA_SE_EV_TRE_BOX_FLASH);
+}
+void PlayDepartureCue() {
+    Sfx_PlaySfxCentered(NA_SE_PL_MAGIC_WIND_WARP);
+}
 u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
@@ -133,8 +149,10 @@ void OpenMirrorText(u16* text, bool* fromTable) {
         return;
     const char* body =
         *text == MirrorRuntime::kReceiptText
-            ? "You found the Magic Mirror!\nEquip it to a C Button to return\nto the Lost Woods from outdoors.\x04"
-              "Its reflection bridges worlds.\nUse the item selector to switch\nbetween Mirror and Time Gate."
+            // OoT's native newline is 0x01; C++ '\n' is its persistent-text
+            // control (0x0A), which cannot close the native get-item receipt.
+            ? "You found the Magic Mirror!&Equip it to a C Button to return&to the Lost Woods from outdoors.\x04"
+              "Its reflection bridges worlds.&Use the item selector to switch&between Mirror and Time Gate."
             : "Return to the Lost Woods?\x01\x1B\x05\x42"
               "Yes\x01No\x05\x40";
     CustomMessage message(body);

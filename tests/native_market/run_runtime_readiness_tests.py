@@ -26,6 +26,7 @@ with tempfile.TemporaryDirectory(prefix="native-market-ready-") as directory:
 #include <cstdio>
 #include "combo/BlackMarketEntry.h"
 #include "combo/BlackMarketNativeResources.h"
+#include "combo/BlackMarketMmShopScene.h"
 #include "mm/2s2h/Enhancements/Gameplay/BlackMarketResources.h"
 std::set<std::string> files;
 std::set<std::string> nativeFiles;
@@ -59,6 +60,15 @@ bool LoadNativeKeeper() {
 /* PRODUCTION */
 int main() {
  for(const char* path:kNativeBlackMarket/* LABEL */Resources)files.insert(path);
+#ifndef OOT_READY_TEST
+ assert(!PackAvailable());
+ for(const char* path:BlackMarketMmShopScene::kPresentationResources)files.insert(path);
+ for(const char* path:BlackMarketMmShopScene::kPresentationResources) {
+  files.erase(path);
+  assert(!PackAvailable() && "each private MM presentation clone is required");
+  files.insert(path);
+ }
+#endif
 #ifdef OOT_READY_TEST
  for(auto it=files.begin();it!=files.end();) {
   if(IsNativeMm(it->c_str()))it=files.erase(it);else ++it;
@@ -103,6 +113,10 @@ int main() {
  assert(!PackAvailable());
  files.clear();
  for(const char* path:kBlackMarketResources)files.insert(path);
+#ifndef OOT_READY_TEST
+ assert(!PackAvailable() && "stale legacy MM presentation needs its private companion resources");
+ for(const char* path:BlackMarketMmShopScene::kPresentationResources)files.insert(path);
+#endif
  mmInitializations=0;nativeImports=0;nativeFiles.clear();
  importFailure=ImportFailure::Limb;
  assert(PackAvailable());

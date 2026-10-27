@@ -28,10 +28,19 @@ void Matrix_Scale(f32, f32, f32, u8) { ++matrixCalls; }
 Mtx* Matrix_ToMtx(Mtx* matrix, char*, s32) { ++matrixCalls; std::memset(matrix, 0x33, sizeof(*matrix)); return matrix; }
 #endif
 // Same raw-pointer branches as the native wrappers; these issue real GBI commands.
-void gSPVertex(Gfx* packet, uintptr_t vertices, int count, int first) { __gSPVertex(packet, vertices, count, first); }
+static std::vector<const Vtx*> submitted;
+void gSPVertex(Gfx* packet, uintptr_t vertices, int count, int first) {
+    submitted.push_back(reinterpret_cast<const Vtx*>(vertices));
+    __gSPVertex(packet, vertices, count, first);
+}
 void gSPDisplayList(Gfx* packet, Gfx* list) { __gSPDisplayList(packet, list); }
 void FrameInterpolation_RecordOpenChild(const void*, int) {}
 void FrameInterpolation_RecordCloseChild() {}
+static bool hasReflection = false;
+extern "C" u8 ResourceMgr_FileExists(const char* path) {
+    assert(std::strcmp(path, "__OTR__textures/magic_mirror/gMagicMirrorForestReflectionTex") == 0);
+    return hasReflection;
+}
 #include "combo/gameplay/MagicMirrorDraw.inc.h"
 
 namespace {
@@ -60,6 +69,7 @@ void Reset(size_t opaBytes, size_t xluBytes, size_t overlayBytes) {
     play.state.gfxCtx = &gfx;
     play.gameplayFrames = 240;
     matrixCalls = stackDepth = 0;
+    submitted.clear();
 }
 
 void RejectWithoutWrites(size_t opaBytes, size_t xluBytes, size_t overlayBytes) {
@@ -86,11 +96,12 @@ void Guard(const ArenaStorage& storage, size_t allowedBytes) {
 }
 }
 
-int main() {
+static void Run(bool reflection) {
+    hasReflection = reflection;
     using namespace ComboMagicMirrorGeometry;
     Mesh mesh;
     Build(0, mesh);
-    size_t opaqueCommands = 14, translucentCommands = 15;
+    size_t opaqueCommands = 14, translucentCommands = 15 + (reflection ? 15 : 0);
     for (int b = 0; b < mesh.batchCount; ++b) {
         const auto& batch = mesh.batches[b];
         const size_t count = 1 + (batch.triangleCount + 1) / 2;
@@ -117,7 +128,18 @@ int main() {
     assert(gfx.polyOpa.p == reinterpret_cast<Gfx*>(opaStorage.Head()) + opaqueCommands);
     assert(gfx.polyXlu.p == reinterpret_cast<Gfx*>(xluStorage.Head()) + translucentCommands);
     assert(gfx.overlay.p == reinterpret_cast<Gfx*>(overlayStorage.Head()));
+    int images = 0;
+    for (Gfx* command = reinterpret_cast<Gfx*>(xluStorage.Head()); command < gfx.polyXlu.p; ++command)
+        images += (command->words.w0 >> 24) == G_SETTIMG;
+    assert(images == (reflection ? 1 : 0));
+    assert(submitted.size() == mesh.batchCount);
+    for (int b = mesh.opaqueBatchCount; b < mesh.glassEndBatch; ++b)
+        for (int v = 0; v < mesh.batches[b].vertexCount; ++v) {
+            assert(submitted[b][v].v.tc[0] >= 0 && submitted[b][v].v.tc[0] <= 1024);
+            assert(submitted[b][v].v.tc[1] >= 0 && submitted[b][v].v.tc[1] <= 1024);
+        }
     Guard(opaStorage, opaqueBytes); Guard(xluStorage, translucentBytes); Guard(overlayStorage, overlayBytes);
     std::printf("Native mirror arenas: short data/OPA/XLU/overlay reject untouched; exact fit passes (%zu data bytes, %zu OPA / %zu XLU commands).\n",
                 dataBytes, opaqueCommands, translucentCommands);
 }
+int main() { Run(false); Run(true); }

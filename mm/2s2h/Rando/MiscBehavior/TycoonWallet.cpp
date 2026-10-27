@@ -31,14 +31,16 @@ static void DrawTycoonRupeeCounter() {
     OPEN_DISPS(play->state.gfxCtx);
 
     s16 counterDigits[RUPEE_COUNTER_MAX_DIGITS];
-    s16 digitCount = RupeeCounter_BuildDigits(gSaveContext.save.saveInfo.playerData.rupees, 4, counterDigits);
+    s16 minimumDigits = CUR_CAPACITY(UPG_WALLET) >= 1000 ? 4 : 3;
+    s16 digitCount =
+        RupeeCounter_BuildDigits(gSaveContext.save.saveInfo.playerData.rupees, minimumDigits, counterDigits);
 
     s16 magicAlpha = interfaceCtx->magicAlpha;
     if (magicAlpha > 180) {
         magicAlpha = 180;
     }
 
-    // Tycoon keeps its four-digit minimum and expands for larger restored balances.
+    // Match the live wallet capacity (ComboShip uses 999); restored balances still expand.
     s16 digitIndex = 0;
     s16 xPos = 42;
 

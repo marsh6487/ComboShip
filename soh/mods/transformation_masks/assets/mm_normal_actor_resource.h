@@ -15,23 +15,28 @@ using Resource = std::shared_ptr<Ship::IResource>;
  * resources, even though the original skeleton and its limbs are still valid.
  * Header tags alone cannot distinguish MM Kafei's misleading Standard/LOD graph. */
 inline bool ValidateSkeleton(const Resource& resource, unsigned limbs, unsigned matrices,
-                             std::vector<Resource>& retained) {
+                             std::vector<Resource>& retained, bool standard = false, unsigned reservedMatrices = 0,
+                             unsigned standardDisplayLists = 0) {
     auto skeleton = std::dynamic_pointer_cast<SOH::Skeleton>(resource);
-    if (!skeleton || skeleton->type != SOH::SkeletonType::Flex || skeleton->limbType != SOH::LimbType::Standard ||
-        skeleton->limbTableType != SOH::LimbType::Standard || skeleton->limbCount != (int)limbs ||
-        skeleton->limbTableCount != (int)limbs || skeleton->dListCount != (int)matrices || limbs == 0 || limbs > 254 ||
-        matrices > limbs || skeleton->limbTable.size() != limbs || skeleton->skeletonHeaderSegments.size() != limbs ||
+    if (!skeleton || skeleton->type != (standard ? SOH::SkeletonType::Normal : SOH::SkeletonType::Flex) ||
+        skeleton->limbType != SOH::LimbType::Standard || skeleton->limbTableType != SOH::LimbType::Standard ||
+        skeleton->limbCount != (int)limbs || skeleton->limbTableCount != (int)limbs ||
+        skeleton->dListCount != (int)matrices || limbs == 0 || limbs > 254 || matrices > limbs ||
+        skeleton->limbTable.size() != limbs || skeleton->skeletonHeaderSegments.size() != limbs ||
         skeleton->limbResources.size() != limbs)
         return false;
-    const auto& header = skeleton->skeletonData.flexSkeletonHeader;
-    if (header.sh.limbCount != limbs || header.sh.skeletonType != (uint8_t)SOH::SkeletonType::Flex ||
-        header.dListCount != matrices || header.sh.segment != skeleton->skeletonHeaderSegments.data())
+    const auto& header =
+        standard ? skeleton->skeletonData.skeletonHeader : skeleton->skeletonData.flexSkeletonHeader.sh;
+    if (header.limbCount != limbs ||
+        header.skeletonType != (uint8_t)(standard ? SOH::SkeletonType::Normal : SOH::SkeletonType::Flex) ||
+        (!standard && skeleton->skeletonData.flexSkeletonHeader.dListCount != matrices) ||
+        header.segment != skeleton->skeletonHeaderSegments.data())
         return false;
     std::vector<Resource> children;
     unsigned actualMatrices = 0;
     for (unsigned i = 0; i < limbs; ++i) {
         auto child = std::dynamic_pointer_cast<SOH::SkeletonLimb>(skeleton->limbResources[i]);
-        if (!child || child->limbType != SOH::LimbType::Standard || header.sh.segment[i] != child->GetRawPointer())
+        if (!child || child->limbType != SOH::LimbType::Standard || header.segment[i] != child->GetRawPointer())
             return false;
         const auto& limb = child->limbData.standardLimb;
         if ((limb.child != 255 && limb.child >= limbs) || (limb.sibling != 255 && limb.sibling >= limbs))
@@ -39,7 +44,8 @@ inline bool ValidateSkeleton(const Resource& resource, unsigned limbs, unsigned 
         actualMatrices += limb.dList != nullptr;
         children.push_back(child);
     }
-    if (actualMatrices != matrices)
+    if ((standard && actualMatrices != standardDisplayLists) ||
+        (!standard && actualMatrices + reservedMatrices != matrices))
         return false;
     std::vector<bool> visited(limbs, false);
     std::function<bool(unsigned)> walk = [&](unsigned index) {

@@ -16,6 +16,12 @@ static const StaticStoryDialogueEntry sDialogue[] = {
     { STATIC_STORY_TEXT_LULU, "Pleased to meet you. I'm Lulu." },
     { STATIC_STORY_TEXT_ANJU, "...Kafei... I promised I'd wait for you." },
     { STATIC_STORY_TEXT_MONKEY, "Ook! Ook! The Woods of Mystery are just ahead!" },
+    { STATIC_STORY_TEXT_CHAMBER_CHILD_ZELDA,
+      "Do you hear it? The stones are humming... as if they remember your footsteps." },
+    { STATIC_STORY_TEXT_CHAMBER_ADULT_ZELDA,
+      "Every path leaves an echo in this chamber. Some wake to a song... others to a promise fulfilled." },
+    { STATIC_STORY_TEXT_CHILD_ZELDA,
+      "A fairy boy... I thought the forest kept its secrets. Did your fairy guide you here?" },
 };
 
 uint16_t StaticStoryDialogue_GetTextIdAt(size_t index) {

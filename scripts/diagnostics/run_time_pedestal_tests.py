@@ -245,6 +245,20 @@ static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
         (build / "extended.c").write_text('#include "time_pedestal_fixture.h"\n' + ext_body)
         (build / "switch.cpp").write_text('#include "time_pedestal_fixture.h"\n' +
             without_includes((ROOT / "soh/soh/Enhancements/SwitchAge.cpp").read_text()))
+        buttons_source = (ROOT / "soh/mods/ext_buttons/ext_buttons.cpp").read_text()
+        (build / "buttons.cpp").write_text('#include "time_pedestal_fixture.h"\n' +
+            '#define EXT_BUTTON_ITEM(button) (gSaveContext.ship.extButtons.items[button])\n' +
+            buttons_source[buttons_source.index('extern "C" {'):])
+        # Cumulative baseline added these unrelated renderer boundaries without
+        # updating this ordinary-form pedestal fixture. Preserve its existing
+        # fire draw observer; no MM transformation is active in these cases.
+        (build / "render_boundaries.cpp").write_text('#include "time_pedestal_fixture.h"\n'
+            'extern "C" {\n'
+            'Gfx *gPlayerLeftHandOpenDLs[4]{}, *sPlayerRightHandOpenDLs[4]{};\n'
+            'void DinFireSword_CopyHandModel(Player*, void*, void*) {}\n'
+            'void DinFireSword_DrawHand(PlayState* p, Player* link, void*) { DinFireSword_Draw(p, link); }\n'
+            'u8 MmForm_IsNativeTransformationPlaying(PlayState*, Player*) { return false; }\n'
+            '}\n')
         arrays = '#include "time_pedestal_fixture.h"\n#include "z64cutscene_commands.h"\n'
         for number in (1, 2, 3):
             arrays += without_includes((ACTOR / f"z_bg_toki_swd_cutscene_data_{number}.c").read_text())
@@ -264,6 +278,8 @@ static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
             objects.append(str(obj))
         executable = build / "time_pedestal_test"
         subprocess.run(["c++", "-std=c++20", "-g", "-Wall", *includes, str(build / "switch.cpp"),
+                        str(build / "buttons.cpp"),
+                        str(build / "render_boundaries.cpp"),
                         str(build / "metadata.cpp"), str(build / "pak.cpp"), str(build / "custom.cpp"),
                         str(ROOT / "soh/tests/time_pedestal_test.cpp"), *objects, "-lm", "-o", str(executable)], check=True)
         subprocess.run([str(executable), *sys.argv[1:]], check=True)

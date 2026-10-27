@@ -17,6 +17,7 @@ import native_market
 import market_interior
 import market_title
 import exit_door
+import room_magic
 
 
 def preparation():
@@ -37,7 +38,17 @@ class DefaultInterior(unittest.TestCase):
         module = preparation()
         self.assertTrue(hasattr(module, 'prepared_resources'), 'Default build has no self-contained interior material pass')
         base = native_market.read_bundle(module.SOURCE)
-        resources = module.prepared_resources(module.SOURCE)
+        complete = module.prepared_resources(module.SOURCE)
+        # The optional material mode has a private graph; the required default
+        # graph retains its original exact inventory and may not depend on it.
+        optional = {name for name in complete if name.startswith(room_magic.PREFIX)}
+        self.assertIn(room_magic.ROOM, optional)
+        self.assertIn(room_magic.TEXTURE, optional)
+        resources = {name: data for name, data in complete.items() if name not in optional}
+        for name, data in resources.items():
+            if data.lstrip().startswith(b'<'):
+                for node in ET.fromstring(data).iter():
+                    self.assertFalse((node.get('Path') or '').startswith(room_magic.PREFIX), name)
         door_scenes = exit_door.apply(base)
         material_paths = set()
         vertex_changes = {f'{market_interior.GEOMETRY}_vtx_{suffix}' for suffix in (2,5,8,12,14,24)}
@@ -62,8 +73,8 @@ class DefaultInterior(unittest.TestCase):
         shelf = 'custom/skiejer_market/texture/arcane_stone'
         self.assertIn(shelf, resources, 'Native shelves must never load an absent texture')
         self.assertEqual(hashlib.sha256(resources[shelf][92:]).hexdigest(),
-                         '3e2bac601d1a9c3e0317d159aa6b9f5354abaac982a24848edfec5e97dbb3231',
-                         'Animated shelves/backdrop must retain original arcane art, never floor slate')
+                         '08fc11578f90b1b834b6fb026bf6defbad4374a0013a448d3fcc7822df355237',
+                         'Animated shelves/backdrop must use the neutral arcane base, never floor slate')
         added = set(resources) - set(base)
         self.assertEqual(added, material_paths | {shelf, market_title.RESOURCE})
         market_title.validate_texture(resources[market_title.RESOURCE])
@@ -186,8 +197,8 @@ class DefaultInterior(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             module.prepare(root)
-            for game in ('soh', 'mm'):
-                for name, data in resources.items():
+            for game, host in (('soh', 'oot'), ('mm', 'mm')):
+                for name, data in module.prepared_resources(host=host).items():
                     self.assertEqual((root / game / 'assets/custom' / name).read_bytes(), data)
             shelf = root / 'mm/assets/custom/custom/skiejer_market/texture/arcane_stone'
             shelf.unlink()

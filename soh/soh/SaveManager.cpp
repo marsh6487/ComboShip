@@ -16,6 +16,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "SaveManager.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "rando/CrossDungeonRuntime.h"
@@ -1069,9 +1070,7 @@ void SaveManager::InitFileNormal() {
         gSaveContext.equips.cButtonSlots[button] = SLOT_NONE;
     }
     gSaveContext.equips.equipment = 0x1100;
-    for (int button = 0; button < ARRAY_COUNT(gSaveContext.ship.extButtons.items); button++) {
-        gSaveContext.ship.extButtons.items[button] = 0;
-    }
+    ExtButton_ResetSaveData();
 
     // Inventory
     for (int item = 0; item < ARRAY_COUNT(gSaveContext.inventory.items); item++) {
@@ -2422,6 +2421,11 @@ void SaveManager::LoadBaseVersion4() {
                                                 static_cast<uint8_t>(SLOT_NONE));
             });
         SaveManager::Instance->LoadData("equipment", gSaveContext.childEquips.equipment);
+        SaveManager::Instance->LoadArray(
+            "extButtonItems", ARRAY_COUNT(gSaveContext.ship.childExtButtons.items), [](size_t i) {
+                SaveManager::Instance->LoadData("", gSaveContext.ship.childExtButtons.items[i],
+                                                static_cast<uint16_t>(0));
+            });
     });
     SaveManager::Instance->LoadStruct("adultEquips", []() {
         SaveManager::Instance->LoadArray(
@@ -2435,6 +2439,11 @@ void SaveManager::LoadBaseVersion4() {
                                                 static_cast<uint8_t>(SLOT_NONE));
             });
         SaveManager::Instance->LoadData("equipment", gSaveContext.adultEquips.equipment);
+        SaveManager::Instance->LoadArray(
+            "extButtonItems", ARRAY_COUNT(gSaveContext.ship.adultExtButtons.items), [](size_t i) {
+                SaveManager::Instance->LoadData("", gSaveContext.ship.adultExtButtons.items[i],
+                                                static_cast<uint16_t>(0));
+            });
     });
     SaveManager::Instance->LoadData("unk_54", gSaveContext.unk_54);
     SaveManager::Instance->LoadData("savedSceneNum", gSaveContext.savedSceneNum);
@@ -2610,6 +2619,9 @@ void SaveManager::SaveBase(const SaveContext& saveContext, int sectionID, bool f
             "cButtonSlots", ARRAY_COUNT(saveContext.childEquips.cButtonSlots),
             [&](size_t i) { SaveManager::Instance->SaveData("", saveContext.childEquips.cButtonSlots[i]); });
         SaveManager::Instance->SaveData("equipment", saveContext.childEquips.equipment);
+        SaveManager::Instance->SaveArray(
+            "extButtonItems", ARRAY_COUNT(saveContext.ship.childExtButtons.items),
+            [&](size_t i) { SaveManager::Instance->SaveData("", saveContext.ship.childExtButtons.items[i]); });
     });
     SaveManager::Instance->SaveStruct("adultEquips", [&]() {
         SaveManager::Instance->SaveArray(
@@ -2619,6 +2631,9 @@ void SaveManager::SaveBase(const SaveContext& saveContext, int sectionID, bool f
             "cButtonSlots", ARRAY_COUNT(saveContext.adultEquips.cButtonSlots),
             [&](size_t i) { SaveManager::Instance->SaveData("", saveContext.adultEquips.cButtonSlots[i]); });
         SaveManager::Instance->SaveData("equipment", saveContext.adultEquips.equipment);
+        SaveManager::Instance->SaveArray(
+            "extButtonItems", ARRAY_COUNT(saveContext.ship.adultExtButtons.items),
+            [&](size_t i) { SaveManager::Instance->SaveData("", saveContext.ship.adultExtButtons.items[i]); });
     });
     SaveManager::Instance->SaveData("unk_54", saveContext.unk_54);
     SaveManager::Instance->SaveData("savedSceneNum", saveContext.savedSceneNum);

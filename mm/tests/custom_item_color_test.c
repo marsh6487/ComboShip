@@ -22,6 +22,8 @@ static struct {
     [GID_RECOVERY_HEART] = { { gGiRecoveryHeartDL } },
     [GID_BOMB] = { { gGiBombDL } },
 };
+static int sCollectibleShimmer, sShimmerDraws, sSampledProfile, sMatrixDepth;
+static float sDropScale = 1.0f, sSavedScale, sShimmerScale;
 static int sCustom, sHeartsChanged, sMagicChanged, sFailures, sCases;
 static const char* sFirstAltDL;
 static Color_RGB8 sHeartsColor = { 53, 167, 225 }, sMagicColor = { 230, 93, 171 };
@@ -37,6 +39,8 @@ static Player sPlayer;
 static EnSlime sSlime;
 
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
+    if (!strcmp(name, "gEnhancements.CollectibleShimmer"))
+        return sCollectibleShimmer;
     if (!strcmp(name, "gCosmetic.HUD.Hearts.Changed"))
         return sHeartsChanged;
     if (!strcmp(name, "gCosmetic.HUD.Magic.Changed"))
@@ -72,6 +76,7 @@ Mtx* Matrix_Finalize(GraphicsContext* gfx) {
     return &sMatrix;
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
+    sDropScale *= x;
 }
 void Matrix_RotateYS(s16 angle, MatrixMode mode) {
 }
@@ -110,9 +115,40 @@ void func_800B8118(Actor* actor, PlayState* play, s32 flag) {
 void UnusedActorSetup(Actor* actor, PlayState* play, s32 flag) {
 }
 
+// Shared drop policy is production code. Only palette service, matrix storage
+// and GPU overlay submission are fixture boundaries.
+void Matrix_Push(void) {
+    sSavedScale = sDropScale;
+    ++sMatrixDepth;
+}
+void Matrix_Pop(void) {
+    sDropScale = sSavedScale;
+    --sMatrixDepth;
+}
+#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#include "ComboCollectibleShimmerHost.h"
+void MM_SampleCollectibleShimmerColor(int32_t profile, uint8_t color[4]) {
+    sSampledProfile = profile;
+    color[0] = sHeartsColor.r;
+    color[1] = sHeartsColor.g;
+    color[2] = sHeartsColor.b;
+    color[3] = 255;
+}
+void NeiGi_DrawTintedShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    ++sShimmerDraws;
+    sShimmerScale = sDropScale;
+    if (play != &sPlay || owner != NULL || sMatrixDepth != 1 || color[0] != sHeartsColor.r ||
+        color[1] != sHeartsColor.g || color[2] != sHeartsColor.b || color[3] != 255)
+        ++sFailures;
+}
+
 #include "custom_item_color_production.inc"
 
 static void Reset(void) {
+    sFailures += sMatrixDepth != 0;
+    sShimmerDraws = 0;
+    sSampledProfile = -1;
+    sDropScale = 1.0f;
     memset(&sGfx, 0, sizeof(sGfx));
     memset(&sPlay, 0, sizeof(sPlay));
     memset(sOpa, 0, sizeof(sOpa));
@@ -222,6 +258,22 @@ static void DrawCases(int tintHearts, int tintMagic) {
     sFailures += should;
     CheckStream("green ChuChu 3D magic", sOpa, sGfx.polyOpa.p, gGiMagicJarSmallDL, tintMagic, sMagicColor);
 }
+static void CheckDropShimmer(void) {
+    for (int enabled = 0; enabled <= 1; ++enabled) {
+        sCollectibleShimmer = enabled;
+        Reset();
+        EnItem00_DrawHeartPiece(&sPickup, &sPlay);
+        sFailures += sShimmerDraws != enabled || sSampledProfile != (enabled ? CW_COLLECTIBLE_HEART : -1) ||
+                     sDropScale != 1.0f || sMatrixDepth != 0 || (enabled && sShimmerScale != 21.0f);
+        ++sCases;
+        Reset();
+        EnItem00_DrawHeartContainer(&sPickup, &sPlay);
+        sFailures += sShimmerDraws != enabled || sSampledProfile != (enabled ? CW_COLLECTIBLE_HEART : -1) ||
+                     sDropScale != 20.0f || sMatrixDepth != 0 || (enabled && sShimmerScale != 20.0f);
+        ++sCases;
+    }
+    sCollectibleShimmer = 0;
+}
 int main(void) {
     sCustom = 1;
     sHeartsChanged = 1;
@@ -250,6 +302,7 @@ int main(void) {
     Reset();
     GetItem_DrawOpa0(&sPlay, GID_MAGIC_JAR_SMALL);
     CheckStream("first Alt magic jar after warm native", sOpa, sGfx.polyOpa.p, gGiMagicJarSmallDL, 1, sMagicColor);
+    CheckDropShimmer();
     printf("%s custom item color draw state: %d cases, %d failures\n", sFailures ? "FAIL" : "PASS", sCases, sFailures);
     return sFailures != 0;
 }

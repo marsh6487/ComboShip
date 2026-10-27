@@ -153,7 +153,7 @@ static void CheckIndexedVineOwnership() {
            decoded->Width == 2 && decoded->Height == 1 && decoded->GetInitData() == source->GetInitData());
     const std::vector<uint8_t> expected{ 41, 148, 41, 255, 74, 49, 24, 0 };
     assert(std::equal(expected.begin(), expected.end(), decoded->ImageData));
-    auto tinted = BuildSurfaceTexture(decoded, 0xE5EDF3FF, 1.8f);
+    auto tinted = BuildSurfaceTexture(decoded, 0xDCECF5FF, 1.8f);
     assert(tinted && tinted->mImageBuffer && std::memcmp(tinted->ImageData, decoded->ImageData, 3) != 0);
     assert(tinted->ImageData[3] == 255 && std::memcmp(tinted->ImageData + 4, decoded->ImageData + 4, 4) == 0);
     decoded.reset(); // The recolored copy must retain its own expanded bytes.
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     auto source = Texture(original, 3, 1);
     auto copy = BuildSurfaceTexture(source);
     assert(copy != nullptr);
-    const std::vector<uint8_t> expected = { 61, 49, 28, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+    const std::vector<uint8_t> expected = { 71, 44, 23, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
     assert(std::equal(expected.begin(), expected.end(), copy->ImageData));
     assert(std::equal(original.begin(), original.end(), source->ImageData));
     CheckMetadata(*source, *copy);
@@ -191,8 +191,8 @@ int main(int argc, char** argv) {
     assert(std::equal(winterExpected.begin(), winterExpected.end(), winterCopy->ImageData));
     assert(std::equal(original.begin(), original.end(), winterSource->ImageData));
     CheckMetadata(*winterSource, *winterCopy);
-    auto frostCopy = BuildSurfaceTexture(winterSource, 0xE5EDF3FF, 1.8f);
-    const std::vector<uint8_t> frostExpected = { 81, 84, 86, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+    auto frostCopy = BuildSurfaceTexture(winterSource, 0xDCECF5FF, 1.8f);
+    const std::vector<uint8_t> frostExpected = { 79, 84, 88, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
     assert(frostCopy != nullptr && std::equal(frostExpected.begin(), frostExpected.end(), frostCopy->ImageData));
     assert(std::equal(original.begin(), original.end(), winterSource->ImageData));
     CheckMetadata(*winterSource, *frostCopy);
@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
                 const unsigned originalSum = unsigned(pixels[i]) + pixels[i + 1] + pixels[i + 2];
                 const unsigned tintedSum =
                     unsigned(copy->ImageData[i]) + copy->ImageData[i + 1] + copy->ImageData[i + 2];
-                if (originalSum <= 583) {
+                if (originalSum <= 496) {
                     assert(tintedSum <= originalSum && tintedSum + 2 >= originalSum);
                 }
             }
@@ -245,11 +245,11 @@ int main(int argc, char** argv) {
             assert(std::equal(expectedPixel.begin(), expectedPixel.end(), copy->ImageData + offset));
         };
         // Fixed samples independently read from the checkpoint image: four
-        // grass regions become amber, and both exposed wood regions stay exact.
-        sample(25, 50, { 111, 90, 52, 255 });
-        sample(512, 920, { 142, 116, 67, 255 });
-        sample(100, 1460, { 94, 77, 44, 255 });
-        sample(500, 1950, { 82, 67, 38, 255 });
+        // grass regions become copper, and both exposed wood regions stay exact.
+        sample(25, 50, { 130, 81, 42, 255 });
+        sample(512, 920, { 167, 104, 54, 255 });
+        sample(100, 1460, { 111, 69, 36, 255 });
+        sample(500, 1950, { 96, 60, 31, 255 });
         sample(500, 500, { 103, 72, 51, 255 });
         sample(200, 700, { 105, 84, 45, 255 });
         winterCopy = BuildSurfaceTexture(source, 0xBED2C2B0);
@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
                std::pair{ (1460u * 1024 + 100) * 4, std::vector<uint8_t>{ 73, 83, 59, 255 } },
                std::pair{ (1950u * 1024 + 500) * 4, std::vector<uint8_t>{ 62, 76, 48, 255 } } })
             assert(std::equal(pixel.begin(), pixel.end(), winterCopy->ImageData + offset));
-        frostCopy = BuildSurfaceTexture(source, 0xE5EDF3FF, 1.8f);
+        frostCopy = BuildSurfaceTexture(source, 0xDCECF5FF, 1.8f);
         assert(frostCopy != nullptr);
         CheckMetadata(*source, *frostCopy);
         for (size_t i = 0; i < pixels.size(); i += 4) {
@@ -291,10 +291,10 @@ int main(int argc, char** argv) {
             }
         }
         for (const auto& [offset, pixel] :
-             { std::pair{ (50u * 1024 + 25) * 4, std::vector<uint8_t>{ 147, 152, 156, 255 } },
-               std::pair{ (920u * 1024 + 512) * 4, std::vector<uint8_t>{ 189, 196, 201, 255 } },
-               std::pair{ (1460u * 1024 + 100) * 4, std::vector<uint8_t>{ 126, 130, 133, 255 } },
-               std::pair{ (1950u * 1024 + 500) * 4, std::vector<uint8_t>{ 109, 113, 115, 255 } },
+             { std::pair{ (50u * 1024 + 25) * 4, std::vector<uint8_t>{ 143, 153, 159, 255 } },
+               std::pair{ (920u * 1024 + 512) * 4, std::vector<uint8_t>{ 184, 197, 205, 255 } },
+               std::pair{ (1460u * 1024 + 100) * 4, std::vector<uint8_t>{ 122, 131, 136, 255 } },
+               std::pair{ (1950u * 1024 + 500) * 4, std::vector<uint8_t>{ 106, 113, 118, 255 } },
                std::pair{ (500u * 1024 + 500) * 4, std::vector<uint8_t>{ 103, 72, 51, 255 } },
                std::pair{ (700u * 1024 + 200) * 4, std::vector<uint8_t>{ 105, 84, 45, 255 } } })
             assert(std::equal(pixel.begin(), pixel.end(), frostCopy->ImageData + offset));

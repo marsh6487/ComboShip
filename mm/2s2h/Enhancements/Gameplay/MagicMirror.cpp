@@ -35,11 +35,27 @@ u8 Sm64Mario_IsReady(void);
 }
 #define COMBO_MAGIC_MIRROR_MM
 #include "gameplay/MagicMirrorDraw.inc.h"
+#include "gameplay/MagicMirrorCamera.inc.h"
 
 namespace MirrorRuntime {
 void FinishPickup(int token);
 }
 namespace MirrorHost {
+void UpdateCastCamera(PlayState* play, Player* player) {
+    ComboMagicMirrorCamera::Begin(play, player);
+}
+void ReleaseCastCamera(PlayState* play) {
+    ComboMagicMirrorCamera::Release(play);
+}
+void ForgetCastCamera() {
+    ComboMagicMirrorCamera::Forget();
+}
+void PlayActivationChime() {
+    Audio_PlaySfx(NA_SE_EV_TRE_BOX_FLASH);
+}
+void PlayDepartureCue() {
+    Audio_PlaySfx(NA_SE_PL_MAGIC_WIND_WARP);
+}
 u32 Seed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }

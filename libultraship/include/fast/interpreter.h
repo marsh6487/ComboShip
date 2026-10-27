@@ -468,6 +468,7 @@ class Interpreter {
     void TextureCacheClear();
     std::shared_ptr<Ship::IResource> ResolveResourceCached(const char* path);
     bool TextureCacheLookup(int i, const TextureCacheKey& key);
+    bool TryReusePreludeMaterialBinding(int i, uint32_t tile, const bool usedTextures[2]);
     void TextureCacheDelete(const uint8_t* origAddr);
     void TextureCacheDeleteByPalette(const uint8_t* paletteAddr, size_t paletteSize);
     void ImportTextureRgba16(int tile, bool importReplacement);
@@ -558,6 +559,10 @@ class Interpreter {
     PackedTriangleVertex mPackedTriangleVertices[MAX_VERTICES]{};
     bool mTriangleStateReuseEnabled = false; // Port opt-in; MM retains the original path.
     bool mTriangleStateReuseAllowed = false; // Only set while dispatching pure triangle commands.
+    bool mPreludeMaterialBindingReuseEnabled = false; // Sampled once per Run; compatible material opt-in.
+    // Identity only: never dereferenced. Cleared at Run/FB binds; the loaded
+    // texture owns the resource and reuse re-finds the live texture cache node.
+    const Fast::Texture* mPreludeMaterialBoundResources[2]{};
 
     GfxTextureCache mTextureCache{};
     RenderCostProbe mRenderCost;

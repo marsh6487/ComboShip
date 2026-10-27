@@ -1,4 +1,5 @@
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>

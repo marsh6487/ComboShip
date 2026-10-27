@@ -27,7 +27,8 @@ palette=shimmer[shimmer.index('// 0 = ordinary mask;'):shimmer.index('// The sha
 a=draw.index('typedef enum {\n    MM_MASK_DRAW_OPA0_XLU1');b=draw.index('\n#ifdef COMBO_BUILD',a)
 fixture=fixture.replace('/* MASK_TABLE */',palette+draw[a:b]+'\n'+function(draw,'OOT_DescribeMmMaskDraw')+'\n'+function(draw,'MmRemainsGetDrawDL')+'\n'+function(draw,'OOT_DescribeMmRemainsDraw')+'\n'+function(draw,'OOT_DescribeMmSpinAttackDraw'))
 a=owner.index('static int32_t OOT_DescribeCustomDraw(');b=owner.index('    // RPG stat models',a)
-fixture=fixture.replace('/* OWNER_DESCRIPTOR */',owner[a:b]+'    return 0;\n}\n'+function(owner,'OOT_FillItemDrawInfo'))
+collectible=(ROOT/'combo/menu/ComboCollectibleShimmerHost.h').read_text()
+fixture=fixture.replace('/* OWNER_DESCRIPTOR */',function(collectible,'ComboCollectibleShimmer_ProfileForDrawId')+'\n'+owner[a:b]+'    return 0;\n}\n'+function(owner,'OOT_FillItemDrawInfo'))
 a=host.index('struct ComboForeignDrawInfoOOT {');b=host.index('\n};',a)+3
 fixture=fixture.replace('/* HOST_INFO */',host[a:b])
 fixture=fixture.replace('/* HOST_RESOLVER */','inline bool ResourceMgr_IsAltAssetsEnabled(){return true;}\n#include "combo/menu/ComboSwordGiAssetSelection.h"\n/* HOST_RESOLVER */')

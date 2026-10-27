@@ -4,6 +4,8 @@
 
 // Fire retains Din's exact two-cycle material and 3/5 scroll. Frost and light
 // keep the native metal visible through two translucent, blade-bound layers.
+// Their opacity also includes I8 intensity and vertex alpha; keep enough body
+// after filtering for the casing to read at ordinary gameplay camera distance.
 static void SwordAura_Material(Gfx** display, u8 element, s32 outerLayer, Color_RGB8 core, Color_RGB8 outer,
                                u16 phase) {
     s32 translucent = element != SWORD_ELEMENT_FIRE || outerLayer;
@@ -12,8 +14,8 @@ static void SwordAura_Material(Gfx** display, u8 element, s32 outerLayer, Color_
                                                : (outerLayer ? 4 : 2);
     s32 scroll = (phase * speed) & 127;
     u8 alpha = element == SWORD_ELEMENT_FIRE  ? (outerLayer ? (u8)((.96f + .04f * sinf(phase * .71f)) * 255.f) : 255)
-               : element == SWORD_ELEMENT_ICE ? (outerLayer ? 190 : 120)
-                                              : (u8)((outerLayer ? 165.f : 115.f) + 20.f * sinf(phase * .075f));
+               : element == SWORD_ELEMENT_ICE ? (outerLayer ? 225 : 200)
+                                              : (u8)((outerLayer ? 220.f : 185.f) + 20.f * sinf(phase * .075f));
     const u8* texture = element == SWORD_ELEMENT_FIRE  ? (outerLayer ? sSwordAuraFireFlameTex : sSwordAuraFireCoreTex)
                         : element == SWORD_ELEMENT_ICE ? sSwordAuraIceTex
                                                        : sSwordAuraLightTex;

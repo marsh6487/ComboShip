@@ -224,6 +224,32 @@ static void CheckSuppliedRepairedSave() {
     std::puts("PASS supplied repaired save: native NEI load/init/save/reload retains equipment without phantom items");
 }
 
+#if HOST_MM
+static void CheckNativeShieldOwnershipRemoval() {
+    for (uint8_t importedSkin : {uint8_t(0), uint8_t(1), uint8_t(2)}) {
+        Reset();
+        gExtEquipState.currentExtShield = 0;
+        Nei_Save()->extEquipShield = 0;
+        Nei_Save()->vanillaShieldSkin = importedSkin;
+        Nei_Save()->shieldOwned = FC_SHIELD_DEKU | FC_SHIELD_MIRROR_OOT;
+        // Preserve sword and unused nibbles while releasing only native MM Mirror.
+        gSaveContext.save.saveInfo.equips.equipment = 0xAB21;
+        ExtEquip_GiveItem(EQUIP_TYPE_SHIELD, 3);
+        Check(ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 3) &&
+                  Nei_Save()->shieldOwned == (FC_SHIELD_DEKU | FC_SHIELD_MIRROR_OOT | FC_SHIELD_IKANA),
+              "canonical Ikana grant must retain unrelated shared shield ownership");
+        ExtEquip_RemoveItem(EQUIP_TYPE_SHIELD, 3);
+        Check(!ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 3) &&
+                  Nei_Save()->shieldOwned == (FC_SHIELD_DEKU | FC_SHIELD_MIRROR_OOT),
+              "canonical Ikana removal must clear only its extended and shared ownership");
+        Check(gSaveContext.save.saveInfo.equips.equipment == (importedSkin ? 0xAB21 : 0xAB01) &&
+                  Nei_Save()->vanillaShieldSkin == importedSkin,
+              "native equipment writer must release MM Mirror without erasing imported skins or other nibbles");
+    }
+    std::puts("PASS native MM shield dependency: real nibble removal and imported skin preservation");
+}
+#endif
+
 #if !HOST_MM
 static void CheckTradeSidecarOwnership() {
     // These are independent trade-wheel entries: Moon's Tear is bit 11,
@@ -449,6 +475,9 @@ int main() {
     CheckTradeSidecarOwnership();
 #endif
     CheckEquipmentLayoutInitialization();
+#if HOST_MM
+    CheckNativeShieldOwnershipRemoval();
+#endif
     CheckBothOwnedRoundtrips();
     CheckSeasonsRoundtrip();
     CheckLegacySelectedItems();

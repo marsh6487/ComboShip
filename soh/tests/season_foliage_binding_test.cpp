@@ -157,6 +157,14 @@ static void CheckSceneTerrain(Ship::Context& context) {
                         const bool tinted = (!*prefix || alt) && (selected == 0 || selected == 2 || selected == 3);
                         auto shown = std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(path));
                         REQUIRE((shown != source) == tinted && "scene-owned terrain/foliage binding was missed");
+                        if (tinted && std::strcmp(item.path, "custom/prelude/spot01_scene/recipe14_tex0") == 0) {
+                            const Tint expectedTint = selected == 0   ? Tint{ 0xF6C1D9E0u, 461 }
+                                                      : selected == 2 ? Tint{ 0xEF484CFFu, 256 }
+                                                                      : Tint{ 0xE2EEE9FFu, 461 };
+                            const auto expected = BuildTexture(source, expectedTint);
+                            REQUIRE(expected && *shown->mImageBuffer == *expected->mImageBuffer &&
+                                    "Kakariko windmill backdrop must inherit its Canopy role hue");
+                        }
                         for (unsigned y = 0; y < 16; ++y)
                             for (unsigned x = 0; x < 16; ++x) {
                                 const size_t at = (y * 16 + x) * stride;
@@ -259,6 +267,17 @@ static void CheckPavingSeams(Ship::Context& context) {
                             std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(std::string(prefix) + road));
                         REQUIRE((shown != source) == tinted && "paving seam grass missed the seasonal binding");
                         REQUIRE((std::memcmp(shown->ImageData, source->ImageData, stride) != 0) == tinted);
+                        if (tinted) {
+                            const auto ordinary = std::dynamic_pointer_cast<Fast::Texture>(
+                                context.rm->cache.at(std::string(prefix) + ground));
+                            REQUIRE(std::memcmp(shown->ImageData, ordinary->ImageData, stride) == 0 &&
+                                    "grass and paving grass trim must share the identical Ground treatment");
+                            const Tint expectedTint = selected == 0   ? Tint{ 0xF6C1D9FFu, 461, 24 }
+                                                      : selected == 2 ? Tint{ 0xF3974FFFu, 320, 24 }
+                                                                      : Tint{ 0xDCECF5FFu, 461, 128 };
+                            const auto expected = BuildTexture(source, expectedTint, {}, PixelMask::GrassTrim);
+                            REQUIRE(expected && *shown->mImageBuffer == *expected->mImageBuffer);
+                        }
                         REQUIRE(std::memcmp(shown->ImageData + stride, source->ImageData + stride, stride * 2) == 0 &&
                                 "paving stones must retain their exact source pixels");
                         REQUIRE(shown->Type == source->Type && shown->Flags == source->Flags &&
@@ -683,7 +702,7 @@ int main() {
     CheckSceneTerrain(context);
     CheckPavingSeams(context);
     // The private forest is shared scenery: its eight greenery identities must
-    // keep MM's darker autumn palette and blush spring grass.
+    // use the confirmed copper ground/scarlet foliage while preserving their exposure.
     const char* forestLeaves[] = { "lw_enkei_01_0", "lw_kusa_01_12600", "lw_wood_02_2CA00", "lw_wood_03_31E00",
                                    "lw_wood_04_37200" };
     const char* forestGround[] = { "lw_kabe_01_5400", "lw_yuka_02_39C00", "lw_yuka_03_44400" };
@@ -703,8 +722,8 @@ int main() {
                         const auto shown = std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(path));
                         REQUIRE((shown != original) == tinted);
                         if (tinted) {
-                            const uint32_t color = selected == 2   ? (ground ? 0xD99C45FFu : 0xB96848FFu)
-                                                   : selected == 3 ? (ground ? 0xE5EDF3FFu : 0xCCDCEEFFu)
+                            const uint32_t color = selected == 2   ? (ground ? 0xF3974FFFu : 0xEF484CFFu)
+                                                   : selected == 3 ? (ground ? 0xDCECF5FFu : 0xE2EEE9FFu)
                                                    : ground        ? 0xF6C1D9FFu
                                                                    : 0xF6C1D9E0u;
                             const auto expected = BuildTexture(original, { color, selected == 2 ? 256u : 461u });
@@ -876,6 +895,17 @@ int main() {
                 season = selected;
                 Update(nullptr);
                 REQUIRE(context.rm->cache[path] != source && "target greenery did not receive the selected tint");
+                // Existing shuffled bush/grass copies share the non-canopy actor
+                // role, including native and Alt namespaces; reward markers stay native.
+                if (std::strncmp(target, "objects/", 8) == 0) {
+                    const Tint expectedTint = selected == 0   ? Tint{ 0xF6C1D9FFu, 461 }
+                                              : selected == 2 ? Tint{ 0xF26846FFu, 256 }
+                                                              : Tint{ 0xDCECF5FFu, 461 };
+                    const auto expected = BuildTexture(source, expectedTint);
+                    const auto shown = std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(path));
+                    REQUIRE(expected && shown && *shown->mImageBuffer == *expected->mImageBuffer &&
+                            "bush/grass texture copies must match the Maple/Glacial non-canopy actor role");
+                }
                 REQUIRE(context.rm->cache[marker] == reward);
                 REQUIRE(context.rm->cache[pavers] == stone && "greenish stone paving must stay native");
                 REQUIRE(*source->mImageBuffer == original);

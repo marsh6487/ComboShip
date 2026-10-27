@@ -1,6 +1,7 @@
 #include "NeiUsedMagicPresentation.h"
 #include "NeiUsedMagicPolicy.h"
 #include "NeiGiRender.h"
+#include "../../../../combo/gameplay/MagicMirrorCast.h"
 #include "mods/items/custom_items.h"
 #include "soh/ResourceManagerHelpers.h"
 extern "C" {
@@ -14,6 +15,10 @@ alignas(2) static const char kLightTexture[] = "__OTR__objects/nei_used_magic/li
 const NeiGi::TextureMaterial kIceMaterial{ kIceTexture, true, true };
 const NeiGi::TextureMaterial kFireMaterial{ kFireTexture, true, false };
 const NeiGi::TextureMaterial kLightMaterial{ kLightTexture, true, false };
+alignas(2) static const char kMirrorSealTexture[] = "__OTR__objects/magic_mirror/forest_seal";
+alignas(2) static const char kMirrorWispTexture[] = "__OTR__objects/magic_mirror/forest_wisp";
+const NeiGi::TextureMaterial kMirrorSealMaterial{ kMirrorSealTexture, false, false };
+const NeiGi::TextureMaterial kMirrorWispMaterial{ kMirrorWispTexture, true, false };
 alignas(2) static const char kFireAttackTexture[] = "__OTR__objects/nei_rod_attack/fire_surge";
 alignas(2) static const char kIceAttackTexture[] = "__OTR__objects/nei_rod_attack/frost_surge";
 alignas(2) static const char kLightAttackTexture[] = "__OTR__objects/nei_rod_attack/light_surge";
@@ -193,8 +198,9 @@ extern "C" void NeiUsedMagic_DrawMirrorCast(PlayState* play, Player* player, flo
     origin.y += 1;
     const MatrixScope matrix(origin);
     constexpr auto palette = NeiUsedMagic::PortalPalette::Forest;
+    NeiGi_DrawTexturedMesh(play, ComboMagicMirrorCast::SampleSeal(scale, alpha), kMirrorSealMaterial);
     NeiGi_DrawMesh(play,
                    NeiUsedMagic::SamplePortal(play->gameplayFrames, scale, alpha, NeiGi_CameraBasis(play), palette));
     NeiGi_DrawTexturedMesh(play, NeiUsedMagic::SamplePortalSurface(play->gameplayFrames, scale, alpha, palette),
-                           kFireMaterial);
+                           kMirrorWispMaterial);
 }

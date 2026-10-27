@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 extern "C" { int gComboGameMode; }
 SaveContext gSaveContext{};
@@ -24,10 +25,33 @@ PlayState* gPlayState;
 GameState* gGameState;
 static PlayState play;
 static Player player;
+#ifndef MIRROR_OOT
+extern "C" {
+s16 sSceneCutsceneCount;
+ActorCutscene* CutsceneManager_GetCutsceneEntry(s16) {
+    assert(false); // These isolated Mirror cases have no prepared scene chain.
+    return nullptr;
+}
+}
+#endif
 static bool owned, blocked, pack = true;
-static bool pending, stow;
+static bool pending, stow, handoffAccepted;
 static bool alternateModel;
 static int animationStarts, idleRestores;
+static std::vector<u16> mirrorSounds;
+static int castCameras, releasedCameras;
+static bool ownsCastCamera;
+#ifdef MIRROR_OOT
+extern "C" void Sfx_PlaySfxCentered(u16 sound) {
+#else
+extern "C" void Audio_PlaySfx(u16 sound) {
+#endif
+    assert(sound == NA_SE_EV_TRE_BOX_FLASH || sound == NA_SE_PL_MAGIC_WIND_WARP);
+    mirrorSounds.push_back(sound);
+}
+static void ExpectSounds(std::initializer_list<u16> expected) {
+    assert(mirrorSounds == std::vector<u16>(expected));
+}
 static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
 static int auraDraws;
@@ -81,6 +105,15 @@ void SetText(u16 text) {
 #endif
 }
 namespace MirrorHost {
+void UpdateCastCamera(PlayState*, Player*) {
+    if (!ownsCastCamera) { ownsCastCamera = true; ++castCameras; }
+}
+void ReleaseCastCamera(PlayState*) {
+    if (ownsCastCamera) ++releasedCameras;
+    ownsCastCamera = false;
+}
+void ForgetCastCamera() { ownsCastCamera = false; }
+#include "native_mirror_sound.inc.h"
 u32 Seed() { return seed; }
 bool PackAvailable() { return pack; }
 bool Busy(PlayState*) { return blocked; }
@@ -111,7 +144,7 @@ void OpenPrompt() {
 #endif
     }
 }
-bool RequestHandoff() { ++handoffs; return true; }
+bool RequestHandoff() { ++handoffs; return handoffAccepted; }
 void Save() { ++saves; }
 void Error() { ++errors; }
 void Trace(const char*, PlayState*) {}
@@ -286,8 +319,10 @@ void Reset() {
     gSaveContext.fileNum = 1;
     owned = true; blocked = false; pack = true;
     pending = stow = false;
+    handoffAccepted = true;
     alternateModel = false;
     animationStarts = idleRestores = 0;
+    mirrorSounds.clear();
     mirrorDraws = worldShimmerDraws = matrixDepth = 0;
     auraDraws = 0;
     auraScale = auraAlpha = 0;
@@ -317,6 +352,8 @@ void Reset() {
     gSaveContext.respawn[RESPAWN_MODE_RETURN].data = 2;
     gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = {-4, 5, -6};
     MirrorRuntime::Reset();
+    castCameras = releasedCameras = 0;
+    ownsCastCamera = false;
 }
 void CompletePromptClose() {
   // The synthetic-message cases don't execute native Message_Update.
@@ -612,6 +649,7 @@ void TestArrival() {
         Reset();
         if (combined) gComboGameMode = COMBO_GAME_BOTH;
         assert(MirrorRuntime::Travel(&play));
+        ExpectSounds({NA_SE_PL_MAGIC_WIND_WARP});
         MirrorRuntime::Destroy(); // The request survives scene arena destruction.
         LoadForest(1500, 320, -1300);
         ActorEntry original{};
@@ -638,9 +676,11 @@ void TestArrival() {
         assert(std::memcmp(&gSaveContext.respawn, &respawns.respawn, sizeof(respawns.respawn)) == 0);
         MagicMirror_FinishArrival(&play);
         assert(player.actionFunc == NativeIdle && idleRestores == 1);
+        ExpectSounds({NA_SE_PL_MAGIC_WIND_WARP, NA_SE_PL_MAGIC_WIND_WARP});
         assert(play.linkActorEntry == &original); // Preserve legacy scene-derived doorway anchors.
         MagicMirror_FinishArrival(&play);
         assert(idleRestores == 1);
+        ExpectSounds({NA_SE_PL_MAGIC_WIND_WARP, NA_SE_PL_MAGIC_WIND_WARP});
         play.linkActorEntry = &original;
         MagicMirror_PrepareArrival(&play);
         assert(play.linkActorEntry == &original); // Consumed exactly once.
@@ -782,12 +822,14 @@ void TestNativeChoiceLifecycle(bool combined) {
     play.state.input[0].press.button = BTN_CLEFT;
     MirrorRuntime::Update();
     assert(Message_GetState(&play.msgCtx) == TEXT_STATE_CHOICE);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH});
     play.state.input[0].press.button = BTN_A;
     MirrorRuntime::Update();
     // A native close retains live text for two ticks. Forcing NONE here sends
     // native drawing back to DISPLAYING and the next update cancels the cast.
     assert(play.msgCtx.msgMode == MSGMODE_TEXT_CLOSING && play.msgCtx.msgLength != 0);
     assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_NONE);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH});
     // Confirmation is committed: extra A/B/C presses during the native close
     // cannot reopen the prompt, restart its timer or cancel the queued cast.
     play.state.input[0].press.button = BTN_A | BTN_B | BTN_CLEFT;
@@ -807,11 +849,18 @@ void TestNativeChoiceLifecycle(bool combined) {
     }
     assert(closed == 1 && animationStarts == 1);
     assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING);
+    assert(castCameras == 1 && ownsCastCamera);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH});
     for (int frame = 0; frame < 80 && !MirrorRuntime::sDeparted; ++frame) {
         player.actionFunc(&player, &play);
         MirrorRuntime::Update();
     }
     assert(MirrorRuntime::sDeparted);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH, NA_SE_PL_MAGIC_WIND_WARP});
+    assert(castCameras == 1);
+    for (int frame = 0; frame < 5; ++frame)
+        MirrorRuntime::Update();
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH, NA_SE_PL_MAGIC_WIND_WARP});
 #ifdef MIRROR_OOT
     if (combined) {
         assert(handoffs == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
@@ -827,6 +876,45 @@ void TestNativeChoiceLifecycle(bool combined) {
 }
 
 int main() {
+    Reset();
+    stow = true;
+    ConfirmCast();
+    assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PUT_AWAY);
+    assert(castCameras == 0 && !ownsCastCamera);
+    player.afterPutAwayFunc(&play, &player);
+    MirrorRuntime::Update();
+    assert(castCameras == 1 && ownsCastCamera);
+    player.actionFunc = NativeIdle; // Damage/another action interrupts our cast.
+    MirrorRuntime::Update();
+    assert(releasedCameras == 1 && !ownsCastCamera);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH}); // Interrupted cast never departs.
+    Reset();
+    ConfirmCast();
+    Player replacement{};
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &replacement.actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &replacement.actor;
+#endif
+    MirrorRuntime::Update();
+    assert(releasedCameras == 1 && !ownsCastCamera && idleRestores == 0);
+    Reset();
+    assert(!MagicMirrorPlayer_Begin(nullptr, &player));
+    assert(!MagicMirrorPlayer_Begin(&play, nullptr));
+    ExpectSounds({});
+    assert(MagicMirrorPlayer_Begin(&play, &player));
+    ExpectSounds({});
+    assert(!MagicMirrorPlayer_Begin(&play, &player));
+    player.actionFunc(&player, &play);
+    ExpectSounds({});
+    MagicMirrorPlayer_End(&play, &player);
+    ExpectSounds({});
+    Reset();
+    stow = true;
+    assert(MagicMirrorPlayer_Begin(&play, &player));
+    ExpectSounds({});
+    MagicMirrorPlayer_End(&play, &player);
+    ExpectSounds({});
     TestNativeChoiceLifecycle(false);
     TestNativeChoiceLifecycle(true);
     TestPromptOwnsInputDuringNativeStateChanges();
@@ -857,9 +945,11 @@ int main() {
     Reset(); play.state.input[0].press.button = BTN_CLEFT; MirrorRuntime::Update();
     play.state.input[0].press.button = BTN_B; advance = true; MirrorRuntime::Update();
     assert(closed == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH});
     Reset(); play.state.input[0].press.button = BTN_CLEFT; MirrorRuntime::Update();
     play.state.input[0].press.button = BTN_A; play.msgCtx.choiceIndex = 1; advance = true; MirrorRuntime::Update();
     assert(closed == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
+    ExpectSounds({NA_SE_EV_TRE_BOX_FLASH});
     Reset(); play.state.input[0].press.button = BTN_CLEFT; MirrorRuntime::Update();
     play.state.input[0].press.button = BTN_A; play.msgCtx.choiceIndex = 0; advance = true; MirrorRuntime::Update();
     // Confirming commits to a visible cast before changing worlds.
@@ -932,6 +1022,9 @@ int main() {
     MirrorRuntime::Update();
 #ifdef MIRROR_OOT
     assert(handoffs == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
+    Reset(); gComboGameMode = COMBO_GAME_BOTH; handoffAccepted = false;
+    assert(!MirrorRuntime::Travel(&play));
+    ExpectSounds({}); // Rejected host transfer must not announce a departure.
 #else
     assert(play.nextEntrance == ENTRANCE(LOST_WOODS, 0));
 #endif
@@ -1033,7 +1126,7 @@ int main() {
 #else
     assert(play.nextEntrance == ENTRANCE(LOST_WOODS, 0));
 #endif
-    Reset(); owned = false; assert(!MirrorRuntime::Travel(&play));
+    Reset(); owned = false; assert(!MirrorRuntime::Travel(&play)); ExpectSounds({});
     Reset(); pack = false; assert(!MirrorRuntime::Travel(&play));
     Reset(); blocked = true; assert(!MirrorRuntime::Travel(&play));
     Reset(); player.actor.bgCheckFlags = 0; assert(!MirrorRuntime::Travel(&play));

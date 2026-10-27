@@ -3,7 +3,9 @@
 Graphics allocation/setup, resource classification and CVar storage are boundaries;
 the item routines and GBI macros are production code. No game/render claim is made.
 """
+import argparse
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 
@@ -13,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sanitize", action="store_true")
+    args = parser.parse_args()
     selected = []
     for path, names in [
         ("soh/src/code/z_draw.c", ["GetItem_DrawDListWithCosmetics", "GetItem_DrawOpa0", "GetItem_DrawXlu01"]),
@@ -36,8 +41,11 @@ def main():
                "-Isoh/assets", "-Isoh", "-Ilibultraship/include", "-Icombo/menu", "-I" + str(out),
                "-Wno-incompatible-pointer-types", "soh/tests/custom_item_color_test.c",
                "-o", str(binary)]
+        if args.sanitize:
+            cmd[2:2] = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                        "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
         subprocess.run(cmd, cwd=ROOT, check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
         syntax = cmd[:cmd.index("soh/tests/custom_item_color_test.c")] + [
             "-fsyntax-only", "-Werror=implicit-function-declaration", "-Wno-int-conversion",
             "-Wno-discarded-qualifiers", '-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"',
@@ -53,7 +61,8 @@ def main():
         cpp_check = out / "double_defense.cpp"
         cpp_check.write_text('#include "z64.h"\nextern "C" {\n#include "macros.h"\n'
                              '#include "functions.h"\n#include "variables.h"\n'
-                             '#include "objects/object_gi_hearts/object_gi_hearts.h"\n}\n'
+                             '#include "objects/object_gi_hearts/object_gi_hearts.h"\n'
+                             'void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*);\n}\n'
                              'extern "C" ' + cpp_body + '\n')
         cpp_cmd = ["c++", "-std=gnu++20"] + cmd[2:cmd.index("-Wno-incompatible-pointer-types")]
         subprocess.run(cpp_cmd + ["-fsyntax-only", str(cpp_check)], cwd=ROOT, check=True)

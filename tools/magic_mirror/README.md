@@ -4,7 +4,9 @@ The round ALTTP-style handheld mirror is generated from
 `combo/gameplay/MagicMirrorGeometry.h`: blue casing and short grip, gold inner
 rim, and pale reflecting glass. The silhouette and palette follow cor's supplied
 reference images. Both engines and the software preview use the same generated
-geometry; no reference image pixels or external model are bundled.
+geometry. The optional forest-glass probe reflects a fixed view of the actual
+Lost Woods scene, with the shop, trunk, purple portal and reference-derived Saria
+silhouette. Its exact source and render provenance are in `reflection/forest-scene.json`.
 
 ## Native interface
 
@@ -28,17 +30,28 @@ pass. The recessed double-sided reflecting pane and confined shimmer use the
 translucent pass. The restrained 960-frame reflection shimmer is deterministic and wraps
 exactly; there is no positional bobbing or rotation inside the visual renderer.
 
-The GI, stump reward, inventory icon and overhead casting item share this mesh.
+The GI, stump reward and inventory icon share this mesh.
 After confirming recall, Link puts away his held item and performs the native
 Farore's Wind main casting clip once at 1.25 playback speed, with a short morph
-from his current pose. The Mirror appears above his head as his hands rise and
-remains there in the final pose during the existing departure fade. No Farore
-spell actor or sparkle mesh is spawned. The native player bridge is isolated in
-`combo/gameplay/MagicMirrorPlayer.inc.c` so this placeholder motion can be replaced.
-The proposed TP green activation sigil remains unimplemented.
+from his current pose. Existing green seal/wisps surround the cast, with no
+floating item or Farore spell actor. The probe uses a magical shimmer when the
+Mirror opens its prompt, then native Farore warp audio at committed departure
+and actual arrival. Animation start, cancellation and put-away stay silent;
+the Farore wind effect is never used. Time Gate ritual framing uses an owned subcamera.
+MM receives a private real KEEPON4 setting; its legacy TURN_AROUND alias is NONE.
+Its native cutscene manager ownership guard protects the camera and stale return
+targets until the scene resets.
+The native player bridge remains in `combo/gameplay/MagicMirrorPlayer.inc.c`.
+
+The cast also has private botanical seal and rising vine-wisp textures. The seal
+adds one transparent floor quad; existing green ritual geometry and timing stay
+in place. Time Gate keeps its own material. Missing textures leave the green
+geometry-only ritual. Original built-in ImageGen artwork and prompts are in
+`cast/ART_PROVENANCE.md`; rebuild with `build_cast_textures.py` and inspect the
+production mesh/material comparison with `render_cast.py --output /path/cast.png`.
 
 Recall and the fixed pickup share the stump cap in the loaded scene collision.
-Arrival initializes the native player beside its base, facing the stump, before
+Arrival retains the validated cap/floor fallback and initializes the player before
 the camera starts. The exact original editable Prelude input and complete scene
 identity are preserved in [scene/README.md](scene/README.md). Moving that stump
 in Prelude moves both anchors when geometry and collision are exported together.
@@ -59,6 +72,12 @@ This writes identical 32×32 RGBA32 inventory icons and identical 128×16 IA4-ex
 the existing item-name generator without altering its item list. Registering
 these texture identities in asset headers/archive recipes belongs to the native
 inventory integration.
+
+The probe additionally writes the same 32×32 RGBA16 forest reflection in both
+ports. Its optional 512px `.o2r` companion uses the same key in base/Alt and keeps
+the existing NEI icon shadow. Missing reflection assets retain the original plain
+glass. Rebuild the HD companion with `build_forest_addon.py --output FILE.o2r
+--preview-dir DIRECTORY`; see the POC report for the pinned scene-render command.
 
 The optional front PNG, contact sheet, and animated GIF rasterize the actual
 mesh after the same 1/16-unit native quantization. Their object geometry, colors,
@@ -88,3 +107,5 @@ current draw needs 16,816 aligned data bytes, 379 opaque commands, 229 transluce
 commands, and two overlay scratch commands. Optional sanitizer flags can be
 passed with `MIRROR_TEST_CXXFLAGS`; the draw fixture also links the real C-named
 interpolation boundary, so namespace/linkage regressions fail at link time.
+The forest-glass path uses 244 translucent commands; the exact boundary and
+missing-asset fallback are both checked under the native guarded arenas.

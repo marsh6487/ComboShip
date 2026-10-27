@@ -434,6 +434,42 @@ static void sharedSamplerTest() {
     std::cout << "PASS shared texture nodes preserve sampler transitions and flushes\n";
 }
 
+#ifdef HAS_PRELUDE_MATERIAL_BINDING_REUSE
+static void materialBindingReuseTest() {
+    Fixture f;
+    configure(f, 1);
+    auto& loaded = f.gfx.mRdp->loaded_texture[0];
+    std::vector<uint8_t> pixels(2048);
+    auto resource = std::make_shared<Texture>();
+    resource->ImageData = pixels.data();
+    resource->ImageDataSize = pixels.size();
+    resource->init->Path = "alt/arbitrary-scene/water";
+    loaded.addr = pixels.data();
+    loaded.raw_tex_metadata.resource = resource;
+    loaded.raw_tex_metadata.type = TextureType::RGBA32bpp;
+    const TextureCacheKey key = {loaded.addr, {}, G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, loaded.orig_size_bytes};
+    auto entry = f.gfx.mTextureCache.map.emplace(key, TextureCacheValue()).first;
+    entry->second.lru_location = f.gfx.mTextureCache.lru.insert(f.gfx.mTextureCache.lru.end(), {entry});
+    f.gfx.mRenderingState.mTextures[0] = &*entry;
+    f.gfx.mPreludeMaterialBoundResources[0] = resource.get();
+    const bool used[2] = {true, false};
+    require(!f.gfx.TryReusePreludeMaterialBinding(0, 0, used), "material reuse stays opt-in");
+    f.gfx.mPreludeMaterialBindingReuseEnabled = true;
+    require(f.gfx.TryReusePreludeMaterialBinding(0, 0, used), "actual helper reuses a compatible live binding");
+    f.gfx.mRdp->textures_changed[0] = true;
+    beginRun(f.gfx, false);
+    f.triangles(1);
+    for (size_t i = 0; i < f.backend.events.size(); i += 2)
+        require(f.backend.events[i] != 13, "triangle submission must avoid import for the compatible unchanged binding");
+    loaded.masked = true;
+    require(!f.gfx.TryReusePreludeMaterialBinding(0, 0, used), "masked materials retain the import path");
+    loaded.masked = false;
+    f.gfx.mRenderingState.mTextures[0] = nullptr;
+    require(!f.gfx.TryReusePreludeMaterialBinding(0, 0, used), "retired bindings must not reuse a live cache key");
+    std::cout << "PASS actual material binding helper: opt-in, live cache, triangle reuse and fallback guards\n";
+}
+#endif
+
 static void frameResetTest() {
     constexpr UcodeHandler table = {{1, {"tri", gfx_tri2_handler_f3dex}}};
     Fixture baseline, optimized;
@@ -741,6 +777,9 @@ int main(int argc, char** argv) {
     }
     if (!reference) { dispatchContextTest(); packedVertexReuseTest(); packedFlushAndBoundaryTest(); }
     if (!reference) reuseTest();
+#ifdef HAS_PRELUDE_MATERIAL_BINDING_REUSE
+    if (!reference) materialBindingReuseTest();
+#endif
     equivalenceTest();
     literalVertexTest();
     if (!reference) { dispatchTest(); sharedSamplerTest(); frameResetTest(); lodInputTest(); }

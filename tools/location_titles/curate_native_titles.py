@@ -16,6 +16,11 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[2]
 PREFIX = 'custom/oot_location_titles/v1/'
+# Native logical pair spacing is shared with the optional HD compositor via
+# the manifest. The y crop retains its donor's leading bearing; fa needs
+# optical overlap beneath the f hook, with no change to either glyph.
+PAIR_KERNING = {'ar': -1, 'et': -1, 'fa': -2,
+                'ay': -3, 'ey': -3, 'gy': -3, 'hy': -3, 'ny': -3, 'ry': -3, 'ty': -3}
 
 
 def sha(data):
@@ -45,12 +50,17 @@ def native_halo(face):
 
 def curate(oot, coverage, destination, preview):
     metrics = json.loads((ROOT / 'tools/location_titles/assets/native-oot-v2/native-title-pack.json').read_text())['native_metrics']
+    isolation_path = Path(__file__).parent / 'assets/native-v3/glyph-isolation.json'
+    isolation = json.loads(isolation_path.read_text())
+    assert isolation['version'] == 1
+    isolation = isolation['glyphs']
     glyphs, provenance = {}, {}
     with ZipFile(oot) as archive:
         names = archive.namelist()
         for ch, metric in metrics.items():
             name = next(n for n in names if '/' + metric['card'] + '/' in n and n.endswith('ENGTex'))
-            source = archive.read(name)[80:]
+            record = archive.read(name)
+            source = record[80:]
             start, _, end, _ = metric['crop']
             width = end - start
             face = Image.new('L', (width, 24))
@@ -58,8 +68,24 @@ def curate(oot, coverage, destination, preview):
                       for y in range(24) for x in range(start, end)]
             for x, y, _ in metric['removed_neighbor_pixels']:
                 values[y * width + x - start] = 0
-            face.putdata(values)
+            # Check the original audited crop before applying this addendum.
+            # Crop windows can include the next/previous donor letter's face,
+            # not just its shadow. Remove only explicit, source-checked pixels;
+            # component filtering would also erase real i/j dots and edge AA.
             assert sha(bytes(values)) == metric['face_sha256']
+            removed = list(metric['removed_neighbor_pixels'])
+            if ch in isolation:
+                fix = isolation[ch]
+                assert (fix['source'] == name and fix['source_sha256'] == sha(record) and
+                        fix['source_crop'] == metric['crop'] and
+                        fix['pre_sweep_face_sha256'] == metric['face_sha256'])
+                for x, y, value in fix['removed_neighbor_pixels']:
+                    assert start <= x < end and 0 <= y < 24
+                    assert values[y * width + x - start] == value
+                    values[y * width + x - start] = 0
+                removed.extend(fix['removed_neighbor_pixels'])
+                assert sha(bytes(values)) == fix['face_sha256']
+            face.putdata(values)
             tile = Image.new('L', (24, 24))
             tile.paste(face, (3, 0))
             native_face = Image.new('L', (24, 24))
@@ -69,7 +95,7 @@ def curate(oot, coverage, destination, preview):
                         native_face.putpixel((x + 3, y), source[y * 144 + start + x])
             glyphs[ch] = (tile, native_halo(tile), metric['advance'], native_face)
             provenance[ch] = {'source': name, 'crop': metric['crop'], 'face_sha256': sha(bytes(values)),
-                              'isolated_neighbor_pixels': metric['removed_neighbor_pixels']}
+                              'isolated_neighbor_pixels': removed}
         # Native OoT font source supplies the five characters absent from its
         # English place wordmarks. Explicit provenance avoids a false claim of
         # place-bitmap identity for these resampled native-font characters.
@@ -91,11 +117,12 @@ def curate(oot, coverage, destination, preview):
             provenance[ch] = {'source': name, 'native_source_sha256': sha(source), 'native_crop': list(crop),
                               'place_card_size': [width, height], 'resampling': 'Lanczos, native OoT font only'}
 
-        def card(text, width=240):
-            # Crop advances stay native. Two native-Market pair adjustments
-            # tighten ar/et; four-pixel spaces match the Forest Temple donor.
+        def card(text, width=240, extra_kerning=None):
+            # Crop advances stay native. Four-pixel spaces match the Forest
+            # Temple donor; only the audited pair positions change.
             advance = lambda ch: 4 if ch == ' ' else glyphs[ch][2]
-            kern = {'ar': -1, 'et': -1}
+            kern = dict(PAIR_KERNING)
+            kern.update(extra_kerning or {})
             length = sum(map(advance, text)) + sum(kern.get(text[i:i + 2], 0) for i in range(len(text) - 1))
             assert length <= width - 8, (text, length)
             face, alpha = Image.new('L', (width, 24)), Image.new('L', (width, 24))
@@ -126,7 +153,11 @@ def curate(oot, coverage, destination, preview):
         titles = json.loads(Path(coverage).read_text())
         assert len(titles) == 67 and all(not set(row['text']) - (set(glyphs) | {' '}) for row in titles)
         resources = {PREFIX + '1/' + row['id']: card(row['text']) for row in titles}
-        resources[PREFIX + 'market'] = card("Skiejer's Black Market")
+        # The narrow native j begins two pixels into its tile. Tighten the
+        # conspicuous gap before it in this shop name, keeping every scene's
+        # accepted layout and the actual spelling unchanged.
+        market_pair_kerning = {'ej': -2}
+        resources[PREFIX + 'market'] = card("Skiejer's Black Market", extra_kerning=market_pair_kerning)
         donor_name = 'textures/g_pn_36/gLostWoodsTitleCardENGTex'
         resources[PREFIX + 'lost_woods'] = archive.read(donor_name)
         assert len(resources[PREFIX + 'lost_woods']) == 3536
@@ -155,6 +186,9 @@ def curate(oot, coverage, destination, preview):
                                       'halo_coverage_sha256': sha(values[1].tobytes())}
                                  for ch, values in sorted(glyphs.items())},
                 'forest_donor_sha256': sha(resources[PREFIX + 'lost_woods']),
+                'glyph_isolation_sha256': sha(isolation_path.read_bytes()),
+                'pair_kerning': PAIR_KERNING,
+                'market_pair_kerning': market_pair_kerning,
                 'native_market_reference_sha256': sha(market_control),
                 'notes': 'Native source artwork, baked halo and 24px baseline. E/N/O/&/j use native OoT NES-font masks, not invented place-card pixels. Optional HD traces these native face contours; generated substitute glyph shapes are rejected.'}
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

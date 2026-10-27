@@ -28,6 +28,10 @@ def main():
         subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
         assert (ROOT / "combo/gameplay/MagicMirrorRuntime.inc.h").exists(), "Mirror recall is not implemented yet"
         for host in ("soh", "mm"):
+            adapter = (ROOT / host / ("soh" if host == "soh" else "2s2h") /
+                       "Enhancements/Gameplay/MagicMirror.cpp").read_text()
+            (Path(directory) / "native_mirror_sound.inc.h").write_text("\n".join(
+                block(adapter, "void " + name + "(") for name in ("PlayActivationChime", "PlayDepartureCue")))
             # Run each engine's real once-animation advancement and dispatcher.
             native = (ROOT / host / "src/code/z_skelanime.c").read_text()
             prefix = "LinkAnimation" if host == "soh" else "PlayerAnimation"

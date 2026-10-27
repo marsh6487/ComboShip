@@ -7,6 +7,8 @@
 #include "soh/OTRGlobals.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
+#include "ComboCollectibleShimmerHost.h"
+
 #define FLAGS 0
 
 void EnItem00_Init(Actor* thisx, PlayState* play);
@@ -1404,6 +1406,26 @@ void EnItem00_DrawRupee(EnItem00* this, PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+
+    int profile = -1;
+    switch (this->actor.params) {
+        case ITEM00_RUPEE_GREEN:
+            profile = CW_COLLECTIBLE_GREEN;
+            break;
+        case ITEM00_RUPEE_BLUE:
+            profile = CW_COLLECTIBLE_BLUE;
+            break;
+        case ITEM00_RUPEE_RED:
+            profile = CW_COLLECTIBLE_RED;
+            break;
+        case ITEM00_RUPEE_PURPLE:
+            profile = CW_COLLECTIBLE_PURPLE;
+            break;
+        case ITEM00_RUPEE_ORANGE:
+            profile = CW_COLLECTIBLE_LARGE;
+            break;
+    }
+    ComboCollectibleShimmer_DrawDrop(play, profile, profile <= CW_COLLECTIBLE_RED ? 25.0f : 17.5f);
 }
 
 static const Vtx customDropVtx[] = {
@@ -1487,6 +1509,8 @@ void EnItem00_DrawHeartContainer(EnItem00* this, PlayState* play) {
     POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gHeartContainerInteriorDL, GID_HEART_CONTAINER);
 
     CLOSE_DISPS(play->state.gfxCtx);
+
+    ComboCollectibleShimmer_DrawDrop(play, CW_COLLECTIBLE_HEART, 20.0f);
 }
 
 /**
@@ -1503,6 +1527,8 @@ void EnItem00_DrawHeartPiece(EnItem00* this, PlayState* play) {
     POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gHeartPieceInteriorDL, GID_HEART_PIECE);
 
     CLOSE_DISPS(play->state.gfxCtx);
+
+    ComboCollectibleShimmer_DrawDrop(play, CW_COLLECTIBLE_HEART, 21.0f);
 }
 
 // #region [Randomizer] [Enchancment]

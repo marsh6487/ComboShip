@@ -116,15 +116,19 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
         gSPDisplayList(head++, reinterpret_cast<Gfx*>(const_cast<char*>(kFire)));
     }
 
-    std::array<Puff, kPuffCount> puffs;
-    for (int pot = 0; pot < int(kPotMouths.size()); ++pot)
+    std::array<Puff, kPuffCount> puffs{};
+    int puffCount = 0;
+    // MM's private presentation removes both rear cauldrons. Preserve the
+    // original OoT room and all its emitters while retaining MM's entry pots.
+    for (int pot = oot ? 0 : 2; pot < int(kPotMouths.size()); ++pot)
         for (int puff = 0; puff < kPuffsPerPot; ++puff)
-            puffs[pot * kPuffsPerPot + puff] = Vapor(pot, puff, play->gameplayFrames);
+            puffs[puffCount++] = Vapor(pot, puff, play->gameplayFrames);
     const auto distance = [&](const Puff& puff) {
         const auto p = puff.center, e = play->view.eye;
         return (p.x - e.x) * (p.x - e.x) + (p.y - e.y) * (p.y - e.y) + (p.z - e.z) * (p.z - e.z);
     };
-    std::sort(puffs.begin(), puffs.end(), [&](const Puff& a, const Puff& b) { return distance(a) > distance(b); });
+    std::sort(puffs.begin(), puffs.begin() + puffCount,
+              [&](const Puff& a, const Puff& b) { return distance(a) > distance(b); });
     gDPPipeSync(head++);
     gDPSetCycleType(head++, G_CYC_2CYCLE);
     gDPSetRenderMode(head++, G_RM_PASS, G_RM_ZB_CLD_SURF2);
@@ -136,7 +140,7 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
     gDPLoadTextureBlock(head++, oot ? kOotSmoke : kMmSmoke, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP,
                         5, 5, G_TX_NOLOD, G_TX_NOLOD);
     gSPMatrix(head++, transforms + 2, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    for (int puff = 0; puff < kPuffCount; ++puff) {
+    for (int puff = 0; puff < puffCount; ++puff) {
         const auto& p = puffs[puff];
         if (!p.alpha)
             continue;
@@ -163,6 +167,10 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
     head = Gfx_SetupDL(head, 25);
     gDPSetPrimColor(head++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(head++, 128, 128, 128, 128);
-    gSPSegment(head++, 0x08, gSegments[8]);
+    // This is a raw CPU segment value, not a resource-name argument. Pause can
+    // leave its retired icon buffer here after reset/scene teardown; the public
+    // wrapper probes that address for an OTR signature and can read freed memory.
+    // Emit the existing segment value directly, without dereferencing it.
+    __gSPSegment(head++, 0x08, gSegments[8]);
 }
 } // namespace BlackMarketInteriorEffects

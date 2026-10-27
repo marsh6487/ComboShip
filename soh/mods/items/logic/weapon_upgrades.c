@@ -178,12 +178,13 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     } else if (player->heldItemAction == PLAYER_IA_SWORD_MASTER) {
         model = WeaponUpgrade_HasTrueMaster() ? NEI_HELD_SWORD_TRUE_MASTER : NEI_HELD_SWORD_MASTER;
     } else if (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON) {
-        if (!fourEquipped && !WeaponUpgrade_HasGreatFairy() && player->heldItemId == ITEM_SWORD_KNIFE &&
-            gSaveContext.swordHealth <= 0.0f)
-            return 0; // Keep the existing broken-knife presentation.
+        // Native BGS hands use durability for either item ID. The broken
+        // Knife must not be replaced by a full authored blade after that draw.
         model = WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)
                     ? NEI_HELD_SWORD_GREAT_FAIRY
-                    : NEI_HELD_SWORD_BIGGORON;
+                : gSaveContext.swordHealth <= 0.0f                                ? NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE
+                : player->heldItemId == ITEM_SWORD_KNIFE || !gSaveContext.bgsFlag ? NEI_HELD_SWORD_GIANTS_KNIFE
+                                                                                  : NEI_HELD_SWORD_BIGGORON;
     } else {
         return 0;
     }
@@ -193,6 +194,10 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         return 0;
     if (!fourEquipped && model >= 0 && model < NEI_HELD_SWORD_FOUR)
         auraModel = model;
+    else if (!fourEquipped && model == NEI_HELD_SWORD_GIANTS_KNIFE)
+        auraModel = SWORD_AURA_GIANTS_KNIFE;
+    else if (!fourEquipped && model == NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE)
+        auraModel = SWORD_AURA_AUTHORED_BROKEN_GIANTS_KNIFE;
 
     // Four Sword first: it replaces whichever sword is in hand while equipped, so it outranks the
     // per-sword upgrade blades below. Its DLs come from soh.o2r (converted out of the old pak), not

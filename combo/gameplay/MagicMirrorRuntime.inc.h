@@ -1,5 +1,8 @@
 // Included by each native adapter after its real engine headers and MirrorHost
 // boundaries. State is local to that engine; only permanent ownership is shared.
+#ifdef COMBO_MAGIC_MIRROR_MM
+extern "C" s16 sSceneCutsceneCount;
+#endif
 namespace MirrorRuntime {
 constexpr u16 kReceiptText = 0x3FEB, kPromptText = 0x3FEC;
 struct Context {
@@ -61,9 +64,13 @@ void ReleasePrompt(bool close) {
     sPromptAddedFlags = 0;
 }
 void ReleaseCast() {
-    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state &&
-        GET_PLAYER(gPlayState) == sCastPlayer)
-        MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state) {
+        MirrorHost::ReleaseCastCamera(gPlayState);
+        if (GET_PLAYER(gPlayState) == sCastPlayer)
+            MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    } else {
+        MirrorHost::ForgetCastCamera();
+    }
     sCastPlay = nullptr;
     sCastPlayer = nullptr;
     sDeparted = false;
@@ -226,8 +233,12 @@ bool Travel(PlayState* play, bool casting = false) {
     if (!MagicMirror_IsOwned() || !Safe(play, casting) || !AllowedScene(play) || !MirrorHost::PackAvailable())
         return false;
 #ifndef COMBO_MAGIC_MIRROR_MM
-    if (Combo_IsCombinedGame())
-        return MirrorHost::RequestHandoff();
+    if (Combo_IsCombinedGame()) {
+        if (!MirrorHost::RequestHandoff())
+            return false;
+        MirrorHost::PlayDepartureCue();
+        return true;
+    }
     play->nextEntranceIndex = COMBO_SOLO_FOREST_OOT_ENTRANCE;
     gSaveContext.cutsceneIndex = 0;
 #else
@@ -241,6 +252,7 @@ bool Travel(PlayState* play, bool casting = false) {
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     play->transitionType = gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     play->transitionTrigger = TRANS_TRIGGER_START;
+    MirrorHost::PlayDepartureCue();
     return true;
 }
 int BeginPickup() {
@@ -419,6 +431,15 @@ void PrepareArrival(PlayState* play) {
     sArrivalSpawn.pos = position;
     sArrivalSpawn.rot.y = yaw;
 #ifdef COMBO_MAGIC_MIRROR_MM
+    // Scene preparation supplied the player's missing unscripted ocarina chain.
+    // Landing changes the packed heading; keep that chain through Player_Init.
+    // Other source spawns retain Landing's native CS_ID_NONE sentinel.
+    if (play->curSpawn == 0 && sSceneCutsceneCount == 1 && (sArrivalOriginal->rot.y & 0x7F) == 0) {
+        const ActorCutscene* ocarina = CutsceneManager_GetCutsceneEntry(0);
+        if (ocarina && ocarina->csCamId == CS_CAM_ID_GLOBAL_ITEM_OCARINA && ocarina->scriptIndex == CS_SCRIPT_ID_NONE &&
+            ocarina->additionalCsId == CS_ID_NONE)
+            sArrivalSpawn.rot.y &= ~0x7F;
+    }
     sArrivalSpawn.id &= ~0x8000; // Actor_SpawnEntry must decode packed degrees.
     sArrivalSpawn.params = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D);
 #else
@@ -460,14 +481,18 @@ void Update() {
                             !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
             MirrorHost::Trace("cast-cancel", play);
             ReleaseCast();
-        } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
-            sDeparted = Travel(play, true);
-            if (sDeparted)
-                sDepartureTick = sCastTicks;
-            MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
-            if (!sDeparted) {
-                ReleaseCast();
-                MirrorHost::Error();
+        } else {
+            if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+                MirrorHost::UpdateCastCamera(play, sCastPlayer);
+            if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
+                sDeparted = Travel(play, true);
+                if (sDeparted)
+                    sDepartureTick = sCastTicks;
+                MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
+                if (!sDeparted) {
+                    ReleaseCast();
+                    MirrorHost::Error();
+                }
             }
         }
         return;
@@ -494,6 +519,8 @@ void Update() {
                     sCastPlay = play;
                     sCastPlayer = GET_PLAYER(play);
                     sCastTicks = 0;
+                    if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+                        MirrorHost::UpdateCastCamera(play, sCastPlayer);
                     MirrorHost::Trace("cast-started", play);
                 } else {
                     MirrorHost::Trace("cast-rejected", play);
@@ -550,6 +577,7 @@ void Update() {
     HoldPrompt();
     play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
+    MirrorHost::PlayActivationChime();
     MirrorHost::Trace("prompt-open", play);
 }
 void DrawWorld() {

@@ -24,7 +24,16 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
         ("soh", "soh/Enhancements/Gameplay/ComboSoloForest.cpp"),
         ("soh", "soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp"),
         ("mm", "2s2h/Rando/NeiGiPresentation.cpp"),
+        ("soh", "soh/Enhancements/randomizer/NeiGiPresentation.cpp"),
     ]
+    renderers = {
+        ("mm", "2s2h/Rando/NeiGiPresentation.cpp"),
+        ("soh", "soh/Enhancements/randomizer/NeiGiPresentation.cpp"),
+    }
+    delegated_sources = {
+        ("mm", "2s2h/Enhancements/Gameplay/ComboSoloForest.cpp"),
+        ("soh", "soh/Enhancements/Graphics/ComboRegionalPassages.cpp"),
+    }
     for index, (host, source) in enumerate(sources):
         obj = Path(temporary) / f"renderer-{index}.o"
         paths = (host, host + ("/2s2h" if host == "mm" else "/soh"),
@@ -45,16 +54,21 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
         ], check=True)
         undefined = subprocess.check_output(["nm", "--undefined-only", str(obj)], text=True)
         symbols = {line.split()[-1] for line in undefined.splitlines() if line.split()}
-        # Solo MM now delegates all particle submission to the shared GI
-        # renderer, compiled above as its own production object. It no longer
-        # emits display-list interpolation macros in this translation unit.
-        delegated = (host, source) == ("mm", "2s2h/Enhancements/Gameplay/ComboSoloForest.cpp")
+        # These callers delegate particle submission to their host's shared
+        # GI renderer. Compile both real owners and verify the C call/definition
+        # boundary as well as the owners' native interpolation imports.
+        delegated = (host, source) in delegated_sources
         if delegated and "NeiGi_DrawWorldParticles" not in symbols:
             failures.append(f"{host}/{source} does not request the native shared GI particle renderer")
+        if (host, source) in renderers:
+            defined = subprocess.check_output(["nm", "--defined-only", str(obj)], text=True)
+            definitions = {line.split()[-1] for line in defined.splitlines() if line.split()}
+            if "NeiGi_DrawWorldParticles" not in definitions:
+                failures.append(f"{host}/{source} does not define the native shared GI particle renderer")
         for function in ["FrameInterpolation_RecordOpenChild", "FrameInterpolation_RecordCloseChild"]:
             requested = [symbol for symbol in symbols if function in symbol]
             if requested != ([] if delegated else [function]):
                 failures.append(f"{host}/{source} requests a non-native interpolation ABI: {requested}")
         print(f"Compiled native interpolation boundary: {host}/{source}", flush=True)
     assert not failures, "\n".join(failures)
-    print(f"PASS: native C interpolation ownership and solo-MM GI renderer delegation across {len(sources)} production objects")
+    print(f"PASS: native C interpolation ownership and both hosts' GI renderer delegation across {len(sources)} production objects")

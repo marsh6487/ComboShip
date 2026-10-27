@@ -88,6 +88,24 @@ int main(int argc, char** argv) {
         checkDraw(-1, 2, 0, "000");
         checkDraw(INT16_MIN, 2, 0, "000");
     }
+    // ComboShip shares OoT's 999 capacity: the Tycoon HUD must not add a zero.
+    gUpgradeCapacities[UPG_WALLET][3] = 999;
+    checkDraw(999, 3, 1, "999");
+    checkDraw(0, 3, 1, "000");
+    checkDraw(7, 3, 1, "007");
+    checkDraw(-1, 3, 1, "000");
+    checkDraw(INT16_MIN, 3, 1, "000");
+    // Restored balances still display every digit without changing saved money.
+    checkDraw(1000, 3, 1, "1000");
+    checkDraw(1667, 3, 1, "1667");
+    checkDraw(10000, 3, 1, "10000");
+    checkDraw(INT16_MAX, 3, 1, "32767");
+    REQUIRE(gUpgradeCapacities[UPG_WALLET][3] == 999);
+
+    // Standalone 2Ship's genuine Tycoon capacity retains its four-digit HUD.
+    gUpgradeCapacities[UPG_WALLET][3] = 5000;
+    checkDraw(0, 3, 1, "0000");
+    checkDraw(999, 3, 1, "0999");
     checkDraw(5000, 3, 1, "5000");
     checkDraw(9999, 3, 1, "9999");
     checkDraw(10000, 3, 1, "10000");
@@ -102,10 +120,16 @@ int main(int argc, char** argv) {
             snprintf(expected, sizeof(expected), "%0*d", width, balance < 0 ? 0 : balance);
             checkDraw((s16)balance, wallet, 0, expected);
         }
+        gUpgradeCapacities[UPG_WALLET][3] = 999;
+        snprintf(expected, sizeof(expected), "%03d", balance < 0 ? 0 : balance);
+        checkDraw((s16)balance, 3, 1, expected);
+        REQUIRE(gUpgradeCapacities[UPG_WALLET][3] == 999);
+        gUpgradeCapacities[UPG_WALLET][3] = 5000;
         snprintf(expected, sizeof(expected), "%04d", balance < 0 ? 0 : balance);
         checkDraw((s16)balance, 3, 1, expected);
+        REQUIRE(gUpgradeCapacities[UPG_WALLET][3] == 5000);
     }
-    puts("PASS all 65536 signed16 balances in native wallet0/1/2/3 and Tycoon: "
-         "decimal textures, no save changes");
+    puts("PASS all 65536 signed16 balances in native wallet0/1/2/3 and 999/5000 Tycoon: "
+         "decimal textures, no save or capacity changes");
     return 0;
 }

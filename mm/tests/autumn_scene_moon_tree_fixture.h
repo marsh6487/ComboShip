@@ -75,8 +75,8 @@ static void CheckPreludeMoonTreeFoliage() {
                 assert(Equal(RemoveTint(changed), originals.at(path)));
                 const auto root = path.substr(assetPrefix.size());
                 const auto color = selected == SEASON_SPRING   ? 0xF6C1D9E0
-                                   : selected == SEASON_WINTER ? 0xCCDCEEFF
-                                                               : 0xF4B783FF;
+                                   : selected == SEASON_WINTER ? 0xE2EEE9FF
+                                                               : 0xDE496BFF;
                 assert(CountMaterialTriangles(changed, (root + "_tex0").c_str(), color) == 1);
                 assert(CountMaterialTriangles(changed, (root + "_tex1").c_str(), color) == 0);
             }
@@ -203,8 +203,8 @@ static void CheckActualPreludeMoonTree(const char* projectPath, const std::vecto
             const auto& commands = CurrentVariants().at(list.get()).commands;
             assert(Equal(RemoveTint(commands), draw.commands));
             const auto color = selected == SEASON_SPRING   ? 0xF6C1D9E0
-                               : selected == SEASON_WINTER ? 0xCCDCEEFF
-                                                           : 0xF4B783FF;
+                               : selected == SEASON_WINTER ? 0xE2EEE9FF
+                                                           : 0xDE496BFF;
             unsigned triangles = 0;
             for (const auto& texture : draw.textures) {
                 const auto expected = CountMaterialTriangles(draw.commands, texture.c_str());

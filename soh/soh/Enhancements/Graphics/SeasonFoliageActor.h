@@ -16,16 +16,16 @@ static inline int SeasonFoliage_ActorBegin(Gfx** display, const PlayState* play,
             mode = 3; // Readable blossom canopies and grass blush; summer restores native color.
             break;
         case 2:
-            red = canopy ? 244 : 217;
-            green = canopy ? 183 : 156;
-            blue = canopy ? 131 : 69;
+            red = canopy ? 239 : 242;
+            green = canopy ? 72 : 104;
+            blue = canopy ? 76 : 70;
             blend = 255;
-            mode = 1;
+            mode = 2; // Preserve the foliage's mean intensity while applying the autumn hue.
             break;
         case 3:
-            red = canopy ? 204 : 229;
-            green = canopy ? 220 : 237;
-            blue = canopy ? 238 : 243;
+            red = canopy ? 226 : 220;
+            green = canopy ? 238 : 236;
+            blue = canopy ? 233 : 245;
             blend = 255;
             mode = 3; // Existing frost normalization preserves texture detail.
             break;

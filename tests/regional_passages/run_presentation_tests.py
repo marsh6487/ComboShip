@@ -50,18 +50,21 @@ def main():
         env["CPATH"] = os.pathsep.join((os.environ["COMBO_NEI_FIXTURE_CPATH"], env.get("CPATH", "")))
     validate_resources()
     with tempfile.TemporaryDirectory(prefix="regional-presentation-") as temporary:
-        binary = Path(temporary) / "policy"
-        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                        "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
-                        "-I" + str(ROOT / "combo"), str(ROOT / "tests/regional_passages/presentation_test.cpp"),
-                        "-o", str(binary)], check=True)
-        subprocess.run([str(binary)], check=True, env=env, timeout=20)
+        for name in ("presentation_test", "shimmer_coverage_test"):
+            binary = Path(temporary) / name
+            subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                            "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
+                            "-I" + str(ROOT / "combo"), str(ROOT / "tests/regional_passages" / (name + ".cpp")),
+                            "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True, env=env, timeout=20)
         if args.core_only:
             return
         for host in ("soh", "mm"):
             path = ROOT / host / ("soh" if host == "soh" else "2s2h") / "Enhancements/Graphics/ComboRegionalPassages.cpp"
             source = path.read_text() if path.is_file() else ""
-            names = ("bool RegionalPresentationSafe(", "void DrawRegionalShell(", "void DrawRegionalPassage(")
+            names = ("bool RegionalPresentationSafe(", "void DrawRegionalPassage(")
+            if host == "mm":
+                names = ("bool RegionalPresentationSafe(", "void DrawRegionalShell(", "void DrawRegionalPassage(")
             if host == "soh":
                 names += ("void StopRegionalWaves(", "void UpdateRegionalWaves(")
             bodies = "\n".join(block_from(source, source.index(name)) for name in names) if source else """
@@ -90,7 +93,7 @@ void UpdateRegionalWaves() {}
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
                             *(["-DOOT_REGIONAL_TEST"] if host == "soh" else ["-w"]),
                             "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
-                            *["-I" + str(ROOT / item) for item in includes], str(cpp), "-o", str(binary)], check=True)
+                            *["-I" + str(ROOT / item) for item in includes], str(cpp), "-o", str(binary)], check=True, env=env)
             subprocess.run([str(binary)], check=True, env=env, timeout=20)
             if host == "soh":
                 engine = Path(temporary) / "engine.cpp"

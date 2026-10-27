@@ -9,22 +9,22 @@
     {
       "name": "glyphs.zlib.001.b64",
       "bytes": 98304,
-      "sha256": "835eb49a9be74f8412e8bd403279b2a6ebdf8e5db3a10e9383841df759800d20",
+      "sha256": "3ecd9016ef1c502266218aa2bdd64af0077e9ccd3ea2edff4cfca44fb23a7aad",
       "encoded_bytes": 131072,
-      "encoded_sha256": "54a4a126ac4b71e95f55e5b3c6e241623dffee2766ddeac76dee5c5f75dcbf82"
+      "encoded_sha256": "594898ac07f6caa9d48bd695eecaea4e47e93d942c0b949f0dcb58fee079f58b"
     },
     {
       "name": "glyphs.zlib.002.b64",
-      "bytes": 54446,
-      "sha256": "95cd5353415ab45992439c8b9c4499ac01495148a714c26edd076e5d332889f4",
-      "encoded_bytes": 72596,
-      "encoded_sha256": "d1b157c0bdf15f9651803d8179d446159b2b124429d6efa1b6e53a8885fb8657"
+      "bytes": 53410,
+      "sha256": "be35d7e48d33afdb31f986046b626d7a4a053d6b3097eebc016596a876d1e44c",
+      "encoded_bytes": 71216,
+      "encoded_sha256": "7fd608b16749c7878a9fa3c095434b7d535e7a879563d0d8c982b1ba33702535"
     }
   ],
   "decoded_bytes": 1013821,
-  "decoded_sha256": "a7814ee966f7c20a8d075c1d552e7a9679595356f3c3f9fb9b6120c1fc47a6e7",
-  "packed_bytes": 152750,
-  "packed_sha256": "4f58fb6968ced1c98cff09bf292dcab76468edade710797f21b5b5f9f4981c41",
+  "decoded_sha256": "91b4af84b003df1ed2d0a07b13c5ddb2e75c01fe68b2701bc328983aa07f082e",
+  "packed_bytes": 151714,
+  "packed_sha256": "47e82fbec9cc68e7a84c7adf54a8a7a9cf299f8d94474321a655f005f379089e",
   "glyphs": {
     "&": {
       "native_core_bbox": [
@@ -114,8 +114,8 @@
       "advance": 10,
       "source_face_sha256": "8207b600d0b58476e162ff0614287d0eb1c3534a165e73322168db15b87fb2bb",
       "source_halo_sha256": "26342efa71c7749bdf8905cc182a2574cfa64f97d1b811ae31df69528c8ebc51",
-      "face_sha256": "7e6e276deb2973a4074ffc017449f2300981bc04c430ec240bdc0c01dfc12c7a",
-      "alpha_sha256": "c7db0964b6dbea44e579185499ff933775c7f7854c207c6eeb04d571c4b24bad"
+      "face_sha256": "601ab71f081dc17d6874349c851428463bb46b0f454ccf80290c37bffda6bd95",
+      "alpha_sha256": "d96026359dcc5c65887e486d46ed36974ecf081861127c1102cee72723584f42"
     },
     "F": {
       "native_core_bbox": [
@@ -251,27 +251,27 @@
       "native_core_bbox": [
         4,
         4,
-        15,
+        13,
         17
       ],
       "advance": 12,
-      "source_face_sha256": "e1fc10a448ca5dc3dbf21003487c5d0208f2a849507e56a37ece2319d3e166b2",
-      "source_halo_sha256": "f868569b79f6ccf0294e0e3370578272dba8ce8ec4a3775280a2ca93ac2d907d",
-      "face_sha256": "d3159764c0bf69428de3bb7e09245f401edc94fd75db9edd97918fe31dbf570c",
-      "alpha_sha256": "910ca1930aca465cdadf5f22ea68f0872c92972beaa7dacb8b085aaf9573f022"
+      "source_face_sha256": "1cc4602088bd5dce59e99f469fd241cff193f091897beab2d946c19916ca00cf",
+      "source_halo_sha256": "ae49ce3031fb25d7e0c5024a4d06a89ea4a3d2d7c481f6cca5734ebb6c4634fa",
+      "face_sha256": "699523913e2853ea8bd1fdb7e9f6645c92c66bda69158a62ea43d024fccc24d4",
+      "alpha_sha256": "328ef4627fca2bb9d9fcff9ec95002e11033087437c7c55c0f0c552ad92f5315"
     },
     "R": {
       "native_core_bbox": [
         4,
         4,
-        14,
+        12,
         18
       ],
       "advance": 11,
-      "source_face_sha256": "18bd7e83f0717373527b7bd3b84fec10e7bf2cb633d19dc36d129b6c489665ee",
-      "source_halo_sha256": "074d6702343c7b43ac772866c65221017c3326eebd30bcfe07812f3f7fe2a76d",
-      "face_sha256": "15414f8da2dc661248add56b86e43ef642eba61b4ee1df081f9dd755773e571b",
-      "alpha_sha256": "b6fa88c81e2fd93d76c0f1769f300464bd628a8b4e0669963f34783dec1c59e6"
+      "source_face_sha256": "6e6b20b9795c29d6231d91638e6a51a3cb94bb45db91b1d5a566c608aa24592b",
+      "source_halo_sha256": "9305f609713eaf142e32ffd6cc15305fc64aefcc27002386a3b93b2ed3a62eb5",
+      "face_sha256": "a378637d5d08d778504dd137d7b9abd451e8f407ef62c2cd237d2a4e5e6f2a91",
+      "alpha_sha256": "b624280d68be261e9e774bcb37c3eb2ea353d7af666365c9320cfae0c6344f9c"
     },
     "S": {
       "native_core_bbox": [
@@ -303,27 +303,27 @@
       "native_core_bbox": [
         3,
         4,
-        16,
+        14,
         17
       ],
       "advance": 13,
-      "source_face_sha256": "eb9568a664ae7893f6f97529622e83ffdb657ee9317d95fea8e100ee3bec17a7",
-      "source_halo_sha256": "0f92c8291687199a842d8f88d72b590cf62b94ce732973e9e80a00382b12e72d",
-      "face_sha256": "8494f84bc536ae4753f4ae9a77dab8c4d6ed5887106ae04904377741fe43d2cd",
-      "alpha_sha256": "b974807e605299d2b821fb3e5d3c9c6c794a2fa24a44387cab13236061069db9"
+      "source_face_sha256": "d6912b71391e1dd6a2f5b8089c5c571009559bfc3b608d8460993fc5c16134d2",
+      "source_halo_sha256": "a31a36bdd89ad362a5852d7a4fc66482cc2e414b7e790115cdd3d4712607cbaf",
+      "face_sha256": "8473c440854c3b0a937dfc4a09759ed34facafbc18f02c9088b60da3735d254c",
+      "alpha_sha256": "72bad1e7be1077f5f8867d8c19ec0907cbc5d2be688171f318dfbb82dcab7f70"
     },
     "W": {
       "native_core_bbox": [
         3,
         4,
-        21,
+        19,
         17
       ],
       "advance": 18,
-      "source_face_sha256": "c54131cf2dd638d6330a7426ba16d84f0432e8531f368427cde3548b660d29cd",
-      "source_halo_sha256": "93a4545fb98fe560ed1df2b9c1682387e022c464b0bbdf57e1bf0f516d4b8c8f",
-      "face_sha256": "8e7e7bb15dc01b2b5418fc5c038f043a2b3de5e468f50020d76fd1962ee1a3df",
-      "alpha_sha256": "dac83425c0bad06bf1af6b19c8814dbe469f37cb590180b7ee00a3e480e778b2"
+      "source_face_sha256": "3d46df00313a0f4287f67f99ad97934fc2384cd95eecbe1aaec907fe11f9da2c",
+      "source_halo_sha256": "78866de234fbccd0018ca54774aced271d688586954ee1e18e14e9bd5e786b98",
+      "face_sha256": "0d1b9810e9a955b6fdccad97e680a723a67a948fce4fa81bc1ea3f9fefc77b2c",
+      "alpha_sha256": "604270b9168c69e341bcd7153c9658d5e8a2a5153aa3f7bbf1f0d0ad82d186e1"
     },
     "Z": {
       "native_core_bbox": [
@@ -550,14 +550,14 @@
       "native_core_bbox": [
         4,
         8,
-        11,
+        10,
         17
       ],
       "advance": 8,
-      "source_face_sha256": "359a298975dcd2aacdad8a2650e05967bd08a47a0ed89d9d0ba6ceca8c1d9ce2",
-      "source_halo_sha256": "7454bb0cca7b2ec9a5b5a865d60a4f40c57f06048c6e3de92305e7a99e58a2c3",
-      "face_sha256": "477d913468a8ca156f4df26697b0e56839bf3cc8686d882425cc995908b752d5",
-      "alpha_sha256": "ce288606c42181b1b23aa5e0294c86da2881589d585c8f792ab335ccaf8dd4ba"
+      "source_face_sha256": "1f144dea100f98729e17cc39710cb837b94c31e820e9cd96495238d288ecefb1",
+      "source_halo_sha256": "4223b6b9fa29bc685ec4a0becb452c2c0fcba1a57c7d4ef56a0af397e6bab9a6",
+      "face_sha256": "a116dabcd5fe9ca1e3291bd9ad89804b70af396bb55521e1895a0ab857a3f110",
+      "alpha_sha256": "f5ce2ffa84641a0c311da3bc75969f3be013eced77607c48d522134eb0f54f5b"
     },
     "s": {
       "native_core_bbox": [
@@ -602,14 +602,14 @@
       "native_core_bbox": [
         4,
         9,
-        13,
+        12,
         17
       ],
       "advance": 10,
-      "source_face_sha256": "28c8b0a6e88262eff575ade5bbc76dfaa21e94dd19acd67de8b0451cbf6645c8",
-      "source_halo_sha256": "6c02e537680f7d281316293bd155b30253907c1a51ce092c048a60e6522fa6f4",
-      "face_sha256": "ac9cbe591913cdbb8d1cea0b33b51e8d9512e5e899d3ec185945be0535e61782",
-      "alpha_sha256": "cd4561243f4a3a81e5fe2d0c6d1ac9820602d4889f5fecea05316877d842c823"
+      "source_face_sha256": "2fdf9e14f0c0a6935bc46ce70ccf145f0b9ef514e2a04a8352671d290657847f",
+      "source_halo_sha256": "42e0aa33cc7391d6b21bf78b84f82e47e70d352cab2fa3702709c7a36d4185c4",
+      "face_sha256": "60cdb0dcd5b73f957c291043fd655593a291b8f63a5f533b40cf14645b028f28",
+      "alpha_sha256": "b1c8fa378ae1ed81ef037fcc98dc3dccac4cdafa89eb94d447c8c04b0ea3f791"
     },
     "w": {
       "native_core_bbox": [
@@ -626,29 +626,29 @@
     },
     "x": {
       "native_core_bbox": [
-        3,
+        5,
         9,
         11,
         17
       ],
       "advance": 9,
-      "source_face_sha256": "844f89575d5fb96119689aece9ed1792bb0c28a75832e1d64cf4bd7b816575c6",
-      "source_halo_sha256": "d266e750b0f0b4377663708359f4df533b3e2a188463fdbd178bfe7e172e77c4",
-      "face_sha256": "dc7087be18047390149d353116f1eae8d46616623340145febfa77b0e5d5b1e7",
-      "alpha_sha256": "7616ac2e811f3f65198f49dcc85feb5791c8ef9b8667a720f9fe420cf0d1a8cf"
+      "source_face_sha256": "cc01be16e89daa8d18ae64e805137cfa2b6bd932896e894065941554b3078110",
+      "source_halo_sha256": "40878fc29c4a420a43cdf171ded7228bcb3d1ee6f4618ff5309574cd9afd3769",
+      "face_sha256": "b775a49f900c96ffdbfeaacae67445e1159f7677604654d95d0924f59bebd3c1",
+      "alpha_sha256": "5f3c22d510b0613e05d9ba26f412cbaf6e4993e04a6284cca64ca5a1a1607f34"
     },
     "y": {
       "native_core_bbox": [
-        3,
+        6,
         9,
         14,
         21
       ],
       "advance": 11,
-      "source_face_sha256": "66576afc21833cd12436b60d98ce7e08fc0f773b111c007cfe68cd746e767301",
-      "source_halo_sha256": "61e00f26323ae01bc580c2131034dcfcd74e2dd8e1606acbd979120541c398aa",
-      "face_sha256": "94166f6ec6d1eb0d53a5cbffd080127acc8a1047e10eab3ce54b00d0f0bd5c9b",
-      "alpha_sha256": "d1fd1fa21be47abbabd1312e11f5f6a11ff3573134d1e02b30b7117f7e836af5"
+      "source_face_sha256": "95c5a8cab67febd8cfe4527357fae8fcc3004e3d4048d91f191ad1047e34a860",
+      "source_halo_sha256": "04d0af1f3b1f4845ca192c55304c1f06f65ef958f5739d83481441c7d658abbd",
+      "face_sha256": "bedab216659ce11144dc9d6af0e3bc886a0cc80cee033db85b2b6e9e81f257fe",
+      "alpha_sha256": "85546397a51e174ed44165a5e6cda83050a4e249983fd2bedff50df007e78275"
     },
     "z": {
       "native_core_bbox": [
@@ -669,12 +669,12 @@
     "face_sha256": "2a8fc716a81c11a2a9d8f05bf6d50da30f5a0f5c54333733785b4b54364d8b36",
     "alpha_sha256": "7000f880e3b11a1f9c2ee08fcc6dea66621c2f83b8e7bee18adf803d1e8d3b70"
   },
-  "native_manifest_sha256": "ad027bf35da959ab41c2cc6dc28f8499d7fca45d5c276088c3817c2bd1c809bc",
+  "native_manifest_sha256": "0d88040dd930d0878d15738e37d0230720a1f988a3057f1d0a8ee9e4eb5972d3",
   "authoring_dependencies": {
     "potracer": "0.0.4",
     "Pillow": "12.3.0",
     "numpy": "2.5.4"
   },
-  "authorship": "Cubic contours directly from native OoT face/halo coverage. No generated glyph geometry.",
-  "recipe": "Clear composed native top/bottom rows before interpolation; native face coverage at 2x Lanczos; Potrace half-coverage (turdsize0, alphamax1.3, tolerance0.05); 16x supersampling to 4x output; native fractional halo at bicubic4x. Original forest donor framing is retained. Native metrics and counters retained."
+  "authorship": "Native OoT face/halo coverage only: 48 cubic-contour glyphs and fractional native E interpolation. No generated glyph geometry.",
+  "recipe": "Clear composed native top/bottom rows before interpolation; native face coverage at 2x Lanczos; Potrace half-coverage (turdsize0, alphamax1.3, tolerance0.05); 16x supersampling to 4x output. E preserves its partial top-bar coverage at bicubic4x to avoid a detached trace artifact. Native fractional halo at bicubic4x. Original forest donor framing is retained. Native metrics and counters retained."
 }
