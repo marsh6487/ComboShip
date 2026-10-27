@@ -1,0 +1,117 @@
+name: Verify cumulative Windows package
+
+on:
+  push:
+    branches: [candidate/verify-cumulative-package-20261026]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    name: Inspect published candidate archives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact published source
+        uses: actions/checkout@v5
+        with:
+          ref: 0cd35e4d25f853dc68995dd88e8b1c177840e301
+          path: source
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Check out verifier
+        uses: actions/checkout@v5
+        with:
+          path: verification
+          persist-credentials: false
+          sparse-checkout: scripts/diagnostics
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image reader
+        run: python -m pip install Pillow==10.4.0
+
+      - name: Download and hash exact candidate and baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python verification/scripts/diagnostics/download_cumulative_artifacts.py
+
+      - name: Verify complete Windows package against published source
+        run: |
+          python -B verification/scripts/diagnostics/verify_cumulative_windows_candidate.py downloaded/candidate.zip --repo source --baseline downloaded/baseline.zip --source-commit 0cd35e4d25f853dc68995dd88e8b1c177840e301 --expected-tree 30c2a6d0ccce1587866df567560d48e9a3baf967 --artifact-sha256 39e676d57390b1fa8b07ae8922dfad828a81576a2923e66e0985b07ce5199116 --output evidence/windows-candidate-verification.json
+
+      - name: Confirm old artifact fails current-source requirements
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          command = [sys.executable, '-B', 'verification/scripts/diagnostics/verify_cumulative_windows_candidate.py', 'downloaded/baseline.zip', '--repo', 'source', '--artifact-sha256', 'eec89cc0ef6dde94005f58d1e9e5a977469857a7666dac604dbbf02fea915c2e', '--output', 'evidence/baseline-negative-control.json']
+          result = subprocess.run(command)
+          assert result.returncode == 1, 'Old artifact must fail the current asset requirements'
+          report = json.load(open('evidence/baseline-negative-control.json'))
+          assert report['status'] == 'failed' and 'error' not in report, report.get('error')
+          for game, missing in [('soh', 4101), ('mm', 4099)]:
+              inventory = report['ports'][game]['source_inventory']
+              assert len(inventory['missing']) == missing, inventory
+              assert len(inventory['mismatches']) == 3, inventory
+              assert not inventory['unexpected'], inventory
+              assert len(report['ports'][game]['chamber']['missing']) == 4096
+          print('PASS old-artifact negative control: exact expected missing and changed resources')
+          PY
+
+      - name: Summarize resource verification
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path('evidence/windows-candidate-verification.json')
+          if not path.exists():
+              raise SystemExit('Candidate report was not produced')
+          report = json.loads(path.read_text())
+          result = {'status': report['status'], 'source': report.get('source_content_tree'), 'artifact_sha256': report.get('artifact_sha256'), 'runtime_acceptance': 'pending'}
+          if 'error' in report:
+              result['error'] = report['error']
+          else:
+              result['x64_binaries'] = report['package']['x64_runtime_images']
+              result['ports'] = {}
+              for game, port in report['ports'].items():
+                  result['ports'][game] = {
+                      'resources': port['crc_verified_resources'],
+                      'source_inventory_pass': port['source_inventory']['pass'],
+                      'missing': port['source_inventory']['missing'][:20],
+                      'unexpected': port['source_inventory']['unexpected'][:20],
+                      'mismatches': port['source_inventory']['mismatches'][:20],
+                      'chamber_pass': port['chamber']['pass'],
+                      'chamber_resources': port['chamber']['expected_resources'],
+                      'dedicated_assets_pass': port['dedicated_assets']['pass'],
+                      'baseline': report.get('baseline', {}).get('ports', {}).get(game),
+                      'archive_sha256': port['sha256'],
+                  }
+          text = json.dumps(result, indent=2)
+          print(text)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Published candidate package verification\n\n')
+              out.write('Source: 0cd35e4d25f853dc68995dd88e8b1c177840e301\n\n')
+              out.write('In-game appearance, audio and travel acceptance remain pending.\n\n')
+              out.write('<pre>' + text + '</pre>\n')
+          assert report['status'] == 'passed'
+          assert sum(p['crc_verified_resources'] for p in report['ports'].values()) == 18715
+          assert sum(p['changed'] for p in report['baseline']['ports'].values()) == 6
+          assert sum(p['added'] for p in report['baseline']['ports'].values()) == 8200
+          assert sum(p['removed'] for p in report['baseline']['ports'].values()) == 0
+          PY
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cumulative-Windows-Package-Verification
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
