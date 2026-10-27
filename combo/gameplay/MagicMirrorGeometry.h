@@ -1,6 +1,6 @@
 #pragma once
 
-// Texture-free geometry shared by the native OoT/MM draw path and the icon/preview
+// Shared geometry/UVs for the native OoT/MM draw path and the icon/preview
 // exporter. Coordinates are ordinary game units; Draw uses 1/16-unit Vtx precision.
 #include <array>
 #include <cmath>
@@ -12,6 +12,8 @@ constexpr float kVertexPrecision = 16.0f;
 constexpr uint32_t kAnimationFrames = 960;
 constexpr int kRimSegments = 32;
 constexpr int kGlassRings = 5;
+// RGBA16: 64 * 32 * 2 = 4096 bytes, exactly one native texture tile.
+constexpr int kReflectionWidth = 64, kReflectionHeight = 32;
 constexpr int kMaxVertices = 1280;
 constexpr int kMaxTriangles = 1280;
 constexpr int kMaxBatches = 96;
@@ -34,7 +36,7 @@ struct Mesh {
     std::array<Vertex, kMaxVertices> vertices;
     std::array<Triangle, kMaxTriangles> triangles;
     std::array<Batch, kMaxBatches> batches;
-    uint16_t vertexCount = 0, triangleCount = 0, batchCount = 0, opaqueBatchCount = 0;
+    uint16_t vertexCount = 0, triangleCount = 0, batchCount = 0, opaqueBatchCount = 0, glassEndBatch = 0;
 };
 
 inline uint8_t Channel(float value) {
@@ -46,6 +48,17 @@ inline Color Mix(Color a, Color b, float amount) {
 }
 inline Vertex Point(float x, float y, float z, Color color) {
     return { x, y, z, color.r, color.g, color.b, color.a };
+}
+inline float ReflectionS(float x) {
+    return x / 25.0f + 0.5f;
+}
+inline float ReflectionT(float y) {
+    return 0.5f - (y - 6.0f) / 25.0f;
+}
+inline Color ReflectionModulation(Color) {
+    // The scene carries its own lighting. Neutral opaque modulation preserves
+    // detail; the separate restrained glints still identify polished glass.
+    return { 255, 255, 255, 255 };
 }
 
 class Builder {
@@ -161,6 +174,7 @@ inline void Build(uint32_t frame, Mesh& mesh) {
             builder.Quad(a, a + 2, a + 3, a + 1);
         }
     }
+    mesh.glassEndBatch = mesh.batchCount;
     // A slender reflected arc and two softly pulsing pinpoints, with transparent
     // edges. Shimmer is intentionally confined to the object.
     for (int segment = 0; segment < 8; ++segment) {

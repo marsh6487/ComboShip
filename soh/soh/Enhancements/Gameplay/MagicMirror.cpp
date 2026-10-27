@@ -33,11 +33,37 @@ int Combo_SOH_CrossDungeonTransitionPending(void);
 u8 Sm64Mario_IsReady(void);
 }
 #include "gameplay/MagicMirrorDraw.inc.h"
+#include "gameplay/MagicMirrorCamera.inc.h"
 
 namespace MirrorRuntime {
-void FinishPickup(int token);
+bool FinishPickup(int token);
 }
+#include "MagicMirrorRando.inc.h"
 namespace MirrorHost {
+bool Shuffled() {
+    return MirrorShuffle::Enabled();
+}
+bool PickupAvailable() {
+    return Shuffled() ? MirrorShuffle::StumpAvailable() : !MagicMirror_IsOwned();
+}
+void CancelPickup() {
+    MirrorShuffle::CancelStumpReward();
+}
+void UpdateCastCamera(PlayState* play, Player* player) {
+    ComboMagicMirrorCamera::Begin(play, player);
+}
+void ReleaseCastCamera(PlayState* play) {
+    ComboMagicMirrorCamera::Release(play);
+}
+void ForgetCastCamera() {
+    ComboMagicMirrorCamera::Forget();
+}
+void PlayActivationChime() {
+    Sfx_PlaySfxCentered(NA_SE_EV_TRE_BOX_FLASH);
+}
+void PlayDepartureCue() {
+    Sfx_PlaySfxCentered(NA_SE_PL_MAGIC_WIND_WARP);
+}
 u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
@@ -99,14 +125,25 @@ void DrawPickup(PlayState* play, GetItemEntry*) {
     // Native OoT get-item draws at .2; MM's item actor uses .015 * 30 = .45.
     Matrix_Scale(2.25f, 2.25f, 2.25f, MTXMODE_APPLY);
     ComboMagicMirrorVisual::Draw(play);
+    NeiGi_DrawMesh(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
 }
 void DrawWorldShimmer(PlayState* play) {
     NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
+}
+void DrawWorldPickup(PlayState* play) {
+    if (Shuffled()) {
+        MirrorShuffle::DrawStumpReward(play);
+    } else {
+        ComboMagicMirrorVisual::Draw(play);
+        DrawWorldShimmer(play);
+    }
 }
 void DrawCastAura(PlayState* play, Player* player, float scale, float alpha) {
     NeiUsedMagic_DrawMirrorCast(play, player, scale, alpha);
 }
 bool QueuePickup(int token) {
+    if (Shuffled())
+        return MirrorShuffle::QueueStumpReward(token);
     GetItemEntry entry = GET_ITEM_NONE;
     entry.gi = 1;
     entry.getItemId = GI_MAX;
@@ -125,6 +162,11 @@ bool QueuePickup(int token) {
 }
 } // namespace MirrorHost
 
+extern "C" void MagicMirror_DrawGI(PlayState* play) {
+    if (play)
+        MirrorHost::DrawPickup(play, nullptr);
+}
+
 #include "gameplay/MagicMirrorRuntime.inc.h"
 
 namespace {
@@ -133,8 +175,10 @@ void OpenMirrorText(u16* text, bool* fromTable) {
         return;
     const char* body =
         *text == MirrorRuntime::kReceiptText
-            ? "You found the Magic Mirror!\nEquip it to a C Button to return\nto the Lost Woods from outdoors.\x04"
-              "Its reflection bridges worlds.\nUse the item selector to switch\nbetween Mirror and Time Gate."
+            // OoT's native newline is 0x01; C++ '\n' is its persistent-text
+            // control (0x0A), which cannot close the native get-item receipt.
+            ? "You found the Magic Mirror!&Equip it to a C Button to return&to the Lost Woods from outdoors.\x04"
+              "Its reflection bridges worlds.&Use the item selector to switch&between Mirror and Time Gate."
             : "Return to the Lost Woods?\x01\x1B\x05\x42"
               "Yes\x01No\x05\x40";
     CustomMessage message(body);

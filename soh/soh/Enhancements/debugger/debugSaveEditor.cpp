@@ -7,9 +7,12 @@
 
 #include <fast/Fast3dGui.h>
 #include <ship/Context.h>
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 
 #include "debugSaveEditor.h"
 #include "NeiEditorItems.h"
+#include "gameplay/MagicMirrorItem.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/item.h"
@@ -132,6 +135,59 @@ constexpr uint32_t ADULT_CHEATED_MASK = 0x80000000;
 
 using namespace UIWidgets;
 
+static bool NeiEditor_RegisterIkanaIcon(const std::shared_ptr<Fast::Fast3dGui>& gui, const char* iconPath) {
+    if (!gui || !iconPath) {
+        return false;
+    }
+    const auto context = Ship::Context::GetRawInstance();
+    auto owner = context ? context->GetResourceManager() : nullptr;
+    std::string path = iconPath;
+#ifdef COMBO_BUILD
+    if (path.starts_with("__OTR__@")) {
+        const auto colon = path.find(':', 8);
+        if (colon == std::string::npos || colon == 8 || colon + 1 == path.size()) {
+            owner = nullptr;
+        } else {
+            owner = Ship::CrossRMRegistry::Get(path.substr(8, colon - 8));
+            path = "__OTR__" + path.substr(colon + 1);
+        }
+    } else {
+        // Solo OoT carries the same private native icon in its own archive.
+        owner = Ship::CrossRMRegistry::Get("oot");
+    }
+#endif
+    std::shared_ptr<Fast::Texture> texture;
+    if (owner) {
+        Ship::ResourceManagerScope scope(owner);
+        texture = std::dynamic_pointer_cast<Fast::Texture>(owner->LoadResource(path));
+    }
+    if (!texture || texture->Type != Fast::TextureType::RGBA32bpp || !texture->ImageData || texture->Width == 0 ||
+        texture->Height == 0 || uint64_t(texture->Width) * texture->Height * 4 != texture->ImageDataSize) {
+        // A warm GUI cache must not conceal a removed or invalid owning resource.
+        if (gui->HasTextureByName(iconPath)) {
+            gui->UnloadTexture(iconPath);
+        }
+        return false;
+    }
+
+    static std::weak_ptr<Fast::Texture> registeredTexture;
+    static std::weak_ptr<Fast::Fast3dGui> registeredGui;
+    static std::string registeredKey;
+    if (!gui->HasTextureByName(iconPath) || registeredTexture.lock() != texture || registeredGui.lock() != gui ||
+        registeredKey != iconPath) {
+        if (gui->HasTextureByName(iconPath)) {
+            gui->UnloadTexture(iconPath);
+        }
+        // Upload the selected resource directly; the string overload would repeat
+        // an OoT-local lookup of the routed name and cannot apply the owner's Alt mode.
+        gui->LoadGuiTexture(iconPath, *texture);
+        registeredTexture = texture;
+        registeredGui = gui;
+        registeredKey = iconPath;
+    }
+    return gui->HasTextureByName(iconPath);
+}
+
 // Helper function to get the correct display name for items, including rando items
 static const char* GetItemDisplayName(int32_t item) {
     if (item == ITEM_NONE) {
@@ -152,6 +208,8 @@ static const char* NeiEditor_ItemName(uint16_t item) {
     switch (item) {
         case ITEM_NONE:
             return "None";
+        case EXT_ITEM_MAGIC_MIRROR:
+            return "Magic Mirror";
         case ITEM_ROCS_FEATHER_SKIJER:
             return "Roc's Feather";
         case ITEM_ELEMENTAL_WAND:
@@ -200,6 +258,19 @@ static bool NeiEditor_ItemButton(uint16_t item) {
                                        ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
     PopStyleButton();
     return clicked;
+}
+
+static void DrawMagicMirrorEditor() {
+    ImGui::SeparatorText("Magic Mirror");
+    const bool owned = MagicMirror_IsOwned() != 0;
+    ImGui::BeginDisabled(owned);
+    if (ImGui::Button("Magic Mirror") && !owned)
+        TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
+    ImGui::EndDisabled();
+    if (owned) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("Owned");
+    }
 }
 
 IntSliderOptions intSliderOptionsBase;
@@ -2003,6 +2074,8 @@ void DrawInventoryTab() {
         }
     }
 
+    DrawMagicMirrorEditor();
+
     if (ImGui::CollapsingHeader("Sheikah Slate Runes and Seasons")) {
         static const char* runeNames[SLATE_RUNE_COUNT] = {
             "Remote Bombs", "Stasis", "Cryonis", "Master Cycle", "Desire Sensor",
@@ -3373,7 +3446,9 @@ void DrawEquipmentTab() {
                     bool clicked = false;
                     const char* iconPath = (const char*)ExtEquip_GetIcon(row, col + 1);
                     bool texReady = false;
-                    if (iconPath != NULL) {
+                    if (row == EQUIP_TYPE_SHIELD && col == 2) {
+                        texReady = NeiEditor_RegisterIkanaIcon(gui, iconPath);
+                    } else if (iconPath != NULL) {
                         if (gui->HasTextureByName(iconPath)) {
                             texReady = true;
                         } else {

@@ -31,6 +31,8 @@ int gMMComboGoalRequired;
 int (*gMMComboOtherTriforceCount)() = nullptr;
 void MMAnchor_BroadcastCrossItem(int, const char*, const char*) {}
 void SaveManager_SaveCurrentForCombo() {}
+// Arrow receipts must not consume a Mirror stump reward token.
+extern "C" bool MagicMirror_CommitStumpRewardToken(void) { assert(false); return false; }
 #endif
 static const char* kCustom = "Custom arrow receipt preserved.\x11Progressive description preserved.";
 extern CustomMessage::Entry activeCustomMessage;
@@ -109,6 +111,7 @@ bool ApplyForeignItemReceiptText(const char*, CustomMessage::Entry&, RandoCheckI
 #endif
 namespace MiscBehavior {
 static bool queued = true;
+static RandoCheckId queuedCheck = RC_UNKNOWN;
 std::string BankRewardSourceSuffix(RandoCheckId) { return " (Bank reward)"; }
 std::string GetTrapMessage() { return "Trap"; }
 #ifdef COMBO_BUILD

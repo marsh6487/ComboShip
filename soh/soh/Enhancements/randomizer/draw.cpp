@@ -1,4 +1,6 @@
 #include "../../../../combo/ComboGameMode.h"
+#include "ComboIkanaShieldResources.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "draw.h"
 #include "NeiGiRender.h"
 #include "soh/frame_interpolation.h"
@@ -101,6 +103,7 @@ extern SaveContext gSaveContext;
 }
 
 #include "ComboMaskShimmer.h"
+#include "ComboCollectibleShimmerHost.h"
 #include "ComboMorphaGi.h"
 #include "ComboItemEffectColors.h"
 #include "ComboSwordGiEffectFit.h"
@@ -1315,6 +1318,8 @@ extern "C" void Randomizer_DrawSilverRupee(PlayState* play, GetItemEntry* getIte
         }
     }
     CLOSE_DISPS(play->state.gfxCtx);
+    ComboCollectibleShimmer_DrawDrop(play, CW_COLLECTIBLE_SILVER,
+                                     CVarGetInteger("gEnhancements.NewDrops", 0) ? 1.0f : 20.0f);
 }
 
 extern "C" void Randomizer_DrawFishingPoleGI(PlayState* play, GetItemEntry* getItemEntry) {
@@ -2088,56 +2093,38 @@ void Randomizer_DrawExtSheikahShield(PlayState* play, GetItemEntry* getItemEntry
 extern void* TransformMasks_LoadMmDL(const char* path);
 
 void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry) {
-    // Use the same MM Mirror Shield model that the equipped Shield of Ikana renders with.
-    // ExtEquip_LoadMmShieldDLs in extended_equipment.c proves this path resolves cleanly in
-    // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
-    // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
-    Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
-    Gfx* selected = mod;
+    if (!ResourceMgr_IsIkanaShieldGiAvailable())
+        return;
+    Gfx* opaque = NULL;
+    Gfx* translucent = NULL;
 #ifdef COMBO_BUILD
-    if (Combo_IsCombinedGame()) {
-        // The pose probe and deferred draw must select the same MM-owned graph.
-        static Gfx sMmShieldDL[2];
-        if (!selected &&
-            ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
-            gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL",
-                   0, G_DL_PUSH);
-            gSPEndDisplayList(&sMmShieldDL[1]);
-            selected = sMmShieldDL;
-        }
+    if (Ship::CrossRMRegistry::Get("mm")) {
+        static Gfx wrappers[2][2];
+        gDma1p(&wrappers[0][0], G_DL_OTR_FILEPATH, COMBO_IKANA_GI_OPA_MM, 0, G_DL_PUSH);
+        gSPEndDisplayList(&wrappers[0][1]);
+        gDma1p(&wrappers[1][0], G_DL_OTR_FILEPATH, COMBO_IKANA_GI_XLU_MM, 0, G_DL_PUSH);
+        gSPEndDisplayList(&wrappers[1][1]);
+        opaque = wrappers[0];
+        translucent = wrappers[1];
     } else
 #endif
     {
-        // Solo keeps the native optional archive loader; it does not initialize an MM resource manager.
-        static Gfx* sCachedMmShieldDL = NULL;
-        static u8 sLoadAttempted = 0;
-        if (!mod && !sLoadAttempted) {
-            sLoadAttempted = 1;
-            sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
-        }
-        selected = mod ? mod : sCachedMmShieldDL;
+        opaque = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_OPA);
+        translucent = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_XLU);
+        if (!opaque || !translucent)
+            return;
+        MmAssets_EnsureStrictTextureBindings();
     }
-    if (selected == NULL) {
-        return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
-    }
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    // Worn shield packs can use upright, sideways or arm-local XZ geometry.
-    // Probe the same selected owner; preserve the old pose if it cannot be read.
-    const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
-    const char* owner = ResourceMgr_IsModAssetForGame("oot", path) ? "oot" : "mm";
-    float tilt = M_PI / 2.0f, roll = 0.f;
-    ResourceMgr_GetIkanaShieldGiPoseForGame(owner, path, &tilt, &roll);
-    s16 rotation = play->gameplayFrames * 0x2;
+    Matrix_Push();
+    const s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    float tilt = 0.f, roll = 0.f;
+    ResourceMgr_GetIkanaShieldGiPoseForGame("mm", COMBO_IKANA_GI_XLU, &tilt, &roll);
     Matrix_RotateZ(roll, MTXMODE_APPLY);
     Matrix_RotateX(tilt, MTXMODE_APPLY);
-    Matrix_Scale(0.035f, 0.035f, 0.035f, MTXMODE_APPLY);
-    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
-              G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_OPA_DISP++, selected);
-    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU);
+    DrawMmGiModel(play, opaque, translucent, true);
+    Matrix_Pop();
 }
 
 void Randomizer_DrawExtMagicCape(PlayState* play, GetItemEntry* getItemEntry) {

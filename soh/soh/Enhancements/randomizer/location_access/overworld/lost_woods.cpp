@@ -18,6 +18,8 @@ void RegionTable_Init_LostWoods() {
         EVENT_ACCESS(LOGIC_SOLD_SKULL_MASK,              logic->IsChild && logic->HasItem(RG_SKULL_MASK) && logic->CanUse(RG_SARIAS_SONG) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_KOKIRI) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
+        // Our solo forest branches from the room-1 fairy tunnel: reaching Lost Woods is sufficient.
+        LOCATION(RC_LOST_WOODS_MAGIC_MIRROR_STUMP, true),
         LOCATION(RC_LW_SKULL_KID,                       logic->IsChild && logic->CanUse(RG_SARIAS_SONG)),
         LOCATION(RC_LW_TRADE_COJIRO,                    logic->IsAdult && logic->CanUse(RG_COJIRO)),
         //I cannot think of a case where you can use Odd pot but not Cojiro to reset the quadrant should you have both. If one exists, add it to logic

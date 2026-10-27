@@ -2,6 +2,9 @@
 #include "ComboForestArrivalCamera.h"
 #include "global.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Gameplay/ComboRegionalPassages.h"
+#include "entrances/MmRegionalBridgePlacements.h"
+#include "ComboGameMode.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include <algorithm>
@@ -29,7 +32,7 @@ void CancelPresentation() {
     sArrival = {};
 }
 
-bool MatchesDestination(const PlayState* play, int route) {
+bool MatchesDestination(PlayState* play, int route) {
     if (!play || gGameState != &play->state || !play->state.running || gSaveContext.gameMode != GAMEMODE_NORMAL ||
         !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gSaveContext.sceneLayer != 0 ||
         gSaveContext.save.cutsceneIndex != 0 || gSaveContext.cutsceneTrigger || play->csCtx.state != CS_STATE_IDLE ||
@@ -37,6 +40,16 @@ bool MatchesDestination(const PlayState* play, int route) {
         return false;
     if (route == COMBO_PORTAL_OPENING_FOREST)
         return ComboOpeningForest_IsExploration(play) && play->roomCtx.curRoom.num == 0 && play->linkActorEntry;
+    if (route == COMBO_PORTAL_SNOWHEAD) {
+        const auto* placement = ComboMmRegional::ForScene(play->sceneId);
+        const int entrance = play->sceneId == SCENE_10YUKIYAMANOMURA2 ? ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 8)
+                                                                      : ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8);
+        return Combo_IsCombinedGame() && placement && placement->route == route && play->curSpawn == 8 &&
+               gSaveContext.save.entrance == entrance && gSaveContext.respawnFlag == 0 &&
+               gSaveContext.save.shipSaveInfo.pauseSaveEntrance == -1 && !gSaveContext.save.isOwlSave &&
+               play->linkActorEntry && PLAYER_GET_START_MODE(play->linkActorEntry) == PLAYER_START_MODE_F &&
+               ComboRegionalPassagesMm_Get(play, nullptr, nullptr, nullptr);
+    }
     return route == COMBO_PORTAL_LOST_WOODS && play->sceneId == SCENE_26SARUNOMORI && play->roomCtx.curRoom.num == 1 &&
            gSaveContext.save.entrance == ENTRANCE(WOODS_OF_MYSTERY, 0);
 }
@@ -67,8 +80,8 @@ void PreparePresentation(s8, s8 spawnNum) {
     const u32 seed = sArrival.seed;
     CancelPresentation(); // Every scene consumes the request, including mismatches.
     PlayState* play = gPlayState;
-    if (spawnNum != 0 || slot != gSaveContext.fileNum || seed != gSaveContext.save.shipSaveInfo.rando.finalSeed ||
-        !MatchesDestination(play, route))
+    if (spawnNum != (route == COMBO_PORTAL_SNOWHEAD ? 8 : 0) || slot != gSaveContext.fileNum ||
+        seed != gSaveContext.save.shipSaveInfo.rando.finalSeed || !MatchesDestination(play, route))
         return;
     Player* player = GET_PLAYER(play);
     Camera* camera = &play->mainCamera;
@@ -80,13 +93,24 @@ void PreparePresentation(s8, s8 spawnNum) {
     s16 yaw = -8192;
     CollisionPoly* floor = nullptr;
     s32 floorBg = BGCHECK_SCENE;
-    if (route == COMBO_PORTAL_OPENING_FOREST) {
-        yaw = ComboOpeningForest_ReturnYaw(play);
-        const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
+    const bool relocate = route == COMBO_PORTAL_OPENING_FOREST || route == COMBO_PORTAL_SNOWHEAD;
+    if (relocate) {
+        Vec3f anchor;
+        float depth;
+        if (route == COMBO_PORTAL_SNOWHEAD) {
+            const auto& mouth = ComboMmRegional::kMountainWinter.mouth;
+            yaw = mouth.yaw;
+            anchor = { mouth.pos.x, mouth.pos.y, mouth.pos.z };
+            depth = ComboMmRegional::kMountainPortalArrivalDepth;
+        } else {
+            yaw = ComboOpeningForest_ReturnYaw(play);
+            anchor = ComboOpeningForest_ReturnAnchor(play);
+            depth = 226.0f;
+        }
         const float angle = yaw * (6.28318530718f / 65536.0f);
-        // Match the proven Mystery arrival distance: native rear-camera reset
-        // stays clear of the decorative black mouth after presentation ends.
-        position = { anchor.x + std::sin(angle) * 226.0f, anchor.y, anchor.z + std::cos(angle) * 226.0f };
+        // Forest keeps its proven Mystery reveal spacing. Snowhead uses its
+        // separately sampled dry apron beyond the return trigger.
+        position = { anchor.x + std::sin(angle) * depth, anchor.y, anchor.z + std::cos(angle) * depth };
         Vec3f probe = position;
         probe.y += 100.0f;
         const float floorY =
@@ -97,7 +121,9 @@ void PreparePresentation(s8, s8 spawnNum) {
     }
     const float height = Player_GetHeight(player);
     const float angle = yaw * (6.28318530718f / 65536.0f);
-    const float arm = std::max(190.0f, height * 4.3f);
+    // The mountain apron faces a native cliff. A short native-FOV view
+    // fits every form without driving the eye into that cliff.
+    const float arm = route == COMBO_PORTAL_SNOWHEAD ? 160.0f : std::max(190.0f, height * 4.3f);
     const float atHeight = std::clamp(height * 1.05f, 46.0f, 80.0f);
     const Vec3f at{ position.x, position.y + atHeight, position.z };
     Vec3f eye{ position.x + std::sin(angle) * arm, at.y + std::max(20.0f, height * 0.25f),
@@ -108,13 +134,13 @@ void PreparePresentation(s8, s8 spawnNum) {
     // Preparation is transactional: floor and camera clearance both succeeded.
     // Only queued portal visits move Link; the scene spawn/cache/save stay intact.
     const bool entryWalking = player->actionFunc == Player_Action_35;
-    if (route == COMBO_PORTAL_OPENING_FOREST) {
+    if (relocate) {
         if (entryWalking) {
             const float turn = (s16)(yaw - player->actor.shape.rot.y) * (6.28318530718f / 65536.0f);
             const Vec3f delta{ player->unk_3A0.x - player->actor.world.pos.x,
                                player->unk_3A0.y - player->actor.world.pos.y,
                                player->unk_3A0.z - player->actor.world.pos.z };
-            // Native E/D entry walking stores an absolute target. Carry its
+            // Native E/D/F entry walking stores an absolute target. Carry its
             // distance and heading with the new arrival instead of walking back.
             player->unk_3A0 = { position.x + delta.x * std::cos(turn) + delta.z * std::sin(turn), position.y + delta.y,
                                 position.z - delta.x * std::sin(turn) + delta.z * std::cos(turn) };
@@ -133,7 +159,7 @@ void PreparePresentation(s8, s8 spawnNum) {
     camera->eye = camera->eyeNext = eye;
     camera->dist = Distance(at, eye);
     camera->focalActorAtOffset = { at.x - position.x, at.y - position.y, at.z - position.z };
-    camera->fov = 35.0f;
+    camera->fov = route == COMBO_PORTAL_SNOWHEAD ? 60.0f : 35.0f;
     camera->roll = 0;
 }
 
@@ -156,7 +182,7 @@ bool PresentArrival(Camera* camera) {
     if (!player || std::abs(input.cur.stick_x) > 10 || std::abs(input.cur.stick_y) > 10 ||
         std::abs(input.cur.right_stick_x) > 1 || std::abs(input.cur.right_stick_y) > 1 || input.cur.button ||
         Distance(camera->eye, sArrival.lastEye) > 0.1f || Distance(camera->at, sArrival.at) > 0.1f ||
-        std::fabs(camera->fov - 35.0f) > 0.01f ||
+        std::fabs(camera->fov - (sArrival.route == COMBO_PORTAL_SNOWHEAD ? 60.0f : 35.0f)) > 0.01f ||
         (!sArrival.entryWalking && Distance(player->actor.world.pos, sArrival.playerPos) > 4.0f) ||
         (Player_InCsMode(play) && !sArrival.entryWalking && play->transitionTrigger != TRANS_TRIGGER_END) ||
         (!sArrival.entryWalking && play->transitionTrigger == TRANS_TRIGGER_OFF && ++sArrival.frames > 60)) {
@@ -213,7 +239,8 @@ static RegisterShipInitFunc initFunc(RegisterForestArrivalCamera, {});
 
 extern "C" void ComboForestArrivalCamera_Queue(int route) {
     CancelPresentation();
-    if (!ComboLostWoods_IsForestRoute(route) || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum))
+    if ((!ComboLostWoods_IsForestRoute(route) && route != COMBO_PORTAL_SNOWHEAD) ||
+        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum))
         return;
     sArrival.route = route;
     sArrival.slot = gSaveContext.fileNum;

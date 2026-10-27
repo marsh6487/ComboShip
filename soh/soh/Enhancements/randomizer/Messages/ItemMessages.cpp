@@ -464,6 +464,18 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     } else {
         rgid = player->getItemId;
     }
+    if (rgid == RG_MAGIC_MIRROR) {
+        msg = CustomMessage(
+            "You found the %gMagic Mirror%w!&Equip it to a C Button to return&to the Lost Woods from outdoors.",
+            TEXTBOX_TYPE_BLUE);
+        msg.receiptPresentation.singleBox = 1;
+        msg.receiptPresentation.rewardLine = 0;
+        std::snprintf(msg.receiptPresentation.iconPath, sizeof(msg.receiptPresentation.iconPath), "%s",
+                      "__OTR__textures/icon_item_custom/gItemIconMagicMirrorTex");
+        msg.receiptPresentation.iconWidth = msg.receiptPresentation.iconHeight = 32;
+        msg.AutoFormat(ITEM_CUSTOM);
+        return;
+    }
     auto soulItem = Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid));
     if (const auto* soul = ComboBossSoulReceiptText::Find(soulItem.GetName().GetEnglish())) {
         using ComboBossSoulReceiptText::Language;

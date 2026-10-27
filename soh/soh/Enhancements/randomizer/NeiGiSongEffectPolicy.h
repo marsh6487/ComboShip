@@ -1,6 +1,6 @@
 #pragma once
 #include "NeiGiEffectPolicy.h"
-#include "ComboSongDraw.h"
+#include "../../../../combo/menu/ComboSongDraw.h"
 
 namespace NeiGi {
 // A curved vane with a raised rachis and tapered, notched barbs. It is a

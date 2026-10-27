@@ -374,6 +374,8 @@ bool Logic::HasItem(RandomizerGet itemName) {
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_CANE_OF_SOMARIA, true);
         case RG_DOMINION_ROD:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_DOMINION_ROD, true);
+        case RG_MAGIC_MIRROR:
+            return MagicMirror_IsOwned();
         case RG_TIME_GATE:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_TIME_GATE, true);
         // Bomb Arrows has no inventory cell any more (it is the bow's element flag), so

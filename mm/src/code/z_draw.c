@@ -622,7 +622,14 @@ s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
 #include "ComboMaskShimmer.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
 
+#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+#include "ComboCollectibleShimmerHost.h"
+#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
+
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
+    const int collectible = ComboCollectibleShimmer_ColorForDrawId(drawId, color);
+    if (collectible)
+        return collectible;
     switch (drawId) {
         case GID_CHATEAU:
             color[0] = 0x4A;
@@ -834,7 +841,9 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
             GetItem_DrawBottleShimmer(play, drawId);
         }
         if (itemShimmer) {
-            if (drawId == GID_CHATEAU) {
+            if (itemShimmer == CW_ITEM_SHIMMER_TINTED) {
+                NeiGi_DrawTintedShimmerOverlay(play, maskColor, NULL);
+            } else if (drawId == GID_CHATEAU) {
                 NeiGi_DrawChateauShimmer(play);
             } else {
                 GetItem_DrawShimmer(play, maskColor);

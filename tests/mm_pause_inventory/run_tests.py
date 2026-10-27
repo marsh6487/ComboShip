@@ -75,6 +75,12 @@ static void reset(void) {
     play.pauseCtx.itemVtx=vertices;
 }
 int main(int argc, char** argv) {
+    for (int stored=0;stored<2;stored++) {
+        reset(); customEnabled=masksEnabled=0;
+        if (stored) nei.magicMirrorOwned=1;
+        else nei.ownedItems[SLOT_MAGIC_MIRROR-24]=EXT_ITEM_MAGIC_MIRROR;
+        assert(MagicMirror_IsOwned() && ExtInv_IsCustomItemsEnabled() && ExtInv_GetMaxPages()==2);
+    }
     int navigation = argc < 2 || strcmp(argv[1],"entry");
     if (navigation) {
         for (int arrow=PAUSE_CURSOR_PAGE_LEFT;arrow<=PAUSE_CURSOR_PAGE_RIGHT;arrow++) {
@@ -143,6 +149,7 @@ def main():
     first = inv.index("static const uint8_t sOotPage0Map[24]")
     mapping = inv[first:inv.index("\n};", first) + 3]
     code = PREFIX + mapping + "\n" + "\n".join(function(inv, n) for n in (
+        "TravelTools_IsOwned", "MagicMirror_IsOwned",
         "ExtInv_Reset", "ExtInv_Update", "ExtInv_CanSwitchPage", "ExtInv_SwitchPage", "ExtInv_GetCurrentPage",
         "ExtInv_GetMaxPages", "ExtInv_IsCustomItemsEnabled", "ExtInv_IsMmMasksEnabled", "ExtInv_GetInventorySlot"))
     code += "\n" + function(ui, "KaleidoScope_UpdateItemCursor") + CHECKS

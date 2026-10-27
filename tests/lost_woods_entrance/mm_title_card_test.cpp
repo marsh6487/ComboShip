@@ -8,6 +8,7 @@
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/RegionalPassages.h"
+#include "entrances/MmRegionalBridgePlacements.h"
 #include "gameplay/CrossGameTitleCard.h"
 #include <cstdio>
 #include <cstdlib>
@@ -67,7 +68,7 @@ extern "C" s32 Entrance_GetTransitionFlags(u16 entrance) {
 /* NATIVE_MESSAGE_TITLE */
 
 #ifdef COMBO_BUILD
-extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) { std::abort(); }
+/* REGIONAL_ARRIVAL */
 int gComboStartFileNum = -1, gComboEntryIsResume, gComboOwlBlobSlot = -1;
 static int sComboPortalRoute;
 static bool sComboPortalArrivalPending;
@@ -133,13 +134,30 @@ static void ClearGuards() {
 static void Boot(int route, int slot = 1, bool resume = false) {
     SetupState state{};
     ClearGuards(); gComboStartFileNum = slot; gComboEntryIsResume = resume;
-    sComboPortalRoute = route; sComboPortalArrivalPending = ComboLostWoods_IsForestRoute(route);
+    sComboPortalRoute = route; sComboPortalArrivalPending = ComboPassages_IsRoute(route);
     Setup_InitImpl(&state);
 }
 #endif
 
 int main() {
 #ifdef COMBO_BUILD
+    for (int route : {COMBO_PORTAL_IKANA, COMBO_PORTAL_GREAT_BAY, COMBO_PORTAL_SNOWHEAD}) {
+        Boot(route);
+        const int scene = route == COMBO_PORTAL_IKANA ? SCENE_IKANAMAE
+                          : route == COMBO_PORTAL_GREAT_BAY ? SCENE_30GYOSON : SCENE_10YUKIYAMANOMURA;
+        auto play = Destination(scene);
+        const int old = presentations;
+        Cutscene_HandleEntranceTriggers(&play);
+        const bool titled = scene != SCENE_IKANAMAE;
+        Require((gSceneTable[scene].titleTextId != 0) == titled,
+                "Road to Ikana has no native title; Bay and Mountain Village do");
+        Require(presentations == old + int(titled),
+                "regional crossings must retain the destination's actual native title availability");
+        gSaveContext.respawnFlag = 2;
+        play = Destination(SCENE_30GYOSON);
+        Cutscene_HandleEntranceTriggers(&play);
+        Require(presentations == old + int(titled), "untitled Ikana must also consume its title request");
+    }
     int allSceneCards = 0, allSceneUntitled = 0;
     for (int source = 0; source < 3; ++source) {
         for (int scene = 0; scene < SCENE_MAX; ++scene) {

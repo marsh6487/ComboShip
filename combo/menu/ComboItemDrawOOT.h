@@ -1,3 +1,4 @@
+#include "ComboIkanaShieldResources.h"
 #include "ItemGrantAuditBridge.h"
 /* combo/menu/ComboItemDrawOOT.h — ComboShip: OOT-side bodies of the cross-game item-draw exports
  * (combo/menu/ComboItemDrawABI.h). The exact mirror of combo/menu/ComboItemDrawMM.h, in the opposite
@@ -18,6 +19,8 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerHost.h"
+
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboLiveCosmetics.h"
@@ -539,6 +542,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     if (rg >= RG_SHADOW_SILVER_BLADES && rg <= RG_GANONS_CASTLE_MQ_SILVER_SHADOW) {
         Color_RGB8 c = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.SilverRupee.Value"), { 255, 255, 255 });
         out->stateDependent = 2; // Keep palette / NewDrops selection live after the receipt is latched.
+        out->itemShimmer = ComboCollectibleShimmer_Color(CW_COLLECTIBLE_SILVER, out->itemShimmerColor);
         if (CVarGetInteger("gEnhancements.NewDrops", 0) != 0) {
             out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
             out->dlistCount = 2;
@@ -645,19 +649,22 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} };
             return 1;
         case RG_EXT_SHIELD_OF_IKANA: {
-            out->stateDependent = 2; // Refresh the selected owner's pose after Alt changes, even during receipts.
-            const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
-            const bool local = ResourceMgr_IsModAssetForGame("oot", path);
-            CwSimple(out,
-                     local ? "__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"
-                           : "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL",
-                     false, .035f);
-            out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
-            out->opCount = 2;
-            float tilt = 1.5707963267948966f, roll = 0.f;
-            ResourceMgr_GetIkanaShieldGiPoseForGame(local ? "oot" : "mm", path, &tilt, &roll);
-            out->ops[0] = { CW_OP_ROTATE_Z, roll * (32768.f / 3.14159265358979323846f), 0, 0, {} };
-            out->ops[1] = { CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0, 0, {} };
+            if (!ResourceMgr_IsIkanaShieldGiAvailable())
+                return 0;
+            out->stateDependent = 2;
+            CwSimple(out, COMBO_IKANA_GI_OPA_MM, false, 0.f);
+            out->dlists[1] = COMBO_IKANA_GI_XLU_MM;
+            out->dlistCount = 2;
+            out->xluStartIndex = 1;
+            float tilt = 0.f, roll = 0.f;
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", COMBO_IKANA_GI_XLU, &tilt, &roll);
+            // MM's SIMPLE consumer accepts pose-only rotations without
+            // adding the custom-GI spin or changing native pass selection.
+            out->opCount = 0;
+            if (roll != 0.f)
+                out->ops[out->opCount++] = { CW_OP_ROTATE_Z, roll * (32768.f / 3.14159265358979323846f), 0, 0, {} };
+            if (tilt != 0.f)
+                out->ops[out->opCount++] = { CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0, 0, {} };
             return 1;
         }
         case RG_CLAWSHOT:
@@ -973,6 +980,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet effRg = actual != RG_NONE                  ? actual
                           : (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId
                                                              : rg;
+    if (effRg == RG_MAGIC_MIRROR)
+        return CwDescribeMagicMirror(out);
     switch (effRg) {
         case RG_KOKIRI_SWORD:
         case RG_MASTER_SWORD:
@@ -1109,8 +1118,11 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
     uint8_t nativeShimmerColor[4] = {};
-    if (GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor)) {
-        out->itemShimmer = 1;
+    const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor);
+    if (ComboCollectibleShimmer_ProfileForDrawId((s16)gi.gid) >= 0)
+        out->stateDependent = 2; // Refresh opt-in and owner palette even when shimmer was disabled.
+    if (nativeShimmer) {
+        out->itemShimmer = nativeShimmer;
         std::memcpy(out->itemShimmerColor, nativeShimmerColor, sizeof(nativeShimmerColor));
     }
     // Apply after native eligibility so dormant-owner rainbow sampling drives

@@ -1434,8 +1434,10 @@ bool MmAssets_LoadNormalActor(int actorType, unsigned char pose, MmNormalActorRe
     *output = {};
     auto type = static_cast<StaticStoryActorType>(actorType);
     const auto* presentation = StaticStoryMm_GetPresentation(type, pose);
-    if (!presentation || presentation->kind != STATIC_STORY_MM_NORMAL_FLEX || !presentation->frameCount ||
-        presentation->eyeCount > 8 || presentation->mouthCount > 4)
+    if (!presentation ||
+        (presentation->kind != STATIC_STORY_MM_NORMAL_FLEX && presentation->kind != STATIC_STORY_MM_NORMAL_STANDARD &&
+         presentation->kind != STATIC_STORY_MM_GHOST_FLEX) ||
+        !presentation->frameCount || presentation->eyeCount > 8 || presentation->mouthCount > 4)
         return false;
     try {
         auto retained = std::make_unique<std::vector<MmNormalActor::Resource>>();
@@ -1469,7 +1471,11 @@ bool MmAssets_LoadNormalActor(int actorType, unsigned char pose, MmNormalActorRe
             scoped->skeletonData.flexSkeletonHeader.sh.segment = scoped->skeletonHeaderSegments.data();
             skeleton = scoped;
         }
-        if (!MmNormalActor::ValidateSkeleton(skeleton, presentation->limbCount, presentation->matrixCount, *retained) ||
+        // Native Stalchild has17 rigid lists; Mikau reserves20 matrices for19 limb lists.
+        if (!MmNormalActor::ValidateSkeleton(skeleton, presentation->limbCount, presentation->matrixCount, *retained,
+                                             presentation->kind == STATIC_STORY_MM_NORMAL_STANDARD,
+                                             type == STATIC_STORY_ACTOR_MIKAU ? 1 : 0,
+                                             type == STATIC_STORY_ACTOR_STALCHILD ? 17 : 0) ||
             !MmNormalActor::ValidateAnimation(animation, presentation->limbCount, presentation->frameCount))
             return false;
         retained->push_back(animation);
@@ -1484,6 +1490,13 @@ bool MmAssets_LoadNormalActor(int actorType, unsigned char pose, MmNormalActorRe
                 return false;
             (eye ? result.eyes : result.mouths)[index] = texture->GetRawPointer();
             retained->push_back(texture);
+        }
+        if (presentation->propDisplayListPath) {
+            auto prop = std::dynamic_pointer_cast<Fast::DisplayList>(load(presentation->propDisplayListPath));
+            if (!prop || prop->Instructions.empty() || (prop->Instructions.back().words.w0 >> 24) != G_ENDDL)
+                return false;
+            result.propDisplayList = prop->GetPointer();
+            retained->push_back(prop);
         }
         /* Raw casts occur only after actual resource and child type validation. */
         result.skeleton = static_cast<FlexSkeletonHeader*>(skeleton->GetRawPointer());

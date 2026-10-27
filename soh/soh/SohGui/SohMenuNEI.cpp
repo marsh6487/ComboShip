@@ -287,6 +287,7 @@ struct NeiRandoSetting {
 };
 
 const NeiRandoSetting kNeiRandoSettings[] = {
+    { CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), nullptr, 1 },
     { CVAR_RANDOMIZER_SETTING("SkijerCustomItems"), "gMods.CustomItems.Enabled", 1 },
     { CVAR_RANDOMIZER_SETTING("MmMasksAll"), "gMods.MmMasks.InventoryEnabled", 1 },
     { CVAR_RANDOMIZER_SETTING("ExtEquipment"), "gCheats.ExtEquip.Enabled", 1 },
@@ -495,9 +496,9 @@ void RegisterNEIMenu() {
         DrawSensorDesirePicker();
     });
 
-    // ===================== Tab: Modes =====================
-    path.sidebarName = "Modes";
-    path.column = SECTION_COLUMN_1;
+    // Seed choices belong with the native per-game item shuffles. ComboShip
+    // exposes this existing sidebar under Randomizer > OOT Randomizer.
+    WidgetPath seasonsPath = { "Randomizer", "Shuffles", SECTION_COLUMN_1 };
 #ifdef COMBO_BUILD
     static const char* seasonsModeCvar =
         Combo_IsCombinedGame() ? "gRando.Options.RO_ROD_OF_SEASONS" : CVAR_RANDOMIZER_SETTING("RodOfSeasons");
@@ -512,7 +513,8 @@ void RegisterNEIMenu() {
         { NEI_SEASONS_ROD, "Rod" },
         { NEI_SEASONS_GATED, "Gated" },
     };
-    mSohMenu->AddWidget(path, "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
+    mSohMenu
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMasks"), "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
         .CVar(seasonsModeCvar)
         .RaceDisable(false)
         .PreFunc(
@@ -528,7 +530,17 @@ void RegisterNEIMenu() {
                               "Winter: Ice Cavern's final Sheik check or Snowhead.\n"
                               "This choice is saved with the seed; menu edits apply to the next seed.\n"
                               "Season abilities are optional in the solver."));
-    mSohMenu->AddWidget(path, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
+    mSohMenu->AddWidgetAfter(seasonsPath, seasonsModeCvar, "Shuffle Magic Mirror", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"))
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(CheckboxOptions().Tooltip(
+            "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
+            "Off keeps the fixed Mirror on the stump. Works independently of Enable Custom Items."));
+    mSohMenu
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), "Start with Rod of Seasons",
+                         WIDGET_CVAR_CHECKBOX)
         .CVar(startingRodCvar)
         .RaceDisable(false)
         .PreFunc(
@@ -538,6 +550,9 @@ void RegisterNEIMenu() {
             "remain shuffled; Gated still requires the season checks. Rod mode starts with all four.\n"
             "Starting with the Rod does not require enabling the other NEI pool items."));
 
+    // ===================== Tab: Modes =====================
+    path.sidebarName = "Modes";
+    path.column = SECTION_COLUMN_1;
     mSohMenu->AddWidget(path, "Crossover Items", WIDGET_SEPARATOR_TEXT);
     mSohMenu->AddWidget(path, "Enable Crossover Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gBrokenItems.Enabled")

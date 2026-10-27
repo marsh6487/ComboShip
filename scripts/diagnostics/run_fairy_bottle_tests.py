@@ -64,8 +64,13 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
     parts += [function(source, name) for name in draws]
     if namespace == 'oot':
         shimmer = function(source, 'GetItem_GetShimmerColor')
-        ids = sorted(set(re.findall(r'GID_\w+', shimmer)) - {'GID_FAIRY'})
+        # The native shimmer dispatcher delegates collectible eligibility to
+        # its shared header. Supply that header's IDs alongside the other
+        # out-of-fixture draw IDs instead of replacing the production helper.
+        collectible = (ROOT / 'combo/menu/ComboCollectibleShimmerHost.h').read_text()
+        ids = sorted(set(re.findall(r'GID_\w+', shimmer + collectible)) - {'GID_FAIRY'})
         parts += ['enum {' + ','.join(name + '=' + str(1000+i) for i, name in enumerate(ids)) + '};',
+                  '#include "combo/menu/ComboCollectibleShimmerHost.h"',
                   shimmer, function(source, 'GetItem_Draw')]
     return '\n'.join(parts) + '\n}\n'
 
@@ -92,6 +97,8 @@ def main():
     bodies += function(source, 'OOT_DrawForeignFairyBottle') + '\n'
     bodies += function(source, 'OOT_DrawForeignFairyContainer') + '\n'
     dispatch = function(source, 'OOT_DrawComboForeign')
+    bodies += 'extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "fairy dispatch selected Mirror"); }\n'
+    bodies += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(), 'ComboDrawMagicMirrorForeign') + '\n'
     for name in sorted(set(re.findall(r'\bOOT_DrawForeign\w+', dispatch)) -
                        {'OOT_DrawForeignFairyBottle', 'OOT_DrawForeignFairyContainer'}):
         bodies += 'template<class...T>void ' + name + '(T...) { assert(false); }\n'

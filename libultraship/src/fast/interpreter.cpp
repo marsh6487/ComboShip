@@ -594,6 +594,71 @@ bool Interpreter::TextureCacheLookup(int i, const TextureCacheKey& key) {
     return false;
 }
 
+bool Interpreter::TryReusePreludeMaterialBinding(int i, uint32_t tile, const bool usedTextures[2]) {
+    if (!mPreludeMaterialBindingReuseEnabled || i < 0 || i >= 2 || tile != static_cast<uint32_t>(i) ||
+        mRdp->first_tile_index != 0 || !usedTextures[i] || mFbActive ||
+        (mRdp->other_mode_l & G_ZS_PRIM) != 0 ||
+        (usedTextures[0] && usedTextures[1] && mRenderingState.mTextures[0] == mRenderingState.mTextures[1])) {
+        return false;
+    }
+
+    // Segment/material animation can dirty a binding while only its UVs move.
+    // Validate the used resources, independent of scene or filename. Palette,
+    // partial-load, replacement and framebuffer paths retain ordinary imports.
+    for (int j = 0; j < 2; ++j) {
+        if (!usedTextures[j]) {
+            continue;
+        }
+        const auto& textureTile = mRdp->texture_tile[j];
+        const bool supportedFormat =
+            (textureTile.fmt == G_IM_FMT_RGBA &&
+             (textureTile.siz == G_IM_SIZ_16b || textureTile.siz == G_IM_SIZ_32b)) ||
+            (textureTile.fmt == G_IM_FMT_IA &&
+             (textureTile.siz == G_IM_SIZ_4b || textureTile.siz == G_IM_SIZ_8b || textureTile.siz == G_IM_SIZ_16b)) ||
+            (textureTile.fmt == G_IM_FMT_I &&
+             (textureTile.siz == G_IM_SIZ_4b || textureTile.siz == G_IM_SIZ_8b));
+        if (textureTile.tmem_index != j || !supportedFormat || textureTile.line_size_bytes == 0) {
+            return false;
+        }
+        const auto& loaded = mRdp->loaded_texture[j];
+        const auto& resource = loaded.raw_tex_metadata.resource;
+        if (loaded.masked || loaded.blended || !resource || loaded.addr == nullptr ||
+            loaded.addr != resource->ImageData || loaded.size_bytes == 0 || loaded.orig_size_bytes == 0 ||
+            loaded.size_bytes > resource->ImageDataSize ||
+            loaded.raw_tex_metadata.type == TextureType::Palette4bpp ||
+            loaded.raw_tex_metadata.type == TextureType::Palette8bpp) {
+            return false;
+        }
+        const auto init = resource->GetInitData();
+        if (!init) {
+            return false;
+        }
+        const auto path = GetBaseTexturePath(init->Path);
+        if (mMaskedTextures.contains(path) || mFbTextures.contains(reinterpret_cast<uintptr_t>(loaded.addr))) {
+            return false;
+        }
+    }
+
+    const auto& textureTile = mRdp->texture_tile[tile];
+    const auto& loaded = mRdp->loaded_texture[textureTile.tmem_index];
+    if (mPreludeMaterialBoundResources[i] != loaded.raw_tex_metadata.resource.get()) {
+        return false;
+    }
+    const TextureCacheKey key = { loaded.addr, {}, textureTile.fmt, textureTile.siz, textureTile.palette,
+                                  loaded.orig_size_bytes };
+    // Do not inspect mTextures[i] before finding a live map node. Clear,
+    // deletion and eviction can retire nodes; a remembered pointer is not a hit.
+    const auto it = mTextureCache.map.find(key);
+    if (it == mTextureCache.map.end() || mRenderingState.mTextures[i] != &*it) {
+        return false;
+    }
+    mTextureCache.lru.splice(mTextureCache.lru.end(), mTextureCache.lru, it->second.lru_location);
+    if (mRenderCost.Active()) {
+        ++mRenderCost.MutableReport().cacheHits;
+    }
+    return true;
+}
+
 std::string_view Interpreter::GetBaseTexturePath(std::string_view path) {
     if (path.starts_with(Ship::IResource::gAltAssetPrefix)) {
         return path.substr(Ship::IResource::gAltAssetPrefix.length());
@@ -1418,6 +1483,7 @@ void Interpreter::ImportTexture(int i, int tile, bool importReplacement) {
         if (fbIt != mFbTextures.end()) {
             Flush();
             mRapi->SelectTextureFb(fbIt->second);
+            std::fill(std::begin(mPreludeMaterialBoundResources), std::end(mPreludeMaterialBoundResources), nullptr);
             mRdp->textures_changed[i] = false;
             return;
         }
@@ -1466,7 +1532,11 @@ void Interpreter::ImportTexture(int i, int tile, bool importReplacement) {
         key = { origAddr, {}, fmt, siz, paletteIndex, origSizeBytes };
     }
 
-    if (TextureCacheLookup(i, key)) {
+    const bool cached = TextureCacheLookup(i, key);
+    if (mPreludeMaterialBindingReuseEnabled && i >= 0 && i < 2) {
+        mPreludeMaterialBoundResources[i] = textureResource.get();
+    }
+    if (cached) {
         return;
     }
 
@@ -2305,13 +2375,16 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
 
             if (comb->usedTextures[i]) {
                 if (mRdp->textures_changed[i]) {
-                    Flush();
-                    ImportTexture(i, tile, false);
-                    if (mRdp->loaded_texture[i].masked) {
-                        ImportTextureMask(SHADER_FIRST_MASK_TEXTURE + i, tile);
-                    }
-                    if (mRdp->loaded_texture[i].blended) {
-                        ImportTexture(SHADER_FIRST_REPLACEMENT_TEXTURE + i, tile, true);
+                    if (!mPreludeMaterialBindingReuseEnabled || is_rect ||
+                        !TryReusePreludeMaterialBinding(i, tile, comb->usedTextures)) {
+                        Flush();
+                        ImportTexture(i, tile, false);
+                        if (mRdp->loaded_texture[i].masked) {
+                            ImportTextureMask(SHADER_FIRST_MASK_TEXTURE + i, tile);
+                        }
+                        if (mRdp->loaded_texture[i].blended) {
+                            ImportTexture(SHADER_FIRST_REPLACEMENT_TEXTURE + i, tile, true);
+                        }
                     }
                     mRdp->textures_changed[i] = false;
                 }
@@ -4865,6 +4938,7 @@ bool gfx_set_timg_fb_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
 
     gfx->Flush();
     gfx->mRapi->SelectTextureFb((uint32_t)cmd->words.w1);
+    std::fill(std::begin(gfx->mPreludeMaterialBoundResources), std::end(gfx->mPreludeMaterialBoundResources), nullptr);
     gfx->mRdp->textures_changed[0] = false;
     gfx->mRdp->textures_changed[1] = false;
     return false;
@@ -5808,6 +5882,9 @@ void Interpreter::RunGuiOnly() {
 }
 
 void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_replacements) {
+    mPreludeMaterialBindingReuseEnabled = Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
+        "gEnhancements.PreludeMaterialBindingReuse", 0) != 0;
+    std::fill(std::begin(mPreludeMaterialBoundResources), std::end(mPreludeMaterialBoundResources), nullptr);
     const bool sampled = mRenderCost.BeginFrame(mCollectRenderCosts, mCollectRenderCosts ? RenderCostNow() : 0, mRenderCostEveryFrame);
     if (sampled) {
         auto& report = mRenderCost.MutableReport();

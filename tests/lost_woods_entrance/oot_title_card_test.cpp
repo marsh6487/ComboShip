@@ -25,6 +25,10 @@ static bool hideCards;
 static bool isRando;
 static int titleCardSetting = -1;
 static bool fallbackPositionsGrotto;
+static bool coveredRegionalArrival;
+extern "C" int ComboRegionalPassagesOot_IsArrivalPending(PlayState*) {
+    return coveredRegionalArrival;
+}
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
     const int result = crossArrival; crossArrival = -1; return result;
 }
@@ -112,6 +116,31 @@ static PlayState Destination(int scene) {
 
 int main() {
 #ifdef COMBO_BUILD
+    // Regional boot first resolves the endpoint under black cover, then
+    // reloads with the native positioned/grotto start. Only that reveal owns
+    // a card; the cover hides world geometry, not the overlay title renderer.
+    for (int scene : {SCENE_GRAVEYARD, SCENE_LAKE_HYLIA, SCENE_ZORAS_FOUNTAIN}) {
+        Boot(COMBO_PORTAL_MARKET);
+        gSaveContext.entranceIndex = scene == SCENE_GRAVEYARD ? ENTR_GRAVEYARD_ENTRANCE
+                                     : scene == SCENE_LAKE_HYLIA ? ENTR_LAKE_HYLIA_OUTSIDE_LAB
+                                                               : ENTR_ZORAS_FOUNTAIN_OUTSIDE_ICE_CAVERN;
+        coveredRegionalArrival = true;
+        auto firstLoad = Destination(scene);
+        SelectPlayerTitle(&firstLoad);
+        require(!Active(firstLoad), "covered regional boot must not show the first of two destination cards");
+        coveredRegionalArrival = false;
+        gSaveContext.respawnFlag = 2;
+        Combo_SOH_RequestCrossGameTitleCard();
+        auto reveal = Destination(scene);
+        SelectPlayerTitle(&reveal);
+        require(Active(reveal), "the final positioned regional reveal must retain its native destination card");
+        const int previous = presentations;
+        for (int frame = 0; frame < 120; ++frame) TitleCard_Update(&reveal, &reveal.actorCtx.titleCtx);
+        require(presentations == previous + 1, "regional return must present exactly one native place card");
+        reveal = Destination(scene);
+        SelectPlayerTitle(&reveal);
+        require(!Active(reveal), "the regional title request must not replay on a subsequent positioned spawn");
+    }
     // Both forest bridges and the newer Woodfall return preserve positioned spawns.
     for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST, COMBO_PORTAL_WOODFALL}) {
         for (int slot = 0; slot < 3; ++slot) {

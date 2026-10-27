@@ -17,6 +17,7 @@
  */
 #ifndef COMBO_FOREIGN_DRAW_OOT_H
 #define COMBO_FOREIGN_DRAW_OOT_H
+#include "ComboMagicMirrorForeign.h"
 
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
@@ -38,6 +39,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboCollectibleShimmerDraw.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
@@ -50,7 +52,7 @@ struct ComboForeignDrawInfo {
     int32_t xluStart = -1;            // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;               // extra model scale; 0 = none (MM remains: 0.02)
     bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
-    bool itemShimmer = false;
+    int32_t itemShimmer = CW_ITEM_SHIMMER_NONE;
     uint8_t itemShimmerColor[4] = {};
     int32_t neiShimmer = 0;
     bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
@@ -120,7 +122,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolve::NotReady; // MM's rando state isn't up — retry, don't freeze
     }
-    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
+    if (rcStatic == 0 ||
+        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI && raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
         // ComboShip: no static DL row — try the animated ABI (MM stray fairies). MM only describes
         // the item; ComboForeignAnim_Draw (combo/menu/ComboForeignAnim.h) loads + draws it.
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -143,6 +146,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
+        return ComboForeignResolve::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
     int32_t n = raw.dlistCount < CW_DRAW_MAX_DLISTS ? raw.dlistCount : CW_DRAW_MAX_DLISTS;
     if (n < CwMinDlistsForKind(raw.drawKind)) {
@@ -174,7 +179,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.matAnimBillboard = raw.matAnimBillboard != 0;
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
-    info.itemShimmer = raw.itemShimmer != 0;
+    info.itemShimmer = raw.itemShimmer;
     info.neiShimmer = raw.neiShimmer;
     memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
@@ -990,6 +995,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         return;
     }
 
+    if (ComboDrawMagicMirrorForeign(play, info->drawKind))
+        return;
+
     // ComboShip: animated class — combo-owned skeletal draw (any failure -> sentinel, never blank).
     if (info->animOk) {
         if (!ComboForeignAnim_Draw(&info->anim, "mm", play)) {
@@ -1146,6 +1154,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
             NeiGi_DrawMesh(
                 play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play), NeiGi::Kind::Pokeball));
+        else if (info->itemShimmer == CW_ITEM_SHIMMER_TINTED)
+            NeiGi_DrawTintedShimmerOverlay(play, info->itemShimmerColor, "mm");
         else
             ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }

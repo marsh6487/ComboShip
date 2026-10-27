@@ -61,6 +61,11 @@ static bool localBase = true, localAlt, localAltEnabled, donorAvailable;
 u8 ResourceMgr_FileExists(const char* path) { return path && localBase; }
 u8 ResourceMgr_FileAltExists(const char* path) { return path && localAlt; }
 bool ResourceMgr_IsAltAssetsEnabled(void) { return localAltEnabled; }
+// This selector/name fixture controls availability at the same local/Alt seam.
+// Real routed texture/type rejection is exercised by run_missing_icon_tests.py.
+u8 MM_IsRgba32TextureAvailable(const char* path) {
+    return path && (localBase || (localAltEnabled && localAlt));
+}
 int NeiResource_Available(const char* path) { return path && donorAvailable; }
 // Interning models the existing bridge's lifetime; the production selector is under test.
 const char* NeiResource_Route(const char* path) {

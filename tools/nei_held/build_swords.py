@@ -25,9 +25,19 @@ SWORDS = {
     "biggoron_sword": (-25.75, 166., 5500.),
     "great_fairy_sword": (-21.90625, 154.5, 5500.),
     "four_sword": (-15.40625, 78., 3389.),
+    "giants_knife": (-23.25, 152., 5500.),
+    # Keep the intact Knife's grip and uniform scale; never stretch the stump.
+    "broken_giants_knife": (-23.25, 56.375, (56.375 + 23.25) * 5500. / (152. + 23.25)),
 }
 FRAMES = {"oot_adult": (0., 328., -77.), "oot_child": (0., 216.22, 4.5),
           "mm_human": (0., 216.22, 4.5)}
+
+
+def source_folder(slug):
+    # A held-only fracture does not add or replace an item in the GI catalog.
+    if slug == "broken_giants_knife":
+        return "objects/nei_held_swords/broken_giants_knife/model/"
+    return "objects/nei_gi_redesign/" + slug + "/"
 
 
 def decode_matrix(raw):
@@ -54,7 +64,7 @@ def build(output):
     output = Path(output)
     paths, graphs, report = [], [], {}
     for slug, (grip, tip, reach) in SWORDS.items():
-        source = "objects/nei_gi_redesign/" + slug + "/"
+        source = source_folder(slug)
         source_dl = source + "gi_dl"
         graph = sorted({source_dl, *(node.get("Path") for node in ET.parse(assets / source_dl).getroot()
                                       if node.get("Path"))})
@@ -122,4 +132,4 @@ if __name__ == "__main__":
     manifest, report = build(args.output)
     args.manifest.write_text(manifest)
     args.report.write_text(json.dumps(report, indent=2) + "\n")
-    print("Wrote 27 rigid held sword attachments; source mesh/material resources unchanged")
+    print(f"Wrote {len(SWORDS) * len(FRAMES)} rigid held sword attachments; source mesh/material resources unchanged")

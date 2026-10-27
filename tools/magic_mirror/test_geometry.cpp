@@ -17,6 +17,10 @@ int main() {
     assert(first.vertexCount > 0 && first.vertexCount <= kMaxVertices);
     assert(first.triangleCount > 0 && first.triangleCount <= kMaxTriangles);
     assert(first.batchCount > first.opaqueBatchCount && first.opaqueBatchCount > 0);
+    assert(first.glassEndBatch == first.opaqueBatchCount + kRimSegments);
+    assert(first.glassEndBatch < first.batchCount);
+    assert(ReflectionS(-12.5f) == 0 && ReflectionS(12.5f) == 1);
+    assert(ReflectionT(-6.5f) == 1 && ReflectionT(18.5f) == 0);
     bool changes = false;
     for (int i = 0; i < first.vertexCount; ++i) {
         const auto& a = first.vertices[i];

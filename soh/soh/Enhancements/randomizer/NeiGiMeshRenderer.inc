@@ -826,10 +826,11 @@ void NeiGi_DrawChateauShimmer(PlayState* play) {
 // Shared by native and foreign mask/remains and progressive sword overlays.
 // Reuse the exact optional NEI shimmer sampler and renderer; only the requested
 // transformation/remains palette changes. Ordinary items retain NEI's palette.
-void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+static void NeiGi_DrawColorShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner,
+                                        bool explicitTint) {
     if (!play || !play->state.gfxCtx || !color)
         return;
-    const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
+    const bool ordinary = !explicitTint && color[0] == 220 && color[1] == 225 && color[2] == 240;
     const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
     auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play));
     if (!ordinary) {
@@ -840,6 +841,14 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
         }
     }
     NeiGi_DrawShimmerMesh(play, mesh, owner);
+}
+
+void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    NeiGi_DrawColorShimmerOverlay(play, color, owner, false);
+}
+
+extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    NeiGi_DrawColorShimmerOverlay(play, color, owner, true);
 }
 
 // All nine rewards share this material and scroll fragment. Identity selects

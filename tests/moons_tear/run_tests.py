@@ -16,7 +16,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/nei_shared_slot"))
-from run_save_tests import extract, production_for, source_at
+from run_save_tests import build_native_equipment_dependency, extract, production_for, source_at
 from run_time_pedestal_tests import block_from
 
 
@@ -171,8 +171,9 @@ def main():
                      "-DLOG_LEVEL_GAME_PRINTS=0", "-DHOST_MM=" + str(int(host == "mm"))]
             if args.sanitizers:
                 flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-no-pie"]
+            native_objects = build_native_equipment_dependency(host, host_build, includes, flags)
             binary = host_build / "test"
-            subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, str(cpp), "-o", str(binary)],
+            subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, str(cpp), *native_objects, "-o", str(binary)],
                            cwd=ROOT, check=True)
             binaries[host] = binary
         pair = build / "pair.json"

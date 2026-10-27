@@ -3,6 +3,7 @@
 #include "SeasonSummerState.h"
 #include "SeasonSummerTextures.h"
 #include "SeasonWinterState.h"
+#include "SeasonWinterMist.h"
 #include "soh/Enhancements/audio/SeasonWeather.h"
 #include "soh/frame_interpolation.h"
 #include "z64.h"
@@ -301,10 +302,8 @@ static void DrawWinter(PlayState* play, const SoHSeasonParticles::View& view) {
     const auto prepare = [&]() {
         if (material)
             return;
-        SetParticleMaterial(gfxCtx);
-        gDPPipeSync(POLY_XLU_DISP++);
-        gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
+        Gfx_SetupDL_25Xlu(gfxCtx);
+        POLY_XLU_DISP = SoHSeasonWinterMist::Prepare(POLY_XLU_DISP);
         material = true;
     };
     const auto mesh = [&](Vtx* vertices, int columns, int count) {
@@ -343,20 +342,8 @@ static void DrawWinter(PlayState* play, const SoHSeasonParticles::View& view) {
         Matrix_Translate(center.x, center.y, center.z, MTXMODE_NEW);
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         auto* vertices = static_cast<Vtx*>(Graph_Alloc(gfxCtx, sizeof(Vtx) * 15));
-        for (int row = 0; row < 3; ++row)
-            for (int column = 0; column < 5; ++column) {
-                const float x = (column - 2) * 0.5f;
-                Vec3 relative = right * (x * wisp.width);
-                relative.y += (row - 1) * wisp.height * (1 - 0.3f * std::abs(x));
-                const float alpha =
-                    row == 1 && column > 0 && column < 4 ? wisp.alpha * edge * (column == 2 ? 1 : 0.68f) : 0;
-                const Vtx vertex =
-                    VTX(static_cast<s16>(std::lround(relative.x)), static_cast<s16>(std::lround(relative.y)),
-                        static_cast<s16>(std::lround(relative.z)), 0, 0, 192, 222, 245,
-                        static_cast<u8>(std::lround(alpha * 255)));
-                vertices[row * 5 + column] = vertex;
-            }
-        mesh(vertices, 5, 15);
+        SoHSeasonWinterMist::Vertices(vertices, right.x, right.z, wisp.width, wisp.height, wisp.alpha * edge);
+        POLY_XLU_DISP = SoHSeasonWinterMist::Draw(POLY_XLU_DISP, vertices);
         Matrix_Pop();
         FrameInterpolation_RecordCloseChild();
     }

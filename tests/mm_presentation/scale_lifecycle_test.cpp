@@ -29,6 +29,8 @@ enum RandomizerGet {
 };
 constexpr int RAND_INF_CAN_SWIM = 0, UPG_SCALE = 0, RI_COMBO_FOREIGN = 1;
 using RandoCheckId = int;
+constexpr RandoCheckId RC_UNKNOWN = -1;
+RandoCheckId queuedCheck = RC_UNKNOWN;
 constexpr RandoCheckId RC_CLOCK_TOWN_WEST_BANK_ADULTS_WALLET = 100,
                        RC_CLOCK_TOWN_WEST_BANK_INTEREST = 101,
                        RC_CLOCK_TOWN_WEST_BANK_PIECE_OF_HEART = 102;

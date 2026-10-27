@@ -1,3 +1,4 @@
+#include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
@@ -2357,31 +2358,46 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
     }
 }
 
-extern "C" uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y) {
-    if (filePath == nullptr || x == nullptr || y == nullptr) {
-        return false;
+static std::shared_ptr<Fast::Texture> MM_LoadRgba32Texture(const char* filePath) {
+    if (filePath == nullptr) {
+        return nullptr;
     }
     auto* context = Ship::Context::GetRawInstance();
     auto rm = context != nullptr ? context->GetResourceManager() : nullptr;
     std::string resolved = filePath;
-    // Match the renderer's explicit owner routing: these season icons belong
-    // to OoT even while the selector is drawn from the MM resource manager.
+    // Match the renderer's explicit owner and owning Alt selection. Never
+    // replace a missing registered owner with a same-named local resource.
     if (std::strncmp(filePath, "__OTR__@", 8) == 0) {
         const char* owner = filePath + 8;
         const char* colon = std::strchr(owner, ':');
         if (colon == nullptr || colon == owner) {
-            return false;
+            return nullptr;
         }
         rm = Ship::CrossRMRegistry::Get(std::string(owner, colon - owner));
         resolved = std::string("__OTR__") + (colon + 1);
     }
     if (rm == nullptr) {
-        return false;
+        return nullptr;
     }
     auto texture = std::dynamic_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(resolved.c_str()));
     if (texture == nullptr || texture->Type != Fast::TextureType::RGBA32bpp || texture->ImageData == nullptr ||
         texture->Width == 0 || texture->Height == 0 ||
         uint64_t(texture->Width) * texture->Height * 4 != texture->ImageDataSize) {
+        return nullptr;
+    }
+    return texture;
+}
+
+extern "C" uint8_t MM_IsRgba32TextureAvailable(const char* filePath) {
+    return MM_LoadRgba32Texture(filePath) != nullptr;
+}
+
+extern "C" uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y) {
+    if (x == nullptr || y == nullptr) {
+        return false;
+    }
+    auto texture = MM_LoadRgba32Texture(filePath);
+    if (texture == nullptr) {
         return false;
     }
     unsigned minX = texture->Width, minY = texture->Height, maxX = 0, maxY = 0;
@@ -3832,6 +3848,8 @@ extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placem
         for (auto& [id, opt] : Rando::StaticData::Options) {
             options[opt.name] = (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
         }
+        if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
+            options[Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].name] = RO_GENERIC_ON;
         // ComboShip (#136): combo owns the goal and MM's own toggle is hidden, so the CVar loop above
         // would save hunt=off — leaving Majora killable pre-completion and the tracker row missing.
         options[Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].name] =
@@ -4129,6 +4147,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoSettings(void) {
             si.push_back(name);
     }
     j["gRando.StartingItems"] = si;
+    j["gRando.Generation.ShuffleMagicMirror"] = CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
     cached = j.dump();
     return cached.c_str();
 }
@@ -4141,6 +4160,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         return;
     try {
         auto j = nlohmann::json::parse(json);
+        CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", RO_GENERIC_OFF);
+        CVarSetInteger("gRando.Generation.ShuffleMagicMirror", 0);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
@@ -5738,6 +5759,24 @@ extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char*
         return NeiAssetPriority::GetGiModelBounds("mm", "mm", paths, count, minimum, maximum);
     }
     return NeiAssetPriority::GetGiModelBounds("mm", game, paths, count, minimum, maximum);
+}
+
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
+    auto owner = Ship::CrossRMRegistry::Get("mm");
+#ifndef COMBO_BUILD
+    if (!owner)
+        if (const auto context = Ship::Context::GetRawInstance())
+            owner = context->GetResourceManager();
+#endif
+    if (!owner)
+        return 0;
+    Ship::ResourceManagerScope scope(owner);
+    for (const char* path : { COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU }) {
+        const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
+        if (!model || model->Instructions.empty())
+            return 0;
+    }
+    return 1;
 }
 
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll) {

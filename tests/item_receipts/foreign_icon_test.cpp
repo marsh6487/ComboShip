@@ -5,6 +5,11 @@
 #include <iostream>
 #include <string>
 /* ICON_OWNER_INCLUDE */
+#ifdef COMBO_BUILD
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+}
+#endif
 using s16 = int16_t;
 using u8 = uint8_t;
 using RandoCheckId = int;

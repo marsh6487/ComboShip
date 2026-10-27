@@ -12,6 +12,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+struct PlayState;
+// Native randomizer GI coordinates: OoT includes its established 2.25 fit;
+// MM's caller already owns the standard GetItem/CheckQueue scale.
+void MagicMirror_DrawGI(struct PlayState* play);
 void TravelTools_Heal(void);
 uint8_t TravelTools_IsOwned(uint16_t item);
 void TravelTools_Grant(uint16_t item);

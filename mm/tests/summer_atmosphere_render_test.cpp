@@ -108,7 +108,8 @@ static size_t Draw(PlayState& play, bool expectTexture = true) {
     opacities.clear();
     MMSummerAtmosphere_Draw(&play);
     const size_t commands = gfx.polyXlu.p - xlu;
-    assert(commands < 400); // Includes the denser dusk field, texture setup, and optional shafts.
+    assert(commands < 520);  // 128 dusk particles, two texture binds, and optional shafts.
+    assert(matrices <= 129); // Fixed 32 mote + 96 firefly budget and one optional beam transform.
     assert(stack == 0 && children == 0 && scopes == 0);
     bool privateIA = false, depthTest = false;
     for (const Gfx* p = xlu; p < gfx.polyXlu.p; ++p) {
@@ -173,7 +174,7 @@ int main() {
     gSaveContext.save.time = CLOCK_TIME(23, 0);
     MMSummerAtmosphere_Update(&play);
     Draw(play);
-    assert(matrices == 56 && vertexLoads == 0);
+    assert(matrices == 96 && vertexLoads == 0);
     assert(textures.size() == 1 && textures[0] != fluff);
     const auto* glow = textures[0];
     for (int y = 0; y < 8; ++y)
@@ -207,9 +208,9 @@ int main() {
     std::printf("Night firefly emitted opacity: min %.3f, mean %.3f, peak %.3f (%zu samples)\n", minimumOpacity / 255.0,
                 meanOpacity, maximumOpacity / 255.0, glowSamples);
     std::fflush(stdout);
-    assert(minimumOpacity >= 70); // Remain readable during the dim phase.
-    assert(meanOpacity >= 0.55);
-    assert(maximumOpacity <= 240); // Retain the existing soft peak opacity.
+    assert(minimumOpacity >= 120); // Brighter dim phase without discarding smooth pulse/fades.
+    assert(meanOpacity >= 0.70);
+    assert(maximumOpacity >= 250 && maximumOpacity <= 255); // Existing glow texture softens the brighter core.
     gSaveContext.save.time = CLOCK_TIME(18, 0);
     MMSummerAtmosphere_Update(&play);
     Draw(play);
@@ -223,7 +224,7 @@ int main() {
     fluffEnabled = 0;
     MMSummerAtmosphere_Update(&play);
     Draw(play);
-    assert(textures.size() == 1 && textures[0] == glow && matrices > 0 && matrices <= 56);
+    assert(textures.size() == 1 && textures[0] == glow && matrices > 0 && matrices <= 96);
     const int duskFireflies = matrices;
     firefliesEnabled = 0;
     MMSummerAtmosphere_Update(&play);

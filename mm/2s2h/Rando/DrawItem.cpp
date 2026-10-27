@@ -15,6 +15,9 @@
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 #include "2s2h/BenGui/CosmeticEditor.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorItem.h"
+#endif
 
 extern "C" {
 #include "variables.h"
@@ -3818,6 +3821,11 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             break;
         case RI_OOT_NEI_SWITCH_HOOK:
             DrawOotNeiSwitchHook();
+            break;
+        case RI_OOT_NEI_MAGIC_MIRROR:
+#ifdef COMBO_BUILD
+            MagicMirror_DrawGI(gPlayState);
+#endif
             break;
         case RI_OOT_NEI_TIME_GATE:
             DrawOotNeiTimeGate();

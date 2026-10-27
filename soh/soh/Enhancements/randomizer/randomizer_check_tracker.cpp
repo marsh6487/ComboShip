@@ -1977,6 +1977,8 @@ void LoadSettings() {
 }
 
 bool IsCheckShuffled(RandomizerCheck rc) {
+    if (rc == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+        return IS_RANDO && !Combo_IsCombinedGame() && RAND_GET_OPTION(RSK_SHUFFLE_MAGIC_MIRROR);
     Rando::Location* loc = Rando::StaticData::GetLocation(rc);
     if (IS_RANDO) {
         return (loc->GetArea() != RCAREA_INVALID) &&        // don't show Invalid locations

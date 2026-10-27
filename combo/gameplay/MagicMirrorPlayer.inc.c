@@ -26,6 +26,7 @@ static void MagicMirrorPlayer_Action(Player* player, PlayState* play) {
 
 static void MagicMirrorPlayer_Start(PlayState* play, Player* player) {
     player->afterPutAwayFunc = NULL;
+    // Runtime owns activation/departure audio; animation and put-away stay silent.
 #ifdef COMBO_MAGIC_MIRROR_MM
     Player_SetAction(play, player, MagicMirrorPlayer_Action, 0);
     player->stateFlags1 |= PLAYER_STATE1_20000000;
@@ -95,8 +96,10 @@ void MagicMirrorPlayer_Arrive(PlayState* play, Player* player) {
     MagicMirrorPlayer_StopMotion(player);
 #ifdef COMBO_MAGIC_MIRROR_MM
     func_80839E74(player, play);
+    Audio_PlaySfx(NA_SE_PL_MAGIC_WIND_WARP);
 #else
     func_80839FFC(player, play);
     Player_AnimChangeOnceMorph(play, player, Player_GetIdleAnim(player));
+    Sfx_PlaySfxCentered(NA_SE_PL_MAGIC_WIND_WARP);
 #endif
 }

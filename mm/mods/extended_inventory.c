@@ -141,8 +141,9 @@ int ExtInv_GetMaxPages(void) {
     return count;
 }
 bool ExtInv_IsCustomItemsEnabled(void) {
-    // Default ON — NEI features are enabled by default.
-    return CVarGetInteger("gMods.CustomItems.Enabled", 1) != 0;
+    // Owning the standalone Mirror makes its existing page reachable without
+    // enabling the other NEI systems or granting any unrelated inventory.
+    return CVarGetInteger("gMods.CustomItems.Enabled", 1) != 0 || MagicMirror_IsOwned();
 }
 bool ExtInv_IsMmMasksEnabled(void) {
     // Default ON — NEI features are enabled by default.

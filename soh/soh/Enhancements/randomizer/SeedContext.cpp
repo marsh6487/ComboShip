@@ -179,6 +179,8 @@ void Context::GenerateLocationPool() {
         // TODO: Exclude checks for some of the older shuffles from the pool too i.e. Frog Songs, Scrubs, etc.)
         if (location.GetRandomizerCheck() == RC_UNKNOWN_CHECK ||
             location.GetRandomizerCheck() == RC_WINCON || // already in pool
+            (location.GetRandomizerCheck() == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
+             (!mOptions[RSK_SHUFFLE_MAGIC_MIRROR] || Combo_IsCombinedGame())) ||
             (location.GetRandomizerCheck() == RC_GANONS_BOSS_KEY && mGBKCondition == RO_CHECK_TRIGGER_NONE) ||
             (location.GetRandomizerCheck() == RC_GANON_SOUL && mGanonsSoulCondition == RO_CHECK_TRIGGER_NONE) ||
             (location.GetRandomizerCheck() == RC_TOT_MASTER_SWORD &&

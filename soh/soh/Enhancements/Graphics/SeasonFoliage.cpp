@@ -40,8 +40,9 @@ struct Binding {
 std::vector<Binding> sBindings;
 // Retain original/copy allocations for queued renderer pointers and GPU cache
 // keys, including when a different scene or season stops using a texture.
-std::map<std::tuple<const Fast::Texture*, uint32_t, unsigned, unsigned, unsigned, unsigned, unsigned, PixelMask>,
-         Binding>
+std::map<
+    std::tuple<const Fast::Texture*, uint32_t, unsigned, unsigned, unsigned, unsigned, unsigned, unsigned, PixelMask>,
+    Binding>
     sCopies;
 
 void Restore(const Binding& binding) {
@@ -95,9 +96,10 @@ void Update(const PlayState* play) {
             });
             if (current != sBindings.end())
                 source = current->source;
-            const auto key = std::tuple{ source.get(),           tint.color,          tint.lightScale,
-                                         material.region.left,   material.region.top, material.region.right,
-                                         material.region.bottom, material.pixelMask };
+            const auto key =
+                std::tuple{ source.get(),         tint.color,          tint.lightScale,       tint.shadowLift,
+                            material.region.left, material.region.top, material.region.right, material.region.bottom,
+                            material.pixelMask };
             auto found = sCopies.find(key);
             if (found == sCopies.end()) {
                 auto copy = BuildTexture(source, tint, material.region, material.pixelMask);

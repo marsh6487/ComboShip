@@ -34,9 +34,19 @@ int main(void) {
         { STATIC_STORY_TEXT_LULU, "Pleased to meet you. I'm Lulu." },
         { STATIC_STORY_TEXT_ANJU, "...Kafei... I promised I'd wait for you." },
         { STATIC_STORY_TEXT_MONKEY, "Ook! Ook! The Woods of Mystery are just ahead!" },
+        { 0x8F2B, "Do you hear it? The stones are humming... as if they remember your footsteps." },
+        { 0x8F2C, "Every path leaves an echo in this chamber. Some wake to a song... others to a promise fulfilled." },
+        { 0x8F2D, "A fairy boy... I thought the forest kept its secrets. Did your fairy guide you here?" },
     };
 
     for (size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); ++entry) {
+        bool catalogued = false;
+        for (size_t index = 0; index < sizeof(expected) / sizeof(expected[0]); ++index) {
+            if (StaticStoryDialogue_GetTextIdAt(index) == expected[entry].id) {
+                catalogued = true;
+            }
+        }
+        REQUIRE(catalogued);
         for (uint8_t language = 0; language < 4; ++language) {
             const char* text = StaticStoryDialogue_GetText(expected[entry].id, language);
 
@@ -44,6 +54,7 @@ int main(void) {
             REQUIRE(strcmp(text, expected[entry].text) == 0);
         }
     }
+    REQUIRE(StaticStoryDialogue_GetTextIdAt(sizeof(expected) / sizeof(expected[0])) == 0);
     REQUIRE(StaticStoryDialogue_GetText(0, 0) == NULL);
     REQUIRE(StaticStoryDialogue_GetText(0xFFFF, 3) == NULL);
 
@@ -61,6 +72,18 @@ int main(void) {
     REQUIRE(StaticStoryDialogue_HandleOpenText(0x8F26, 3, &loadFromMessageTable, FixtureLoad, &fixture));
     REQUIRE(fixture.calls == 1 && fixture.language == 3);
     REQUIRE(!loadFromMessageTable && strstr(fixture.text, "Kafei") != NULL);
+
+    /* Every entry, including Zelda, loads its English fallback in all four language slots. */
+    for (size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); ++entry) {
+        for (uint8_t language = 0; language < 4; ++language) {
+            fixture = (LoaderFixture){ .result = true };
+            loadFromMessageTable = true;
+            REQUIRE(StaticStoryDialogue_HandleOpenText(expected[entry].id, language, &loadFromMessageTable, FixtureLoad,
+                                                       &fixture));
+            REQUIRE(fixture.calls == 1 && fixture.language == language);
+            REQUIRE(!loadFromMessageTable && strcmp(fixture.text, expected[entry].text) == 0);
+        }
+    }
 
     fixture = (LoaderFixture){ .result = false };
     loadFromMessageTable = true;

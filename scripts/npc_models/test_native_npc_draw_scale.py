@@ -20,7 +20,8 @@ class DrawScaleArchiveTests(unittest.TestCase):
         self.root = Path(self.temp.name)
 
     def source(self, model="young-malon"):
-        namespace = "objects/object_ma1/NativeNpcV1" if model == "young-malon" else "objects/object_sa/NativeNpcV1"
+        namespace = {"young-malon": "objects/object_ma1/NativeNpcV1", "saria": "objects/object_sa/NativeNpcV1",
+                     "young-fado": "objects/object_fa/YoungFadoNpcPOC1"}[model]
         data = {namespace + "/Skel": b"base-rig", "alt/" + namespace + "/Skel": b"private-rig",
                 "alt/" + namespace + "/Body/Limb14": b"mesh", "untouched/animation": b"native-timing-and-root",
                 "untouched/texture": b"local-pixels", "alt/" + namespace + "/Props/Basket": b"prop"}
@@ -35,12 +36,13 @@ class DrawScaleArchiveTests(unittest.TestCase):
         return subprocess.run([sys.executable, str(SCRIPT), "--input", str(source), "--output", str(output),
                                "--model", model, "--scale", scale], capture_output=True, text=True)
 
-    def test_adds_only_scale_resource_for_both_requested_models(self):
-        for model in ["young-malon", "saria"]:
+    def test_adds_only_scale_resource_for_requested_models(self):
+        for model in ["young-malon", "saria", "young-fado"]:
             source, namespace, data = self.source(model)
             before = hashlib.sha256(source.read_bytes()).hexdigest()
             output = self.root / (model + ".o2r")
-            result = self.invoke(source, output, model)
+            expected_factor = 1.25 if model == "young-fado" else 1.10
+            result = self.invoke(source, output, model, str(expected_factor))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
             with zipfile.ZipFile(output) as archive:
@@ -58,7 +60,7 @@ class DrawScaleArchiveTests(unittest.TestCase):
                     words.append(value)
                 self.assertEqual(words[:2], [0x4e44, 1])
                 factor = struct.unpack("<f", struct.pack("<HH", *words[2:]))[0]
-                self.assertAlmostEqual(factor, 1.10, places=6)
+                self.assertAlmostEqual(factor, expected_factor, places=6)
             report = json.loads(result.stdout)
             self.assertEqual(report["changed_entries"], [path])
             self.assertEqual(report["source_sha256"], before)

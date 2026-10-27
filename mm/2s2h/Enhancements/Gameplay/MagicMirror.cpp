@@ -35,11 +35,37 @@ u8 Sm64Mario_IsReady(void);
 }
 #define COMBO_MAGIC_MIRROR_MM
 #include "gameplay/MagicMirrorDraw.inc.h"
+#include "gameplay/MagicMirrorCamera.inc.h"
 
 namespace MirrorRuntime {
-void FinishPickup(int token);
+bool FinishPickup(int token);
 }
+#include "MagicMirrorRando.inc.h"
 namespace MirrorHost {
+bool Shuffled() {
+    return MirrorShuffle::Enabled();
+}
+bool PickupAvailable() {
+    return Shuffled() ? MirrorShuffle::StumpAvailable() : !MagicMirror_IsOwned();
+}
+void CancelPickup() {
+    MirrorShuffle::CancelStumpReward();
+}
+void UpdateCastCamera(PlayState* play, Player* player) {
+    ComboMagicMirrorCamera::Begin(play, player);
+}
+void ReleaseCastCamera(PlayState* play) {
+    ComboMagicMirrorCamera::Release(play);
+}
+void ForgetCastCamera() {
+    ComboMagicMirrorCamera::Forget();
+}
+void PlayActivationChime() {
+    Audio_PlaySfx(NA_SE_EV_TRE_BOX_FLASH);
+}
+void PlayDepartureCue() {
+    Audio_PlaySfx(NA_SE_PL_MAGIC_WIND_WARP);
+}
 u32 Seed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
@@ -105,14 +131,25 @@ void GivePickup(Actor* actor, PlayState*) {
 void DrawPickup(Actor*, PlayState* play) {
     Matrix_Scale(30, 30, 30, MTXMODE_APPLY);
     ComboMagicMirrorVisual::Draw(play);
+    NeiGi_DrawMesh(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
 }
 void DrawWorldShimmer(PlayState* play) {
     NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
+}
+void DrawWorldPickup(PlayState* play) {
+    if (Shuffled()) {
+        MirrorShuffle::DrawStumpReward(play);
+    } else {
+        ComboMagicMirrorVisual::Draw(play);
+        DrawWorldShimmer(play);
+    }
 }
 void DrawCastAura(PlayState* play, Player* player, float scale, float alpha) {
     NeiUsedMagic_DrawMirrorCast(play, player, scale, alpha);
 }
 bool QueuePickup(int token) {
+    if (Shuffled())
+        return MirrorShuffle::QueueStumpReward(token);
     GameInteractor::Instance->events.emplace_back(GIEventGiveItem{
         .showGetItemCutscene = true,
         .param = static_cast<s16>(token),
@@ -129,6 +166,13 @@ void ClearQueuedPickups() {
     });
 }
 } // namespace MirrorHost
+
+extern "C" void MagicMirror_DrawGI(PlayState* play) {
+    if (!play)
+        return;
+    ComboMagicMirrorVisual::Draw(play);
+    NeiGi_DrawMesh(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
+}
 
 #include "gameplay/MagicMirrorRuntime.inc.h"
 

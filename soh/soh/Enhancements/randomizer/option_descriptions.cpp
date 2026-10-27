@@ -17,6 +17,9 @@ void Settings::CreateOptionDescriptions() {
         "lighting torches and burning webs, Water Medallion = melt red ice, etc.).\n"
         "  - Projectile: Medallion + Bow (adult) or Slingshot (child) imbues the shot with the element.\n"
         "Item placement logic will respect this option.";
+    mOptionDescriptions[RSK_SHUFFLE_MAGIC_MIRROR] =
+        "Adds one Magic Mirror to the randomized item pool and shuffles the reward on the Lost Woods stump. Disabled "
+        "keeps the fixed Mirror there. Independent of the other NEI items.";
     mOptionDescriptions[RSK_SKIJER_CUSTOM_ITEMS] =
         "Adds Skijer's 24 custom items to the item pool (Second Inventory Page). \n"
         "These include: Whip, Spinner, Bomb Arrows, Fire/Ice/Light Rods, Deku Leaf, \n"

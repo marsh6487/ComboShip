@@ -1,6 +1,7 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveEditor.h"
 #include "NeiEditorItems.h"
+#include "gameplay/MagicMirrorItem.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -2475,6 +2476,7 @@ extern "C" {
 uint16_t Nei_GetOwnedItem(uint8_t slot);         // u16 store (NeiSaveData.ownedItems)
 void Nei_SetOwnedItem(uint8_t slot, uint16_t v); // u16 store (NeiSaveData.ownedItems)
 void ExtEquip_GiveItem(int16_t equipType, uint8_t index);
+void ExtEquip_RemoveItem(int16_t equipType, uint8_t index);
 uint8_t ExtEquip_HasItem(int16_t equipType, uint8_t index);
 void Nei_GiveAllOotItems(void);
 // Dual Cane (Somaria / Pacci) — item_cane_of_somaria.c. Cane_GiveSkill lights one of the six
@@ -2564,7 +2566,21 @@ static void DrawDualCaneEditor() {
     ImGui::TextDisabled("A on the cane cell (pause) switches entry. L/R pick the summon. C casts.");
 }
 
+static void DrawMagicMirrorEditor() {
+    ImGui::SeparatorText("Magic Mirror");
+    const bool owned = MagicMirror_IsOwned() != 0;
+    ImGui::BeginDisabled(owned);
+    if (ImGui::Button("Magic Mirror") && !owned)
+        TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
+    ImGui::EndDisabled();
+    if (owned) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("Owned");
+    }
+}
+
 static void DrawNeiTab() {
+    DrawMagicMirrorEditor();
     // Unified trade wheel — visual cell 22 (row 4, col 5). MM had NO trade editor at all, so there was
     // no way to inspect or set ownership here and the shared slot was untestable from this side.
     // Same 23 entries, same order, same indices as soh's debugSaveEditor: the index IS the
@@ -2947,7 +2963,7 @@ static void DrawNeiTab() {
     // which freed BOOTS 2/3 for the Climb and Roc Boots.
     static const char* sNeiEquipPieceNames[4][3] = {
         { "Byrna", "Four Sword", "Trident" },
-        { "Goddess", "Kite", "Ikana" },
+        { "Goddess", "Kite", "Shield of Ikana" },
         { "Champion", "Magic Tunic", "Sage's" },
         { "Pegasus", "Climb", "Roc" },
     };

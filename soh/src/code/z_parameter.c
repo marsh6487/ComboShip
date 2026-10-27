@@ -1494,6 +1494,8 @@ void Rando_Inventory_SwapAgeEquipment(void) {
     s16 i;
     u16 shieldEquipValue;
 
+    ExtButton_SaveAgeItems(gSaveContext.linkAge);
+
     if (LINK_AGE_IN_YEARS == YEARS_CHILD) {
         for (i = 0; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
             if (i != 0) {
@@ -1581,6 +1583,7 @@ void Rando_Inventory_SwapAgeEquipment(void) {
 
             gSaveContext.equips.equipment = gSaveContext.adultEquips.equipment;
         }
+        ExtButton_LoadAgeItems(LINK_AGE_ADULT);
     } else {
 
         for (i = 0; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
@@ -1613,6 +1616,7 @@ void Rando_Inventory_SwapAgeEquipment(void) {
             gSaveContext.equips.equipment = gSaveContext.childEquips.equipment;
             gSaveContext.equips.equipment &= (u16) ~(0xF << (EQUIP_TYPE_SWORD * 4));
             gSaveContext.equips.equipment |= EQUIP_VALUE_SWORD_KOKIRI << (EQUIP_TYPE_SWORD * 4);
+            ExtButton_LoadAgeItems(LINK_AGE_CHILD);
         }
         // In Rando we need an extra case to handle starting as adult. We can use the fact that the childEquips will be
         // uninitialised (i.e. 0) at this point
@@ -1629,6 +1633,7 @@ void Rando_Inventory_SwapAgeEquipment(void) {
                                             (EQUIP_VALUE_SHIELD_DEKU << (EQUIP_TYPE_SHIELD * 4)) |
                                             (EQUIP_VALUE_TUNIC_KOKIRI << (EQUIP_TYPE_TUNIC * 4)) |
                                             (EQUIP_VALUE_BOOTS_KOKIRI << (EQUIP_TYPE_BOOTS * 4));
+            ExtButton_LoadAgeItems(LINK_AGE_CHILD);
         }
 
         // When becoming child in rando, set swordless flag and clear B button if player doesn't have kokiri sword
@@ -1662,6 +1667,8 @@ void Inventory_SwapAgeEquipment(void) {
         Rando_Inventory_SwapAgeEquipment();
         return;
     }
+
+    ExtButton_SaveAgeItems(gSaveContext.linkAge);
 
     if (LINK_AGE_IN_YEARS == YEARS_CHILD) {
         for (i = 0; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
@@ -1727,6 +1734,7 @@ void Inventory_SwapAgeEquipment(void) {
 
             gSaveContext.equips.equipment = gSaveContext.adultEquips.equipment;
         }
+        ExtButton_LoadAgeItems(LINK_AGE_ADULT);
     } else {
         for (i = 0; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
             gSaveContext.adultEquips.buttonItems[i] = gSaveContext.equips.buttonItems[i];
@@ -1759,6 +1767,7 @@ void Inventory_SwapAgeEquipment(void) {
             gSaveContext.equips.equipment = gSaveContext.childEquips.equipment;
             gSaveContext.equips.equipment &= (u16) ~(0xF << (EQUIP_TYPE_SWORD * 4));
             gSaveContext.equips.equipment |= EQUIP_VALUE_SWORD_KOKIRI << (EQUIP_TYPE_SWORD * 4);
+            ExtButton_LoadAgeItems(LINK_AGE_CHILD);
         }
     }
 
@@ -6350,7 +6359,8 @@ void Interface_Draw(PlayState* play) {
 
         // C-Left Button Icon & Ammo Count
         // SM64 Mario mode: C-buttons become moves (spin/dash), not items — hide the icon.
-        if (gSaveContext.equips.buttonItems[1] < ITEM_LAST_USED && !CVarGetInteger("gSm64Mario", 0)) {
+        if (gSaveContext.equips.buttonItems[1] < ITEM_LAST_USED && ExtButton_GetItem(1) != ITEM_NONE &&
+            !CVarGetInteger("gSm64Mario", 0)) {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cLeftAlpha);
             gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
             Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(1, ExtInv_GetItemIcon(ExtButton_GetItem(1))), 1);
@@ -6363,7 +6373,8 @@ void Interface_Draw(PlayState* play) {
         gDPPipeSync(OVERLAY_DISP++);
 
         // C-Down Button Icon & Ammo Count
-        if (gSaveContext.equips.buttonItems[2] < ITEM_LAST_USED && !CVarGetInteger("gSm64Mario", 0)) {
+        if (gSaveContext.equips.buttonItems[2] < ITEM_LAST_USED && ExtButton_GetItem(2) != ITEM_NONE &&
+            !CVarGetInteger("gSm64Mario", 0)) {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cDownAlpha);
             gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
             Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(2, ExtInv_GetItemIcon(ExtButton_GetItem(2))), 2);
@@ -6376,7 +6387,8 @@ void Interface_Draw(PlayState* play) {
         gDPPipeSync(OVERLAY_DISP++);
 
         // C-Right Button Icon & Ammo Count
-        if (gSaveContext.equips.buttonItems[3] < ITEM_LAST_USED && !CVarGetInteger("gSm64Mario", 0)) {
+        if (gSaveContext.equips.buttonItems[3] < ITEM_LAST_USED && ExtButton_GetItem(3) != ITEM_NONE &&
+            !CVarGetInteger("gSm64Mario", 0)) {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->cRightAlpha);
             gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
             Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(3, ExtInv_GetItemIcon(ExtButton_GetItem(3))), 3);
@@ -6445,7 +6457,7 @@ void Interface_Draw(PlayState* play) {
             }
 
             // DPad-Up Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[4] < ITEM_LAST_USED) {
+            if (gSaveContext.equips.buttonItems[4] < ITEM_LAST_USED && ExtButton_GetItem(4) != ITEM_NONE) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->dpadUpAlpha);
                 gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
                 Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(4, ExtInv_GetItemIcon(ExtButton_GetItem(4))),
@@ -6457,7 +6469,7 @@ void Interface_Draw(PlayState* play) {
             }
 
             // DPad-Down Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[5] < ITEM_LAST_USED) {
+            if (gSaveContext.equips.buttonItems[5] < ITEM_LAST_USED && ExtButton_GetItem(5) != ITEM_NONE) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->dpadDownAlpha);
                 gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
                 Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(5, ExtInv_GetItemIcon(ExtButton_GetItem(5))),
@@ -6469,7 +6481,7 @@ void Interface_Draw(PlayState* play) {
             }
 
             // DPad-Left Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[6] < ITEM_LAST_USED) {
+            if (gSaveContext.equips.buttonItems[6] < ITEM_LAST_USED && ExtButton_GetItem(6) != ITEM_NONE) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->dpadLeftAlpha);
                 gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
                 Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(6, ExtInv_GetItemIcon(ExtButton_GetItem(6))),
@@ -6481,7 +6493,7 @@ void Interface_Draw(PlayState* play) {
             }
 
             // DPad-Right Button Icon & Ammo Count
-            if (gSaveContext.equips.buttonItems[7] < ITEM_LAST_USED) {
+            if (gSaveContext.equips.buttonItems[7] < ITEM_LAST_USED && ExtButton_GetItem(7) != ITEM_NONE) {
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->dpadRightAlpha);
                 gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
                 Interface_DrawItemIconTexture(play, PikaMode_ButtonIcon(7, ExtInv_GetItemIcon(ExtButton_GetItem(7))),

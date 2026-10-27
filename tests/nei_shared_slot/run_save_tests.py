@@ -44,6 +44,42 @@ def option_block(source, name):
     return source[start:end]
 
 
+def native_equipment_declarations():
+    variables = source_at("mm/include/variables.h")
+    functions = source_at("mm/include/functions.h")
+    declarations = [re.search(r"^extern [^;\n]+\b" + name + r"\[\];$", variables, re.M).group()
+                    for name in ("gEquipMasks", "gEquipNegMasks", "gEquipShifts")]
+    declarations.append(re.search(r"^void Inventory_ChangeEquipment\([^;\n]+;$", functions, re.M).group())
+    return ('#ifdef __cplusplus\nextern "C" {\n#endif\n' + "\n".join(declarations) +
+            "\n#ifdef __cplusplus\n}\n#endif\n")
+
+
+def build_native_equipment_dependency(host, build, includes, flags):
+    """Link MM's exact native nibble writer/data, retaining their C semantics.
+
+    The native negative-mask initializers intentionally convert signed constants
+    to u16. Compile them as C, not modified C++ initializers or a fake setter.
+    The real save context remains supplied by the headless persistence fixture.
+    """
+    if host != "mm":
+        return []
+    inventory = source_at("mm/src/code/z_inventory.c")
+    parts = ['#include "z64save.h"\n#include "z64item.h"\n#include "macros.h"\n',
+             native_equipment_declarations()]
+    for marker in ("u16 gEquipMasks[]", "u16 gEquipNegMasks[]", "u8 gEquipShifts[]"):
+        start = inventory.index(marker)
+        end = inventory.index("\n};", start) + len("\n};")
+        parts.append(inventory[start:end])
+    parts.append(extract(inventory, "Inventory_ChangeEquipment"))
+    source = build / "native_equipment.c"
+    source.write_text("\n\n".join(parts) + "\n")
+    obj = build / "native_equipment.o"
+    cflags = [flag for flag in flags if not flag.startswith("-std=")]
+    subprocess.run([os.environ.get("CC", "cc"), "-std=gnu11", *cflags, *includes,
+                    "-c", str(source), "-o", str(obj)], cwd=ROOT, check=True)
+    return [str(obj)]
+
+
 def production_for(host, serializer_ref, init_ref=None):
     save = source_at(f"{host}/mods/nei_save.cpp")
     initializers = source_at(f"{host}/mods/nei_save.cpp", init_ref)
@@ -51,6 +87,10 @@ def production_for(host, serializer_ref, init_ref=None):
     names = ("Nei_Save", "Nei_GetOwnedItem", "Nei_SetOwnedItem")
     parts = [extract(save, name) for name in names]
     if host == "mm":
+        # ExtEquip_RemoveItem also releases the equivalent native MM shield.
+        # Its actual declarations precede the verbatim ownership functions;
+        # build_native_equipment_dependency supplies their native C definitions.
+        parts.insert(0, native_equipment_declarations())
         parts.append(extract(initializers, "Nei_InitNewSave"))
         conversions = source_at("mm/2s2h/BenJsonConversions.hpp", serializer_ref)
         for signature in ("inline void to_json(json& j, const NeiSaveData& n)",
@@ -120,9 +160,10 @@ def main():
                 flags.append("-DCOMBO_BUILD")
             if args.sanitizers:
                 flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer"]
+            native_objects = build_native_equipment_dependency(host, build, includes, flags)
             binary = build / "nei_save_test"
             subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes,
-                            str(ROOT / "tests/nei_shared_slot/save_test.cpp"), "-o", str(binary)],
+                            str(ROOT / "tests/nei_shared_slot/save_test.cpp"), *native_objects, "-o", str(binary)],
                            cwd=ROOT, check=True)
             result = subprocess.run([str(binary)], cwd=ROOT,
                                     env={**os.environ, "NEI_SAVE_TEST_DIRECTORY": str(build / "Save"),

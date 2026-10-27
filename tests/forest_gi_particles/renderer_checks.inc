@@ -1,11 +1,12 @@
 for (unsigned frame : {0u, 47u, 100000u, 0xffffffffu}) {
-    for (int effect = 0; effect < 4; ++effect) {
+    for (int effect = 0; effect < 6; ++effect) {
         Reset(frame);
         const auto camera = NeiGi_CameraBasis(&play);
         const auto mesh = effect == 0 ? ForestGiParticles::Saria(frame, false, camera)
                         : effect == 1 ? ForestGiParticles::Saria(frame, true, camera)
                         : effect == 2 ? ForestGiParticles::Mystery(frame, camera)
-                                      : ForestGiParticles::Portal(frame, true, camera);
+                        : effect == 3 ? ForestGiParticles::Portal(frame, true, camera)
+                        : TempleSagesZeldaAura::Sample(effect == 4 ? 0x7D23 : 0x7F34, frame, camera);
         // ExpandedVertices starts with incoming grayscale enabled. The shared
         // shimmer boundary must clear it and restore the current material pose.
         transform = {5, 12, -8, 2};
@@ -41,4 +42,4 @@ for (unsigned frame : {0u, 47u, 100000u, 0xffffffffu}) {
         }
     }
 }
-puts("PASS forest particles through actual native GI renderer: exact triangle vertices/palettes/alpha, grayscale boundary, balanced matrices and exhausted-arena guards");
+puts("PASS forest and Zelda aura through actual native GI renderer: exact triangle vertices/palettes/alpha, grayscale boundary, restored colors/matrices and exhausted-arena guards");

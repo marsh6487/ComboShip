@@ -1,171 +1,130 @@
 #ifdef COMBO_BUILD
 #include "ComboRegionalPassages.h"
 #include "ComboGameMode.h"
-#include "entrances/RegionalPassages.h"
-#include <cmath>
+#include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
+#include "entrances/MmRegionalBridgePlacements.h"
+
 namespace {
 using namespace ComboRegional;
+using ComboMmRegional::Placement;
+static_assert(SCENE_IKANAMAE == ComboMmRegional::kIkana.scene && SCENE_30GYOSON == ComboMmRegional::kGreatBay.scene &&
+              SCENE_10YUKIYAMANOMURA == ComboMmRegional::kMountainWinter.scene &&
+              SCENE_10YUKIYAMANOMURA2 == ComboMmRegional::kMountainSpring.scene);
 struct Passage {
     PlayState* play = nullptr;
-    Pose entry{}, mouth{};
-    int route = 0, room = -1, slot = -1;
+    const Placement* placement = nullptr;
+    int slot = -1;
     u32 seed = 0;
-    bool queried = false, ready = false, armed = false;
+    bool armed = false;
 } sRegional;
 PlayState* sEntrancePlay = nullptr;
 unsigned sEntranceCount = 0;
-int SceneRoute(int scene) {
-    if (scene == SCENE_IKANAMAE)
-        return COMBO_PORTAL_IKANA;
-    if (scene == SCENE_30GYOSON)
-        return COMBO_PORTAL_GREAT_BAY;
-    if (scene == SCENE_10YUKIYAMANOMURA || scene == SCENE_10YUKIYAMANOMURA2)
-        return COMBO_PORTAL_SNOWHEAD;
-    return 0;
-}
-struct NativeWorld {
-    PlayState* play;
-    bool Floor(Point p, float expected, float* height) {
-        Vec3f point{ p.x, expected + 100, p.z };
-        CollisionPoly* floor = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        const float y =
-            BgCheck_EntityRaycastFloor5_3(play, &play->colCtx, &floor, &bg, &GET_PLAYER(play)->actor, &point);
-        if (!floor || bg != BGCHECK_SCENE || !std::isfinite(y) || y == BGCHECK_Y_MIN || std::fabs(y - expected) > 35 ||
-            floor->normal.y < 23170 || SurfaceType_GetSceneExitIndex(&play->colCtx, floor, bg) != 0)
-            return false;
-        WaterBox* water = nullptr;
-        float waterY;
-        if (WaterBox_GetSurface1_2(play, &play->colCtx, p.x, p.z, &waterY, &water) && waterY >= y - .5f)
-            return false;
-        *height = y;
-        return true;
-    }
-    bool Wall(Point a, Point b, Point* hit, Point* normal) {
-        Vec3f from{ a.x, a.y, a.z }, to{ b.x, b.y, b.z }, found{};
-        CollisionPoly* wall = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        if (!BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &found, &wall, true, false, false, true, &bg) ||
-            !wall || bg != BGCHECK_SCENE || std::abs(wall->normal.y) > 4096)
-            return false;
-        *hit = { found.x, found.y, found.z };
-        *normal = { wall->normal.x / 32767.f, 0, wall->normal.z / 32767.f };
-        return true;
-    }
-    bool Clear(Point a, Point b) {
-        Vec3f from{ a.x, a.y, a.z }, to{ b.x, b.y, b.z }, found{};
-        CollisionPoly* polygon = nullptr;
-        s32 bg = BGCHECK_SCENE;
-        // A hit of any kind obstructs the apron, including dynamic geometry,
-        // floors/ceilings and backfaces. Only Wall() filters a support wall.
-        return !BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &found, &polygon, true, true, true, false, &bg);
-    }
-    bool NearWater(Point p) {
-        for (float radius : { 120.f, 280.f, 500.f })
-            for (int step = 0; step < 8; ++step) {
-                const auto point = Add(p, Forward(static_cast<short>(step * 8192)), radius);
-                WaterBox* box = nullptr;
-                float y;
-                if (WaterBox_GetSurface1_2(play, &play->colCtx, point.x, point.z, &y, &box) && std::isfinite(y))
-                    return true;
-            }
-        return false;
-    }
-    bool Occupied(Point p, float radius) {
-        for (int category = 0; category < ACTORCAT_MAX; ++category) {
-            if (category == ACTORCAT_PLAYER || category == ACTORCAT_MISC || category == ACTORCAT_EXPLOSIVES)
-                continue;
-            for (Actor* a = play->actorCtx.actorLists[category].first; a; a = a->next) {
-                if (!a->update || (a->room >= 0 && a->room != play->roomCtx.curRoom.num) ||
-                    std::fabs(a->home.pos.y - p.y) > 180)
-                    continue;
-                if (Distance2({ a->home.pos.x, a->home.pos.y, a->home.pos.z }, p) < radius * radius)
-                    return true;
-            }
-        }
-        return false;
-    }
-};
+struct Arrival {
+    const Placement* placement = nullptr;
+    int slot = -1, entrance = -1;
+    u32 seed = 0;
+} sArrival;
+// Scene resources are cached across owl warps. Keep the bridge-only start
+// params in a module-owned copy, alive through native player initialization.
+ActorEntry sArrivalSpawn{};
 } // namespace
+
 extern "C" void ComboRegionalPassagesMm_Reset(void) {
     sRegional = {};
+    sEntrancePlay = nullptr;
+    sEntranceCount = 0;
+    sArrival = {};
 }
 extern "C" void ComboRegionalPassagesMm_ReadEntrances(PlayState* play, unsigned count) {
+    // Scene headers can reuse the same PlayState arena. The next spawn command
+    // must recapture ownership before either drawing or testing a return.
+    sRegional = {};
     sEntrancePlay = play;
     sEntranceCount = count;
 }
 extern "C" void ComboRegionalPassagesMm_ReadSpawns(PlayState* play, const ActorEntry* entries, unsigned count) {
     sRegional = {};
-    if (!Combo_IsCombinedGame() || !play || !SceneRoute(play->sceneId) || !entries || !play->setupEntranceList ||
-        !count)
+    const auto arrival = sArrival;
+    sArrival = {};
+    if (!Combo_IsCombinedGame() || !play || !entries || !play->setupEntranceList || !count || sEntrancePlay != play)
         return;
-    if (sEntrancePlay != play || sEntranceCount == 0)
+    const auto* placement = ComboMmRegional::ForScene(play->sceneId);
+    if (!placement || static_cast<unsigned>(placement->entrance) >= sEntranceCount)
         return;
-    const auto native = play->setupEntranceList[0];
-    if (native.spawn >= count)
+    const auto native = play->setupEntranceList[placement->entrance];
+    if (native.spawn >= count || native.room != placement->room)
         return;
-    const auto& source = entries[native.spawn];
-    s16 yaw = (source.rot.y >> 7) & 0x1FF;
-    if (!(source.id & 0x8000))
-        yaw = DEG_TO_BINANG(yaw);
-    else if (yaw > 180)
-        yaw -= 360;
+    if (arrival.placement == placement && arrival.slot == gSaveContext.fileNum &&
+        arrival.seed == gSaveContext.save.shipSaveInfo.rando.finalSeed &&
+        arrival.entrance == gSaveContext.save.entrance && play->curSpawn == placement->entrance &&
+        gSaveContext.gameMode == GAMEMODE_NORMAL && ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) &&
+        gSaveContext.respawnFlag == 0 && gSaveContext.save.cutsceneIndex == 0 &&
+        gSaveContext.save.shipSaveInfo.pauseSaveEntrance == -1 && !gSaveContext.save.isOwlSave &&
+        play->linkActorEntry == &entries[native.spawn] &&
+        PLAYER_GET_START_MODE(play->linkActorEntry) == PLAYER_START_MODE_OWL) {
+        sArrivalSpawn = *play->linkActorEntry;
+        sArrivalSpawn.params = PLAYER_PARAMS(sArrivalSpawn.params, PLAYER_START_MODE_F);
+        play->linkActorEntry = &sArrivalSpawn;
+        ComboForestArrivalCamera_Queue(COMBO_PORTAL_SNOWHEAD);
+    }
+    // Keep native player initialization and the cached owl pose intact. Only a
+    // matched Snowhead handoff queues the transactional exterior reveal; its
+    // floor/camera failure retains this dry native landing.
     sRegional.play = play;
-    sRegional.entry = {
-        { static_cast<float>(source.pos.x), static_cast<float>(source.pos.y), static_cast<float>(source.pos.z) }, yaw
-    };
-    sRegional.route = SceneRoute(play->sceneId);
-    sRegional.room = native.room;
+    sRegional.placement = placement;
     sRegional.slot = gSaveContext.fileNum;
     sRegional.seed = gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
 extern "C" int ComboRegionalPassagesMm_Get(PlayState* play, int* route, Vec3f* anchor, s16* yaw) {
-    if (!Combo_IsCombinedGame() || !play || play != sRegional.play || SceneRoute(play->sceneId) != sRegional.route ||
-        play->roomCtx.curRoom.num != sRegional.room || gSaveContext.gameMode != GAMEMODE_NORMAL ||
-        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || sRegional.slot != gSaveContext.fileNum ||
-        sRegional.seed != gSaveContext.save.shipSaveInfo.rando.finalSeed || !play->colCtx.colHeader ||
-        !GET_PLAYER(play))
-        return false;
-    if (!sRegional.queried) {
-        sRegional.queried = true;
-        NativeWorld world{ play };
-        sRegional.ready =
-            FindMouth(world, sRegional.entry, &sRegional.mouth, sRegional.route == COMBO_PORTAL_GREAT_BAY);
-    }
-    if (!sRegional.ready)
+    const auto* placement = sRegional.placement;
+    if (!Combo_IsCombinedGame() || !play || play != sRegional.play || !placement ||
+        ComboMmRegional::ForScene(play->sceneId) != placement || play->roomCtx.curRoom.num != placement->room ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+        sRegional.slot != gSaveContext.fileNum || sRegional.seed != gSaveContext.save.shipSaveInfo.rando.finalSeed ||
+        !play->colCtx.colHeader || !GET_PLAYER(play))
         return false;
     if (route)
-        *route = sRegional.route;
+        *route = placement->route;
     if (anchor)
-        *anchor = { sRegional.mouth.pos.x, sRegional.mouth.pos.y, sRegional.mouth.pos.z };
+        *anchor = { placement->mouth.pos.x, placement->mouth.pos.y, placement->mouth.pos.z };
     if (yaw)
-        *yaw = sRegional.mouth.yaw;
+        *yaw = placement->mouth.yaw;
     return true;
 }
 extern "C" int ComboRegionalPassagesMm_AtReturn(PlayState* play, const Vec3f* position) {
     if (!position || !ComboRegionalPassagesMm_Get(play, nullptr, nullptr, nullptr))
         return 0;
+    const auto& placement = *sRegional.placement;
     const Point point{ position->x, position->y, position->z };
-    if (Distance2(point, sRegional.mouth.pos) > 110 * 110)
+    if (Distance2(point, placement.mouth.pos) > placement.armDistance * placement.armDistance)
         sRegional.armed = true;
-    return sRegional.armed && InMouth(sRegional.mouth, point) ? sRegional.route : 0;
+    return sRegional.armed && InMouth(placement.mouth, point) ? placement.route : 0;
 }
 extern "C" int ComboRegionalPassagesMm_ApplyArrival(int route) {
     if (!Combo_IsCombinedGame() || !ComboRegionalPassages_IsRoute(route) || gSaveContext.gameMode != GAMEMODE_NORMAL ||
         !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum))
         return 0;
-    // Native regional approach records own floor, facing and camera. Never
-    // rewrite progression to make winter/spring, the coast or Ikana available.
-    gSaveContext.save.entrance = route == COMBO_PORTAL_IKANA       ? ENTRANCE(ROAD_TO_IKANA, 0)
-                                 : route == COMBO_PORTAL_GREAT_BAY ? ENTRANCE(GREAT_BAY_COAST, 0)
-                                 : CHECK_WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE)
-                                     ? ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 0)
-                                     : ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 0);
+    const auto* placement =
+        ComboMmRegional::ForArrival(route, CHECK_WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE));
+    // These native approach records own floor, facing and camera. No respawn
+    // coordinates or cycle/progression flags are rewritten.
+    gSaveContext.save.entrance = placement->scene == SCENE_IKANAMAE   ? ENTRANCE(ROAD_TO_IKANA, placement->entrance)
+                                 : placement->scene == SCENE_30GYOSON ? ENTRANCE(GREAT_BAY_COAST, placement->entrance)
+                                 : placement->scene == SCENE_10YUKIYAMANOMURA2
+                                     ? ENTRANCE(MOUNTAIN_VILLAGE_SPRING, placement->entrance)
+                                     : ENTRANCE(MOUNTAIN_VILLAGE_WINTER, placement->entrance);
     gSaveContext.save.cutsceneIndex = 0;
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     gSaveContext.cutsceneTrigger = 0;
+    // A portal checkpoint retains its ordinary resume marker. This explicit
+    // destination replaces that resume, so use the bridge's normal start mode
+    // rather than inheriting the saved-session marker's stationary mode D.
+    gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
     gSaveContext.save.isOwlSave = false;
     gSaveContext.respawnFlag = 0;
+    sArrival = route == COMBO_PORTAL_SNOWHEAD ? Arrival{ placement, gSaveContext.fileNum, gSaveContext.save.entrance,
+                                                         gSaveContext.save.shipSaveInfo.rando.finalSeed }
+                                              : Arrival{};
     return 1;
 }
 #endif

@@ -87,6 +87,7 @@ std::map<RandoOptionId, RandoStaticOption> Options = {
     RO(RO_TRIFORCE_PIECES_REQUIRED,    DEFAULT_TRIFORCE_PIECES_MAX),
     // Skijer's NEI. RO_SHUFFLE_NEI_ITEMS defaults OFF because until now NO RI_OOT_NEI_* item was
     // ever added to the pool — turning it on by default would silently change every existing seed.
+    RO(RO_SHUFFLE_MAGIC_MIRROR,        RO_GENERIC_OFF),
     RO(RO_SHUFFLE_NEI_ITEMS,           RO_GENERIC_OFF),
     RO(RO_SHUFFLE_BOMB_ARROWS,         RO_BOMB_ARROWS_OFF),
     RO(RO_ELEMENTAL_WAND_SHUFFLE,      RO_WAND_MEDALLIONS),

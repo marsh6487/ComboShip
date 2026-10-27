@@ -58,7 +58,8 @@ foreign = foreign.replace('/* EDITOR_SAMPLER */', editor[a:b])
 foreign = foreign.replace('/* LIVE_WRAPPER */', '#include "combo/menu/ComboLiveCosmetics.h"')
 a = owner.index('    // Silver rupees:')
 b = owner.index('    // Nut bag:', a)
-recipe = '\n'.join(function(owner, n) for n in ('CwLayerPrim', 'CwLayerEnv'))
+recipe = function(read('combo/menu/ComboCollectibleShimmerHost.h'), 'ComboCollectibleShimmer_Color') + '\n'
+recipe += '\n'.join(function(owner, n) for n in ('CwLayerPrim', 'CwLayerEnv'))
 recipe += '\nint DescribeSilverRupee(RandomizerGet rg,CwItemDrawInfo* out) {\n' + owner[a:b] + 'return 0;\n}'
 foreign = foreign.replace('/* OWNER_KEY_RECIPES */', recipe)
 a = host.index('struct ComboForeignDrawInfoOOT {')
@@ -75,7 +76,7 @@ foreign = ('#include "objects/object_gi_rupy/object_gi_rupy.h"\n'
            '#include "objects/gameplay_keep/gameplay_keep.h"\n'
            'std::vector<std::pair<int,std::vector<int>>> primColors;\n' + foreign)
 # Standard container declarations must precede the extra boundary state.
-foreign = '#include <vector>\n#include <utility>\n' + foreign
+foreign = '#include <vector>\n#include <utility>\n#include "combo/menu/ComboCollectibleShimmer.h"\n' + foreign
 foreign += read('tests/mm_presentation/silver_rupee_cosmetic_test.cpp')
 foreign = foreign.replace('/* REGISTERED_OPTION */', option)
 foreign = foreign.replace('/* SILVER_HOST_DRAW */', function(host, 'MM_DrawForeignSilverRupee'))

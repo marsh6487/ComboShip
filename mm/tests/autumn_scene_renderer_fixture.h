@@ -80,7 +80,7 @@ struct Interpreter {
         stats.palettes.push_back(
             rdp.grayscale ? uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a : 0);
         stats.tintModes.push_back(!rdp.grayscale ? 0 : rdp.grayscale_frost ? 3 : rdp.grayscale_normalize ? 2 : 1);
-        if (rdp.grayscale && color.r == 244 && color.g == 183 && color.b == 131 && color.a == 255) {
+        if (rdp.grayscale && color.r == 239 && color.g == 72 && color.b == 76 && color.a == 255) {
             ++stats.tinted;
             ++material.second;
         }
@@ -183,7 +183,7 @@ static void CheckDraw(const Stats& stats, bool tinted, const std::string& phase 
     const auto canopy = stats.materials.at("scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_037098");
     if (stats.tinted != (tinted ? 22u : 0u)) {
         std::fprintf(stderr,
-                     "FAIL rendered forest: wall %u/14 and canopy %u/8 copper triangles after "
+                     "FAIL rendered forest: wall %u/14 and canopy %u/8 Scarlet triangles after "
                      "untinted renderer pointer writebacks\n",
                      wall.second, canopy.second);
     }
@@ -344,7 +344,7 @@ static void CheckRenderedForestTransitions() {
             CheckDraw(Draw(forest->Instructions), false);
         }
     }
-    std::puts("PASS production renderer forest transitions: 14/14 wallpaper + 8/8 canopy stay copper after Off, "
+    std::puts("PASS production renderer forest transitions: 14/14 wallpaper + 8/8 canopy stay Scarlet after Off, "
               "scene reset and texture-pointer changes; seven real writebacks, both namespaces and Alt");
 
     // The copy can resolve an address before the source has ever drawn Off.

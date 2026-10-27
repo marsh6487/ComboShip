@@ -412,7 +412,13 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
 inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("randoInf").get_to(rando.randoInf);
     j.at("randoEvents").get_to(rando.randoEvents);
-    j.at("randoSaveChecks").get_to(rando.randoSaveChecks);
+    // Check IDs are append-only. Old saves have a shorter array; future saves
+    // may have a longer one. Preserve known checks and default absent additions.
+    const auto savedChecks = j.at("randoSaveChecks").get<std::vector<RandoSaveCheck>>();
+    memset(rando.randoSaveChecks, 0, sizeof(rando.randoSaveChecks));
+    for (size_t i = 0; i < savedChecks.size() && i < ARRAY_COUNT(rando.randoSaveChecks); ++i) {
+        rando.randoSaveChecks[i] = savedChecks[i];
+    }
     j.at("finalSeed").get_to(rando.finalSeed);
     // Options are append-only. A pre-option save has a shorter array; missing
     // entries retain legacy zero values (Grace On), even when reusing a struct.

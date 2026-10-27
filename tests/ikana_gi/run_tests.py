@@ -19,7 +19,7 @@ def function(source,name):
     return source[match.start():cursor]
 def read(path):return (ROOT/path).read_text()
 source=read('tests/ikana_gi/presentation_test.cpp')
-source=source.replace('/* OOT_NATIVE_DRAW */',function(read('soh/soh/Enhancements/randomizer/draw.cpp'),'Randomizer_DrawExtShieldOfIkana'))
+source=source.replace('/* OOT_NATIVE_DRAW */',function(read('soh/soh/Enhancements/randomizer/draw.cpp'),'DrawMmGiModel')+'\n'+function(read('soh/soh/Enhancements/randomizer/draw.cpp'),'Randomizer_DrawExtShieldOfIkana'))
 owner=read('combo/menu/ComboItemDrawOOT.h')
 case=re.search(r'        case RG_EXT_SHIELD_OF_IKANA:.*?(?=\n        case )',owner,re.S)[0]
 source=source.replace('/* OOT_DESCRIPTOR */',function(owner,'CwSimple')+'\nint DescribeIkana(CwItemDrawInfo* out){switch(RG_EXT_SHIELD_OF_IKANA){\n'+case+'\n}return 0;}')
@@ -28,13 +28,19 @@ case=re.search(r'        case RI_SHIELD_MIRROR:.*?(?=\n        case )',native,re
 if case:case=case[0]
 else:case=re.search(r'        default:\s*GetItem_Draw\(gPlayState,.*?break;',native,re.S)[0]
 source=source.replace('/* MM_NATIVE_DRAW */','void DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}')
+foreign_mm=read('combo/menu/ComboForeignDrawMM.h')
+source=source.replace('/* MM_SIMPLE_INFO */',re.search(r'struct ComboForeignDrawInfoOOT \{.*?\n\};',foreign_mm,re.S)[0])
+source=source.replace('/* MM_SIMPLE_CONSUMER */',function(foreign_mm,'MM_DrawForeignSimple'))
 source=source.replace('/* TEXTURE_RESOLVER */',function(read('libultraship/src/fast/interpreter.cpp'),'ComboLoadTextureResource'))
 equipment=read('mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_equipment.c')
-source=source.replace('/* EQUIPMENT_SELECTOR */',function(equipment,'KaleidoEquip_OotTex'))
+source=source.replace('/* EQUIPMENT_SELECTOR */',
+    '// Availability follows this fixture\'s actual renderer/owner store.\n'
+    'u8 MM_IsRgba32TextureAvailable(const char* path) { return ComboLoadTextureResource(path) != nullptr; }\n'+
+    function(equipment,'KaleidoEquip_OotTex'))
 tables=[]
 for host,namespace in [('mm','MmEquip'),('soh','OotEquip')]:
     data=read(host+'/mods/extended_equipment.c')
-    table=re.search(r'static const char\* sExtEquipIconPaths\[4\]\[3\] = \{.*?\n\};',data,re.S)[0]
+    table=re.search(r'static\s+const\s+char\s*\*\s*sExtEquipIconPaths\[4\]\[3\] = \{.*?\n\};',data,re.S)[0]
     tables.append('namespace '+namespace+'{\n#include "'+host+'/assets/'+('2s2h' if host=='mm' else 'soh')+'_assets.h"\n'+
                   ('#include "mm/mods/equipment/ext_equip_icon_assets.h"\n' if host=='mm' else '')+
                   table+'\n'+function(data,'ExtEquip_GetIcon')+'\n}')
@@ -61,7 +67,9 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
 
     exported=read('tests/ikana_gi/mm_export_test.cpp')
     mm=read('combo/menu/ComboItemDrawMM.h')
-    exported=exported.replace('/* MM_PRODUCER */','\n'.join(function(mm,name) for name in
+    collectible=read('combo/menu/ComboCollectibleShimmerHost.h')
+    profile='#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'+function(collectible,'ComboCollectibleShimmer_ProfileForDrawId')+'\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'
+    exported=exported.replace('/* MM_PRODUCER */',profile+'\n'.join(function(mm,name) for name in
         ('MM_Op','MM_OpV','MM_IsProgressiveItem','MM_IsStateDependentDraw','MM_IsSwordAppearanceDependent',
          'MM_FillElementalSpellDrawInfo','MM_FillItemDrawInfo','MM_GetItemDrawInfo')))
     native=read('mm/src/code/z_draw.c')

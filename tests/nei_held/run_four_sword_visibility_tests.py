@@ -101,6 +101,9 @@ const char* NeiGi_BaseSwordPath(const char* path) {
     return paths.insert(std::string("__OTR__@oot-gi-base:")+(path+7)).first->c_str();
 }
 static std::set<std::string> selected;
+int ResourceMgr_IsIkanaShieldGiAvailable() {
+    assert(false && "Four Sword fixture must not query the native shield pair"); return 0;
+}
 int ResourceMgr_IsModAssetForGame(const char* owner, const char* path) {
     assert(!strcmp(owner,"mm"));
     return selected.contains(path);

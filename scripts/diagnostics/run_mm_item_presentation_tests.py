@@ -21,6 +21,8 @@ def function(source, name):
 src = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
 song_body = function(src, 'OOT_FillSongDrawInfo')
 body = function(src, 'OOT_FillItemDrawInfo')
+collectible = (ROOT / 'combo/menu/ComboCollectibleShimmerHost.h').read_text()
+body = function(collectible, 'ComboCollectibleShimmer_ProfileForDrawId') + '\n' + body
 preamble = r'''
 #include <atomic>
 #define SPDLOG_WARN(...) ((void)0)
@@ -31,6 +33,8 @@ preamble = r'''
 #include <iostream>
 #include <cstring>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboCollectibleShimmer.h"
+#include "soh/include/z64item.h"
 #include "combo/menu/ComboItemEffectColors.h"
 #include "combo/menu/ComboBottleContents.h"
 using s16=int16_t; using s32=int32_t; using f32=float;

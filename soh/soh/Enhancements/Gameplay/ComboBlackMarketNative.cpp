@@ -11,7 +11,13 @@
 #include "BlackMarketNativeResources.h"
 #include "BlackMarketEntry.h"
 #include "BlackMarketExitDoor.h"
+#include "BlackMarketDoorCollision.h"
+extern "C" {
+#include "overlays/actors/ovl_En_Door/z_en_door.h"
+void EnDoor_Idle(EnDoor*, PlayState*);
+}
 #include "BlackMarketGrannyResources.h"
+#include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketBrowsing.h"
 #include "BlackMarketReceipt.h"
 #include "BlackMarketText.h"
@@ -73,7 +79,8 @@ s16 sGroundedReturnYaw = 0;
 u16 sGroundedReturnEntrance = ENTR_SKIEJER_FOREST;
 RespawnData sPreservedReturn;
 std::string sStatus;
-constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
+constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13,
+              kKeeperTalkText = 0x8F15, kKeeperHelpChoiceText = 0x8F17, kKeeperHelpText = 0x8F18;
 int sKeeperActorId = -1;
 constexpr int kLimbCount = 24, kHeadLimb = 5;
 alignas(2) constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
@@ -88,10 +95,9 @@ BlackMarketKeeperAssets::NativeModel sNativeKeeper;
 bool sNativeKeeperReady = false;
 BlackMarketShelvesNative::Fixture sShelfFixture;
 constexpr Vec3f kShelves[8] = {
-    // Two framed shelf banks; keep all offers on one frontal plane.
-    // Upper anchors clear the physical middle board and selected-item seals.
-    { 35, 58, 110 },  { 35, 110, 110 },  { 70, 58, 110 },  { 70, 110, 110 },
-    { -35, 58, 110 }, { -35, 110, 110 }, { -70, 58, 110 }, { -70, 110, 110 }
+    // Native +/-30-degree bank planes; row changes keep one bank camera.
+    { 44.84456f, 58, 98.75f },  { 44.84456f, 110, 98.75f },  { 75.15544f, 58, 116.25f },  { 75.15544f, 110, 116.25f },
+    { -44.84456f, 58, 98.75f }, { -44.84456f, 110, 98.75f }, { -75.15544f, 58, 116.25f }, { -75.15544f, 110, 116.25f }
 };
 
 u32 Seed() {
@@ -132,6 +138,36 @@ bool Active() {
     return Interior() && sSession.Active(gSaveContext.fileNum);
 }
 
+BlackMarketDoorCollision::Fixture<true> sDoorCollision;
+void SyncShopDoorCollision() {
+    auto* play = gPlayState;
+    if (!play || gGameState != &play->state || !play->state.running)
+        return;
+    // Custom native Open starts its transition immediately. Keep its explicit
+    // release for the whole handoff even if the actor is still idle this frame.
+    if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF) {
+        sDoorCollision.Release(play);
+        return;
+    }
+    Actor* closed = nullptr;
+    if (Interior())
+        closed = const_cast<Actor*>(BlackMarketExitDoor::Live<true>(play));
+    else if (Exterior(play)) {
+        OotBlackMarketDoorNative::Pose pose;
+        if (OotBlackMarketDoorNative::Find(play, pose))
+            for (auto* actor = play->actorCtx.actorLists[ACTORCAT_DOOR].head; actor; actor = actor->next)
+                if (OotBlackMarketDoorNative::Matches(actor, pose) && actor->update && actor->draw) {
+                    closed = actor;
+                    break;
+                }
+    }
+    if (closed) {
+        const auto* native = reinterpret_cast<const EnDoor*>(closed);
+        if (native->actionFunc != EnDoor_Idle || native->playerIsOpening)
+            closed = nullptr;
+    }
+    sDoorCollision.Ensure(play, closed);
+}
 BlackMarketGranny::Resources sGrannyResources;
 bool sGrannyPending = false, sGrannyActive = false;
 MeshHeader sGrannyShape{};
@@ -188,6 +224,46 @@ void DrawGrannyRoom() {
                                                1023 - (tick * 6) % 1024, 16, 256, 0, -3, 0, -6),
                             sGrannyResources.Route());
     sGrannyEntry = { frame, frame + 5 };
+}
+BlackMarketRoomMagic::Resources sRoomMagicResources;
+MeshHeader sRoomMagicShape{};
+PolygonDlist sRoomMagicEntry{};
+MeshHeader* sRoomMagicOriginal = nullptr;
+PlayState* sRoomMagicPlay = nullptr;
+void RestoreRoomMagic() {
+    // Restore only the live room we attached. A scene load may have reused the
+    // PlayState address or installed another shape since the previous draw.
+    auto* play = gPlayState;
+    if (play && play == sRoomMagicPlay && play->roomCtx.curRoom.meshHeader == &sRoomMagicShape)
+        play->roomCtx.curRoom.meshHeader = sRoomMagicOriginal;
+    sRoomMagicPlay = nullptr;
+    sRoomMagicOriginal = nullptr;
+    sRoomMagicEntry = {};
+}
+void ClearRoomMagic() {
+    RestoreRoomMagic();
+    sRoomMagicResources.Clear();
+}
+void BeginRoomMagic() {
+    RestoreRoomMagic();
+    auto* play = gPlayState;
+    if (!Interior() || sGrannyActive || play->roomCtx.curRoom.num != 0 ||
+        !CVarGetInteger(BlackMarketRoomMagic::kCvar, 0))
+        return;
+    auto* shape = play->roomCtx.curRoom.meshHeader;
+    if (!shape || shape->base.type != 0 || shape->polygon0.num != 1 || !shape->polygon0.start ||
+        !BlackMarketRoomMagic::MatchesSource(static_cast<PolygonDlist*>(shape->polygon0.start)->opa, true) ||
+        !sRoomMagicResources.Prepare("oot", static_cast<PolygonDlist*>(shape->polygon0.start)->opa))
+        return;
+    sRoomMagicResources.SetPalette(BlackMarketRoomMagic::ReadPalette(true));
+    sRoomMagicEntry = *static_cast<PolygonDlist*>(shape->polygon0.start);
+    sRoomMagicEntry.opa = sRoomMagicResources.Opaque();
+    sRoomMagicShape = *shape;
+    sRoomMagicShape.polygon0.start = &sRoomMagicEntry;
+    sRoomMagicShape.polygon0.end = &sRoomMagicEntry + 1;
+    sRoomMagicOriginal = shape;
+    sRoomMagicPlay = play;
+    play->roomCtx.curRoom.meshHeader = &sRoomMagicShape;
 }
 bool Safe(PlayState* play) {
     return play && play->state.running && gSaveContext.gameMode == GAMEMODE_NORMAL &&
@@ -393,6 +469,7 @@ bool LoadNativeKeeper() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    sBrowseKeeper = actor;
     SkelAnime_Update(&sKeeper.skel);
     if (sKeeper.timer > 0)
         --sKeeper.timer;
@@ -496,14 +573,18 @@ void MarketText(u16* textId, bool* fromTable) {
         return;
     }
     if (!Active() ||
-        (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
+        (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText &&
+         *textId != kKeeperTalkText && *textId != kKeeperHelpChoiceText && *textId != kKeeperHelpText))
         return;
-    const Page page = *textId == kWelcomeText   ? Page::Welcome
-                      : *textId == kConfirmText ? Page::Confirm
-                      : *textId == kResultText  ? Page::Result
-                                                : Page::Browse;
+    const Page page = *textId == kKeeperTalkText         ? Page::KeeperTalk
+                      : *textId == kKeeperHelpChoiceText ? Page::KeeperHelpChoice
+                      : *textId == kKeeperHelpText       ? Page::KeeperHelp
+                      : *textId == kWelcomeText          ? Page::Welcome
+                      : *textId == kConfirmText          ? Page::Confirm
+                      : *textId == kResultText           ? Page::Result
+                                                         : Page::Browse;
     BlackMarketText::Offer offer;
-    if (page != Page::Welcome) {
+    if (page == Page::Browse || page == Page::Confirm || page == Page::Result) {
         offer.item = Offer(sSelected);
         if (!offer.item && page != Page::Result)
             return;
@@ -531,7 +612,7 @@ void MarketText(u16* textId, bool* fromTable) {
     CustomMessage entry(BlackMarketText::Oot(page, offer, sStatus, gSaveContext.language));
     entry.AutoFormat();
     entry = CustomMessage(BlackMarketText::OotPages(entry.GetForCurrentLanguage(MF_RAW)));
-    if (page != Page::Welcome)
+    if (page == Page::Browse || page == Page::Confirm || page == Page::Result)
         entry.SetTextBoxPosition(TEXTBOX_POS_BOTTOM);
     entry.LoadIntoFont();
     *fromTable = false;
@@ -858,8 +939,11 @@ void RegisterNativeMarket() {
     SaveManager::Instance->AddSaveFunction("blackMarket", 1, SaveMarket, true, SECTION_PARENT_NONE);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>(BindSolo);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
+        ClearRoomMagic();
         sShelfFixture.Reset();
+        sDoorCollision.Reset();
         EndBrowsing(gPlayState, true);
+        InitBrowsingCameraScene(nullptr);
         CancelReceipt(true);
         GrannySceneBegin();
         sEntering = sDoorArmed = sTalking = false;
@@ -868,8 +952,17 @@ void RegisterNativeMarket() {
         if (scene == SCENE_SKIEJER_MARKET)
             sSelected = 0;
     });
-    Ship::CrossRMRegistry::RegisterTeardownListener([] { sGrannyResources.Clear(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>(DrawGrannyRoom);
+    Ship::CrossRMRegistry::RegisterTeardownListener([] {
+        ClearRoomMagic();
+        sGrannyResources.Clear();
+    });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(
+        ACTOR_EN_DOOR, [](void*) { SyncShopDoorCollision(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(SyncShopDoorCollision);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>([] {
+        DrawGrannyRoom();
+        BeginRoomMagic();
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(ApplyGrannyInterior);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(PlayerUpdate);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(MarketText);
@@ -880,12 +973,15 @@ void RegisterNativeMarket() {
         PresentTitle();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>([] {
+        RestoreRoomMagic();
         DrawMarket();
         DrawBrowseCursor();
         DrawExterior();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
+        ClearRoomMagic();
         sShelfFixture.Reset();
+        sDoorCollision.Reset();
         EndBrowsing(gPlayState, true);
         CancelReceipt();
         sTitlePending = sTalking = sDoorArmed = sGrannyActive = sGrannyPending = false;
@@ -893,6 +989,11 @@ void RegisterNativeMarket() {
 }
 RegisterShipInitFunc init(RegisterNativeMarket);
 } // namespace
+
+extern "C" void ComboBlackMarketOot_RestoreRoomAfterDraw(PlayState* play) {
+    if (play && play == gPlayState && play == sRoomMagicPlay)
+        RestoreRoomMagic();
+}
 
 extern "C" bool ComboBlackMarketOot_TryFixedReceiptGrant(PlayState* play, GetItemEntry entry) {
     return FixedMarketGrant(play, entry);
@@ -1015,6 +1116,7 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
             player->doorType != PLAYER_DOORTYPE_HANDLE || player->actionFunc != Player_Action_80845EF8 ||
             gSaveContext.health <= 0)
             return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+        sDoorCollision.Release(play);
         RememberTravel();
         sReturnPending = true;
         Transition(play, sReturnEntrance);
@@ -1046,6 +1148,7 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
         return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
     }
     LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_ENTERED, "native_open");
+    sDoorCollision.Release(play);
     // The native save worker must finish before publishing a new return point.
     SaveManager::Instance->ThreadPoolWait();
     sReturnPos = OotBlackMarketDoorNative::Outside(placed);
@@ -1056,6 +1159,17 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
     RememberTravel();
     Transition(play, ENTR_SKIEJER_MARKET);
     return COMBO_BLACK_MARKET_OOT_DOOR_ENTERED;
+}
+
+extern "C" int ComboBlackMarketNative_PrepareViewpointCamera(PlayState* play) {
+    if (!sTalking || play != gPlayState || OwnNativeBrowsingCamera(play))
+        return 1;
+    if (BrowsingMessage(play))
+        Message_CloseTextbox(play);
+    EndBrowsing(play);
+    // Skipping this dispatch is necessary even after restoring viewpoint 1:
+    // applying its original BG0 record would also mutate the foreign camera.
+    return 0;
 }
 
 extern "C" void ComboBlackMarketOot_NormalizeEntry(void) {

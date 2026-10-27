@@ -1,5 +1,8 @@
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "BlackMarketFairy.h"
+#endif
 #include "gameplay/ComboFaroresWind.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include <stdio.h>
@@ -471,6 +474,12 @@ void Attention_Init(TargetContext* targetCtx, Actor* actor, PlayState* play) {
 
 void Attention_Draw(TargetContext* targetCtx, PlayState* play) {
     Actor* actor = targetCtx->targetedActor;
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_OOT, play->sceneNum, SCENE_SKIEJER_MARKET)) {
+        return;
+    }
+#endif
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -3924,6 +3933,14 @@ u8 D_801160A0[] = {
 Actor* Attention_FindActor(PlayState* play, ActorContext* actorCtx, Actor** actorPtr, Player* player) {
     s32 i;
     u8* entry;
+
+#ifdef COMBO_BUILD
+    if (ComboBlackMarket_FairyQuiet(COMBO_GAME_OOT, play->sceneNum, SCENE_SKIEJER_MARKET)) {
+        *actorPtr = NULL;
+        actorCtx->targetCtx.bgmEnemy = NULL;
+        return NULL;
+    }
+#endif
 
     D_8015BBE8 = D_8015BBEC = NULL;
     D_8015BBF0 = sbgmEnemyDistSq = FLT_MAX;

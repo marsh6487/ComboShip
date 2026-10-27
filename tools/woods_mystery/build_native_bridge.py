@@ -57,7 +57,17 @@ def build(native_path, accepted_path):
     aperture[:, 1] = 60 + (aperture[:, 1] - 60) * .99
     aperture[:, 1] += 3 * np.clip((aperture[:, 1] - 60) / 15, 0, 1)
     aperture[aperture[:, 1] < bottom + 1, 1] = -2
+    # The mesh reader pairs the last image with tile0's extent in this native
+    # dual-texture material. A1C0 actually uses tile1: RGBA16,32x32. Derive the
+    # baked single-texture load from that resource rather than the other sampler.
+    wall_texture = native.get(WALL)
+    wall_format, wall_width, wall_height, wall_bytes = struct.unpack_from('<IIII', wall_texture, 64)
+    assert wall_format == 2 and wall_bytes == wall_width * wall_height * 2
+    assert len(wall_texture) == 80 + wall_bytes
+    wall_tile = (wall_width, wall_height)
     original_wall = native.mesh(NATIVE_WALL)
+    assert all(tri['texture'] == WALL for tri in original_wall)
+    original_wall = [{**tri, 'tile': wall_tile} for tri in original_wall]
     retained = []
     clipped = []
     for tri in original_wall:
@@ -74,7 +84,7 @@ def build(native_path, accepted_path):
     wall_triangles = len(wall)
     # The accepted outer annulus seals the back of the corner. Give this
     # backing the original native wall material, with no HD-pack dependency.
-    surround = [{**tri, 'texture': WALL, 'tile': (64, 64), 'lit': True}
+    surround = [{**tri, 'texture': WALL, 'tile': wall_tile, 'lit': True}
                 for tri in accepted.mesh(ROOT + 'room_1/bridge_surround')]
     files = {}
     emit_mesh(files, PREFIX + 'wall', wall + surround, lighting=True)
@@ -114,6 +124,14 @@ def build(native_path, accepted_path):
         source_bridge=source_path,
         source_native_wall=NATIVE_WALL,
         native_wall_sha256=hashlib.sha256(native.get(NATIVE_WALL)).hexdigest(),
+        wall_material=dict(
+            texture=WALL,
+            texture_sha256=hashlib.sha256(wall_texture).hexdigest(),
+            native_sampler=1,
+            logical_size=list(wall_tile),
+            rgba16_bytes=wall_bytes,
+            preservation='Native RGBA16 image, geometry, UVs and normals unchanged; baked load uses its actual dimensions',
+        ),
         bridge_triangles=len(bridge),
         bridge_material_triangles={new.rsplit('/', 1)[-1]: counts[old] for old, new in TEXTURES.items()},
         original_wall_triangles=len(original_wall),

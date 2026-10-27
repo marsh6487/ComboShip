@@ -24,30 +24,6 @@ bool RegionalPresentationSafe(PlayState* play) {
            play->transitionMode == TRANS_MODE_OFF && play->gameOverCtx.state == GAMEOVER_INACTIVE;
 }
 
-void DrawRegionalShell(PlayState* play, int route) {
-    static const auto vertices = RP::NativeShell<Vtx>();
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPComboRMPush(POLY_OPA_DISP++, "oot");
-    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
-              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH);
-    gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_MODULATEI);
-    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
-    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
-    gDPLoadTextureBlock(POLY_OPA_DISP++, RP::Texture(RP::Host::Oot, route), G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0,
-                        G_TX_WRAP, G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
-    for (size_t i = 0; i < RP::kShellQuads; ++i) {
-        gSPVertex(POLY_OPA_DISP++, (uintptr_t)&vertices[i * 4], 4, 0);
-        gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-    }
-    gDPPipeSync(POLY_OPA_DISP++);
-    gSPComboRMPop(POLY_OPA_DISP++);
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 void DrawRegionalPassage() {
     auto* play = gPlayState;
     int route;
@@ -57,16 +33,15 @@ void DrawRegionalPassage() {
         !RP::KnownRoute(route))
         return;
     const bool grave = route == COMBO_PORTAL_IKANA;
-    if (!grave && !NeiGi_CanDrawLayers(play, 1, RP::kShellOpaCommands, RP::kShellXluCommands))
+    if (!NeiGi_CanDrawLayers(play, 1, 0, RP::kShellXluCommands))
         return;
     Matrix_Push();
     Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
     Matrix_RotateY(yaw * (NeiGi::Tau / 65536.f), MTXMODE_APPLY);
-    if (!grave)
-        DrawRegionalShell(play, route);
+    // Fixed scene providers own their complete opaque cave/path geometry.
     const auto camera = NeiGi_CameraBasis(play);
-    const auto mesh =
-        grave ? RP::GraveShimmer(play->gameplayFrames, camera) : RP::Shimmer(play->gameplayFrames, route, camera);
+    const auto mesh = grave ? RP::GraveShimmer(play->gameplayFrames, camera)
+                            : RP::Shimmer(play->gameplayFrames, RP::Host::Oot, route, camera);
     NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
 }

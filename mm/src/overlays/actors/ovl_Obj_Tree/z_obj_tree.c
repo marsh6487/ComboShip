@@ -198,24 +198,20 @@ void ObjTree_Draw(Actor* thisx, PlayState* play) {
     if (spring || autumn || frost) {
         // This tree has its own canopy draw, outside En_Wood02. Tint only the
         // selected canopy, including Alt leaves; preserve trunk, sway and collision.
-        u32 variant = ((u32)(s32)thisx->home.pos.x ^ (u32)(s32)thisx->home.pos.z) & 1;
         // Full spring/winter color with the existing brightness lift makes
         // dark leaves readable while the body draw above keeps its bark.
         gDPSetGrayscaleColor(POLY_OPA_DISP++,
-                             spring    ? 246
-                             : frost   ? 204
-                             : variant ? 220
-                                       : 205,
-                             spring    ? 193
-                             : frost   ? 220
-                             : variant ? 145
-                                       : 65,
-                             spring    ? 217
-                             : frost   ? 238
-                             : variant ? 35
-                                       : 40,
+                             spring  ? 246
+                             : frost ? 226
+                                     : 239,
+                             spring  ? 193
+                             : frost ? 238
+                                     : 72,
+                             spring  ? 217
+                             : frost ? 233
+                                     : 76,
                              255);
-        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
+        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 2);
     }
     gSPDisplayList(POLY_OPA_DISP++, gTreeLeavesDL);
     if (spring || autumn || frost) {

@@ -25,6 +25,7 @@ enum class PixelMask {
 struct Tint {
     uint32_t color = 0;
     unsigned lightScale = 256;
+    unsigned shadowLift = 0; // 0..255: lift dark ground without flattening its texture.
 };
 // Atlas bounds in sixteenths, independent of native/HD texture dimensions.
 // Defaults select the whole texture; authored exceptions protect nearby bark/stone.
@@ -35,11 +36,17 @@ struct Region {
 inline Tint Palette(int season, Surface surface, uint32_t autumnColor = 0) {
     switch (season) {
         case 0:
+            if (surface == Surface::Ground && !autumnColor)
+                return { 0xF6C1D9FFu, 461, 24 }; // Gentle lift; retain the accepted spring blush.
             return { surface == Surface::Canopy ? 0xF6C1D9E0u : 0xF6C1D9FFu, 461 };
         case 2:
-            return { autumnColor ? autumnColor : surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };
+            if (surface == Surface::Ground && !autumnColor)
+                return { 0xF3974FFFu, 320, 24 }; // Copper grass and trim; retain the accepted exposure.
+            return { autumnColor ? autumnColor : surface == Surface::Understory ? 0xF26846FFu : 0xEF484CFFu, 256 };
         case 3:
-            return { surface == Surface::Canopy ? 0xCCDCEEFFu : 0xE5EDF3FFu, 461 };
+            if (surface == Surface::Ground && !autumnColor)
+                return { 0xDCECF5FFu, 461, 128 }; // Pale frost, including the darkest grass shadows.
+            return { surface == Surface::Canopy ? 0xE2EEE9FFu : 0xDCECF5FFu, 461 };
         default:
             return {};
     }
@@ -173,9 +180,17 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
         if (pixelMask == PixelMask::GrassTrim &&
             (g * 100 <= r * 120 || g * 100 <= b * 120 || g - r < (packed ? 2u : 10u)))
             continue;
+        const unsigned maximum = packed ? 31u : 255u;
+        unsigned light = (r + g + b) * tint.lightScale;
+        if (tint.shadowLift) {
+            const unsigned white = 3 * maximum * 256;
+            const unsigned lift = std::min(255u, tint.shadowLift);
+            // Compress toward white smoothly instead of clamping shadows to a
+            // flat floor. Zero lift preserves the original arithmetic exactly.
+            light = (std::min(white, light) * (255 - lift) + white * lift) / 255;
+        }
         const auto channel = [&](unsigned original, unsigned target) {
-            const unsigned normalized =
-                std::min(packed ? 31u : 255u, (r + g + b) * target * tint.lightScale / (targetSum * 256));
+            const unsigned normalized = std::min(maximum, light * target / (targetSum * 256));
             return (original * (255 - blend) + normalized * blend) / 255;
         };
         const unsigned tr = channel(r, red), tg = channel(g, green), tb = channel(b, blue);

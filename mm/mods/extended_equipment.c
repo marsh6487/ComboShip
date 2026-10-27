@@ -479,15 +479,28 @@ void ExtEquip_TogglePendantEffect(void) {
 void ExtEquip_GiveItem(s16 equipType, u8 index) {
     if (index == 0 || index > 3 || equipType < 0 || equipType > 3)
         return;
+    // Editing this cell must also update the shared owner, otherwise a later
+    // game switch can resurrect a removed shield or lose an explicit grant.
+    if (equipType == EQUIP_TYPE_SHIELD && index == 3)
+        Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
     Nei_Save()->extEquipOwnedBits |= ExtEquip_GetBit(equipType, index); // Skijer's NEI
 }
 
 void ExtEquip_RemoveItem(s16 equipType, u8 index) {
     if (index == 0 || index > 3 || equipType < 0 || equipType > 3)
         return;
+    if (equipType == EQUIP_TYPE_SHIELD && index == 3)
+        Nei_Save()->shieldOwned &= ~FC_SHIELD_IKANA;
     Nei_Save()->extEquipOwnedBits &= ~ExtEquip_GetBit(equipType, index); // Skijer's NEI
     if (ExtEquip_GetCurrent(equipType) == index) {
         ExtEquip_SetSlot(equipType, 0);
+    } else if (equipType == EQUIP_TYPE_SHIELD && index == 3 && ExtEquip_GetCurrent(equipType) == 0 &&
+               Nei_Save()->vanillaShieldSkin == 0 &&
+               GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == EQUIP_VALUE_SHIELD_MIRROR) {
+        // This native MM value is the same shield. An explicit ownership
+        // removal must release it, or sync will infer the shield again.
+        // Imported OoT Mirror/Deku skins remain independent.
+        Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_NONE);
     }
 }
 
@@ -834,7 +847,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     { dgItemIconCaneOfByrnaTex, dgItemIconFourSwordTex, dgItemIconTridentTex },
     // Shields
     { dgItemIconGoddessShieldTex, dgItemIconKiteShieldTex,
-      COMBO_IKANA_SHIELD_ICON }, // Shield of Ikana (MM mirror shield)
+      COMBO_IKANA_SHIELD_ICON_NATIVE }, // Shield of Ikana; runtime owner is selected below.
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots
@@ -856,6 +869,9 @@ void* ExtEquip_GetIcon(s16 equipType, u8 index) {
         return NULL;
     }
 
+    if (equipType == 1 && index == 3) {
+        return (void*)COMBO_IKANA_SHIELD_ICON;
+    }
     return (void*)sExtEquipIconPaths[equipType][index - 1];
 }
 

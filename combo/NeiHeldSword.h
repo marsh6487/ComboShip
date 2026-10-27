@@ -32,6 +32,8 @@ enum {
     NEI_HELD_SWORD_BIGGORON,
     NEI_HELD_SWORD_GREAT_FAIRY,
     NEI_HELD_SWORD_FOUR,
+    NEI_HELD_SWORD_GIANTS_KNIFE,
+    NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE,
     NEI_HELD_SWORD_COUNT,
 };
 enum {
@@ -108,12 +110,19 @@ static inline bool NeiHeldSword_SelectedResource(const char* owner, const char* 
 // adult one-hand tiers use Master hands, child tiers use Kokiri hands, and child
 // BGS uses the ceremonial Master hand. Keep both LODs/cross-age sources owned.
 static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
+    const bool twoHand = sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY ||
+                         sword == NEI_HELD_SWORD_GIANTS_KNIFE || sword == NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE;
     const char* custom = sword == NEI_HELD_SWORD_MASTER || sword == NEI_HELD_SWORD_TRUE_MASTER
                              ? "__OTR__objects/object_custom_equip/gCustomMasterSwordDL"
-                         : sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY
-                             ? "__OTR__objects/object_custom_equip/gCustomLongswordDL"
-                             : "__OTR__objects/object_custom_equip/gCustomKokiriSwordDL";
+                         : twoHand ? "__OTR__objects/object_custom_equip/gCustomLongswordDL"
+                                   : "__OTR__objects/object_custom_equip/gCustomKokiriSwordDL";
     if (NeiHeldSword_SelectedResource("oot", custom))
+        return true;
+    if (sword == NEI_HELD_SWORD_GIANTS_KNIFE &&
+        NeiHeldSword_SelectedResource("oot", "__OTR__objects/object_custom_equip/gCustomBreakableLongswordDL"))
+        return true;
+    if (sword == NEI_HELD_SWORD_BROKEN_GIANTS_KNIFE &&
+        NeiHeldSword_SelectedResource("oot", "__OTR__objects/object_custom_equip/gCustomBrokenLongswordDL"))
         return true;
     const char* const oot[] = {
         "__OTR__objects/object_link_child/gLinkChildLeftFistAndKokiriSwordNearDL",
@@ -123,14 +132,11 @@ static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
         "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsNearDL",
         "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsFarDL",
     };
-    const int family = sword == NEI_HELD_SWORD_MASTER || sword == NEI_HELD_SWORD_TRUE_MASTER     ? 2
-                       : sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY ? 4
-                                                                                                 : 0;
+    const int family = sword == NEI_HELD_SWORD_MASTER || sword == NEI_HELD_SWORD_TRUE_MASTER ? 2 : twoHand ? 4 : 0;
     for (int i = family; i < family + 2; ++i)
         if (NeiHeldSword_SelectedResource("oot", oot[i]))
             return true;
     if (frame == NEI_HELD_SWORD_OOT_ADULT || frame == NEI_HELD_SWORD_OOT_CHILD) {
-        const bool twoHand = sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY;
 #ifndef NEI_EQUIPMENT_MM
         if (!twoHand) {
             // EquipmentAlwaysVisible can interchange the two one-hand rig

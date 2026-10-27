@@ -1119,6 +1119,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_NEI_DEKU_LEAF:
             ExtInv_GiveItem(SLOT_DEKU_LEAF, ITEM_DEKU_LEAF);
             break;
+        case RI_OOT_NEI_MAGIC_MIRROR:
+            TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
+            break;
         case RI_OOT_NEI_TIME_GATE:
             ExtInv_GiveItem(SLOT_TIME_GATE, ITEM_TIME_GATE);
             break;

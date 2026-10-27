@@ -7,6 +7,7 @@ static inline int ComboPassages_IsRoute(int route) {
     return ComboLostWoods_IsForestRoute(route) || ComboRegionalPassages_IsRoute(route);
 }
 #ifdef __cplusplus
+#include "FountainSnowheadBridge.h"
 #include <cmath>
 #include <initializer_list>
 namespace ComboRegional {
@@ -46,7 +47,7 @@ inline short Yaw(Point direction) {
 inline bool ValidOrigin(const Origin& point, int scene) {
     const int wanted = point.route == COMBO_PORTAL_IKANA       ? 0x53
                        : point.route == COMBO_PORTAL_GREAT_BAY ? 0x57
-                       : point.route == COMBO_PORTAL_SNOWHEAD  ? 0x09
+                       : point.route == COMBO_PORTAL_SNOWHEAD  ? 0x59
                                                                : -1;
     return wanted == scene && wanted >= 0 && point.entrance >= 0 && point.room >= 0 && point.room < 32 &&
            std::isfinite(point.pose.pos.x) && std::isfinite(point.pose.pos.y) && std::isfinite(point.pose.pos.z) &&
@@ -58,6 +59,24 @@ inline bool InMouth(const Pose& mouth, Point point) {
     const auto front = Forward(mouth.yaw);
     const float width = delta.x * front.z - delta.z * front.x, depth = Dot(delta, front);
     return std::fabs(width) < 22 && depth > 0 && depth < 34 && delta.y > -20 && delta.y < 120;
+}
+// Snowhead is an open valley threshold. Test feet against its sloping ground
+// across the whole aperture instead of a cave-height box at a single Y.
+inline bool InSnowheadMouth(const Pose& mouth, Point point) {
+    const auto delta = Sub(point, mouth.pos);
+    const auto front = Forward(mouth.yaw);
+    const float across = delta.x * front.z - delta.z * front.x, depth = Dot(delta, front);
+    float floor;
+    return std::fabs(across) < 90 && depth > 0 && depth < 34 && ComboFountainValley::BodyClearAt(point.x, point.z) &&
+           ComboFountainValley::FloorAt(point.x, point.z, &floor) && point.y >= floor - 5 && point.y < floor + 20;
+}
+inline bool SnowheadReturn(Pose* pose) {
+    const auto p = ComboFountainSnowhead::kReturn;
+    float floor;
+    if (!pose || !ComboFountainValley::BodyClearAt(p.x, p.z) || !ComboFountainValley::FloorAt(p.x, p.z, &floor))
+        return false;
+    *pose = { { p.x, floor, p.z }, ComboFountainSnowhead::kYaw, Forward(ComboFountainSnowhead::kYaw) };
+    return true;
 }
 // All dimensions are world units. Providers must reject dynamic/wet/exit floor,
 // walls from actors and occupied architecture. No scene resource is modified.

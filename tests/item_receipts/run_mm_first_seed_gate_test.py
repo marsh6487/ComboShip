@@ -25,6 +25,22 @@ otr = (ROOT / "soh/soh/OTRGlobals.cpp").read_text()
 menu = subprocess.check_output(["git", "show", args.baseline + ":combo/gui/ComboMenu.cpp"], cwd=ROOT, text=True) \
     if args.baseline else (ROOT / "combo/gui/ComboMenu.cpp").read_text()
 source = (ROOT / "tests/item_receipts/mm_first_seed_gate_test.cpp").read_text()
+# Keep the panel's actual release-highlight helper. These additional ImGui
+# observers cover presentation only; the fixture's disabled/button behavior
+# and the complete production generation/reload gates remain unchanged.
+source = r'''
+#include "gui/WhatsNew.h"
+ImGuiStyle::ImGuiStyle() = default;
+namespace ImGui {
+ImGuiStyle& GetStyle() { static ImGuiStyle style; return style; }
+float GetFrameHeight() { return 20.0f; }
+float GetTextLineHeight() { return 16.0f; }
+ImVec2 CalcTextSize(const char*, const char*, bool, float) { return {}; }
+ImVec2 GetContentRegionAvail() { return { 1000.0f, 1000.0f }; }
+bool IsItemHovered(ImGuiHoveredFlags) { return false; }
+void SetTooltip(const char*, ...) {}
+}
+''' + source
 functions = "\n".join(block_from(otr, otr.index(signature)) for signature in
                        ('extern "C" COMBO_EXPORT uint8_t SOH_IsOnFileSelect',
                         'extern "C" COMBO_EXPORT void SOH_ParkForComboMMResume'))

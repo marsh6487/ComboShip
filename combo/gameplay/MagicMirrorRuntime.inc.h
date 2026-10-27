@@ -1,5 +1,8 @@
 // Included by each native adapter after its real engine headers and MirrorHost
 // boundaries. State is local to that engine; only permanent ownership is shared.
+#ifdef COMBO_MAGIC_MIRROR_MM
+extern "C" s16 sSceneCutsceneCount;
+#endif
 namespace MirrorRuntime {
 constexpr u16 kReceiptText = 0x3FEB, kPromptText = 0x3FEC;
 struct Context {
@@ -22,6 +25,8 @@ static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
 static unsigned sCastTicks = 0;
 static unsigned sDepartureTick = 0;
+static unsigned sAuraTicks = 0;
+static u32 sCastPreservedFlags = 0;
 // Arrival owns no old PlayState/player pointer and survives departure teardown.
 static Context sArrivalContext;
 static bool sArrivalPending = false;
@@ -45,30 +50,44 @@ u16 CurrentText(const PlayState* play) {
     return play->msgCtx.textId;
 #endif
 }
-void ReleasePrompt(bool close) {
+void ReleaseCast();
+void ReleasePrompt(bool close, bool keepCast = false) {
     // Teardown/slot changes can invalidate the old actor. Touch only the same
     // live player, and close only the private message this prompt opened.
     if (sPromptPlay && gPlayState == sPromptPlay && gGameState == &gPlayState->state &&
         GET_PLAYER(gPlayState) == sPromptPlayer) {
         if (close && CurrentText(gPlayState) == kPromptText)
             Message_CloseTextbox(gPlayState);
-        sPromptPlayer->stateFlags1 &= ~sPromptAddedFlags;
+        // Accepted closing transfers the freeze to the already-running cast.
+        // Cancellation releases it here; the cast's native idle handles the rest.
+        if (!keepCast)
+            sPromptPlayer->stateFlags1 &= ~sPromptAddedFlags;
     }
     sPrompt = false;
     sPromptAccepted = false;
     sPromptPlay = nullptr;
     sPromptPlayer = nullptr;
     sPromptAddedFlags = 0;
+    if (!keepCast)
+        ReleaseCast();
 }
 void ReleaseCast() {
-    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state &&
-        GET_PLAYER(gPlayState) == sCastPlayer)
-        MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state) {
+        MirrorHost::ReleaseCastCamera(gPlayState);
+        if (GET_PLAYER(gPlayState) == sCastPlayer && MagicMirrorPlayer_State(sCastPlayer)) {
+            MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+            sCastPlayer->stateFlags1 |= sCastPreservedFlags;
+        }
+    } else {
+        MirrorHost::ForgetCastCamera();
+    }
     sCastPlay = nullptr;
     sCastPlayer = nullptr;
     sDeparted = false;
     sCastTicks = 0;
     sDepartureTick = 0;
+    sAuraTicks = 0;
+    sCastPreservedFlags = 0;
 }
 
 int Scene(const PlayState* play) {
@@ -83,6 +102,9 @@ bool Matches(PlayState* play) {
            sContext.scene == Scene(play) && sContext.mode == gComboGameMode;
 }
 void Reset() {
+    // Native randomizer acceptance may already have consumed sPickupToken.
+    // Revoke its separate pending receipt even if a new scene reuses addresses.
+    MirrorHost::CancelPickup();
     ReleasePrompt(true);
     ReleaseCast();
     sContext = {};
@@ -192,6 +214,9 @@ bool Safe(PlayState* play, bool ownMessage) {
 void HoldPrompt() {
     // Native action changes clear this bit. Reacquire only the bits this
     // prompt now adds, so release still preserves a pre-existing owner.
+    // If an earlier owner released its flag, it must not be resurrected when
+    // this ritual ends. Native action changes may also clear our own freeze.
+    sCastPreservedFlags &= sPromptPlayer->stateFlags1;
     sPromptAddedFlags |= kPromptFreeze & ~sPromptPlayer->stateFlags1;
     sPromptPlayer->stateFlags1 |= kPromptFreeze;
     MagicMirrorPlayer_StopMotion(sPromptPlayer);
@@ -226,8 +251,12 @@ bool Travel(PlayState* play, bool casting = false) {
     if (!MagicMirror_IsOwned() || !Safe(play, casting) || !AllowedScene(play) || !MirrorHost::PackAvailable())
         return false;
 #ifndef COMBO_MAGIC_MIRROR_MM
-    if (Combo_IsCombinedGame())
-        return MirrorHost::RequestHandoff();
+    if (Combo_IsCombinedGame()) {
+        if (!MirrorHost::RequestHandoff())
+            return false;
+        MirrorHost::PlayDepartureCue();
+        return true;
+    }
     play->nextEntranceIndex = COMBO_SOLO_FOREST_OOT_ENTRANCE;
     gSaveContext.cutsceneIndex = 0;
 #else
@@ -241,24 +270,28 @@ bool Travel(PlayState* play, bool casting = false) {
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     play->transitionType = gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     play->transitionTrigger = TRANS_TRIGGER_START;
+    MirrorHost::PlayDepartureCue();
     return true;
 }
 int BeginPickup() {
-    if (sPickupToken || MagicMirror_IsOwned())
+    if (sPickupToken || !MirrorHost::PickupAvailable())
         return 0;
     sSerial = sSerial >= 0x7FFF ? 1 : sSerial + 1;
     sPickupToken = sSerial;
     return sPickupToken;
 }
-void FinishPickup(int token) {
+bool FinishPickup(int token) {
     if (!token || token != sPickupToken || !Matches(gPlayState) || !Mode() ||
         !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum))
-        return;
+        return false;
     sPickupToken = 0;
-    if (!MagicMirror_IsOwned()) {
+    // Native randomizer callbacks own their assigned reward and check flag.
+    // Never turn an arbitrary shuffled stump reward into a second Mirror.
+    if (!MirrorHost::Shuffled() && !MagicMirror_IsOwned()) {
         TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
         MirrorHost::Save();
     }
+    return true;
 }
 bool Locate(PlayState* play) {
     const auto* header = play->colCtx.colHeader;
@@ -419,6 +452,20 @@ void PrepareArrival(PlayState* play) {
     sArrivalSpawn.pos = position;
     sArrivalSpawn.rot.y = yaw;
 #ifdef COMBO_MAGIC_MIRROR_MM
+    // Scene preparation supplied the player's missing unscripted ocarina chain.
+    // Landing changes the packed heading; keep that chain through Player_Init.
+    // Other source spawns retain Landing's native CS_ID_NONE sentinel.
+    if (play->curSpawn == 0 && (sSceneCutsceneCount == 1 || sSceneCutsceneCount == 2) &&
+        (sArrivalOriginal->rot.y & 0x7F) == 0) {
+        const ActorCutscene* ocarina = CutsceneManager_GetCutsceneEntry(0);
+        const ActorCutscene* itemGet = sSceneCutsceneCount == 2 ? CutsceneManager_GetCutsceneEntry(1) : nullptr;
+        const bool completeChain = itemGet && ocarina && ocarina->additionalCsId == 1 &&
+                                   itemGet->csCamId == CS_CAM_ID_GLOBAL_ITEM_GET &&
+                                   itemGet->scriptIndex == CS_SCRIPT_ID_NONE && itemGet->additionalCsId == CS_ID_NONE;
+        if (ocarina && ocarina->csCamId == CS_CAM_ID_GLOBAL_ITEM_OCARINA && ocarina->scriptIndex == CS_SCRIPT_ID_NONE &&
+            (completeChain || (sSceneCutsceneCount == 1 && ocarina->additionalCsId == CS_ID_NONE)))
+            sArrivalSpawn.rot.y &= ~0x7F;
+    }
     sArrivalSpawn.id &= ~0x8000; // Actor_SpawnEntry must decode packed degrees.
     sArrivalSpawn.params = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D);
 #else
@@ -453,55 +500,32 @@ void Update() {
     Bind(play);
     if (!play || !Mode())
         return;
-    if (sCastPlay) {
-        if (play != sCastPlay || GET_PLAYER(play) != sCastPlayer || !MagicMirrorPlayer_State(sCastPlayer) ||
-            ++sCastTicks > 160 ||
-            (!sDeparted && (!MagicMirror_IsOwned() || !Safe(play, true) || play->msgCtx.msgMode != MSGMODE_NONE ||
-                            !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
-            MirrorHost::Trace("cast-cancel", play);
-            ReleaseCast();
-        } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
-            sDeparted = Travel(play, true);
-            if (sDeparted)
-                sDepartureTick = sCastTicks;
-            MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
-            if (!sDeparted) {
-                ReleaseCast();
-                MirrorHost::Error();
-            }
-        }
-        return;
-    }
+    if (sCastPlay && sAuraTicks < 20)
+        ++sAuraTicks; // Bounded growth; scrolling uses the native gameplay clock.
     if (sPrompt) {
         const auto text = CurrentText(play);
         const bool finished = sPromptAccepted && play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0;
         if (play != sPromptPlay || GET_PLAYER(play) != sPromptPlayer || (text != kPromptText && !finished) ||
-            !Safe(play, true) || !MagicMirror_IsOwned()) {
+            !Safe(play, true) || !MagicMirror_IsOwned() || !AllowedScene(play) || !MirrorHost::PackAvailable() ||
+            play != sCastPlay || GET_PLAYER(play) != sCastPlayer || !MagicMirrorPlayer_State(sCastPlayer)) {
             MirrorHost::Trace("prompt-invalidated", play);
             ReleasePrompt(text == kPromptText);
             return;
         }
         HoldPrompt();
+        if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+            MirrorHost::UpdateCastCamera(play, sCastPlayer);
         if (sPromptAccepted) {
             if (!finished)
                 return;
             // Native closing clears text length/ID and restores the HUD. A
             // forced NONE with live text makes native drawing reopen the box.
             ConsumePromptInput(play);
-            ReleasePrompt(false);
-            if (Safe(play, false) && AllowedScene(play) && MirrorHost::PackAvailable()) {
-                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
-                    sCastPlay = play;
-                    sCastPlayer = GET_PLAYER(play);
-                    sCastTicks = 0;
-                    MirrorHost::Trace("cast-started", play);
-                } else {
-                    MirrorHost::Trace("cast-rejected", play);
-                    MirrorHost::Error();
-                }
-            } else {
-                MirrorHost::Trace("cast-ineligible-after-close", play);
-            }
+            ReleasePrompt(false, true);
+            // Keep the existing action, camera and aura phase. Only the bounded
+            // post-confirmation watchdog begins here; the choice may stay open.
+            sCastTicks = 0;
+            MirrorHost::Trace("cast-confirmed", play);
             return;
         }
         if (play->state.input[0].press.button & BTN_B) {
@@ -526,17 +550,42 @@ void Update() {
         }
         return;
     }
-    if (!MagicMirror_IsOwned()) {
+    if (sCastPlay) {
+        if (play != sCastPlay || GET_PLAYER(play) != sCastPlayer || !MagicMirrorPlayer_State(sCastPlayer) ||
+            ++sCastTicks > 160 ||
+            (!sDeparted && (!MagicMirror_IsOwned() || !Safe(play, true) || play->msgCtx.msgMode != MSGMODE_NONE ||
+                            !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
+            MirrorHost::Trace("cast-cancel", play);
+            ReleaseCast();
+        } else {
+            if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+                MirrorHost::UpdateCastCamera(play, sCastPlayer);
+            if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
+                sDeparted = Travel(play, true);
+                if (sDeparted)
+                    sDepartureTick = sCastTicks;
+                MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
+                if (!sDeparted) {
+                    ReleaseCast();
+                    MirrorHost::Error();
+                }
+            }
+        }
+        return;
+    }
+    if (MirrorHost::PickupAvailable()) {
         if (!sPickupToken && Safe(play, false) && Forest(play) && play->roomCtx.curRoom.num == 0 && Locate(play)) {
             const auto& p = GET_PLAYER(play)->actor.world.pos;
             if (MagicMirrorAnchor::CanClaim({ p.x, p.y, p.z }, sAnchor) && OnStumpCap(play, GET_PLAYER(play))) {
                 const int token = BeginPickup();
                 if (token && !MirrorHost::QueuePickup(token))
                     sPickupToken = 0;
+                return;
             }
         }
-        return;
     }
+    if (!MagicMirror_IsOwned())
+        return;
     const u16 pressed = PressedButton(play);
     if (!pressed)
         return;
@@ -544,27 +593,44 @@ void Update() {
         MirrorHost::Error();
         return;
     }
+    // Begin before the textbox so the native motion and immediate ritual share
+    // its whole lifetime. Held equipment still follows native put-away first.
+    play->state.input[0].press.button &= ~pressed;
+    const u32 preservedFlags = GET_PLAYER(play)->stateFlags1 & kPromptFreeze;
+    if (!MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
+        MirrorHost::Trace("cast-rejected", play);
+        MirrorHost::Error();
+        return;
+    }
+    sCastPlay = play;
+    sCastPlayer = GET_PLAYER(play);
+    sCastPreservedFlags = preservedFlags;
+    sCastTicks = sDepartureTick = 0;
+    sAuraTicks = 1;
+    sDeparted = false;
+    if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+        MirrorHost::UpdateCastCamera(play, sCastPlayer);
     sPrompt = true;
     sPromptPlay = play;
     sPromptPlayer = GET_PLAYER(play);
     HoldPrompt();
-    play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
+    MirrorHost::PlayActivationChime();
     MirrorHost::Trace("prompt-open", play);
 }
 void DrawWorld() {
     auto* play = gPlayState;
     if (play && Mode() && Matches(play) && play == sCastPlay && GET_PLAYER(play) == sCastPlayer &&
-        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING) {
+        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PUT_AWAY) {
         // Keep Farore's exact motion. The established Time Gate seal/wisps
         // build around the actor, then dissolve during departure; no GI model.
-        const float rise = std::clamp(sCastPlayer->skelAnime.curFrame / 20.0f, 0.0f, 1.0f);
+        const float rise = sAuraTicks / 20.0f;
         const float fade = sDeparted ? std::clamp(1.0f - (sCastTicks - sDepartureTick) / 12.0f, 0.0f, 1.0f) : 1.0f;
         if (rise > 0 && fade > 0)
             MirrorHost::DrawCastAura(play, sCastPlayer, 0.15f + 0.85f * rise, 255.0f * rise * fade);
     }
-    if (!play || !Mode() || !Forest(play) || play->roomCtx.curRoom.num != 0 || MagicMirror_IsOwned() || sPickupToken ||
-        !Locate(play))
+    if (!play || !Mode() || !Forest(play) || play->roomCtx.curRoom.num != 0 || !MirrorHost::PickupAvailable() ||
+        sPickupToken || !Locate(play))
         return;
     Matrix_Push();
     Matrix_Translate(sAnchor.x, sAnchor.y + 42 + std::sin(play->gameplayFrames * 0.05f) * 3, sAnchor.z, MTXMODE_NEW);
@@ -573,8 +639,7 @@ void DrawWorld() {
 #else
     Matrix_RotateY(play->gameplayFrames * 0.025f, MTXMODE_APPLY);
 #endif
-    ComboMagicMirrorVisual::Draw(play);
-    MirrorHost::DrawWorldShimmer(play);
+    MirrorHost::DrawWorldPickup(play);
     Matrix_Pop();
 }
 } // namespace MirrorRuntime

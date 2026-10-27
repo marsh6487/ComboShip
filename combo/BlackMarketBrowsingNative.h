@@ -1,6 +1,5 @@
 // Included inside each native controller's private namespace after Purchase().
-// Both engines use this bounded manual FREE0/Unique6 adapter and spatial
-// navigation state; native shop actors/cutscene tables do not own the market.
+// The existing offer/receipt policy is an adapter to native host camera flows.
 BlackMarketBrowsing::State sBrowser;
 s16 sBrowseCamera = -1, sBrowseParent = -1;
 s16 sBrowseCameraUid = -1;
@@ -8,6 +7,7 @@ Camera* sBrowseCameraPtr = nullptr;
 bool sBrowsePlayerWasHidden = false;
 bool sBrowseTextboxSaved = false;
 std::array<s16, 6> sBrowseTextboxLayout{};
+#include "BlackMarketShopCameraNative.h"
 void PlayBrowseCursorSound() {
 #ifdef BLACK_MARKET_BROWSING_OOT
     Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
@@ -22,7 +22,8 @@ bool BrowsingMessage(PlayState* play) {
 #else
     const auto text = play->msgCtx.currentTextId;
 #endif
-    return text == kWelcomeText || text == kBrowseText || text == kConfirmText || text == kResultText;
+    return text == kWelcomeText || text == kBrowseText || text == kConfirmText || text == kResultText ||
+           text == kKeeperTalkText || text == kKeeperHelpChoiceText || text == kKeeperHelpText;
 }
 
 void ContinueBrowsingText(PlayState* play, u16 text) {
@@ -37,68 +38,39 @@ void ContinueBrowsingText(PlayState* play, u16 text) {
     const std::array<s16, 6> current{ message.textboxY,    message.textboxYTarget, message.unk11FFE[0],
                                       message.unk11FFE[1], message.unk11FFE[2],    0 };
 #endif
-    if (text != kWelcomeText && !sBrowseTextboxSaved) {
+    const bool keeperText =
+        text == kWelcomeText || text == kKeeperTalkText || text == kKeeperHelpChoiceText || text == kKeeperHelpText;
+    if (!keeperText && !sBrowseTextboxSaved) {
         sBrowseTextboxLayout = current;
         sBrowseTextboxSaved = true;
     }
     Message_ContinueTextbox(play, text);
-    if (text == kWelcomeText && !sBrowseTextboxSaved)
+    if (keeperText && !sBrowseTextboxSaved)
         return;
 #ifdef BLACK_MARKET_BROWSING_OOT
-    const auto layout =
-        text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 201, 162, 174, 186 };
+    const auto layout = keeperText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 201, 162, 174, 186 };
     R_TEXTBOX_Y = layout[0];
     R_TEXTBOX_Y_TARGET = layout[1];
     R_TEXTBOX_END_YPOS = layout[2];
     for (int row = 0; row < 3; ++row)
         R_TEXT_CHOICE_YPOS(row) = layout[3 + row];
 #else
-    const auto layout = text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 162, 174, 186, 0 };
+    const auto layout = keeperText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 162, 174, 186, 0 };
     message.textboxY = layout[0];
     message.textboxYTarget = layout[1];
     for (int row = 0; row < 3; ++row)
         message.unk11FFE[row] = layout[2 + row];
 #endif
-    if (text == kWelcomeText)
+    if (keeperText)
         sBrowseTextboxSaved = false;
 }
 
 void EndBrowsing(PlayState* play, bool destroying = false) {
-    if (!destroying && play && sBrowseCamera >= CAM_ID_SUB_FIRST) {
-        if (play->cameraPtrs[sBrowseCamera] == sBrowseCameraPtr && sBrowseCameraPtr->uid == sBrowseCameraUid) {
-#ifdef BLACK_MARKET_BROWSING_OOT
-            // Native one-point cameras can name the shop as their parent.
-            // Splice their live queue links before freeing the owned slot.
-            const auto child = sBrowseCameraPtr->childCamIdx;
-            const auto survivingChild =
-                child >= CAM_ID_SUB_FIRST && child < NUM_CAMS && child != sBrowseCamera && play->cameraPtrs[child]
-                    ? child
-                    : SUBCAM_FREE;
-            for (auto* camera : play->cameraPtrs) {
-                if (!camera || camera == sBrowseCameraPtr)
-                    continue;
-                if (camera->parentCamIdx == sBrowseCamera)
-                    camera->parentCamIdx = sBrowseParent;
-                if (camera->childCamIdx == sBrowseCamera)
-                    camera->childCamIdx = survivingChild;
-            }
-            if (survivingChild >= CAM_ID_SUB_FIRST && play->cameraPtrs[sBrowseParent] &&
-                play->cameraPtrs[sBrowseParent]->childCamIdx == SUBCAM_FREE)
-                play->cameraPtrs[sBrowseParent]->childCamIdx = survivingChild;
-#else
-            const auto cs = CutsceneManager_GetCurrentCsId();
-            if (cs != CS_ID_NONE && Play_GetActiveCamId(play) != sBrowseCamera &&
-                CutsceneManager_GetCurrentSubCamId(cs) == Play_GetActiveCamId(play))
-                CutsceneManager_SetReturnCamera(sBrowseParent);
-#endif
-            if (Play_GetActiveCamId(play) == sBrowseCamera && sBrowseParent >= 0 && play->cameraPtrs[sBrowseParent])
-                Play_ChangeCameraStatus(play, sBrowseParent, 7); // native ACTIVE in both engines
-            Play_ClearCamera(play, sBrowseCamera);
-        }
+    const bool wasTalking = sTalking;
+    EndNativeBrowsingCamera(play, destroying);
+    if (wasTalking && !destroying && play)
         if (auto* player = GET_PLAYER(play); player && !sBrowsePlayerWasHidden)
-            player->stateFlags2 &= ~(1u << 29); // native shop player-hide bit
-    }
-    // MM's destroy hook runs after actor arena cleanup; never touch its player.
+            player->stateFlags2 &= ~(1u << 29);
     sBrowseCamera = sBrowseParent = sBrowseCameraUid = -1;
     sBrowseCameraPtr = nullptr;
     sBrowseTextboxSaved = false;
@@ -111,30 +83,13 @@ bool BeginBrowsing(PlayState* play) {
     sBrowseParent = Play_GetActiveCamId(play);
     if (sBrowseParent != CAM_ID_MAIN || !GET_PLAYER(play))
         return false;
-#ifdef BLACK_MARKET_BROWSING_OOT
-    if (play->cameraPtrs[sBrowseParent]->childCamIdx >= CAM_ID_SUB_FIRST)
-        return false;
-#endif
-    sBrowseCamera = Play_CreateSubCamera(play);
-    if (sBrowseCamera < CAM_ID_SUB_FIRST)
-        return false;
-    sBrowseCameraPtr = Play_GetCamera(play, sBrowseCamera);
-    sBrowseCameraUid = sBrowseCameraPtr->uid;
-#ifdef BLACK_MARKET_BROWSING_OOT
-    sBrowseCameraPtr->parentCamIdx = sBrowseParent;
-    sBrowseCameraPtr->childCamIdx = SUBCAM_FREE;
-    // A manual shop view is outside the native one-point cutscene queue.
-    // Linking it as main's child would make later parent=MAIN cutscenes wait.
-    Play_CameraChangeSetting(play, sBrowseCamera, CAM_SET_FREE0);
-#else
-    Play_ChangeCameraSetting(play, sBrowseCamera, CAM_SET_FREE0);
-#endif
     sBrowser = {};
     sSelected = -1;
+    if (!BeginNativeBrowsingCamera(play))
+        return false;
     auto* player = GET_PLAYER(play);
     sBrowsePlayerWasHidden = (player->stateFlags2 & (1u << 29)) != 0;
     player->stateFlags2 |= 1u << 29;
-    Play_ChangeCameraStatus(play, sBrowseParent, 1); // native WAIT
     sTalking = true;
     UpdateBrowsingCamera(play);
     return true;
@@ -143,16 +98,7 @@ void UpdateBrowsingCamera(PlayState* play) {
     if (!sTalking)
         return;
     sBrowser.TickCamera();
-    auto& view = sBrowser.view;
-    Vec3f at{ view.at.x, view.at.y, view.at.z }, eye{ view.eye.x, view.eye.y, view.eye.z };
-#ifdef BLACK_MARKET_BROWSING_OOT
-    Play_CameraSetAtEye(play, sBrowseCamera, &at, &eye);
-    Play_CameraSetFov(play, sBrowseCamera, view.fov);
-#else
-    Play_SetCameraAtEye(play, sBrowseCamera, &at, &eye);
-    Play_SetCameraFov(play, sBrowseCamera, view.fov);
-#endif
-    Play_ChangeCameraStatus(play, sBrowseCamera, 7);
+    TickNativeBrowsingCamera(play);
 }
 void MonitorBrowsing() {
     if (!sTalking)
@@ -162,10 +108,9 @@ void MonitorBrowsing() {
         EndBrowsing(nullptr, true);
         return;
     }
-    if (!Active() || Play_GetActiveCamId(play) != sBrowseCamera ||
-        play->cameraPtrs[sBrowseCamera] != sBrowseCameraPtr || sBrowseCameraPtr->uid != sBrowseCameraUid ||
-        !BrowsingMessage(play) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-        play->transitionMode != TRANS_MODE_OFF || play->gameOverCtx.state != GAMEOVER_INACTIVE) {
+    if (!Active() || !OwnNativeBrowsingCamera(play) || !BrowsingMessage(play) ||
+        play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
+        play->gameOverCtx.state != GAMEOVER_INACTIVE) {
         if (BrowsingMessage(play))
             Message_CloseTextbox(play);
         EndBrowsing(play);
@@ -186,7 +131,11 @@ void BrowseInput(PlayState* play) {
     UpdateBrowsingCamera(play);
     auto& input = play->state.input[0];
     if (input.press.button & BTN_B) {
-        if (sBrowser.phase != Phase::Browse) {
+        if (sBrowser.phase == Phase::KeeperTalk || sBrowser.phase == Phase::KeeperHelpChoice ||
+            sBrowser.phase == Phase::KeeperHelp) {
+            sBrowser.phase = Phase::Browse;
+            ContinueBrowsingText(play, kWelcomeText);
+        } else if (sBrowser.phase != Phase::Browse) {
             sBrowser.phase = Phase::Browse;
             ContinueBrowsingText(play, kBrowseText);
         } else if (sSelected >= 0) {
@@ -204,7 +153,27 @@ void BrowseInput(PlayState* play) {
     // Native EnOssan has separate look-to-shelf/look-to-keeper states. Do not
     // consume navigation or A/Buy while the camera is still turning; B remains
     // available above so an interrupted browse can always be cancelled.
-    if (!sBrowser.CameraSettled()) {
+    if (!NativeBrowsingCameraSettled(play)) {
+        sBrowser.ResetInput();
+        return;
+    }
+    if (sBrowser.phase == Phase::KeeperTalk || sBrowser.phase == Phase::KeeperHelpChoice ||
+        sBrowser.phase == Phase::KeeperHelp) {
+        if (!(input.press.button & BTN_A) || !Message_ShouldAdvance(play))
+            return;
+        if (sBrowser.phase == Phase::KeeperHelpChoice && state == TEXT_STATE_CHOICE) {
+            if (play->msgCtx.choiceIndex == 0) {
+                sBrowser.phase = Phase::KeeperHelp;
+                ContinueBrowsingText(play, kKeeperHelpText);
+            } else {
+                sBrowser.phase = Phase::Browse;
+                ContinueBrowsingText(play, kWelcomeText);
+            }
+        } else if (state == TEXT_STATE_EVENT || state == TEXT_STATE_DONE) {
+            const bool intro = sBrowser.phase == Phase::KeeperTalk;
+            sBrowser.phase = intro ? Phase::KeeperHelpChoice : Phase::Browse;
+            ContinueBrowsingText(play, intro ? kKeeperHelpChoiceText : kWelcomeText);
+        }
         sBrowser.ResetInput();
         return;
     }
@@ -212,7 +181,7 @@ void BrowseInput(PlayState* play) {
         if (state == TEXT_STATE_CHOICE && (input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
             if (play->msgCtx.choiceIndex == 0) {
                 if (Purchase()) {
-                    // Release the manual camera and native shop-hide bit before
+                    // Release the native shop view and shop-hide bit before
                     // the engine starts its own get-item camera and receipt.
                     Message_CloseTextbox(play);
                     EndBrowsing(play);
@@ -258,10 +227,8 @@ void BrowseInput(PlayState* play) {
         ContinueBrowsingText(play, sSelected < 0 ? kWelcomeText : kBrowseText);
     } else if ((input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
         if (sSelected < 0) {
-            if (sBrowser.Move(1, 0))
-                PlayBrowseCursorSound();
-            sSelected = sBrowser.slot;
-            ContinueBrowsingText(play, kBrowseText);
+            sBrowser.phase = Phase::KeeperTalk;
+            ContinueBrowsingText(play, kKeeperTalkText);
         } else {
             sBrowser.phase = Phase::Confirm;
             ContinueBrowsingText(play, kConfirmText);
@@ -272,7 +239,7 @@ void BrowseInput(PlayState* play) {
 void DrawBrowseCursor() {
     auto* play = gPlayState;
     if (!sTalking || !Active() || sSelected < 0 || Play_GetActiveCamId(play) != sBrowseCamera ||
-        sBrowser.phase != BlackMarketBrowsing::Phase::Browse || !sBrowser.CameraSettled())
+        sBrowser.phase != BlackMarketBrowsing::Phase::Browse || !NativeBrowsingCameraSettled(play))
         return;
     Actor display{};
     // Both native Actor_GetScreenPos implementations project focus.pos, as

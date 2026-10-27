@@ -142,11 +142,26 @@ int main() {
   Fixture::greenOnly = true;
   for (bool textures : {false, true}) {
       Fixture::textures = textures;
+      Fixture::materials.clear();
       MirrorCastAura(&play, &player, 1, 255);
       restored();
       assert(Fixture::draws.back().position.y == 201);
+      assert(Fixture::materials.size() == 2);
+      assert(std::string(Fixture::materials[0].path) == "__OTR__objects/magic_mirror/forest_seal");
+      assert(!Fixture::materials[0].repeatS && !Fixture::materials[0].repeatT);
+      assert(std::string(Fixture::materials[1].path) == "__OTR__objects/magic_mirror/forest_wisp");
+      assert(Fixture::materials[1].repeatS && !Fixture::materials[1].repeatT);
   }
   assert(Fixture::greenVertices > 0);
+  Fixture::materials.clear();
+  Fixture::greenOnly = false;
+  NeiUsedMagic_DrawPortal(&play, &player, 1, 255);
+  assert(Fixture::materials.size() == 1 &&
+         std::string(Fixture::materials[0].path) == "__OTR__objects/nei_used_magic/fire_wisp");
+  Fixture::materials.clear();
+  MirrorCastAura(&play, &player, 0, 255);
+  MirrorCastAura(&play, &player, 1, 0);
+  assert(Fixture::materials.empty());
   Fixture::greenOnly = Fixture::textures = false;
   const auto valid = Fixture::draws.size();
   NeiUsedMagic_DrawProjectile(nullptr, 2, &trail[0], &velocity, 2, 0);

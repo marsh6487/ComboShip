@@ -103,10 +103,9 @@ def main():
 
     # Real item registrations supply localized names/articles and hint keys.
     rows = []
-    for line in (rando / "item_list.cpp").read_text().splitlines():
-        if line.lstrip().startswith("//") or not re.search(r"itemTable\[RG_\w+\]\s*=\s*Item\(", line):
-            continue
-        fields = arguments(line)
+    registrations = (rando / "item_list.cpp").read_text()
+    for match in re.finditer(r"^\s*itemTable\[RG_\w+\]\s*=\s*Item\(", registrations, re.M):
+        fields = arguments(registrations[match.start():])
         if fields[6] != "RHT_NONE":
             continue
         article = fields[15] if len(fields) > 15 else (fields[8] if 8 < len(fields) < 15 else "{}")

@@ -9,10 +9,34 @@
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <spdlog/spdlog.h>
 
 namespace BlackMarketGranny {
 inline constexpr char kErrorCvar[] = "gCombo.BlackMarket.GrannyLoadError";
 
+inline Vertices NativeVaporVertices(const std::shared_ptr<Ship::IResource>& resource) {
+    if (!resource || !resource->GetInitData())
+        return {};
+    const auto type = resource->GetInitData()->Type;
+    // Original OoT vertices are OARR/Vertex, newer archives may use OVTX.
+    // Consume only the pinned owner's public byte interface: game-specific
+    // Array RTTI must not cross the OoT/MM DLL boundary. Copy for validation;
+    // rendering still uses the unchanged native vertex hash in the private view.
+    if ((type != 0x4f415252 && type != 0x4f565458) || resource->GetPointerSize() != 56 * sizeof(Vtx))
+        return {};
+    const auto* bytes = resource->GetRawPointer();
+    if (!bytes)
+        return {};
+    auto vertices = std::make_shared<std::vector<Vtx>>(56);
+    std::memcpy(vertices->data(), bytes, 56 * sizeof(Vtx));
+    return { vertices->data(), vertices->size(), vertices };
+}
+
+inline bool MapsDependenciesAvailable(const std::shared_ptr<Ship::ResourceManager>& maps) {
+    const auto archive = maps ? maps->GetArchiveManager() : nullptr;
+    return archive && archive->HasFile(Exact(kOpaque)) && archive->HasFile(Exact(kCounterVertices)) &&
+           archive->HasFile("alt/scenes/shared/mahouya_scene/sh_maho_book_01__UDIM_");
+}
 inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner() {
     const auto context = Ship::Context::GetRawInstance();
     if (!context)
@@ -20,12 +44,12 @@ inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner(
     const auto active = context->GetResourceManager();
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
-        if (rm && rm == active && rm->GetArchiveManager()->HasFile(Exact(kOpaque)))
+        if (rm == active && MapsDependenciesAvailable(rm))
             return { name, rm };
     }
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
-        if (rm && rm->GetArchiveManager()->HasFile(Exact(kOpaque)))
+        if (MapsDependenciesAvailable(rm))
             return { name, rm };
     }
     return {};
@@ -34,21 +58,33 @@ inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner(
 inline std::pair<std::shared_ptr<Ship::ResourceManager>, std::shared_ptr<Ship::Archive>> NativeOwner() {
     // MM-only already mounts the user's optional oot.o2r companion. Its native
     // scene parser differs, so use only common render factories and raw metadata.
+    const auto complete = [](const std::shared_ptr<Ship::Archive>& archive) {
+        return archive && archive->HasFile(kScene) && archive->HasFile(kRoom) && archive->HasFile(kTranslucent);
+    };
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
         if (!rm)
             continue;
-        auto archive = rm->GetArchiveManager()->GetArchiveFromFile(kScene);
-        if (archive && archive->HasFile(kScene) && archive->HasFile(kRoom) && archive->HasFile(kTranslucent))
+        const auto manager = rm->GetArchiveManager();
+        if (!manager)
+            continue;
+        auto archive = manager->GetArchiveFromFile(kScene);
+        if (complete(archive))
             return { rm, archive };
+        // A scene-only mod can own the winning header while the complete base
+        // archive remains mounted. Pin one complete donor, never a mixed graph.
+        const auto archives = manager->GetArchives();
+        if (archives)
+            for (auto it = archives->rbegin(); it != archives->rend(); ++it)
+                if (complete(*it))
+                    return { rm, *it };
     }
     return {};
 }
 inline bool DependenciesAvailable() {
     const auto [game, maps] = MapsOwner();
     const auto [native, archive] = NativeOwner();
-    return maps && native && maps->GetArchiveManager()->HasFile(Exact(kCounterVertices)) &&
-           maps->GetArchiveManager()->HasFile("alt/scenes/shared/mahouya_scene/sh_maho_book_01__UDIM_");
+    return maps && native;
 }
 
 // The native actor has a different ID and switch-bit encoding in MM.
@@ -59,15 +95,19 @@ inline int16_t MmFlameParams(int16_t oot) {
 class Resources {
   public:
     bool Prepare(const char* host) {
-        if (!DependenciesAvailable())
-            return Error("Install Djipi 3DE scene maps and 3DS textures; OoT resources are required.");
-        if (mRoom) {
-            CVarSetString(kErrorCvar, "");
-            return true;
-        }
         try {
             auto [game, maps] = MapsOwner();
+            if (!maps)
+                return Error(
+                    "Djipi Granny room, counter vertices or 3DS textures are unavailable in a registered game.");
             const auto [native, archive] = NativeOwner();
+            if (!native)
+                return Error(
+                    "A complete original OoT Granny scene, room and translucent-resource archive is unavailable.");
+            if (mRoom) {
+                CVarSetString(kErrorCvar, "");
+                return true;
+            }
             Provider provider;
             provider.game = game;
             provider.display = [maps](const std::string& path) -> Display {
@@ -82,7 +122,7 @@ class Resources {
                 return std::dynamic_pointer_cast<Fast::Texture>(maps->LoadResource(path, true));
             };
             auto room = std::make_unique<Room>();
-            if (!room->Load(provider))
+            if (!room->Load(provider, true))
                 return Error(room->Error());
             auto view = native->CreateResourceView(archive);
             if (!view)
@@ -98,7 +138,16 @@ class Resources {
             mRoute = std::string("granny_") + host;
             mShelfPaths = { "__OTR__@" + game + ":" + BlackMarketShelves::kWoodTexture,
                             "__OTR__@" + game + ":" + BlackMarketShelves::kAtlasTexture };
+            auto vapor = std::make_unique<Vapor>();
+            auto vaporLeaf = std::dynamic_pointer_cast<Fast::DisplayList>(view->LoadResource(kVaporLeaf, true));
+            auto vaporVertices = NativeVaporVertices(view->LoadResource(kVaporVertices, true));
+            if (!vaporLeaf || !vaporVertices.data ||
+                !vapor->Load({ xlu->Instructions.data(), xlu->Instructions.size(), xlu },
+                             { vaporLeaf->Instructions.data(), vaporLeaf->Instructions.size(), vaporLeaf },
+                             vaporVertices))
+                return Error("Unsupported original Granny vapor layout.");
             mRoom = std::move(room);
+            mVapor = std::move(vapor);
             mXlu = std::move(xlu);
             mLights = std::move(metadata.lights);
             mDecorations = std::move(metadata.decorations);
@@ -113,7 +162,7 @@ class Resources {
         return mRoom ? mRoom->Opaque() : nullptr;
     }
     Gfx* Translucent() const {
-        return mXlu ? mXlu->Instructions.data() : nullptr;
+        return mVapor ? mVapor->Root() : nullptr;
     }
     const char* Route() const {
         return mRoute.c_str();
@@ -136,6 +185,7 @@ class Resources {
         mClearing = true;
         auto view = std::move(mNativeView);
         mRoom.reset();
+        mVapor.reset();
         mXlu.reset();
         mLights.clear();
         mDecorations.clear();
@@ -148,6 +198,7 @@ class Resources {
 
   private:
     std::unique_ptr<Room> mRoom;
+    std::unique_ptr<Vapor> mVapor;
     std::shared_ptr<Fast::DisplayList> mXlu;
     std::shared_ptr<Ship::ResourceManager> mNativeView;
     std::string mRoute;
@@ -156,6 +207,7 @@ class Resources {
     std::vector<std::array<uint8_t, 22>> mLights;
     std::vector<Decoration> mDecorations;
     static bool Error(const std::string& message) {
+        SPDLOG_WARN("BlackMarketGranny: {}", message);
         CVarSetString(kErrorCvar, message.c_str());
         return false;
     }

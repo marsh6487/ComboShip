@@ -634,8 +634,18 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
             // the renderer tint to the canopy so those trees change as well.
             // Lift the dark actor canopies into readable blossom pink without
             // retaining a green blend; opaque bark and native impact leaves stay native.
-            gDPSetGrayscaleColor(POLY_XLU_DISP++, spring ? 246 : red, spring ? 193 : green, spring ? 217 : blue, 255);
-            gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
+            gDPSetGrayscaleColor(POLY_XLU_DISP++,
+                                 spring  ? 246
+                                 : frost ? 226
+                                         : 239,
+                                 spring  ? 193
+                                 : frost ? 238
+                                         : 72,
+                                 spring  ? 217
+                                 : frost ? 233
+                                         : 76,
+                                 255);
+            gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 2);
         }
         gSPDisplayList(POLY_XLU_DISP++, D_808C4D70[this->drawType & 0xF]);
         if (spring || autumn || frost) {

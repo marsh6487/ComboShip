@@ -74,6 +74,12 @@ def main():
                                 "tests/elemental_swords/biggoron_builtin_render.c",
                                 f"{host}/src/code/din_fire_sword.c", "-lm", "-o", builtin], cwd=ROOT, check=True)
                 subprocess.run([builtin], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+                if host == "soh":
+                    knife = str(binary) + "-knife"
+                    subprocess.run([os.environ.get("CC", "cc"), *selected,
+                                    "tests/elemental_swords/knife_builtin_render.c",
+                                    "soh/src/code/din_fire_sword.c", "-lm", "-o", knife], cwd=ROOT, check=True)
+                    subprocess.run([knife], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
                 subprocess.run([os.environ.get("CC", "cc"), *selected, "-fsyntax-only",
                                 f"{host}/src/code/z_player_lib.c"], cwd=ROOT, check=True)
                 print("PASS Biggoron", host, "Combo" if combined else "solo")

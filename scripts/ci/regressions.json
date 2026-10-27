@@ -2,8 +2,26 @@
   {
     "suite": "world",
     "origin": "gate",
+    "name": "Native silver-rupee hooks preserve unregistered scene actors",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/silver_rupee/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Native Ikana GI priority, resource availability and pause icon routing",
+    "run": "python3 -B tests/ikana_gi/run_native_priority_tests.py\npython3 -B tests/ikana_gi/run_native_availability_tests.py\npython3 -B tests/oot_equipment_pause/run_ikana_icon_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
     "name": "Fast shared Granny UI and engine header regression",
     "run": "python3 -B tests/black_market/run_granny_header_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native forest ocarina cameras in combined and both solo modes",
+    "run": "python3 -B tests/forest_ocarina/run_tests.py"
   },
   {
     "suite": "world",
@@ -22,6 +40,18 @@
     "origin": "gate",
     "name": "Fast headless module loader diagnostics",
     "run": "python3 -B tests/solo_games/headless_module_load_test.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Native OoT Magic Mirror pickup message completion",
+    "run": "python3 -B tests/magic_mirror/run_receipt_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native OoT Black Market button glyph colors",
+    "run": "python3 -B tests/black_market/run_oot_button_glyph_tests.py"
   },
   {
     "suite": "items",
@@ -118,6 +148,15 @@
   },
   {
     "suite": "render",
+    "origin": "nei",
+    "name": "Drop-in regional material packs and native texture metadata",
+    "run": "python3 -B tests/regional_passages/run_material_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
     "origin": "gate",
     "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
     "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py"
@@ -139,6 +178,15 @@
     "origin": "nei",
     "name": "Native regional passage geometry, actor entry and cross-game handoff",
     "run": "python3 -B tests/regional_passages/run_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "entrances",
+    "origin": "nei",
+    "name": "Shared native and alternate Fountain valley geometry and resource lifecycle",
+    "run": "python3 -B tests/regional_passages/run_valley_tests.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
@@ -214,6 +262,12 @@
     "origin": "nei",
     "name": "scripts/diagnostics/run_forest_actor_tests.py",
     "run": "python3 -B scripts/diagnostics/run_forest_actor_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Regional Stalchild, Mikau and Darmani presentations and placement lifecycle",
+    "run": "python3 -B tests/regional_actors/run_tests.py"
   },
   {
     "suite": "world",
@@ -332,6 +386,18 @@
   {
     "suite": "world",
     "origin": "nei",
+    "name": "Native Black Market shop actor, scenes and dialogue formatting",
+    "run": "python3 -B tests/black_market/oot_shop_camera_parity_tests.py\npython3 -B tests/black_market/run_counter_barrier_native_tests.py\npython3 -B tests/black_market/test_mm_shop_presentation.py\npython3 -B tests/black_market/native_mm_shop_adapter_tests.py\npython3 -B tests/black_market/native_mm_scene_runtime_tests.py\npython3 -B tests/black_market/test_mm_native_shop_scene.py\npython3 -B tests/black_market/run_keeper_dialogue_oot_formatter_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Black Market optional room assets and native draw ownership",
+    "run": "python3 -B tests/black_market/test_room_magic_assets.py\npython3 -B tests/black_market/run_room_magic_tests.py\npython3 -B tests/black_market/run_room_magic_loader_tests.py\npython3 -B tests/black_market/run_room_magic_draw_exit_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
     "name": "tests/black_market/run_shelves_native_tests.py",
     "run": "python3 -B tests/black_market/run_shelves_native_tests.py"
   },
@@ -370,6 +436,18 @@
     "origin": "nei",
     "name": "tests/woods_mystery/run_active_pack_test.py",
     "run": "python3 -B tests/woods_mystery/run_active_pack_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "tests/woods_mystery/run_wall_material_test.py",
+    "run": "python3 -B tests/woods_mystery/run_wall_material_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "tests/woods_mystery/run_shimmer_placement_test.py",
+    "run": "python3 -B tests/woods_mystery/run_shimmer_placement_test.py"
   },
   {
     "suite": "world",
@@ -1047,6 +1125,12 @@
     "run": "python3 -B tests/mm_pause_inventory/run_tests.py --sanitize"
   },
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "OoT inventory-page arrow focus and item identity",
+    "run": "python3 -B tests/oot_pause_inventory/run_tests.py --sanitize"
+  },
+  {
     "suite": "render",
     "origin": "nei",
     "name": "tests/pause_tutorials/run_tests.py",
@@ -1062,7 +1146,7 @@
     "suite": "render",
     "origin": "nei",
     "name": "tests/combo_button_transfer/run_tests.py --sanitize",
-    "run": "python3 -B tests/combo_button_transfer/run_tests.py --sanitize"
+    "run": "python3 -B tests/combo_button_transfer/run_tests.py --sanitize\npython3 -B tests/combo_button_transfer/run_age_tests.py"
   },
   {
     "suite": "equipment",
@@ -1284,7 +1368,7 @@
     "suite": "equipment",
     "origin": "gate",
     "name": "2Ship back equipment and OoT sky compatibility",
-    "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py"
+    "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py\npython3 -B tests/adult_mm_flex/run_tests.py"
   },
   {
     "suite": "equipment",
@@ -1297,5 +1381,143 @@
     "origin": "gate",
     "name": "Young Epona riding and independent Epona cosmetics",
     "run": "python3 scripts/diagnostics/run_young_epona_tests.py\npython3 scripts/diagnostics/run_young_epona_actor_tests.py\npython3 scripts/diagnostics/run_young_epona_player_tests.py\npython3 scripts/diagnostics/run_young_epona_save_tests.py\npython3 scripts/diagnostics/test_young_epona_assets.py\npython3 scripts/diagnostics/run_epona_mask_tests.py\npython3 scripts/diagnostics/run_epona_cosmetics_tests.py\npython3 scripts/diagnostics/run_mm_epona_cosmetics_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Shield of Ikana current editor ownership and private icon routing",
+    "run": "python3 -B tests/ikana_editor_icon/run_ui_tests.py\npython3 -B tests/ikana_editor_icon/run_ownership_tests.py\npython3 -B tests/ikana_editor_icon/run_native_syntax_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Black Market native closed doors and quiet fairy interactions",
+    "run": "python3 -B tests/black_market/run_door_collision_native_tests.py\npython3 -B tests/black_market/run_fairy_quiet_native_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Granny vapor accepts real native Array and Vertex resource owners",
+    "run": "python3 -B tests/black_market/run_granny_vapor_resource_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "MM Black Market material context traces are bounded and observation only",
+    "run": "python3 -B tests/black_market/run_room_material_trace_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Seasonal water ownership, quiet Winter emergence and native well targets",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_shop/native_regressions.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_water/lifetime_test.py soh/mods/season_scene.cpp --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Cross-scene material binding reuse preserves fallback and cache identity",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/caustic_binding/native_regressions.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Mirror button deduplication and single native cast chime",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/magic_mirror_followups/run.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Opt-in authored collectible shimmer and owner cosmetic palettes",
+    "run": "python3 -B tests/collectible_shimmer/native_regressions.py\npython3 -B tests/collectible_shimmer/renderer_regressions.py\npython3 -B tests/collectible_shimmer/draw_regressions.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Termina native floor packets and additive seasonal coverage",
+    "run": "ASAN_OPTIONS=detect_leaks=0 MM_FOLIAGE_TEST_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py --materials mm/tests/fixtures/termina_season_materials"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Sages Chamber travel policy, registered native adapter and confirmation",
+    "run": "python3 -B tests/temple_sages/run_tests.py\npython3 -B tests/temple_sages/run_confirmation_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Cutscene-only Zelda aura scope and optimized finite-position guards",
+    "run": "python3 -B tests/temple_sages/run_aura_tests.py\npython3 -B tests/temple_sages/run_aura_tests.py --fast-math"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Packaged Sages Chamber resource closure with native and Alt rendering",
+    "run": "python3 -B tests/temple_sages/test_packaged_chamber.py"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Packaged Lake Hylia dedicated sand, native and Alt resource parity",
+    "run": "python3 -B -m unittest discover -s tests/lake_tunnel_sand -v"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Cutscene actor Zelda dialogue catalogue and native talk lifecycle",
+    "run": "python3 -B tests/custom_messages/run_cutscene_actor_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Exact cumulative assets from bounded compressed source parts",
+    "run": "python3 -B -m unittest discover -s tests/cumulative_assets -v"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native-texture chamber and optional visual layer compatibility",
+    "run": "python3 -B tests/temple_sages/test_native_chamber_layers.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Stone chamber footsteps and full walkable surface echo",
+    "run": "python3 -B tests/temple_sages/test_collision_audio.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Shield of Ikana player matrix binding in OoT and MM",
+    "run": "python3 -B tests/ikana_shield_render/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Morning Ikana native missing-icon fallback and OoT editor tile",
+    "run": "python3 -B tests/ikana_editor_icon/run_missing_icon_tests.py\npython3 -B tests/ikana_editor_icon/run_oot_ui_icon_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Magic Mirror native shuffle pool ownership save and foreign rewards",
+    "run": "python3 -B tests/magic_mirror_shuffle/registry_test.py\npython3 -B tests/magic_mirror_shuffle/run_pool_tests.py\npython3 -B tests/magic_mirror_shuffle/run_grant_tests.py\npython3 -B tests/magic_mirror_shuffle/run_save_tests.py\npython3 -B tests/magic_mirror_shuffle/run_foreign_tests.py"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Magic Mirror combined route logic policy snapshots and queue invalidation",
+    "run": "python3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Native Mirror editor grants and forest pickup close-up camera",
+    "run": "python3 -B tests/magic_mirror_editor/run_tests.py\npython3 -B tests/magic_mirror_editor/run_pickup_camera_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Built-in Black Market materials and Granny interior availability",
+    "run": "python3 -B tests/black_market/run_granny_availability_tests.py"
   }
 ]

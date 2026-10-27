@@ -34,6 +34,13 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 #endif
+    // Generation-only request from the OoT checkbox. Keep the UI CVars independent,
+    // but serialize the shared feature into the generated MM save/spoiler.
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0)) {
+        saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = RO_GENERIC_ON;
+    }
+#endif
     std::vector<RandoItemId> startingItems = Rando::GetStartingItemsFromSave(saveInfo);
     std::vector<RandoItemId> computedStartingItems = Rando::GetComputedStartingItems(saveInfo);
     startingItems.insert(startingItems.end(), computedStartingItems.begin(), computedStartingItems.end());
@@ -74,6 +81,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
             // Skip checks that are already in the pool
             if (std::find(checkPool.begin(), checkPool.end(), randoCheckId) != checkPool.end()) {
+                continue;
+            }
+
+            if (randoCheckId == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
+                saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] != RO_GENERIC_ON) {
                 continue;
             }
 
@@ -548,6 +560,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         std::vector<RandoItemId> plentifulItems;
         for (size_t i = 0; i < itemPool.size(); i++) {
             // The user can specify exactly how many pieces they want to shuffle, so skip those
+            if (itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR) {
+                continue; // One physical Mirror in every density, including Plentiful.
+            }
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }

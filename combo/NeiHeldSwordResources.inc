@@ -45,6 +45,16 @@ static const char* const sNeiHeldSwordPaths[NEI_HELD_SWORD_COUNT][NEI_HELD_SWORD
         { "__OTR__objects/nei_held_swords/four_sword/oot_child/held_dl", "__OTR__objects/nei_held_swords/four_sword/oot_child/grip_mtx" },
         { "__OTR__objects/nei_held_swords/four_sword/mm_human/held_dl", "__OTR__objects/nei_held_swords/four_sword/mm_human/grip_mtx" },
     },
+    { // giants_knife
+        { "__OTR__objects/nei_held_swords/giants_knife/oot_adult/held_dl", "__OTR__objects/nei_held_swords/giants_knife/oot_adult/grip_mtx" },
+        { "__OTR__objects/nei_held_swords/giants_knife/oot_child/held_dl", "__OTR__objects/nei_held_swords/giants_knife/oot_child/grip_mtx" },
+        { "__OTR__objects/nei_held_swords/giants_knife/mm_human/held_dl", "__OTR__objects/nei_held_swords/giants_knife/mm_human/grip_mtx" },
+    },
+    { // broken_giants_knife
+        { "__OTR__objects/nei_held_swords/broken_giants_knife/oot_adult/held_dl", "__OTR__objects/nei_held_swords/broken_giants_knife/oot_adult/grip_mtx" },
+        { "__OTR__objects/nei_held_swords/broken_giants_knife/oot_child/held_dl", "__OTR__objects/nei_held_swords/broken_giants_knife/oot_child/grip_mtx" },
+        { "__OTR__objects/nei_held_swords/broken_giants_knife/mm_human/held_dl", "__OTR__objects/nei_held_swords/broken_giants_knife/mm_human/grip_mtx" },
+    },
 };
 static const char* const sNeiHeldSwordResources[NEI_HELD_SWORD_COUNT][12] = {
     { // kokiri_sword
@@ -155,6 +165,30 @@ static const char* const sNeiHeldSwordResources[NEI_HELD_SWORD_COUNT][12] = {
         "__OTR__objects/nei_gi_redesign/four_sword/steel_tex",
         NULL
     },
+    { // giants_knife
+        "__OTR__objects/nei_gi_redesign/giants_knife/fittings_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/four_sword_sheen_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/gi_dl",
+        "__OTR__objects/nei_gi_redesign/giants_knife/leather_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/mesh_opa_vtx",
+        "__OTR__objects/nei_gi_redesign/giants_knife/ordon_steel_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/rim_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/scale_mtx",
+        "__OTR__objects/nei_gi_redesign/giants_knife/wrap_tex",
+        NULL
+    },
+    { // broken_giants_knife
+        "__OTR__objects/nei_gi_redesign/giants_knife/fittings_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/four_sword_sheen_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/leather_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/ordon_steel_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/rim_tex",
+        "__OTR__objects/nei_gi_redesign/giants_knife/wrap_tex",
+        "__OTR__objects/nei_held_swords/broken_giants_knife/model/gi_dl",
+        "__OTR__objects/nei_held_swords/broken_giants_knife/model/mesh_opa_vtx",
+        "__OTR__objects/nei_held_swords/broken_giants_knife/model/scale_mtx",
+        NULL
+    },
 };
 
 static const char* const sNeiHeldSwordBasePaths[NEI_HELD_SWORD_COUNT][NEI_HELD_SWORD_FRAME_COUNT][2] = {
@@ -202,6 +236,16 @@ static const char* const sNeiHeldSwordBasePaths[NEI_HELD_SWORD_COUNT][NEI_HELD_S
         { "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/oot_adult/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/oot_adult/grip_mtx" },
         { "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/oot_child/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/oot_child/grip_mtx" },
         { "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/mm_human/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/mm_human/grip_mtx" },
+    },
+    { // giants_knife
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/oot_adult/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/oot_adult/grip_mtx" },
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/oot_child/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/oot_child/grip_mtx" },
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/mm_human/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/giants_knife/mm_human/grip_mtx" },
+    },
+    { // broken_giants_knife
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/oot_adult/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/oot_adult/grip_mtx" },
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/oot_child/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/oot_child/grip_mtx" },
+        { "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/mm_human/held_dl", "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/mm_human/grip_mtx" },
     },
 };
 static const char* const sNeiHeldSwordBaseResources[NEI_HELD_SWORD_COUNT][12] = {
@@ -311,6 +355,30 @@ static const char* const sNeiHeldSwordBaseResources[NEI_HELD_SWORD_COUNT][12] = 
         "__OTR__@oot-gi-base:objects/nei_gi_redesign/four_sword/ruby_tex",
         "__OTR__@oot-gi-base:objects/nei_gi_redesign/four_sword/scale_mtx",
         "__OTR__@oot-gi-base:objects/nei_gi_redesign/four_sword/steel_tex",
+        NULL
+    },
+    { // giants_knife
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/fittings_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/four_sword_sheen_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/gi_dl",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/leather_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/mesh_opa_vtx",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/ordon_steel_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/rim_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/scale_mtx",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/wrap_tex",
+        NULL
+    },
+    { // broken_giants_knife
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/fittings_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/four_sword_sheen_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/leather_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/ordon_steel_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/rim_tex",
+        "__OTR__@oot-gi-base:objects/nei_gi_redesign/giants_knife/wrap_tex",
+        "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/model/gi_dl",
+        "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/model/mesh_opa_vtx",
+        "__OTR__@oot-gi-base:objects/nei_held_swords/broken_giants_knife/model/scale_mtx",
         NULL
     },
 };

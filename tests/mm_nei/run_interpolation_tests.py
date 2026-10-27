@@ -13,8 +13,8 @@ with tempfile.TemporaryDirectory(prefix='mm-nei-interpolation-') as td:
     # boundary, with distinct entry names. Native structs never cross engines.
     donor=(ROOT/'soh/soh/Enhancements/randomizer/NeiUsedMagicPresentation.cpp').read_text()
     donor=donor.replace('"NeiUsedMagicPresentation.h"','"2s2h/Rando/NeiUsedMagicPresentation.h"')
-    for header in ['NeiGiRender.h','NeiUsedMagicPolicy.h']:
-        donor=donor.replace('"'+header+'"','"'+str(ROOT/'soh/soh/Enhancements/randomizer'/header)+'"')
+    for header in ['NeiGiRender.h','NeiUsedMagicPolicy.h','../../../../combo/gameplay/MagicMirrorCast.h']:
+        donor=donor.replace('"'+header+'"','"'+str((ROOT/'soh/soh/Enhancements/randomizer'/header).resolve())+'"')
     donor=donor.replace('#include "soh/ResourceManagerHelpers.h"','extern "C" { uint8_t ResourceMgr_FileExists(const char*); uint8_t ResourceMgr_FileAltExists(const char*); bool ResourceMgr_IsAltAssetsEnabled(); }')
     donor=re.sub(r'void NeiUsedMagic_(\w+)\(',r'void Baseline_\1(',donor)
     baseline=Path(td)/'donor.cpp';baseline.write_text(donor)

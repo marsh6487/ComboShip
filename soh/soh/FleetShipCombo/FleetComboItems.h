@@ -849,7 +849,10 @@
     X(FCI_SEASON_AUTUMN, 1, FCI_F_NONE, RG_SEASON_AUTUMN, RI_OOT_NEI_SEASON_AUTUMN, "Season: Autumn",                  \
       "Season: Autumn", "Season: Autumn")                                                                              \
     X(FCI_SEASON_WINTER, 1, FCI_F_NONE, RG_SEASON_WINTER, RI_OOT_NEI_SEASON_WINTER, "Season: Winter",                  \
-      "Season: Winter", "Season: Winter")
+      "Season: Winter", "Season: Winter")                                                                              \
+    /* Standalone Mirror identity. Appended: FCI ordinals are serialized. */                                           \
+    X(FCI_MAGIC_MIRROR, 1, FCI_F_NONE, RG_MAGIC_MIRROR, RI_OOT_NEI_MAGIC_MIRROR, "Magic Mirror", "Magic Mirror",       \
+      "Magic Mirror")
 
 // -----------------------------------------------------------------------------
 // Enum estable de items combo (generado por la lista; APPEND-ONLY)

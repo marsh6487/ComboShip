@@ -1,8 +1,9 @@
 #pragma once
 
-// Only paths and the counter recipe live in source. All room/texture data is
+// Only paths and private counter/clearance recipes live in source. Room/texture data is
 // supplied by the user's Djipi archive; no resource is written back or exported.
 #include <libultraship/libultra/gbi.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -49,6 +50,9 @@ struct Provider {
     std::function<std::shared_ptr<void>(const std::string&)> texture;
 };
 
+} // namespace BlackMarketGranny
+#include "BlackMarketGrannyRefinement.h"
+namespace BlackMarketGranny {
 class Room {
   public:
     Room() = default;
@@ -57,12 +61,14 @@ class Room {
     Room(Room&&) = delete;
     Room& operator=(Room&&) = delete;
 
-    bool Load(const Provider& provider) {
+    bool Load(const Provider& provider, bool removeRearPots = false) {
         Clear();
         try {
             if (provider.game != "oot" && provider.game != "mm")
                 Fail("Unknown resource owner");
+            mRearPots.Reset(removeRearPots);
             auto* opaque = CopyList(Exact(kOpaque), provider);
+            mRearPots.Validate();
             if (mCounter.size() != 1197 || !mLists.contains(Exact(kCounterDraw)))
                 Fail("Incompatible Djipi Granny counter layout");
             mOpaque = opaque;
@@ -93,6 +99,7 @@ class Room {
     std::vector<Vtx> mCounter;
     Gfx* mOpaque = nullptr;
     std::string mError;
+    RearPots mRearPots;
 
     [[noreturn]] static void Fail(const std::string& error) {
         throw std::runtime_error(error);
@@ -106,6 +113,7 @@ class Room {
         mOwners.clear();
         mCounter.clear();
         mError.clear();
+        mRearPots.Reset();
     }
     void RaiseCounter(const Vertices& source) {
         if (source.count != 1189)
@@ -174,6 +182,8 @@ class Room {
         mActive.insert(path);
         auto& list = mLists[path];
         list.reserve(source.count + 4);
+        std::array<int, 32> cache;
+        cache.fill(-1);
         for (size_t i = 0; i < source.count; ++i) {
             Gfx command = source.data[i];
             const auto opcode = command.words.w0 >> 24;
@@ -205,6 +215,7 @@ class Room {
                 if (!count || count > 32 || destination + count > 32 || offset > vertices.count ||
                     count > vertices.count - offset)
                     Fail("Invalid Djipi vertex range");
+                mRearPots.VerticesFor(path, vertexPath, vertices, count, offset, destination, cache);
                 const Vtx* data = vertexPath == Exact(kCounterVertices) ? mCounter.data() : vertices.data;
                 Gfx load = { gsSPVertex(data + offset, count, destination) };
                 list.push_back(load);
@@ -233,7 +244,7 @@ class Room {
                 };
                 list.insert(list.end(), std::begin(cap), std::end(cap));
             }
-            list.push_back(command);
+            list.push_back(mRearPots.Filter(path, command, cache));
             if (opcode == G_ENDDL) {
                 if (i + 1 != source.count)
                     Fail("Unexpected trailing Djipi commands");

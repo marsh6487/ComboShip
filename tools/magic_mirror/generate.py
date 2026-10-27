@@ -4,8 +4,8 @@
 python tools/magic_mirror/generate.py --preview-dir /absolute/scratch/path
 
 The icon is a software raster of MagicMirrorGeometry.h, including its native
-1/16-unit quantization, vertex colors, opaque metal and translucent pane. No
-image generator, downloaded art, texture substitution or Time Gate asset is used.
+1/16-unit quantization, vertex colors, opaque metal and textured translucent pane.
+The glass image is a fixed render of the real preserved Lost Woods scene.
 Names use the existing IA4-exact native name generator and bundled font.
 """
 from __future__ import annotations
@@ -51,7 +51,11 @@ def render(mesh, size, *, roll=-0.28, yaw=-0.13, pitch=-0.04, border=2):
     colors = vertices[:, 3:] / 255.0
     output = np.zeros((height, width, 4), dtype=np.float64)
     depth = np.full((height, width), -np.inf)
-    for ia, ib, ic, translucent in mesh["triangles"]:
+    reflection_path = ROOT / 'tools/magic_mirror/reflection/forest-scene.png'
+    reflection = np.asarray(Image.open(reflection_path).convert('RGBA'), dtype=np.float64) / 255.0
+    uv = np.asarray(mesh['reflectionUV'], dtype=np.float64)
+    for triangle in mesh["triangles"]:
+        ia, ib, ic, translucent, textured = triangle
         indexes = [ia, ib, ic]
         points = position[indexes]
         x0 = max(0, math.floor(points[:, 0].min()))
@@ -75,6 +79,19 @@ def render(mesh, size, *, roll=-0.28, yaw=-0.13, pitch=-0.04, border=2):
         if not visible.any():
             continue
         rgba = wa[..., None]*colors[ia] + wb[..., None]*colors[ib] + wc[..., None]*colors[ic]
+        if textured:
+            # Same bright glass modulation as the native Vtx conversion; the
+            # source texture carries the forest, not the casing or highlights.
+            st = wa[..., None]*uv[ia] + wb[..., None]*uv[ib] + wc[..., None]*uv[ic]
+            tx = np.clip(st[..., 0] * reflection.shape[1] - 0.5, 0, reflection.shape[1]-1)
+            ty = np.clip(st[..., 1] * reflection.shape[0] - 0.5, 0, reflection.shape[0]-1)
+            x0t, y0t = np.floor(tx).astype(int), np.floor(ty).astype(int)
+            x1t, y1t = np.minimum(x0t+1, reflection.shape[1]-1), np.minimum(y0t+1, reflection.shape[0]-1)
+            fx, fy = (tx-x0t)[..., None], (ty-y0t)[..., None]
+            sampled = (reflection[y0t,x0t]*(1-fx) + reflection[y0t,x1t]*fx)*(1-fy) + \
+                      (reflection[y1t,x0t]*(1-fx) + reflection[y1t,x1t]*fx)*fy
+            rgba[..., :3] *= sampled[..., :3]
+            rgba[..., 3] *= sampled[..., 3]
         destination = output[y0:y1, x0:x1]
         alpha = rgba[..., 3:4]
         if translucent:
@@ -94,6 +111,13 @@ def load_mesh(executable, frame):
 
 
 def generate_assets(executable):
+    reflection = Image.open(ROOT / 'tools/magic_mirror/reflection/forest-scene.png').convert('RGBA')
+    # Double horizontal detail while remaining inside a 4 KiB RGBA16 tile.
+    native_reflection = reflection.resize((64, 32), Image.Resampling.LANCZOS)
+    for game in ('soh', 'mm'):
+        target = ROOT / game / 'assets/custom/textures/magic_mirror/gMagicMirrorForestReflectionTex.rgb5a1.png'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        native_reflection.save(target, compress_level=9)
     # Render larger, then filter to the actual native inventory texture size.
     image = render(load_mesh(executable, 0), (256, 256), border=12, roll=-0.35)
     icon = image.resize((32, 32), Image.Resampling.LANCZOS)
@@ -126,7 +150,7 @@ def generate_preview(executable, icon, directory):
     canvas = Image.new("RGBA", (1240, 880), (17, 31, 30, 255))
     draw = ImageDraw.Draw(canvas)
     draw.text((52, 35), "MAGIC MIRROR", font=font(34, True), fill=(240, 222, 162))
-    draw.text((53, 85), "ALTTP direction • blue casing / gold inner rim • round reflecting face / short grip", font=font(17), fill=(157, 185, 172))
+    draw.text((53, 85), "Actual Lost Woods scene reflected in glass • preserved blue casing and gold rim", font=font(17), fill=(157, 185, 172))
     for index, (frame, yaw, roll, title) in enumerate(((0, -0.13, -0.1, "Front · frame 0"), (240, -0.13, -0.1, "Reflection · frame 240"), (480, 0.72, 0.04, "Turned · frame 480"))):
         x = 45 + index * 395
         draw.rounded_rectangle((x, 133, x+365, 738), radius=18, fill=(22, 41, 39), outline=(50, 73, 61), width=1)
@@ -135,7 +159,7 @@ def generate_preview(executable, icon, directory):
         draw.text((x+25, 694), title, font=font(18), fill=(202, 215, 193))
     draw.text((55, 776), "32 × 32 inventory icon", font=font(18, True), fill=(222, 213, 178))
     canvas.alpha_composite(icon.resize((64, 64), Image.Resampling.NEAREST), (315, 758))
-    draw.text((415, 771), "Generated directly from the same mesh and vertex colors.", font=font(18), fill=(173, 195, 180))
+    draw.text((415, 771), "Generated from the same mesh, forest image and glass material.", font=font(18), fill=(173, 195, 180))
     draw.text((415, 802), "Software preview; native runtime appearance still requires game verification.", font=font(15), fill=(133, 159, 146))
     canvas.convert("RGB").save(directory / "magic-mirror-native-preview.png", optimize=False, compress_level=9)
     render(load_mesh(executable, 0), (600, 900), border=30, roll=-0.10).save(directory / "magic-mirror-native-front.png", optimize=False, compress_level=9)

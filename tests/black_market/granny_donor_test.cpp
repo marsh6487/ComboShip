@@ -66,7 +66,7 @@ int main(int argc,char** argv) {
                 assert(std::string(reinterpret_cast<const char*>(copy[i].words.w1))=="__OTR__@oot:"+name);
                 ++textureReferences;
             } else if (op==G_ENDDL && path==Exact(kCounterDraw)) {
-                assert((copy[i].words.w0>>24)==G_VTX && (copy[i+4].words.w0>>24)==G_ENDDL);
+                assert((copy[i].words.w0>>24)==G_VTX && (copy[i+6].words.w0>>24)==G_ENDDL);
             } else { assert(std::memcmp(&copy[i],&g,sizeof(Gfx))==0);++unchanged; }
         }
     };

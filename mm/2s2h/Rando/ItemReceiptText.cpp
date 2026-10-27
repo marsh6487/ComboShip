@@ -980,6 +980,12 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (id == RI_OOT_NEI_MAGIC_MIRROR) {
+        SetReceiptBody(
+            entry,
+            "You found the %gMagic Mirror%w!\nEquip it to a C Button to return\nto the Lost Woods from outdoors.");
+        return true;
+    }
     if (BossSoulItemReceipt(item.name, entry) || MaskItemReceipt(item.name, entry) ||
         ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
         return true;

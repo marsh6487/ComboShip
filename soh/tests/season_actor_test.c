@@ -112,8 +112,8 @@ static void Grass(void) {
                 season = current;
                 Begin();
                 EnKusa_Draw(&actor.actor, &play);
-                const u32 color = current == 0 ? 0xF6C1D9FF : current == 2 ? 0xD99C45FF : 0xE5EDF3FF;
-                const unsigned mode = current == 2 ? 1 : 3;
+                const u32 color = current == 0 ? 0xF6C1D9FF : current == 2 ? 0xF26846FF : 0xDCECF5FF;
+                const unsigned mode = current == 2 ? 2 : 3;
                 Check(opaque, gfx.polyOpa.p, list, !cut && current != 1, native, count, color, mode);
             }
             season = 2;
@@ -144,11 +144,11 @@ static void Trees(void) {
             EnWood02_Draw(&actor.actor, &play);
             REQUIRE(gfx.polyOpa.p - opaque == opaCount && !memcmp(opaque, nativeOpa, opaCount * sizeof(Gfx)));
             const u32 color = current == 0   ? 0xF6C1D9FF
-                              : current == 2 ? (type < 3 ? 0xF4B783FF : 0xD99C45FF)
-                                             : (type < 3 ? 0xCCDCEEFF : 0xE5EDF3FF);
+                              : current == 2 ? (type < 3 ? 0xEF484CFF : 0xF26846FF)
+                                             : (type < 3 ? 0xE2EEE9FF : 0xDCECF5FF);
             Check(translucent, gfx.polyXlu.p, list, current != 1 && type <= 3, nativeXlu, xluCount, color,
                   current == 0   ? 3
-                  : current == 2 ? 1
+                  : current == 2 ? 2
                                  : 3);
         }
     }

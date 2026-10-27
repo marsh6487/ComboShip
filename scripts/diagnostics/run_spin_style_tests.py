@@ -40,6 +40,7 @@ def main():
     if "resources" in gates:
         subprocess.run(["python3", "-B", "tests/spin_style/resources_test.py"], cwd=ROOT, check=True)
     if "render" in gates:
+        subprocess.run(["python3", "-B", "scripts/assets/prepare_spin_styles.py"], cwd=ROOT, check=True)
         compile_run("tests/spin_style/render_core_test.cpp", args.sanitize)
         flags = ["-DF3DEX_GBI_2", "-DCONTROLLERBUTTONS_T=uint32_t", "-DNON_EQUIVALENT",
                  "-DNON_MATCHING", "-DLOG_LEVEL_GAME_PRINTS=0", '-DCVAR_PREFIX_COSMETIC="gCosmetics"']
@@ -54,6 +55,10 @@ def main():
                 parts = [re.search(r'typedef enum \{.*?\} EnMThunderSubType;', source, re.S).group(0)] if host == "mm" else []
                 parts += [production_function(source, n) for n in ("EnMThunder_VisualStyle", "EnMThunder_DrawChargeStyle")]
                 (Path(directory) / "spin_draw_production.inc").write_text("\n".join(parts))
+                graph = (ROOT / host / "src/code/graph.c").read_text()
+                (Path(directory) / "spin_graph_production.inc").write_text("\n".join(
+                    production_function(graph, name).replace(name, "SpinTest_" + name, 1)
+                    for name in ("Graph_OpenDisps", "Graph_CloseDisps")))
                 compile_run("tests/spin_style/render_test.cpp", args.sanitize, [*host_flags, "-I" + directory])
     if "native" in gates:
         compile_run("tests/spin_style/state_core_test.cpp", args.sanitize)
