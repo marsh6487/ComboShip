@@ -70,6 +70,8 @@ std::string RemoveColorCodes(const std::string& text) { return text; }
 }
 extern "C" int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
 extern "C" uint8_t Wand_RandoMode(void) { return 0; }
+// Mirror stump delivery has its own grant fixture; key receipts must never call it.
+extern "C" bool MagicMirror_CommitStumpRewardToken(void) { assert(false); return false; }
 namespace Notification { struct Info { const char* itemIcon; std::string message, suffix; }; void Emit(Info) { assert(false); } }
 namespace CustomItem { constexpr int GIVE_ITEM_CUTSCENE = 1; }
 static int flags = 1, param = RC_UNKNOWN, param2 = 0;
@@ -96,6 +98,7 @@ void GiveItem(RandoItemId randoItemId, RandoCheckId) {
 }
 namespace MiscBehavior {
 static bool queued = true;
+static RandoCheckId queuedCheck = RC_UNKNOWN;
 std::string BankRewardSourceSuffix(RandoCheckId) { return " (Bank reward)"; }
 bool ShouldShowForeignCutscene(RandoCheckId) { return true; }
 void OfferTrapItem() { assert(false); }
