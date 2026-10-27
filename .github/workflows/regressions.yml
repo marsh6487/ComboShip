@@ -43,6 +43,8 @@ jobs:
           git fetch --no-tags --depth=1 origin 122dd5f68cb37fcf515c3726f8a77043db5dcdf4 a82852a3a02c8cabc541cce7c124da71c5755efb
           # Gerudo GI UVs, rig and isolated cuff edits compare to this fixed pre-polish baseline.
           git fetch --no-tags --depth=1 origin c0181856968dd6f3869be0d1aa240743091fd6a8
+          # Mirror serialization compares every prior identity to the public PR66 baseline.
+          git fetch --no-tags --depth=1 origin 0cd35e4d25f853dc68995dd88e8b1c177840e301
           # Match libultraship's ImGui dependency for the real save-editor draw fixture.
           git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
           # The direct Ikana editor click test compiles this pinned input engine.
