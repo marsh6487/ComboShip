@@ -9,6 +9,7 @@
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <spdlog/spdlog.h>
 
 namespace BlackMarketGranny {
 inline constexpr char kErrorCvar[] = "gCombo.BlackMarket.GrannyLoadError";
@@ -31,6 +32,11 @@ inline Vertices NativeVaporVertices(const std::shared_ptr<Ship::IResource>& reso
     return { vertices->data(), vertices->size(), vertices };
 }
 
+inline bool MapsDependenciesAvailable(const std::shared_ptr<Ship::ResourceManager>& maps) {
+    const auto archive = maps ? maps->GetArchiveManager() : nullptr;
+    return archive && archive->HasFile(Exact(kOpaque)) && archive->HasFile(Exact(kCounterVertices)) &&
+           archive->HasFile("alt/scenes/shared/mahouya_scene/sh_maho_book_01__UDIM_");
+}
 inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner() {
     const auto context = Ship::Context::GetRawInstance();
     if (!context)
@@ -38,12 +44,12 @@ inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner(
     const auto active = context->GetResourceManager();
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
-        if (rm && rm == active && rm->GetArchiveManager()->HasFile(Exact(kOpaque)))
+        if (rm == active && MapsDependenciesAvailable(rm))
             return { name, rm };
     }
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
-        if (rm && rm->GetArchiveManager()->HasFile(Exact(kOpaque)))
+        if (MapsDependenciesAvailable(rm))
             return { name, rm };
     }
     return {};
@@ -52,21 +58,33 @@ inline std::pair<std::string, std::shared_ptr<Ship::ResourceManager>> MapsOwner(
 inline std::pair<std::shared_ptr<Ship::ResourceManager>, std::shared_ptr<Ship::Archive>> NativeOwner() {
     // MM-only already mounts the user's optional oot.o2r companion. Its native
     // scene parser differs, so use only common render factories and raw metadata.
+    const auto complete = [](const std::shared_ptr<Ship::Archive>& archive) {
+        return archive && archive->HasFile(kScene) && archive->HasFile(kRoom) && archive->HasFile(kTranslucent);
+    };
     for (const char* name : { "oot", "mm" }) {
         auto rm = Ship::CrossRMRegistry::Get(name);
         if (!rm)
             continue;
-        auto archive = rm->GetArchiveManager()->GetArchiveFromFile(kScene);
-        if (archive && archive->HasFile(kScene) && archive->HasFile(kRoom) && archive->HasFile(kTranslucent))
+        const auto manager = rm->GetArchiveManager();
+        if (!manager)
+            continue;
+        auto archive = manager->GetArchiveFromFile(kScene);
+        if (complete(archive))
             return { rm, archive };
+        // A scene-only mod can own the winning header while the complete base
+        // archive remains mounted. Pin one complete donor, never a mixed graph.
+        const auto archives = manager->GetArchives();
+        if (archives)
+            for (auto it = archives->rbegin(); it != archives->rend(); ++it)
+                if (complete(*it))
+                    return { rm, *it };
     }
     return {};
 }
 inline bool DependenciesAvailable() {
     const auto [game, maps] = MapsOwner();
     const auto [native, archive] = NativeOwner();
-    return maps && native && maps->GetArchiveManager()->HasFile(Exact(kCounterVertices)) &&
-           maps->GetArchiveManager()->HasFile("alt/scenes/shared/mahouya_scene/sh_maho_book_01__UDIM_");
+    return maps && native;
 }
 
 // The native actor has a different ID and switch-bit encoding in MM.
@@ -77,15 +95,19 @@ inline int16_t MmFlameParams(int16_t oot) {
 class Resources {
   public:
     bool Prepare(const char* host) {
-        if (!DependenciesAvailable())
-            return Error("Install Djipi 3DE scene maps and 3DS textures; OoT resources are required.");
-        if (mRoom) {
-            CVarSetString(kErrorCvar, "");
-            return true;
-        }
         try {
             auto [game, maps] = MapsOwner();
+            if (!maps)
+                return Error(
+                    "Djipi Granny room, counter vertices or 3DS textures are unavailable in a registered game.");
             const auto [native, archive] = NativeOwner();
+            if (!native)
+                return Error(
+                    "A complete original OoT Granny scene, room and translucent-resource archive is unavailable.");
+            if (mRoom) {
+                CVarSetString(kErrorCvar, "");
+                return true;
+            }
             Provider provider;
             provider.game = game;
             provider.display = [maps](const std::string& path) -> Display {
@@ -185,6 +207,7 @@ class Resources {
     std::vector<std::array<uint8_t, 22>> mLights;
     std::vector<Decoration> mDecorations;
     static bool Error(const std::string& message) {
+        SPDLOG_WARN("BlackMarketGranny: {}", message);
         CVarSetString(kErrorCvar, message.c_str());
         return false;
     }

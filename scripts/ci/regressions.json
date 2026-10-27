@@ -1483,5 +1483,41 @@
     "origin": "gate",
     "name": "Stone chamber footsteps and full walkable surface echo",
     "run": "python3 -B tests/temple_sages/test_collision_audio.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Shield of Ikana player matrix binding in OoT and MM",
+    "run": "python3 -B tests/ikana_shield_render/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Morning Ikana native missing-icon fallback and OoT editor tile",
+    "run": "python3 -B tests/ikana_editor_icon/run_missing_icon_tests.py\npython3 -B tests/ikana_editor_icon/run_oot_ui_icon_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Magic Mirror native shuffle pool ownership save and foreign rewards",
+    "run": "python3 -B tests/magic_mirror_shuffle/registry_test.py\npython3 -B tests/magic_mirror_shuffle/run_pool_tests.py\npython3 -B tests/magic_mirror_shuffle/run_grant_tests.py\npython3 -B tests/magic_mirror_shuffle/run_save_tests.py\npython3 -B tests/magic_mirror_shuffle/run_foreign_tests.py"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Magic Mirror combined route logic policy snapshots and queue invalidation",
+    "run": "python3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Native Mirror editor grants and forest pickup close-up camera",
+    "run": "python3 -B tests/magic_mirror_editor/run_tests.py\npython3 -B tests/magic_mirror_editor/run_pickup_camera_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Built-in Black Market materials and Granny interior availability",
+    "run": "python3 -B tests/black_market/run_granny_availability_tests.py"
   }
 ]

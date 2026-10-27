@@ -33,7 +33,10 @@ source=source.replace('/* MM_SIMPLE_INFO */',re.search(r'struct ComboForeignDraw
 source=source.replace('/* MM_SIMPLE_CONSUMER */',function(foreign_mm,'MM_DrawForeignSimple'))
 source=source.replace('/* TEXTURE_RESOLVER */',function(read('libultraship/src/fast/interpreter.cpp'),'ComboLoadTextureResource'))
 equipment=read('mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_equipment.c')
-source=source.replace('/* EQUIPMENT_SELECTOR */',function(equipment,'KaleidoEquip_OotTex'))
+source=source.replace('/* EQUIPMENT_SELECTOR */',
+    '// Availability follows this fixture\'s actual renderer/owner store.\n'
+    'u8 MM_IsRgba32TextureAvailable(const char* path) { return ComboLoadTextureResource(path) != nullptr; }\n'+
+    function(equipment,'KaleidoEquip_OotTex'))
 tables=[]
 for host,namespace in [('mm','MmEquip'),('soh','OotEquip')]:
     data=read(host+'/mods/extended_equipment.c')

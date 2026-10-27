@@ -181,13 +181,17 @@ static void* KaleidoEquip_OotTex(const char* path) {
     extern u8 ResourceMgr_FileExists(const char* resName);
     extern u8 ResourceMgr_FileAltExists(const char* resName);
     extern bool ResourceMgr_IsAltAssetsEnabled(void);
+    extern u8 MM_IsRgba32TextureAvailable(const char* filePath);
     if (path == NULL) {
         return NULL;
     }
     // This native MM icon must not consult the OoT donor or the cold
     // filename cache used for optional imported equipment textures.
     if (ComboIconUsesMmOwnership(path)) {
-        return (void*)COMBO_IKANA_SHIELD_ICON;
+        const char* icon = COMBO_IKANA_SHIELD_ICON;
+        // Missing textures retain the previous cell's TMEM. Keep the private
+        // route only when its selected owner supplies a usable RGBA32 tile.
+        return MM_IsRgba32TextureAvailable(icon) ? (void*)icon : NULL;
     }
     if (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path))) {
         return (void*)path;

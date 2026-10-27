@@ -41,6 +41,8 @@ def main():
     source = (VIEWER / 'z_en_viewer.c').read_text()
     fixture = (ROOT / 'soh/tests/static_story_zelda_viewer_test.c').read_text()
     fixture = fixture.replace('/* PRODUCTION_INCLUDES */', source[:source.index('#define FLAGS')])
+    fixture = fixture.replace('/* PRODUCTION_MATRIX_MULTIPLY */', function(
+        (ROOT / 'soh/src/code/sys_matrix.c').read_text(), 'Matrix_MultVec3f'))
     fixture = fixture.replace('/* PRODUCTION_NATIVE_INIT */', function(
         (ROOT / 'soh/src/code/z_skelanime.c').read_text(), 'SkelAnime_InitFlex'))
     fixture = fixture.replace('/* PRODUCTION_ANIMATION_AND_SKELETON */', function(

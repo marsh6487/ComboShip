@@ -85,6 +85,36 @@ class RoomMagicAssets(unittest.TestCase):
         self.assertNotEqual(self.magic.TEXTURE, market_interior.SHELF)
         self.assertEqual(result[market_interior.SHELF], self.originals['mm'][market_interior.SHELF])
 
+    def test_builtin_magic_graph_is_closed_without_mod_archives_in_both_asset_modes(self):
+        # Only the normal port preparation inputs are present. There are no
+        # mounted Djipi/Granny/mod resources to satisfy a missing dependency.
+        for host, original in self.originals.items():
+            resources = self.magic.apply(original, host)
+            for alt in (False, True):
+                with self.subTest(host=host, alt=alt):
+                    visited = set()
+                    def resolve(path):
+                        selected = 'alt/' + path if alt and 'alt/' + path in resources else path
+                        self.assertIn(selected, resources, 'magical room depends on an external archive: ' + selected)
+                        self.assertTrue(selected.removeprefix('alt/').startswith('custom/skiejer_market/'))
+                        return selected
+                    def visit(path):
+                        selected = resolve(path)
+                        if selected in visited:
+                            return
+                        visited.add(selected)
+                        data = resources[selected]
+                        if not data.lstrip().startswith(b'<'):
+                            return
+                        for node in ET.fromstring(data):
+                            child = node.get('Path')
+                            if child:
+                                visit(child)
+                    visit(self.magic.ROOM)
+                    for index in range(28):
+                        visit(self.magic.PREFIX + f'geometry/mat_mahouya_room_0DL_006548_GranmaShop{index:02}')
+                    self.assertIn(self.magic.TEXTURE, visited)
+
     def test_corrupt_or_reordered_source_parts_are_rejected(self):
         # Exercise the real decoder used by room preparation; compressed source
         # corruption must fail rather than produce a broken native upload.

@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,3 +28,5 @@ with tempfile.TemporaryDirectory(prefix="granny-header-") as temporary:
                     "-I" + str(ROOT), "-I" + str(ROOT / "libultraship/include"),
                     str(ROOT / "tests/black_market/granny_refinement_unit_test.cpp"), "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/black_market/run_granny_availability_tests.py')], check=True)

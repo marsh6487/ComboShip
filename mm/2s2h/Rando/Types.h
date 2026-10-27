@@ -2689,6 +2689,8 @@ typedef enum {
     RC_WOODFALL_TEMPLE_ENTRANCE_BEEHIVE,
     RC_WOODFALL_TEMPLE_MAZE_ROOM_BEEHIVE,
 
+    // Append-only: Magic Mirror standalone shuffle.
+    RC_LOST_WOODS_MAGIC_MIRROR_STUMP,
     RC_MAX,
 } RandoCheckId;
 
@@ -3224,6 +3226,8 @@ typedef enum {
     // NeiSaveData.marioMaskOwned, which is what unlocks MARIO MODE on the equipment page.
     RI_OOT_NEI_MARIO_MASK,
     RI_MAX_TRAP, // Just used for ice trap ice cube model
+    // Append-only: Magic Mirror standalone shuffle.
+    RI_OOT_NEI_MAGIC_MIRROR,
     RI_MAX,
 } RandoItemId;
 
@@ -3639,6 +3643,8 @@ typedef enum {
     RO_ROD_OF_SEASONS,
     RO_STARTING_ROD_OF_SEASONS,
     RO_MAPS_COMPASSES_GIVE_INFORMATION,
+    // Append-only: Magic Mirror standalone shuffle.
+    RO_SHUFFLE_MAGIC_MIRROR,
     RO_MAX,
 } RandoOptionId;
 

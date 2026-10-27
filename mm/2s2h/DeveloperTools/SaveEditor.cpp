@@ -1,6 +1,7 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveEditor.h"
 #include "NeiEditorItems.h"
+#include "gameplay/MagicMirrorItem.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -2565,7 +2566,21 @@ static void DrawDualCaneEditor() {
     ImGui::TextDisabled("A on the cane cell (pause) switches entry. L/R pick the summon. C casts.");
 }
 
+static void DrawMagicMirrorEditor() {
+    ImGui::SeparatorText("Magic Mirror");
+    const bool owned = MagicMirror_IsOwned() != 0;
+    ImGui::BeginDisabled(owned);
+    if (ImGui::Button("Magic Mirror") && !owned)
+        TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
+    ImGui::EndDisabled();
+    if (owned) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("Owned");
+    }
+}
+
 static void DrawNeiTab() {
+    DrawMagicMirrorEditor();
     // Unified trade wheel — visual cell 22 (row 4, col 5). MM had NO trade editor at all, so there was
     // no way to inspect or set ownership here and the shared slot was untestable from this side.
     // Same 23 entries, same order, same indices as soh's debugSaveEditor: the index IS the
@@ -2948,7 +2963,7 @@ static void DrawNeiTab() {
     // which freed BOOTS 2/3 for the Climb and Roc Boots.
     static const char* sNeiEquipPieceNames[4][3] = {
         { "Byrna", "Four Sword", "Trident" },
-        { "Goddess", "Kite", "Ikana" },
+        { "Goddess", "Kite", "Shield of Ikana" },
         { "Champion", "Magic Tunic", "Sage's" },
         { "Pegasus", "Climb", "Roc" },
     };
@@ -2959,16 +2974,6 @@ static void DrawNeiTab() {
             ImGui::SameLine();
             ImGui::PushID(idx);
             bool owned = ExtEquip_HasItem(type, idx);
-            if (type == EQUIP_TYPE_SHIELD && idx == 3) {
-                if (ImGui::Checkbox("Shield of Ikana", &owned)) {
-                    if (owned)
-                        ExtEquip_GiveItem(type, idx);
-                    else
-                        ExtEquip_RemoveItem(type, idx);
-                }
-                ImGui::PopID();
-                continue;
-            }
             ImGui::BeginDisabled(owned);
             if (ImGui::Button(sNeiEquipPieceNames[type][idx - 1]) && !owned) {
                 ExtEquip_GiveItem(type, idx);

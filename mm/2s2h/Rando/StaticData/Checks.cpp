@@ -26,6 +26,7 @@ std::array<std::string, RC_MAX> CheckNames = std::array<std::string, RC_MAX>();
 
 // clang-format off
 std::map<RandoCheckId, RandoStaticCheck> Checks = {
+    RC(RC_LOST_WOODS_MAGIC_MIRROR_STUMP, RCTYPE_NPC, SCENE_LOST_WOODS, FLAG_NONE, 0, RI_OOT_NEI_MAGIC_MIRROR),
     RC(RC_UNKNOWN,                                                       RCTYPE_UNKNOWN,          SCENE_MAX,                      FLAG_NONE,                   0x00,                                                                RI_UNKNOWN),
 
     RC(RC_ANCIENT_CASTLE_OF_IKANA_BOSS,                                  RCTYPE_SONG,             SCENE_IKNINSIDE,                FLAG_NONE,                   0x00,                                                                RI_SONG_ELEGY),

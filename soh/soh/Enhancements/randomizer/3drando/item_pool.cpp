@@ -618,6 +618,12 @@ bool GenerateItemPool() {
         AddItemToPool(RG_MM_SONG_SOARING, 2, 1, 1, 1);
     }
 
+    // The combined seed contributes its one physical stump and one Mirror from MM.
+    // Fixed cardinality in every pool density; never gated by the broad NEI option.
+    if (ctx->GetOption(RSK_SHUFFLE_MAGIC_MIRROR) && !Combo_IsCombinedGame()) {
+        AddFixedItemToPool(RG_MAGIC_MIRROR, 1);
+    }
+
     // Skijer's Custom Items (Second Inventory Page) - 24 items
     if (ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS)) {
         SPDLOG_INFO("[NEI] SKIJER_CUSTOM_ITEMS block ENTERED — adding 24 custom items, itemPool.size() before = {}", itemPool.size());

@@ -12,6 +12,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class MagicMirrorVisualTests(unittest.TestCase):
+    def test_hd_reflection_scale_matches_double_width_native_tile(self):
+        from build_forest_addon import texture
+        raw = texture(Image.new('RGBA', (512, 512), (60, 100, 40, 255)), 2)
+        self.assertEqual(struct.unpack_from('<IIIIffI', raw, 64), (2, 512, 512, 1, 16., 16., 1048576))
+        self.assertEqual(len(raw), 1048668)
+
     def test_private_forest_cast_resources(self):
         art = ROOT / 'tools/magic_mirror/cast'
         manifest = json.loads((art/'manifest.json').read_text())
@@ -42,7 +48,8 @@ class MagicMirrorVisualTests(unittest.TestCase):
                  for game in ('soh','mm')]
         self.assertEqual(paths[0].read_bytes(),paths[1].read_bytes())
         image = Image.open(paths[0]).convert('RGBA')
-        self.assertEqual(image.size,(32,32))
+        self.assertEqual(image.size,(64,32))
+        self.assertLessEqual(image.width * image.height * 2, 4096)
         self.assertEqual(image.getchannel('A').getextrema(),(255,255))
 
     def test_shared_mesh_behavior(self):

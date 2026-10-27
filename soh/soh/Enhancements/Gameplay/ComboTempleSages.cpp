@@ -4,6 +4,8 @@
 #include "actors/TempleSagesZeldaAura.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "ComboGameMode.h"
+#include "gameplay/CrossGameTitleCard.h"
+#include "textures/place_title_cards/g_pn_14.h"
 #include "entrances/TempleSagesPolicy.h"
 #include "entrances/TempleSagesReturnPlacements.h"
 #include "entrances/TempleSagesConfirmationNative.h"
@@ -11,6 +13,7 @@
 #include "soh/resource/type/scenecommand/SetActorList.h"
 #include "soh/resource/type/scenecommand/SetAlternateHeaders.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/ShipInit.hpp"
 #include "soh/frame_interpolation.h"
@@ -40,6 +43,13 @@ TempleSages::PadCache sPads;
 unsigned sCaptureGeneration = 0;
 bool sReturnVisit = false;
 bool sWarpStarted = false;
+struct ChamberTitle {
+    int file = -1;
+    bool pending = false;
+    bool tunnelArmed = false;
+    bool fromTunnel = false;
+};
+ChamberTitle sTitle;
 std::optional<int> sSelection;
 std::array<TempleSages::Pad, TempleSages::kPadCount> sHubPads{};
 struct PendingReturn {
@@ -62,6 +72,11 @@ void FinishPending(bool abort) {
         gSaveContext.respawn[RESPAWN_MODE_RETURN] = sPending.previous;
         if (abort && gSaveContext.respawnFlag == 2)
             gSaveContext.respawnFlag = 0;
+        if (!abort) {
+            sTitle = {};
+            sTitle.file = gSaveContext.fileNum;
+            sTitle.pending = true;
+        }
     }
     sPending = {};
 }
@@ -180,6 +195,7 @@ void Reset() {
     sWarpStarted = false;
     sPads.Reset();
     sReturnVisit = false;
+    sTitle = {};
     ++sCaptureGeneration;
 }
 
@@ -226,6 +242,77 @@ TempleSages::TravelMode TravelModeSetting() {
     return TempleSages::NormalizeTravelMode(CVarGetInteger("gEnhancements.TempleSagesTravel", 1));
 }
 
+void UpdateTitle(PlayState* play) {
+    const auto visit = CurrentVisit(play);
+    if (!OotSession() || !TempleSages::NormalVisit(visit) || !sPads.Ready(visit) || sReturnVisit ||
+        gSaveContext.fileNum < 0 || gSaveContext.fileNum >= 3 ||
+        (sTitle.file >= 0 && sTitle.file != gSaveContext.fileNum)) {
+        sTitle = {};
+        return;
+    }
+    sTitle.file = gSaveContext.fileNum;
+    if (!Safe(play) || TempleSages::ConfirmationNative::Active())
+        return;
+    const auto* player = GET_PLAYER(play);
+    if (!player)
+        return;
+    const auto& pos = player->actor.world.pos;
+    if (!TempleSages::Finite({ pos.x, pos.y, pos.z }))
+        return;
+
+    // The chamber enclosure opens at z=-1200. Require a tunnel-side approach
+    // before crossing its mouth, with hysteresis to avoid edge jitter/repeats.
+    const bool opening = std::fabs(pos.x) < 100.f && pos.y >= -150.f && pos.y <= 130.f;
+    if (sTitle.fromTunnel && pos.z >= -1160.f)
+        sTitle.pending = false;
+    if (opening && pos.z >= -1160.f && pos.z <= -720.f) {
+        sTitle.tunnelArmed = true;
+    } else if (opening && pos.z <= -1240.f && sTitle.tunnelArmed) {
+        sTitle.pending = sTitle.fromTunnel = true;
+        sTitle.tunnelArmed = false;
+    } else if (!opening || pos.z > -720.f) {
+        sTitle.tunnelArmed = false;
+    }
+
+    auto& card = play->actorCtx.titleCtx;
+    if (!sTitle.pending || card.durationTimer || card.delayTimer || card.alpha)
+        return;
+    struct PresentationScope {
+        int previous = Combo_SOH_SwapCustomTitleCardPresentation(true);
+        ~PresentationScope() {
+            Combo_SOH_SwapCustomTitleCardPresentation(previous);
+        }
+    } scope;
+    sTitle.pending = false;
+    if (!GameInteractor_Should(VB_SHOW_TITLE_CARD, true))
+        return;
+
+    // This annex still belongs to SCENE_TEMPLE_OF_TIME. InitPlaceName would
+    // replace our texture with the temple card, so initialize its ordinary
+    // place-card context with the chamber's native resource instead. Native
+    // update/draw, HUD cosmetics and HD/Alt replacements retain ownership.
+    const char* texture = gChamberOfTheSagesTitleCardENGTex;
+    if (gSaveContext.language == LANGUAGE_GER)
+        texture = gChamberOfTheSagesTitleCardGERTex;
+    else if (gSaveContext.language == LANGUAGE_FRA)
+        texture = gChamberOfTheSagesTitleCardFRATex;
+    else if (gSaveContext.language == LANGUAGE_JPN) {
+        // Match the suffix selection in native TitleCard_InitPlaceName.
+        alignas(2) static constexpr char japanese[] = "__OTR__textures/g_pn_14/gChamberOfTheSagesTitleCardJPNTex";
+        texture = japanese;
+    }
+    card = {};
+    card.texture = const_cast<char*>(texture);
+    card.isBossCard = false;
+    card.hasTranslation = false;
+    card.x = 160;
+    card.y = 120;
+    card.width = 144;
+    card.height = 24;
+    card.durationTimer = 80;
+    card.delayTimer = 20;
+}
+
 void PlayerUpdate() {
     sPads.ObserveMode(TravelModeSetting());
     auto* play = gPlayState;
@@ -237,6 +324,7 @@ void PlayerUpdate() {
                  CurrentVisit(play).roomReady)
             FinishPending(!sPads.Ready(CurrentVisit(play)));
     }
+    UpdateTitle(play);
     bool confirmed = false;
     if (TempleSages::ConfirmationNative::Active()) {
         const auto decision = TempleSages::ConfirmationNative::Update(play);
@@ -406,7 +494,7 @@ void Register() {
 RegisterShipInitFunc init(Register);
 } // namespace
 
-extern "C" void ComboTempleSages_DrawZeldaAura(Actor* actor, PlayState* play) {
+extern "C" void ComboTempleSages_DrawZeldaAuraAt(Actor* actor, PlayState* play, float x, float y, float z) {
     if (!actor || !play || !TempleSagesZeldaAura::Enabled(actor->id, actor->params) || !OotSession() ||
         !play->state.running || !play->state.gfxCtx || !play->sceneSegment || !play->roomCtx.curRoom.segment ||
         play->roomCtx.status != 0 || (actor->room != -1 && actor->room != play->roomCtx.curRoom.num) ||
@@ -416,12 +504,18 @@ extern "C" void ComboTempleSages_DrawZeldaAura(Actor* actor, PlayState* play) {
         gSaveContext.gameMode != GAMEMODE_NORMAL || gSaveContext.sceneLayer >= 4 ||
         !TempleSagesZeldaAura::Finite(actor->xzDistToPlayer) || !TempleSagesZeldaAura::Finite(actor->yDistToPlayer) ||
         actor->xzDistToPlayer > 1800.f || std::fabs(actor->yDistToPlayer) > 400.f ||
-        !TempleSagesZeldaAura::Finite({ actor->world.pos.x, actor->world.pos.y, actor->world.pos.z }))
+        !TempleSagesZeldaAura::Finite({ actor->world.pos.x, actor->world.pos.y, actor->world.pos.z }) ||
+        !TempleSagesZeldaAura::Finite({ x, y, z }))
         return;
     Matrix_Push();
-    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    Matrix_Translate(x, y, z, MTXMODE_NEW);
     const auto mesh = TempleSagesZeldaAura::Sample(actor->params, play->gameplayFrames, NeiGi_CameraBasis(play));
     NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
+}
+
+extern "C" void ComboTempleSages_DrawZeldaAura(Actor* actor, PlayState* play) {
+    if (actor)
+        ComboTempleSages_DrawZeldaAuraAt(actor, play, actor->world.pos.x, actor->world.pos.y, actor->world.pos.z);
 }
 #endif

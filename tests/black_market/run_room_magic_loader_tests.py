@@ -37,5 +37,6 @@ with tempfile.TemporaryDirectory(prefix='room-magic-loader-') as temporary:
                 target = folder / host / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
-        subprocess.run([str(binary), str(folder / host), host], check=True,
-                       env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})
+        for mode in ('private', 'source'):
+            subprocess.run([str(binary), str(folder / host), host, mode], check=True,
+                           env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})

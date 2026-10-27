@@ -7,6 +7,7 @@ struct PlayState;
 extern "C" {
 #endif
 void ComboTempleSages_DrawZeldaAura(struct Actor* actor, struct PlayState* play);
+void ComboTempleSages_DrawZeldaAuraAt(struct Actor* actor, struct PlayState* play, float x, float y, float z);
 #ifdef __cplusplus
 }
 #endif

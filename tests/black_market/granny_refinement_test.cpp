@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
                 std::string(reinterpret_cast<const char *>(copy[i].words.w1)) ==
                 "__OTR__@" + provider.game + ":" + name);
             ++textureReferences;
-          } else if (op == 5 || op == 6) {
+          } else if (op == 5 || op == 6 || op == G_TRI1_OTR) {
             const auto &want = expected.at(path)[i];
             if (copy[i].words.w0 != want.words.w0 ||
                 copy[i].words.w1 != want.words.w1)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "../../soh/soh/Enhancements/randomizer/NeiGiSongEffectPolicy.h"
 
 namespace ForestGiParticles {
 constexpr int kSariaMotes = 10;
@@ -78,7 +79,11 @@ inline NeiGi::Mesh Mystery(uint32_t frame, const NeiGi::Basis& camera = {}) {
 }
 
 inline NeiGi::Mesh Mirror(uint32_t frame, const NeiGi::Basis& camera = {}) {
-    return Emit(
-        frame, 5, .5f, camera, [](int, NeiGi::Point original) { return original * .55f; }, NeiGi::Kind::Neutral);
+    // Reuse Saria's Song's actual leaves, colors and motion; fit only their
+    // positions to the Mirror face. The cast ritual keeps its own materials.
+    auto mesh = NeiGi::SampleSong(CW_SONG_OOT_SARIA, frame, camera);
+    for (size_t i = 0; i < mesh.count; ++i)
+        mesh.vertices[i].p = mesh.vertices[i].p * .55f + NeiGi::Point{ 0, 6, 0 };
+    return mesh;
 }
 } // namespace ForestGiParticles

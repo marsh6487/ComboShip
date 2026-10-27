@@ -207,8 +207,9 @@ static void SkelAnime_ApplyNpcSkin(const void* plan, Mtx* matrices, s32 nativeCo
     Matrix_Pop();
 }
 
-void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
-                           OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg, s32 lod) {
+static void SkelAnime_DrawFlexLodImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                                      OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg,
+                                      s32 lod, s32 bindXlu) {
     LodLimb* rootLimb;
     s32 pad;
     Gfx* newDList;
@@ -234,6 +235,11 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     OPEN_DISPS(play->state.gfxCtx);
 
     gSPSegment(POLY_OPA_DISP++, 0xD, mtx);
+    if (bindXlu) {
+        // Deferred player equipment must use this skeleton's matrices, rather
+        // than inheriting the final actor's binding from the opaque pass.
+        gSPSegment(POLY_XLU_DISP++, 0x0D, mtx);
+    }
     Matrix_Push();
     if (drawScale != 1.f)
         Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
@@ -275,6 +281,17 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     SkelAnime_ApplyNpcSkin(skin, matrixBase, dListCount);
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                           OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg, s32 lod) {
+    SkelAnime_DrawFlexLodImpl(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, lod, false);
+}
+
+void SkelAnime_DrawFlexLodWithXlu(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                                  OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg,
+                                  s32 lod) {
+    SkelAnime_DrawFlexLodImpl(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, lod, true);
 }
 
 /**

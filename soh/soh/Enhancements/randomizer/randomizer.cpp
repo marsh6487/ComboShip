@@ -2418,6 +2418,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_SHADOW_CRYSTAL:
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
+        case RG_MAGIC_MIRROR:
+            TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
+            break;
         case RG_ROD_OF_SEASONS:
             Seasons_GrantRod();
             break;

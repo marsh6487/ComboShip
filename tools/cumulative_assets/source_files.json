@@ -13,13 +13,13 @@
     },
     {
       "path": "mm/assets/custom/textures/icon_item_custom/gItemIconMagicMirrorTex.rgba32.png",
-      "bytes": 2214,
-      "sha256": "7cec52a25831fd4e653b635a35328db8f9551331a2e60eea24ed23374dc0c937"
+      "bytes": 2203,
+      "sha256": "4f7eb68271ae35426ca47d373d41d472dce45fcd3ec74bf95f1b2cefcdfa1823"
     },
     {
       "path": "mm/assets/custom/textures/magic_mirror/gMagicMirrorForestReflectionTex.rgb5a1.png",
-      "bytes": 2174,
-      "sha256": "f31a8a528e49aac6eb16480b07d7b51b0cc6dc37ebae9db4c48d204d32bd13c0"
+      "bytes": 4261,
+      "sha256": "8cd93532ef53491f98d0fd163d5be5dd05111fe9677b3e58eff55593633b9012"
     },
     {
       "path": "soh/assets/custom/objects/magic_mirror/forest_seal",
@@ -33,13 +33,13 @@
     },
     {
       "path": "soh/assets/custom/textures/icon_item_custom/gItemIconMagicMirrorTex.rgba32.png",
-      "bytes": 2214,
-      "sha256": "7cec52a25831fd4e653b635a35328db8f9551331a2e60eea24ed23374dc0c937"
+      "bytes": 2203,
+      "sha256": "4f7eb68271ae35426ca47d373d41d472dce45fcd3ec74bf95f1b2cefcdfa1823"
     },
     {
       "path": "soh/assets/custom/textures/magic_mirror/gMagicMirrorForestReflectionTex.rgb5a1.png",
-      "bytes": 2174,
-      "sha256": "f31a8a528e49aac6eb16480b07d7b51b0cc6dc37ebae9db4c48d204d32bd13c0"
+      "bytes": 4261,
+      "sha256": "8cd93532ef53491f98d0fd163d5be5dd05111fe9677b3e58eff55593633b9012"
     },
     {
       "path": "tools/lake_tunnel_sand/coverage_preview.png",

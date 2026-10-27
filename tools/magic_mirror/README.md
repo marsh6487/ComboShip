@@ -31,10 +31,14 @@ translucent pass. The restrained 960-frame reflection shimmer is deterministic a
 exactly; there is no positional bobbing or rotation inside the visual renderer.
 
 The GI, stump reward and inventory icon share this mesh.
-After confirming recall, Link puts away his held item and performs the native
+On pressing the equipped Mirror button, Link puts away his held item and performs the native
 Farore's Wind main casting clip once at 1.25 playback speed, with a short morph
-from his current pose. Existing green seal/wisps surround the cast, with no
-floating item or Farore spell actor. The probe uses a magical shimmer when the
+from his current pose. The green seal/wisps begin immediately, including during
+put-away, and continue scrolling for the entire Yes/No prompt. The motion plays
+once and holds its finish. Yes waits for native textbox teardown and animation
+readiness without replaying the cast; No/B restores control, camera and ritual
+state. Prompt duration is unbounded; only post-confirmation completion has a
+watchdog. There is no floating item or Farore spell actor. The probe uses a magical shimmer when the
 Mirror opens its prompt, then native Farore warp audio at committed departure
 and actual arrival. Animation start, cancellation and put-away stay silent;
 the Farore wind effect is never used. Time Gate ritual framing uses an owned subcamera.
@@ -73,9 +77,13 @@ the existing item-name generator without altering its item list. Registering
 these texture identities in asset headers/archive recipes belongs to the native
 inventory integration.
 
-The probe additionally writes the same 32×32 RGBA16 forest reflection in both
+The probe additionally writes the same 64×32 RGBA16 forest reflection in both
 ports. Its optional 512px `.o2r` companion uses the same key in base/Alt and keeps
-the existing NEI icon shadow. Missing reflection assets retain the original plain
+the existing NEI icon shadow. The native tile fits exactly 4096 bytes and textured
+glass has neutral opaque modulation; separate glints retain its polished look.
+POC2 requires its matching HD companion if a previous Mirror companion is installed:
+replace POC1 rather than mixing its older logical texture scale with the new UVs.
+Missing reflection assets retain the original plain
 glass. Rebuild the HD companion with `build_forest_addon.py --output FILE.o2r
 --preview-dir DIRECTORY`; see the POC report for the pinned scene-render command.
 

@@ -995,6 +995,7 @@ struct NeiRandoOption {
 };
 
 static const NeiRandoOption kNeiRandoOptions[] = {
+    { RO_SHUFFLE_MAGIC_MIRROR, 1 },
     { RO_SHUFFLE_NEI_ITEMS, 1 },
     { RO_SHUFFLE_OOT_GEAR, 1 },
     { RO_SHUFFLE_OOT_EQUIPMENT, 1 },
@@ -1509,6 +1510,17 @@ static void DrawItemPoolTab() {
                          "Summer: Fire Temple OR Stone Tower. Autumn: Forest Temple OR Woodfall.\n"
                          "Winter: Ice Cavern's final Sheik check OR Snowhead. Gates apply only in Gated mode.\n"
                          "Seasons are not used by the reachability solver."));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+        CVarCheckbox(
+            "Shuffle Magic Mirror", Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar,
+            CheckboxOptions(
+                { { .tooltip =
+                        "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
+                        "Off keeps the fixed Mirror on the stump. Independent of Shuffle NEI Custom Items." } }));
     }
     {
         WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar, nullptr,

@@ -253,7 +253,7 @@ void BeginRoomMagic() {
     auto* shape = play->roomCtx.curRoom.meshHeader;
     if (!shape || shape->base.type != 0 || shape->polygon0.num != 1 || !shape->polygon0.start ||
         !BlackMarketRoomMagic::MatchesSource(static_cast<PolygonDlist*>(shape->polygon0.start)->opa, true) ||
-        !sRoomMagicResources.Prepare("oot"))
+        !sRoomMagicResources.Prepare("oot", static_cast<PolygonDlist*>(shape->polygon0.start)->opa))
         return;
     sRoomMagicResources.SetPalette(BlackMarketRoomMagic::ReadPalette(true));
     sRoomMagicEntry = *static_cast<PolygonDlist*>(shape->polygon0.start);

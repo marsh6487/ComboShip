@@ -233,6 +233,8 @@ int32_t GetGIID(uint32_t itemID);
 #ifdef __cplusplus
 extern "C" {
 #endif
+// Typed tile preflight follows the selected resource owner and its Alt mode.
+uint8_t MM_IsRgba32TextureAvailable(const char* filePath);
 uint64_t GetUnixTimestamp();
 #ifdef COMBO_BUILD
 COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind));

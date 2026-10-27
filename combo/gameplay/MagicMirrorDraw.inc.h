@@ -121,8 +121,8 @@ static void Draw(PlayState* play) {
         vertex.v.cn[2] = color.b;
         vertex.v.cn[3] = color.a;
         if (glass) {
-            vertex.v.tc[0] = static_cast<s16>(std::lround(ReflectionS(source.x) * 32 * 32));
-            vertex.v.tc[1] = static_cast<s16>(std::lround(ReflectionT(source.y) * 32 * 32));
+            vertex.v.tc[0] = static_cast<s16>(std::lround(ReflectionS(source.x) * kReflectionWidth * 32));
+            vertex.v.tc[1] = static_cast<s16>(std::lround(ReflectionT(source.y) * kReflectionHeight * 32));
         }
     }
     ToMatrix(&matrices[0]);
@@ -151,8 +151,8 @@ static void Draw(PlayState* play) {
         gDPSetCycleType(POLY_XLU_DISP++, G_CYC_1CYCLE);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
-        gDPLoadTextureBlock(POLY_XLU_DISP++, kForestReflection, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_CLAMP,
-                            G_TX_CLAMP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+        gDPLoadTextureBlock(POLY_XLU_DISP++, kForestReflection, G_IM_FMT_RGBA, G_IM_SIZ_16b, kReflectionWidth,
+                            kReflectionHeight, 0, G_TX_CLAMP, G_TX_CLAMP, 6, 5, G_TX_NOLOD, G_TX_NOLOD);
         gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_MODULATEIA);
     }
     Submit(POLY_XLU_DISP, vertices, mesh, mesh.opaqueBatchCount, mesh.glassEndBatch);

@@ -14,6 +14,7 @@
 
 namespace BlackMarketRoomMagic {
 inline constexpr char kCvar[] = "gCombo.BlackMarket.MagicalRoomMaterials";
+inline constexpr char kSourcePrefix[] = "custom/skiejer_market/";
 inline constexpr char kPrefix[] = "custom/skiejer_market/room_magic_v1/";
 inline constexpr char kRoom[] = "custom/skiejer_market/room_magic_v1/room";
 inline constexpr char kTexture[] = "custom/skiejer_market/room_magic_v1/texture/arcane_stone";
@@ -24,8 +25,8 @@ using Color = std::array<uint8_t, 4>;
 using Palette = std::array<Color, 4>;
 inline constexpr Palette kDefaultPalette = { Color{ 165, 148, 230, 255 }, Color{ 135, 194, 210, 255 },
                                              Color{ 204, 170, 215, 255 }, Color{ 175, 160, 216, 255 } };
-inline std::string MaterialPath(size_t index) {
-    return std::string(kPrefix) + "geometry/mat_mahouya_room_0DL_006548_GranmaShop" +
+inline std::string MaterialPath(size_t index, bool source = false) {
+    return std::string(source ? kSourcePrefix : kPrefix) + "geometry/mat_mahouya_room_0DL_006548_GranmaShop" +
            static_cast<char>('0' + index / 10) + static_cast<char>('0' + index % 10);
 }
 inline const char* SourceRoom(bool oot) {
@@ -33,7 +34,12 @@ inline const char* SourceRoom(bool oot) {
 }
 inline bool MatchesSource(const Gfx* opaque, bool oot) {
     const auto* path = reinterpret_cast<const char*>(opaque);
-    return path && std::strncmp(path, "__OTR__", 7) == 0 && std::strcmp(path + 7, SourceRoom(oot)) == 0;
+    if (!path || std::strncmp(path, "__OTR__", 7) != 0)
+        return false;
+    path += 7;
+    if (std::strncmp(path, "alt/", 4) == 0)
+        path += 4;
+    return std::strcmp(path, SourceRoom(oot)) == 0;
 }
 struct Display {
     const Gfx* data = nullptr;
@@ -59,8 +65,9 @@ class Room {
     Room() = default;
     Room(const Room&) = delete;
     Room& operator=(const Room&) = delete;
-    bool Load(const Provider& provider) {
+    bool Load(const Provider& provider, bool useSource = false) {
         Clear();
+        mUseSource = useSource;
         try {
             if (provider.game != "oot" && provider.game != "mm")
                 throw std::runtime_error("Invalid room material owner");
@@ -68,7 +75,7 @@ class Room {
             // same versioned contract and must also be compatible.
             for (size_t i = 0; i < mColors.size(); ++i)
                 CopyList(MaterialPath(i), provider);
-            mOpaque = CopyList(kRoom, provider);
+            mOpaque = CopyList(useSource ? SourceRoom(provider.game == "oot") : kRoom, provider);
             return true;
         } catch (const std::exception&) {
             Clear();
@@ -94,6 +101,7 @@ class Room {
         mActive.clear();
         mStrings.clear();
         mOwners.clear();
+        mUseSource = false;
     }
 
   private:
@@ -103,6 +111,7 @@ class Room {
     std::vector<std::shared_ptr<void>> mOwners;
     std::array<Gfx*, 28> mColors{};
     Gfx* mOpaque = nullptr;
+    bool mUseSource = false;
 
     static std::string Path(const char* value) {
         if (!value || value[0] == '>')
@@ -114,8 +123,15 @@ class Room {
     }
     Gfx* CopyList(const std::string& path, const Provider& provider) {
         std::string canonical = path.starts_with("alt/") ? path.substr(4) : path;
-        if (!canonical.starts_with(kPrefix) || mActive.contains(path))
+        if ((!canonical.starts_with(kPrefix) && !(mUseSource && canonical.starts_with(kSourcePrefix))) ||
+            mActive.contains(path))
             throw std::runtime_error("Unsupported room material graph");
+        // Unpaired Alt rooms retain their active mesh and UVs. Replace only
+        // known material calls with the private, independently colored graph.
+        if (mUseSource)
+            for (size_t i = 0; i < mColors.size(); ++i)
+                if (canonical == MaterialPath(i, true))
+                    return CopyList(MaterialPath(i), provider);
         if (auto found = mLists.find(path); found != mLists.end())
             return found->second.data();
         if (mLists.size() >= 128)

@@ -12,6 +12,8 @@ constexpr float kVertexPrecision = 16.0f;
 constexpr uint32_t kAnimationFrames = 960;
 constexpr int kRimSegments = 32;
 constexpr int kGlassRings = 5;
+// RGBA16: 64 * 32 * 2 = 4096 bytes, exactly one native texture tile.
+constexpr int kReflectionWidth = 64, kReflectionHeight = 32;
 constexpr int kMaxVertices = 1280;
 constexpr int kMaxTriangles = 1280;
 constexpr int kMaxBatches = 96;
@@ -53,9 +55,10 @@ inline float ReflectionS(float x) {
 inline float ReflectionT(float y) {
     return 0.5f - (y - 6.0f) / 25.0f;
 }
-inline Color ReflectionModulation(Color glass) {
-    return { static_cast<uint8_t>(210 + glass.r * 45 / 255), static_cast<uint8_t>(210 + glass.g * 45 / 255),
-             static_cast<uint8_t>(210 + glass.b * 45 / 255), glass.a };
+inline Color ReflectionModulation(Color) {
+    // The scene carries its own lighting. Neutral opaque modulation preserves
+    // detail; the separate restrained glints still identify polished glass.
+    return { 255, 255, 255, 255 };
 }
 
 class Builder {

@@ -60,7 +60,11 @@ def main():
      assert int(node.get(f'Flag{face}','0'))==0
      faces.append(vertices)
     words=[sum((v*2)<<shift for v,shift in zip(face,(16,8,0))) for face in faces]
-    w0=(6 if len(faces)==2 else 5)<<24|words[0];w1=words[1] if len(faces)==2 else 0
+    if len(faces)==1:
+     # Match ResourceFactoryXMLDisplayListV0's extended single-triangle codec.
+     w0=0x26000000|faces[0][0];w1=faces[0][1]<<16|faces[0][2]
+    else:
+     w0=6<<24|words[0];w1=words[1]
     keep=[]
     for face in faces:
      selected=[cache[v] in masks.get(name,set()) for v in face]

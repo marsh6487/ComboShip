@@ -323,7 +323,7 @@ void BeginRoomMagic() {
         TraceRoomMagic("source-mismatch", shape);
         return;
     }
-    if (!sRoomMagicResources.Prepare("mm")) {
+    if (!sRoomMagicResources.Prepare("mm", shape->normal.entries->opa)) {
         TraceRoomMagic("resource-unavailable", shape, true);
         return;
     }

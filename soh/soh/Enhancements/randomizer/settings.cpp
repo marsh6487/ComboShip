@@ -1551,6 +1551,8 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_STARTING_SKULLTULA_TOKEN, {NumOpts(0, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("StartingSkulltulaToken"), WIDGET_CVAR_SLIDER_INT);
     OPT_U8(RSK_STARTING_HEARTS, {NumOpts(1, 20)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("StartingHearts"), WIDGET_CVAR_SLIDER_INT, 2);
 
+    OPT_BOOL(RSK_SHUFFLE_MAGIC_MIRROR, "Shuffle Magic Mirror", CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), mOptionDescriptions[RSK_SHUFFLE_MAGIC_MIRROR], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
+
     // Integration-only options retain their authored labels and help text.
     OPT_BOOL(RSK_SW97_SPELLS, "Sage Spells", CVAR_RANDOMIZER_SETTING("SW97Spells"), mOptionDescriptions[RSK_SW97_SPELLS]);
     OPT_BOOL(RSK_SKIJER_CUSTOM_ITEMS, "Skijer's Custom Items", CVAR_RANDOMIZER_SETTING("SkijerCustomItems"), mOptionDescriptions[RSK_SKIJER_CUSTOM_ITEMS], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON);
@@ -3614,6 +3616,7 @@ void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     // A native spoiler from before this option must not retain the setting
     // from a previously loaded seed in the same Context.
     mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
+    mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF);
     // Pre-policy spoilers included Grace without a gate. Loading one after a
     // newer seed must restore that behavior rather than inherit its restriction.
     mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
@@ -3657,6 +3660,8 @@ void Settings::SetAllToContext() {
     for (int i = 0; i < RSK_MAX; i++) {
         mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set(mOptions[i].GetOptionIndex());
     }
+    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
+        mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_ON);
     for (int i = 0; i < RT_MAX; i++) {
         mContext->GetTrickOption(static_cast<RandomizerTrick>(i)).Set(mTrickSettings[i].GetOptionIndex());
     }

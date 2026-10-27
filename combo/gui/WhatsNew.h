@@ -19,6 +19,10 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.RideYoungEpona", Kind::New,
+      "Ride Young Epona as Child Link after learning Epona's Song with the Young Epona asset archive installed." },
+    { "gEnhancements.TempleSagesTravel", Kind::New,
+      "Choose Sages Chamber portal travel: Off, Dungeon rewards, Free, or Warp songs." },
     { "gEnhancements.Graphics.OotLocationTitleCards", Kind::New,
       "Use native OoT-style lettering and fades for MM location cards, with optional HD pack support." },
     { "gEnhancements.MidnaCompanionMM", Kind::New, "Replace Tatl with the installed Midna companion and sounds." },
@@ -239,6 +243,10 @@ inline constexpr Entry kControls[]{
       "Season presentation includes distinct blush spring grass, forest foliage, weather and audio integration." },
     { "gRando.Options.RO_ROD_OF_SEASONS", Kind::Updated,
       "Shared season modes retain the cumulative foliage, grass, forest-weather and audio integrations." },
+    { "gRandoSettings.ShuffleMagicMirror", Kind::New,
+      "Shuffle one Magic Mirror into the pool and randomize its Lost Woods stump reward. Defaults off." },
+    { "gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", Kind::New,
+      "Shuffle one Magic Mirror into the pool and randomize its Lost Woods stump reward. Defaults off." },
     { "gRandoSettings.StartingRodOfSeasons", Kind::Updated,
       "The starting Rod follows the selected individual, Rod or gated season mode." },
     { "gRando.Options.RO_STARTING_ROD_OF_SEASONS", Kind::Updated,

@@ -43,17 +43,27 @@ class RearPots {
     }
     Gfx Filter(const std::string& list, Gfx command, const std::array<int, 32>& cache) {
         const auto op = command.words.w0 >> 24;
-        if (!Selected(list) || (op != 5 && op != 6))
+        if (!Selected(list) || (op != 5 && op != 6 && op != G_TRI1_OTR))
             return command;
         const uintptr_t words[2] = { command.words.w0, command.words.w1 };
         int keep[2]{}, kept = 0;
         for (int face = 0; face < (op == 6 ? 2 : 1); ++face) {
             int selected = 0, labels[3];
             for (int v = 0; v < 3; ++v) {
-                const auto index = (words[face] >> (16 - 8 * v)) & 255;
-                if ((index & 1) || index / 2 >= cache.size() || cache[index / 2] < 0)
+                // XML Triangle1 stores raw indices across both words, unlike
+                // native packed triangles' doubled byte-sized indices.
+                size_t index;
+                if (op == G_TRI1_OTR)
+                    index = v == 0 ? words[0] & 0xffffff : (words[1] >> (v == 1 ? 16 : 0)) & 0xffff;
+                else {
+                    const auto packed = (words[face] >> (16 - 8 * v)) & 255;
+                    if (packed & 1)
+                        throw std::runtime_error("Changed Granny pot triangle encoding");
+                    index = packed / 2;
+                }
+                if (index >= cache.size() || cache[index] < 0)
                     throw std::runtime_error("Changed Granny pot triangle encoding");
-                labels[v] = cache[index / 2];
+                labels[v] = cache[index];
                 if (labels[v])
                     selected = labels[v];
             }

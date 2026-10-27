@@ -287,6 +287,7 @@ struct NeiRandoSetting {
 };
 
 const NeiRandoSetting kNeiRandoSettings[] = {
+    { CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), nullptr, 1 },
     { CVAR_RANDOMIZER_SETTING("SkijerCustomItems"), "gMods.CustomItems.Enabled", 1 },
     { CVAR_RANDOMIZER_SETTING("MmMasksAll"), "gMods.MmMasks.InventoryEnabled", 1 },
     { CVAR_RANDOMIZER_SETTING("ExtEquipment"), "gCheats.ExtEquip.Enabled", 1 },
@@ -529,7 +530,17 @@ void RegisterNEIMenu() {
                               "Winter: Ice Cavern's final Sheik check or Snowhead.\n"
                               "This choice is saved with the seed; menu edits apply to the next seed.\n"
                               "Season abilities are optional in the solver."));
-    mSohMenu->AddWidgetAfter(seasonsPath, seasonsModeCvar, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
+    mSohMenu->AddWidgetAfter(seasonsPath, seasonsModeCvar, "Shuffle Magic Mirror", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"))
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(CheckboxOptions().Tooltip(
+            "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
+            "Off keeps the fixed Mirror on the stump. Works independently of Enable Custom Items."));
+    mSohMenu
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), "Start with Rod of Seasons",
+                         WIDGET_CVAR_CHECKBOX)
         .CVar(startingRodCvar)
         .RaceDisable(false)
         .PreFunc(

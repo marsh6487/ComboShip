@@ -25,7 +25,7 @@ def main():
     source = (ROOT / 'soh/soh/Enhancements/Gameplay/ComboTempleSages.cpp').read_text()
     fixture = (ROOT / 'tests/temple_sages/zelda_aura_native_test.cpp').read_text().replace(
         '/* PRODUCTION_AURA_BRIDGE */', function(source, 'OotSession') +
-        function(source, 'ComboTempleSages_DrawZeldaAura'))
+        function(source, 'ComboTempleSages_DrawZeldaAuraAt') + function(source, 'ComboTempleSages_DrawZeldaAura'))
     with tempfile.TemporaryDirectory(prefix='sages-zelda-aura-') as temporary:
         work = Path(temporary)
         for name in ('policy', 'native'):

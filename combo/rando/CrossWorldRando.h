@@ -22,6 +22,7 @@
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
 #include "CrossDungeonReachability.h"
+#include "MagicMirrorShuffle.h"
 
 namespace ComboRando {
 
@@ -792,6 +793,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                     portalOpen = ootOracle.GetPortalOpen() != 0;
                 mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
             }
+            // Read from this exact OOT search, whose owned set excludes the
+            // candidate being placed. The forest branch opens only its stump,
+            // independently of the main portal; it cannot open all of Termina.
+            MagicMirrorShuffle::AddOotRoute(ootReachable, mmReachable);
             bool changed = false;
             for (size_t i = 0; i < placements.size(); ++i) {
                 if (credited[i])

@@ -290,6 +290,47 @@ static std::queue<RandomizerCheck> randomizerQueuedChecks;
 static RandomizerCheck randomizerQueuedCheck = RC_UNKNOWN_CHECK;
 static GetItemEntry randomizerQueuedItemEntry = GET_ITEM_NONE;
 #ifdef COMBO_BUILD
+extern "C" bool MagicMirror_CommitStumpRewardToken(void);
+static PlayState* sMirrorAcceptedPlay = nullptr;
+static int sMirrorAcceptedSlot = -1, sMirrorAcceptedScene = -1, sMirrorAcceptedMode = -1;
+static uint32_t sMirrorAcceptedSeed = 0;
+extern "C" void Randomizer_CancelMagicMirrorStump(void) {
+    std::queue<RandomizerCheck> retained;
+    while (!randomizerQueuedChecks.empty()) {
+        const auto check = randomizerQueuedChecks.front();
+        randomizerQueuedChecks.pop();
+        if (check != RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+            retained.push(check);
+    }
+    randomizerQueuedChecks = std::move(retained);
+    if (randomizerQueuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP) {
+        randomizerQueuedCheck = RC_UNKNOWN_CHECK;
+        randomizerQueuedItemEntry = GET_ITEM_NONE;
+    }
+    sMirrorAcceptedPlay = nullptr;
+    sMirrorAcceptedSlot = sMirrorAcceptedScene = sMirrorAcceptedMode = -1;
+    sMirrorAcceptedSeed = 0;
+}
+extern "C" bool Randomizer_MagicMirrorStumpQueued(void) {
+    if (randomizerQueuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+        return true;
+    auto pending = randomizerQueuedChecks;
+    while (!pending.empty()) {
+        if (pending.front() == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+            return true;
+        pending.pop();
+    }
+    return false;
+}
+extern "C" bool Randomizer_QueueMagicMirrorStump(void) {
+    if (Randomizer_MagicMirrorStumpQueued())
+        return false;
+    sMirrorAcceptedPlay = nullptr;
+    randomizerQueuedChecks.push(RC_LOST_WOODS_MAGIC_MIRROR_STUMP);
+    return true;
+}
+#endif
+#ifdef COMBO_BUILD
 static ComboRando::CrossDungeon::PendingChecks sCrossDungeonPendingChecks;
 void Combo_SOH_CapturePendingChecks() {
     std::vector<std::string> pending;
@@ -696,8 +737,8 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
             // The cape's receipt asks for an appearance preference, even when other pickups are skipped.
             !capeVisibilityChoice &&
             // Skipping ItemGet animation incompatible with checks that require closing a text box to finish
-            rc != RC_HF_OCARINA_OF_TIME_ITEM && rc != RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE &&
-            rc != RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE &&
+            rc != RC_LOST_WOODS_MAGIC_MIRROR_STUMP && rc != RC_HF_OCARINA_OF_TIME_ITEM &&
+            rc != RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE && rc != RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE &&
             // Always show ItemGet animation for ice traps
             !(getItemEntry.modIndex == MOD_RANDOMIZER && getItemEntry.getItemId == RG_ICE_TRAP) &&
             (CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("TimeSavers.SkipGetItemAnimation"), SGIA_JUNK) == SGIA_ALL ||
@@ -744,7 +785,37 @@ void RandomizerOnPlayerUpdateForItemQueueHandler() {
 
     SPDLOG_INFO("Attempting to give Item mod {} item {} from RC {}", randomizerQueuedItemEntry.modIndex,
                 randomizerQueuedItemEntry.itemId, static_cast<uint32_t>(randomizerQueuedCheck));
-    GiveItemEntryWithoutActor(gPlayState, randomizerQueuedItemEntry);
+#ifdef COMBO_BUILD
+    if (randomizerQueuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP) {
+        // Native acceptance may precede the receive callback by several frames.
+        // Validate once, retain the same accepted context, and never consume the
+        // token a second time while the native item action is finishing.
+        const bool acceptedContext = sMirrorAcceptedPlay == gPlayState && sMirrorAcceptedSlot == gSaveContext.fileNum &&
+                                     sMirrorAcceptedScene == gPlayState->sceneNum &&
+                                     sMirrorAcceptedSeed == Rando::Context::GetInstance()->GetSeed() &&
+                                     sMirrorAcceptedMode == gComboGameMode;
+        if ((sMirrorAcceptedPlay && !acceptedContext) ||
+            (!sMirrorAcceptedPlay && !MagicMirror_CommitStumpRewardToken())) {
+            randomizerQueuedCheck = RC_UNKNOWN_CHECK;
+            randomizerQueuedItemEntry = GET_ITEM_NONE;
+            sMirrorAcceptedPlay = nullptr;
+            return;
+        }
+        if (!GiveItemEntryWithoutActor(gPlayState, randomizerQueuedItemEntry)) {
+            if (!sMirrorAcceptedPlay) {
+                randomizerQueuedCheck = RC_UNKNOWN_CHECK;
+                randomizerQueuedItemEntry = GET_ITEM_NONE;
+            }
+            return;
+        }
+        sMirrorAcceptedPlay = gPlayState;
+        sMirrorAcceptedSlot = gSaveContext.fileNum;
+        sMirrorAcceptedScene = gPlayState->sceneNum;
+        sMirrorAcceptedSeed = Rando::Context::GetInstance()->GetSeed();
+        sMirrorAcceptedMode = gComboGameMode;
+    } else
+#endif
+        GiveItemEntryWithoutActor(gPlayState, randomizerQueuedItemEntry);
     if (player->stateFlags1 & PLAYER_STATE1_IN_WATER) {
         // Allow the player to receive the item while swimming
         player->stateFlags2 |= PLAYER_STATE2_UNDERWATER;
@@ -776,8 +847,21 @@ void RandomizerOnItemReceiveHandler(GetItemEntry receivedItemEntry) {
         randomizerQueuedItemEntry.itemId == receivedItemEntry.itemId) {
         SPDLOG_INFO("Item received mod {} item {} from RC {}", receivedItemEntry.modIndex, receivedItemEntry.itemId,
                     static_cast<uint32_t>(randomizerQueuedCheck));
+#ifdef COMBO_BUILD
+        if (randomizerQueuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
+            (!gPlayState || sMirrorAcceptedPlay != gPlayState || sMirrorAcceptedSlot != gSaveContext.fileNum ||
+             sMirrorAcceptedScene != gPlayState->sceneNum || sMirrorAcceptedMode != gComboGameMode ||
+             sMirrorAcceptedSeed != Rando::Context::GetInstance()->GetSeed()))
+            return; // A coincidental/stale receive must not acknowledge an unaccepted stump offer.
+#endif
         loc->SetCheckStatus(RCSHOW_COLLECTED);
 #ifdef COMBO_BUILD
+        if (randomizerQueuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP) {
+            // Set status first: the flag hook must not enqueue this same reward again.
+            Flags_SetRandomizerInf(RAND_INF_MAGIC_MIRROR_STUMP);
+            sMirrorAcceptedPlay = nullptr;
+            Play_PerformSave(gPlayState);
+        }
         sCrossDungeonPendingChecks.Acknowledge(Rando::StaticData::GetLocation(randomizerQueuedCheck)->GetName());
 #endif
         CheckTracker::SpoilAreaFromCheck(randomizerQueuedCheck);

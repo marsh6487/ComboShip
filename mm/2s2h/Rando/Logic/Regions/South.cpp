@@ -607,6 +607,9 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_WOODS_OF_MYSTERY] = RandoRegion{ .sceneId = SCENE_26SARUNOMORI,
         .checks = {
+            // Solo: room-1 passage enters our forest directly. Combined: it returns
+            // to OoT Lost Woods, whose room-1 fairy tunnel enters the same forest.
+            CHECK(RC_LOST_WOODS_MAGIC_MIRROR_STUMP, true),
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_01, true),
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_02, true),
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_03, true),

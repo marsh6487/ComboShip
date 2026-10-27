@@ -980,6 +980,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet effRg = actual != RG_NONE                  ? actual
                           : (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId
                                                              : rg;
+    if (effRg == RG_MAGIC_MIRROR)
+        return CwDescribeMagicMirror(out);
     switch (effRg) {
         case RG_KOKIRI_SWORD:
         case RG_MASTER_SWORD:

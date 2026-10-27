@@ -17,7 +17,8 @@ trace=(block_from(source,source.index('void TraceRoomMagic(const char* result, R
 start=source.index('BlackMarketRoomMagic::Resources sRoomMagicResources;')
 end=source.index('void RestoreRoomMagic(',start)
 production=source[start:end]+'\n'.join(block_from(source,source.index(sig)) for sig in ('void RestoreRoomMagic(','void ClearRoomMagic(','void BeginRoomMagic('))
-native=native.replace('void TraceRoomMagic(const char*, RoomShape* = nullptr, bool = false) {}', '')
+stub=block_from(native,native.index('void TraceRoomMagic('))
+native=native.replace(stub, '', 1)
 native=native.replace('/* PALETTE */',block_from(resources,resources.index('inline Palette ReadPalette('))).replace('/* PRODUCTION */',production)
 boundary=(ROOT/'tests/black_market/room_magic_resources_test.cpp').read_text().split('namespace BlackMarketRoomMagic {\n/* RESOURCES */')[0]
 graph=(ROOT/'tests/black_market/room_magic_test.cpp').read_text().split('int main() {')[0]
@@ -54,14 +55,35 @@ int main() {
  const auto draw=[&] { BeginRoomMagic(); RestoreRoomMagic(); };
  const auto expected=[&](const char* result,const char* prepare) { assert(!events.empty()); if(events.back()!=std::make_pair(std::string(result),std::string(prepare))) std::fprintf(stderr,"expected %s/%s got %s/%s\n",result,prepare,events.back().first.c_str(),events.back().second.c_str()); assert(events.back()==std::make_pair(std::string(result),std::string(prepare))); };
  draw(); expected("attached","ready");
+ // A failed optional Granny request must not gate the built-in magical room.
+ integers[BlackMarketGranny::kCvar]=1; draw(); expected("attached","ready");
+ integers.erase(BlackMarketGranny::kCvar);
+ draw(); expected("attached","ready");
  auto count=events.size(); for(int i=0;i<500;++i) draw(); assert(events.size()==count);
  nei.timeGateAdultMode=1; draw(); assert(events.size()==++count); draw(); assert(events.size()==count);
  integers["gAdultLink.ForceOn"]=1; draw(); assert(events.size()==++count);
  own->alt=true; draw(); assert(events.size()==++count); expected("attached","ready");
  own->archive->paths.insert(std::string("alt/")+SourceRoom(false));
- draw(); expected("resource-unavailable","source-alt-unpaired");
+ draw(); expected("resource-unavailable","root-not-display-list");
  count=events.size(); for(int i=0;i<500;++i) draw(); assert(events.size()==count);
  own->alt=false; draw(); expected("attached","ready");
+ // A scene may name its Alt root explicitly even when global Alt is off.
+ // Its exact mesh still owns the draw; do not substitute the base-room mesh.
+ auto explicitRoot=std::make_shared<Fast::DisplayList>();
+ explicitRoot->Instructions=std::dynamic_pointer_cast<Fast::DisplayList>(own->resources.at(kRoom))->Instructions;
+ Gfx explicitTriangle={gsSP1Triangle(0,1,2,0)};
+ explicitRoot->Instructions.insert(explicitRoot->Instructions.end()-1,explicitTriangle);
+ const std::string explicitName=std::string("alt/")+SourceRoom(false);
+ own->resources[explicitName]=explicitRoot;
+ const std::string explicitPath=std::string("__OTR__")+explicitName;
+ entry.opa=reinterpret_cast<Gfx*>(const_cast<char*>(explicitPath.c_str()));
+ BeginRoomMagic(); expected("attached","ready");
+ assert(std::memcmp(&sRoomMagicResources.Opaque()[30],&explicitTriangle,sizeof(Gfx))==0);
+ RestoreRoomMagic();
+ assert(ShapePointer(play)==&shape && entry.opa==reinterpret_cast<const Gfx*>(explicitPath.c_str()));
+ entry.opa=reinterpret_cast<Gfx*>(const_cast<char*>(path.c_str()));
+ own->resources.erase(explicitName); own->archive->paths.erase(explicitName);
+ draw(); expected("attached","ready");
  const auto requests=own->requested.size();
  integers[BlackMarketRoomMagic::kCvar]=0; draw(); expected("disabled","skipped");
  assert(own->requested.size()==requests);

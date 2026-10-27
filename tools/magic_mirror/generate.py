@@ -112,7 +112,8 @@ def load_mesh(executable, frame):
 
 def generate_assets(executable):
     reflection = Image.open(ROOT / 'tools/magic_mirror/reflection/forest-scene.png').convert('RGBA')
-    native_reflection = reflection.resize((32, 32), Image.Resampling.LANCZOS)
+    # Double horizontal detail while remaining inside a 4 KiB RGBA16 tile.
+    native_reflection = reflection.resize((64, 32), Image.Resampling.LANCZOS)
     for game in ('soh', 'mm'):
         target = ROOT / game / 'assets/custom/textures/magic_mirror/gMagicMirrorForestReflectionTex.rgb5a1.png'
         target.parent.mkdir(parents=True, exist_ok=True)

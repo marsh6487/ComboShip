@@ -1951,8 +1951,16 @@ void EnViewer_DrawStaticChildZelda(EnViewer* this, PlayState* play) {
 #ifdef COMBO_BUILD
     const StaticStoryPoseDescriptor* pose =
         StaticStoryActor_ResolvePose(STATIC_STORY_ACTOR_CHILD_ZELDA, this->staticState.pose);
-    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA))
-        ComboTempleSages_DrawZeldaAura(&this->actor, play);
+    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA) &&
+        this->skin.skelAnime.jointTable != NULL) {
+        /* The clasped animation translates the root sideways. Follow the
+         * same loaded animation and actor draw matrix as the model, while
+         * keeping the floor-relative aura below the animated pelvis. */
+        Vec3f modelOrigin = { this->skin.skelAnime.jointTable[0].x, 0.0f, this->skin.skelAnime.jointTable[0].z };
+        Vec3f worldOrigin;
+        Matrix_MultVec3f(&modelOrigin, &worldOrigin);
+        ComboTempleSages_DrawZeldaAuraAt(&this->actor, play, worldOrigin.x, worldOrigin.y, worldOrigin.z);
+    }
 #endif
 }
 

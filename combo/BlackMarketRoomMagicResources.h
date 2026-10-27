@@ -33,7 +33,7 @@ class Resources {
     const PreparationTrace& LastPreparation() const {
         return mPreparation;
     }
-    bool Prepare(const char* host) {
+    bool Prepare(const char* host, const Gfx* opaque = nullptr) {
         mPreparation = {};
         try {
             // Copied textures use @host routes, which require a registered owner.
@@ -43,26 +43,35 @@ class Resources {
                 return Unavailable("no-owner");
             const bool alt = owner->IsAltAssetsEnabled();
             mPreparation.alt = alt;
+            const bool oot = std::strcmp(host, "oot") == 0;
+            if (opaque && !MatchesSource(opaque, oot))
+                return Unavailable("source-mismatch");
+            const std::string sourceName = SourceRoom(oot);
+            const std::string sourcePath = opaque ? reinterpret_cast<const char*>(opaque) + 7 : sourceName;
             const auto archive = owner->GetArchiveManager();
-            // An unrelated Alt room needs its matching variant. Never put a
-            // base-room material graph over a custom Alt room's geometry.
-            if (alt && archive->HasFile(std::string("alt/") + SourceRoom(std::strcmp(host, "oot") == 0)) &&
-                !archive->HasFile(std::string("alt/") + kRoom))
-                return Unavailable("source-alt-unpaired");
+            // Reuse an unpaired Alt room's active geometry and replace only
+            // its known material calls. Explicit Alt roots retain their exact
+            // identity even with global Alt off; children keep normal routing.
+            const bool useSource =
+                sourcePath.starts_with("alt/") || (alt && archive->HasFile(std::string("alt/") + sourceName) &&
+                                                   !archive->HasFile(std::string("alt/") + kRoom));
             if (!archive->HasFile(kRoom) && !(alt && archive->HasFile(std::string("alt/") + kRoom)))
                 return Unavailable("graph-absent");
-            auto root = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(kRoom));
+            const std::string rootPath = useSource ? sourcePath : kRoom;
+            auto root = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(rootPath));
             mPreparation.root = root.get();
             if (!root)
                 return Unavailable("root-not-display-list");
             mPreparation.reason = "ready";
-            if (mRoom && mOwner == owner && mRoot == root && mAlt == alt && mHost == host)
+            if (mRoom && mOwner == owner && mRoot == root && mAlt == alt && mUseSource == useSource &&
+                mRootPath == rootPath && mHost == host)
                 return true;
             Clear();
             Provider provider;
             provider.game = host;
-            provider.display = [owner](const std::string& path) -> Display {
-                auto resource = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
+            provider.display = [owner, sourceName, sourcePath](const std::string& path) -> Display {
+                auto resource = std::dynamic_pointer_cast<Fast::DisplayList>(
+                    owner->LoadResource(path == sourceName ? sourcePath : path));
                 return resource ? Display{ resource->Instructions.data(), resource->Instructions.size(), resource }
                                 : Display{};
             };
@@ -75,12 +84,14 @@ class Resources {
                 return std::dynamic_pointer_cast<Fast::Texture>(owner->LoadResource(path));
             };
             auto room = std::make_unique<Room>();
-            if (!room->Load(provider))
+            if (!room->Load(provider, useSource))
                 return Unavailable("graph-invalid");
             mRoom = std::move(room);
             mOwner = owner;
             mRoot = std::move(root);
             mAlt = alt;
+            mUseSource = useSource;
+            mRootPath = rootPath;
             mHost = host;
             return true;
         } catch (const std::exception&) { return Unavailable("exception"); }
@@ -97,7 +108,9 @@ class Resources {
         mRoot.reset();
         mOwner.reset();
         mHost.clear();
+        mRootPath.clear();
         mAlt = false;
+        mUseSource = false;
     }
 
   private:
@@ -111,6 +124,8 @@ class Resources {
     std::shared_ptr<Ship::ResourceManager> mOwner;
     std::shared_ptr<Fast::DisplayList> mRoot;
     std::string mHost;
+    std::string mRootPath;
     bool mAlt = false;
+    bool mUseSource = false;
 };
 } // namespace BlackMarketRoomMagic

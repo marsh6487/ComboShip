@@ -335,6 +335,11 @@ inline RequirednessResult PareDownPlaythrough(const std::string& spoilerJson, co
                 portalOpen = portalOpen || ootQ.portalOpen;
                 mmReach = portalOpen ? QueryReachableMemo(mmOracle, mmSeen, mmMemo).reach : kEmptyReach;
             }
+            if (ootReach->contains(MagicMirrorShuffle::kOotAccessProbe)) {
+                auto forestReach = std::make_shared<std::unordered_set<std::string>>(*mmReach);
+                MagicMirrorShuffle::AddOotRoute(*ootReach, *forestReach);
+                mmReach = forestReach;
+            }
             // Test the goal per sphere and stop at the first win: we only break when the goal IS met
             // and never un-credit an item, so an early win is final regardless of oracle monotonicity.
             if (goalReached(*ootReach, *mmReach, ootOwned, mmOwned)) {
@@ -505,6 +510,7 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
             portalOpen = portalOpen || OraclePortalOpen(ootOracle);
             mmReach = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
         }
+        MagicMirrorShuffle::AddOotRoute(ootReach, mmReach);
         bool canGanon = ootReach.count(kOotGanon) > 0;
         bool canMajora = mmReach.count(kMmWin) > 0;
         if (goal.hunt ? CountOwnedTriforcePieces(ownedOot, ownedMm) >= goal.required : (canGanon && canMajora)) {
@@ -576,6 +582,7 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
         bool everPortalOpen = !portalGated || OraclePortalOpen(ootOracle) || mmStart;
         everReachMm = everPortalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
     }
+    MagicMirrorShuffle::AddOotRoute(everReachOot, everReachMm);
     result.ganonReachable = everReachOot.count(kOotGanon) > 0;
     result.majoraReachable = everReachMm.count(kMmWin) > 0;
     if (goal.hunt) {

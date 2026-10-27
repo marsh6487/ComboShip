@@ -23,6 +23,7 @@
  */
 #ifndef COMBO_FOREIGN_DRAW_MM_H
 #define COMBO_FOREIGN_DRAW_MM_H
+#include "ComboMagicMirrorForeign.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawMM.h is TU-glue: include the host engine headers before it"
@@ -164,9 +165,9 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolveOOT::NotReady; // OOT dormant / rando context null — retry next frame
     }
-    if (rcStatic == 0 ||
-        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
-         raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
+    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
+                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI &&
+                          raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -189,6 +190,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         return ComboForeignResolveOOT::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
+        return ComboForeignResolveOOT::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
     int32_t n = raw.dlistCount < CW_DRAW_MAX_DLISTS ? raw.dlistCount : CW_DRAW_MAX_DLISTS;
     if (n < CwMinDlistsForKind(raw.drawKind)) {
@@ -1294,6 +1297,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
     ComboGiReceiptTrace::Dispatch(info->resolvedName.c_str(), info->drawKind, info->dls, info->count, info->scale,
                                   info->nativeMmItem, mmPickup);
 #endif
+    if (ComboDrawMagicMirrorForeign(gPlayState, info->drawKind))
+        return;
     if (info->nativeMmItem >= 0) {
         Rando::DrawResolvedItem(static_cast<RandoItemId>(info->nativeMmItem), RC_UNKNOWN, actor);
         return;

@@ -142,8 +142,11 @@ def main():
     nearest_torch = min(math.hypot(sx-a[1], sz-a[3]) for a in torches)
     assert nearest_torch > 84+15, nearest_torch  # Flame15, stand12.
     print(f'shadow nearest_torch_center={nearest_torch:.2f}; flame_radius=15; effect/avatar_disc=84')
-    # Door is east of torch center: facing +X, right is +Z.
-    assert placements[4][2][2] > 80 and placements[4][3] == 16384
+    # Remain on the door-facing right (+Z), with the portal front aimed at the room center.
+    assert placements[4][2][2] > 80
+    shadow_yaw = placements[4][3]*math.tau/65536
+    to_center = (2136-sx, 80-sz)
+    assert (math.sin(shadow_yaw)*to_center[0]+math.cos(shadow_yaw)*to_center[1])/math.hypot(*to_center) > 0.9999
     for file in (args.base, args.djipi):
         print(file.name, hashlib.sha256(file.read_bytes()).hexdigest())
     print('PASS: five return effects; native pad offsets; 84-unit support discs; 75-unit avatar height; no collision overrides')

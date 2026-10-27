@@ -122,7 +122,30 @@ bool Rando::MiscBehavior::ShouldShowForeignCutscene(RandoCheckId rc) {
 }
 #endif
 
+#ifdef COMBO_BUILD
+extern "C" bool MagicMirror_CommitStumpRewardToken(void);
+#endif
 static bool queued = false;
+static RandoCheckId queuedCheck = RC_UNKNOWN;
+static ActorFunc sCheckQueueGive = nullptr;
+#ifdef COMBO_BUILD
+extern "C" void Rando_CancelMagicMirrorStump(void) {
+    auto* interactor = GameInteractor::Instance;
+    if (!interactor)
+        return;
+    auto stumpEvent = [](const GIEvent& event) {
+        const auto* item = std::get_if<GIEventGiveItem>(&event);
+        return item && item->param == RC_LOST_WOODS_MAGIC_MIRROR_STUMP && item->giveItem == sCheckQueueGive;
+    };
+    std::erase_if(interactor->events, stumpEvent);
+    if (stumpEvent(interactor->currentEvent))
+        interactor->currentEvent = GIEventNone{};
+    if (queuedCheck == RC_LOST_WOODS_MAGIC_MIRROR_STUMP) {
+        queued = false;
+        queuedCheck = RC_UNKNOWN;
+    }
+}
+#endif
 
 // This function handles queuing up item gives that the player has been marked as eligible for. If you are looking for
 // the behavior of the actual giving itself, the heavy lifting is done by the GameInteractor queue. This function is
@@ -143,6 +166,7 @@ void Rando::MiscBehavior::CheckQueue() {
 
         if (randoSaveCheck.eligible) {
             queued = true;
+            queuedCheck = randoCheckId;
 
             GameInteractor::Instance->events.emplace_back(GIEventGiveItem{
                 .showGetItemCutscene =
@@ -157,6 +181,18 @@ void Rando::MiscBehavior::CheckQueue() {
                 .giveItem =
                     [](Actor* actor, PlayState* play) {
                         auto& randoSaveCheck = RANDO_SAVE_CHECKS[CUSTOM_ITEM_PARAM];
+#ifdef COMBO_BUILD
+                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
+                            !MagicMirror_CommitStumpRewardToken()) {
+                            // An abandoned scene/save can leave a queued event. It must not
+                            // collect the check, grant anything, or retry forever.
+                            randoSaveCheck.eligible = false;
+                            queued = false;
+                            queuedCheck = RC_UNKNOWN;
+                            CUSTOM_ITEM_PARAM = RI_NONE;
+                            return;
+                        }
+#endif
 #ifdef COMBO_BUILD
                         // ComboShip: this MM check holds an item belonging to OOT. Present it like a
                         // native item (real name + get-item cutscene when important at home; the
@@ -221,6 +257,7 @@ void Rando::MiscBehavior::CheckQueue() {
                                 Rando::MiscBehavior::SendForeignCheck(cid); // cross-deliver + toast + save
                             }
                             queued = false;
+                            queuedCheck = RC_UNKNOWN;
                             // ComboShip (#66): keep the check id (the held-up foreign model resolves
                             // by check id) before CUSTOM_ITEM_PARAM is repurposed as the item id.
                             CUSTOM_ITEM_PARAM2 = cid;
@@ -313,12 +350,17 @@ void Rando::MiscBehavior::CheckQueue() {
                         randoSaveCheck.obtained = true;
                         randoSaveCheck.eligible = false;
                         queued = false;
+                        queuedCheck = RC_UNKNOWN;
 #ifdef COMBO_BUILD
                         // ComboShip: shared-progression co-op — broadcast this obtained check's RAW
                         // item to Anchor teammates (CUSTOM_ITEM_PARAM is still the checkId here; it is
                         // overwritten with the item id on the next line). No-op if Anchor is inactive.
                         Rando::MiscBehavior::BroadcastCheckObtainedIfFirst((RandoCheckId)CUSTOM_ITEM_PARAM,
                                                                            randoSaveCheck.randoItemId, wasObtained);
+#endif
+#ifdef COMBO_BUILD
+                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+                            SaveManager_SaveCurrentForCombo();
 #endif
                         CUSTOM_ITEM_PARAM = randoItemId;
                     },
@@ -349,6 +391,7 @@ void Rando::MiscBehavior::CheckQueue() {
                         Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
                         Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
                     } });
+            sCheckQueueGive = std::get<GIEventGiveItem>(GameInteractor::Instance->events.back()).giveItem;
             return;
         }
     }
@@ -356,6 +399,7 @@ void Rando::MiscBehavior::CheckQueue() {
 
 void Rando::MiscBehavior::CheckQueueReset() {
     queued = false;
+    queuedCheck = RC_UNKNOWN;
     GameInteractor::Instance->currentEvent = GIEventNone{};
     GameInteractor::Instance->events.clear();
 }

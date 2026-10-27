@@ -42,6 +42,20 @@ def main():
         fixture = fixture.replace("/* ACTUAL RESPAWN */", respawn).replace("/* ACTUAL ROOM */", room)
         message = (ROOT / "soh/src/code/z_message_PAL.c").read_text()
         fixture = fixture.replace("/* ACTUAL MESSAGE STATE */", block_from(message, message.index("u8 Message_GetState(")))
+        boot = (ROOT / "soh/src/code/title_setup.c").read_text()
+        title = "\n".join(re.findall(r"static s32 sCombo(?:CrossGameTitleCardPending|CustomTitleCardPresentation)[^;]*;", boot))
+        for signature in ("int Combo_SOH_SwapCustomTitleCardPresentation(", "int Combo_SOH_IsPresentingCustomTitleCard(",
+                          "int Combo_SOH_HasCrossGameTitleCard(", "int Combo_SOH_ConsumeCrossGameTitleCard(",
+                          "void Combo_SOH_RequestCrossGameTitleCard("):
+            title += "\n" + block_from(boot, boot.index(signature))
+        actor = (ROOT / "soh/src/code/z_actor.c").read_text()
+        library = (ROOT / "soh/src/code/z_lib.c").read_text()
+        title += "\n" + block_from(library, library.index("s32 Math_StepToS("))
+        title += "\n" + block_from(actor, actor.index("void TitleCard_Update("))
+        fixture = fixture.replace("/* ACTUAL TITLE FUNCTIONS */", title)
+        handlers = (ROOT / "soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp").read_text()
+        policy = handlers[handlers.index("        case VB_SHOW_TITLE_CARD:"):handlers.index("        case VB_WONDER_TALK:")]
+        fixture = fixture.replace("/* ACTUAL TITLE POLICY */", policy.replace("IS_RANDO", "randomized"))
         gbi = (ROOT / "soh/soh/GbiWrap.cpp").read_text()
         gbi = block_from(gbi, gbi.index('extern "C" void gSPDisplayList('))
         cpp = Path(temporary) / "adapter.cpp"

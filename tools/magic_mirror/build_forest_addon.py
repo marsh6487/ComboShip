@@ -20,7 +20,8 @@ def texture(image, kind):
     header = bytearray(64)
     struct.pack_into('<BB2xIIQ', header, 0, 0, 1, 0x4F544558, 1, 0xDEADBEEFDEADBEEF)
     bpp = {1:32, 2:16}[kind]
-    body = struct.pack('<4I2fI', kind, width, height, 1, width/32*32/bpp, height/32, width*height*4)
+    logical_width = 64 if kind == 2 else 32
+    body = struct.pack('<4I2fI', kind, width, height, 1, width/logical_width*32/bpp, height/32, width*height*4)
     return bytes(header)+body+image.tobytes()
 
 def nei_icon(art):
@@ -71,7 +72,7 @@ def main():
             assert actual == raw
             kind,w,h,flags,sx,sy,length=struct.unpack_from('<4I2fI',actual,64)
             assert flags == 1 and (w,h,length,len(actual)) == (512,512,1048576,1048668)
-            assert (kind,sx,sy) == ((2,32.,16.) if path.endswith('ForestReflectionTex') else (1,16.,16.))
+            assert (kind,sx,sy) == ((2,16.,16.) if path.endswith('ForestReflectionTex') else (1,16.,16.))
     report = dict(archive=args.output.name,sha256=hashlib.sha256(args.output.read_bytes()).hexdigest(),
                   resources={p:hashlib.sha256(raw).hexdigest() for p,raw in sorted(entries.items())},
                   reflection='Fixed rendered view of the actual preserved Lost Woods room; not live rendering',

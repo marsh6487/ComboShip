@@ -17,6 +17,7 @@
  */
 #ifndef COMBO_FOREIGN_DRAW_OOT_H
 #define COMBO_FOREIGN_DRAW_OOT_H
+#include "ComboMagicMirrorForeign.h"
 
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
@@ -121,7 +122,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolve::NotReady; // MM's rando state isn't up — retry, don't freeze
     }
-    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
+    if (rcStatic == 0 ||
+        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI && raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
         // ComboShip: no static DL row — try the animated ABI (MM stray fairies). MM only describes
         // the item; ComboForeignAnim_Draw (combo/menu/ComboForeignAnim.h) loads + draws it.
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -144,6 +146,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
+        return ComboForeignResolve::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
     int32_t n = raw.dlistCount < CW_DRAW_MAX_DLISTS ? raw.dlistCount : CW_DRAW_MAX_DLISTS;
     if (n < CwMinDlistsForKind(raw.drawKind)) {
@@ -990,6 +994,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         GetItem_Draw(play, getItemEntry->gid);
         return;
     }
+
+    if (ComboDrawMagicMirrorForeign(play, info->drawKind))
+        return;
 
     // ComboShip: animated class — combo-owned skeletal draw (any failure -> sentinel, never blank).
     if (info->animOk) {

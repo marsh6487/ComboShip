@@ -1,3 +1,4 @@
+#include "rando/MagicMirrorShuffle.h"
 // This module accesses GameState::main and owns no SDL entry point.
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
@@ -5226,6 +5227,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
     // String CVar outside GetAllOptions(); without it a replayed spoiler inherits the local machine's
     // exclusions (GAP-7). Restore below is type-aware.
     j[CVAR_RANDOMIZER_SETTING("ExcludedLocations")] = CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");
+    j["gRando.Generation.ShuffleMagicMirror"] = CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
     cached = j.dump();
     return cached.c_str();
 }
@@ -5234,6 +5236,13 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
 // preference. The MM option is shared by the combo menus and governs both pools.
 // Replays restore their existing snapshots instead of calling this normalizer.
 extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM(void) {
+    // One physical combined stump: OR the independent native requests, while
+    // keeping both checkbox CVars unchanged. The generation value is snapshotted
+    // separately so replay reconstructs both native seed flags.
+    CVarSetInteger(
+        "gRando.Generation.ShuffleMagicMirror",
+        ComboRando::MagicMirrorShuffle::Requested(CVarGetInteger(CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), 0),
+                                                  CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", 0)));
     const auto mode = NeiGrace_SeedMode(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", NEI_GRACE_OFF));
     const auto rewards = NeiGrace_SeedRequired(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4));
     CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", mode);
@@ -5258,6 +5267,7 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         return;
     try {
         auto j = nlohmann::json::parse(json);
+        CVarSetInteger("gRando.Generation.ShuffleMagicMirror", 0);
         // Upstream appended these renames to the already-run ConfigVersion7 updater, so older snapshots
         // still carry the old keys; rename them here (same table, values unchanged).
         static const std::pair<const char*, const char*> kRenamed[] = {
@@ -6826,6 +6836,9 @@ extern "C" COMBO_EXPORT const char* Combo_SOH_Rando_GetReachableChecks(void) {
     sComboPortalOpen = portal->Child() || portal->Adult();
 #endif
     nlohmann::json out = nlohmann::json::array();
+    if (Combo_IsCombinedGame() && ctx->GetOption(RSK_SHUFFLE_MAGIC_MIRROR) &&
+        RegionTable(RR_THE_LOST_WOODS)->HasAccess())
+        out.push_back(ComboRando::MagicMirrorShuffle::kOotAccessProbe);
     for (RandomizerCheck rc : reachable) {
         const std::string& name = Rando::StaticData::GetLocation(rc)->GetName();
         if (!name.empty())

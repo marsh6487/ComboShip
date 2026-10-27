@@ -111,6 +111,26 @@ class EncodedAssets(unittest.TestCase):
                     module.prepare(root / 'output', root)
                 self.assertFalse((root / 'output').exists())
 
+    def test_corrupt_morning_override_preserves_all_installed_files(self):
+        module = loader()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            overlay = root / 'overlay'
+            shutil.copytree(module.OVERLAY, overlay)
+            manifest = json.loads((overlay / 'manifest.json').read_text())
+            part = overlay / manifest['parts'][0]['name']
+            data = bytearray(part.read_bytes())
+            data[0] = ord('A') if data[0] != ord('A') else ord('B')
+            part.write_bytes(data)
+            output = root / 'output'
+            witness = output / 'soh/assets/custom/objects/magic_mirror/forest_seal'
+            witness.parent.mkdir(parents=True)
+            witness.write_bytes(b'installed')
+            with self.assertRaisesRegex(ValueError, 'part'):
+                module.prepare(output, overlay=overlay)
+            self.assertEqual(witness.read_bytes(), b'installed')
+            self.assertEqual(len([p for p in output.rglob('*') if p.is_file()]), 1)
+
     def test_cmake_target_prepares_exact_assets_before_archive_target(self):
         module = loader()
         cmake = shutil.which('cmake')

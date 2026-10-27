@@ -40,9 +40,13 @@ void ExtEquip_SetSlot(s16,u8) { assert(false); }
 void Inventory_ChangeEquipment(int) { assert(false); }
 ImRect target;
 bool found=false;
+bool disabled=false;
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext*,ImGuiID,const ImRect&,const ImGuiLastItemData*) {}
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx,ImGuiID,const char* label,ImGuiItemStatusFlags flags) {
- if (!strcmp(label,"Shield of Ikana")) { target=ctx->LastItemData.Rect;found=true;assert(flags & ImGuiItemStatusFlags_Checkable); }
+ if (!strcmp(label,"Shield of Ikana")) {
+  target=ctx->LastItemData.Rect;found=true;
+  disabled=(ctx->LastItemData.ItemFlags & ImGuiItemFlags_Disabled)!=0;
+ }
 }
 void ImGuiTestEngineHook_Log(ImGuiContext*,const char*,...) {}
 const char* ImGuiTestEngine_FindItemDebugLabel(ImGuiContext*,ImGuiID) { return ""; }
@@ -55,15 +59,16 @@ void frame() {
 int main() {
  ImGui::CreateContext();auto& io=ImGui::GetIO();io.IniFilename=nullptr;io.DisplaySize=ImVec2(900,600);
  unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);GImGui->TestEngineHookItems=true;
- frame();frame();assert(found && "current editor lacks an explicit Ikana ownership checkbox");
- assert(!ExtEquip_HasItem(1,3) && state.shieldOwned==FC_SHIELD_MIRROR_OOT);
+ frame();frame();assert(found && "current editor lacks an Ikana ownership button");
+ assert(!disabled && !ExtEquip_HasItem(1,3) && state.shieldOwned==FC_SHIELD_MIRROR_OOT);
  const auto center=target.GetCenter();
  for (int edit=0;edit<2;++edit) {
-  io.AddMousePosEvent(center.x,center.y);frame();io.AddMouseButtonEvent(0,true);frame();io.AddMouseButtonEvent(0,false);frame();
-  assert(bool(ExtEquip_HasItem(1,3))==(edit==0));
-  assert(state.shieldOwned==(edit==0 ? FC_SHIELD_MIRROR_OOT|FC_SHIELD_IKANA : FC_SHIELD_MIRROR_OOT));
+  io.AddMousePosEvent(center.x,center.y);frame();io.AddMouseButtonEvent(0,true);frame();io.AddMouseButtonEvent(0,false);frame();frame();
+  assert(ExtEquip_HasItem(1,3));
+  assert(state.shieldOwned==(FC_SHIELD_MIRROR_OOT|FC_SHIELD_IKANA));
+  assert(disabled && "owned Ikana must use the same disabled grant button as sibling equipment");
  }
- ImGui::DestroyContext();puts("PASS real ImGui current editor grant/remove and side-effect-free drawing");
+ ImGui::DestroyContext();puts("PASS real ImGui Ikana button: unowned/enabled, owned/disabled, repeat click retains ownership, idle drawing preserves save");
 }
 '''
 imgui=Path(os.environ['IMGUI_DIR'])

@@ -19,6 +19,7 @@ using namespace Rando;
 // live in the combo-owned header to keep the vendored footprint to this one include. Mirror of MM's
 // ComboItemDrawMM.h include, in the opposite direction.
 #include "ComboItemDrawOOT.h"
+#include "gameplay/MagicMirrorItem.h"
 #endif
 
 std::array<Item, RG_MAX> Rando::StaticData::itemTable;
@@ -1155,6 +1156,13 @@ void Rando::StaticData::InitItemTable() {
     itemTable[RG_PHANTOM_HOURGLASS].SetCustomDrawFunc(Randomizer_DrawNeiPhantomHourglass);
     itemTable[RG_SHADOW_CRYSTAL].SetCustomDrawFunc(Randomizer_DrawNeiShadowCrystal);
     itemTable[RG_ROD_OF_SEASONS].SetCustomDrawFunc(Randomizer_DrawNeiRodOfSeasons);
+    itemTable[RG_MAGIC_MIRROR] = Item(RG_MAGIC_MIRROR, Text{ "Magic Mirror", "Miroir Magique", "Magischer Spiegel" },
+        ITEMTYPE_ITEM, RG_MAGIC_MIRROR, true, LOGIC_NONE, RHT_NONE, EXT_ITEM_MAGIC_MIRROR,
+        OBJECT_GAMEPLAY_KEEP, 0, TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG,
+        ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER).CustomIcon("__OTR__textures/icon_item_custom/gItemIconMagicMirrorTex");
+#ifdef COMBO_BUILD
+    itemTable[RG_MAGIC_MIRROR].SetCustomDrawFunc([](PlayState* play, GetItemEntry*) { MagicMirror_DrawGI(play); });
+#endif
     // Seasons: same rod model, per-season flame color.
     itemTable[RG_SEASON_SPRING].SetCustomDrawFunc(Randomizer_DrawSeasonSpring);
     itemTable[RG_SEASON_SUMMER].SetCustomDrawFunc(Randomizer_DrawSeasonSummer);

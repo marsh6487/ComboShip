@@ -1365,7 +1365,7 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
     // returning false (e.g. Harpoon's Prop Hunt hider draws as a prop and
     // wants to hide Link entirely). Default keeps vanilla draw on.
     if (GameInteractor_Should(VB_PLAYER_DRAW, true, play, data)) {
-        SkelAnime_DrawFlexLod(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, data, lod);
+        SkelAnime_DrawFlexLodWithXlu(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, data, lod);
     }
 
     if (!GameInteractor_InvisibleLinkActive() &&

@@ -1049,6 +1049,8 @@ static int32_t MM_FillElementalSpellDrawInfo(RandoItemId id, CwItemDrawInfo* out
 }
 
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    if (id == RI_OOT_NEI_MAGIC_MIRROR)
+        return CwDescribeMagicMirror(out);
     bool progressiveConverted = false;
     // ComboShip (#88): a progressive item's model is the tier the player is owed, not the static base
     // drawId (which is always tier 1 — every Progressive Sword drew a Kokiri Sword). Resolve it the way

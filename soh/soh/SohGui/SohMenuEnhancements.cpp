@@ -299,6 +299,7 @@ void SohMenu::AddMenuEnhancements() {
     AddSidebarEntry("Enhancements", path.sidebarName, 3);
     path.column = SECTION_COLUMN_1;
 
+    AddWidget(path, "Convenience", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Ride Young Epona as Child", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("RideYoungEpona"))
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
@@ -307,6 +308,66 @@ void SohMenu::AddMenuEnhancements() {
             "with native horse fences and area restrictions.\n"
             "Requires Young_Epona_SoH_POC1_Assets.o2r. Reload the area after changing this option.\n"
             "Young Epona's saved location is separate from adult Epona."));
+
+#ifdef COMBO_BUILD
+    AddWidget(path, "Sages Chamber travel", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_ENHANCEMENT("TempleSagesTravel"))
+        .Options(ComboboxOptions()
+                     .ComboMap(templeSagesTravelOptions)
+                     .DefaultIndex(int(TempleSages::TravelMode::DungeonRewards))
+                     .Tooltip("Choose travel through the five Sages Chamber portals.\n"
+                              "Off: Keep Chamber decoration; hide destination return portals.\n"
+                              "Dungeon rewards: Require each portal's matching medallion.\n"
+                              "Free: All five portals are usable immediately.\n"
+                              "Warp songs: Require each portal's matching learned warp song.\n"
+                              "Gated portals stay dim until their required medallion or song is owned.\n"
+                              "All travel requires Yes/No confirmation. No dungeon rewards are granted.\n"
+                              "After changing modes on a portal, step off and enter again to travel."));
+#endif
+    AddWidget(path, "Quit Fishing at Door", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("QuitFishingAtDoor"))
+        .Options(CheckboxOptions().Tooltip(
+            "Fisherman asks if you want to quit at the door if you try to leave the Fishing Pond "
+            "while still holding the Fishing Rod."));
+    AddWidget(path, "Instant Putaway", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("InstantPutaway"))
+        .Options(CheckboxOptions().Tooltip("Allow Link to put items away without having to wait around."));
+    AddWidget(path, "Navi Timer Resets on Scene Change", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("ResetNaviTimer"))
+        .Options(
+            CheckboxOptions().Tooltip("Resets the Navi timer on scene change. If you have already talked to her, "
+                                      "she will try and talk to you again, instead of needing a save warp or death."));
+    AddWidget(path, "Link's Cow in Both Time Periods", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("CowOfTime"))
+        .Options(CheckboxOptions().Tooltip(
+            "Allows the Lon Lon Ranch Obstacle Course reward to be shared across time periods."));
+    AddWidget(path, "Play Zelda's Lullaby to Open Sleeping Waterfall", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_ENHANCEMENT("TimeSavers.SleepingWaterfall"))
+        .PreFunc([](WidgetInfo& info) {
+            info.options->disabled =
+                IS_RANDO &&
+                OTRGlobals::Instance->gRandoContext->GetOption(RSK_SLEEPING_WATERFALL).Is(RO_WATERFALL_OPEN);
+            info.options->disabledTooltip = "This setting is forcefully enabled because a randomizer savefile with "
+                                            "\"Sleeping Waterfall: Open\" is loaded.";
+        })
+        .Options(
+            ComboboxOptions()
+                .ComboMap(sleepingWaterfallOptions)
+                .DefaultIndex(WATERFALL_ALWAYS)
+                .Tooltip(
+                    "Always: Link must always play Zelda's Lullaby to open the waterfall entrance to Zora's Domain.\n"
+                    "Once: Link only needs to play Zelda's Lullaby once to open the waterfall; after that, it stays "
+                    "open permanently.\n"
+                    "Never: Link never needs to play Zelda's Lullaby to open the waterfall. He only needs to have "
+                    "learned it and have an Ocarina."));
+    AddWidget(path, "Skip Feeding Jabu-Jabu", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("TimeSavers.SkipJabuJabuFish"))
+        .PreFunc([](WidgetInfo& info) {
+            info.options->disabled = IS_RANDO;
+            info.options->disabledTooltip =
+                "This setting is disabled because a randomizer savefile with \"Jabu-Jabu: Open\" is loaded.";
+        })
+        .Options(CheckboxOptions().Tooltip("Allow Link to enter Jabu-Jabu without feeding him a fish."));
 
     AddWidget(path, "Saving", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Autosave", WIDGET_CVAR_CHECKBOX)
@@ -487,67 +548,6 @@ void SohMenu::AddMenuEnhancements() {
         .Options(CheckboxOptions().Tooltip("Allows normally throw-only objects (such as Cuccos, pots, grass, and small "
                                            "rocks) to be dropped by pressing A while standing still. Can be toggled "
                                            "while holding an object."));
-
-    AddWidget(path, "Convenience", WIDGET_SEPARATOR_TEXT);
-#ifdef COMBO_BUILD
-    AddWidget(path, "Sages Chamber travel", WIDGET_CVAR_COMBOBOX)
-        .CVar(CVAR_ENHANCEMENT("TempleSagesTravel"))
-        .Options(ComboboxOptions()
-                     .ComboMap(templeSagesTravelOptions)
-                     .DefaultIndex(int(TempleSages::TravelMode::DungeonRewards))
-                     .Tooltip("Choose travel through the five Sages Chamber portals.\n"
-                              "Off: Keep Chamber decoration; hide destination return portals.\n"
-                              "Dungeon rewards: Require each portal's matching medallion.\n"
-                              "Free: All five portals are usable immediately.\n"
-                              "Warp songs: Require each portal's matching learned warp song.\n"
-                              "Gated portals stay dim until their required medallion or song is owned.\n"
-                              "All travel requires Yes/No confirmation. No dungeon rewards are granted.\n"
-                              "After changing modes on a portal, step off and enter again to travel."));
-#endif
-    AddWidget(path, "Quit Fishing at Door", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("QuitFishingAtDoor"))
-        .Options(CheckboxOptions().Tooltip(
-            "Fisherman asks if you want to quit at the door if you try to leave the Fishing Pond "
-            "while still holding the Fishing Rod."));
-    AddWidget(path, "Instant Putaway", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("InstantPutaway"))
-        .Options(CheckboxOptions().Tooltip("Allow Link to put items away without having to wait around."));
-    AddWidget(path, "Navi Timer Resets on Scene Change", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("ResetNaviTimer"))
-        .Options(
-            CheckboxOptions().Tooltip("Resets the Navi timer on scene change. If you have already talked to her, "
-                                      "she will try and talk to you again, instead of needing a save warp or death."));
-    AddWidget(path, "Link's Cow in Both Time Periods", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("CowOfTime"))
-        .Options(CheckboxOptions().Tooltip(
-            "Allows the Lon Lon Ranch Obstacle Course reward to be shared across time periods."));
-    AddWidget(path, "Play Zelda's Lullaby to Open Sleeping Waterfall", WIDGET_CVAR_COMBOBOX)
-        .CVar(CVAR_ENHANCEMENT("TimeSavers.SleepingWaterfall"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled =
-                IS_RANDO &&
-                OTRGlobals::Instance->gRandoContext->GetOption(RSK_SLEEPING_WATERFALL).Is(RO_WATERFALL_OPEN);
-            info.options->disabledTooltip = "This setting is forcefully enabled because a randomizer savefile with "
-                                            "\"Sleeping Waterfall: Open\" is loaded.";
-        })
-        .Options(
-            ComboboxOptions()
-                .ComboMap(sleepingWaterfallOptions)
-                .DefaultIndex(WATERFALL_ALWAYS)
-                .Tooltip(
-                    "Always: Link must always play Zelda's Lullaby to open the waterfall entrance to Zora's Domain.\n"
-                    "Once: Link only needs to play Zelda's Lullaby once to open the waterfall; after that, it stays "
-                    "open permanently.\n"
-                    "Never: Link never needs to play Zelda's Lullaby to open the waterfall. He only needs to have "
-                    "learned it and have an Ocarina."));
-    AddWidget(path, "Skip Feeding Jabu-Jabu", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("TimeSavers.SkipJabuJabuFish"))
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = IS_RANDO;
-            info.options->disabledTooltip =
-                "This setting is disabled because a randomizer savefile with \"Jabu-Jabu: Open\" is loaded.";
-        })
-        .Options(CheckboxOptions().Tooltip("Allow Link to enter Jabu-Jabu without feeding him a fish."));
 
     // Skips & Speed-ups
     path.sidebarName = "Skips & Speed-ups";

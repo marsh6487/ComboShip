@@ -2313,7 +2313,7 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
     if ((playerForm == PLAYER_FORM_HUMAN) && Trident_GoldenArmor()) {
         gDPSetEnvColor(POLY_OPA_DISP++, 255, 205, 40, 0);
     }
-    SkelAnime_DrawFlexLod(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, actor, lod);
+    SkelAnime_DrawFlexLodWithXlu(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, actor, lod);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

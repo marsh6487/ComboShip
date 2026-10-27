@@ -34,6 +34,27 @@ int main() {
          result.words.w1 == retained.words.w1);
   Gfx removed = {gsSP1Triangle(0, 1, 2, 0)};
   assert((filter.Filter(path, removed, cache).words.w0 >> 24) == G_SPNOOP);
+  // Actual XML Triangle1 packing: raw indices split across both words.
+  // gsSP1TriangleOTR alone is not the factory's final encoding.
+  Gfx extendedRemoved{};
+  extendedRemoved.words = {0x26000000, 0x00010002};
+  assert((filter.Filter(path, extendedRemoved, cache).words.w0 >> 24) ==
+         G_SPNOOP);
+  Gfx extendedRetained{};
+  extendedRetained.words = {0x26000003, 0x00040005};
+  const auto keptExtended = filter.Filter(path, extendedRetained, cache);
+  assert(std::memcmp(&keptExtended, &extendedRetained, sizeof(Gfx)) == 0);
+  for (const uintptr_t last : {uintptr_t(3), uintptr_t(32)}) {
+    Gfx invalidExtended{};
+    invalidExtended.words = {0x26000000, 0x00010000 | last};
+    bool invalidRejected = false;
+    try {
+      filter.Filter(path, invalidExtended, cache);
+    } catch (const std::runtime_error &) {
+      invalidRejected = true;
+    }
+    assert(invalidRejected);
+  }
   Gfx crossing = {gsSP1Triangle(0, 1, 3, 0)};
   bool rejected = false;
   try {
@@ -52,6 +73,8 @@ int main() {
          "incomplete geometry must never masquerade as a compatible donor");
   filter.Reset();
   assert(filter.Filter(path, both, cache).words.w0 == both.words.w0);
+  assert(filter.Filter(path, extendedRemoved, cache).words.w0 ==
+         extendedRemoved.words.w0);
   assert(!std::memcmp(source->data(), before.data(), sizeof(before)));
   Vapor invalid;
   assert(!invalid.Load({}, {}, {}) && !invalid.Root());

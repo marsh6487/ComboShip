@@ -14,13 +14,23 @@ static void* customLimbs[17];
 static FlexSkeletonHeader loadedSkeleton;
 Gfx D_80116280[3];
 static unsigned draws, adultDraws, auraDraws;
+static Vec3f auraOrigin;
+static MtxF modelMatrix;
+static MtxF* sCurrentMatrix = &modelMatrix;
 #ifdef COMBO_BUILD
 void ComboTempleSages_DrawZeldaAura(Actor* actor, PlayState* play) {
     REQUIRE(actor->id == ACTOR_EN_VIEWER);
     REQUIRE(actor->params == 0x7D23 || actor->params == 0x7F34);
+    auraOrigin = actor->world.pos;
+    ++auraDraws;
+}
+void ComboTempleSages_DrawZeldaAuraAt(Actor* actor, PlayState* play, float x, float y, float z) {
+    REQUIRE(actor->id == ACTOR_EN_VIEWER && actor->params == 0x7D23);
+    auraOrigin = (Vec3f){ x, y, z };
     ++auraDraws;
 }
 #endif
+/* PRODUCTION_MATRIX_MULTIPLY */
 
 uint8_t ResourceMgr_FileExists(const char* path) {
     return 0;
@@ -142,6 +152,23 @@ int main(void) {
             REQUIRE(actor.skin.skelAnime.limbCount == 18);
             REQUIRE(actor.skin.skelAnime.dListCount == (replacement ? 9 : 16));
             REQUIRE(strcmp((char*)actor.skin.skelAnime.animation, childAnimations[pose]) == 0);
+            actor.actor.world.pos = (Vec3f){ 100, 200, 300 };
+            actor.actor.shape.rot.y = model ? 0x4000 : 0;
+            actor.actor.scale = (Vec3f){ model ? .02f : .01f, .01f, .01f };
+            actor.skin.skelAnime.jointTable[0] = (Vec3s){ 1570, 2460, model ? -200 : 0 };
+            modelMatrix = (MtxF){ 0 };
+            modelMatrix.xw = 100;
+            modelMatrix.yw = 200;
+            modelMatrix.zw = 300;
+            modelMatrix.ww = 1;
+            modelMatrix.yy = .01f;
+            if (model) {
+                modelMatrix.xz = .01f;
+                modelMatrix.zx = -.02f;
+            } else {
+                modelMatrix.xx = .01f;
+                modelMatrix.zz = .01f;
+            }
             for (int eye = 0; eye < 3; ++eye) {
                 actor.staticState.eyeIndex = eye;
                 expectedEye = eyes[eye];
@@ -155,6 +182,11 @@ int main(void) {
                 REQUIRE(memcmp(&before, &actor, sizeof(actor)) == 0);
 #ifdef COMBO_BUILD
                 REQUIRE(auraDraws == previousAura + (pose == 2));
+                if (pose == 2) {
+                    REQUIRE(fabsf(auraOrigin.x - (model ? 98.f : 115.7f)) < .0001f);
+                    REQUIRE(auraOrigin.y == 200.f);
+                    REQUIRE(fabsf(auraOrigin.z - (model ? 268.6f : 300.f)) < .0001f);
+                }
 #else
                 REQUIRE(auraDraws == previousAura);
 #endif

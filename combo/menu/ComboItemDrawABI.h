@@ -7,6 +7,8 @@
 #include "ComboElementalArrowGi.h"
 
 #include <stdint.h>
+#include <stddef.h>
+#include <string.h>
 #include "../ComboGameExport.h"
 
 #ifdef __cplusplus
@@ -78,6 +80,7 @@ typedef enum {
     CW_DRAW_KIND_ELEMENTAL_ARROW = 39,      /* owner arrow core dl0; host aura profile 1..3 in neiEffect */
     CW_DRAW_KIND_BOTTLE_CONTENTS = 40,      /* shared casing; dl0 marker selects mushroom/princess/gold dust */
     CW_DRAW_KIND_SILVER_RUPEE = 41,         /* OPA seg8 = segTexPath (owner RM), dl0; optional grayscale */
+    CW_DRAW_KIND_MAGIC_MIRROR = 42,         /* receiving host draws authored procedural Mirror + leaves */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -225,6 +228,19 @@ typedef int32_t (*Fn_GetNeiGiDrawInfoForAssets)(const char* slug, int32_t altAss
  * producer's state isn't up yet. itemName is in the owning game's namespace (MM: RI_* spoilerName). */
 typedef int32_t (*Fn_GetItemDrawInfo)(const char* itemName, CwItemDrawInfo* out);
 
+static inline int32_t CwDescribeMagicMirror(CwItemDrawInfo* out) {
+    if (out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    out->drawKind = CW_DRAW_KIND_MAGIC_MIRROR;
+    out->dlistCount = 0;
+    out->opCount = 0;
+    out->scale = 0.0f;    /* native callback owns its receiving host's existing GI scale */
+    out->itemShimmer = 0; /* the authored callback supplies Saria leaves */
+    out->resolvedName = "Magic Mirror";
+    return 1;
+}
+
 /* Lowest dlists[] slot index each kind's handler blind-indexes, +1. Both resolvers reject a recipe
  * below this before caching it, so a handler can never submit a null display list. */
 static inline int32_t CwMinDlistsForKind(int32_t kind) {
@@ -252,6 +268,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
             return 2;
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:
+        case CW_DRAW_KIND_MAGIC_MIRROR:
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             return 0; /* native kinds carry no resource lists; OPS bounds-checks every DL index */
         case CW_DRAW_KIND_SEASON_GI:
