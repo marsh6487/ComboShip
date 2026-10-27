@@ -23,6 +23,23 @@ int main() {
     using namespace SeasonFoliage;
     const auto hd = Make(Fast::TextureType::RGBA16bpp, TEX_FLAG_LOAD_AS_RAW, { 40, 110, 25, 83, 95, 85, 70, 255 });
     const auto before = *hd->mImageBuffer;
+    // Independently derived RGBA output pins the confirmed role hues at the texture
+    // boundary, including each role's existing exposure and source alpha.
+    struct RoleOutput {
+        int season;
+        Surface surface;
+        uint8_t red, green, blue;
+    };
+    for (const auto role :
+         { RoleOutput{ 2, Surface::Ground, 138, 86, 45 }, RoleOutput{ 2, Surface::Canopy, 108, 32, 34 },
+           RoleOutput{ 2, Surface::Understory, 101, 43, 29 }, RoleOutput{ 3, Surface::Ground, 169, 182, 189 },
+           RoleOutput{ 3, Surface::Canopy, 102, 107, 105 }, RoleOutput{ 3, Surface::Understory, 98, 106, 110 } }) {
+        const auto shown = BuildTexture(hd, Palette(role.season, role.surface));
+        REQUIRE(shown && shown->ImageData[0] == role.red && shown->ImageData[1] == role.green &&
+                shown->ImageData[2] == role.blue && "confirmed seasonal role hue/exposure output differs");
+        REQUIRE(shown->ImageData[3] == 83 && *hd->mImageBuffer == before);
+        REQUIRE(std::equal(shown->ImageData + 4, shown->ImageData + 8, hd->ImageData + 4));
+    }
     const auto autumn = BuildTexture(hd, Palette(2, Surface::Ground));
     REQUIRE(autumn && "Djipi raw RGBA pixels must receive autumn despite native RGBA16 type");
     REQUIRE(autumn->ImageData[0] > autumn->ImageData[1] && autumn->ImageData[1] > autumn->ImageData[2]);

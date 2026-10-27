@@ -40,7 +40,11 @@ def main():
                         help="Optional Prelude Termina export for actual Moon tree leaf/bark draw coverage")
     parser.add_argument("--all-scene-materials", action="store_true",
                         help="Check frozen grass/forest and negative material cases from the full --mm archive")
+    parser.add_argument("--field-only", action="store_true",
+                        help="Use --mm as an exact Termina native resource subset; verify its 19 frozen field cases")
     args = parser.parse_args()
+    if args.field_only and (not args.mm or args.all_scene_materials or args.woodfall_pack):
+        parser.error("--field-only requires --mm and cannot use --all-scene-materials or --woodfall-pack")
     if args.all_scene_materials and not args.mm:
         parser.error("--all-scene-materials requires --mm")
     if args.woodfall_pack and not args.mm:
@@ -62,7 +66,7 @@ def main():
     if args.mm:
         path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_0241B0"
         with zipfile.ZipFile(args.mm) as archive:
-            if args.all_scene_materials:
+            if args.all_scene_materials or args.field_only:
                 # Use actual archive identities for the extracted texture-hash handlers.
                 from_paths = [p for p in archive.namelist() if "Tex_" in p or "TLUT_" in p]
                 # CRC64 is computed by the C++ fixture; resolve only the curated paths below.
@@ -70,15 +74,17 @@ def main():
             for suffix, triangles in (("034098", 14), ("037098", 8)):
                 texture = f"scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_{suffix}"
                 coverage_cases.append((path, texture, triangles, archive.read(path)))
-            if args.all_scene_materials:
+            if args.all_scene_materials or args.field_only:
                 reference = json.loads((ROOT / "mm/tests/autumn_scene_material_cases.json").read_text())
                 for case in reference["cases"]:
+                    if args.field_only and case["scene_id"] != "SCENE_00KEIKOKU":
+                        continue
                     data = archive.read(case["path"])
                     if hashlib.sha256(data).hexdigest() != case["resource_sha256"]:
                         raise ValueError(f"Native scene fixture hash differs: {case['path']}")
                     winter_palette = (reference["termina_winter_palette"] if case["scene_id"] == "SCENE_00KEIKOKU"
                                       else reference["winter_palette"])
-                    scene_cases.append((case, reference["palette"], winter_palette, data))
+                    scene_cases.append((case, case.get("autumn_palette", reference["palette"]), winter_palette, data))
                 if not scene_cases:
                     raise ValueError("The requested all-scene material reference has no cases")
     source = (ROOT / "mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp").read_text()
@@ -229,7 +235,7 @@ def main():
                 fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{expected}}}, {{{textures}}});\n'
                 fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{winter_expected}}}, {{{textures}}}, SEASON_WINTER);\n'
             fixtures += '}\n'
-        if args.mm:
+        if args.mm and not args.field_only:
             def texture_fixture(archive, path, label):
                 data = archive.read(path)
                 version = struct.unpack_from('<I', data, 8)[0]
@@ -292,7 +298,7 @@ def main():
                 fixtures += ',\n'.join(f'Command(0x{a:08X}, 0x{b:08X})'
                                       for a, b in struct.iter_unpack('<II', archive.read(trim)[72:]))
                 fixtures += '};\n'
-                for selected, color in (("SEASON_AUTUMN", "D99C45FF"), ("SEASON_WINTER", "E5EDF3FF"),
+                for selected, color in (("SEASON_AUTUMN", "F3974FFF"), ("SEASON_WINTER", "DCECF5FF"),
                                          ("SEASON_SPRING", "F6C1D9FF")):
                     expected = ','.join('0x' + color for _ in range(52))
                     fixtures += f'CheckActualSceneMaterial({json.dumps(trim)}, SCENE_24KEMONOMITI, source, {{{expected}}}, {selected});\n'

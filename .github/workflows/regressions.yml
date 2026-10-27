@@ -18,6 +18,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Prepare exact cumulative source assets
+        run: |
+          python3 -B scripts/assets/prepare_cumulative_assets.py
+          python3 -B scripts/assets/prepare_temple_sages.py
+          python3 -B scripts/assets/prepare_lake_tunnel_sand.py
+
       - name: Install regression dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pycparser python3-venv
 

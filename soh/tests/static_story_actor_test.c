@@ -125,7 +125,7 @@ int main(void) {
     REQUIRE(StaticStoryActor_GetPose((int16_t)0x7E23) == 2);
     REQUIRE(StaticStoryActor_GetType((int16_t)0x7E00) == STATIC_STORY_ACTOR_NONE);
     REQUIRE(StaticStoryActor_GetType((int16_t)0x7E0A) == STATIC_STORY_ACTOR_KEATON);
-    REQUIRE(StaticStoryActor_GetType((int16_t)0x7D03) == STATIC_STORY_ACTOR_NONE);
+    REQUIRE(StaticStoryActor_GetType((int16_t)0x7D04) == STATIC_STORY_ACTOR_NONE);
     REQUIRE(StaticStoryActor_GetType((int16_t)0x7F06) == STATIC_STORY_ACTOR_ADULT_RUTO);
     REQUIRE(StaticStoryActor_GetType(0x7F00) == 0);
     REQUIRE(StaticStoryActor_GetType(0x7F0B) == 0);

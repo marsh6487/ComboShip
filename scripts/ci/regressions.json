@@ -1435,5 +1435,53 @@
     "origin": "gate",
     "name": "Termina native floor packets and additive seasonal coverage",
     "run": "ASAN_OPTIONS=detect_leaks=0 MM_FOLIAGE_TEST_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py --materials mm/tests/fixtures/termina_season_materials"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Sages Chamber travel policy, registered native adapter and confirmation",
+    "run": "python3 -B tests/temple_sages/run_tests.py\npython3 -B tests/temple_sages/run_confirmation_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Cutscene-only Zelda aura scope and optimized finite-position guards",
+    "run": "python3 -B tests/temple_sages/run_aura_tests.py\npython3 -B tests/temple_sages/run_aura_tests.py --fast-math"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Packaged Sages Chamber resource closure with native and Alt rendering",
+    "run": "python3 -B tests/temple_sages/test_packaged_chamber.py"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Packaged Lake Hylia dedicated sand, native and Alt resource parity",
+    "run": "python3 -B -m unittest discover -s tests/lake_tunnel_sand -v"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Cutscene actor Zelda dialogue catalogue and native talk lifecycle",
+    "run": "python3 -B tests/custom_messages/run_cutscene_actor_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Exact cumulative assets from bounded compressed source parts",
+    "run": "python3 -B -m unittest discover -s tests/cumulative_assets -v"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native-texture chamber and optional visual layer compatibility",
+    "run": "python3 -B tests/temple_sages/test_native_chamber_layers.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Stone chamber footsteps and full walkable surface echo",
+    "run": "python3 -B tests/temple_sages/test_collision_audio.py"
   }
 ]

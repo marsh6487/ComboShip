@@ -2,11 +2,11 @@
   "native_archive_sha256": "f10167e5682d74cc8da0137c524b1521f4e7ff47438b8888b63db6c7c6dc8d59",
   "palette": [
     "00000000",
-    "D99C45FF",
-    "B96848FF",
-    "FFD078FF",
-    "F4B783FF",
-    "FF9F91FF"
+    "F3974FFF",
+    "EF484CFF",
+    "F3974FFF",
+    "EF484CFF",
+    "F26846FF"
   ],
   "note": "Frozen native reference: primary render tile, production renderer TMEM slots, direct triangle submissions. Eligibility is tested separately by MMWeather. No game runtime proof.",
   "positive_cases": 298,
@@ -736,6 +736,14 @@
         3,
         3,
         3
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -769,6 +777,14 @@
         4,
         4,
         4
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -801,6 +817,14 @@
         3,
         3,
         3
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -820,6 +844,14 @@
         4,
         4,
         4
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -844,6 +876,14 @@
         3,
         3,
         3
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -871,6 +911,14 @@
         4,
         4,
         4
+      ],
+      "autumn_palette": [
+        "00000000",
+        "F3974FFF",
+        "EF484CFF",
+        "DE496BFF",
+        "DE496BFF",
+        "F26846FF"
       ]
     },
     {
@@ -29161,19 +29209,19 @@
   ],
   "termina_winter_palette": [
     "00000000",
-    "E5EDF3FF",
-    "CCDCEEFF",
-    "E5EDF3FF",
-    "CCDCEEFF",
-    "D8E2ECFF"
+    "DCECF5FF",
+    "E2EEE9FF",
+    "DCECF5FF",
+    "E2EEE9FF",
+    "E2EEE9FF"
   ],
   "winter_palette": [
     "00000000",
-    "E5EDF3FF",
-    "CCDCEEFF",
-    "E5EDF3FF",
-    "CCDCEEFF",
-    "D8E2ECFF"
+    "DCECF5FF",
+    "E2EEE9FF",
+    "DCECF5FF",
+    "E2EEE9FF",
+    "E2EEE9FF"
   ],
   "recovered_native_archive_sha256": "17ca3a4be1726b3080c5e7ea923e0673cd55ec560439d77478b7663663087c6a"
 }

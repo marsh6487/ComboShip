@@ -89,6 +89,12 @@ jobs:
       - name: Prepare exact shipped spin resources
         run: python3 -B scripts/assets/prepare_spin_styles.py
 
+      - name: Prepare exact cumulative source assets
+        run: |
+          python3 -B scripts/assets/prepare_cumulative_assets.py
+          python3 -B scripts/assets/prepare_temple_sages.py
+          python3 -B scripts/assets/prepare_lake_tunnel_sand.py
+
       - name: Check custom asset trees for new path collisions
         run: python3 scripts/check-asset-collisions.py
 

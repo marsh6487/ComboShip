@@ -27,6 +27,12 @@ typedef struct {
     bool (*offerTalk)(float distance, void* context);
 } StaticStoryTalkOperations;
 
+bool StaticStoryTalk_CanTalkPose(StaticStoryActorType type, uint8_t pose);
+void StaticStoryTalk_UpdateForPose(StaticStoryActorType type, uint8_t pose, const StaticStoryProgression* progression,
+                                  float talkDistance, bool timePedestalOffered, StaticStoryTalkSession* session,
+                                  const StaticStoryTalkOperations* operations, void* context);
+
+/* Legacy callers use the ordinary pose-zero dialogue. */
 void StaticStoryTalk_Update(StaticStoryActorType type, const StaticStoryProgression* progression, float talkDistance,
                             bool timePedestalOffered, StaticStoryTalkSession* session,
                             const StaticStoryTalkOperations* operations, void* context);

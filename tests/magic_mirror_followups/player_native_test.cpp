@@ -11,7 +11,7 @@ constexpr u32 PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET = 0x20, PLAYER_STATE2_DISA
 constexpr u32 PLAYER_STATE2_20 = 0x20, PLAYER_STATE2_40 = 0x40;
 constexpr u32 PLAYER_STATE3_PAUSE_ACTION_FUNC = 4, PLAYER_STATE3_4 = 4;
 constexpr int ANIMMODE_ONCE = 0;
-constexpr u16 NA_SE_SY_TRE_BOX_APPEAR = 0x4807;
+constexpr u16 NA_SE_PL_MAGIC_WIND_WARP = 0x087B;
 struct Animation {};
 Animation gPlayerAnim_link_magic_kaze1;
 struct SkelAnime { bool complete = false; };
@@ -70,32 +70,33 @@ int main() {
     player.actor.velocity.x = 5;
     player.actor.velocity.z = 7;
     Check(MagicMirrorPlayer_Begin(&play, &player) == 1, "Eligible cast starts");
-    Check(sSounds.size() == 1 && sSounds[0] == 0x4807, "One existing chime starts with the actual cast");
+    Check(sSounds.empty(), "Animation start leaves activation and departure audio to the runtime");
     Check(player.actor.velocity.x == 0 && player.actor.velocity.z == 0, "Cast stops motion");
     Check(!MagicMirrorPlayer_Begin(&play, &player), "Repeated begin is rejected");
     for (int frame = 0; frame < 60; ++frame) player.actionFunc(&player, &play);
-    Check(sSounds.size() == 1, "Casting update does not replay audio");
+    Check(sSounds.empty(), "Casting update does not emit audio");
     player.skelAnime.complete = true;
     player.actionFunc(&player, &play);
     Check(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_READY, "Native animation completion commits readiness");
-    Check(sSounds.size() == 1, "Readiness does not replay audio");
+    Check(sSounds.empty(), "Readiness alone does not emit departure audio");
     MagicMirrorPlayer_End(&play, &player);
-    Check(sSounds.size() == 1, "Cast cancellation/release is silent");
+    Check(sSounds.empty(), "Cast cancellation/release is silent");
 
     sPutAway = true;
     Check(MagicMirrorPlayer_Begin(&play, &player), "Holstered cast can queue");
-    Check(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PUT_AWAY && sSounds.size() == 1,
+    Check(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PUT_AWAY && sSounds.empty(),
           "Put-away wait does not announce a cast that has not started");
     MagicMirrorPlayer_End(&play, &player);
-    Check(player.afterPutAwayFunc == nullptr && sSounds.size() == 1, "Cancelled put-away leaves no chime callback");
+    Check(player.afterPutAwayFunc == nullptr && sSounds.empty(), "Cancelled put-away leaves no audio callback");
     Check(MagicMirrorPlayer_Begin(&play, &player), "Next put-away cast queues");
     player.afterPutAwayFunc(&play, &player);
-    Check(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING && sSounds.size() == 2,
-          "Successful post-holster casting starts one new chime");
+    Check(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING && sSounds.empty(),
+          "Successful post-holster casting does not prematurely play the departure cue");
     for (int frame = 0; frame < 60; ++frame) player.actionFunc(&player, &play);
-    Check(sSounds.size() == 2, "Post-holster update does not loop the chime");
+    Check(sSounds.empty(), "Post-holster update does not loop audio");
     MagicMirrorPlayer_End(&play, &player);
     MagicMirrorPlayer_Arrive(&play, &player);
-    Check(sSounds.size() == 2, "Arrival does not duplicate departure audio");
-    std::puts("PASS: native cast lifecycle, one-shot chime, holster/cancel/repeat/arrival timing");
+    Check(sSounds.size() == 1 && sSounds.back() == NA_SE_PL_MAGIC_WIND_WARP,
+          "Actual Mirror arrival has its own native Farore cue");
+    std::puts("PASS: native cast lifecycle, silent animation/holster/cancel/repeat, one-shot Farore arrival");
 }

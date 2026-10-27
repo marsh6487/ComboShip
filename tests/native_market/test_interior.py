@@ -73,8 +73,8 @@ class DefaultInterior(unittest.TestCase):
         shelf = 'custom/skiejer_market/texture/arcane_stone'
         self.assertIn(shelf, resources, 'Native shelves must never load an absent texture')
         self.assertEqual(hashlib.sha256(resources[shelf][92:]).hexdigest(),
-                         '3e2bac601d1a9c3e0317d159aa6b9f5354abaac982a24848edfec5e97dbb3231',
-                         'Animated shelves/backdrop must retain original arcane art, never floor slate')
+                         '08fc11578f90b1b834b6fb026bf6defbad4374a0013a448d3fcc7822df355237',
+                         'Animated shelves/backdrop must use the neutral arcane base, never floor slate')
         added = set(resources) - set(base)
         self.assertEqual(added, material_paths | {shelf, market_title.RESOURCE})
         market_title.validate_texture(resources[market_title.RESOURCE])

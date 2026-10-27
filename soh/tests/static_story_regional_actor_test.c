@@ -27,7 +27,7 @@ int main(void) {
     }
     assert(StaticStoryActor_GetType(0x7E0E) == 24);
     assert(StaticStoryActor_GetType(0x7D00) == 0);
-    assert(StaticStoryActor_GetType(0x7D03) == 0);
+    assert(StaticStoryActor_GetType(0x7D04) == 0);
     assert(StaticStoryActor_GetType(0x0010) == 0);
     return 0;
 }

@@ -41,12 +41,12 @@ inline Tint Palette(int season, Surface surface, uint32_t autumnColor = 0) {
             return { surface == Surface::Canopy ? 0xF6C1D9E0u : 0xF6C1D9FFu, 461 };
         case 2:
             if (surface == Surface::Ground && !autumnColor)
-                return { 0xF2B45CFFu, 320, 24 }; // Readable warm amber/ochre on dark grass and trim.
-            return { autumnColor ? autumnColor : surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };
+                return { 0xF3974FFFu, 320, 24 }; // Copper grass and trim; retain the accepted exposure.
+            return { autumnColor ? autumnColor : surface == Surface::Understory ? 0xF26846FFu : 0xEF484CFFu, 256 };
         case 3:
             if (surface == Surface::Ground && !autumnColor)
-                return { 0xE5EDF3FFu, 461, 128 }; // Pale frost, including the darkest grass shadows.
-            return { surface == Surface::Canopy ? 0xCCDCEEFFu : 0xE5EDF3FFu, 461 };
+                return { 0xDCECF5FFu, 461, 128 }; // Pale frost, including the darkest grass shadows.
+            return { surface == Surface::Canopy ? 0xE2EEE9FFu : 0xDCECF5FFu, 461 };
         default:
             return {};
     }

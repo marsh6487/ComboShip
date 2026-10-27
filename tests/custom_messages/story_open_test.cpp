@@ -84,7 +84,7 @@ static std::string Decode() {
   return body;
 }
 
-static void CheckCustom(u16 id) {
+static void CheckCustom(u16 id, const char* expectedText = nullptr) {
   ResetMessage();
   bool fromTable = true;
   GameInteractor_ExecuteOnOpenText(&id, &fromTable);
@@ -107,7 +107,7 @@ static void CheckCustom(u16 id) {
          play.msgCtx.msgLength < sizeof(play.msgCtx.font.msgBuf));
   assert(play.msgCtx.font.msgLength == play.msgCtx.msgLength);
   const std::string expected =
-      StaticStoryDialogue_GetText(id, gSaveContext.language);
+      expectedText != nullptr ? expectedText : StaticStoryDialogue_GetText(id, gSaveContext.language);
   assert(Decode() == expected);
   Message_CloseTextbox(&play);
   assert(play.msgCtx.msgMode == MSGMODE_TEXT_CLOSING &&
@@ -121,11 +121,14 @@ static void CheckCustom(u16 id) {
 
 int main() {
   ShipInit::InitAll();
-  // The monkey is first so a missing registration is the decisive failure.
+  // Explicit IDs/copy ensure missing Zelda catalog or registration fails decisively.
   for (u8 language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRA, LANGUAGE_JPN}) {
     gSaveContext.language = language;
-    CheckCustom(0x8F27);
-    for (u16 id = 0x8F20; id < 0x8F27; ++id)
+    CheckCustom(0x8F2B, "Do you hear it? The stones are humming... as if they remember your footsteps.");
+    CheckCustom(0x8F2C,
+                "Every path leaves an echo in this chamber. Some wake to a song... others to a promise fulfilled.");
+    CheckCustom(0x8F2D, "A fairy boy... I thought the forest kept its secrets. Did your fairy guide you here?");
+    for (size_t entry = 0; const u16 id = StaticStoryDialogue_GetTextIdAt(entry); ++entry)
       CheckCustom(id);
     bool fromTable = true;
     u16 ordinary = 0x1234;
@@ -135,15 +138,17 @@ int main() {
   // Re-running initialization must retain one delivery per ID.
   ShipInit::InitAll();
   gSaveContext.language = LANGUAGE_ENG;
-  CheckCustom(0x8F27);
-  assert(GameInteractor::RegisteredGameHooks<
-             GameInteractor::OnOpenText>::functionsForID[0x8F27]
-             .size() == 1);
+  for (size_t entry = 0; const u16 id = StaticStoryDialogue_GetTextIdAt(entry); ++entry) {
+    CheckCustom(id);
+    assert(GameInteractor::RegisteredGameHooks<
+               GameInteractor::OnOpenText>::functionsForID[id]
+               .size() == 1);
+  }
   ResetMessage();
   Message_StartTextbox(&play, 0x1234, nullptr);
   assert(Decode() == "Native table.");
   puts("PASS story registration -> native opening/decoding/closing/reopening: "
-       "monkey and all catalog IDs, "
+       "plain child/chamber Zelda and all catalog IDs, "
        "four languages, repeat registration and native-table passthrough "
        "(ASan/UBSan)");
 }

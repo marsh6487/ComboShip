@@ -3529,6 +3529,21 @@ CameraMode sCamSetBlackMarketOotModes[] = {
     CAM_SETTING_MODE_ENTRY(CAM_FUNC_DATA4, sSetBlackMarketOotModeNormalData),
 };
 
+// OoT TURN_AROUND / KEEP4 type 10, used only by the Mirror's private subcamera.
+// MM has the same height-normalized KEEPON4 solver but no TURN_AROUND setting.
+CameraModeValue sSetMagicMirrorModeData[] = {
+    CAM_FUNCDATA_KEEP4(-50, 150, -15, 175, 0, 70,
+                      CAM_INTERFACE_FLAGS(CAM_LETTERBOX_MEDIUM, CAM_HUD_VISIBILITY_IGNORE, KEEPON4_FLAG_1), 25, 60),
+};
+CameraMode sCamSetMagicMirrorModes[] = {
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_KEEPON4, sSetMagicMirrorModeData), // human
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_KEEPON4, sSetMagicMirrorModeData), // Fierce Deity
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_KEEPON4, sSetMagicMirrorModeData), // Goron
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_KEEPON4, sSetMagicMirrorModeData), // Deku
+    CAM_SETTING_MODE_NULL,
+    CAM_SETTING_MODE_ENTRY(CAM_FUNC_KEEPON4, sSetMagicMirrorModeData), // Zora
+};
+
 CameraSetting sCameraSettings[] = {
     { 0x00000000, 0x00000000, NULL },                              // CAM_SET_NONE
     { 0x3FFFFFFF, 0x00000005, sCamSetNormal0Modes },               // CAM_SET_NORMAL0
@@ -3622,6 +3637,7 @@ CameraSetting sCameraSettings[] = {
     { 0x0000002F, 0x00000005, sCamSetElegyShellModes },            // CAM_SET_ELEGY_SHELL
     { 0x03FFFFFF, 0x00000005, sCamSetDungeon4Modes },              // CAM_SET_DUNGEON4
     { 0x00000001, 0x80000005, sCamSetBlackMarketOotModes },        // CAM_SET_BLACK_MARKET_OOT
+    { 0x0000002F, 0x00000005, sCamSetMagicMirrorModes },           // CAM_SET_MAGIC_MIRROR
 };
 
 s16 sGlobalCamDataSettings[] = {

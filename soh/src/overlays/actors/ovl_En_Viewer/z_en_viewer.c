@@ -42,6 +42,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 #include "soh/Enhancements/Gameplay/ComboForestActors.h"
+#include "soh/Enhancements/Gameplay/ComboTempleSages.h"
 #include <assert.h>
 #include <string.h>
 
@@ -331,6 +332,12 @@ static AnimationHeader* EnViewerStatic_GetAnimation(uint16_t animation) {
             return &gPhantomGanonNeutralAnim;
         case STATIC_ANIM_ADULT_ZELDA_IDLE:
             return &gZelda2Anime2Anim_009FBC;
+        case STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED:
+            return &gZelda2Anime2Anim_003FF8;
+        case STATIC_ANIM_CHILD_ZELDA_IDLE:
+            return &gChildZeldaAnim_000654;
+        case STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED:
+            return &gChildZeldaAnim_01910C;
         default:
             return NULL;
     }
@@ -370,6 +377,11 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             break;
         case STATIC_SKELETON_ADULT_ZELDA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gZelda2Skel, NULL, NULL, NULL, 0);
+            break;
+        case STATIC_SKELETON_CHILD_ZELDA:
+            /* Use the public resource signature, like adult Zelda, so native
+             * ResourceMgr/SkeletonPatcher replacement and Alt selection apply. */
+            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gChildZeldaSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_DARUNIA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gDaruniaSkel, NULL, NULL, NULL, 0);
@@ -1087,7 +1099,7 @@ void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
     EnViewerStaticTalkContext context;
 
     /* Model-only catalogue entries remain visible, collidable, and targetable without entering talk state. */
-    if (!StaticStoryActor_CanTalk(type)) {
+    if (!StaticStoryTalk_CanTalkPose(type, this->staticState.pose)) {
         this->actor.textId = 0;
         EnViewerStatic_RestorePlacementPose(this);
         return;
@@ -1112,8 +1124,8 @@ void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
         EnViewerStatic_GetTalkMessageState, EnViewerStatic_ShouldAdvanceTalk,   EnViewerStatic_CloseTalk,
         EnViewerStatic_ProcessTalkRequest,  EnViewerStatic_OfferTalkAtDistance,
     };
-    StaticStoryTalk_Update(type, &progression, definition->talkDistance, timePedestalOffered, &session, &operations,
-                           &context);
+    StaticStoryTalk_UpdateForPose(type, this->staticState.pose, &progression, definition->talkDistance,
+                                  timePedestalOffered, &session, &operations, &context);
     this->actor.textId = session.textId;
     this->staticState.talking = session.talking;
     this->staticState.tracking = session.tracking;
@@ -1916,6 +1928,34 @@ void EnViewer_DrawStaticAdultMalon(EnViewer* this, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static s32 EnViewer_StaticChildZeldaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
+                                                     Vec3s* rot, void* thisx) {
+    /* Match the ordinary child Zelda model contract: legs inside the skirt
+     * are hidden, with all other limbs supplied by the loaded skeleton. */
+    if (limbIndex >= 3 && limbIndex < 7) {
+        *dList = NULL;
+    }
+    return false;
+}
+
+void EnViewer_DrawStaticChildZelda(EnViewer* this, PlayState* play) {
+    static void* sEyes[] = { gChildZeldaEyeOpenTex, gChildZeldaEyeBlinkTex, gChildZeldaEyeShutTex };
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gChildZeldaMouthNeutralTex));
+    SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticChildZeldaOverrideLimbDraw, NULL, this);
+    CLOSE_DISPS(play->state.gfxCtx);
+#ifdef COMBO_BUILD
+    const StaticStoryPoseDescriptor* pose =
+        StaticStoryActor_ResolvePose(STATIC_STORY_ACTOR_CHILD_ZELDA, this->staticState.pose);
+    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA))
+        ComboTempleSages_DrawZeldaAura(&this->actor, play);
+#endif
+}
+
 static s32 EnViewer_StaticAdultZeldaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
                                                      Vec3s* rot, void* thisx, Gfx** gfx) {
     EnViewer* this = (EnViewer*)thisx;
@@ -1988,6 +2028,12 @@ void EnViewer_DrawStaticAdultZelda(EnViewer* this, PlayState* play) {
                                        this->skin.skelAnime.dListCount, EnViewer_StaticAdultZeldaOverrideLimbDraw, NULL,
                                        this, POLY_OPA_DISP);
     CLOSE_DISPS(play->state.gfxCtx);
+#ifdef COMBO_BUILD
+    const StaticStoryPoseDescriptor* pose =
+        StaticStoryActor_ResolvePose(STATIC_STORY_ACTOR_ADULT_ZELDA, this->staticState.pose);
+    if (this->staticState.staticMode && (pose->flags & STATIC_POSE_FLAG_BLUE_AURA))
+        ComboTempleSages_DrawZeldaAura(&this->actor, play);
+#endif
 }
 
 static s32 EnViewer_StaticDaruniaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
@@ -2458,6 +2504,9 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
             break;
         case STATIC_STORY_ACTOR_ADULT_ZELDA:
             EnViewer_DrawStaticAdultZelda(this, play);
+            break;
+        case STATIC_STORY_ACTOR_CHILD_ZELDA:
+            EnViewer_DrawStaticChildZelda(this, play);
             break;
         case STATIC_STORY_ACTOR_SHEIK:
             EnViewer_DrawStaticSheik(this, play);

@@ -469,6 +469,10 @@ add_custom_target(
     DEPENDS ZAPD CheckAssetCollisions)
 
 include(CMake/NativeForestAssets.cmake)
+include(CMake/CumulativeAssets.cmake)
+include(CMake/TempleSagesAssets.cmake)
+include(CMake/LakeTunnelSandAssets.cmake)
+add_dependencies(CheckAssetCollisions PrepareCumulativeAssets PrepareTempleSagesAssets PrepareLakeTunnelSandAssets)
 
 ################################################################################
 # Installation and Packaging

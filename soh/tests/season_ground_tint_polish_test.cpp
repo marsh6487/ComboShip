@@ -51,15 +51,15 @@ int main() {
         }
     }
     for (int season : { 0, 2, 3 }) {
-        for (uint32_t override : { 0xD99C45FFu, 0xB96848FFu }) {
-            const uint32_t color = season == 0 ? 0xF6C1D9FFu : season == 2 ? override : 0xE5EDF3FFu;
+        for (uint32_t override : { 0xF3974FFFu, 0xEF484CFFu }) {
+            const uint32_t color = season == 0 ? 0xF6C1D9FFu : season == 2 ? override : 0xDCECF5FFu;
             const auto expected = BuildTexture(dark, { color, season == 2 ? 256u : 461u });
             const auto actual = BuildTexture(dark, Palette(season, Surface::Ground, override));
             REQUIRE(expected && actual && *expected->mImageBuffer == *actual->mImageBuffer);
         }
     }
-    // Compare all sampled RGB inputs against fixed pre-polish palette contracts
-    // for the surfaces this request does not change.
+    // Literal role hues pin seasonal output while retaining the accepted exposure
+    // and blend alpha over all sampled RGB inputs.
     std::vector<char> samples;
     for (unsigned r = 0; r < 256; r += 16)
         for (unsigned g = 0; g < 256; g += 16)
@@ -70,8 +70,8 @@ int main() {
         const bool canopy = surface == Surface::Canopy;
         for (int season : { 0, 2, 3 }) {
             const uint32_t color = season == 0   ? (canopy ? 0xF6C1D9E0u : 0xF6C1D9FFu)
-                                   : season == 2 ? (canopy ? 0xF4B783FFu : 0xFFD078FFu)
-                                                 : (canopy ? 0xCCDCEEFFu : 0xE5EDF3FFu);
+                                   : season == 2 ? (canopy ? 0xEF484CFFu : 0xF26846FFu)
+                                                 : (canopy ? 0xE2EEE9FFu : 0xDCECF5FFu);
             auto expected = BuildTexture(sampled, { color, season == 2 ? 256u : 461u });
             auto actual = BuildTexture(sampled, Palette(season, surface));
             REQUIRE(expected && actual && *expected->mImageBuffer == *actual->mImageBuffer);
@@ -98,6 +98,6 @@ int main() {
                 REQUIRE(output->ImageData[at] == (value >> 8) && output->ImageData[at + 1] == (value & 255));
         }
     }
-    std::cout << "PASS native OoT ground polish: amber/frost/blush, dark detail, private-forest overrides, "
-                 "24576 unchanged non-ground pixels, all 65536 packed colors, source/alpha preservation\n";
+    std::cout << "PASS native OoT ground polish: copper/glacial/blush, dark detail, private-forest overrides, "
+                 "24576 non-ground palette samples, all 65536 packed colors, source/alpha preservation\n";
 }

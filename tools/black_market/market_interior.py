@@ -414,6 +414,23 @@ def texture(name, logical_size):
     return bytes(header) + framing + pixels
 
 
+def grayscale_magic_texture():
+    """Neutral BM tint base; preserve the original colored source API.
+
+    Rec.709 integer weights operate on the existing encoded RGB values, with
+    nearest-integer rounding: (2126R + 7152G + 722B + 5000) // 10000.
+    No exposure/contrast adjustment or resampling is applied. Alpha and the
+    corrected RGBA8 LOAD_AS_RAW / logical64 upload header stay byte-identical.
+    """
+    original = texture('arcane_stone', 64)
+    pixels = bytearray(original[92:])
+    for offset in range(0, len(pixels), 4):
+        red, green, blue = pixels[offset:offset+3]
+        luminance = (2126*red + 7152*green + 722*blue + 5000) // 10000
+        pixels[offset:offset+3] = bytes((luminance, luminance, luminance))
+    return original[:92] + pixels
+
+
 def apply(resources):
     import native_market
     native_market.validate_resources(resources)
@@ -423,8 +440,8 @@ def apply(resources):
     for name, path in TEXTURES.items():
         result[path] = texture(name, 32 if name in BASE_NAMES else 64)
     # Flow/Veil owns this animated shelf/backdrop path, not the slate floor.
-    # Retain valid raw framing while restoring its exact original ethereal art.
-    result[SHELF] = texture('arcane_stone', 64)
+    # Preserve the original detail with a neutral base for the existing tint.
+    result[SHELF] = grayscale_magic_texture()
     count = 0
     for path, data in resources.items():
         if '/mat_' not in path:

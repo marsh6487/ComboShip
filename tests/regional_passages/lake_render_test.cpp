@@ -92,6 +92,7 @@ struct Interpreter {
     bool hasWater = false;
     bool hasVerticalFall = false;
     size_t vertices = 0;
+    float dryFloorArea = 0, sandFloorArea = 0;
     const GraphicsContext* gfx = nullptr;
     void* SegAddr(uintptr_t);
     void GfxDpSetCombineMode(uint32_t, uint32_t, uint32_t, uint32_t);
@@ -166,6 +167,25 @@ struct Interpreter {
         const auto tailEnd = reinterpret_cast<uintptr_t>(opa.data() + opa.size());
         assert((address >= rockBegin && address + count * sizeof(Vtx) <= rockEnd) ||
                (address >= tailBegin && address + count * sizeof(Vtx) <= tailEnd));
+        // Measure actual queued, quantized vertices under their active texture.
+        // A correct isolated partition is insufficient if the renderer submits
+        // the old single-atlas floor or assigns sand to a narrow UV strip.
+        bool floor = !waterMaterial;
+        for (size_t i = 0; i < count; ++i)
+            floor &= pointer[i].v.ob[1] == std::lround(Lake::kMouth.y);
+        if (floor) {
+            float twiceArea = 0;
+            for (size_t i = 0; i < count; ++i) {
+                const auto& a = pointer[i].v.ob;
+                const auto& b = pointer[(i + 1) % count].v.ob;
+                twiceArea += float(a[0]) * b[2] - float(b[0]) * a[2];
+            }
+            const float area = std::fabs(twiceArea) * .5f;
+            dryFloorArea += area;
+            if (std::strcmp(texture, RegionalBridgeMaterials::Resolve(
+                    RegionalBridgeMaterials::Material::LakeSand, ResourceMgr_FileExists)) == 0)
+                sandFloorArea += area;
+        }
         if (waterMaterial && !hasWater) {
             firstWater = pointer[0];
             nextWater = pointer[3];
@@ -322,6 +342,10 @@ int main() {
                 assert(rock.vertices == quads * 4);
                 assert(rock.triangles == quads * 2);
                 assert(rock.textures == 2 && rock.pushes == 1 && rock.pops == 1);
+                assert(interpreter.dryFloorArea > 0 &&
+                       interpreter.sandFloorArea / interpreter.dryFloorArea > .42f &&
+                       interpreter.sandFloorArea / interpreter.dryFloorArea < .58f &&
+                       "the active native/Alt draw must assign dedicated sand to roughly half the platform");
                 const bool inlet = Lake::HasInlet(level);
                 if (inlet) {
                     assert(interpreter.hasWater);
@@ -350,5 +374,5 @@ int main() {
                 assert(water.triangles == expectedQuads * 2);
                 assert(water.textures == size_t(inlet) && water.pushes == size_t(inlet) && water.pops == size_t(inlet));
             }
-    puts("PASS actual CaveDraw/GBI/native combiner and vertex dispatch: stone/water depend only on owned texture0; setup lists, command validity, static/frame vertex lifetime, native/replacement full/drained/refilled draws");
+    puts("PASS actual CaveDraw/GBI/native combiner and vertex dispatch: dedicated sand covers roughly half the emitted platform in every material path; stone/water depend only on owned texture0; setup lists, command validity, static/frame vertex lifetime, native/replacement full/drained/refilled draws");
 }

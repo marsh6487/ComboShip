@@ -53,17 +53,19 @@ const char* SceneResourceName(int sceneId) {
 // in edited packs. No source texture, UV, vertex or alpha command is changed.
 struct Material {
     const char* path;
-    uint32_t color;
+    uint32_t color; // Legacy role identifier; surface selectors depend on these original values.
     bool springGrass = false;
     int scene = -1;
     const char* palette = nullptr;
+    bool autumnCrimson = false;
 };
 constexpr Material kMaterials[] = {
 #include "AutumnSceneMaterials.inc"
 };
 constexpr const char* kWoodfallTempleDL = "objects/object_mtoride/gWoodfallSceneryTempleDL";
 
-uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/ = -1, bool springGrass = false) {
+uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/ = -1, bool springGrass = false,
+                       bool autumnCrimson = false) {
     if (selectedSeason == SEASON_SPRING) {
         if (springGrass)
             return 0xF6C1D9FF; // Full existing blush on explicit grass; keep tree/ground palettes separate.
@@ -72,24 +74,38 @@ uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/
             case 0xF4B783FF:
                 return 0xF6C1D9E0; // Blossom canopy; retain the source texture's shading.
             case 0xFF9F91FF:
-                return 0xE8AACBCC; // A slightly deeper middle-tree layer.
+                return 0xF6C1D9CC; // Keep the middle-tree layer's existing blend alpha.
             default:
                 return 0; // Ground uses green-only image copies, never a whole-triangle spring tint.
         }
     }
-    if (selectedSeason != SEASON_WINTER)
-        return autumnColor;
+    if (selectedSeason != SEASON_WINTER) {
+        if (selectedSeason == SEASON_AUTUMN && autumnCrimson)
+            return 0xDE496BFF;
+        switch (autumnColor) {
+            case 0xD99C45FF:
+            case 0xFFD078FF:
+                return 0xF3974FFF;
+            case 0xB96848FF:
+            case 0xF4B783FF:
+                return 0xEF484CFF;
+            case 0xFF9F91FF:
+                return 0xF26846FF;
+            default:
+                return autumnColor;
+        }
+    }
     // Use Termina's accepted full frost palette wherever this foliage is drawn.
     // Shared materials must not lose their white lift across outdoor entrances.
     switch (autumnColor) {
         case 0xD99C45FF:
         case 0xFFD078FF:
-            return 0xE5EDF3FF;
+            return 0xDCECF5FF;
         case 0xB96848FF:
         case 0xF4B783FF:
-            return 0xCCDCEEFF;
+            return 0xE2EEE9FF;
         case 0xFF9F91FF:
-            return 0xD8E2ECFF;
+            return 0xE2EEE9FF;
         default:
             return autumnColor;
     }
@@ -144,9 +160,9 @@ uint32_t RoadRandoGrassColor(std::string path, int selectedSeason, int sceneId) 
     if (path.starts_with("alt/"))
         path.erase(0, 4);
     const auto& paths = RoadRandoGrassPaths();
-    return std::find(paths.begin(), paths.end(), path) == paths.end()
-               ? 0
-               : SeasonPalette(0xD99C45FF, selectedSeason, sceneId, true);
+    return std::find(paths.begin(), paths.end(), path) == paths.end() ? 0
+           : selectedSeason == SEASON_AUTUMN                          ? 0xF26846FF
+                                             : SeasonPalette(0xD99C45FF, selectedSeason, sceneId, true);
 }
 
 uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
@@ -160,11 +176,11 @@ uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN, in
         const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00DL_";
         for (const auto* top : { "0153A8", "015DF0", "016598" }) {
             if (path == prefix + top)
-                return SeasonPalette(0xFFD078FF, selectedSeason, SCENE_00KEIKOKU);
+                return SeasonPalette(0xFFD078FF, selectedSeason, SCENE_00KEIKOKU, false, true);
         }
         for (const auto* side : { "0158E8", "016180", "016A38" }) {
             if (path == prefix + side)
-                return SeasonPalette(0xF4B783FF, selectedSeason, SCENE_00KEIKOKU);
+                return SeasonPalette(0xF4B783FF, selectedSeason, SCENE_00KEIKOKU, false, true);
         }
     }
     return 0;
@@ -268,7 +284,7 @@ MoonTreeMaterials FindMoonTreeMaterials(const std::shared_ptr<Ship::ArchiveManag
 uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sceneId = -1,
                        const std::set<uint64_t>* moonTree = nullptr) {
     if (sceneId == SCENE_00KEIKOKU && moonTree != nullptr && moonTree->contains(hash))
-        return SeasonPalette(0xF4B783FF, selectedSeason, sceneId);
+        return SeasonPalette(0xF4B783FF, selectedSeason, sceneId, false, true);
     static const auto colors = [] {
         std::map<uint64_t, const Material*> result;
         for (const auto& material : kMaterials) {
@@ -288,7 +304,8 @@ uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sc
     const auto found = colors.find(hash);
     return found == colors.end() || (found->second->scene != -1 && found->second->scene != sceneId)
                ? 0
-               : SeasonPalette(found->second->color, selectedSeason, sceneId, found->second->springGrass);
+               : SeasonPalette(found->second->color, selectedSeason, sceneId, found->second->springGrass,
+                               found->second->autumnCrimson);
 }
 
 size_t MaterialCommandLength(uint8_t opcode) {
@@ -704,6 +721,7 @@ struct SurfaceMaterial {
     bool springGrass = false;
     const char* palette = nullptr;
     bool drawFallback = false;
+    bool autumnCrimson = false;
 };
 constexpr SurfaceMaterial kSurfaceMaterials[] = {
 #ifdef COMBO_BUILD
@@ -780,8 +798,8 @@ const std::vector<SurfaceMaterial>& SurfaceMaterials(int /*selectedSeason*/) {
                 std::any_of(result.begin(), result.end(),
                             [&](const auto& existing) { return std::string(existing.path) == material.path; }))
                 continue;
-            result.push_back(
-                { material.path, material.color, material.scene, false, false, true, true, material.palette, true });
+            result.push_back({ material.path, material.color, material.scene, false, false, true, true,
+                               material.palette, true, material.autumnCrimson });
         }
         return result;
     }();
@@ -831,7 +849,7 @@ std::shared_ptr<Fast::Texture> ExpandIndexedSurface(const std::shared_ptr<Fast::
 }
 
 std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::Texture>& source,
-                                                   uint32_t color = 0xFFD078FF, float intensityScale = 1.0f) {
+                                                   uint32_t color = 0xF3974FFF, float intensityScale = 1.0f) {
     const unsigned red = color >> 24, green = (color >> 16) & 255, blue = (color >> 8) & 255;
     const unsigned colorSum = red + green + blue;
     const unsigned blend = color & 255;
@@ -995,7 +1013,8 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
                     if (palette == nullptr)
                         continue; // Load the active palette normally; never borrow a different cold Alt palette.
                 }
-                const auto color = SeasonPalette(material.color, selectedSeason, play->sceneId, material.springGrass);
+                const auto color = SeasonPalette(material.color, selectedSeason, play->sceneId, material.springGrass,
+                                                 material.autumnCrimson);
                 const bool lift =
                     selectedSeason == SEASON_WINTER || (selectedSeason == SEASON_SPRING && material.blossomLift);
                 const auto key = std::tuple{ source.get(), color, lift, palette.get() };
@@ -1312,7 +1331,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 // retain all dynamic child calls, geometry and alpha commands.
                 variant.draw = variant.original;
                 const unsigned mode = RoadRandoGrassColor(path, selectedSeason, play->sceneId) != 0
-                                          ? (selectedSeason == SEASON_AUTUMN ? 1 : 3)
+                                          ? (selectedSeason == SEASON_AUTUMN ? 2 : 3)
                                           : SeasonTintMode(selectedSeason, play->sceneId);
                 variant.commands = { gsSPGrayscale(mode),
                                      gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,

@@ -8,6 +8,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -53,6 +54,7 @@ def main():
     if failures:
         raise SystemExit("Failed fixtures: " + ", ".join(failures))
     print("PASS: all four production fixtures under ASan/UBSan")
+    subprocess.run([sys.executable, '-B', str(HERE/'run_camera.py')], check=True)
 
 
 if __name__ == "__main__":

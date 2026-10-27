@@ -372,16 +372,16 @@ void ObjGrassCarry_Draw(Actor* this, PlayState* play) {
     if (seasonal) {
         gDPSetGrayscaleColor(POLY_OPA_DISP++,
                              spring  ? 246
-                             : frost ? 229
-                                     : 217,
+                             : frost ? 220
+                                     : 242,
                              spring  ? 193
-                             : frost ? 237
-                                     : 156,
+                             : frost ? 236
+                                     : 104,
                              spring  ? 217
-                             : frost ? 243
-                                     : 69,
+                             : frost ? 245
+                                     : 70,
                              255);
-        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
+        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 2);
     }
     Gfx_DrawDListOpa(play, gKusaBushType1DL);
     if (seasonal) {

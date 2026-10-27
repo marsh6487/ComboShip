@@ -324,6 +324,7 @@ static int LeafCount(void) {
 }
 
 static void RequireTintScoped(const Gfx* first, const Gfx* end, const char* resource) {
+    const int legacyLeaf = !strcmp(resource, object_wood02_DL_000700);
     int enabled = false;
     int enables = 0;
     int disables = 0;
@@ -333,13 +334,14 @@ static void RequireTintScoped(const Gfx* first, const Gfx* end, const char* reso
             case G_SETGRAYSCALE:
                 enabled = command->words.w1 != 0;
                 if (enabled) {
+                    REQUIRE(command->words.w1 == (legacyLeaf ? 1 : 2));
                     ++enables;
                 } else {
                     ++disables;
                 }
                 break;
             case G_SETINTENSITY:
-                REQUIRE(Warm(command->words.w1));
+                REQUIRE(legacyLeaf ? Warm(command->words.w1) : command->words.w1 == 0xEF484CFF);
                 REQUIRE((command->words.w1 & 255) == 255);
                 break;
             case G_DL:
@@ -370,8 +372,15 @@ static void Materials(void) {
         EnWood02_Draw(&tree.actor, &play);
         REQUIRE(Warm(Color(translucent, gfx.polyXlu.p, G_SETENVCOLOR)));
         RequireTintScoped(translucent, gfx.polyXlu.p, (const char*)D_808C4D70[tree.drawType]);
+        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xEF484CFF);
+        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETGRAYSCALE) == 2);
         REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == trunkSize);
         REQUIRE(!memcmp(originalTrunk, opaque, trunkSize));
+        liveSeason = SEASON_WINTER;
+        BeginDraw();
+        EnWood02_Draw(&tree.actor, &play);
+        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xE2EEE9FF);
+        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETGRAYSCALE) == 3);
         for (int season = SEASON_SPRING; season <= SEASON_OFF; ++season) {
             if (season == SEASON_AUTUMN || season == SEASON_SPRING || season == SEASON_WINTER) {
                 continue;
@@ -396,6 +405,7 @@ static void Materials(void) {
     REQUIRE((Color(opaque, gfx.polyOpa.p, G_SETPRIMCOLOR) & 255) == 127);
     REQUIRE(leaf.actor.params == WOOD_LEAF_GREEN);
     RequireTintScoped(opaque, gfx.polyOpa.p, object_wood02_DL_000700);
+    REQUIRE(Color(opaque, gfx.polyOpa.p, G_SETGRAYSCALE) == 1);
     liveSeason = SEASON_OFF;
     BeginDraw();
     EnWood02_Draw(&leaf.actor, &play);
@@ -536,7 +546,7 @@ static void WinterMaterials(void) {
             liveSeason = SEASON_WINTER;
             BeginDraw();
             EnWood02_Draw(&tree.actor, &play);
-            REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xCCDCEEFF);
+            REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xE2EEE9FF);
             int frost = 0, draws = 0;
             for (const Gfx* cmd = translucent; cmd < gfx.polyXlu.p; ++cmd) {
                 if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE) {
@@ -576,7 +586,7 @@ static void WinterMaterials(void) {
             if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE)
                 mode = cmd->words.w1;
             if ((cmd->words.w0 >> 24) == G_SETINTENSITY)
-                REQUIRE(cmd->words.w1 == 0xCCDCEEFF);
+                REQUIRE(cmd->words.w1 == 0xE2EEE9FF);
             if ((cmd->words.w0 >> 24) == G_DL) {
                 REQUIRE(mode == (cmd->words.w1 == (uintptr_t)gTreeLeavesDL ? 3 : 0));
                 if (mode)
@@ -867,10 +877,10 @@ static void NativeImpact(void) {
 int main(int argc, char** argv) {
     if (argc == 1 || !strcmp(argv[1], "materials")) {
         SpringMaterials();
+        BranchingTreeMaterials();
         WinterMaterials();
         Materials();
         AssetOwnership();
-        BranchingTreeMaterials();
     }
     if (argc == 1 || !strcmp(argv[1], "particles")) {
         Particles();

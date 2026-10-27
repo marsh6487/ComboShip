@@ -17,7 +17,7 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
                                          STATIC_TRACKING_CHILD_MALON, 0, 0.0f, 10.0f },
     [STATIC_STORY_ACTOR_SARIA] = { 3, 1, OBJECT_SA, STATIC_ADAPTER_SARIA, 0.01f, 40.0f, 8, 46, 0, 30, 30, 70.0f,
                                    STATIC_TRACKING_SARIA, 2, 4.0f },
-    [STATIC_STORY_ACTOR_ADULT_ZELDA] = { 1, 1, OBJECT_ZL2, STATIC_ADAPTER_ADULT_ZELDA, 0.01f, 60.0f, 25, 80, 0, 30, 30,
+    [STATIC_STORY_ACTOR_ADULT_ZELDA] = { 3, 1, OBJECT_ZL2, STATIC_ADAPTER_ADULT_ZELDA, 0.01f, 60.0f, 25, 80, 0, 30, 30,
                                          90.0f, STATIC_TRACKING_ADULT_ZELDA, 12, -3.0f, 0.0f,
                                          STATIC_DRAW_CONTRACT_FACE_FLEX },
     [STATIC_STORY_ACTOR_SHEIK] = { 2, 1, OBJECT_XC, STATIC_ADAPTER_SHEIK, 0.01f, 52.0f, 25, 80, 0, 60, 60, 90.0f,
@@ -68,6 +68,8 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
                                    90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
     [STATIC_STORY_ACTOR_DARMANI] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_DARMANI, 0.01f, 55.0f, 20, 65, 0, 30, 30,
                                      90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_CHILD_ZELDA] = { 2, 1, OBJECT_ZL4, STATIC_ADAPTER_CHILD_ZELDA, 0.01f, 40.0f, 10, 44, 0, 30, 30,
+                                         75.0f, STATIC_TRACKING_NONE, 0, 0.0f },
 
 };
 
@@ -91,6 +93,10 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
     [STATIC_STORY_ACTOR_ADULT_ZELDA] = {
         STATIC_POSE(STATIC_ANIM_ADULT_ZELDA_IDLE, STATIC_POSE_FLAG_NONE, STATIC_SKELETON_ADULT_ZELDA),
         STATIC_POSE(STATIC_ANIM_ADULT_ZELDA_IDLE, STATIC_POSE_FLAG_NONE, STATIC_SKELETON_ADULT_ZELDA),
+        STATIC_POSE(STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED, STATIC_POSE_FLAG_NO_TRACKING,
+                    STATIC_SKELETON_ADULT_ZELDA),
+        STATIC_POSE(STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED, STATIC_POSE_FLAG_NO_TRACKING | STATIC_POSE_FLAG_BLUE_AURA,
+                    STATIC_SKELETON_ADULT_ZELDA),
     },
     [STATIC_STORY_ACTOR_SHEIK] = {
         STATIC_POSE(STATIC_ANIM_SHEIK_IDLE, STATIC_POSE_FLAG_NONE, STATIC_SKELETON_SHEIK),
@@ -226,6 +232,13 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
         STATIC_POSE(STATIC_ANIM_DARMANI_WAIT, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_DARMANI),
         STATIC_POSE(STATIC_ANIM_DARMANI_FLY, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_DARMANI),
     },
+    [STATIC_STORY_ACTOR_CHILD_ZELDA] = {
+        STATIC_POSE(STATIC_ANIM_CHILD_ZELDA_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_CHILD_ZELDA),
+        STATIC_POSE(STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED, STATIC_POSE_FLAG_NO_TRACKING,
+                    STATIC_SKELETON_CHILD_ZELDA),
+        STATIC_POSE(STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED, STATIC_POSE_FLAG_NO_TRACKING | STATIC_POSE_FLAG_BLUE_AURA,
+                    STATIC_SKELETON_CHILD_ZELDA),
+    },
 
 };
 
@@ -233,7 +246,7 @@ _Static_assert(sizeof(sDefinitions) / sizeof(sDefinitions[0]) == STATIC_STORY_AC
                "Every static story actor type needs a definition");
 _Static_assert(sizeof(sPoses) / sizeof(sPoses[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a pose row");
-enum { STATIC_STORY_DEFINITION_COUNT = 27, STATIC_STORY_POSE_ROW_COUNT = 27 };
+enum { STATIC_STORY_DEFINITION_COUNT = 28, STATIC_STORY_POSE_ROW_COUNT = 28 };
 _Static_assert(STATIC_STORY_DEFINITION_COUNT == STATIC_STORY_ACTOR_MAX - 1,
                "Definition count must change with the actor registry");
 _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
@@ -252,7 +265,10 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
     StaticStoryActorType type;
 
     if (prefix == STATIC_STORY_ACTOR_REGIONAL_PARAM_PREFIX) {
-        return id == 1 ? STATIC_STORY_ACTOR_MIKAU : id == 2 ? STATIC_STORY_ACTOR_DARMANI : STATIC_STORY_ACTOR_NONE;
+        return id == 1   ? STATIC_STORY_ACTOR_MIKAU
+               : id == 2 ? STATIC_STORY_ACTOR_DARMANI
+               : id == 3 ? STATIC_STORY_ACTOR_CHILD_ZELDA
+                         : STATIC_STORY_ACTOR_NONE;
     }
     if (prefix == STATIC_STORY_ACTOR_EXPANDED_PARAM_PREFIX) {
         switch (id) {
@@ -376,6 +392,8 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
             return progression->forestComplete ? 0x10AD : 0x1001;
         case STATIC_STORY_ACTOR_ADULT_ZELDA:
             return progression->metZelda ? 0x70FE : 0x70FF;
+        case STATIC_STORY_ACTOR_CHILD_ZELDA:
+            return STATIC_STORY_TEXT_CHILD_ZELDA;
         case STATIC_STORY_ACTOR_SHEIK:
             return progression->waterComplete ? 0x7010 : 0x700F;
         case STATIC_STORY_ACTOR_ADULT_RUTO:

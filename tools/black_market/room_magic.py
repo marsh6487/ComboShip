@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Optional original room materials; preserve the final per-host mesh verbatim.
 
-The original room and shelf art have identical pixels. Reuse the already
-verified, bounded zlib/base64 source parts, but give the room its own runtime
-texture and material paths so overrides and cosmetic colors remain separate.
+Room and shelf art use the same neutral luminance from the verified original
+bounded zlib/base64 source parts. The room retains its own runtime texture and
+material paths so overrides and cosmetic colors remain separate.
 """
 import hashlib
 import re
-import struct
 import xml.etree.ElementTree as ET
 
 import market_interior
@@ -26,12 +25,8 @@ def texture():
     pixels = market_interior.shelf_pixels()
     if hashlib.sha256(pixels).hexdigest() != PIXELS_SHA256:
         raise ValueError('Original magical room pixel identity changed')
-    header = bytearray(64)
-    header[1] = 1
-    struct.pack_into('<IIQ', header, 4, 0x4F544558, 1, 0xDEADBEEFDEADBEEF)
-    # Use the corrected LOAD_AS_RAW RGBA32 upload header and a logical 64px
-    # tile. POC14's older kind-2 header is not the current raw-upload contract.
-    return bytes(header) + struct.pack('<IIIIffI', 1, 512, 512, 1, 16.0, 8.0, len(pixels)) + pixels
+    # Existing primitive palette controls now supply hue without baked chroma.
+    return market_interior.grayscale_magic_texture()
 
 
 def _material(tree, index):

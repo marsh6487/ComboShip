@@ -157,8 +157,8 @@ placement, collider, and sampled joints are unchanged. Dialogue is
 
 Existing catalog IDs and `0x7F`/`0x7E` placements are unchanged. New catalog
 IDs are Stalchild 25, Mikau 26 and Darmani 27. Stalchild uses the last `0x7E`
-identity nibble; Mikau and Darmani start the `0x7D` family. `0x7D00` and
-`0x7D03` remain invalid. Each row below is an ambient presentation, with no
+identity nibble; Mikau and Darmani start the `0x7D` family. `0x7D00` remains invalid; `0x7D03` is allocated to child Zelda below.
+`0x7D04` remains invalid. Each row below is an ambient presentation, with no
 quest actions, hostile AI, native path requirements or talk prompt.
 
 | Actor | Params | Pose | Skeleton limbs / matrix reservation | Frames |
@@ -205,3 +205,65 @@ Native MM receives no extra automatic groups.
 The fixtures establish catalog/resource contracts, lifecycle and emitted draw
 commands. They do not establish visible game rendering, exact body/floor fitting
 or traversable portal clearance in either configured scene presentation.
+
+## Zelda catalogue additions — 2026-10-26
+
+Place these as **Cutscene Actors / En_Viewer (`0x002A`)**, using the full params.
+The normal child Zelda actor and its courtyard proximity/story sequence are not
+used by these entries. Child Zelda uses safe optional A-button dialogue, with no automatic
+conversation, quest reward, progression change or forced cutscene. She uses
+the catalogue's standard soft collision.
+
+| Actor | Params | Presentation | Blink | Model replacement |
+|---|---|---|---|---|
+| Child Zelda | `0x7D03` | Standing idle | Yes | Native/custom public skeleton and face resources |
+| Child Zelda | `0x7D13` | Hands clasped | Yes | Same |
+| Adult Zelda | `0x7F24` | Hands clasped, native 20-frame loop | Yes | Existing adult adapter and face matrices |
+
+The two existing adult entries `0x7F04` and `0x7F14` both deliberately retain
+their prior standing idle. `0x7F24` is an additional distinct pose, with
+tracking disabled to preserve the clasped silhouette. All previous actor IDs
+and poses retain their values. Child Zelda is appended as catalogue ID 28,
+using OoT `OBJECT_ZL4` for both model and animations.
+
+Child Zelda uses `objects/object_zl4/gChildZeldaSkel` through the same public
+ResourceMgr/SkeletonPatcher replacement mechanism used for adult Zelda's
+`objects/object_zl2/gZelda2Skel`. Compatible custom packs replacing those
+resources remain eligible for mod load-order and Alt selection. Every child
+draw binds left/right eye segments `0x08`/`0x09` and neutral mouth `0x0A`,
+uses the loaded skeleton, and follows the normal child's hidden-under-skirt
+limb convention. Blinking is driven by the independent catalogue actor.
+No vanilla-only display-list copy is baked into the adapter.
+
+Machine-readable presets: `combo/actors/ZeldaActorPresets.json`. Scene
+placement remains explicit in Prelude; put the child and adult entries in
+the corresponding normal age/setup actor lists. The POC4 addon below supplies explicit age-specific Chamber placements;
+no native automatic actor spawning is used.
+Rebuild the executable containing this source before using the new params.
+
+Native/source checks and replacement-boundary fixtures are recorded with the
+candidate; the actual custom model pack, Alt toggles, pause/reentry and
+in-game pose/face appearance still need configured runtime acceptance.
+
+## Blue Chamber Zelda variants — 2026-10-26
+
+| Actor / pose | Params | Dialogue | Blue aura |
+|---|---|---|---|
+| Child Zelda standing | `0x7D03` | Fairy-boy greeting | No |
+| Child Zelda hands clasped | `0x7D13` | Same fairy-boy greeting | No |
+| Child Zelda hands clasped, Chamber echo | `0x7D23` | Mysterious Chamber line | Yes |
+| Adult Zelda standing / alias | `0x7F04` / `0x7F14` | Existing safe standing dialogue | No |
+| Adult Zelda hands clasped | `0x7F24` | Same dialogue as standing | No |
+| Adult Zelda hands clasped, Chamber echo | `0x7F34` | Mysterious Chamber line | Yes |
+
+The aura combines a soft light-blue halo and existing NEI twinkles local to
+the selected En_Viewer instance. It changes no scene lighting, model texture,
+custom model selection or normal Zelda story actor. Existing plain variants
+remain free of the aura. Dialogue only offers the A prompt; it never starts
+from proximity alone, changes progression, grants an item or runs story
+actions. All existing ordinary catalogue actors keep their prior dialogue.
+
+The full POC4 addon places blue child/adult Zelda at the center of the
+authored Chamber platform, facing its Light approach, using normal age/setup
+headers. The matching rebuilt source is required for both new params, aura
+and dialogue. See the placement evidence for the inherited night fallbacks.

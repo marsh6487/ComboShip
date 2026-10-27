@@ -76,12 +76,12 @@ class RoomMagicAssets(unittest.TestCase):
                 stable = lambda tree: [(n.tag, dict(n.attrib)) for n in tree if n.tag not in changed]
                 self.assertEqual(stable(before), stable(after))
 
-    def test_texture_is_exact_recovered_art_in_independent_resource(self):
+    def test_texture_is_neutral_recovered_art_in_independent_resource(self):
         result = self.magic.apply(self.originals['mm'], 'mm')
         data = result[self.magic.TEXTURE]
         self.assertEqual(struct.unpack_from('<IIIIffI', data, 64), (1,512,512,1,16.0,8.0,1048576))
         self.assertEqual(hashlib.sha256(data[92:]).hexdigest(),
-                         '3e2bac601d1a9c3e0317d159aa6b9f5354abaac982a24848edfec5e97dbb3231')
+                         '08fc11578f90b1b834b6fb026bf6defbad4374a0013a448d3fcc7822df355237')
         self.assertNotEqual(self.magic.TEXTURE, market_interior.SHELF)
         self.assertEqual(result[market_interior.SHELF], self.originals['mm'][market_interior.SHELF])
 

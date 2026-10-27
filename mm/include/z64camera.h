@@ -234,7 +234,8 @@ typedef enum {
     /* 0x59 */ CAM_SET_ELEGY_SHELL, // cutscene after playing elegy of emptyness and spawning a shell "SHELL"
     /* 0x5A */ CAM_SET_DUNGEON4, // Used in Pirates Fortress Interior, hidden room near hookshot "DUNGEON4"
     /* 0x5B */ CAM_SET_BLACK_MARKET_OOT, // Private Black Market port of OoT's shop pivot camera
-    /* 0x5C */ CAM_SET_MAX
+    /* 0x5C */ CAM_SET_MAGIC_MIRROR, // Private OoT Time Gate type-10 ritual framing
+    /* 0x5D */ CAM_SET_MAX
 } CameraSettingType;
 
 typedef enum {

@@ -33,11 +33,27 @@ int Combo_SOH_CrossDungeonTransitionPending(void);
 u8 Sm64Mario_IsReady(void);
 }
 #include "gameplay/MagicMirrorDraw.inc.h"
+#include "gameplay/MagicMirrorCamera.inc.h"
 
 namespace MirrorRuntime {
 void FinishPickup(int token);
 }
 namespace MirrorHost {
+void UpdateCastCamera(PlayState* play, Player* player) {
+    ComboMagicMirrorCamera::Begin(play, player);
+}
+void ReleaseCastCamera(PlayState* play) {
+    ComboMagicMirrorCamera::Release(play);
+}
+void ForgetCastCamera() {
+    ComboMagicMirrorCamera::Forget();
+}
+void PlayActivationChime() {
+    Sfx_PlaySfxCentered(NA_SE_EV_TRE_BOX_FLASH);
+}
+void PlayDepartureCue() {
+    Sfx_PlaySfxCentered(NA_SE_PL_MAGIC_WIND_WARP);
+}
 u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }

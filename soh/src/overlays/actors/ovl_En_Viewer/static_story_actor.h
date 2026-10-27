@@ -41,6 +41,7 @@ typedef enum {
     STATIC_STORY_ACTOR_STALCHILD,
     STATIC_STORY_ACTOR_MIKAU,
     STATIC_STORY_ACTOR_DARMANI,
+    STATIC_STORY_ACTOR_CHILD_ZELDA,
     STATIC_STORY_ACTOR_MAX,
 } StaticStoryActorType;
 
@@ -72,6 +73,7 @@ typedef enum {
     STATIC_ADAPTER_MM_STALCHILD,
     STATIC_ADAPTER_MM_MIKAU,
     STATIC_ADAPTER_MM_DARMANI,
+    STATIC_ADAPTER_CHILD_ZELDA,
 } StaticStoryActorAdapter;
 
 typedef enum {
@@ -101,6 +103,7 @@ typedef enum {
     STATIC_SKELETON_STALCHILD,
     STATIC_SKELETON_MIKAU,
     STATIC_SKELETON_DARMANI,
+    STATIC_SKELETON_CHILD_ZELDA,
 } StaticStorySkeletonFamily;
 
 typedef enum {
@@ -236,6 +239,9 @@ typedef enum {
     STATIC_ANIM_MIKAU_GUITAR,
     STATIC_ANIM_DARMANI_WAIT,
     STATIC_ANIM_DARMANI_FLY,
+    STATIC_ANIM_CHILD_ZELDA_IDLE,
+    STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED,
+    STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED,
 } StaticStoryAnimation;
 
 enum {
@@ -249,6 +255,8 @@ enum {
     STATIC_POSE_FLAG_CLOSED_EYES = 1 << 5,
     /* Ignore animation-authored root motion and honor the Prelude placement. */
     STATIC_POSE_FLAG_LOCK_ROOT_TRANSLATION = 1 << 6,
+    /* Explicit ambient Zelda variants; no global model tint or scene light. */
+    STATIC_POSE_FLAG_BLUE_AURA = 1 << 7,
 };
 
 /* A read-only snapshot: selectors never inspect or mutate save state directly. */

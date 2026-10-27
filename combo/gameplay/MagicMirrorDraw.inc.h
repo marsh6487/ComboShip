@@ -4,9 +4,11 @@
 // COMBO_MAGIC_MIRROR_MM; OoT callers leave it undefined. The caller owns the
 // object's translation, rotation and ordinary-unit scale in the current matrix.
 #include "MagicMirrorGeometry.h"
+extern "C" u8 ResourceMgr_FileExists(const char* path);
 
 namespace ComboMagicMirrorVisual {
 namespace {
+alignas(2) const char kForestReflection[] = "__OTR__textures/magic_mirror/gMagicMirrorForestReflectionTex";
 size_t AvailableBytes(const void* head, const void* tail, bool alignTail) {
     const uintptr_t begin = reinterpret_cast<uintptr_t>(head);
     uintptr_t end = reinterpret_cast<uintptr_t>(tail);
@@ -14,7 +16,7 @@ size_t AvailableBytes(const void* head, const void* tail, bool alignTail) {
         end &= ~uintptr_t(15); // OoT's tail allocator also discards initial misalignment.
     return begin && end >= begin ? static_cast<size_t>(end - begin) : size_t(0);
 }
-bool CanDraw(const GraphicsContext* gfx, const ComboMagicMirrorGeometry::Mesh& mesh) {
+bool CanDraw(const GraphicsContext* gfx, const ComboMagicMirrorGeometry::Mesh& mesh, bool reflection) {
     // Native Graph_Alloc / GRAPH_ALLOC unconditionally subtract the OPA tail.
     // Check the complete draw before touching an arena, including both aligned
     // allocations and each batch's vertex/triangle commands.
@@ -24,6 +26,8 @@ bool CanDraw(const GraphicsContext* gfx, const ComboMagicMirrorGeometry::Mesh& m
     // Per stream: two native setup DL calls (3 commands each in debug builds),
     // outer OPEN/CLOSE markers, draw state, and final sync/matrix restoration.
     size_t opaCommands = 14, xluCommands = 15;
+    if (reflection)
+        xluCommands += 15; // Owned one-cycle texture state and native untextured-glint restoration.
     for (int i = 0; i < mesh.batchCount; ++i) {
         const auto& batch = mesh.batches[i];
         const size_t commands = 1 + (batch.triangleCount + 1) / 2;
@@ -93,12 +97,15 @@ static void Draw(PlayState* play) {
         return;
     Mesh mesh;
     Build(play->gameplayFrames, mesh);
-    if (!CanDraw(play->state.gfxCtx, mesh))
+    const bool reflection = ResourceMgr_FileExists(kForestReflection) != 0;
+    if (!CanDraw(play->state.gfxCtx, mesh, reflection))
         return;
     auto* vertices = static_cast<Vtx*>(Allocate(play, sizeof(Vtx) * mesh.vertexCount));
     auto* matrices = static_cast<Mtx*>(Allocate(play, sizeof(Mtx) * 2));
     if (!vertices || !matrices)
         return;
+    const int glassBegin = mesh.batches[mesh.opaqueBatchCount].firstVertex;
+    const int glassEnd = mesh.batches[mesh.glassEndBatch].firstVertex;
     for (int i = 0; i < mesh.vertexCount; ++i) {
         const auto& source = mesh.vertices[i];
         auto& vertex = vertices[i];
@@ -106,10 +113,17 @@ static void Draw(PlayState* play) {
         vertex.v.ob[0] = static_cast<s16>(std::lround(source.x * kVertexPrecision));
         vertex.v.ob[1] = static_cast<s16>(std::lround(source.y * kVertexPrecision));
         vertex.v.ob[2] = static_cast<s16>(std::lround(source.z * kVertexPrecision));
-        vertex.v.cn[0] = source.r;
-        vertex.v.cn[1] = source.g;
-        vertex.v.cn[2] = source.b;
-        vertex.v.cn[3] = source.a;
+        const bool glass = i >= glassBegin && i < glassEnd;
+        const Color color = reflection && glass ? ReflectionModulation({ source.r, source.g, source.b, source.a })
+                                                : Color{ source.r, source.g, source.b, source.a };
+        vertex.v.cn[0] = color.r;
+        vertex.v.cn[1] = color.g;
+        vertex.v.cn[2] = color.b;
+        vertex.v.cn[3] = color.a;
+        if (glass) {
+            vertex.v.tc[0] = static_cast<s16>(std::lround(ReflectionS(source.x) * 32 * 32));
+            vertex.v.tc[1] = static_cast<s16>(std::lround(ReflectionT(source.y) * 32 * 32));
+        }
     }
     ToMatrix(&matrices[0]);
     Matrix_Push();
@@ -127,13 +141,28 @@ static void Draw(PlayState* play) {
 
     SetupTranslucent(play);
     gSPMatrix(POLY_XLU_DISP++, &matrices[1], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    // Both sides of the reflecting pane and antique frame remain visible while
-    // the reward spins. No surface uses an external texture or actor resource.
+    // Both sides remain visible while spinning. Only the recessed glass uses
+    // the fixed scene view; absent new assets retain the exact untextured pane.
     gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
     gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
     gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
     gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    Submit(POLY_XLU_DISP, vertices, mesh, mesh.opaqueBatchCount, mesh.batchCount);
+    if (reflection) {
+        gDPSetCycleType(POLY_XLU_DISP++, G_CYC_1CYCLE);
+        gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+        gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
+        gDPLoadTextureBlock(POLY_XLU_DISP++, kForestReflection, G_IM_FMT_RGBA, G_IM_SIZ_16b, 32, 32, 0, G_TX_CLAMP,
+                            G_TX_CLAMP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_MODULATEIA);
+    }
+    Submit(POLY_XLU_DISP, vertices, mesh, mesh.opaqueBatchCount, mesh.glassEndBatch);
+    if (reflection) {
+        gDPPipeSync(POLY_XLU_DISP++);
+        gDPSetCycleType(POLY_XLU_DISP++, G_CYC_2CYCLE);
+        gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
+    }
+    Submit(POLY_XLU_DISP, vertices, mesh, mesh.glassEndBatch, mesh.batchCount);
 
     gDPPipeSync(POLY_OPA_DISP++);
     SetupOpaque(play);

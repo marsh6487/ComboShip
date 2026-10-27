@@ -88,6 +88,7 @@ void DrawSong(RandoItemId) {assert(false && "songs have their own production dis
 
         if '--forest-particles' in sys.argv:
             fixture = '#include "' + str(ROOT / 'combo/actors/ForestGiParticles.h') + '"\n' + fixture
+            fixture = '#include "' + str(ROOT / 'combo/actors/TempleSagesZeldaAura.h') + '"\n' + fixture
             fixture = fixture.replace('int main() {', 'int main() {\n#include "' +
                                       str(ROOT / 'tests/forest_gi_particles/renderer_checks.inc') + '"\n', 1)
 

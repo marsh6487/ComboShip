@@ -64,9 +64,13 @@ void ReleasePrompt(bool close) {
     sPromptAddedFlags = 0;
 }
 void ReleaseCast() {
-    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state &&
-        GET_PLAYER(gPlayState) == sCastPlayer)
-        MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state) {
+        MirrorHost::ReleaseCastCamera(gPlayState);
+        if (GET_PLAYER(gPlayState) == sCastPlayer)
+            MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    } else {
+        MirrorHost::ForgetCastCamera();
+    }
     sCastPlay = nullptr;
     sCastPlayer = nullptr;
     sDeparted = false;
@@ -229,8 +233,12 @@ bool Travel(PlayState* play, bool casting = false) {
     if (!MagicMirror_IsOwned() || !Safe(play, casting) || !AllowedScene(play) || !MirrorHost::PackAvailable())
         return false;
 #ifndef COMBO_MAGIC_MIRROR_MM
-    if (Combo_IsCombinedGame())
-        return MirrorHost::RequestHandoff();
+    if (Combo_IsCombinedGame()) {
+        if (!MirrorHost::RequestHandoff())
+            return false;
+        MirrorHost::PlayDepartureCue();
+        return true;
+    }
     play->nextEntranceIndex = COMBO_SOLO_FOREST_OOT_ENTRANCE;
     gSaveContext.cutsceneIndex = 0;
 #else
@@ -244,6 +252,7 @@ bool Travel(PlayState* play, bool casting = false) {
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     play->transitionType = gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     play->transitionTrigger = TRANS_TRIGGER_START;
+    MirrorHost::PlayDepartureCue();
     return true;
 }
 int BeginPickup() {
@@ -472,14 +481,18 @@ void Update() {
                             !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
             MirrorHost::Trace("cast-cancel", play);
             ReleaseCast();
-        } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
-            sDeparted = Travel(play, true);
-            if (sDeparted)
-                sDepartureTick = sCastTicks;
-            MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
-            if (!sDeparted) {
-                ReleaseCast();
-                MirrorHost::Error();
+        } else {
+            if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+                MirrorHost::UpdateCastCamera(play, sCastPlayer);
+            if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
+                sDeparted = Travel(play, true);
+                if (sDeparted)
+                    sDepartureTick = sCastTicks;
+                MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
+                if (!sDeparted) {
+                    ReleaseCast();
+                    MirrorHost::Error();
+                }
             }
         }
         return;
@@ -506,6 +519,8 @@ void Update() {
                     sCastPlay = play;
                     sCastPlayer = GET_PLAYER(play);
                     sCastTicks = 0;
+                    if (MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING)
+                        MirrorHost::UpdateCastCamera(play, sCastPlayer);
                     MirrorHost::Trace("cast-started", play);
                 } else {
                     MirrorHost::Trace("cast-rejected", play);
@@ -562,6 +577,7 @@ void Update() {
     HoldPrompt();
     play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
+    MirrorHost::PlayActivationChime();
     MirrorHost::Trace("prompt-open", play);
 }
 void DrawWorld() {
