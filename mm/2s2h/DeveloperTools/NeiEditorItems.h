@@ -107,6 +107,11 @@ inline bool WandModeEarned(int mode) {
 }
 
 inline bool IsOwned(RandoItemId id) {
+    if (id == RI_OOT_NEI_TIME_GATE || id == RI_OOT_NEI_MAGIC_MIRROR) {
+        const auto selected = Nei_GetOwnedItem(SLOT_MAGIC_MIRROR);
+        const auto item = id == RI_OOT_NEI_TIME_GATE ? ITEM_TIME_GATE : EXT_ITEM_MAGIC_MIRROR;
+        return TravelTools_IsOwned(item) && (selected == ITEM_TIME_GATE || selected == EXT_ITEM_MAGIC_MIRROR);
+    }
     if (id == RI_OOT_NEI_HYLIAS_GRACE || id == RI_OOT_NEI_PHANTOM_HOURGLASS) {
         const auto selected = Nei_GetOwnedItem(SLOT_PHANTOM_HOURGLASS);
         const auto item = id == RI_OOT_NEI_HYLIAS_GRACE ? ITEM_HYLIAS_GRACE : EXT_ITEM_PHANTOM_HOURGLASS;
@@ -203,6 +208,11 @@ template <std::size_t N> inline bool IsOneOf(RandoItemId id, const RandoItemId (
 // restore that cell through the canonical setter without replaying earned grants
 // (the cane handler ignores owned skills, and replaying runes changes selection).
 inline bool RestoreOwnedHost(RandoItemId id) {
+    if (id == RI_OOT_NEI_TIME_GATE || id == RI_OOT_NEI_MAGIC_MIRROR) {
+        const auto before = Nei_GetOwnedItem(SLOT_MAGIC_MIRROR);
+        TravelTools_Heal();
+        return before != Nei_GetOwnedItem(SLOT_MAGIC_MIRROR);
+    }
     if (id == RI_OOT_NEI_HYLIAS_GRACE || id == RI_OOT_NEI_PHANTOM_HOURGLASS) {
         const auto before = Nei_GetOwnedItem(SLOT_PHANTOM_HOURGLASS);
         GraceHourglass_Heal();

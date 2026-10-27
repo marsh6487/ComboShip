@@ -16,7 +16,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 def function(source, name):
-    match = re.search(r"^(?:static\s+)?(?:bool|void|int|s32|u16)\s+" + re.escape(name) +
+    match = re.search(r"^(?:static\s+)?(?:bool|void|int|s32|u16|uint8_t)\s+" + re.escape(name) +
                       r"\([^;{}]*\)\s*\{", source, re.M)
     if match is None:
         raise ValueError(name)
@@ -89,6 +89,12 @@ static void tick(u16 pressed, s16 stickX) {
 }
 static void cooldown(void) { for (int i=0;i<15;i++) tick(0,0); }
 int main(int argc,char** argv) {
+    for (int stored=0;stored<2;stored++) {
+        reset(); customEnabled=masksEnabled=0;
+        if (stored) nei.magicMirrorOwned=1;
+        else nei.ownedItems[SLOT_MAGIC_MIRROR-24]=EXT_ITEM_MAGIC_MIRROR;
+        assert(MagicMirror_IsOwned() && ExtInv_IsCustomItemsEnabled() && ExtInv_GetMaxPages()==2);
+    }
     int sameFrame=argc>1 && !strcmp(argv[1],"same-frame");
     if (sameFrame) {
         for (int mode=0;mode<2;mode++) {
@@ -172,6 +178,7 @@ def main():
     locals_=draw[draw.index("    Input* input"):draw.index("    OPEN_DISPS")]
     input_=draw[draw.index("    // Update extended inventory pagination timer"):draw.index("    gDPSetCombineLERP(OVERLAY_DISP")]
     code=PREFIX+"\n"+"\n".join(function(inventory,n) for n in (
+        "TravelTools_IsOwned","MagicMirror_IsOwned",
         "ExtInv_Reset","ExtInv_Update","ExtInv_CanSwitchPage","ExtInv_SwitchPage","ExtInv_GetCurrentPage",
         "ExtInv_GetMaxPages","ExtInv_IsCustomItemsEnabled","ExtInv_IsMmMasksEnabled","ExtInv_GetInventorySlot"))
     code+="\n"+function(scope,"KaleidoScope_MoveCursorToSpecialPos")

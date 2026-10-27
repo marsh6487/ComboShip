@@ -92,6 +92,41 @@ int main() {
     REQUIRE(memcmp(&nativeIkanaBefore, &gSaveContext.save.saveInfo, sizeof(nativeIkanaBefore)) == 0);
     puts("PASS current editor Ikana catalog, explicit ownership grant and duplicate safety");
 
+#ifndef MM_EDITOR_CONTROL
+    for (const auto first : {RI_OOT_NEI_TIME_GATE, RI_OOT_NEI_MAGIC_MIRROR}) {
+        reset();
+        const auto second = first == RI_OOT_NEI_TIME_GATE ? RI_OOT_NEI_MAGIC_MIRROR : RI_OOT_NEI_TIME_GATE;
+        const auto nativeBefore = gSaveContext.save.saveInfo;
+        REQUIRE(NeiEditor::Grant(first));
+        const auto selected = Nei_GetOwnedItem(SLOT_MAGIC_MIRROR);
+        REQUIRE(NeiEditor::Grant(second));
+        REQUIRE(Nei_GetOwnedItem(SLOT_MAGIC_MIRROR) == selected);
+        REQUIRE(NeiEditor::IsOwned(first) && NeiEditor::IsOwned(second));
+        const auto before = *Nei_Save();
+        REQUIRE(!NeiEditor::Grant(first) && !NeiEditor::Grant(second));
+        REQUIRE(memcmp(&before, Nei_Save(), sizeof(before)) == 0);
+        REQUIRE(gRandoPickupSerial == 2 && sharedObtained == 2);
+        Nei_SetOwnedItem(SLOT_MAGIC_MIRROR, ITEM_NONE);
+        REQUIRE(NeiEditor::Grant(first));
+        REQUIRE(NeiEditor::IsOwned(first) && NeiEditor::IsOwned(second));
+        REQUIRE(gRandoPickupSerial == 2 && sharedObtained == 2);
+        NeiEditor::GrantAll();
+        const auto allBefore = *Nei_Save();
+        const auto serialBefore = gRandoPickupSerial;
+        const auto sharedBefore = sharedObtained;
+        NeiEditor::GrantAll();
+        REQUIRE(memcmp(&allBefore, Nei_Save(), sizeof(allBefore)) == 0);
+        REQUIRE(gRandoPickupSerial == serialBefore && sharedObtained == sharedBefore);
+        REQUIRE(memcmp(&nativeBefore, &gSaveContext.save.saveInfo, sizeof(nativeBefore)) == 0);
+    }
+    reset();
+    REQUIRE(NeiEditor::Grant(RI_OOT_NEI_MAGIC_MIRROR));
+    NeiEditor::GrantAll();
+    REQUIRE(Nei_GetOwnedItem(SLOT_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
+    REQUIRE(NeiEditor::IsOwned(RI_OOT_NEI_TIME_GATE) && NeiEditor::IsOwned(RI_OOT_NEI_MAGIC_MIRROR));
+    puts("PASS travel tools: both grant orders retain selection, independent ownership and duplicate/clear repair safety");
+#endif
+
     for (int rule = WAND_RANDO_MEDALLIONS; rule <= WAND_RANDO_ELEMENTAL; ++rule) {
         wandRule = rule;
         reset();
