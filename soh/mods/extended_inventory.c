@@ -345,6 +345,13 @@ static const CustomItemAsset* ExtInv_FindCustomItemAsset(uint16_t itemId) {
 }
 
 void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
+    // The shared Lens cell's name must follow the same mode as its icon.
+    extern unsigned char Picto_IsOwned(void);
+    extern unsigned char Picto_IsOnLensActive(void);
+    if (itemId == ITEM_LENS && Picto_IsOwned() && Picto_IsOnLensActive()) {
+        return (void*)"__OTR__item_name_static/gItemNamePictographBoxENGTex";
+    }
+
     // 2026-08-06 page-2 additions — EXT (u16) ids; their IA4 name textures come from the
     // generate_names.py pipeline. Path strings, resolved by the RSP like every custom name.
     switch (itemId) {

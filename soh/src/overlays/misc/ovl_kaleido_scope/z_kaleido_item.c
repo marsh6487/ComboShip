@@ -1223,6 +1223,7 @@ static u8 sPictoSelectorActive = 0;
 // Flip toggled by the wheel cycle: Lens of Truth <-> Pictograph Box on the Lens slot.
 static void Picto_Cycle(PlayState* play, s32 dir) {
     Picto_SetOnLensActive(Picto_IsOnLensActive() ? 0 : 1);
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }

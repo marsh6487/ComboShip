@@ -8,7 +8,6 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 extern "C" void Player_PlayVoiceSfx(Player* player, u16 sfxId);
-extern "C" void func_80837918(Player* player, s32 quadIndex, u32 dmgFlags);
 extern "C" s32 func_80041DB8(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
 extern "C" void func_80837C0C(PlayState* play, Player* player, s32 damageResponseType, f32 speed, f32 yVelocity,
                               s16 yRot, s32 invincibilityTimer);
@@ -431,8 +430,8 @@ void StartRecoil(PlayState* play, Player* player) {
 void StartAirKick(PlayState* play, Player* player) {
     sState = STATE_AIRKICK;
     sJumpDelay = 0;
-    func_80837918(player, 0, SLASH_KOKIRI_SWORD);
-    func_80837918(player, 1, SLASH_KOKIRI_SWORD);
+    func_80837918(play, player, 0, SLASH_KOKIRI_SWORD);
+    func_80837918(play, player, 1, SLASH_KOKIRI_SWORD);
     player->actor.shape.rot.y = player->yaw;
     player->linearVelocity = AIR_KICK_SPEED;
     Play(play, player, sAirKick, 0.0f, Animation_GetLastFrame(sAirKick));
@@ -559,8 +558,8 @@ extern "C" u8 KeatonForm_Update(Player* player, PlayState* play) {
         if (CHECK_BTN_ALL(input->press.button, BTN_B)) {
             sState = STATE_COMBO;
             sStep = 0;
-            func_80837918(player, 0, SLASH_KOKIRI_SWORD);
-            func_80837918(player, 1, SLASH_KOKIRI_SWORD);
+            func_80837918(play, player, 0, SLASH_KOKIRI_SWORD);
+            func_80837918(play, player, 1, SLASH_KOKIRI_SWORD);
             Play(play, player, sCombo[0], 0.0f, Animation_GetLastFrame(sCombo[0]));
             return 1;
         }
