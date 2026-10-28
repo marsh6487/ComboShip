@@ -80,6 +80,28 @@ s32 func_80AFB748(EnSi* this, PlayState* play) {
     return 0;
 }
 
+static void EnSi_LogPickupBlock(EnSi* this, PlayState* play, Player* player, const char* reason) {
+    if (this->unk_19C != 0 || this->actor.xzDistToPlayer > 100.0f ||
+        this->actor.yDistToPlayer < -100.0f || this->actor.yDistToPlayer > 100.0f) {
+        return;
+    }
+    this->unk_19C = 120;
+    lusprintf(__FILE__, __LINE__, LUSLOG_LEVEL_INFO,
+              "[SkullPickup] phase=blocked reason=%s scene=%d room=%d params=0x%04X "
+              "ocCount=%d/%d xz=%.1f dy=%.1f playerOC=0x%02X/0x%02X "
+              "playerCyl=%d,%d,%d tokenCyl=%d,%d,%d csAction=%d "
+              "state1=0x%08X state2=0x%08X state3=0x%08X actionGate=%d transition=%d "
+              "frameAdvance=%d secondCollision=%d",
+              reason, play->sceneNum, play->roomCtx.curRoom.num, (u16)this->actor.params,
+              play->colChkCtx.colOCCount, COLLISION_CHECK_OC_MAX, this->actor.xzDistToPlayer,
+              this->actor.yDistToPlayer, player->cylinder.base.ocFlags1, player->cylinder.base.ocFlags2,
+              player->cylinder.dim.radius, player->cylinder.dim.height, player->cylinder.dim.yShift,
+              this->collider.dim.radius, this->collider.dim.height, this->collider.dim.yShift,
+              player->csAction, player->stateFlags1, player->stateFlags2, player->stateFlags3,
+              player->unk_6AD, play->transitionTrigger, FrameAdvance_IsEnabled(play),
+              GameInteractor_SecondCollisionUpdate());
+}
+
 void func_80AFB768(EnSi* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
 
@@ -107,8 +129,11 @@ void func_80AFB768(EnSi* this, PlayState* play) {
             } else {
                 Collider_UpdateCylinder(&this->actor, &this->collider);
                 CollisionCheck_SetAC(play, &play->colChkCtx, &this->collider.base);
-                CollisionCheck_SetOC(play, &play->colChkCtx, &this->collider.base);
+                s32 ocIndex = CollisionCheck_SetOC(play, &play->colChkCtx, &this->collider.base);
+                EnSi_LogPickupBlock(this, play, player, ocIndex < 0 ? "oc-registration" : "awaiting-contact");
             }
+        } else {
+            EnSi_LogPickupBlock(this, play, player, "cutscene");
         }
     }
 }
@@ -149,6 +174,9 @@ void func_80AFB950(EnSi* this, PlayState* play) {
 void EnSi_Update(Actor* thisx, PlayState* play) {
     EnSi* this = (EnSi*)thisx;
 
+    if (this->unk_19C != 0) {
+        --this->unk_19C;
+    }
     Actor_MoveXZGravity(&this->actor);
     Actor_UpdateBgCheckInfo(play, &this->actor, 0.0f, 0.0f, 0.0f, 4);
     this->actionFunc(this, play);

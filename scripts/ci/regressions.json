@@ -1,5 +1,23 @@
 [
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Native Skulltula pickup gates and collision admission tracing",
+    "run": "python3 -B tests/keaton_melee/skull_pickup_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/skull_pickup_test.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Pictograph shared-slot name and selector refresh",
+    "run": "python3 -B tests/keaton_melee/picto_name_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/picto_name_test.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Keaton native melee ABI and ground/air attack entries",
+    "run": "python3 -B tests/keaton_melee/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/run_tests.py --sanitize"
+  },
+  {
     "suite": "world",
     "origin": "gate",
     "name": "Native silver-rupee hooks preserve unregistered scene actors",
