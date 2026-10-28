@@ -81,8 +81,8 @@ s32 func_80AFB748(EnSi* this, PlayState* play) {
 }
 
 static void EnSi_LogPickupBlock(EnSi* this, PlayState* play, Player* player, const char* reason) {
-    if (this->unk_19C != 0 || this->actor.xzDistToPlayer > 100.0f ||
-        this->actor.yDistToPlayer < -100.0f || this->actor.yDistToPlayer > 100.0f) {
+    if (this->unk_19C != 0 || this->actor.xzDistToPlayer > 100.0f || this->actor.yDistToPlayer < -100.0f ||
+        this->actor.yDistToPlayer > 100.0f) {
         return;
     }
     this->unk_19C = 120;
@@ -92,14 +92,13 @@ static void EnSi_LogPickupBlock(EnSi* this, PlayState* play, Player* player, con
               "playerCyl=%d,%d,%d tokenCyl=%d,%d,%d csAction=%d "
               "state1=0x%08X state2=0x%08X state3=0x%08X actionGate=%d transition=%d "
               "frameAdvance=%d secondCollision=%d",
-              reason, play->sceneNum, play->roomCtx.curRoom.num, (u16)this->actor.params,
-              play->colChkCtx.colOCCount, COLLISION_CHECK_OC_MAX, this->actor.xzDistToPlayer,
-              this->actor.yDistToPlayer, player->cylinder.base.ocFlags1, player->cylinder.base.ocFlags2,
-              player->cylinder.dim.radius, player->cylinder.dim.height, player->cylinder.dim.yShift,
-              this->collider.dim.radius, this->collider.dim.height, this->collider.dim.yShift,
-              player->csAction, player->stateFlags1, player->stateFlags2, player->stateFlags3,
-              player->unk_6AD, play->transitionTrigger, FrameAdvance_IsEnabled(play),
-              GameInteractor_SecondCollisionUpdate());
+              reason, play->sceneNum, play->roomCtx.curRoom.num, (u16)this->actor.params, play->colChkCtx.colOCCount,
+              COLLISION_CHECK_OC_MAX, this->actor.xzDistToPlayer, this->actor.yDistToPlayer,
+              player->cylinder.base.ocFlags1, player->cylinder.base.ocFlags2, player->cylinder.dim.radius,
+              player->cylinder.dim.height, player->cylinder.dim.yShift, this->collider.dim.radius,
+              this->collider.dim.height, this->collider.dim.yShift, player->csAction, player->stateFlags1,
+              player->stateFlags2, player->stateFlags3, player->unk_6AD, play->transitionTrigger,
+              FrameAdvance_IsEnabled(play), GameInteractor_SecondCollisionUpdate());
 }
 
 void func_80AFB768(EnSi* this, PlayState* play) {
