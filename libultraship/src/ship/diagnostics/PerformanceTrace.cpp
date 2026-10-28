@@ -17,6 +17,8 @@ constexpr size_t MaxAggregates = 4096;
 constexpr size_t MaxCounters = 128;
 constexpr size_t MaxPhases = 128;
 constexpr size_t MaxActors = 2048;
+constexpr size_t MaxResources = 4096;
+constexpr size_t MaxResourceStages = 16;
 struct Event {
     uint64_t tick, start, duration, thread;
     uintptr_t manager, owner;
@@ -35,7 +37,11 @@ struct Aggregate { uint64_t count = 0, total = 0, max = 0; };
 std::map<Key, Aggregate> aggregates, phases;
 struct ActorAggregate { Aggregate update, draw; };
 std::map<Key, ActorAggregate> actors;
+using ResourceAggregate = std::map<std::string, Aggregate>;
+std::map<Key, ResourceAggregate> resources;
 uint64_t phaseOverflow = 0, actorOverflow = 0;
+uint64_t resourceOverflow = 0, resourceStageOverflow = 0;
+uint64_t truncatedNames = 0, truncatedCategories = 0, truncatedDetails = 0, unknownNames = 0;
 bool IsFixedPhase(std::string_view category) {
     return category == "play_draw" || category == "play_draw_detail" || category == "play_update" ||
            category == "actor_draw_all" || category == "actor_draw_detail" ||
@@ -59,7 +65,7 @@ struct CollectorTimer {
     }
 };
 void Add(Context context, const char* category, std::string_view name, uint64_t start, uint64_t end,
-         uintptr_t manager, uintptr_t owner, const char* detail, bool emitEvent = true) noexcept {
+         uintptr_t manager, uintptr_t owner, const char* detail, bool emitEvent = true, bool nameWasTruncated = false) noexcept {
     if (!context.enabled) return;
     CollectorTimer timer{recordNanos, recordCalls};
     try {
@@ -67,9 +73,14 @@ void Add(Context context, const char* category, std::string_view name, uint64_t 
         bool late = !active.load() || context.tickId != activeTick.load();
         if (late) ++lateEvents;
         const auto duration = end >= start ? end - start : 0;
+        const auto categoryView = std::string_view(category ? category : "");
+        const auto detailView = std::string_view(detail ? detail : "");
+        if (nameWasTruncated || name.size() > 512) ++truncatedNames;
+        if (categoryView.size() > 128) ++truncatedCategories;
+        if (detailView.size() > 128) ++truncatedDetails;
+        if (name.empty()) { ++unknownNames; name = "<unknown>"; }
         Key key{context.tickId, std::string(std::string_view(category ? category : "").substr(0, 128)),
                 std::string(name.substr(0, 512)), manager, owner};
-        const auto categoryView = std::string_view(category ? category : "");
         const bool fixed = IsFixedPhase(categoryView);
         auto& destination = fixed ? phases : aggregates;
         const auto limit = fixed ? MaxPhases : MaxAggregates;
@@ -91,7 +102,23 @@ void Add(Context context, const char* category, std::string_view name, uint64_t 
             if (actor != actors.end()) Accumulate(actorUpdate ? actor->second.update : actor->second.draw, duration);
             else ++actorOverflow;
         }
-        const bool resource = std::string_view(category ? category : "").starts_with("resource.");
+        const bool resource = categoryView.starts_with("resource.");
+        if (resource) {
+            Key resourceKey = key;
+            std::get<1>(resourceKey) = "resource";
+            auto group = resources.find(resourceKey);
+            if (group == resources.end() && resources.size() < MaxResources)
+                group = resources.emplace(std::move(resourceKey), ResourceAggregate{}).first;
+            if (group == resources.end()) ++resourceOverflow;
+            else {
+                const auto& stageName = std::get<1>(key);
+                auto stage = group->second.find(stageName);
+                if (stage == group->second.end() && group->second.size() < MaxResourceStages)
+                    stage = group->second.emplace(stageName, Aggregate{}).first;
+                if (stage != group->second.end()) Accumulate(stage->second, duration);
+                else ++resourceStageOverflow;
+            }
+        }
         if (!emitEvent || (!resource && duration < 2000000)) return;
         if ((resource && resourceEvents >= MaxEvents) || (!resource && slowEvents >= MaxSlowEvents)) {
             ++overflow; return;
@@ -128,8 +155,10 @@ nlohmann::json EndTick() noexcept {
         std::map<std::string, uint64_t> counters;
         std::map<Key, Aggregate> summary, phaseSummary;
         std::map<Key, ActorAggregate> actorSummary;
+        std::map<Key, ResourceAggregate> resourceSummary;
         uint64_t dropped, droppedCounters, droppedAggregates, droppedPhases, droppedActors, late, lateCount, tick, peakRecords;
         uint64_t measuredRecordNs, measuredCountNs, measuredRecordCalls, measuredCountCalls, errors, outstanding;
+        uint64_t droppedResources, droppedStages, namesTruncated, categoriesTruncated, detailsTruncated, namesUnknown;
         {
             std::lock_guard<std::mutex> lock(mutex);
             tick = activeTick.load();
@@ -145,8 +174,15 @@ nlohmann::json EndTick() noexcept {
             summary.swap(aggregates);
             phaseSummary.swap(phases);
             actorSummary.swap(actors);
+            resourceSummary.swap(resources);
             droppedPhases = phaseOverflow; phaseOverflow = 0;
             droppedActors = actorOverflow; actorOverflow = 0;
+            droppedResources = resourceOverflow; resourceOverflow = 0;
+            droppedStages = resourceStageOverflow; resourceStageOverflow = 0;
+            namesTruncated = truncatedNames; truncatedNames = 0;
+            categoriesTruncated = truncatedCategories; truncatedCategories = 0;
+            detailsTruncated = truncatedDetails; truncatedDetails = 0;
+            namesUnknown = unknownNames; unknownNames = 0;
             resourceEvents = slowEvents = 0;
             peakRecords = lifetimePeakRecords;
             droppedAggregates = aggregateOverflow; aggregateOverflow = 0;
@@ -172,7 +208,7 @@ nlohmann::json EndTick() noexcept {
                                   {"manager", manager}, {"cache_owner", owner}, {"count", a.count},
                                   {"total_ns", a.total}, {"max_ns", a.max}};
         };
-        for (size_t i = 0; i < std::min<size_t>(64, sorted.size()); ++i)
+        for (size_t i = 0; i < sorted.size(); ++i)
             totals.push_back(row(sorted[i].first, sorted[i].second));
         for (const auto& [key, value] : phaseSummary) phaseTotals.push_back(row(key, value));
         std::vector<std::pair<Key, ActorAggregate>> sortedActors(actorSummary.begin(), actorSummary.end());
@@ -180,7 +216,7 @@ nlohmann::json EndTick() noexcept {
             return a.second.update.total + a.second.draw.total > b.second.update.total + b.second.draw.total;
         });
         auto actorTotals = nlohmann::json::array();
-        for (size_t i = 0; i < std::min<size_t>(64, sortedActors.size()); ++i) {
+        for (size_t i = 0; i < sortedActors.size(); ++i) {
             const auto& [key, a] = sortedActors[i];
             const auto& [origin, category, name, manager, owner] = key;
             actorTotals.push_back({{"origin_tick", origin}, {"category", category}, {"name", name},
@@ -188,6 +224,15 @@ nlohmann::json EndTick() noexcept {
                                    {"update_count", a.update.count}, {"draw_count", a.draw.count},
                                    {"update_ns", a.update.total}, {"draw_ns", a.draw.total},
                                    {"update_max_ns", a.update.max}, {"draw_max_ns", a.draw.max}});
+        }
+        auto resourceTotals = nlohmann::json::array();
+        for (const auto& [key, stages] : resourceSummary) {
+            const auto& [origin, category, name, manager, owner] = key;
+            auto stageTotals = nlohmann::json::object();
+            for (const auto& [stage, value] : stages)
+                stageTotals[stage] = {{"count", value.count}, {"total_ns", value.total}, {"max_ns", value.max}};
+            resourceTotals.push_back({{"origin_tick", origin}, {"name", name}, {"manager", manager},
+                                      {"cache_owner", owner}, {"stages", std::move(stageTotals)}});
         }
         return {{"collector_record_ns", measuredRecordNs}, {"collector_count_ns", measuredCountNs},
                 {"collector_record_calls", measuredRecordCalls}, {"collector_count_calls", measuredCountCalls},
@@ -198,9 +243,17 @@ nlohmann::json EndTick() noexcept {
                 {"phase_key_limit", MaxPhases}, {"overflow_phases", droppedPhases},
                 {"actor_aggregates", std::move(actorTotals)}, {"actor_keys", actorSummary.size()},
                 {"actor_key_limit", MaxActors}, {"overflow_actors", droppedActors},
-                {"actor_keys_omitted", sortedActors.size() > 64 ? sortedActors.size() - 64 : 0},
+                {"actor_keys_omitted", 0},
                 {"aggregates", std::move(totals)}, {"aggregate_keys", summary.size()},
-                {"aggregate_keys_omitted", sorted.size() > 64 ? sorted.size() - 64 : 0},
+                {"aggregate_keys_omitted", 0}, {"aggregate_key_limit", MaxAggregates},
+                {"resource_aggregates", std::move(resourceTotals)}, {"resource_keys", resourceSummary.size()},
+                {"resource_key_limit", MaxResources}, {"resource_stage_limit", MaxResourceStages},
+                {"overflow_resources", droppedResources}, {"overflow_resource_stages", droppedStages},
+                {"truncated_names", namesTruncated}, {"truncated_categories", categoriesTruncated},
+                {"truncated_details", detailsTruncated}, {"unknown_names", namesUnknown},
+                {"identity_limits", {{"name_bytes", 512}, {"category_bytes", 128}, {"detail_bytes", 128}}},
+                {"emission_truncated", false},
+                {"overflow_semantics", "calls dropped after collection limits; every retained resource/actor/general key is emitted"},
                 {"overflow_aggregates", droppedAggregates}, {"tick", tick}, {"events", std::move(rows)}, {"counts", counters},
                 {"overflow_events", dropped}, {"overflow_counters", droppedCounters}, {"late_events", late}, {"late_counters", lateCount},
                 {"resource_event_limit", MaxEvents}, {"slow_event_limit", MaxSlowEvents}, {"counter_limit", MaxCounters},
@@ -245,6 +298,7 @@ Scope::Scope(const char* category, const std::string& name, uintptr_t manager, u
     if (mContext.enabled) {
         try {
             mName = name.substr(0, 512);
+            mNameTruncated = name.size() > 512;
             mStart = Now();
             outstandingScopes.fetch_add(1, std::memory_order_relaxed);
         } catch (...) { mContext.enabled = false; collectionErrors.fetch_add(1, std::memory_order_relaxed); }
@@ -253,7 +307,7 @@ Scope::Scope(const char* category, const std::string& name, uintptr_t manager, u
 Scope::~Scope() {
     if (!mContext.enabled) return;
     const auto end = Now();
-    Add(mContext, mCategory, mName, mStart, end, mManager, mOwner, mDetail, end - mStart >= mMinimum);
+    Add(mContext, mCategory, mName, mStart, end, mManager, mOwner, mDetail, end - mStart >= mMinimum, mNameTruncated);
     outstandingScopes.fetch_sub(1, std::memory_order_relaxed);
 }
 }

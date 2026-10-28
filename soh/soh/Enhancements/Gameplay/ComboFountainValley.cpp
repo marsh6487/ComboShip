@@ -117,7 +117,7 @@ struct ValleyActor {
 };
 // Process-owned, fixed-size buffers outlive native DynaPoly teardown. Only one
 // scene instance is registered; no archive collision/resource buffer is edited.
-std::array<Vec3s, 43 * 3> sVertices{};
+std::array<Vec3i, 43 * 3> sVertices{};
 std::array<CollisionPoly, 43> sPolys{};
 std::array<Vtx, 43 * 3> sDrawVertices{};
 SurfaceType sSurface[1]{};
@@ -167,7 +167,7 @@ void ReportReadiness(PlayState* play, const char* status) {
                 sObservedVertices, operand(25), operand(40), sActorId, static_cast<void*>(sActor),
                 sActor ? sActor->dyna.bgId : -1, static_cast<void*>(play->colCtx.colHeader));
 }
-bool SamePoint(const Vec3s& v, const Point& p) {
+bool SamePoint(const Vec3i& v, const Point& p) {
     return v.x == p.x && v.y == p.y && v.z == p.z;
 }
 bool SceneContains(const CollisionHeader* h, const Triangle& t) {
@@ -176,8 +176,8 @@ bool SceneContains(const CollisionHeader* h, const Triangle& t) {
     const Point points[] = { t.a, t.b, t.c };
     for (size_t i = 0; i < h->numPolygons; ++i) {
         const auto& p = h->polyList[i];
-        const unsigned indices[] = { unsigned(p.flags_vIA & 0x1fff), unsigned(p.flags_vIB & 0x1fff),
-                                     unsigned(p.vIC & 0x1fff) };
+        const unsigned indices[] = { COLPOLY_VTX_INDEX(p.flags_vIA), COLPOLY_VTX_INDEX(p.flags_vIB),
+                                     COLPOLY_VTX_INDEX(p.vIC) };
         if (indices[0] >= h->numVertices || indices[1] >= h->numVertices || indices[2] >= h->numVertices)
             continue;
         bool match = true;
@@ -200,9 +200,9 @@ void Build(CollisionHeader* scene) {
         const Point points[] = { t.a, t.b, t.c };
         for (size_t j = 0; j < 3; ++j) {
             auto& d = sDrawVertices[i * 3 + j].v;
-            d.ob[0] = s16(points[j].x);
-            d.ob[1] = s16(points[j].y);
-            d.ob[2] = s16(points[j].z);
+            d.ob[0] = s32(points[j].x);
+            d.ob[1] = s32(points[j].y);
+            d.ob[2] = s32(points[j].z);
             // One shared origin keeps every S in signed16 range without changing
             // density or seams. The 16384-unit shift is 16 whole 32-pixel tiles.
             d.tc[0] = s16((points[j].x - 2048) * 8);
@@ -212,7 +212,7 @@ void Build(CollisionHeader* scene) {
         if (SceneContains(scene, t))
             continue;
         for (size_t j = 0; j < 3; ++j)
-            sVertices[count * 3 + j] = { s16(points[j].x), s16(points[j].y), s16(points[j].z) };
+            sVertices[count * 3 + j] = { s32(points[j].x), s32(points[j].y), s32(points[j].z) };
         float ux = t.b.x - t.a.x, uy = t.b.y - t.a.y, uz = t.b.z - t.a.z;
         float vx = t.c.x - t.a.x, vy = t.c.y - t.a.y, vz = t.c.z - t.a.z;
         float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -228,7 +228,7 @@ void Build(CollisionHeader* scene) {
         poly.flags_vIB = count * 3 + 1;
         poly.vIC = count * 3 + 2;
         poly.normal = { s16(std::lround(nx * 32767)), s16(std::lround(ny * 32767)), s16(std::lround(nz * 32767)) };
-        poly.dist = s16(std::lround(-(nx * t.a.x + ny * t.a.y + nz * t.a.z)));
+        poly.dist = s32(std::lround(-(nx * t.a.x + ny * t.a.y + nz * t.a.z)));
         ++count;
     }
     if (count) {
@@ -255,7 +255,7 @@ void Build(CollisionHeader* scene) {
 }
 void Destroy(Actor* actor, PlayState* play) {
     auto* self = reinterpret_cast<ValleyActor*>(actor);
-    if (self->dyna.bgId >= 0 && self->dyna.bgId < BG_ACTOR_MAX)
+    if (self->dyna.bgId >= 0 && self->dyna.bgId < play->colCtx.dyna.bgActorMax)
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, self->dyna.bgId);
     if (sActor == self) {
         RestoreBackdrop();
@@ -267,13 +267,13 @@ void Destroy(Actor* actor, PlayState* play) {
 void Init(Actor* actor, PlayState* play) {
     auto* self = reinterpret_cast<ValleyActor*>(actor);
     DynaPolyActor_Init(&self->dyna, 0);
-    self->dyna.bgId = BG_ACTOR_MAX;
+    self->dyna.bgId = BGACTOR_INVALID;
     Actor_SetScale(actor, 1);
     actor->room = 0;
     Build(play->colCtx.colHeader);
     if (sCollision.numPolygons) {
         self->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, actor, &sCollision);
-        if (self->dyna.bgId < 0 || self->dyna.bgId >= BG_ACTOR_MAX) {
+        if (self->dyna.bgId < 0 || self->dyna.bgId == BGACTOR_INVALID || self->dyna.bgId >= play->colCtx.dyna.bgActorMax) {
             Actor_Kill(actor);
             return;
         }

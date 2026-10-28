@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #include <map>
 #include <unordered_map>
@@ -181,8 +182,9 @@ void GfxRenderingAPIDX11::CreateDepthStencilObjects(uint32_t width, uint32_t hei
     texture_desc.Height = height;
     texture_desc.MipLevels = 1;
     texture_desc.ArraySize = 1;
-    texture_desc.Format =
-        mFeatureLevel >= D3D_FEATURE_LEVEL_10_0 ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_R24G8_TYPELESS;
+    // SOH [Enhancement] World light casting: use a combined depth+stencil format on ALL feature levels
+    // so the stencil light-volume technique always has a stencil plane.
+    texture_desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
     texture_desc.SampleDesc.Count = msaa_count;
     texture_desc.SampleDesc.Quality = 0;
     texture_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -194,7 +196,7 @@ void GfxRenderingAPIDX11::CreateDepthStencilObjects(uint32_t width, uint32_t hei
     ThrowIfFailed(mDevice->CreateTexture2D(&texture_desc, nullptr, texture.GetAddressOf()));
 
     D3D11_DEPTH_STENCIL_VIEW_DESC view_desc;
-    view_desc.Format = mFeatureLevel >= D3D_FEATURE_LEVEL_10_0 ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
+    view_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; // SOH [Enhancement] world light casting (depth+stencil)
     view_desc.Flags = 0;
     if (msaa_count > 1) {
         view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
@@ -208,8 +210,9 @@ void GfxRenderingAPIDX11::CreateDepthStencilObjects(uint32_t width, uint32_t hei
 
     if (srv != nullptr) {
         D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-        srv_desc.Format =
-            mFeatureLevel >= D3D_FEATURE_LEVEL_10_0 ? DXGI_FORMAT_R32_FLOAT : DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        // SOH [Enhancement] World light casting: depth read view matching the R24G8 depth+stencil texture
+        // (the X8 part is the stencil byte, ignored by GetPixelDepth's compute shader).
+        srv_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
         srv_desc.ViewDimension = msaa_count > 1 ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
         srv_desc.Texture2D.MostDetailedMip = 0;
         srv_desc.Texture2D.MipLevels = -1;
@@ -311,6 +314,9 @@ static bool CreateDeviceFunc(class GfxRenderingAPIDX11* self, bool SoftwareRende
 
 void GfxRenderingAPIDX11::Init() {
     ResetGpuTiming();
+    for (auto& state : mDepthStencilStates) state.Reset();
+    mStencilMode = (int)StencilMode::Off;
+    mLastStencilMode = -1;
     // Load d3d11.dll
     mDX11Module = LoadLibraryW(L"d3d11.dll");
     if (mDX11Module == nullptr) {
@@ -347,6 +353,7 @@ void GfxRenderingAPIDX11::Init() {
         mLastDepthTest = -1;
         mLastDepthMask = -1;
         mLastZmodeDecal = -1;
+        mLastStencilMode = -1; // SOH [Enhancement] world light casting / actor shadows
         mLastPrimitaveTopology = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
     });
 
@@ -370,6 +377,11 @@ void GfxRenderingAPIDX11::Init() {
     for (uint32_t sample_count = 1; sample_count <= D3D11_MAX_MULTISAMPLE_SAMPLE_COUNT; sample_count++) {
         ThrowIfFailed(mDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, sample_count,
                                                              &mMsaaNumQualityLevels[sample_count - 1]));
+        uint32_t depthQualityLevels = 0;
+        ThrowIfFailed(mDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_D24_UNORM_S8_UINT, sample_count,
+                                                             &depthQualityLevels));
+        mMsaaNumQualityLevels[sample_count - 1] =
+            (std::min)(mMsaaNumQualityLevels[sample_count - 1], depthQualityLevels);
     }
 
     // Create main vertex buffer
@@ -378,7 +390,8 @@ void GfxRenderingAPIDX11::Init() {
     ZeroMemory(&vertex_buffer_desc, sizeof(D3D11_BUFFER_DESC));
 
     vertex_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
-    vertex_buffer_desc.ByteWidth = 256 * 32 * 3 * sizeof(float); // Same as buf_vbo size in gfx_pc
+    // Matches the CPU mBufVbo allocation in interpreter.cpp (VBO_MAX_FLOATS_PER_VERTEX floats/vertex).
+    vertex_buffer_desc.ByteWidth = 256 * VBO_MAX_FLOATS_PER_VERTEX * 3 * sizeof(float); // Same as buf_vbo size in gfx_pc
     vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     vertex_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     vertex_buffer_desc.MiscFlags = 0;
@@ -416,6 +429,11 @@ void GfxRenderingAPIDX11::Init() {
     constant_buffer_desc.ByteWidth = sizeof(PerPrimDepthCB);
     ThrowIfFailed(mDevice->CreateBuffer(&constant_buffer_desc, nullptr, mPerPrimDepthCb.GetAddressOf()),
                   mWindowBackend->GetWindowHandle(), "Failed to create per-prim-depth constant buffer.");
+
+    // Toon uses b3: b2 remains the host's primitive-depth buffer.
+    constant_buffer_desc.ByteWidth = sizeof(PerToonCB);
+    ThrowIfFailed(mDevice->CreateBuffer(&constant_buffer_desc, nullptr, mPerToonCb.GetAddressOf()),
+                  mWindowBackend->GetWindowHandle(), "Failed to create toon-lighting constant buffer.");
 
     // Create compute shader that can be used to retrieve depth buffer values
 
@@ -598,6 +616,12 @@ struct ShaderProgram* GfxRenderingAPIDX11::CreateAndLoadNewShader(uint64_t shade
                              D3D11_INPUT_PER_VERTEX_DATA,
                              0 };
     }
+    // SOH [Enhancement] Toon lighting world-space normal (order must match the vbo packing).
+    if (cc_features.opt_toon) {
+        ied[ied_index++] = {
+            "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0
+        };
+    }
     for (unsigned int i = 0; i < cc_features.numInputs; i++) {
         DXGI_FORMAT format = cc_features.opt_alpha ? DXGI_FORMAT_R32G32B32A32_FLOAT : DXGI_FORMAT_R32G32B32_FLOAT;
         ied[ied_index++] = { "INPUT", i, format, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
@@ -633,7 +657,8 @@ struct ShaderProgram* GfxRenderingAPIDX11::CreateAndLoadNewShader(uint64_t shade
     prg->shader_id0 = shader_id0;
     prg->shader_id1 = shader_id1;
     prg->numInputs = cc_features.numInputs;
-    prg->numFloats = numFloats;
+    prg->numFloats = GetShaderVertexLayout(cc_features).numFloats;
+    prg->opt_toon = cc_features.opt_toon; // SOH [Enhancement] toon lighting
     prg->usedTextures[0] = cc_features.usedTextures[0];
     prg->usedTextures[1] = cc_features.usedTextures[1];
     prg->usedTextures[2] = cc_features.used_masks[0];
@@ -787,25 +812,75 @@ void GfxRenderingAPIDX11::SetUseAlpha(bool use_alpha) {
 
 void GfxRenderingAPIDX11::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) {
 
-    if (mLastDepthTest != mCurrentDepthTest || mLastDepthMask != mCurrentDepthMask) {
+    // SOH [Enhancement] World light casting: also rebuild when the stencil mode changes. The decal
+    // flag participates because DepthFunc below depends on it; without it a decal-only change kept the
+    // previous compare function (mLastZmodeDecal itself is updated by the rasterizer block further down).
+    if (mLastDepthTest != mCurrentDepthTest || mLastDepthMask != mCurrentDepthMask ||
+        mLastZmodeDecal != mCurrentZmodeDecal || mLastStencilMode != mStencilMode) {
         mLastDepthTest = mCurrentDepthTest;
         mLastDepthMask = mCurrentDepthMask;
+        mLastStencilMode = mStencilMode;
 
-        mDepthStencilState.Reset();
+        // SOH [Enhancement] Depth-stencil states are cached (created lazily, kept for the device's
+        // lifetime): the stencil features flip the mode many times per frame, and re-running
+        // CreateDepthStencilState on every flip churned a driver object per change. Same key scheme as
+        // the Metal backend's cache.
+        uint32_t dsKey = (mCurrentDepthTest ? 1u : 0u) | ((mCurrentDepthMask ? 1u : 0u) << 1) |
+                         ((mCurrentZmodeDecal ? 1u : 0u) << 2) | (((uint32_t)mStencilMode & 7u) << 3);
+        if (mDepthStencilStates[dsKey] == nullptr) {
+            D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
+            ZeroMemory(&depth_stencil_desc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 
-        D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
-        ZeroMemory(&depth_stencil_desc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+            depth_stencil_desc.DepthEnable = mCurrentDepthTest || mCurrentDepthMask;
+            depth_stencil_desc.DepthWriteMask =
+                mCurrentDepthMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+            depth_stencil_desc.DepthFunc =
+                mCurrentDepthTest ? (mCurrentZmodeDecal ? D3D11_COMPARISON_LESS_EQUAL : D3D11_COMPARISON_LESS)
+                                  : D3D11_COMPARISON_ALWAYS;
 
-        depth_stencil_desc.DepthEnable = mCurrentDepthTest || mCurrentDepthMask;
-        depth_stencil_desc.DepthWriteMask =
-            mCurrentDepthMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
-        depth_stencil_desc.DepthFunc = mCurrentDepthTest
-                                           ? (mCurrentZmodeDecal ? D3D11_COMPARISON_LESS_EQUAL : D3D11_COMPARISON_LESS)
-                                           : D3D11_COMPARISON_ALWAYS;
-        depth_stencil_desc.StencilEnable = false;
+            // SOH [Enhancement] World light casting / actor shadows stencil volume state. Off leaves the
+            // stencil disabled (rendering unchanged). The single-sided mask modes (z-fail) use identical
+            // front/back ops because those passes cull game-side; VolumeIncrDecr is the two-sided single
+            // pass — opposite WRAP ops per facing (D3D11_STENCIL_OP_INCR/DECR wrap; the _SAT variants
+            // clamp), order/polarity independent. The composite draws where stencil != 0 and zeroes it as
+            // it goes (self-clearing).
+            if (mStencilMode == (int)StencilMode::Off) {
+                depth_stencil_desc.StencilEnable = false;
+            } else {
+                depth_stencil_desc.StencilEnable = true;
+                depth_stencil_desc.StencilReadMask = 0xFF;
+                depth_stencil_desc.StencilWriteMask = 0xFF;
 
-        ThrowIfFailed(mDevice->CreateDepthStencilState(&depth_stencil_desc, mDepthStencilState.GetAddressOf()));
-        mContext->OMSetDepthStencilState(mDepthStencilState.Get(), 0);
+                D3D11_DEPTH_STENCILOP_DESC op;
+                op.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+                if (mStencilMode == (int)StencilMode::VolumeIncr) {
+                    op.StencilDepthFailOp = D3D11_STENCIL_OP_INCR_SAT;
+                    op.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+                    op.StencilFunc = D3D11_COMPARISON_ALWAYS;
+                } else if (mStencilMode == (int)StencilMode::VolumeDecr) {
+                    op.StencilDepthFailOp = D3D11_STENCIL_OP_DECR_SAT;
+                    op.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+                    op.StencilFunc = D3D11_COMPARISON_ALWAYS;
+                } else if (mStencilMode == (int)StencilMode::VolumeIncrDecr) {
+                    op.StencilDepthFailOp = D3D11_STENCIL_OP_INCR; // wrap
+                    op.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+                    op.StencilFunc = D3D11_COMPARISON_ALWAYS;
+                } else { // Composite: draw where stencil != ref(0), zeroing it
+                    op.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+                    op.StencilPassOp = D3D11_STENCIL_OP_ZERO;
+                    op.StencilFunc = D3D11_COMPARISON_NOT_EQUAL;
+                }
+                depth_stencil_desc.FrontFace = op;
+                depth_stencil_desc.BackFace = op;
+                if (mStencilMode == (int)StencilMode::VolumeIncrDecr) {
+                    depth_stencil_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR; // wrap
+                }
+            }
+
+            ThrowIfFailed(
+                mDevice->CreateDepthStencilState(&depth_stencil_desc, mDepthStencilStates[dsKey].GetAddressOf()));
+        }
+        mContext->OMSetDepthStencilState(mDepthStencilStates[dsKey].Get(), 0);
     }
 
     if (mLastZmodeDecal != mCurrentZmodeDecal) {
@@ -897,6 +972,27 @@ void GfxRenderingAPIDX11::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, siz
         mPrimDepthDirty = false;
     }
 
+    // SOH [Enhancement] Toon lighting: per-object dominant light + ramp shape into the dedicated toon
+    // CB (b3), re-uploaded per toon draw (WRITE_DISCARD makes this safe). Only the toon pixel shader
+    // reads it, and PerFrameCB is left untouched so it stays frame-global.
+    if (mShaderProgram->opt_toon) {
+        for (int j = 0; j < 3; j++) {
+            mPerToonCbData.toon_light_dir[j] = mToonLightDir[j];
+            mPerToonCbData.toon_light_color[j] = mToonLightColor[j];
+            mPerToonCbData.toon_ambient[j] = mToonAmbient[j];
+        }
+        mPerToonCbData.toon_ramp_center = mToonRampCenter;
+        mPerToonCbData.toon_ramp_softness = mToonRampSoftness;
+        mPerToonCbData.toon_highlight_intensity = mToonHighlightIntensity;
+        mPerToonCbData.toon_shadow_intensity = mToonShadowIntensity;
+        mPerToonCbData.toon_debug = mToonDebug;
+        D3D11_MAPPED_SUBRESOURCE toon_ms;
+        ZeroMemory(&toon_ms, sizeof(D3D11_MAPPED_SUBRESOURCE));
+        mContext->Map(mPerToonCb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &toon_ms);
+        memcpy(toon_ms.pData, &mPerToonCbData, sizeof(PerToonCB));
+        mContext->Unmap(mPerToonCb.Get(), 0);
+    }
+
     // Set vertex buffer data
 
     D3D11_MAPPED_SUBRESOURCE ms;
@@ -939,8 +1035,10 @@ void GfxRenderingAPIDX11::OnResize() {
 
 void GfxRenderingAPIDX11::StartFrame() {
     // Set per-frame constant buffer
-    ID3D11Buffer* buffers[3] = { mPerFrameCb.Get(), mPerDrawCb.Get(), mPerPrimDepthCb.Get() };
-    mContext->PSSetConstantBuffers(0, 3, buffers);
+    mStencilMode = (int)StencilMode::Off;
+    mLastStencilMode = -1;
+    ID3D11Buffer* buffers[4] = { mPerFrameCb.Get(), mPerDrawCb.Get(), mPerPrimDepthCb.Get(), mPerToonCb.Get() };
+    mContext->PSSetConstantBuffers(0, 4, buffers);
 
     mPerFrameCbData.noise_frame++;
     if (mPerFrameCbData.noise_frame > 150) {
@@ -1075,7 +1173,11 @@ void GfxRenderingAPIDX11::ClearFramebuffer(bool color, bool depth) {
         mContext->ClearRenderTargetView(fb.render_target_view.Get(), clearColor);
     }
     if (depth && fb.has_depth_buffer) {
-        mContext->ClearDepthStencilView(fb.depth_stencil_view.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+        // SOH [Enhancement] Stencil volumes: also clear the stencil plane (the combined D24S8 format always
+        // has one). The z-fail masks assume stencil starts at 0 each frame, and the composite only
+        // self-zeroes pixels it draws.
+        mContext->ClearDepthStencilView(fb.depth_stencil_view.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+                                        1.0f, 0);
     }
 }
 
@@ -1538,6 +1640,7 @@ std::string gfx_direct3d_common_build_shader(size_t& numFloats, const CCFeatures
         { "o_invisible", cc_features.opt_invisible },
         { "o_grayscale", cc_features.opt_grayscale },
         { "o_prim_depth", cc_features.opt_prim_depth },
+        { "o_toon", cc_features.opt_toon },
         { "o_textures", M_ARRAY(cc_features.usedTextures, bool, 2) },
         { "o_masks", M_ARRAY(cc_features.used_masks, bool, 2) },
         { "o_blend", M_ARRAY(cc_features.used_blend, bool, 2) },

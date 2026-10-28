@@ -18,6 +18,13 @@
 #include "z64math.h"
 #include <string.h>
 
+#define TRANSITION_TILE_GFX_COUNT(cols, rows) (((cols) * 9 + 1) * (rows) + 2)
+#if defined(GBI_S32_VTX) || defined(GBI_FLOATS)
+#define TRANSITION_TILE_GFX_FRAME_COUNT 2
+#else
+#define TRANSITION_TILE_GFX_FRAME_COUNT 1
+#endif
+
 Gfx sTransTileSetupDL[] = {
     gsDPPipeSync(),
     gsSPTexture(0x8000, 0x8000, 0, G_TX_RENDERTILE, G_ON),
@@ -73,30 +80,41 @@ void TransitionTile_InitGraphics(TransitionTile* this) {
         }
     }
 
-    gfx = this->gfx;
-    for (rowTex = 0, row = 0; row < this->rows; row++, rowTex += 0x20) {
-        gSPVertex(gfx++, SEGMENT_ADDR(0xA, (u32)row * (this->cols + 1) * sizeof(Vtx)), 2 * (this->cols + 1), 0);
+    for (frame = 0; frame < TRANSITION_TILE_GFX_FRAME_COUNT; frame++) {
+        gfx = this->gfx + frame * TRANSITION_TILE_GFX_COUNT(this->cols, this->rows);
+#if defined(GBI_S32_VTX) || defined(GBI_FLOATS)
+        // Segmented vertex offsets use archived 16-byte records in the renderer.
+        // Keep one native-pointer list per vertex buffer so both frame lifetimes remain independent.
+        vtx = frame == 0 ? this->vtxFrame1 : this->vtxFrame2;
+#endif
+        for (rowTex = 0, row = 0; row < this->rows; row++, rowTex += 0x20) {
+#if defined(GBI_S32_VTX) || defined(GBI_FLOATS)
+            gSPVertex(gfx++, (uintptr_t)&vtx[row * (this->cols + 1)], 2 * (this->cols + 1), 0);
+#else
+            gSPVertex(gfx++, SEGMENT_ADDR(0xA, (u32)row * (this->cols + 1) * sizeof(Vtx)), 2 * (this->cols + 1), 0);
+#endif
 
-        colTex = 0;
-        col2 = 0;
-        col = 0;
-        while (col < this->cols) {
-            gDPPipeSync(gfx++);
+            colTex = 0;
+            col2 = 0;
+            col = 0;
+            while (col < this->cols) {
+                gDPPipeSync(gfx++);
 
-            gDPLoadTextureTile(gfx++, SEGMENT_ADDR(0xB, 0), G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WIDTH, SCREEN_HEIGHT,
-                               colTex, rowTex, colTex + 0x20, rowTex + 0x20, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                               G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+                gDPLoadTextureTile(gfx++, SEGMENT_ADDR(0xB, 0), G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WIDTH, SCREEN_HEIGHT,
+                                   colTex, rowTex, colTex + 0x20, rowTex + 0x20, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                                   G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
 
-            gSP1Quadrangle(gfx++, col, col + 1, col2 + this->cols + 2, this->cols + col2 + 1, 0);
+                gSP1Quadrangle(gfx++, col, col + 1, col2 + this->cols + 2, this->cols + col2 + 1, 0);
 
-            colTex += 0x20;
-            col2++;
-            col++;
+                colTex += 0x20;
+                col2++;
+                col++;
+            }
         }
-    }
 
-    gDPPipeSync(gfx++);
-    gSPEndDisplayList(gfx++);
+        gDPPipeSync(gfx++);
+        gSPEndDisplayList(gfx++);
+    }
 }
 
 void TransitionTile_InitVtxData(TransitionTile* this) {
@@ -143,7 +161,7 @@ TransitionTile* TransitionTile_Init(TransitionTile* this, s32 cols, s32 rows) {
     this->vtxData = SystemArena_Malloc(gridSize * sizeof(TransitionTileVtxData));
     this->vtxFrame1 = SystemArena_Malloc(gridSize * sizeof(Vtx));
     this->vtxFrame2 = SystemArena_Malloc(gridSize * sizeof(Vtx));
-    this->gfx = SystemArena_Malloc(((cols * 9 + 1) * rows + 2) * sizeof(Gfx));
+    this->gfx = SystemArena_Malloc(TRANSITION_TILE_GFX_FRAME_COUNT * TRANSITION_TILE_GFX_COUNT(cols, rows) * sizeof(Gfx));
 
     if ((this->vtxData == NULL) || (this->vtxFrame1 == NULL) || (this->vtxFrame2 == NULL) || (this->gfx == NULL)) {
         if (this->vtxData != NULL) {
@@ -198,7 +216,11 @@ void TransitionTile_Draw(TransitionTile* this, Gfx** gfxP) {
     gSPSegment(gfx++, 0xA, this->frame == 0 ? this->vtxFrame1 : this->vtxFrame2);
     gSPSegment(gfx++, 0xB, this->zBuffer);
     gSPDisplayList(gfx++, sTransTileSetupDL);
+#if defined(GBI_S32_VTX) || defined(GBI_FLOATS)
+    gSPDisplayList(gfx++, this->gfx + this->frame * TRANSITION_TILE_GFX_COUNT(this->cols, this->rows));
+#else
     gSPDisplayList(gfx++, this->gfx);
+#endif
     gDPPipeSync(gfx++);
     this->frame ^= 1;
     *gfxP = gfx;

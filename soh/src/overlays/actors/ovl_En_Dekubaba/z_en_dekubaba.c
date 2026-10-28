@@ -1,3 +1,4 @@
+#include "soh/Enhancements/Graphics/ToonLighting.h"
 #include "z_en_dekubaba.h"
 #include "objects/object_dekubaba/object_dekubaba.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -1250,6 +1251,10 @@ void EnDekubaba_DrawStemBasePruned(EnDekubaba* this, PlayState* play) {
 }
 
 void EnDekubaba_DrawBaseShadow(EnDekubaba* this, PlayState* play) {
+    if (ToonLighting_SuppressVanillaShadows()) {
+        return;
+    }
+
     MtxF mtx;
     f32 horizontalScale;
 

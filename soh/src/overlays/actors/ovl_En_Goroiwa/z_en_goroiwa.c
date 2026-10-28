@@ -139,7 +139,7 @@ void EnGoroiwa_SetSpeed(EnGoroiwa* this, PlayState* play) {
 
 void EnGoroiwa_FaceNextWaypoint(EnGoroiwa* this, PlayState* play) {
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
-    Vec3s* nextPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    Vec3f* nextPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
     Vec3f nextPosF;
 
     nextPosF.x = nextPos->x;
@@ -153,8 +153,8 @@ void EnGoroiwa_GetPrevWaypointDiff(EnGoroiwa* this, PlayState* play, Vec3f* dest
     s16 loopMode = (this->actor.params >> 8) & 3;
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
     s16 prevWaypoint = this->currentWaypoint - this->pathDirection;
-    Vec3s* prevPointPos;
-    Vec3s* currentPointPos;
+    Vec3f* prevPointPos;
+    Vec3f* currentPointPos;
 
     if (prevWaypoint < 0) {
         if (loopMode == ENGOROIWA_LOOPMODE_ONEWAY || loopMode == ENGOROIWA_LOOPMODE_ONEWAY_BREAK) {
@@ -170,8 +170,8 @@ void EnGoroiwa_GetPrevWaypointDiff(EnGoroiwa* this, PlayState* play, Vec3f* dest
         }
     }
 
-    currentPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
-    prevPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + prevWaypoint;
+    currentPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
+    prevPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + prevWaypoint;
     dest->x = currentPointPos->x - prevPointPos->x;
     dest->y = currentPointPos->x - prevPointPos->y;
     dest->z = currentPointPos->x - prevPointPos->z;
@@ -224,7 +224,7 @@ void EnGoroiwa_InitPath(EnGoroiwa* this, PlayState* play) {
 
 void EnGoroiwa_TeleportToWaypoint(EnGoroiwa* this, PlayState* play, s32 waypoint) {
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
-    Vec3s* pointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + waypoint;
+    Vec3f* pointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + waypoint;
 
     this->actor.world.pos.x = pointPos->x;
     this->actor.world.pos.y = pointPos->y;
@@ -239,8 +239,8 @@ void EnGoroiwa_InitRotation(EnGoroiwa* this) {
 s32 EnGoroiwa_GetAscendDirection(EnGoroiwa* this, PlayState* play) {
     s32 pad;
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
-    Vec3s* nextPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
-    Vec3s* currentPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
+    Vec3f* nextPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    Vec3f* currentPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
 
     if (nextPointPos->x == currentPointPos->x && nextPointPos->z == currentPointPos->z) {
         if (nextPointPos->y == currentPointPos->y) {
@@ -298,12 +298,12 @@ s32 EnGoroiwa_MoveAndFall(EnGoroiwa* this, PlayState* play) {
     Path* path;
     s32 result;
     s32 pad;
-    Vec3s* nextPointPos;
+    Vec3f* nextPointPos;
 
     Math_StepToF(&this->actor.speedXZ, R_EN_GOROIWA_SPEED * 0.01f, 0.3f);
     Actor_UpdateVelocityXZGravity(&this->actor);
     path = &play->setupPathList[this->actor.params & 0xFF];
-    nextPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    nextPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
     result = true;
     result &= Math_StepToF(&this->actor.world.pos.x, nextPointPos->x, fabsf(this->actor.velocity.x));
     result &= Math_StepToF(&this->actor.world.pos.z, nextPointPos->z, fabsf(this->actor.velocity.z));
@@ -314,8 +314,8 @@ s32 EnGoroiwa_MoveAndFall(EnGoroiwa* this, PlayState* play) {
 s32 EnGoroiwa_Move(EnGoroiwa* this, PlayState* play) {
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
     s32 pad;
-    Vec3s* nextPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
-    Vec3s* currentPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
+    Vec3f* nextPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    Vec3f* currentPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->currentWaypoint;
     s32 nextPointReached;
     Vec3f posDiff;
     Vec3f nextPointPosF;
@@ -345,7 +345,7 @@ s32 EnGoroiwa_Move(EnGoroiwa* this, PlayState* play) {
 s32 EnGoroiwa_MoveUpToNextWaypoint(EnGoroiwa* this, PlayState* play) {
     s32 pad;
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
-    Vec3s* nextPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    Vec3f* nextPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
 
     Math_StepToF(&this->actor.velocity.y, (R_EN_GOROIWA_SPEED * 0.01f) * 0.5f, 0.18f);
     this->actor.world.pos.x = nextPointPos->x;
@@ -356,7 +356,7 @@ s32 EnGoroiwa_MoveUpToNextWaypoint(EnGoroiwa* this, PlayState* play) {
 s32 EnGoroiwa_MoveDownToNextWaypoint(EnGoroiwa* this, PlayState* play) {
     s32 pad;
     Path* path = &play->setupPathList[this->actor.params & 0xFF];
-    Vec3s* nextPointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
+    Vec3f* nextPointPos = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points) + this->nextWaypoint;
     f32 nextPointY;
     f32 thisY;
     f32 yDistToFloor;

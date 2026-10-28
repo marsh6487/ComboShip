@@ -235,6 +235,7 @@ MTL::VertexDescriptor* gfx_metal_build_shader(std::string& result, size_t& numFl
         { "o_invisible", cc_features.opt_invisible },
         { "o_grayscale", cc_features.opt_grayscale },
         { "o_prim_depth", cc_features.opt_prim_depth },
+        { "o_toon", cc_features.opt_toon },
         { "o_textures", M_ARRAY(cc_features.usedTextures, bool, 2) },
         { "o_masks", M_ARRAY(cc_features.used_masks, bool, 2) },
         { "o_blend", M_ARRAY(cc_features.used_blend, bool, 2) },
@@ -276,9 +277,18 @@ MTL::VertexDescriptor* gfx_metal_build_shader(std::string& result, size_t& numFl
     // SPDLOG_INFO("=========== METAL SHADER ============");
     // SPDLOG_INFO(result);
     // SPDLOG_INFO("====================================");
-    vertex_descriptor->layouts()->object(0)->setStride(raw_numFloats * sizeof(float));
+    const auto layout = Fast::GetShaderVertexLayout(cc_features);
+    const bool missingNormal = cc_features.opt_toon && raw_numFloats + 3 == layout.numFloats;
+    if (missingNormal) {
+        for (size_t index = 0; index < vertex_index; ++index) {
+            auto* attribute = vertex_descriptor->attributes()->object(index);
+            attribute->setOffset(Fast::GetShaderVertexAttributeOffset(attribute->offset() / sizeof(float), layout,
+                                                                     true) * sizeof(float));
+        }
+    }
+    vertex_descriptor->layouts()->object(0)->setStride(layout.numFloats * sizeof(float));
     vertex_descriptor->layouts()->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
-    numFloats = raw_numFloats;
+    numFloats = layout.numFloats;
     return vertex_descriptor;
 }
 

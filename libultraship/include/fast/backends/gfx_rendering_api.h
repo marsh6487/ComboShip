@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <set>
 #include "imconfig.h"
+#include "fast/toon_shading.h"
 
 namespace Fast {
 struct ShaderProgram;
@@ -16,6 +17,31 @@ struct GfxClipParameters {
 };
 
 enum FilteringMode { FILTER_THREE_POINT, FILTER_LINEAR, FILTER_NONE };
+
+// The interpreter packs this layout independently of a selected Prism shader. In particular,
+// legacy custom templates may ignore the normal while still reading the inputs after it.
+struct ShaderVertexLayout {
+    size_t normalOffset;
+    size_t numFloats;
+};
+
+template <typename Features> constexpr ShaderVertexLayout GetShaderVertexLayout(const Features& features) {
+    size_t offset = 4; // clip-space position
+    for (size_t texture = 0; texture < 2; ++texture) {
+        if (features.usedTextures[texture]) {
+            offset += 2 + (features.clamp[texture][0] ? 1 : 0) + (features.clamp[texture][1] ? 1 : 0);
+        }
+    }
+    offset += (features.opt_fog ? 4 : 0) + (features.opt_grayscale ? 4 : 0);
+    return { offset, offset + (features.opt_toon ? 3 : 0) + features.numInputs * (features.opt_alpha ? 4 : 3) };
+}
+
+// A legacy Metal template has no normal attribute, so input indices remain unchanged while
+// input offsets skip the normal carried by the interpreter's vertex payload.
+constexpr size_t GetShaderVertexAttributeOffset(size_t offset, const ShaderVertexLayout& layout,
+                                                bool missingNormal) {
+    return offset + (missingNormal && offset >= layout.normalOffset ? 3 : 0);
+}
 
 // A hash function used to hash a: pair<float, float>
 struct hash_pair_ff {
@@ -87,7 +113,49 @@ class GfxRenderingAPI {
     virtual ImTextureID GetTextureById(int id) = 0;
     virtual void SetCurrentPrimDepth(float depth) = 0;
 
+    // SOH [Enhancement] Toon lighting: the interpreter pushes the per-object dominant light here
+    // before each batch; backends read the mToon* members in their per-draw uniform paths.
+    virtual void SetToonLighting(const float dir[3], const float color[3], const float ambient[3]) {
+        for (int i = 0; i < 3; i++) {
+            mToonLightDir[i] = dir[i];
+            mToonLightColor[i] = color[i];
+            mToonAmbient[i] = ambient[i];
+        }
+    }
+
+    // SOH [Enhancement] Toon lighting: the application pushes the frame-global ramp shape here (the
+    // values are app-side tuning, so the framework never reaches into the app's config to read them).
+    // Backends read the mToonRamp* members in their per-draw uniform paths; they keep their default
+    // (a plain two-tone ramp) until the application overrides them.
+    // debug != 0 switches the toon variant to a diagnostic view: each relit object is drawn as flat
+    // white on the lit side of the ramp and flat black on the shadow side (albedo discarded), so it is
+    // obvious at a glance which draws actually receive toon lighting.
+    virtual void SetToonRamp(float center, float softness, float highlight, float shadow, float debug) {
+        mToonRampCenter = center;
+        mToonRampSoftness = softness;
+        mToonHighlightIntensity = highlight;
+        mToonShadowIntensity = shadow;
+        mToonDebug = debug;
+    }
+
+    // SOH [Enhancement] World light casting / actor shadows: the interpreter pushes the current stencil
+    // mode here when a gSPStencil command is seen, or directly from RenderShadowVolumes; backends read
+    // mStencilMode in their per-draw path. Off (0) is normal rendering, so ordinary draws are unaffected.
+    virtual void SetStencilMode(int mode) {
+        mStencilMode = mode >= (int)StencilMode::Off && mode <= (int)StencilMode::VolumeIncrDecr
+                           ? mode : (int)StencilMode::Off;
+    }
+
   protected:
+    float mToonLightDir[3] = { 0.0f, 0.0f, 1.0f };
+    float mToonLightColor[3] = { 1.0f, 1.0f, 1.0f };
+    float mToonAmbient[3] = { 0.0f, 0.0f, 0.0f };
+    float mToonRampCenter = TOON_SHADING_DEFAULT_RAMP_CENTER;
+    float mToonRampSoftness = TOON_SHADING_DEFAULT_RAMP_SOFTNESS;
+    float mToonHighlightIntensity = TOON_SHADING_DEFAULT_HIGHLIGHT;
+    float mToonShadowIntensity = TOON_SHADING_DEFAULT_SHADOW;
+    float mToonDebug = 0.0f;
+    int mStencilMode = 0; // SOH [Enhancement] world light casting / actor shadows (see StencilMode)
     int8_t mCurrentDepthTest = 0;
     int8_t mCurrentDepthMask = 0;
     int8_t mCurrentZmodeDecal = 0;

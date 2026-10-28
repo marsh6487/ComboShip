@@ -12,14 +12,11 @@ diff --git a/include/fast/lus_gbi.h b/include/fast/lus_gbi.h
 diff --git a/include/libultraship/libultra/gbi.h b/include/libultraship/libultra/gbi.h
 --- a/include/libultraship/libultra/gbi.h
 +++ b/include/libultraship/libultra/gbi.h
-@@ -201,6 +201,7 @@
+@@ -201,3 +201,4 @@
  #define G_SETTILESIZE_INTERP 0x45
  #define G_SETTARGETINTERPINDEX 0x46
  #define G_SETTILESIZE_LERP 0x4a
 +#define G_SCROLL_TEXTURE 0x4b
- 
- /*
-  * The following commands are the "generated" RDP commands; the user
 @@ -1941,6 +1942,20 @@
  #define gsImmp3(c, p0, p1, p2) \
      { _SHIFTL((c), 24, 8), (_SHIFTL((p0), 16, 16) | _SHIFTL((p1), 8, 8) | _SHIFTL((p2), 0, 8)) }

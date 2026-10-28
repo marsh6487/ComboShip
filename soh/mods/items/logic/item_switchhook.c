@@ -120,11 +120,8 @@ s32 SwitchHook_ConsumeCharge(void) {
 // ============================================================================
 
 void SwitchHook_ShiftCollider(Collider* col, Vec3f* delta) {
-    // Round rather than truncate: the s16 shapes would otherwise lose up to a unit per frame of
-    // re-anchoring and lag permanently behind the model.
-    s16 dxs = (s16)((delta->x >= 0.0f) ? (delta->x + 0.5f) : (delta->x - 0.5f));
-    s16 dys = (s16)((delta->y >= 0.0f) ? (delta->y + 0.5f) : (delta->y - 0.5f));
-    s16 dzs = (s16)((delta->z >= 0.0f) ? (delta->z + 0.5f) : (delta->z - 0.5f));
+    // Every native shape position and cached midpoint is now float. Carry the
+    // full translation so wide teleports and fractional re-anchoring stay aligned.
     s32 i;
     s32 j;
 
@@ -135,9 +132,9 @@ void SwitchHook_ShiftCollider(Collider* col, Vec3f* delta) {
             for (i = 0; i < jntSph->count; i++) {
                 Sphere16* sphere = &jntSph->elements[i].dim.worldSphere;
 
-                sphere->center.x += dxs;
-                sphere->center.y += dys;
-                sphere->center.z += dzs;
+                sphere->center.x += delta->x;
+                sphere->center.y += delta->y;
+                sphere->center.z += delta->z;
             }
             break;
         }
@@ -145,9 +142,9 @@ void SwitchHook_ShiftCollider(Collider* col, Vec3f* delta) {
         case COLSHAPE_CYLINDER: {
             ColliderCylinder* cyl = (ColliderCylinder*)col;
 
-            cyl->dim.pos.x += dxs;
-            cyl->dim.pos.y += dys;
-            cyl->dim.pos.z += dzs;
+            cyl->dim.pos.x += delta->x;
+            cyl->dim.pos.y += delta->y;
+            cyl->dim.pos.z += delta->z;
             break;
         }
 
@@ -180,12 +177,12 @@ void SwitchHook_ShiftCollider(Collider* col, Vec3f* delta) {
                 quad->dim.quad[i].z += delta->z;
             }
             // The cached edge midpoints are world-space too (they drive the quad-vs-quad tests).
-            quad->dim.dcMid.x += dxs;
-            quad->dim.dcMid.y += dys;
-            quad->dim.dcMid.z += dzs;
-            quad->dim.baMid.x += dxs;
-            quad->dim.baMid.y += dys;
-            quad->dim.baMid.z += dzs;
+            quad->dim.dcMid.x += delta->x;
+            quad->dim.dcMid.y += delta->y;
+            quad->dim.dcMid.z += delta->z;
+            quad->dim.baMid.x += delta->x;
+            quad->dim.baMid.y += delta->y;
+            quad->dim.baMid.z += delta->z;
             break;
         }
     }

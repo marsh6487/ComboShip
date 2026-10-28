@@ -13,7 +13,14 @@ the integration controller.
 python3 tests/cel_sky/run_tests.py
 ASAN_OPTIONS=detect_leaks=0 python3 tests/cel_sky/run_tests.py --sanitize
 python3 tests/cel_sky/run_tests.py --compile-commands /absolute/build/compile_commands.json
+python3 tests/cel_sky/run_native_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 tests/cel_sky/run_native_tests.py --sanitize
+python3 tests/cel_sky/compile_native_sources.py --dependencies /absolute/dependency-sources
 ```
+
+`--baseline-registration badc4e09a5176b5d423926eed21d5d19a67ee87e`
+is a negative control: the host's old menu registration fails because no cel
+controls enter the exported menu. It does not modify the worktree.
 
 The first two commands execute actual production function bodies, with only
 native state or UI registration supplied by the fixtures. They cover weather
@@ -24,6 +31,15 @@ format/size/lifetime validation. The optional compilation-database gate checks
 the eight full new Graphics translation units, new menu translation unit and
 current `SohMenu.cpp` using the native build's exact include/define options.
 Fixture success is not a substitute for that compile gate or runtime proof.
+
+The native integration fixtures execute the complete current actor traversal,
+the actual sky and pre-retirement teardown phases, and native fairy/light
+producers. They cover all cel/shadow toggle combinations, receiver ordering,
+single draw/SFX admission, native culling/metrics, lantern-only lens brackets,
+Navi tint with Midna/shop halo suppression, and TimeCtl/SM64 cleanup while scene
+actors remain live. `compile_native_sources.py` checks 21 complete production
+translation units against the current headers and prepared dependency sources.
+The native `z_kankyo.c` is included in that probe and is unchanged by this port.
 
 Changes from the runtime donor:
 
@@ -76,8 +92,8 @@ policy; generic renderer transport does not add MM sky/shadow policy.
 
 The shared renderer must provide public `gSPToon`, `gSPToonKey`, `gSPStencil`,
 `gSPToonShadow`, `gSPToonShadowArm`, `gSPToonShadowFlush`, and
-`TOON_SHADOW_NO_CLAMP`. The controller assigned unused opcodes 0x41/0x4c/0x4e/0x4d
-respectively while preserving host scroll/interpolation opcodes.
+`TOON_SHADOW_NO_CLAMP`. The controller assigned unused opcodes Toon 0x4c, ToonKey 0x4d,
+Shadow 0x4e, Stencil 0x4f (Unbound float fog retains 0x41) while preserving host scroll/interpolation opcodes.
 `Fast::GfxRenderingAPI` needs `SetToonLighting`/`SetToonRamp` and
 `Fast::Interpreter` needs
 `SetToonShadowParams(float,float,float,float,int,bool)`.

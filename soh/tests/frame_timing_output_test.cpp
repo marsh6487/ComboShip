@@ -59,10 +59,22 @@ int main(int argc, char** argv) {
         render.BeginFrame(true, 1000);
         render.SyncDepth(1);
         render.SetResource("objects/young_din/head");
-        render.AddCommand(4, 5, "G_TRI1", 2000000);
+        render.SetPass(17);
+        render.BeginCommand();
+        auto importing = render.BeginOperation(Fast::RenderCostOperation::TextureImport, 1000);
         {
             Fast::RenderTextureScope texture(&render, "textures/young_din/hair");
-            render.AddUpload(4096, 500000);
+            render.DescribeTexture(32, 32, 2, 0, 2048, 2080, true);
+            render.NoteTextureCache(false);
+            render.AddUpload(4096, 500000, 32, 32);
+        }
+        render.EndOperation(Fast::RenderCostOperation::TextureImport, importing, 601000);
+        render.AddCommand(4, 5, "G_TRI1", 2000000);
+        for (int i = 0; i < 24; ++i) {
+            render.SetResource("objects/complete/" + std::to_string(i));
+            render.AddCommand(4, 5, "G_TRI1", 0);
+            Fast::RenderTextureScope texture(&render, "textures/complete/" + std::to_string(i));
+            render.AddUpload(16, 0);
         }
         render.MutableReport().backend = "Direct3D 11";
         render.MutableReport().gameTick = 42;
@@ -76,6 +88,9 @@ int main(int argc, char** argv) {
         render.MutableReport().displayListLookups = { 30, 1 };
         render.EndFrame(3001000);
         FrameTiming_LogRenderCost(render.Report(), play);
+        auto fastDetail = render.Report();
+        fastDetail.frameIndex = 2;
+        FrameTiming_LogRenderCost(fastDetail, play); // Explicit detailed capture retains ordinary fast frames too.
         assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
         assert(spdlog::default_logger() == decoy); // Keep module-local logging unchanged.
     }
@@ -129,9 +144,23 @@ int main(int argc, char** argv) {
             assert(cost.at("command_sum_ms") == 2.0);
             assert(cost.at("non_command_ms") == 1.0);
             assert(cost.at("opcodes").at(0).at("name") == "G_TRI1");
-            assert(cost.at("top_resources").at(0).at("path") == "objects/young_din/head");
-            assert(cost.at("top_texture_uploads").at(0).at("path") == "textures/young_din/hair");
-            assert(cost.at("top_texture_uploads").at(0).at("bytes") == 4096);
+            assert(cost.at("schema") == 2);
+            assert(cost.at("resources").at(0).at("path") == "objects/young_din/head");
+            assert(cost.at("resources").size() == 25);
+            assert(cost.at("textures").size() == 25);
+            assert(cost.at("textures").at(0).at("path") == "textures/young_din/hair");
+            assert(cost.at("textures").at(0).at("bytes") == 4096);
+            assert(cost.at("textures").at(0).at("decoded_resident_bytes").is_null());
+            assert(cost.at("textures").at(0).at("source_data_bytes") == 2048);
+            assert(cost.at("textures").at(0).at("source_backing_bytes") == 2080);
+            assert(cost.at("textures").at(0).at("source_resident_bytes").is_null());
+            assert(cost.at("textures").at(0).at("decoded_rgba_upload_bytes") == 4096);
+            assert(cost.at("textures").at(0).at("source_width") == 32);
+            assert(cost.at("resources").at(0).at("self").at("ms") == 1.4);
+            assert(cost.at("resources").at(0).at("texture_import").at("ms") == 0.6);
+            assert(cost.at("passes").size() == 1 && cost.at("passes").at(0).at("framebuffer") == 17);
+            assert(!cost.at("emission_truncated").get<bool>());
+            assert(cost.at("resource_limit") == Fast::RenderCostProbe::MaxResources);
             assert(cost.at("cache").at("misses") == 1);
             const auto& lookup = cost.at("alt_render_lookup");
             assert(lookup.at("enabled") == true);
@@ -169,7 +198,7 @@ int main(int argc, char** argv) {
     assert(armed);
     assert(disabled);
     assert(samples == 2);
-    assert(renderSamples == 2);
+    assert(renderSamples == 4);
     assert(flightSamples == 2);
 
     // A fresh Context in the same process must announce itself and bind to its

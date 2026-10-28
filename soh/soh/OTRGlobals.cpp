@@ -139,6 +139,11 @@
 #include "soh/FleetShipCombo/FleetShipCombo.h"
 #include "ActorDB.h"
 #include "SaveManager.h"
+#include "soh/unbound/ActorRegistry.h"
+#include "soh/unbound/SceneDB.h"
+#include "soh/unbound/UnboundExporter.h"
+#include "soh/unbound/UnboundFactories.h"
+#include "soh/unbound/UnboundSchema.h"
 #include "soh/Network/CrowdControl/CrowdControl.h"
 #include "soh/Network/Sail/Sail.h"
 #include "soh/Network/Anchor/Anchor.h"
@@ -350,6 +355,9 @@ static bool VerifyArchiveVersion(OTRVersion version);
 std::string portArchivePath = "";
 static bool sohArchiveVersionMatch = false;
 
+static constexpr const char* kUnboundExportFlag = "--export-unbound";
+static std::string sUnboundExportPath;
+
 #ifdef COMBO_BUILD
 // OOT's own ResourceManager, created at first boot and kept alive for the whole process. A combo
 // transition swaps the Context's active RM between OOT's and MM's (each game keeps its own archives +
@@ -360,10 +368,34 @@ static bool sohArchiveVersionMatch = false;
 static std::shared_ptr<Ship::ResourceManager> sOOTResourceManager;
 #endif
 
+// Register against the owning manager, including the render-only OoT manager retained by MM-only boots.
+// Keep the legacy factories alongside these: vanilla archives and structured scene mods remain readable.
+static void RegisterUnboundFactories(const std::shared_ptr<Ship::ResourceManager>& resources) {
+    auto loader = resources->GetResourceLoader();
+    loader->RegisterResourceFactory(std::make_shared<Fast::ResourceFactoryBinaryVertexV1>(), RESOURCE_FORMAT_BINARY,
+                                    "Vertex", static_cast<uint32_t>(Fast::ResourceType::Vertex), 1);
+    loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryArrayV1>(), RESOURCE_FORMAT_BINARY,
+                                    "Array", static_cast<uint32_t>(SOH::ResourceType::SOH_Array), 1);
+    auto jsonScene = std::make_shared<SOH::ResourceFactoryJsonSceneV1>();
+    loader->RegisterResourceFactory(jsonScene, RESOURCE_FORMAT_JSON, SOH::Unbound::Schema::kSceneType,
+                                    static_cast<uint32_t>(SOH::ResourceType::SOH_Room), 1);
+    loader->RegisterResourceFactory(jsonScene, RESOURCE_FORMAT_JSON, SOH::Unbound::Schema::kRoomType,
+                                    static_cast<uint32_t>(SOH::ResourceType::SOH_Room), 1);
+    loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryJsonCollisionHeaderV3>(), RESOURCE_FORMAT_JSON,
+                                    SOH::Unbound::Schema::kCollisionType,
+                                    static_cast<uint32_t>(SOH::ResourceType::SOH_CollisionHeader), 3);
+    loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryJsonPathV1>(), RESOURCE_FORMAT_JSON,
+                                    SOH::Unbound::Schema::kPathsType,
+                                    static_cast<uint32_t>(SOH::ResourceType::SOH_Path), 1);
+}
+
 // These factories decode shipped rendering resources and need no game state or ROM.
 // MM-only sessions retain this OoT owner for authored NEI models without Initialize().
 static void RegisterRenderingFactories(const std::shared_ptr<Ship::ResourceManager>& resources) {
     auto loader = resources->GetResourceLoader();
+    RegisterUnboundFactories(resources);
+    loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryArrayV0>(), RESOURCE_FORMAT_BINARY,
+                                    "Array", static_cast<uint32_t>(SOH::ResourceType::SOH_Array), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::SpinEffectTextureFactoryV0>(), RESOURCE_FORMAT_BINARY,
                                     "Texture", static_cast<uint32_t>(Fast::ResourceType::Texture), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::SpinEffectTextureFactoryV1>(), RESOURCE_FORMAT_BINARY,
@@ -591,6 +623,14 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     std::vector<std::string> args;
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
+            if (argv[i] != nullptr && std::string(argv[i]) == kUnboundExportFlag) {
+                if (i + 1 >= argc || argv[i + 1] == nullptr || argv[i + 1][0] == '-') {
+                    SPDLOG_ERROR("{} requires an output archive path", kUnboundExportFlag);
+                    std::exit(1);
+                }
+                sUnboundExportPath = argv[++i];
+                continue;
+            }
             // Skip command-line flags (e.g. Fleet Ship Combo's --boot=mm / --fleet-child) so
             // the ROM extractor doesn't treat them as a ROM path. ROM paths never start with '-'.
             if (argv[i] != nullptr && argv[i][0] == '-') {
@@ -813,7 +853,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                         const bool ootO2RExists =
                             std::filesystem::exists(
                                 Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName)) ||
-                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName));
+                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
+                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
 
                         if (!ootO2RExists) {
                             SohGui::RegisterPopup(
@@ -886,7 +927,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
             case ES_VERIFY: {
                 const bool ootO2RExists =
                     std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName)) ||
-                    std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName));
+                    std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
+                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
 
                 if (!ootO2RExists) {
                     SohGui::RegisterPopup("No ROM Archives",
@@ -1035,16 +1077,9 @@ void InitGfxDebugger() {
     }
 }
 
-void OTRGlobals::Initialize() {
-    std::string mqPath = Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName);
-    if (std::filesystem::exists(mqPath)) {
-        context->GetResourceManager()->GetArchiveManager()->AddArchive(mqPath);
-    }
-    std::string ootPath = Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName);
-    if (std::filesystem::exists(ootPath)) {
-        context->GetResourceManager()->GetArchiveManager()->AddArchive(ootPath);
-    }
-
+// Supplemental archives must follow base conversion: otherwise authored scenes and messages would be
+// copied into the generated vanilla base and keep shadowing later edits even after the mod is removed.
+static void MountOotSupplementalArchives(const std::shared_ptr<Ship::ResourceManager>& resources) {
     // NEI folder: scan for .o2r/.zip archives (loose extras, e.g. generated by
     // tools/glb_to_o2r.py) and add them to the ArchiveManager.
     // .pak files in this folder are handled separately by pak_loader.
@@ -1077,10 +1112,61 @@ void OTRGlobals::Initialize() {
                 continue;
             }
             if (StringHelper::IEquals(ext, ".o2r") || StringHelper::IEquals(ext, ".zip")) {
-                context->GetResourceManager()->GetArchiveManager()->AddArchive(entry.path().generic_string());
+                resources->GetArchiveManager()->AddArchive(entry.path().generic_string());
             }
         }
     }
+}
+
+static void AbortUnboundStartup(const std::string& problem) {
+    SPDLOG_ERROR("[Unbound] {}", problem);
+#if !defined(__SWITCH__) && !defined(__WIIU__)
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Unusable Unbound archive", problem.c_str(), nullptr);
+#endif
+    std::exit(1);
+}
+
+static bool MountStandaloneUnboundBase(const std::string& ootPath, const std::string& mqPath) {
+    std::string basePath = Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName);
+    if (std::filesystem::exists(ootPath) || std::filesystem::exists(mqPath) || !std::filesystem::exists(basePath)) {
+        return false;
+    }
+    auto resources = Ship::CrossRMRegistry::GetOrActive("oot");
+    return resources->GetArchiveManager()->AddArchive(basePath) != nullptr;
+}
+
+static void FinishUnboundArchiveSetup(bool standalone, const std::string& ootPath, const std::string& mqPath) {
+    auto resources = Ship::CrossRMRegistry::GetOrActive("oot");
+    if (standalone) {
+        std::string problem = SOH::Unbound::CheckStandaloneBaseArchive();
+        if (!problem.empty()) {
+            AbortUnboundStartup(problem);
+        }
+    } else if (std::filesystem::exists(ootPath) || std::filesystem::exists(mqPath)) {
+        // Alt assets are a runtime preference. A generated base always describes the clean vanilla archives.
+        bool altAssets = resources->IsAltAssetsEnabled();
+        resources->SetAltAssetsEnabled(false);
+        std::string dir = std::filesystem::path(std::filesystem::exists(ootPath) ? ootPath : mqPath).parent_path().string();
+        SOH::Unbound::EnsureBaseArchive(dir);
+        resources->SetAltAssetsEnabled(altAssets);
+    }
+    // Conversion reads and caches native headers and messages. Drop those startup-only reads before
+    // mounting overrides, so a legacy room/collision mod cannot reuse a cached vanilla command list.
+    resources->UnloadResources("scenes/*");
+    resources->UnloadResources("text/*");
+    MountOotSupplementalArchives(resources);
+}
+
+void OTRGlobals::Initialize() {
+    std::string mqPath = Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName);
+    if (std::filesystem::exists(mqPath)) {
+        context->GetResourceManager()->GetArchiveManager()->AddArchive(mqPath);
+    }
+    std::string ootPath = Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName);
+    if (std::filesystem::exists(ootPath)) {
+        context->GetResourceManager()->GetArchiveManager()->AddArchive(ootPath);
+    }
+    bool standaloneUnboundBase = MountStandaloneUnboundBase(ootPath, mqPath);
 
     std::unordered_set<uint32_t> ValidHashes = {
         OOT_PAL_MQ,     OOT_NTSC_JP_MQ, OOT_NTSC_US_MQ, OOT_PAL_GC_MQ_DBG, OOT_NTSC_US_10,
@@ -1125,8 +1211,6 @@ void OTRGlobals::Initialize() {
                 (char*)gGitBranch, (char*)gGitCommitHash);
 
     auto loader = context->GetResourceManager()->GetResourceLoader();
-    loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryArrayV0>(), RESOURCE_FORMAT_BINARY,
-                                    "Array", static_cast<uint32_t>(SOH::ResourceType::SOH_Array), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryAnimationV0>(), RESOURCE_FORMAT_BINARY,
                                     "Animation", static_cast<uint32_t>(SOH::ResourceType::SOH_Animation), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryPlayerAnimationV0>(),
@@ -1299,6 +1383,15 @@ void OTRGlobals::Initialize() {
 #endif
         exit(1);
     }
+
+    if (!sUnboundExportPath.empty()) {
+        // The explicit CLI export also sees the clean vanilla source, before a generated base or mods.
+        context->GetResourceManager()->SetAltAssetsEnabled(false);
+        int rc = Unbound_Export(sUnboundExportPath.c_str());
+        spdlog::default_logger()->flush();
+        std::_Exit(rc);
+    }
+    FinishUnboundArchiveSetup(standaloneUnboundBase, ootPath, mqPath);
 }
 
 OTRGlobals::~OTRGlobals() {
@@ -2224,6 +2317,7 @@ static void Combo_FinishInit() {
     // elemental arrow spawns its trail actor with id -1 — which indexes the overlay table out of
     // bounds and kills the process the moment you charge the bow. Skijer's NEI
     ActorDB::Instance->AddBuiltInCustomActors();
+    SOH::Unbound::LoadCustomActors();
 #ifdef __APPLE__
     SpeechSynthesizer::Instance = new DarwinSpeechSynthesizer();
 #elif defined(_WIN32)

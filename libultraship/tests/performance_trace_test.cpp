@@ -74,10 +74,10 @@ int main() {
     BeginTick(8);
     for (int i = 0; i < 4200; ++i) Record("actor", std::to_string(i), 0, i);
     auto cap = EndTick();
-    assert(cap["aggregates"].size() == 64);
+    assert(cap["aggregates"].size() == 4096);
     assert(cap["aggregate_keys"] == 4096);
     assert(cap["overflow_aggregates"] == 104);
-    assert(cap["aggregate_keys_omitted"] == 4032);
+    assert(cap["aggregate_keys_omitted"] == 0);
     BeginTick(9);
     // Saturate general aggregates first: fast fixed phases and paired actor
     // update/draw must remain observable after a cold-resource flood.
@@ -102,12 +102,45 @@ int main() {
     for (const auto& phase : reserved["phase_aggregates"]) {
         assert(phase["count"] == 2 && phase["total_ns"] == 3);
     }
-    assert(reserved["actor_aggregates"].size() == 64);
-    assert(reserved["actor_keys"] == 80 && reserved["actor_keys_omitted"] == 16);
+    assert(reserved["actor_aggregates"].size() == 80);
+    assert(reserved["actor_keys"] == 80 && reserved["actor_keys_omitted"] == 0);
     assert(reserved["overflow_actors"] == 0);
     for (const auto& actor : reserved["actor_aggregates"]) {
         assert(actor["update_count"] == 2 && actor["draw_count"] == 1);
         assert(actor["draw_ns"] == 1);
     }
+    assert(reserved["resource_aggregates"].size() == 4096);
+    assert(reserved["resource_keys"] == 4096 && reserved["resource_key_limit"] == 4096);
+    assert(reserved["overflow_resources"] == 204);
+    assert(reserved["emission_truncated"] == false);
+    BeginTick(10);
+    for (int i = 0; i < 4300; ++i) Record("noise", std::to_string(i), 0, 1);
+    for (int i = 0; i < 90; ++i) {
+        const auto name = "texture/" + std::to_string(i);
+        Record("resource.queue_delay", name, 0, 100, 123, 456);
+        Record("resource.deserialize_import", name, 100, 300, 123, 456);
+    }
+    const auto complete = EndTick();
+    assert(complete["resource_aggregates"].size() == 90);
+    assert(complete["overflow_resources"] == 0 && complete["overflow_aggregates"].get<int>() > 0);
+    for (const auto& resource : complete["resource_aggregates"]) {
+        assert(resource["manager"] == 123 && resource["cache_owner"] == 456 && resource["origin_tick"] == 10);
+        assert(resource["stages"]["resource.queue_delay"]["total_ns"] == 100);
+        assert(resource["stages"]["resource.deserialize_import"]["total_ns"] == 200);
+    }
+    BeginTick(11);
+    for (int i = 0; i < 20; ++i)
+        Record(("resource.stage." + std::to_string(i)).c_str(), "many-stages", 0, 1);
+    Record("resource.wait", "", 0, 1);
+    { Scope longName("resource.cold_load", std::string(700, 'x')); }
+    const std::string category = "resource." + std::string(200, 'c'), detail(200, 'd');
+    Record(category.c_str(), "long-category", 0, 1, 0, 0, detail.c_str());
+    const auto explicitLimits = EndTick();
+    assert(explicitLimits["overflow_resource_stages"] == 4);
+    assert(explicitLimits["truncated_names"] == 1 && explicitLimits["truncated_categories"] == 1);
+    assert(explicitLimits["truncated_details"] == 1 && explicitLimits["unknown_names"] == 1);
+    assert(explicitLimits["resource_stage_limit"] == 16);
+    const auto reset = EndTick();
+    assert(reset["resource_aggregates"].empty() && reset["overflow_resource_stages"] == 0 && reset["unknown_names"] == 0);
     std::cout << "PerformanceTrace: worker origin, late, disabled, stage attribution, aggregates and bounds passed\n";
 }

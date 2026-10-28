@@ -16,6 +16,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "SaveManager.h"
+#include "soh/unbound/SceneDB.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -234,6 +235,8 @@ SaveManager::SaveManager() {
 
     AddLoadFunction("randomizer", 1, LoadRandomizer);
     AddSaveFunction("randomizer", 1, SaveRandomizer, true, SECTION_PARENT_NONE);
+
+    SceneDB_RegisterSaveFunctions(*this);
 
     AddInitFunction(InitFileImpl);
 

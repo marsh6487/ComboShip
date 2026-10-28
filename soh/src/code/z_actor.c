@@ -7,6 +7,7 @@
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include <stdio.h>
 #include "din_fire_sword.h"
+#include "soh/unbound/SceneDB.h"
 #include "vt.h"
 
 #include "overlays/actors/ovl_Arms_Hook/z_arms_hook.h"
@@ -27,6 +28,7 @@
 #include "soh/Enhancements/Gameplay/ComboForestActors.h"
 
 #include "soh/ActorDB.h"
+#include "soh/Enhancements/Graphics/ToonLighting.h"
 #include "soh/OTRGlobals.h"
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/transformation_masks/mm_mask_wear.h"
@@ -109,6 +111,9 @@ extern s32 Sw97_IsBlinded(Actor* actor);
 
 static CollisionPoly* sCurCeilingPoly;
 static s32 sCurCeilingBgId;
+// SOH [Unbound] Transition-actor list index for the Actor_Spawn in flight. It has to be a side channel: the
+// actor's Init runs inside Actor_Spawn and door actors read their list index there, before Actor_Spawn returns.
+static s32 sSpawnTransitionIndex = -1;
 
 // Used for animating the ice trap on the "Get Item" model.
 f32 iceTrapScale;
@@ -132,6 +137,10 @@ void ActorShape_Init(ActorShape* shape, f32 yOffset, ActorShadowFunc shadowDraw,
 }
 
 void ActorShadow_Draw(Actor* actor, Lights* lights, PlayState* play, Gfx* dlist, Color_RGBA8* color) {
+    if (ToonLighting_SuppressVanillaShadows()) {
+        return;
+    }
+
     f32 temp1;
     f32 temp2;
     MtxF sp60;
@@ -213,6 +222,10 @@ void ActorShadow_DrawFoot(PlayState* play, Light* light, MtxF* arg2, s32 arg3, f
 }
 
 void ActorShadow_DrawFeet(Actor* actor, Lights* lights, PlayState* play) {
+    if (ToonLighting_SuppressVanillaShadows()) {
+        return;
+    }
+
     f32 distToFloor = actor->world.pos.y - actor->floorHeight;
 
     if (distToFloor > 20.0f) {
@@ -796,6 +809,10 @@ void Flags_SetTreasure(PlayState* play, s32 flag) {
  * Tests if current scene clear flag is set.
  */
 s32 Flags_GetClear(PlayState* play, s32 flag) {
+    // SOH [Unbound] Clear flags are keyed by room; rooms >= 32 live in the registry's growable store.
+    if (flag >= 32) {
+        return SceneFlagsExt_Get(play->sceneNum, SCENE_FLAGS_EXT_CLEAR, flag);
+    }
     return play->actorCtx.flags.clear & (1 << flag);
 }
 
@@ -804,7 +821,11 @@ s32 Flags_GetClear(PlayState* play, s32 flag) {
  */
 void Flags_SetClear(PlayState* play, s32 flag) {
     u8 previouslyOff = !Flags_GetClear(play, flag);
-    play->actorCtx.flags.clear |= (1 << flag);
+    if (flag >= 32) { // SOH [Unbound]
+        SceneFlagsExt_Set(play->sceneNum, SCENE_FLAGS_EXT_CLEAR, flag);
+    } else {
+        play->actorCtx.flags.clear |= (1 << flag);
+    }
     if (previouslyOff) {
         LUSLOG_INFO("Clear Flag Set - %#x", flag);
         GameInteractor_ExecuteOnSceneFlagSet(play->sceneNum, FLAG_SCENE_CLEAR, flag);
@@ -816,7 +837,11 @@ void Flags_SetClear(PlayState* play, s32 flag) {
  */
 void Flags_UnsetClear(PlayState* play, s32 flag) {
     u8 previouslyOn = Flags_GetClear(play, flag);
-    play->actorCtx.flags.clear &= ~(1 << flag);
+    if (flag >= 32) { // SOH [Unbound]
+        SceneFlagsExt_Unset(play->sceneNum, SCENE_FLAGS_EXT_CLEAR, flag);
+    } else {
+        play->actorCtx.flags.clear &= ~(1 << flag);
+    }
     if (previouslyOn) {
         LUSLOG_INFO("Clear Flag Unset - %#x", flag);
         GameInteractor_ExecuteOnSceneFlagUnset(play->sceneNum, FLAG_SCENE_CLEAR, flag);
@@ -827,6 +852,9 @@ void Flags_UnsetClear(PlayState* play, s32 flag) {
  * Tests if current scene temp clear flag is set.
  */
 s32 Flags_GetTempClear(PlayState* play, s32 flag) {
+    if (flag >= 32) { // SOH [Unbound]
+        return SceneFlagsExt_Get(play->sceneNum, SCENE_FLAGS_EXT_TEMP_CLEAR, flag);
+    }
     return play->actorCtx.flags.tempClear & (1 << flag);
 }
 
@@ -834,6 +862,10 @@ s32 Flags_GetTempClear(PlayState* play, s32 flag) {
  * Sets current scene temp clear flag.
  */
 void Flags_SetTempClear(PlayState* play, s32 flag) {
+    if (flag >= 32) { // SOH [Unbound]
+        SceneFlagsExt_Set(play->sceneNum, SCENE_FLAGS_EXT_TEMP_CLEAR, flag);
+        return;
+    }
     play->actorCtx.flags.tempClear |= (1 << flag);
 }
 
@@ -841,6 +873,10 @@ void Flags_SetTempClear(PlayState* play, s32 flag) {
  * Unsets current scene temp clear flag.
  */
 void Flags_UnsetTempClear(PlayState* play, s32 flag) {
+    if (flag >= 32) { // SOH [Unbound]
+        SceneFlagsExt_Unset(play->sceneNum, SCENE_FLAGS_EXT_TEMP_CLEAR, flag);
+        return;
+    }
     play->actorCtx.flags.tempClear &= ~(1 << flag);
 }
 
@@ -915,213 +951,218 @@ void TitleCard_InitBossName(PlayState* play, TitleCardContext* titleCtx, void* t
 
 void TitleCard_InitPlaceName(PlayState* play, TitleCardContext* titleCtx, void* texture, s32 x, s32 y, s32 width,
                              s32 height, s32 delay) {
-    SceneTableEntry* loadedScene = play->loadedScene;
-    //  size_t size = loadedScene->titleFile.vromEnd - loadedScene->titleFile.vromStart;
-    switch (play->sceneNum) {
-        case SCENE_DEKU_TREE:
-            texture = gDekuTreeTitleCardENGTex;
-            break;
-        case SCENE_DODONGOS_CAVERN:
-            texture = gDodongosCavernTitleCardENGTex;
-            break;
-        case SCENE_JABU_JABU:
-            texture = gJabuJabuTitleCardENGTex;
-            break;
-        case SCENE_FOREST_TEMPLE:
-            texture = gForestTempleTitleCardENGTex;
-            break;
-        case SCENE_FIRE_TEMPLE:
-            texture = gFireTempleTitleCardENGTex;
-            break;
-        case SCENE_WATER_TEMPLE:
-            texture = gWaterTempleTitleCardENGTex;
-            break;
-        case SCENE_SPIRIT_TEMPLE:
-            texture = gSpiritTempleTitleCardENGTex;
-            break;
-        case SCENE_SHADOW_TEMPLE:
-            texture = gShadowTempleTitleCardENGTex;
-            break;
-        case SCENE_BOTTOM_OF_THE_WELL:
-            texture = gBottomOfTheWellTitleCardENGTex;
-            break;
-        case SCENE_ICE_CAVERN:
-            texture = gIceCavernTitleCardENGTex;
-            break;
-        case SCENE_GERUDO_TRAINING_GROUND:
-            texture = gGERudoTrainingGroundTitleCardENGTex;
-            break;
-        case SCENE_THIEVES_HIDEOUT:
-            texture = gThievesHideoutTitleCardENGTex;
-            break;
-        case SCENE_OUTSIDE_GANONS_CASTLE:
-            texture = gGanonsCastleTitleCardENGTex;
-            break;
-        case SCENE_INSIDE_GANONS_CASTLE:
-            texture = gInsideGanonsCastleTitleCardENGTex;
-            break;
-        case SCENE_TREASURE_BOX_SHOP:
-            texture = gTreasureBoxShopTitleCardENGTex;
-            break;
-        case SCENE_BACK_ALLEY_DAY:
-        case SCENE_BACK_ALLEY_NIGHT:
-            texture = gBackAlleyTitleCardENGTex;
-            break;
-        case SCENE_MARKET_DAY:
-        case SCENE_MARKET_NIGHT:
-        case SCENE_MARKET_RUINS:
-            texture = gMarketTitleCardENGTex;
-            break;
-        case SCENE_BAZAAR:
-            texture = gBazaarTitleCardENGTex;
-            break;
-        case SCENE_KOKIRI_SHOP:
-            texture = gKokiriShopTitleCardENGTex;
-            break;
-        case SCENE_GORON_SHOP:
-            texture = gGoronShopTitleCardENGTex;
-            break;
-        case SCENE_ZORA_SHOP:
-            texture = gZoraShopTitleCardENGTex;
-            break;
-        case SCENE_BOMBCHU_SHOP:
-            texture = gBombchuShopTitleCardENGTex;
-            break;
-        case SCENE_POTION_SHOP_KAKARIKO:
-        case SCENE_POTION_SHOP_GRANNY:
-        case SCENE_POTION_SHOP_MARKET:
-            texture = gPotionShopTitleCardENGTex;
-            break;
-        case SCENE_HAPPY_MASK_SHOP:
-            texture = gHappyMaskShopTitleCardENGTex;
-            break;
-        case SCENE_STABLE:
-            texture = gStableTitleCardENGTex;
-            break;
-        case SCENE_LAKESIDE_LABORATORY:
-            texture = gLakesideLaboratoryTitleCardENGTex;
-            break;
-        case SCENE_GRAVEKEEPERS_HUT:
-            texture = gGravekeepersHutTitleCardENGTex;
-            break;
-        case SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC:
-        case SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS:
-            texture = gGreatFairysFountainTitleCardENGTex;
-            break;
-        case SCENE_FAIRYS_FOUNTAIN:
-            texture = gFairysFountainTitleCardENGTex;
-            break;
-        case SCENE_ROYAL_FAMILYS_TOMB:
-            texture = gRoyalFamilysTombTitleCardENGTex;
-            break;
-        case SCENE_SHOOTING_GALLERY:
-            texture = gShootingGalleryTitleCardENGTex;
-            break;
-        case SCENE_TEMPLE_OF_TIME:
-            texture = gTempleOfTimeTitleCardENGTex;
-            break;
-        case SCENE_CHAMBER_OF_THE_SAGES:
-            texture = gChamberOfTheSagesTitleCardENGTex;
-            break;
-        case SCENE_CASTLE_COURTYARD_GUARDS_DAY:
-        case SCENE_CASTLE_COURTYARD_GUARDS_NIGHT:
-        case SCENE_CASTLE_COURTYARD_ZELDA:
-        case SCENE_HAIRAL_NIWA2:
-            texture = gCastleCourtyardTitleCardENGTex;
-            break;
-        case SCENE_WINDMILL_AND_DAMPES_GRAVE:
-            texture = gQuestionMarkTitleCardENGTex;
-            break;
-        case SCENE_FISHING_POND:
-            texture = gFishingPondTitleCardENGTex;
-            break;
-        case SCENE_BOMBCHU_BOWLING_ALLEY:
-            texture = gBombchuBowlingAlleyCardENGTex;
-            break;
-        case SCENE_HOUSE_OF_SKULLTULA:
-            texture = gHouseOfSkulltulaTitleCardENGTex;
-            break;
-        case SCENE_HYRULE_FIELD:
-            texture = gHyruleFieldTitleCardENGTex;
-            break;
-        case SCENE_KAKARIKO_VILLAGE:
-            texture = gKakarikoVillageTitleCardENGTex;
-            break;
-        case SCENE_GRAVEYARD:
-            texture = gGraveyardTitleCardENGTex;
-            break;
-        case SCENE_ZORAS_RIVER:
-            texture = gZorasRiverTitleCardENGTex;
-            break;
-        case SCENE_KOKIRI_FOREST:
-            texture = gKokiriForestTitleCardENGTex;
-            break;
-        case SCENE_SACRED_FOREST_MEADOW:
-            texture = gSacredForestMeadowTitleCardENGTex;
-            break;
-        case SCENE_LAKE_HYLIA:
-            texture = gLakeHyliaTitleCardENGTex;
-            break;
-        case SCENE_ZORAS_DOMAIN:
-            texture = gZorasDomainTitleCardENGTex;
-            break;
-        case SCENE_ZORAS_FOUNTAIN:
-            texture = gZorasFountainTitleCardENGTex;
-            break;
-        case SCENE_GERUDO_VALLEY:
-            texture = gGERudoValleyTitleCardENGTex;
-            break;
-        case SCENE_LOST_WOODS:
-            texture = gLostWoodsTitleCardENGTex;
-            break;
-        case SCENE_DESERT_COLOSSUS:
-            texture = gDesertColossusTitleCardENGTex;
-            break;
-        case SCENE_GERUDOS_FORTRESS:
-            texture = gGERudosFortressTitleCardENGTex;
-            break;
-        case SCENE_HAUNTED_WASTELAND:
-            texture = gHauntedWastelandTitleCardENGTex;
-            break;
-        case SCENE_HYRULE_CASTLE:
-            texture = gHyruleCastleTitleCardENGTex;
-            break;
-        case SCENE_DEATH_MOUNTAIN_TRAIL:
-            texture = gDeathMountainTrailTitleCardENGTex;
-            break;
-        case SCENE_DEATH_MOUNTAIN_CRATER:
-            texture = gDeathMountainCraterTitleCardENGTex;
-            break;
-        case SCENE_GORON_CITY:
-            texture = gGoronCityTitleCardENGTex;
-            break;
-        case SCENE_LON_LON_RANCH:
-            texture = gLonLonRanchTitleCardENGTex;
-            break;
-        default:
-            titleCtx->texture = NULL;
-            return;
-    }
-
-    static char newName[512];
-
-    if (gSaveContext.language != LANGUAGE_ENG) {
-        size_t length = strlen(texture);
-        strcpy(newName, texture);
-        if (gSaveContext.language == LANGUAGE_FRA) {
-            newName[length - 6] = 'F';
-            newName[length - 5] = 'R';
-            newName[length - 4] = 'A';
-        } else if (gSaveContext.language == LANGUAGE_GER) {
-            newName[length - 6] = 'G';
-            newName[length - 5] = 'E';
-            newName[length - 4] = 'R';
-        } else if (gSaveContext.language == LANGUAGE_JPN) {
-            newName[length - 6] = 'J';
-            newName[length - 5] = 'P';
-            newName[length - 4] = 'N';
+    // Registry paths are arbitrary names: resolve them before the vanilla
+    // switch and never apply the vanilla ENG/FRA/GER filename rewrite to them.
+    const char* customTexture = SceneDB_GetTitleCardTexture(play->sceneNum);
+    if (customTexture != NULL) {
+        texture = (void*)customTexture;
+    } else {
+        switch (play->sceneNum) {
+            case SCENE_DEKU_TREE:
+                texture = gDekuTreeTitleCardENGTex;
+                break;
+            case SCENE_DODONGOS_CAVERN:
+                texture = gDodongosCavernTitleCardENGTex;
+                break;
+            case SCENE_JABU_JABU:
+                texture = gJabuJabuTitleCardENGTex;
+                break;
+            case SCENE_FOREST_TEMPLE:
+                texture = gForestTempleTitleCardENGTex;
+                break;
+            case SCENE_FIRE_TEMPLE:
+                texture = gFireTempleTitleCardENGTex;
+                break;
+            case SCENE_WATER_TEMPLE:
+                texture = gWaterTempleTitleCardENGTex;
+                break;
+            case SCENE_SPIRIT_TEMPLE:
+                texture = gSpiritTempleTitleCardENGTex;
+                break;
+            case SCENE_SHADOW_TEMPLE:
+                texture = gShadowTempleTitleCardENGTex;
+                break;
+            case SCENE_BOTTOM_OF_THE_WELL:
+                texture = gBottomOfTheWellTitleCardENGTex;
+                break;
+            case SCENE_ICE_CAVERN:
+                texture = gIceCavernTitleCardENGTex;
+                break;
+            case SCENE_GERUDO_TRAINING_GROUND:
+                texture = gGERudoTrainingGroundTitleCardENGTex;
+                break;
+            case SCENE_THIEVES_HIDEOUT:
+                texture = gThievesHideoutTitleCardENGTex;
+                break;
+            case SCENE_OUTSIDE_GANONS_CASTLE:
+                texture = gGanonsCastleTitleCardENGTex;
+                break;
+            case SCENE_INSIDE_GANONS_CASTLE:
+                texture = gInsideGanonsCastleTitleCardENGTex;
+                break;
+            case SCENE_TREASURE_BOX_SHOP:
+                texture = gTreasureBoxShopTitleCardENGTex;
+                break;
+            case SCENE_BACK_ALLEY_DAY:
+            case SCENE_BACK_ALLEY_NIGHT:
+                texture = gBackAlleyTitleCardENGTex;
+                break;
+            case SCENE_MARKET_DAY:
+            case SCENE_MARKET_NIGHT:
+            case SCENE_MARKET_RUINS:
+                texture = gMarketTitleCardENGTex;
+                break;
+            case SCENE_BAZAAR:
+                texture = gBazaarTitleCardENGTex;
+                break;
+            case SCENE_KOKIRI_SHOP:
+                texture = gKokiriShopTitleCardENGTex;
+                break;
+            case SCENE_GORON_SHOP:
+                texture = gGoronShopTitleCardENGTex;
+                break;
+            case SCENE_ZORA_SHOP:
+                texture = gZoraShopTitleCardENGTex;
+                break;
+            case SCENE_BOMBCHU_SHOP:
+                texture = gBombchuShopTitleCardENGTex;
+                break;
+            case SCENE_POTION_SHOP_KAKARIKO:
+            case SCENE_POTION_SHOP_GRANNY:
+            case SCENE_POTION_SHOP_MARKET:
+                texture = gPotionShopTitleCardENGTex;
+                break;
+            case SCENE_HAPPY_MASK_SHOP:
+                texture = gHappyMaskShopTitleCardENGTex;
+                break;
+            case SCENE_STABLE:
+                texture = gStableTitleCardENGTex;
+                break;
+            case SCENE_LAKESIDE_LABORATORY:
+                texture = gLakesideLaboratoryTitleCardENGTex;
+                break;
+            case SCENE_GRAVEKEEPERS_HUT:
+                texture = gGravekeepersHutTitleCardENGTex;
+                break;
+            case SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC:
+            case SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS:
+                texture = gGreatFairysFountainTitleCardENGTex;
+                break;
+            case SCENE_FAIRYS_FOUNTAIN:
+                texture = gFairysFountainTitleCardENGTex;
+                break;
+            case SCENE_ROYAL_FAMILYS_TOMB:
+                texture = gRoyalFamilysTombTitleCardENGTex;
+                break;
+            case SCENE_SHOOTING_GALLERY:
+                texture = gShootingGalleryTitleCardENGTex;
+                break;
+            case SCENE_TEMPLE_OF_TIME:
+                texture = gTempleOfTimeTitleCardENGTex;
+                break;
+            case SCENE_CHAMBER_OF_THE_SAGES:
+                texture = gChamberOfTheSagesTitleCardENGTex;
+                break;
+            case SCENE_CASTLE_COURTYARD_GUARDS_DAY:
+            case SCENE_CASTLE_COURTYARD_GUARDS_NIGHT:
+            case SCENE_CASTLE_COURTYARD_ZELDA:
+            case SCENE_HAIRAL_NIWA2:
+                texture = gCastleCourtyardTitleCardENGTex;
+                break;
+            case SCENE_WINDMILL_AND_DAMPES_GRAVE:
+                texture = gQuestionMarkTitleCardENGTex;
+                break;
+            case SCENE_FISHING_POND:
+                texture = gFishingPondTitleCardENGTex;
+                break;
+            case SCENE_BOMBCHU_BOWLING_ALLEY:
+                texture = gBombchuBowlingAlleyCardENGTex;
+                break;
+            case SCENE_HOUSE_OF_SKULLTULA:
+                texture = gHouseOfSkulltulaTitleCardENGTex;
+                break;
+            case SCENE_HYRULE_FIELD:
+                texture = gHyruleFieldTitleCardENGTex;
+                break;
+            case SCENE_KAKARIKO_VILLAGE:
+                texture = gKakarikoVillageTitleCardENGTex;
+                break;
+            case SCENE_GRAVEYARD:
+                texture = gGraveyardTitleCardENGTex;
+                break;
+            case SCENE_ZORAS_RIVER:
+                texture = gZorasRiverTitleCardENGTex;
+                break;
+            case SCENE_KOKIRI_FOREST:
+                texture = gKokiriForestTitleCardENGTex;
+                break;
+            case SCENE_SACRED_FOREST_MEADOW:
+                texture = gSacredForestMeadowTitleCardENGTex;
+                break;
+            case SCENE_LAKE_HYLIA:
+                texture = gLakeHyliaTitleCardENGTex;
+                break;
+            case SCENE_ZORAS_DOMAIN:
+                texture = gZorasDomainTitleCardENGTex;
+                break;
+            case SCENE_ZORAS_FOUNTAIN:
+                texture = gZorasFountainTitleCardENGTex;
+                break;
+            case SCENE_GERUDO_VALLEY:
+                texture = gGERudoValleyTitleCardENGTex;
+                break;
+            case SCENE_LOST_WOODS:
+                texture = gLostWoodsTitleCardENGTex;
+                break;
+            case SCENE_DESERT_COLOSSUS:
+                texture = gDesertColossusTitleCardENGTex;
+                break;
+            case SCENE_GERUDOS_FORTRESS:
+                texture = gGERudosFortressTitleCardENGTex;
+                break;
+            case SCENE_HAUNTED_WASTELAND:
+                texture = gHauntedWastelandTitleCardENGTex;
+                break;
+            case SCENE_HYRULE_CASTLE:
+                texture = gHyruleCastleTitleCardENGTex;
+                break;
+            case SCENE_DEATH_MOUNTAIN_TRAIL:
+                texture = gDeathMountainTrailTitleCardENGTex;
+                break;
+            case SCENE_DEATH_MOUNTAIN_CRATER:
+                texture = gDeathMountainCraterTitleCardENGTex;
+                break;
+            case SCENE_GORON_CITY:
+                texture = gGoronCityTitleCardENGTex;
+                break;
+            case SCENE_LON_LON_RANCH:
+                texture = gLonLonRanchTitleCardENGTex;
+                break;
+            default:
+                titleCtx->texture = NULL;
+                return;
         }
-        texture = newName;
+
+        static char newName[512];
+
+        if (gSaveContext.language != LANGUAGE_ENG) {
+            size_t length = strlen(texture);
+            strcpy(newName, texture);
+            if (gSaveContext.language == LANGUAGE_FRA) {
+                newName[length - 6] = 'F';
+                newName[length - 5] = 'R';
+                newName[length - 4] = 'A';
+            } else if (gSaveContext.language == LANGUAGE_GER) {
+                newName[length - 6] = 'G';
+                newName[length - 5] = 'E';
+                newName[length - 4] = 'R';
+            } else if (gSaveContext.language == LANGUAGE_JPN) {
+                newName[length - 6] = 'J';
+                newName[length - 5] = 'P';
+                newName[length - 4] = 'N';
+            }
+            texture = newName;
+        }
     }
 
     titleCtx->texture = texture;
@@ -2673,7 +2714,8 @@ void Actor_InitContext(PlayState* play, ActorContext* actorCtx, ActorEntry* acto
     SavedSceneFlags* savedSceneFlags;
     s32 i;
 
-    savedSceneFlags = &gSaveContext.sceneFlags[play->sceneNum];
+    savedSceneFlags = SceneFlags_Get(play->sceneNum); // SOH [Unbound]
+    SceneFlagsExt_LoadClear(play->sceneNum);          // SOH [Unbound] clear/temp flags for rooms >= 32
 
     memset(actorCtx, 0, sizeof(*actorCtx));
 
@@ -2954,6 +2996,11 @@ void Actor_Draw(PlayState* play, Actor* actor) {
                    (actor->flags & ACTOR_FLAG_IGNORE_POINTLIGHTS) ? NULL : &actor->world.pos);
     Lights_Draw(lights, play->state.gfxCtx);
 
+    // Emit this actor's cel key/shadow boundary after its native lights.
+    if (ToonLighting_FeaturesActive()) {
+        GameInteractor_ExecuteOnActorDraw(actor);
+    }
+
     FrameTiming_EndNamedSpan("actor_draw_detail", "lighting", detailSpan);
     detailSpan = FrameTiming_BeginSpan();
     FrameInterpolation_RecordActorPosRotMatrix();
@@ -3232,8 +3279,15 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
         return false;
     }
 
-    s32 multiplier = CVarGetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 1);
+    f32 multiplier = CVarGetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 1);
     multiplier = MAX(multiplier, 1);
+
+    // SOH [Unbound] Scenes that raise their draw distance past the vanilla 12800 get actor culling scaled to match,
+    // otherwise a far horizon shows empty terrain (vanilla uncull zones were tuned to the 12800 far plane).
+    // Stopgap: a per-scene cull scale in the lighting entry would be the honest format field.
+    if (play->lightCtx.worldFog && play->lightCtx.zFar > 12800.0f) {
+        multiplier *= play->lightCtx.zFar / 12800.0f;
+    }
 
     // Some actors have a really short forward value, so we need to add to it before the multiplier to increase the
     // final strength of the forward culling
@@ -3303,89 +3357,120 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    actorListEntry = &actorCtx->actorLists[0];
+    bool celEnabled = ToonLighting_CelEnabled();
+    bool shadowsEnabled = ToonLighting_ShadowsEnabled();
+    if (celEnabled) {
+        gSPToon(POLY_OPA_DISP++, true);
+        gSPToon(POLY_XLU_DISP++, true);
+    }
 
-    for (i = 0; i < ARRAY_COUNT(actorCtx->actorLists); i++, actorListEntry++) {
-        actor = actorListEntry->head;
-
-        while (actor != NULL) {
-            actorsVisited++;
-            char* actorName = ActorDB_Retrieve(actor->id)->name;
-
-            gDPNoOpString(POLY_OPA_DISP++, actorName, i);
-            gDPNoOpString(POLY_XLU_DISP++, actorName, i);
-
-            HREG(66) = i;
-
-            if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(68) == 0)) {
-                SkinMatrix_Vec3fMtxFMultXYZW(&play->viewProjectionMtxF, &actor->world.pos, &actor->projectedPos,
-                                             &actor->projectedW);
+    // Reuse the host traversal in both passes so NEI audio, extended culling,
+    // lens/lantern deferral and timing remain identical for every actor.
+    for (s32 drawPass = 0; drawPass < (shadowsEnabled ? 2 : 1); drawPass++) {
+        if (!shadowsEnabled || drawPass == 1) {
+            GameInteractor_ExecuteOnPlayDrawWorldLights(play);
+            if (shadowsEnabled) {
+                gSPToonShadowFlush(POLY_OPA_DISP++);
             }
+        }
+        actorListEntry = &actorCtx->actorLists[0];
 
-            if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(69) == 0)) {
-                if (actor->sfx != 0) {
-                    // Suppress continuous item SFX on player when in MM form
-                    extern u8 TransformMasks_IsTransformed(void);
-                    if (!(actor->id == ACTOR_PLAYER && TransformMasks_IsTransformed() &&
-                          (actor->sfx & 0xF800) == 0x1800)) {
-                        Actor_UpdateFlaggedAudio(actor); // upstream renamed func_80030ED8
-                    }
+        for (i = 0; i < ARRAY_COUNT(actorCtx->actorLists); i++, actorListEntry++) {
+            actor = actorListEntry->head;
+
+            while (actor != NULL) {
+                // Each actor executes the complete host path exactly once. Receivers
+                // enter depth before world pools/shadows; other actors follow them.
+                if (shadowsEnabled && ((drawPass == 0) != (ToonLighting_IsShadowReceiver(actor) != 0))) {
+                    actor = actor->next;
+                    continue;
                 }
-            }
+                actorsVisited++;
+                char* actorName = ActorDB_Retrieve(actor->id)->name;
 
-            // #region SOH [Enhancement] Extended culling updates
-            bool shipShouldDraw = false;
-            bool shipShouldUpdate = false;
-            if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(70) == 0)) {
-                if (CVarGetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 1) > 1 ||
-                    CVarGetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 0)) {
-                    Ship_CalcShouldDrawAndUpdate(play, actor, &actor->projectedPos, actor->projectedW, &shipShouldDraw,
-                                                 &shipShouldUpdate);
+                gDPNoOpString(POLY_OPA_DISP++, actorName, i);
+                gDPNoOpString(POLY_XLU_DISP++, actorName, i);
 
-                    if (shipShouldUpdate) {
-                        actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;
-                    } else {
-                        actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
-                    }
-                } else {
-                    if (Actor_CullingCheck(play, actor)) {
-                        actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;
-                    } else {
-                        actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
-                    }
+                HREG(66) = i;
+
+                if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(68) == 0)) {
+                    SkinMatrix_Vec3fMtxFMultXYZW(&play->viewProjectionMtxF, &actor->world.pos, &actor->projectedPos,
+                                                 &actor->projectedW);
                 }
-            }
 
-            // Count geometric culling only; lens deferral and debug suppression are separate.
-            if (listSpan.epoch != 0 && actor->init == NULL && actor->draw != NULL &&
-                !(actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
-                !shipShouldDraw) {
-                actorsCulled++;
-            }
-            actor->isDrawn = false;
-
-            if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
-                if ((actor->init == NULL) && (actor->draw != NULL) &&
-                    ((actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) ||
-                     shipShouldDraw)) {
-                    // #endregion
-                    if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
-                        ((play->roomCtx.curRoom.lensMode == LENS_MODE_HIDE_ACTORS) || play->actorCtx.lensActive ||
-                         play->actorCtx.lensFromLantern || (actor->room != play->roomCtx.curRoom.num))) {
-                        assert(invisibleActorCounter < INVISIBLE_ACTOR_MAX);
-                        invisibleActors[invisibleActorCounter] = actor;
-                        invisibleActorCounter++;
-                    } else {
-                        if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(72) == 0)) {
-                            Actor_Draw(play, actor);
-                            actor->isDrawn = true;
+                if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(69) == 0)) {
+                    if (actor->sfx != 0) {
+                        // Suppress continuous item SFX on player when in MM form
+                        extern u8 TransformMasks_IsTransformed(void);
+                        if (!(actor->id == ACTOR_PLAYER && TransformMasks_IsTransformed() &&
+                              (actor->sfx & 0xF800) == 0x1800)) {
+                            Actor_UpdateFlaggedAudio(actor); // upstream renamed func_80030ED8
                         }
                     }
                 }
-            }
 
-            actor = actor->next;
+                // #region SOH [Enhancement] Extended culling updates
+                bool shipShouldDraw = false;
+                bool shipShouldUpdate = false;
+                if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(70) == 0)) {
+                    if (CVarGetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 1) > 1 ||
+                        CVarGetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 0)) {
+                        Ship_CalcShouldDrawAndUpdate(play, actor, &actor->projectedPos, actor->projectedW, &shipShouldDraw,
+                                                     &shipShouldUpdate);
+
+                        if (shipShouldUpdate) {
+                            actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;
+                        } else {
+                            actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
+                        }
+                    } else {
+                        if (Actor_CullingCheck(play, actor)) {
+                            actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;
+                        } else {
+                            actor->flags &= ~ACTOR_FLAG_INSIDE_CULLING_VOLUME;
+                        }
+                    }
+                }
+
+                // Count geometric culling only; lens deferral and debug suppression are separate.
+                if (listSpan.epoch != 0 && actor->init == NULL && actor->draw != NULL &&
+                    !(actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
+                    !shipShouldDraw) {
+                    actorsCulled++;
+                }
+                actor->isDrawn = false;
+
+                if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
+                    if ((actor->init == NULL) && (actor->draw != NULL) &&
+                        ((actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) ||
+                         shipShouldDraw)) {
+                        // #endregion
+                        if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
+                            ((play->roomCtx.curRoom.lensMode == LENS_MODE_HIDE_ACTORS) || play->actorCtx.lensActive ||
+                             play->actorCtx.lensFromLantern || (actor->room != play->roomCtx.curRoom.num))) {
+                            assert(invisibleActorCounter < INVISIBLE_ACTOR_MAX);
+                            invisibleActors[invisibleActorCounter] = actor;
+                            invisibleActorCounter++;
+                        } else {
+                            if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(72) == 0)) {
+                                Actor_Draw(play, actor);
+                                actor->isDrawn = true;
+                            }
+                        }
+                    }
+                }
+
+                actor = actor->next;
+            }
         }
+    }
+
+    if (celEnabled) {
+        gSPToon(POLY_OPA_DISP++, false);
+        gSPToon(POLY_XLU_DISP++, false);
+    } else if (shadowsEnabled) {
+        // No toon edge exists in shadow-only mode to close the last capture.
+        gSPToonShadow(POLY_OPA_DISP++, 0, 0, 0, 0.0f);
     }
 
     FrameTiming_EndNamedSpan("actor_draw_all", "actor_traversal", phaseSpan);
@@ -3409,7 +3494,9 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         // Skijer's NEI: lensFromLantern is the Poe-fire lantern's own lens; it is
         // independent of the Lens of Truth (no magic, no lensActive) so both can be on.
         if (play->actorCtx.lensActive || play->actorCtx.lensFromLantern) {
+            ToonLighting_LensBracketBegin(play->state.gfxCtx);
             Actor_DrawLensActors(play, invisibleActorCounter, invisibleActors);
+            ToonLighting_LensBracketEnd(play->state.gfxCtx);
             if ((play->csCtx.state != CS_STATE_IDLE) || Player_InCsMode(play)) {
                 Actor_DisableLens(play);
             }
@@ -3623,14 +3710,19 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
 
     ActorDBEntry* dbEntry = ActorDB_Retrieve(actorId);
 
-    assert(dbEntry->valid);
+    // SOH [Unbound] An id no actor answers to (a scene's typo, a gap below the custom actor types) spawns nothing.
+    // This was only an assert, which release builds drop: they then allocated a zero-size actor and wrote past it.
+    if (!dbEntry->valid) {
+        LUSLOG_ERROR("Actor_Spawn: no actor has id %#x", (u16)actorId);
+        return NULL;
+    }
 
     if (HREG(20) != 0) {
         // "Actor class addition [%d:%s]"
         osSyncPrintf("アクタークラス追加 [%d:%s]\n", actorId, dbEntry->name);
     }
 
-    if (actorCtx->total > ACTOR_NUMBER_MAX) {
+    if (actorCtx->total >= ACTOR_NUMBER_MAX) {
         LUSLOG_WARN("Actor_Spawn: Actor number max exceeded");
         // "Ａｃｔｏｒ set number exceeded"
         osSyncPrintf(VT_COL(YELLOW, BLACK) "Ａｃｔｏｒセット数オーバー\n" VT_RST);
@@ -3673,8 +3765,8 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
     SetActorListIndex(actor, -1);
     // #endregion
 
-    assert(dbEntry->numLoaded < 255);
-
+    // SOH [Unbound] No per-type cap: numLoaded is an s32, and a room may hold hundreds of one prop (unbound-docs
+    // SPEC §9). Vanilla asserted fewer than 255, a count from its 8-bit overlay client counter.
     dbEntry->numLoaded++;
 
     if (HREG(20) != 0) {
@@ -3698,6 +3790,8 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
     actor->update = dbEntry->update;
     actor->draw = dbEntry->draw;
     actor->room = play->roomCtx.curRoom.num;
+    actor->transitionIndex = sSpawnTransitionIndex; // SOH [Unbound] -1 unless spawned from the transition list
+    sSpawnTransitionIndex = -1;
     actor->home.pos.x = posX;
     actor->home.pos.y = posY;
     actor->home.pos.z = posZ;
@@ -3741,7 +3835,7 @@ Actor* Actor_SpawnAsChild(ActorContext* actorCtx, Actor* parent, PlayState* play
 
 void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
     TransitionActorEntry* transitionActor;
-    u8 numActors;
+    u16 numActors; // SOH [Unbound]
     s32 i;
 
     transitionActor = play->transiActorCtx.list;
@@ -3755,9 +3849,14 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
                 ((transitionActor->sides[1].room >= 0) &&
                  ((transitionActor->sides[1].room == play->roomCtx.curRoom.num) ||
                   (transitionActor->sides[1].room == play->roomCtx.prevRoom.num)))) {
+                // SOH [Unbound] The list index travels on Actor.transitionIndex (see TRANSITION_ACTOR_INDEX);
+                // the 6-bit packing into params is kept for the first 64 so untouched readers still work.
+                // Scene data leaves bits 10-15 clear, so masking them is equivalent to vanilla's add.
+                sSpawnTransitionIndex = i;
                 Actor_Spawn(actorCtx, play, (s16)(transitionActor->id & 0x1FFF), transitionActor->pos.x,
                             transitionActor->pos.y, transitionActor->pos.z, 0, transitionActor->rotY, 0,
-                            (i << 0xA) + transitionActor->params);
+                            ((i & 0x3F) << 0xA) | (transitionActor->params & 0x3FF));
+                sSpawnTransitionIndex = -1;
 
                 transitionActor->id = -transitionActor->id;
                 numActors = play->transiActorCtx.numActors;

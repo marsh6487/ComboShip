@@ -10,6 +10,8 @@
 
 #include "z64.h"
 #include "functions.h"
+#include <stdint.h>
+#include <stdlib.h>
 #define SM64_LIB_FN
 #include "expansions/sm64/libsm64.h"
 
@@ -25,10 +27,12 @@
 // Same direction → floors keep normal.y > 0 → accepted by find_floor.
 // Reversing to (C, B, A) inverts the normal, turning every floor into a
 // ceiling in libsm64's view and failing the filter at surface_collision.c:104.
-static void writeSurface(struct SM64Surface* out, CollisionPoly* poly, Vec3s* vtxList) {
-    u16 idxA = COLPOLY_VTX_INDEX(poly->flags_vIA);
-    u16 idxB = COLPOLY_VTX_INDEX(poly->flags_vIB);
-    u16 idxC = poly->vIC;
+static u8 writeSurface(struct SM64Surface* out, CollisionPoly* poly, Vec3i* vtxList, u32 vtxCount) {
+    u32 idxA = COLPOLY_VTX_INDEX(poly->flags_vIA);
+    u32 idxB = COLPOLY_VTX_INDEX(poly->flags_vIB);
+    u32 idxC = poly->vIC;
+    if (idxA >= vtxCount || idxB >= vtxCount || idxC >= vtxCount)
+        return 0;
 
     out->type = 0;
     out->force = 0;
@@ -45,6 +49,7 @@ static void writeSurface(struct SM64Surface* out, CollisionPoly* poly, Vec3s* vt
     out->vertices[2][0] = vtxList[idxC].x * SM64_WORLD_SCALE;
     out->vertices[2][1] = vtxList[idxC].y * SM64_WORLD_SCALE;
     out->vertices[2][2] = vtxList[idxC].z * SM64_WORLD_SCALE;
+    return 1;
 }
 
 // =============================================================================
@@ -57,9 +62,37 @@ static void writeSurface(struct SM64Surface* out, CollisionPoly* poly, Vec3s* vt
 // them to the surface set. Enemies/bosses are excluded so Mario can still run
 // into them to attack. Vanish-cap (floorOnly) skips these like any other wall.
 // =============================================================================
-#define SM64_ACTOR_SURF_MAX 1024 // ~ COLLISION_CHECK_OC_MAX(50) * 16 walls + headroom
-static struct SM64Surface sActorSurfaces[SM64_ACTOR_SURF_MAX];
+static struct SM64Surface* sActorSurfaces = NULL;
+static size_t sActorSurfaceCapacity = 0;
 static u32 sActorSurfaceCount = 0;
+static u8 sActorSnapshotFailed = 0;
+static PlayState* sActorOwner = NULL;
+static CollisionHeader* sActorSceneHeader = NULL;
+
+// The OC queue can grow beyond the old fifty entries. Own a complete snapshot
+// rather than silently dropping player blockers after a fixed triangle budget.
+static u8 reserveActorSurfaces(size_t needed) {
+    size_t capacity;
+    struct SM64Surface* grown;
+    if (needed <= sActorSurfaceCapacity)
+        return 1;
+    if (needed > UINT32_MAX || needed > SIZE_MAX / sizeof(*sActorSurfaces))
+        return 0;
+    capacity = sActorSurfaceCapacity ? sActorSurfaceCapacity : 1024;
+    while (capacity < needed) {
+        if (capacity > UINT32_MAX / 2 || capacity > SIZE_MAX / sizeof(*sActorSurfaces) / 2) {
+            capacity = needed;
+            break;
+        }
+        capacity *= 2;
+    }
+    grown = realloc(sActorSurfaces, capacity * sizeof(*sActorSurfaces));
+    if (grown == NULL)
+        return 0;
+    sActorSurfaces = grown;
+    sActorSurfaceCapacity = capacity;
+    return 1;
+}
 
 // Write one SM64 surface from three OOT-space points (scaled into libsm64 world).
 static void emitActorTri(struct SM64Surface* out, f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz, f32 cx, f32 cy,
@@ -92,8 +125,16 @@ static const f32 kOctDir[8][2] = {
 // so libsm64 treats each face as a solid wall (one-sided from outside).
 static void emitActorPrism(f32 cx, f32 cz, f32 by, f32 ty, f32 r) {
     s32 k;
-    if (sActorSurfaceCount + 16 > SM64_ACTOR_SURF_MAX)
+    if (sActorSnapshotFailed)
         return;
+    if (!reserveActorSurfaces((size_t)sActorSurfaceCount + 16)) {
+        // Extraction fails as a whole, so Mario cannot upload a partial prefix
+        // and walk through the remaining blockers. The caller reports/retries
+        // failed extraction through its existing zero-surface path.
+        sActorSnapshotFailed = 1;
+        sActorSurfaceCount = 0;
+        return;
+    }
     for (k = 0; k < 8; k++) {
         const f32* d0 = kOctDir[k];
         const f32* d1 = kOctDir[(k + 1) & 7];
@@ -142,17 +183,20 @@ struct SM64Surface* Sm64Surfaces_ExtractStatic(PlayState* play, u32* outCount) {
 struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount, u8 floorOnly) {
     CollisionHeader* colHeader;
     CollisionPoly* polyList;
-    Vec3s* vtxList;
+    Vec3i* vtxList;
     u32 staticCount;
     u32 dynaCapacity;
-    u32 total;
+    size_t total;
+    u32 actorCount;
     u32 outIdx = 0;
     u32 i;
     s32 bgId;
     struct SM64Surface* surfaces;
 
-    if (play == NULL || play->colCtx.colHeader == NULL || play->colCtx.colHeader->numPolygons == 0) {
-        *outCount = 0;
+    if (outCount == NULL)
+        return NULL;
+    *outCount = 0;
+    if (play == NULL || play->colCtx.colHeader == NULL) {
         return NULL;
     }
 
@@ -160,11 +204,18 @@ struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount,
     staticCount = colHeader->numPolygons;
     polyList = colHeader->polyList;
     vtxList = colHeader->vtxList;
+    if (staticCount && (polyList == NULL || vtxList == NULL))
+        return NULL;
+    actorCount = (sActorOwner == play && sActorSceneHeader == colHeader) ? sActorSurfaceCount : 0;
+    if (!floorOnly && sActorOwner == play && sActorSceneHeader == colHeader && sActorSnapshotFailed)
+        return NULL;
 
     // Upper bound for total surfaces: static + whatever dyna capacity allows.
     // dyna.polyListMax is the allocation size; we'll only copy active ones.
-    dynaCapacity = play->colCtx.dyna.polyListMax;
-    total = staticCount + dynaCapacity + (floorOnly ? 0 : sActorSurfaceCount);
+    dynaCapacity = play->colCtx.dyna.polyListMax > 0 ? (u32)play->colCtx.dyna.polyListMax : 0;
+    total = (size_t)staticCount + dynaCapacity + (floorOnly ? 0 : actorCount);
+    if (total == 0 || total > UINT32_MAX || total > SIZE_MAX / sizeof(struct SM64Surface))
+        return NULL;
 
     surfaces = malloc(total * sizeof(struct SM64Surface));
     if (surfaces == NULL) {
@@ -186,7 +237,8 @@ struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount,
         // through everything else.
         if (floorOnly && !isFloorPoly(poly) && !isExitPoly(play, poly, BGCHECK_SCENE))
             continue;
-        writeSurface(&surfaces[outIdx++], poly, vtxList);
+        if (writeSurface(&surfaces[outIdx], poly, vtxList, colHeader->numVertices))
+            ++outIdx;
     }
 
     // === Dynamic BgActor collision (moving platforms, doors, Forest Meadow
@@ -195,22 +247,23 @@ struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount,
     {
         DynaCollisionContext* dyna = &play->colCtx.dyna;
         CollisionPoly* dPolyList = dyna->polyList;
-        Vec3s* dVtxList = dyna->vtxList;
-        if (dPolyList != NULL && dVtxList != NULL) {
-            for (bgId = 0; bgId < BG_ACTOR_MAX; bgId++) {
+        Vec3i* dVtxList = dyna->vtxList;
+        if (dPolyList != NULL && dVtxList != NULL && dyna->vtxListMax > 0 && dyna->bgActors != NULL &&
+            dyna->bgActorFlags != NULL) {
+            for (bgId = 0; bgId < dyna->bgActorMax; bgId++) {
                 BgActor* bg;
                 u32 polyStart, polyEnd, p;
-                if (!(dyna->bgActorFlags[bgId] & 1))
+                if ((dyna->bgActorFlags[bgId] & (1 | 2 | 4)) != 1)
                     continue;
                 bg = &dyna->bgActors[bgId];
                 if (bg->colHeader == NULL)
                     continue;
                 polyStart = bg->dynaLookup.polyStartIndex;
-                polyEnd = polyStart + bg->colHeader->numPolygons;
-                if (polyEnd > dynaCapacity)
-                    polyEnd = dynaCapacity;
+                if (polyStart >= dynaCapacity)
+                    continue;
+                polyEnd = polyStart + MIN(bg->colHeader->numPolygons, dynaCapacity - polyStart);
                 for (p = polyStart; p < polyEnd; p++) {
-                    // Honor the player-ignore flag (flags_vIA & 0x4000) on dynapoly
+                    // Honor the player-ignore flag on dynapoly
                     // too — same as the static pass. This is what makes Lens-of-Truth
                     // "fake walls" (and other entity-ignored bgActor polys) passable;
                     // without it Mario collided with illusory walls and phantom
@@ -221,7 +274,8 @@ struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount,
                     // too (e.g. door-mounted loading zones).
                     if (floorOnly && !isFloorPoly(&dPolyList[p]) && !isExitPoly(play, &dPolyList[p], bgId))
                         continue;
-                    writeSurface(&surfaces[outIdx++], &dPolyList[p], dVtxList);
+                    if (writeSurface(&surfaces[outIdx], &dPolyList[p], dVtxList, dyna->vtxListMax))
+                        ++outIdx;
                 }
             }
         }
@@ -230,11 +284,15 @@ struct SM64Surface* Sm64Surfaces_ExtractFiltered(PlayState* play, u32* outCount,
     // === Actor OC colliders (signs, torches, props) snapshotted last frame ===
     // Solid mode only; vanish-cap (floorOnly) phases through them like walls.
     if (!floorOnly) {
-        for (i = 0; i < sActorSurfaceCount; i++) {
+        for (i = 0; i < actorCount; i++) {
             surfaces[outIdx++] = sActorSurfaces[i];
         }
     }
 
+    if (outIdx == 0) {
+        free(surfaces);
+        return NULL;
+    }
     *outCount = outIdx;
     return surfaces;
 }
@@ -250,8 +308,15 @@ void Sm64Surfaces_RefreshActorColliders(PlayState* play) {
     s32 i;
 
     sActorSurfaceCount = 0;
-    if (play == NULL)
+    sActorSnapshotFailed = 0;
+    sActorOwner = play;
+    sActorSceneHeader = play ? play->colCtx.colHeader : NULL;
+    if (play == NULL) {
+        free(sActorSurfaces);
+        sActorSurfaces = NULL;
+        sActorSurfaceCapacity = 0;
         return;
+    }
     cc = &play->colChkCtx;
 
     for (i = 0; i < cc->colOCCount; i++) {

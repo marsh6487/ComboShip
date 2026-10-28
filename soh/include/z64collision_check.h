@@ -1,9 +1,13 @@
 #ifndef Z_COLLISION_CHECK_H
 #define Z_COLLISION_CHECK_H
 
-#define COLLISION_CHECK_AT_MAX 50
-#define COLLISION_CHECK_AC_MAX 60
-#define COLLISION_CHECK_OC_MAX 50
+#define COLLISION_CHECK_AT_INITIAL_CAPACITY 50
+#define COLLISION_CHECK_AC_INITIAL_CAPACITY 60
+#define COLLISION_CHECK_OC_INITIAL_CAPACITY 50
+// Compatibility names for mods. These are initial reservations, not admission limits.
+#define COLLISION_CHECK_AT_MAX COLLISION_CHECK_AT_INITIAL_CAPACITY
+#define COLLISION_CHECK_AC_MAX COLLISION_CHECK_AC_INITIAL_CAPACITY
+#define COLLISION_CHECK_OC_MAX COLLISION_CHECK_OC_INITIAL_CAPACITY
 #define COLLISION_CHECK_OC_LINE_MAX 3
 
 // From z64.h
@@ -202,12 +206,13 @@ typedef struct {
     /* 0x0C */ ColliderTrisElementInit* elements;
 } ColliderTrisInitType1; // size = 0x10
 
+// SOH [Unbound] Midpoints retain world-coordinate precision like the quad vertices.
 typedef struct {
-    /* 0x00 */ Vec3f quad[4];
-    /* 0x30 */ Vec3s dcMid; // midpoint of vectors d, c
-    /* 0x36 */ Vec3s baMid; // midpoint of vectors b, a
-    /* 0x3C */ f32 acDist; // distance to nearest AC collision this frame.
-} ColliderQuadDim; // size = 0x40
+    Vec3f quad[4];
+    Vec3f dcMid; // midpoint of vectors d, c
+    Vec3f baMid; // midpoint of vectors b, a
+    f32 acDist; // distance to nearest AC collision this frame.
+} ColliderQuadDim;
 
 typedef struct {
     /* 0x00 */ Vec3f quad[4];

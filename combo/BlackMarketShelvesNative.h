@@ -2,6 +2,7 @@
 // Include after the host's global.h. All room-independent data is authored here.
 #include "BlackMarketShelves.h"
 #include <cmath>
+#include <type_traits>
 
 namespace BlackMarketShelvesNative {
 class Fixture {
@@ -52,7 +53,7 @@ class Fixture {
                     nz /= length;
                     p.normal = { s16(std::lround(nx * 32767)), s16(std::lround(ny * 32767)),
                                  s16(std::lround(nz * 32767)) };
-                    p.dist = s16(std::lround(-(nx * a.x + ny * a.y + nz * a.z)));
+                    p.dist = decltype(p.dist)(std::lround(-(nx * a.x + ny * a.y + nz * a.z)));
                 }
             vertex += 8;
         }
@@ -76,14 +77,17 @@ class Fixture {
     // collision context owns its registration; no actor overlay/inventory is used.
     // Scene destroy may run after MM's arena cleanup, so reset without dereferencing it.
     void Reset() {
-        mRegistered = false;
         mOwner = {};
     }
     bool Ensure(PlayState* play) {
-        if (mRegistered)
-            return true;
         if (!play || !play->colCtx.colHeader || play->roomCtx.curRoom.num != 0)
             return false;
+        for (int bg = 0; bg < ActorCapacity(play->colCtx.dyna); ++bg) {
+            const auto& dyna = play->colCtx.dyna;
+            if ((dyna.bgActorFlags[bg] & 1) && !(dyna.bgActorFlags[bg] & 2) &&
+                dyna.bgActors[bg].actor == &mOwner.actor && dyna.bgActors[bg].colHeader == &mCollision)
+                return true;
+        }
         mOwner = {};
         DynaPolyActor_Init(&mOwner, 0);
         mOwner.actor.id = -1;
@@ -91,10 +95,13 @@ class Fixture {
         mOwner.actor.scale = { 1, 1, 1 };
         mOwner.actor.update = [](Actor*, PlayState*) {};
         const int bg = DynaPoly_SetBgActor(play, &play->colCtx.dyna, &mOwner.actor, &mCollision);
-        if (bg < 0 || bg >= BG_ACTOR_MAX)
+        if (bg < 0 || bg >= ActorCapacity(play->colCtx.dyna)
+#ifdef BGACTOR_INVALID
+            || bg == BGACTOR_INVALID
+#endif
+        )
             return false;
         mOwner.bgId = bg;
-        mRegistered = true;
         return true;
     }
     void Draw(Gfx*& head, bool granny = false, const std::array<const char*, 2>& textures = {},
@@ -147,6 +154,13 @@ class Fixture {
     }
 
   private:
+    static int ActorCapacity(const DynaCollisionContext& dyna) {
+#ifdef BGACTOR_INVALID
+        return dyna.bgActorMax;
+#else
+        return BG_ACTOR_MAX;
+#endif
+    }
     // Floor-camera queries also visit dynamic polygons. Surface zero refers to
     // this owned, valid no-camera entry instead of a null camera-data list.
     void AttachCamera(auto& header) {
@@ -158,12 +172,12 @@ class Fixture {
         }
     }
     std::array<std::array<Vtx, BlackMarketShelves::kBoxes.size() * 24>, 2> mVertices{};
-    std::array<Vec3s, 16> mCollisionVertices{};
+    using CollisionVertex = std::remove_pointer_t<decltype(CollisionHeader::vtxList)>;
+    std::array<CollisionVertex, 16> mCollisionVertices{};
     std::array<CollisionPoly, 24> mPolygons{};
     std::array<SurfaceType, 1> mSurface{};
     std::array<CamData, 1> mCamera{ { { CAM_SET_NONE, 0, nullptr } } };
     CollisionHeader mCollision{};
     DynaPolyActor mOwner{};
-    bool mRegistered = false;
 };
 } // namespace BlackMarketShelvesNative

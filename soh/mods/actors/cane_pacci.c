@@ -1131,13 +1131,14 @@ static u8 Pacci_UhTooBig(Actor* actor) {
     }
     // Reading the bgActors table directly rather than through Pacci_FuseGetBox: that lives in the
     // FUSION section far below this one, along with the type it returns.
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
         CollisionHeader* hdr;
         f32 halfX;
         f32 halfZ;
 
-        if ((bg->actor != actor) || (bg->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 ||
+            (bg->actor != actor) || (bg->colHeader == NULL)) {
             continue;
         }
         hdr = bg->colHeader;
@@ -1355,9 +1356,9 @@ static void Pacci_BurstSpawn(PlayState* play, Player* player, Vec3f* pos, u8 hea
     }
     Collider_SetCylinder(play, &sPacciBurst, &player->actor, &sPacciBurstInit);
     sPacciBurst.info.toucher.dmgFlags = heavy ? PACCI_DMG_HEAVY : PACCI_DMG_LIGHT;
-    sPacciBurst.dim.pos.x = (s16)pos->x;
-    sPacciBurst.dim.pos.y = (s16)pos->y;
-    sPacciBurst.dim.pos.z = (s16)pos->z;
+    sPacciBurst.dim.pos.x = pos->x;
+    sPacciBurst.dim.pos.y = pos->y;
+    sPacciBurst.dim.pos.z = pos->z;
     sPacciBurstTimer = PACCI_BURST_FRAMES;
 }
 
@@ -3056,7 +3057,7 @@ static void Pacci_UhConstrain(PlayState* play, Actor* actor) {
         // Water Temple path is a handful of points tens of units apart; snapping to waypoints
         // would make the platform teleport between them instead of sliding along.
         Path* path = &play->setupPathList[sUltrahand.pathId];
-        Vec3s* pts = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points);
+        Vec3f* pts = (Vec3f*)SEGMENTED_TO_VIRTUAL(path->points);
         Vec3f want = actor->world.pos;
         Vec3f best = want;
         f32 bestD = 3.0e38f;
@@ -3628,10 +3629,11 @@ static u8 Pacci_FuseGetBox(PlayState* play, Actor* actor, PacciFuseBox* box) {
     box->solid = 0;
     box->dyna = 0;
 
-    for (s32 i = 0; i < BG_ACTOR_MAX; i++) {
+    for (s32 i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((bg->actor == actor) && (bg->colHeader != NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 &&
+            (bg->actor == actor) && (bg->colHeader != NULL)) {
             hdr = bg->colHeader;
             break;
         }
@@ -4189,10 +4191,11 @@ static u8 Pacci_UhDynaTopY(PlayState* play, Actor* actor, f32* outY) {
     if ((play == NULL) || (actor == NULL)) {
         return 0;
     }
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
+    for (i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((bg->actor != actor) || (bg->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 ||
+            (bg->actor != actor) || (bg->colHeader == NULL)) {
             continue;
         }
         *outY = actor->world.pos.y + ((f32)bg->colHeader->maxBounds.y * actor->scale.y);

@@ -1,3 +1,6 @@
+#include "soh/unbound/SceneDB.h"
+#include "util.h"
+
 #include <string.h>
 #include <vector>
 #include <algorithm>
@@ -6,7 +9,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include "util.h"
 
 extern "C" {
 #include <variables.h>
@@ -717,13 +719,18 @@ std::array<std::string, RA_MAX> rcareaPrefixes = {
 };
 
 const std::string& SohUtils::GetSceneName(int32_t scene) {
-    if (scene < 0 || static_cast<size_t>(scene) >= sceneNames.size()) {
-        SPDLOG_WARN("Passed invalid scene id to SohUtils::GetSceneName: ({})", scene);
-        assert(false);
-        return invalidString;
+    if (scene >= 0 && scene < (int32_t)sceneNames.size()) {
+        return sceneNames[scene];
     }
 
-    return sceneNames[scene];
+    // SOH [Unbound] custom scenes are named by the registry
+    const SceneDB::Entry& entry = SceneDB::Instance->RetrieveEntry(scene);
+    if (entry.valid) {
+        return entry.displayName;
+    }
+
+    SPDLOG_WARN("Passed invalid scene id to SohUtils::GetSceneName: ({})", scene);
+    return invalidString;
 }
 
 const std::string& SohUtils::GetItemName(int32_t item) {

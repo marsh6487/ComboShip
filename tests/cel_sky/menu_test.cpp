@@ -25,7 +25,7 @@ namespace Ship {
 struct FakeGui { int saves = 0; void SaveConsoleVariablesNextFrame() { saves++; } };
 struct Context {
     FakeGui gui;
-    static Context* GetInstance() { static Context context; return &context; }
+    static Context* GetRawInstance() { static Context context; return &context; }
     Context* GetWindow() { return this; } FakeGui* GetGui() { return &gui; }
 };
 }
@@ -101,6 +101,6 @@ int main() {
     for (auto& w: menu.widgets) if (w.sidebar == "Cel Shading" && w.name == "Reset All to Defaults") { w.callback(w); reset = true; }
     Require(reset && !cvars.contains(CVAR_ENHANCEMENT("Graphics.ToonLighting.RampCenter")), "cel reset clears its tuning");
     Require(cvars.at(CVAR_ENHANCEMENT("Graphics.WorldShadows.Opacity")) == .75, "cel reset preserves shadow tuning");
-    Require(Ship::Context::GetInstance()->gui.saves == 1, "reset persists once");
+    Require(Ship::Context::GetRawInstance()->gui.saves == 1, "reset persists once");
     std::puts("cel sky menu registration: PASS");
 }

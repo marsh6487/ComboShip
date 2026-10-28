@@ -127,10 +127,11 @@ static u8 SwitchMagnet_IsPressable(Actor* actor) {
 static u8 SwitchMagnet_DynaTopY(PlayState* play, Actor* actor, f32* outY) {
     s32 bg;
 
-    for (bg = 0; bg < BG_ACTOR_MAX; bg++) {
+    for (bg = 0; bg < play->colCtx.dyna.bgActorMax; bg++) {
         BgActor* bgActor = &play->colCtx.dyna.bgActors[bg];
 
-        if (!(play->colCtx.dyna.bgActorFlags[bg] & 1) || (bgActor->actor != actor) || (bgActor->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[bg] & (1 | 2)) != 1 || (bgActor->actor != actor) ||
+            (bgActor->colHeader == NULL)) {
             continue;
         }
         *outY = actor->world.pos.y + ((f32)bgActor->colHeader->maxBounds.y * actor->scale.y);
@@ -143,10 +144,11 @@ static u8 SwitchMagnet_DynaTopY(PlayState* play, Actor* actor, f32* outY) {
 static f32 SwitchMagnet_BodyBottom(PlayState* play, Actor* actor) {
     s32 bg;
 
-    for (bg = 0; bg < BG_ACTOR_MAX; bg++) {
+    for (bg = 0; bg < play->colCtx.dyna.bgActorMax; bg++) {
         BgActor* bgActor = &play->colCtx.dyna.bgActors[bg];
 
-        if (!(play->colCtx.dyna.bgActorFlags[bg] & 1) || (bgActor->actor != actor) || (bgActor->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[bg] & (1 | 2)) != 1 || (bgActor->actor != actor) ||
+            (bgActor->colHeader == NULL)) {
             continue;
         }
         return (f32)bgActor->colHeader->minBounds.y * actor->scale.y;

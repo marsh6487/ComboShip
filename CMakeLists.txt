@@ -131,6 +131,12 @@ set(GFX_DEBUG_DISASSEMBLER ON)
 # Tell LUS we're using F3DEX_GBI_2 (in a way that doesn't break libgfxd)
 set(GBI_UCODE F3DEX_GBI_2)
 
+# Both games and the shared engine exchange native Mtx/Vtx pointers in one frame.
+# Keep their ABI identical, including C/C++ geometry and asset-generation tools.
+set(GBI_FLOAT_MTX ON CACHE BOOL "Use float Mtx throughout the combined runtime" FORCE)
+set(GBI_S32_VTX ON CACHE BOOL "Use s32 Vtx positions throughout the combined runtime" FORCE)
+add_compile_definitions(GBI_FLOAT_MTX=1 GBI_S32_VTX=1)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 # Enable MPQ and OTR support
@@ -462,6 +468,9 @@ add_custom_target(
 add_custom_target(
     Generate2ShipOtr
     COMMAND ${CMAKE_COMMAND} -E $<IF:$<VERSION_LESS:${CMAKE_VERSION},3.17>,remove,rm> -f 2ship.o2r
+    # Keep both games' shader resources aligned with the shared vertex/uniform layout.
+    # Overlay defaults so MM's separate Prism shaders (for example flatavg) survive.
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom/shaders/
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --norom --custom-otr-file 2ship.o2r "--custom-assets-path" ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLY2SHIPOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/CMake/copy-existing-otrs.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mm

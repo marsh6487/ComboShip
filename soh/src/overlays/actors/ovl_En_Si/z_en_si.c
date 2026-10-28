@@ -89,11 +89,11 @@ static void EnSi_LogPickupBlock(EnSi* this, PlayState* play, Player* player, con
     lusprintf(__FILE__, __LINE__, LUSLOG_LEVEL_INFO,
               "[SkullPickup] phase=blocked reason=%s scene=%d room=%d params=0x%04X "
               "ocCount=%d/%d xz=%.1f dy=%.1f playerOC=0x%02X/0x%02X "
-              "playerCyl=%d,%d,%d tokenCyl=%d,%d,%d csAction=%d "
+              "playerCyl=%.1f,%.1f,%.1f tokenCyl=%.1f,%.1f,%.1f csAction=%d "
               "state1=0x%08X state2=0x%08X state3=0x%08X actionGate=%d transition=%d "
               "frameAdvance=%d secondCollision=%d",
               reason, play->sceneNum, play->roomCtx.curRoom.num, (u16)this->actor.params, play->colChkCtx.colOCCount,
-              COLLISION_CHECK_OC_MAX, this->actor.xzDistToPlayer, this->actor.yDistToPlayer,
+              play->colChkCtx.colOCCapacity, this->actor.xzDistToPlayer, this->actor.yDistToPlayer,
               player->cylinder.base.ocFlags1, player->cylinder.base.ocFlags2, player->cylinder.dim.radius,
               player->cylinder.dim.height, player->cylinder.dim.yShift, this->collider.dim.radius,
               this->collider.dim.height, this->collider.dim.yShift, player->csAction, player->stateFlags1,

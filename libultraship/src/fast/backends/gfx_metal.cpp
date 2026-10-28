@@ -74,6 +74,10 @@ bool GfxRenderingAPIMetal::NonUniformThreadGroupSupported() {
 
 bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
     mRenderer = renderer;
+    for (auto*& state : mDepthStencilStates) {
+        if (state != nullptr) state->release();
+        state = nullptr;
+    }
     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
 
     mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
@@ -84,7 +88,7 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
     mReadbackQueue = mDevice->newCommandQueue();
 
     for (size_t i = 0; i < kMaxVertexBufferPoolSize; i++) {
-        MTL::Buffer* new_buffer = mDevice->newBuffer(256 * 32 * 3 * sizeof(float) * 50, MTL::ResourceStorageModeShared);
+        MTL::Buffer* new_buffer = mDevice->newBuffer(kInitialVertexBufferLength, MTL::ResourceStorageModeShared);
         mVertexBufferPool[i] = new_buffer;
     }
 
@@ -127,6 +131,20 @@ void GfxRenderingAPIMetal::RenderDrawData(ImDrawData* drawData) {
 }
 
 // MARK: - Metal Graphics Rendering API
+
+GfxRenderingAPIMetal::~GfxRenderingAPIMetal() {
+    // SOH [Enhancement] Release the cached depth-stencil states (see DrawTriangles).
+    for (auto*& state : mDepthStencilStates) {
+        if (state != nullptr) {
+            state->release();
+            state = nullptr;
+        }
+    }
+    for (auto& framebuffer : mFramebuffers) {
+        if (framebuffer.mStencilTexture != nullptr) framebuffer.mStencilTexture->release();
+        if (framebuffer.mMsaaStencilTexture != nullptr) framebuffer.mMsaaStencilTexture->release();
+    }
+}
 
 const char* GfxRenderingAPIMetal::GetName() {
     return "Metal";
@@ -244,6 +262,9 @@ struct ShaderProgram* GfxRenderingAPIMetal::CreateAndLoadNewShader(uint64_t shad
     pipeline_descriptor->colorAttachments()->object(0)->setPixelFormat(mSrgbMode ? MTL::PixelFormatBGRA8Unorm_sRGB
                                                                                  : MTL::PixelFormatBGRA8Unorm);
     pipeline_descriptor->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+    // SOH [Enhancement] World light casting: declare the Stencil8 format on every pipeline (parallels the
+    // unconditional depth format above), so pipelines stay consistent with the stencil-bearing render pass.
+    pipeline_descriptor->setStencilAttachmentPixelFormat(MTL::PixelFormatStencil8);
     if (cc_features.opt_alpha) {
         pipeline_descriptor->colorAttachments()->object(0)->setBlendingEnabled(true);
         pipeline_descriptor->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
@@ -270,6 +291,7 @@ struct ShaderProgram* GfxRenderingAPIMetal::CreateAndLoadNewShader(uint64_t shad
     prg->usedTextures[5] = cc_features.used_blend[1];
     prg->numInputs = cc_features.numInputs;
     prg->numFloats = numFloats;
+    prg->opt_toon = cc_features.opt_toon; // SOH [Enhancement] toon lighting
 
     // Prepoluate pipeline state cache with program and available msaa levels
     for (int i = 0; i < ARRAY_COUNT(mMsaaNumQualityLevels); i++) {
@@ -454,20 +476,73 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
     auto& current_framebuffer = mFramebuffers[mCurrentFramebuffer];
 
     if (current_framebuffer.mLastDepthTest != mCurrentDepthTest ||
-        current_framebuffer.mLastDepthMask != mCurrentDepthMask) {
+        current_framebuffer.mLastDepthMask != mCurrentDepthMask ||
+        // SOH [Enhancement] The decal flag participates because the depth compare function below
+        // depends on it; without it a decal-only change kept the previous compare function.
+        current_framebuffer.mLastZmodeDecal != mCurrentZmodeDecal ||
+        current_framebuffer.mLastStencilMode != mStencilMode) { // SOH [Enhancement] world light casting
         current_framebuffer.mLastDepthTest = mCurrentDepthTest;
         current_framebuffer.mLastDepthMask = mCurrentDepthMask;
+        current_framebuffer.mLastStencilMode = mStencilMode; // SOH [Enhancement] world light casting
 
-        MTL::DepthStencilDescriptor* depth_descriptor = MTL::DepthStencilDescriptor::alloc()->init();
-        depth_descriptor->setDepthWriteEnabled(mCurrentDepthMask);
-        depth_descriptor->setDepthCompareFunction(
-            mCurrentDepthTest ? (mCurrentZmodeDecal ? MTL::CompareFunctionLessEqual : MTL::CompareFunctionLess)
-                              : MTL::CompareFunctionAlways);
+        // SOH [Enhancement] Depth-stencil states are cached (created lazily, kept for the device's
+        // lifetime): the stencil features flip the mode many times per frame, and creating a fresh
+        // state per change churned a driver object on every flip — and leaked it (newDepthStencilState
+        // returns an owned reference that was never released).
+        uint32_t dsKey = (mCurrentDepthTest ? 1u : 0u) | ((mCurrentDepthMask ? 1u : 0u) << 1) |
+                         ((mCurrentZmodeDecal ? 1u : 0u) << 2) | (((uint32_t)mStencilMode & 7u) << 3);
+        if (mDepthStencilStates[dsKey] == nullptr) {
+            MTL::DepthStencilDescriptor* depth_descriptor = MTL::DepthStencilDescriptor::alloc()->init();
+            depth_descriptor->setDepthWriteEnabled(mCurrentDepthMask);
+            depth_descriptor->setDepthCompareFunction(
+                mCurrentDepthTest ? (mCurrentZmodeDecal ? MTL::CompareFunctionLessEqual : MTL::CompareFunctionLess)
+                                  : MTL::CompareFunctionAlways);
 
-        MTL::DepthStencilState* depth_stencil_state = mDevice->newDepthStencilState(depth_descriptor);
-        current_framebuffer.mCommandEncoder->setDepthStencilState(depth_stencil_state);
+            // SOH [Enhancement] World light casting / actor shadows: stencil volume ops (see StencilMode).
+            // Off leaves the descriptor stencil-free, so ordinary draws are unchanged. The single-sided
+            // modes use front == back ops (face culling is done game-side); VolumeIncrDecr is the
+            // two-sided single pass — opposite WRAP ops per facing, order/polarity independent.
+            if (mStencilMode != (int)StencilMode::Off) {
+                MTL::StencilDescriptor* stencil = MTL::StencilDescriptor::alloc()->init();
+                stencil->setReadMask(0xFF);
+                stencil->setWriteMask(0xFF);
+                stencil->setStencilFailureOperation(MTL::StencilOperationKeep);
+                if (mStencilMode == (int)StencilMode::Composite) {
+                    stencil->setStencilCompareFunction(MTL::CompareFunctionNotEqual); // ref 0: draw where != 0
+                    stencil->setDepthFailureOperation(MTL::StencilOperationKeep);
+                    stencil->setDepthStencilPassOperation(MTL::StencilOperationZero); // self-clear as it composites
+                } else {
+                    stencil->setStencilCompareFunction(MTL::CompareFunctionAlways);
+                    stencil->setDepthFailureOperation(mStencilMode == (int)StencilMode::VolumeDecr
+                                                          ? MTL::StencilOperationDecrementClamp
+                                                          : MTL::StencilOperationIncrementClamp); // z-fail count
+                    stencil->setDepthStencilPassOperation(MTL::StencilOperationKeep);
+                }
+                if (mStencilMode == (int)StencilMode::VolumeIncrDecr) {
+                    // Two-sided: back faces wrap-increment (set below on the shared descriptor), front
+                    // faces wrap-decrement on their own descriptor.
+                    stencil->setDepthFailureOperation(MTL::StencilOperationIncrementWrap);
+                    MTL::StencilDescriptor* front = MTL::StencilDescriptor::alloc()->init();
+                    front->setReadMask(0xFF);
+                    front->setWriteMask(0xFF);
+                    front->setStencilCompareFunction(MTL::CompareFunctionAlways);
+                    front->setStencilFailureOperation(MTL::StencilOperationKeep);
+                    front->setDepthFailureOperation(MTL::StencilOperationDecrementWrap);
+                    front->setDepthStencilPassOperation(MTL::StencilOperationKeep);
+                    depth_descriptor->setFrontFaceStencil(front);
+                    front->release();
+                } else {
+                    depth_descriptor->setFrontFaceStencil(stencil);
+                }
+                depth_descriptor->setBackFaceStencil(stencil);
+                stencil->release();
+            }
 
-        depth_descriptor->release();
+            mDepthStencilStates[dsKey] = mDevice->newDepthStencilState(depth_descriptor);
+            depth_descriptor->release();
+        }
+        current_framebuffer.mCommandEncoder->setDepthStencilState(mDepthStencilStates[dsKey]);
+        current_framebuffer.mCommandEncoder->setStencilReferenceValue(0);
     }
 
     if (current_framebuffer.mLastZmodeDecal != mCurrentZmodeDecal) {
@@ -497,7 +572,21 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
     }
 
     MTL::Buffer* vertex_buffer = mVertexBufferPool[mCurrentVertexBufferPoolIndex];
-    memcpy((char*)vertex_buffer->contents() + mCurrentVertexBufferOffset, buf_vbo, sizeof(float) * buf_vbo_len);
+
+    // SOH [Enhancement] Guard the per-frame vertex buffer against overflow. Large scenes (e.g.
+    // Hyrule Field) — especially with toon lighting's extra per-vertex normal and the debug
+    // viewer's geometry — can exceed this frame's buffer. Rather than memcpy past the end (a
+    // SIGBUS in memmove), skip this batch and record how much room the frame actually wants so
+    // StartFrame can grow the pool. This bounds the write even when extra geometry exceeds
+    // the current pool allocation.
+    size_t vertex_data_size = sizeof(float) * buf_vbo_len;
+    if (mCurrentVertexBufferOffset + vertex_data_size > vertex_buffer->length()) {
+        mVertexBufferTargetLength =
+            std::max(mVertexBufferTargetLength, (mCurrentVertexBufferOffset + vertex_data_size) * 3 / 2);
+        autorelease_pool->release();
+        return;
+    }
+    memcpy((char*)vertex_buffer->contents() + mCurrentVertexBufferOffset, buf_vbo, vertex_data_size);
 
     if (!current_framebuffer.mHasBoundVertexShader) {
         current_framebuffer.mCommandEncoder->setVertexBuffer(vertex_buffer, 0, 0);
@@ -532,7 +621,23 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
         }
     }
 
-    if (textures_changed || mPrimDepthDirty) {
+    // SOH [Enhancement] Toon lighting: feed the per-object dominant light + frame-global ramp shape,
+    // both pushed in by the application (SetToonLighting / SetToonRamp). No config reads here.
+    if (mShaderProgram->opt_toon) {
+        for (int j = 0; j < 3; j++) {
+            mDrawUniforms.toonLightDir[j] = mToonLightDir[j];
+            mDrawUniforms.toonLightColor[j] = mToonLightColor[j];
+            mDrawUniforms.toonAmbient[j] = mToonAmbient[j];
+        }
+        mDrawUniforms.toonRampCenter = mToonRampCenter;
+        mDrawUniforms.toonRampSoftness = mToonRampSoftness;
+        mDrawUniforms.toonHighlightIntensity = mToonHighlightIntensity;
+        mDrawUniforms.toonShadowIntensity = mToonShadowIntensity;
+        mDrawUniforms.toonDebug = mToonDebug;
+    }
+
+    if (textures_changed || mPrimDepthDirty || mShaderProgram->opt_toon ||
+        current_framebuffer.mLastShaderProgram == nullptr) {
         mDrawUniforms.prim_depth = mCurrentPrimDepth;
         current_framebuffer.mCommandEncoder->setFragmentBytes(&mDrawUniforms, sizeof(DrawUniforms), 1);
         mPrimDepthDirty = false;
@@ -547,7 +652,7 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
     }
 
     current_framebuffer.mCommandEncoder->drawPrimitives(MTL::PrimitiveTypeTriangle, 0.f, buf_vbo_num_tris * 3);
-    mCurrentVertexBufferOffset += sizeof(float) * buf_vbo_len;
+    mCurrentVertexBufferOffset += vertex_data_size;
 
     autorelease_pool->release();
 }
@@ -556,6 +661,13 @@ void GfxRenderingAPIMetal::OnResize() {
 }
 
 void GfxRenderingAPIMetal::StartFrame() {
+    mStencilMode = (int)StencilMode::Off;
+    for (auto& framebuffer : mFramebuffers) {
+        framebuffer.mLastStencilMode = -1;
+        if (framebuffer.mHasDepthBuffer && framebuffer.mRenderPassDescriptor != nullptr) {
+            framebuffer.mRenderPassDescriptor->stencilAttachment()->setLoadAction(MTL::LoadActionClear);
+        }
+    }
     mFrameUniforms.frameCount++;
     if (mFrameUniforms.frameCount > 150) {
         // No high values, as noise starts to look ugly
@@ -570,6 +682,17 @@ void GfxRenderingAPIMetal::StartFrame() {
     }
 
     mCurrentVertexBufferOffset = 0;
+
+    // SOH [Enhancement] Grow this frame's vertex buffer if an earlier frame overflowed it (see
+    // the guard in DrawTriangles). The pool rotates every frame; submitted command buffers
+    // retain the old buffer while this slot receives the larger allocation.
+    MTL::Buffer*& vertex_buffer = mVertexBufferPool[mCurrentVertexBufferPoolIndex];
+    if (vertex_buffer->length() < mVertexBufferTargetLength) {
+        SPDLOG_INFO("Growing Metal vertex buffer from {} to {} bytes", vertex_buffer->length(),
+                    mVertexBufferTargetLength);
+        vertex_buffer->release();
+        vertex_buffer = mDevice->newBuffer(mVertexBufferTargetLength, MTL::ResourceStorageModeShared);
+    }
 
     mFrameAutoreleasePool = NS::AutoreleasePool::alloc()->init();
 }
@@ -660,6 +783,10 @@ void GfxRenderingAPIMetal::EndFrame() {
         fb.mLastDepthTest = -1;
         fb.mLastDepthMask = -1;
         fb.mLastZmodeDecal = -1;
+        fb.mLastStencilMode = -1; // SOH [Enhancement] world light casting
+        if (fb.mHasDepthBuffer && fb.mRenderPassDescriptor != nullptr) {
+            fb.mRenderPassDescriptor->stencilAttachment()->setLoadAction(MTL::LoadActionClear);
+        }
     }
 
     mFrameAutoreleasePool->release();
@@ -728,12 +855,32 @@ void GfxRenderingAPIMetal::SetupScreenFramebuffer(uint32_t width, uint32_t heigh
         depth_tex_desc->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
 
         fb.mDepthTexture = mDevice->newTexture(depth_tex_desc);
+
+        // SOH [Enhancement] World light casting: separate Stencil8 plane (depth texture untouched).
+        MTL::TextureDescriptor* stencil_tex_desc =
+            MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatStencil8, width, height, false);
+        stencil_tex_desc->setTextureType(MTL::TextureType2D);
+        stencil_tex_desc->setStorageMode(MTL::StorageModePrivate);
+        stencil_tex_desc->setSampleCount(1);
+        stencil_tex_desc->setUsage(MTL::TextureUsageRenderTarget);
+        if (fb.mStencilTexture != nullptr)
+            fb.mStencilTexture->release();
+        fb.mStencilTexture = mDevice->newTexture(stencil_tex_desc);
+        // NB: texture2DDescriptor returns an autoreleased descriptor (like depth_tex_desc above) — do
+        // NOT release it manually, or the autorelease pool double-frees it (SIGBUS).
     }
 
     render_pass_descriptor->depthAttachment()->setTexture(fb.mDepthTexture);
     render_pass_descriptor->depthAttachment()->setLoadAction(MTL::LoadActionLoad);
     render_pass_descriptor->depthAttachment()->setStoreAction(MTL::StoreActionStore);
     render_pass_descriptor->depthAttachment()->setClearDepth(1);
+
+    // SOH [Enhancement] World light casting: attach the stencil plane (cleared on the first pass;
+    // it starts at zero and is preserved across encoder restarts).
+    render_pass_descriptor->stencilAttachment()->setTexture(fb.mStencilTexture);
+    render_pass_descriptor->stencilAttachment()->setLoadAction(MTL::LoadActionClear);
+    render_pass_descriptor->stencilAttachment()->setStoreAction(MTL::StoreActionStore);
+    render_pass_descriptor->stencilAttachment()->setClearStencil(0);
 
     if (fb.mRenderPassDescriptor != nullptr)
         fb.mRenderPassDescriptor->release();
@@ -854,6 +1001,36 @@ void GfxRenderingAPIMetal::UpdateFramebufferParameters(int fb_id, uint32_t width
 
             fb.mMsaaDepthTexture = mDevice->newTexture(depth_tex_desc);
         }
+        // SOH [Enhancement] World light casting: separate Stencil8 plane(s), matching the depth texture's
+        // size/sample-count. Kept separate so the depth texture + GetPixelDepth are untouched.
+        MTL::TextureDescriptor* stencil_tex_desc =
+            MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatStencil8, width, height, false);
+        stencil_tex_desc->setTextureType(MTL::TextureType2D);
+        stencil_tex_desc->setStorageMode(MTL::StorageModePrivate);
+        stencil_tex_desc->setSampleCount(1);
+        stencil_tex_desc->setUsage(MTL::TextureUsageRenderTarget);
+        if (fb.mStencilTexture != nullptr)
+            fb.mStencilTexture->release();
+        fb.mStencilTexture = mDevice->newTexture(stencil_tex_desc);
+
+        if (msaa_level > 1) {
+            stencil_tex_desc->setTextureType(MTL::TextureType2DMultisample);
+            stencil_tex_desc->setSampleCount(msaa_level);
+            if (fb.mMsaaStencilTexture != nullptr)
+                fb.mMsaaStencilTexture->release();
+            fb.mMsaaStencilTexture = mDevice->newTexture(stencil_tex_desc);
+        }
+        // NB: texture2DDescriptor returns an autoreleased descriptor (like depth_tex_desc above) — do
+        // NOT release it manually, or the autorelease pool double-frees it (SIGBUS).
+    }
+
+    if (!has_depth_buffer) {
+        if (fb.mStencilTexture != nullptr) fb.mStencilTexture->release();
+        fb.mStencilTexture = nullptr;
+    }
+    if (!has_depth_buffer || msaa_level <= 1) {
+        if (fb.mMsaaStencilTexture != nullptr) fb.mMsaaStencilTexture->release();
+        fb.mMsaaStencilTexture = nullptr;
     }
 
     if (has_depth_buffer && fb.mRenderPassDescriptor != nullptr) {
@@ -861,16 +1038,23 @@ void GfxRenderingAPIMetal::UpdateFramebufferParameters(int fb_id, uint32_t width
             fb.mRenderPassDescriptor->depthAttachment()->setTexture(fb.mMsaaDepthTexture);
             fb.mRenderPassDescriptor->depthAttachment()->setResolveTexture(fb.mDepthTexture);
             fb.mRenderPassDescriptor->depthAttachment()->setLoadAction(MTL::LoadActionLoad);
-            fb.mRenderPassDescriptor->depthAttachment()->setStoreAction(MTL::StoreActionMultisampleResolve);
+            fb.mRenderPassDescriptor->depthAttachment()->setStoreAction(MTL::StoreActionStoreAndMultisampleResolve);
             fb.mRenderPassDescriptor->depthAttachment()->setClearDepth(1);
         } else {
+            fb.mRenderPassDescriptor->depthAttachment()->setResolveTexture(nullptr);
             fb.mRenderPassDescriptor->depthAttachment()->setTexture(fb.mDepthTexture);
             fb.mRenderPassDescriptor->depthAttachment()->setLoadAction(MTL::LoadActionLoad);
             fb.mRenderPassDescriptor->depthAttachment()->setStoreAction(MTL::StoreActionStore);
             fb.mRenderPassDescriptor->depthAttachment()->setClearDepth(1);
         }
+        auto* stencil = fb.mRenderPassDescriptor->stencilAttachment();
+        stencil->setTexture(msaa_level > 1 ? fb.mMsaaStencilTexture : fb.mStencilTexture);
+        stencil->setLoadAction(MTL::LoadActionClear);
+        stencil->setStoreAction(MTL::StoreActionStore);
+        stencil->setClearStencil(0);
     } else if (fb.mRenderPassDescriptor != nullptr) {
         fb.mRenderPassDescriptor->setDepthAttachment(nullptr);
+        fb.mRenderPassDescriptor->setStencilAttachment(nullptr);
     }
 
     fb.mRenderTarget = render_target;
@@ -902,9 +1086,24 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale) 
         }
 
         fb.mCommandEncoder = fb.mCommandBuffer->renderCommandEncoder(fb.mRenderPassDescriptor);
+        // All bindings belong to the new encoder, including a framebuffer reused after CPU readback.
+        fb.mHasBoundVertexShader = false;
+        fb.mHasBoundFragShader = false;
+        fb.mLastShaderProgram = nullptr;
+        for (int i = 0; i < SHADER_MAX_TEXTURES; ++i) {
+            fb.mLastBoundTextures[i] = nullptr;
+            fb.mLastBoundSamplers[i] = nullptr;
+        }
+        fb.mLastDepthTest = -1;
+        fb.mLastDepthMask = -1;
+        fb.mLastZmodeDecal = -1;
+        fb.mLastStencilMode = -1;
         std::string fbce_label = fmt::format("FrameBuffer {} Command Encoder", fb_id);
         fb.mCommandEncoder->setLabel(NS::String::string(fbce_label.c_str(), NS::UTF8StringEncoding));
         fb.mCommandEncoder->setDepthClipMode(MTL::DepthClipModeClamp);
+        if (fb.mHasDepthBuffer) {
+            fb.mRenderPassDescriptor->stencilAttachment()->setLoadAction(MTL::LoadActionLoad);
+        }
     }
 
     if (noise_scale != 0.0f) {
@@ -939,6 +1138,13 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
         srcDepthAttachment->setLoadAction(MTL::LoadActionClear);
     }
 
+    auto* stencilAttachment = framebuffer.mRenderPassDescriptor->stencilAttachment();
+    MTL::LoadAction origStencilLoadAction = stencilAttachment->loadAction();
+    if (depth && framebuffer.mHasDepthBuffer) {
+        stencilAttachment->setLoadAction(MTL::LoadActionClear);
+        stencilAttachment->setClearStencil(0);
+    }
+
     // Create a new render encoder back onto the framebuffer
     framebuffer.mCommandEncoder = framebuffer.mCommandBuffer->renderCommandEncoder(framebuffer.mRenderPassDescriptor);
 
@@ -950,6 +1156,7 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
 
     // Now that the command encoder is started, we set the original load actions back for the next frame's use
     srcColorAttachment->setLoadAction(origLoadAction);
+    stencilAttachment->setLoadAction(origStencilLoadAction);
     if (depth && framebuffer.mHasDepthBuffer) {
         srcDepthAttachment->setLoadAction(origDepthLoadAction);
     }
@@ -965,6 +1172,7 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
     framebuffer.mLastDepthTest = -1;
     framebuffer.mLastDepthMask = -1;
     framebuffer.mLastZmodeDecal = -1;
+    framebuffer.mLastStencilMode = -1; // SOH [Enhancement] world light casting / actor shadows
 }
 
 void GfxRenderingAPIMetal::ResolveMSAAColorBuffer(int fb_id_target, int fb_id_source) {
@@ -1017,6 +1225,20 @@ void GfxRenderingAPIMetal::ResolveMSAAColorBuffer(int fb_id_target, int fb_id_so
 
         std::string fbce_label = fmt::format("FrameBuffer {} Command Encoder After MSAA Resolve", fb_id_target);
         target_framebuffer.mCommandEncoder->setLabel(NS::String::string(fbce_label.c_str(), NS::UTF8StringEncoding));
+        target_framebuffer.mCommandEncoder->setDepthClipMode(MTL::DepthClipModeClamp);
+        target_framebuffer.mCommandEncoder->setViewport(*target_framebuffer.mViewport);
+        target_framebuffer.mCommandEncoder->setScissorRect(*target_framebuffer.mScissorRect);
+        target_framebuffer.mHasBoundVertexShader = false;
+        target_framebuffer.mHasBoundFragShader = false;
+        target_framebuffer.mLastShaderProgram = nullptr;
+        for (int i = 0; i < SHADER_MAX_TEXTURES; ++i) {
+            target_framebuffer.mLastBoundTextures[i] = nullptr;
+            target_framebuffer.mLastBoundSamplers[i] = nullptr;
+        }
+        target_framebuffer.mLastDepthTest = -1;
+        target_framebuffer.mLastDepthMask = -1;
+        target_framebuffer.mLastZmodeDecal = -1;
+        target_framebuffer.mLastStencilMode = -1;
     }
 }
 
@@ -1176,6 +1398,7 @@ void GfxRenderingAPIMetal::CopyFramebuffer(int fb_dst_id, int fb_src_id, int src
     source_framebuffer.mLastDepthTest = -1;
     source_framebuffer.mLastDepthMask = -1;
     source_framebuffer.mLastZmodeDecal = -1;
+    source_framebuffer.mLastStencilMode = -1;
 }
 
 void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint32_t height, uint16_t* rgba16_buf) {

@@ -1,4 +1,5 @@
 static void reset(void) {
+    static Collider* ocList[2];
     memset(&play, 0, sizeof(play));
     memset(&player, 0, sizeof(player));
     memset(&hook, 0, sizeof(hook));
@@ -25,6 +26,8 @@ static void reset(void) {
     targetCollider.base.shape = COLSHAPE_CYLINDER;
     targetCollider.dim.pos.z = 400;
     play.colChkCtx.colOCCount = 2;
+    play.colChkCtx.colOC = ocList;
+    play.colChkCtx.colOCCapacity = 2;
     play.colChkCtx.colOC[0] = &playerCollider.base;
     play.colChkCtx.colOC[1] = &targetCollider.base;
 }

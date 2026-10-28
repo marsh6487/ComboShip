@@ -137,12 +137,28 @@ f32 Math_SinS(s16 angle) {
     return sinf(angle * (3.14159265358979323846f / 32768.0f));
 }
 int32_t CVarGetInteger(const char* name, int32_t defaultValue) {
+    if (!strcmp(name, CVAR_ENHANCEMENT("Graphics.WorldLighting.ImproveFlameFlicker"))) {
+        REQUIRE(defaultValue == 1);
+        return defaultValue;
+    }
+    if (!strcmp(name, CVAR_ENHANCEMENT("Graphics.WorldLighting.OtherFairyLights"))) {
+        REQUIRE(defaultValue == 0);
+        return defaultValue;
+    }
     REQUIRE(strcmp(name, CVAR_ENHANCEMENT("MidnaCompanion")) == 0);
     REQUIRE(defaultValue == 0);
     return midnaEnabled;
 }
 float CVarGetFloat(const char* name, float defaultValue) {
+    if (!strcmp(name, CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviSaturation"))) {
+        REQUIRE(defaultValue == 0.2f);
+        return defaultValue;
+    }
     return fairySize;
+}
+// The production source-light policy is tested by cel_sky fixtures; this
+// fixture keeps its own boundary at Midna model/halo and blink behavior.
+void WorldLighting_ApplyFlameFlicker(LightInfo* info, u8* r, u8* g, u8* b) {
 }
 s32 EnElf_OverrideLimbDraw(PlayState* play, s32 limb, Gfx** dl, Vec3f* p, Vec3s* r, void* actor, Gfx** gfx) {
     return 0;

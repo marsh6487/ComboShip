@@ -113,6 +113,13 @@ class ArchiveManager {
     std::shared_ptr<File> LoadFile(uint64_t hash);
 
     /**
+     * @brief Every mounted archive's copy of filePath, lowest (first mounted) layer first. Used by merging loaders.
+     * @param filePath Virtual path of the file.
+     * @return One File per archive that has the path; empty if none does.
+     */
+    std::vector<std::shared_ptr<File>> LoadFileFromAllLayers(const std::string& filePath);
+
+    /**
      * @brief Writes raw data into a specific archive.
      * @param archive  Target archive (must be mounted and writable).
      * @param filename Virtual path to write to within the archive.

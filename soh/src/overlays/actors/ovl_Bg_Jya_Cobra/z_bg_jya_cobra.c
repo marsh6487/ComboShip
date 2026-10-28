@@ -1,3 +1,4 @@
+#include "soh/Enhancements/Graphics/ToonLighting.h"
 #include "z_bg_jya_cobra.h"
 
 #include <string.h>
@@ -128,7 +129,7 @@ void BgJyaCobra_InitDynapoly(BgJyaCobra* this, PlayState* play, CollisionHeader*
     DynaPolyActor_Init(&this->dyna, flags);
     CollisionHeader_GetVirtual(collision, &colHeader);
     this->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, &this->dyna.actor, colHeader);
-    if (this->dyna.bgId == BG_ACTOR_MAX) {
+    if (this->dyna.bgId == BGACTOR_INVALID) {
         // "Warning : move BG Registration Failure"
         osSyncPrintf("Warning : move BG 登録失敗(%s %d)(name %d)(arg_data 0x%04x)\n", __FILE__, __LINE__,
                      this->dyna.actor.id, this->dyna.actor.params);
@@ -563,6 +564,10 @@ void func_80896D78(BgJyaCobra* this, PlayState* play) {
 }
 
 void BgJyaCobra_DrawShadow(BgJyaCobra* this, PlayState* play) {
+    if (ToonLighting_SuppressVanillaShadows()) {
+        return;
+    }
+
     s32 pad;
     s16 params = this->dyna.actor.params & 3;
     Vec3f sp64;

@@ -208,7 +208,7 @@ static bool IsExcludedFromTimedRooms(s16 enemyId, s16 enemyParams) {
     }
 }
 
-static bool IsClearRoom(bool mq, s16 sceneNum, s8 roomNum) {
+static bool IsClearRoom(bool mq, s16 sceneNum, s16 roomNum) {
     switch (sceneNum) {
         case SCENE_DEKU_TREE:
             if (mq) {
@@ -289,7 +289,7 @@ static bool IsClearRoom(bool mq, s16 sceneNum, s8 roomNum) {
     }
 }
 
-static bool IsTimedRoom(bool mq, s16 sceneNum, s8 roomNum) {
+static bool IsTimedRoom(bool mq, s16 sceneNum, s16 roomNum) {
     switch (sceneNum) {
         case SCENE_JABU_JABU:
             return !mq && roomNum == 12;
@@ -306,7 +306,7 @@ static bool IsTimedRoom(bool mq, s16 sceneNum, s8 roomNum) {
     }
 }
 
-static bool IsEnemyAllowedToSpawn(s16 sceneNum, s8 roomNum, EnemyEntry enemy, s16 posY, bool fromBari) {
+static bool IsEnemyAllowedToSpawn(s16 sceneNum, s16 roomNum, EnemyEntry enemy, s16 posY, bool fromBari) {
     bool mq = ResourceMgr_IsSceneMasterQuest(sceneNum);
 
     if (IsExcludedFromClearRooms(enemy.id, enemy.params) && IsClearRoom(mq, sceneNum, roomNum)) {
@@ -416,7 +416,7 @@ static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, s16 posY, b
     return ShipUtils::RandomElement(filteredEnemyList, false);
 }
 
-static bool IsEnemyFoundToRandomize(s16 sceneNum, s8 roomNum, s16 actorId, s16 params, f32 posX) {
+static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 params, f32 posX) {
     u32 isMQ = ResourceMgr_IsSceneMasterQuest(sceneNum);
 
     for (int i = 0; i < ARRAY_COUNT(enemiesToRandomize); i++) {
@@ -784,9 +784,9 @@ void RegisterEnemyRandomizer() {
         Actor** actor = va_arg(args, Actor**);
 
         s16 actorId = actorEntry->id;
-        s16 posX = actorEntry->pos.x;
-        s16 posY = actorEntry->pos.y;
-        s16 posZ = actorEntry->pos.z;
+        s16 posX = static_cast<s16>(actorEntry->pos.x); // SOH [Unbound] pos is f32
+        s16 posY = static_cast<s16>(actorEntry->pos.y); // SOH [Unbound] pos is f32
+        s16 posZ = static_cast<s16>(actorEntry->pos.z); // SOH [Unbound] pos is f32
         s16 rotX = actorEntry->rot.x;
         s16 rotY = actorEntry->rot.y;
         s16 rotZ = actorEntry->rot.z;

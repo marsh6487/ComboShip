@@ -50,7 +50,7 @@ extern "C" {
 #include "actors/deku_flower.c"
 
 // External linkage in its own overlay.
-void BgMizuWater_SetWaterBoxesHeight(WaterBox* waterBoxes, s16 height);
+void BgMizuWater_SetWaterBoxesHeight(WaterBox* waterBoxes, s32 height);
 }
 
 extern PlayState* gPlayState;
@@ -161,7 +161,7 @@ static void SeasonScene_OnInitWaterTemple(void* refActor) {
 
     self->actor.world.pos.y = self->baseY + ((season == SEASON_SUMMER) ? MIZU_Y_LOWEST : MIZU_Y_HIGHEST);
     self->targetY = self->actor.world.pos.y;
-    BgMizuWater_SetWaterBoxesHeight(gPlayState->colCtx.colHeader->waterBoxes, (s16)self->actor.world.pos.y);
+    BgMizuWater_SetWaterBoxesHeight(gPlayState->colCtx.colHeader->waterBoxes, (s32)self->actor.world.pos.y);
 }
 
 /**
@@ -430,7 +430,7 @@ static void SeasonScene_BuildGround(CollisionHeader* col) {
             if (SeasonScene_GroundKind(poly) != kind) {
                 continue;
             }
-            Vec3s* vertices[3] = { &col->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)],
+            Vec3i* vertices[3] = { &col->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIA)],
                                    &col->vtxList[COLPOLY_VTX_INDEX(poly->flags_vIB)],
                                    &col->vtxList[COLPOLY_VTX_INDEX(poly->vIC)] };
 
@@ -636,7 +636,7 @@ static void SeasonScene_ApplyActorRule(void* refActor) {
 #define SEASON_MAX_WATERBOXES 32
 
 static CollisionHeader* sSuppressedHeader = NULL;
-static s16 sWaterSurfaceBackup[SEASON_MAX_WATERBOXES];
+static s32 sWaterSurfaceBackup[SEASON_MAX_WATERBOXES];
 static s32 sSuppressedCount = 0;
 
 static void SeasonScene_RestoreWaterBoxes(void) {

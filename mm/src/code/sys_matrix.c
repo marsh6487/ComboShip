@@ -44,6 +44,10 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
 /* data */
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+#define gdSPDefMtx(xx, yx, zx, wx, xy, yy, zy, wy, xz, yz, zz, wz, xw, yw, zw, ww) \
+    { { { xx, yx, zx, wx }, { xy, yy, zy, wy }, { xz, yz, zz, wz }, { xw, yw, zw, ww } } }
+#else
 #define qs1616(e) ((s32)((e)*0x00010000))
 
 #define IPART(x) ((qs1616(x) >> 16) & 0xFFFF)
@@ -60,6 +64,7 @@
                 (FPART(wz) << 0x10) | FPART(ww),                                                                   \
         }                                                                                                          \
     }
+#endif
 // clang-format off
 Mtx gIdentityMtx = gdSPDefMtx(
     1.0f, 0.0f, 0.0f, 0.0f,

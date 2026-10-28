@@ -2,6 +2,7 @@
 #include "SohGui.hpp"
 #include "soh/OTRGlobals.h"
 #include "UIWidgets.hpp"
+#include <ship/Context.h>
 
 namespace SohGui {
 
@@ -43,7 +44,7 @@ void SohMenu::AddMenuWindWakerStyle() {
             CVarClear(CVAR_ENHANCEMENT("Graphics.ToonLighting.PointLightRange"));
             CVarClear(CVAR_ENHANCEMENT("Graphics.ToonLighting.UseNaviLight"));
             CVarClear(CVAR_ENHANCEMENT("Graphics.ToonLighting.TransitionTime"));
-            Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
         })
         .Options(ButtonOptions().Tooltip("Resets all the Cel Shading sliders below to their default values."));
     AddWidget(path, "Ramp Center", WIDGET_CVAR_SLIDER_FLOAT)
@@ -247,7 +248,7 @@ void SohMenu::AddMenuWindWakerStyle() {
             if (Button(resetId.c_str(),
                        ButtonOptions().Size(ImVec2(80.0f, 36.0f)).Padding(ImVec2(5.0f, 0.0f)).Color(THEME_COLOR))) {
                 CVarClear(cvar);
-                Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+                Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
             }
         });
     };
@@ -399,7 +400,7 @@ void SohMenu::AddMenuWindWakerStyle() {
             CVarClear(CVAR_ENHANCEMENT("Graphics.WorldShadows.SlabDepth"));
             CVarClear(CVAR_ENHANCEMENT("Graphics.WorldShadows.SlabRise"));
             CVarClear(CVAR_ENHANCEMENT("Graphics.WorldShadows.MaxDistance"));
-            Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
         })
         .Options(ButtonOptions().Tooltip("Resets all the Actor Shadows sliders below to their default values."));
     AddWidget(path, "Opacity", WIDGET_CVAR_SLIDER_FLOAT)

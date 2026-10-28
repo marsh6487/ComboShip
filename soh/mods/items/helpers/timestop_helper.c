@@ -12,6 +12,8 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include <stdint.h>
+#include <stdlib.h>
 
 // Motion scale consumed by z_actor.c. Defined in extended_equipment.c.
 extern f32 gChampionSlowFactor;
@@ -46,7 +48,7 @@ static u8 sTimeCtlFrozenLastFrame = 0;
 // arrows and items pass straight through it. Remembering the AC colliders each
 // actor registers lets the freeze pass re-register them on the actor's behalf.
 //
-// Entries are deduped by (actor, collider) and capped; the cache is dropped on
+// Entries are deduped by (actor, collider); the owned cache grows as needed and is dropped on
 // scene change and on a full reset, which is when actor pointers stop meaning
 // anything. Entries are only ever consulted for actors found alive in the actor
 // lists during the same walk, so a stale pointer is never dereferenced.
@@ -56,8 +58,39 @@ typedef struct {
     Collider* collider;
 } TimeCtlAcEntry;
 
-static TimeCtlAcEntry sTimeCtlAcCache[TIMECTL_MAX_AC_TRACKED];
+static TimeCtlAcEntry* sTimeCtlAcCache = NULL;
 static s32 sTimeCtlAcCount = 0;
+static s32 sTimeCtlAcCapacity = 0;
+
+static u8 TimeCtl_ReserveAcCache(s32 required) {
+    s32 capacity;
+    TimeCtlAcEntry* grown;
+
+    if (required <= sTimeCtlAcCapacity) {
+        return 1;
+    }
+    capacity = sTimeCtlAcCapacity > 0 ? sTimeCtlAcCapacity : TIMECTL_AC_INITIAL_CAPACITY;
+    while (capacity < required) {
+        capacity = capacity > INT32_MAX / 2 ? INT32_MAX : capacity * 2;
+    }
+    if ((size_t)capacity > SIZE_MAX / sizeof(*sTimeCtlAcCache)) {
+        return 0;
+    }
+    grown = realloc(sTimeCtlAcCache, (size_t)capacity * sizeof(*sTimeCtlAcCache));
+    if (grown == NULL) {
+        return 0;
+    }
+    sTimeCtlAcCache = grown;
+    sTimeCtlAcCapacity = capacity;
+    return 1;
+}
+
+static void TimeCtl_ClearAcCache(void) {
+    free(sTimeCtlAcCache);
+    sTimeCtlAcCache = NULL;
+    sTimeCtlAcCount = 0;
+    sTimeCtlAcCapacity = 0;
+}
 
 // ---------------------------------------------------------------------------
 // Arbitration
@@ -203,11 +236,14 @@ void TimeCtl_NoteAcCollider(Collider* collider) {
             return;
         }
     }
-    if (sTimeCtlAcCount < TIMECTL_MAX_AC_TRACKED) {
-        sTimeCtlAcCache[sTimeCtlAcCount].actor = collider->actor;
-        sTimeCtlAcCache[sTimeCtlAcCount].collider = collider;
-        sTimeCtlAcCount++;
+    if (sTimeCtlAcCount == INT32_MAX || !TimeCtl_ReserveAcCache(sTimeCtlAcCount + 1)) {
+        // Retain every captured collider and permit a later registration to retry.
+        osSyncPrintf("TimeCtl: unable to grow remembered AC collider cache\n");
+        return;
     }
+    sTimeCtlAcCache[sTimeCtlAcCount].actor = collider->actor;
+    sTimeCtlAcCache[sTimeCtlAcCount].collider = collider;
+    sTimeCtlAcCount++;
 }
 
 /**
@@ -392,7 +428,7 @@ void TimeCtl_Update(PlayState* play) {
     // and leaving the clock held across a load would stall the day forever.
     if (sTimeCtlLastSceneNum != play->sceneNum) {
         sTimeCtlLastSceneNum = play->sceneNum;
-        sTimeCtlAcCount = 0;
+        TimeCtl_ClearAcCache();
         if (sTimeCtlActiveOwner != TIMECTL_OWNER_NONE || sTimeCtlClockHeld) {
             TimeCtl_Reset(play);
             return;
@@ -418,7 +454,7 @@ void TimeCtl_Reset(PlayState* play) {
         TimeCtl_FreezeAll(play, 0);
     }
     sTimeCtlFrozenLastFrame = 0;
-    sTimeCtlAcCount = 0;
+    TimeCtl_ClearAcCache();
 
     TimeCtl_ApplyClock(0);
 }

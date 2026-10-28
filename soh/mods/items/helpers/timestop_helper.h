@@ -49,8 +49,10 @@ typedef enum {
  */
 s32 TimeCtl_GetStutterFrames(void);
 
-/** How many (actor, AC collider) pairs stay remembered for the hittable-while-frozen pass. */
-#define TIMECTL_MAX_AC_TRACKED 64
+/** Initial reservation for the growable hittable-while-frozen AC cache. */
+#define TIMECTL_AC_INITIAL_CAPACITY 64
+// Compatibility name: an initial reservation, not a limit on remembered colliders.
+#define TIMECTL_MAX_AC_TRACKED TIMECTL_AC_INITIAL_CAPACITY
 
 /**
  * Claim (or update) the world speed for `owner`.

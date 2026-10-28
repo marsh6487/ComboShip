@@ -12,7 +12,7 @@
 - Use one float-Mtx/s32-Vtx runtime ABI across the shared engine and both game modules, with native MM writer adapters and legacy resource readers. Cross-game models can appear in the same frame, making a global active-game format switch unsafe.
 - Preserve legacy authored scene-header mods: Unbound's JSON scene routing must not silently bypass existing actor/setup/collision overrides. Use explicit compatible routing/structured-layer conversion while leaving original input archives untouched.
 - Keep cel policy and sky hooks in OoT. Shared backend transport must return to neutral state for MM, menus and existing effects. Preserve Rich's release defaults.
-- Allocate unused host opcodes for cel transport: Toon `0x41`, ToonKey `0x4c`, ToonShadow `0x4d`, Stencil `0x4e`. Preserve existing `0x46`, `0x4a`, `0x4b` commands. Verify uniqueness across producers and interpreters.
+- Allocate unused host opcodes for cel transport: Toon `0x4c`, ToonKey `0x4d`, ToonShadow `0x4e`, Stencil `0x4f`. Preserve Unbound float fog `0x41` and existing `0x46`, `0x4a`, `0x4b` commands. Verify uniqueness across producers and interpreters.
 - Replace OoT's fixed AT50/AC60/OC50 admission ceilings with growable queues, preserving native order, damage/contact policies, frame-advance/second-update guards, Champion/Din/TimeCtl behavior and proper teardown. The donor's uncapped static geometry does not expand these queues.
 - Preserve runtime proof as distinct from source/native/build checks. Test correctness and feature preservation in this combined candidate; do not make a comparative performance study a prerequisite.
 

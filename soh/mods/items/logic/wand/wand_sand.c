@@ -68,11 +68,13 @@ static void WandSand_Measure(PlayState* play, Actor* slab) {
     f32 halfX;
     f32 halfZ;
 
-    if (sSandMeasured || (bgId < 0) || (bgId >= BG_ACTOR_MAX)) {
+    if (sSandMeasured || (bgId < 0) || (bgId >= play->colCtx.dyna.bgActorMax)) {
         return;
     }
     header = play->colCtx.dyna.bgActors[bgId].colHeader;
-    if (header == NULL) {
+    if (!(play->colCtx.dyna.bgActorFlags[bgId] & 1) ||
+        (play->colCtx.dyna.bgActorFlags[bgId] & 2) ||
+        play->colCtx.dyna.bgActors[bgId].actor != slab || header == NULL) {
         return;
     }
     halfX = (f32)(header->maxBounds.x - header->minBounds.x) * 0.5f * SAND_SLAB_SCALE;

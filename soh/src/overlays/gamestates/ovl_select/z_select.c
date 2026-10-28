@@ -14,6 +14,7 @@
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "soh/unbound/UnboundSceneSelect.h" // SOH [Unbound]
 #include <libultraship/bridge/consolevariablebridge.h>
 
 void Select_SwitchBetterWarpMode(SelectContext* this, u8 isBetterWarpMode);
@@ -1828,12 +1829,25 @@ void Select_SwitchBetterWarpMode(SelectContext* this, u8 isBetterWarpMode) {
 
     if (isBetterWarpMode) {
         s32 currScene = CVarGetInteger(CVAR_GENERAL("BetterDebugWarpScreenCurrentScene"), 0);
-        this->count = ARRAY_COUNT(sBetterScenes);
+        // SOH [Unbound] The vanilla list plus the registry's custom scenes
+        this->betterScenes =
+            UnboundSceneSelect_BuildList(sBetterScenes, ARRAY_COUNT(sBetterScenes), Select_LoadGame, &this->count);
 
         if (currScene >= 0 && currScene < this->count) {
             this->currentScene = currScene;
             this->topDisplayedScene = CVarGetInteger(CVAR_GENERAL("BetterDebugWarpScreenTopDisplayedScene"), 0);
             this->pageDownIndex = CVarGetInteger(CVAR_GENERAL("BetterDebugWarpScreenPageDownIndex"), 0);
+            // SOH [Unbound] A window saved for a list of another length (the mod set changed) can wrap past
+            // the selection; scrolling only follows a selection on rows 0-18, so re-anchor it on row 1
+            this->topDisplayedScene = ((this->topDisplayedScene % this->count) + this->count) % this->count;
+            if ((this->currentScene - this->topDisplayedScene + this->count) % this->count > 18) {
+                this->topDisplayedScene = (this->currentScene - 1 + this->count) % this->count;
+            }
+            // SOH [Unbound] The saved line may now be a scene with fewer entrances (the mod set changed)
+            if (this->pageDownIndex < 0 ||
+                this->pageDownIndex >= this->betterScenes[this->currentScene].entranceCount) {
+                this->pageDownIndex = 0;
+            }
 
             BetterSceneSelectEntrancePair entrancePair =
                 this->betterScenes[this->currentScene].entrancePairs[this->pageDownIndex];

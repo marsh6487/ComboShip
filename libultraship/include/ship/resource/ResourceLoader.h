@@ -159,6 +159,15 @@ class ResourceLoader {
                                                                      std::shared_ptr<tinyxml2::XMLDocument> document);
 
     /**
+     * @brief Reads a JSON resource header: the type comes from a top-level "$schema" in any archive layer.
+     * @param filePath   Virtual path (for error messages and the layer search).
+     * @param fileToLoad Highest-priority file at filePath.
+     * @return Populated ResourceInitData, or nullptr if no layer names a schema.
+     */
+    std::shared_ptr<ResourceInitData> ReadResourceInitDataJson(const std::string& filePath,
+                                                               std::shared_ptr<File> fileToLoad);
+
+    /**
      * @brief Reads a PNG image header to produce ResourceInitData.
      * @param filePath     Virtual path (for error messages).
      * @param headerReader Reader positioned at the start of the PNG file.
