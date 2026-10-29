@@ -852,9 +852,9 @@ static bool MmAssets_ValidateSkullKidCommands(const std::vector<MmDisplayListCom
 }
 
 static uintptr_t MmAssets_ResolveDisplayListReference(void* context, MmDisplayListReferenceKind kind, uint64_t hash,
-                                                      size_t* resourceSize) {
+                                                      MmDisplayListVertexResourceView* vertexView) {
     auto* resolve = static_cast<MmDisplayListResolveContext*>(context);
-    *resourceSize = 0;
+    *vertexView = {};
     if (kind == MM_DISPLAY_LIST_REFERENCE_RENDER_MODE) {
         return (hash == 0 || hash == 2) ? reinterpret_cast<uintptr_t>(&sMmOpaqueRenderModeDL[hash]) : 0;
     }
@@ -878,17 +878,16 @@ static uintptr_t MmAssets_ResolveDisplayListReference(void* context, MmDisplayLi
     auto vertexResource = MmAssets_LoadGraphResource(pathIt->second, *resolve->graph);
     auto vertex = std::dynamic_pointer_cast<Fast::Vertex>(vertexResource);
     auto vertexArray = std::dynamic_pointer_cast<SOH::Array>(vertexResource);
-    MmDisplayListVertexResourceView vertexView = {};
     if (!MmDisplayList_SelectVertexResource(
             vertex != nullptr ? vertex->GetRawPointer() : nullptr, vertex != nullptr ? vertex->GetPointerSize() : 0,
             vertexArray != nullptr ? vertexArray->GetRawPointer() : nullptr,
             vertexArray != nullptr ? vertexArray->GetPointerSize() : 0,
-            vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, &vertexView)) {
+            vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, vertexView,
+            sizeof(Fast::F3DVtx), vertex != nullptr ? vertex->GetVertexRecordSize() : 16)) {
         MMASSETS_LOG("[MM Assets] STRICT graph vertex type/miss: %s", pathIt->second.c_str());
         return 0;
     }
-    *resourceSize = vertexView.size;
-    return vertexView.pointer;
+    return vertexView->pointer;
 }
 
 static Gfx* MmAssets_PatchDisplayListGraph(const std::string& path, MmDisplayListGraphContext& graph, int depth) {

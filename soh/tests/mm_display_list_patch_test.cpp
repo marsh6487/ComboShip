@@ -13,10 +13,16 @@ struct ResolveFixture {
     size_t vertexSize;
     uint64_t textureHash;
     uintptr_t texturePointer;
+    size_t vertexRecordSize = 16;
+    size_t vertexStride = 16;
+    ResolveFixture* alternate = nullptr;
 };
 
-static uintptr_t ResolveResource(void* context, MmDisplayListReferenceKind kind, uint64_t hash, size_t* resourceSize) {
+static uintptr_t ResolveResource(void* context, MmDisplayListReferenceKind kind, uint64_t hash,
+                                 MmDisplayListVertexResourceView* vertexView) {
     ResolveFixture* fixture = static_cast<ResolveFixture*>(context);
+    if (kind == MM_DISPLAY_LIST_REFERENCE_VERTEX && hash != fixture->vertexHash && fixture->alternate)
+        return ResolveResource(fixture->alternate, kind, hash, vertexView);
 
     if (kind == MM_DISPLAY_LIST_REFERENCE_RENDER_MODE) {
         return hash == 0 ? UINT64_C(0x30000000) : hash == 2 ? UINT64_C(0x30000020) : 0;
@@ -26,7 +32,9 @@ static uintptr_t ResolveResource(void* context, MmDisplayListReferenceKind kind,
         return fixture->nestedPointer;
     }
     if (kind == MM_DISPLAY_LIST_REFERENCE_VERTEX && hash == fixture->vertexHash) {
-        *resourceSize = fixture->vertexSize;
+        vertexView->size = fixture->vertexSize;
+        vertexView->recordSize = fixture->vertexRecordSize;
+        vertexView->stride = fixture->vertexStride;
         return fixture->vertexPointer;
     }
     if (kind == MM_DISPLAY_LIST_REFERENCE_TEXTURE && hash == fixture->textureHash) {
@@ -162,5 +170,89 @@ int main() {
     REQUIRE(MmDisplayList_PatchCommands(payload, 3, ResolveResource, &fixture, &stats));
     REQUIRE(payload[1].w0 == UINT32_C(0x3D000000));
     REQUIRE(stats.renderModePatched == 0);
+
+    // Native MM archives address 16-byte records. The wide engine expands
+    // each record to 24 bytes; the second vertex must still be selected.
+    struct alignas(8) WideVertex {
+        int32_t position[3];
+        uint16_t flag;
+        int16_t uv[2];
+        uint8_t color[4];
+    };
+    static_assert(sizeof(WideVertex) == 24);
+    WideVertex nativeVertices[3] = {};
+    nativeVertices[1].position[0] = 12000;
+    nativeVertices[1].position[1] = -19000;
+    fixture.vertexPointer = reinterpret_cast<uintptr_t>(nativeVertices);
+    fixture.vertexSize = sizeof(nativeVertices);
+    fixture.vertexStride = sizeof(WideVertex);
+    MmDisplayListCommand native[] = {
+        { UINT32_C(0x32001002), 16 },
+        { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+        { UINT32_C(0xDF000000), 0 },
+    };
+    REQUIRE(MmDisplayList_PatchCommands(native, 3, ResolveResource, &fixture, &stats));
+    REQUIRE(native[0].w1 == reinterpret_cast<uintptr_t>(&nativeVertices[1]));
+
+    // Consecutive resources may have different archive formats in one graph.
+    WideVertex wideVertices[3] = {};
+    wideVertices[1].position[0] = 90000;
+    ResolveFixture wide = fixture;
+    wide.vertexHash = 7;
+    wide.vertexPointer = reinterpret_cast<uintptr_t>(wideVertices);
+    wide.vertexRecordSize = 22;
+    fixture.alternate = &wide;
+    MmDisplayListCommand mixed[] = {
+        { UINT32_C(0x32001002), 16 }, { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+        { UINT32_C(0x32001002), 22 }, { 0, 7 }, { UINT32_C(0xDF000000), 0 },
+    };
+    REQUIRE(MmDisplayList_PatchCommands(mixed, 5, ResolveResource, &fixture, &stats));
+    REQUIRE(mixed[0].w1 == reinterpret_cast<uintptr_t>(&nativeVertices[1]));
+    REQUIRE(mixed[2].w1 == reinterpret_cast<uintptr_t>(&wideVertices[1]));
+    REQUIRE(reinterpret_cast<const WideVertex*>(mixed[2].w1)->position[0] == 90000);
+
+    for (size_t recordSize : { size_t(16), size_t(22) }) {
+        fixture.vertexRecordSize = recordSize;
+        MmDisplayListCommand last[] = {
+            { UINT32_C(0x32001002), 2 * recordSize },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+        };
+        REQUIRE(MmDisplayList_PatchCommands(last, 3, ResolveResource, &fixture, &stats));
+        REQUIRE(last[0].w1 == reinterpret_cast<uintptr_t>(&nativeVertices[2]));
+        for (uintptr_t offset : { uintptr_t(1), uintptr_t(3 * recordSize), UINTPTR_MAX }) {
+            MmDisplayListCommand bad[] = {
+                { UINT32_C(0x32001002), offset },
+                { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+            };
+            REQUIRE(!MmDisplayList_PatchCommands(bad, 3, ResolveResource, &fixture, &stats));
+            REQUIRE(stats.malformed == 1 && bad[0].w0 == UINT32_C(0x32001002));
+        }
+        MmDisplayListCommand overrunWide[] = {
+            { UINT32_C(0x32002004), 2 * recordSize },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+        };
+        REQUIRE(!MmDisplayList_PatchCommands(overrunWide, 3, ResolveResource, &fixture, &stats));
+    }
+    fixture.vertexRecordSize = 16;
+    for (unsigned badCase = 0; badCase < 5; ++badCase) {
+        ResolveFixture badFixture = fixture;
+        if (badCase == 0) badFixture.vertexRecordSize = 0;
+        if (badCase == 1) badFixture.vertexRecordSize = 24;
+        if (badCase == 2) badFixture.vertexStride = 0;
+        if (badCase == 3) --badFixture.vertexSize;
+        if (badCase == 4) badFixture.vertexPointer = UINTPTR_MAX - 15;
+        MmDisplayListCommand bad[] = {
+            { UINT32_C(0x32001002), 16 },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+        };
+        REQUIRE(!MmDisplayList_PatchCommands(bad, 3, ResolveResource, &badFixture, &stats));
+        REQUIRE(stats.malformed == 1);
+    }
+    REQUIRE(MmDisplayList_SelectVertexResource(nativeVertices, sizeof(nativeVertices), nullptr, 0, false,
+                                               &vertexView, sizeof(WideVertex), 22));
+    REQUIRE(vertexView.recordSize == 22 && vertexView.stride == sizeof(WideVertex));
+    REQUIRE(MmDisplayList_SelectVertexResource(nullptr, 0, nativeVertices, sizeof(nativeVertices), true,
+                                               &vertexView, sizeof(WideVertex), 22));
+    REQUIRE(vertexView.recordSize == 16 && vertexView.stride == sizeof(WideVertex));
     return 0;
 }

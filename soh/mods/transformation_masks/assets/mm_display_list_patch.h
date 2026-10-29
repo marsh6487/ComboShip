@@ -29,14 +29,18 @@ struct MmDisplayListPatchStats {
 struct MmDisplayListVertexResourceView {
     uintptr_t pointer;
     size_t size;
+    // Archive byte offsets use recordSize; loaded elements occupy stride bytes.
+    size_t recordSize = 16;
+    size_t stride = 16;
 };
 
 bool MmDisplayList_SelectVertexResource(void* fastVertexPointer, size_t fastVertexSize, void* arrayPointer,
                                         size_t arraySize, bool arrayContainsVertices,
-                                        MmDisplayListVertexResourceView* view);
+                                        MmDisplayListVertexResourceView* view, size_t runtimeStride = 16,
+                                        size_t fastRecordSize = 16);
 
 using MmDisplayListResolveResource = uintptr_t (*)(void* context, MmDisplayListReferenceKind kind, uint64_t hash,
-                                                   size_t* resourceSize);
+                                                   MmDisplayListVertexResourceView* vertexView);
 
 bool MmDisplayList_PatchCommands(MmDisplayListCommand* commands, size_t commandCount,
                                  MmDisplayListResolveResource resolveResource, void* context,
