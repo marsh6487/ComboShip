@@ -171,9 +171,9 @@ def bridge_adapters():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("cases", nargs="*", choices=("shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy"))
+    parser.add_argument("cases", nargs="*", choices=("shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy", "effects"))
     args = parser.parse_args()
-    cases = args.cases or ["shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy"]
+    cases = args.cases or ["shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy", "effects"]
     env = {**os.environ, "ASAN_OPTIONS": "detect_leaks=0"}
     with tempfile.TemporaryDirectory(prefix="custom-unbound-collision-") as tmp:
         work = Path(tmp)
@@ -294,7 +294,8 @@ int main() {
                 "-o", str(binary)], check=True)
             for case in ("growth", "filters", "failure", "lifetime"):
                 subprocess.run([str(binary), case], check=True, env=env)
-    for case, script in (("abi", "run_adapter_abi_tests.py"), ("enemy", "run_enemy_randomizer_tests.py")):
+    for case, script in (("abi", "run_adapter_abi_tests.py"), ("enemy", "run_enemy_randomizer_tests.py"),
+                         ("effects", "run_hammergeist_effects_tests.py")):
         if case in cases:
             subprocess.run([sys.executable, "-B", str(Path(__file__).with_name(script))], check=True)
     return 0

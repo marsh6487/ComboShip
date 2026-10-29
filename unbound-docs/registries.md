@@ -74,8 +74,11 @@ an error in the log. The four by-`sceneNum` sites (`Play_SaveSceneFlags`, `Actor
 `sceneFlags.<scene id>.{chest,swch,…}`, keyed by **name**, so they survive id reassignment between
 mod stacks and never touch the positional vanilla array (old saves stay valid).
 
-Known gap: save states (`savestates.cpp`) `memcpy` `gSaveContext` only, so they don't capture
-custom-scene flags.
+This combined build captures custom flags and persisted/live/temporary extended room-clear flags
+with same-room savestates. Loads validate the scene and room allocation epochs before copying the
+heap; a state from a different scene or room lifetime is refused without changing the world.
+Regular saves capture an immutable SceneDB payload on the game thread beside `SaveContext`, so
+background serialization cannot mix flags from a later frame into that save.
 
 ### Saved entrances
 

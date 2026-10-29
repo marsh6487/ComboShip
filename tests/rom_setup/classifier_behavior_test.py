@@ -24,8 +24,11 @@ source=r'''
 #include "soh/soh/Extractor/Extract.h"
 #include "libultraship/include/ship/utils/binarytools/BitConverter.h"
 #define UNREACHABLE __builtin_unreachable()
+extern "C" uint32_t CRC32C(unsigned char*, size_t) {
+    assert(false && "the header classifier must not hash the full ROM");
+    return 0;
+}
 '''
-source+=extractor[extractor.index('static constexpr uint32_t OOT_PAL_GC'):extractor.index('enum class ButtonId')]
 for signature in ['void Extractor::SetRomInfo','uint32_t Extractor::GetRomVerCrc','size_t Extractor::GetCurRomSize',
                   'bool Extractor::ValidateRomSize','bool Extractor::ValidateNotCompressed',
                   'bool Extractor::ClassifyRom','bool Extractor::IsMasterQuest']:
@@ -62,6 +65,7 @@ with tempfile.TemporaryDirectory(prefix='rom-setup-classifier-') as tmp:
     cpp=Path(tmp)/'classifier.cpp';binary=Path(tmp)/'classifier';cpp.write_text(source)
     flags=['-std=c++20','-Wall','-Wextra','-Werror','-I',str(ROOT)]
     if args.sanitize:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
-    subprocess.run(['g++',*flags,str(cpp),'-o',str(binary)],check=True)
+    # Link the actual public API as a separate TU; importing its private tables would hide API drift.
+    subprocess.run(['g++',*flags,str(cpp),str(ROOT/'soh/soh/Extractor/RomInfo.cpp'),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],cwd=tmp,check=True)
 print('OoT classifier: 27 real header/byte-order cases, invalid paths and truncated files PASS')

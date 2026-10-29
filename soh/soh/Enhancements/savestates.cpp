@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
+#include <cstdlib>
 
 #include <spdlog/spdlog.h>
 #include <ship/Context.h>
@@ -179,6 +180,7 @@ typedef struct SaveStateInfo {
     void* sceneSegment;
     void* roomSegment;
     void* previousRoomSegment;
+    uint64_t queueEpoch;
     std::unique_ptr<BgCheckStateSnapshot> collision;
     QueueSnapshot queues;
     SceneDBState sceneFlags;
@@ -192,7 +194,8 @@ static bool SaveStateMatchesPlay(const SaveStateInfo& info) {
            gPlayState->roomCtx.curRoom.segment == info.roomSegment &&
            gPlayState->roomCtx.prevRoom.num == info.previousRoomNum &&
            gPlayState->roomCtx.prevRoom.segment == info.previousRoomSegment && info.collision &&
-           info.collision->Matches(&gPlayState->colCtx);
+           info.collision->Matches(&gPlayState->colCtx) && info.queueEpoch != 0 &&
+           CollisionCheck_GetContextEpoch(&gPlayState->colChkCtx) == info.queueEpoch;
 }
 
 class SaveState {
@@ -493,6 +496,7 @@ SaveStateReturn SaveState::Save(void) {
         next->roomSegment = gPlayState->roomCtx.curRoom.segment;
         next->previousRoomNum = gPlayState->roomCtx.prevRoom.num;
         next->previousRoomSegment = gPlayState->roomCtx.prevRoom.segment;
+        next->queueEpoch = CollisionCheck_GetContextEpoch(&gPlayState->colChkCtx);
         info = std::move(next);
         memcpy(&info->sysHeapCopy, gSystemHeap, SYSTEM_HEAP_SIZE /* sizeof(gSystemHeap) */);
         memcpy(&info->audioHeapCopy, gAudioHeap, AUDIO_HEAP_SIZE /* sizeof(gAudioContext) */);
@@ -551,7 +555,9 @@ SaveStateReturn SaveState::Load(void) {
         return SaveStateReturn::FAIL_STATE_MISMATCH;
     }
     memcpy(gSystemHeap, &info->sysHeapCopy, SYSTEM_HEAP_SIZE);
-    collision->Commit();
+    if (!collision->Commit()) {
+        std::abort(); // A validated, allocation-free commit cannot lose its owner on the paused game thread.
+    }
     if (!CollisionCheck_CommitQueueRestore(queues.get())) {
         std::abort(); // A validated, allocation-free commit cannot fail without an intervening queue mutation.
     }

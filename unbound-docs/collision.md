@@ -107,11 +107,12 @@ exhaustion like the arena was).
   lookup is invalidated so the "transform unchanged" fast path cannot re-link polys in the old
   buffer. Actors keep `CollisionPoly*` into these lists (`Actor.floorPoly/wallPoly`, camera,
   a handful of overlay caches) — those pointers are already logically stale every frame, but
-  they must stay *readable*, so superseded buffers are parked on `dyna.retiredBuffers` (a fixed
-  array of 32 — growth doubles, so a list retires one buffer per doubling; overflow is
-  `LOG_HUNGUP_THREAD`) and freed with everything else in `BgCheck_Free`. Geometric growth bounds
-  the parked memory to the final size. The dyna node list grows the same way (nodes are addressed
-  by index).
+  they must stay *readable*. This combined build retains current and superseded buffers in an
+  external allocation owner until `BgCheck_Free`. Same-room savestates restore saved bytes at
+  their original retained addresses and keep newer allocations owned too; repeated rewinds can
+  therefore retain additional buffers until scene teardown. Static and actor/node arrays are
+  copied into fresh storage before the heap restore and rebound immediately afterward. Allocation
+  failure or a scene/room epoch mismatch leaves the world unchanged. Node lists grow by index.
 - Dyna actors: `BG_ACTOR_MAX` (50) is gone. `bgActors`/`bgActorFlags` are heap tables of
   `dyna.bgActorMax` slots (initially 64), doubled by `DynaPoly_SetBgActor` when the free-slot
   scan fails. `BGCHECK_SCENE` is a fixed sentinel (`0x7FFF`) instead of the table size, and

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ship/resource/Resource.h>
+#include <fast/resource/type/Vertex.h>
 
 namespace Fast {
 union F3DVtx;
@@ -69,7 +69,7 @@ enum class ArrayResourceType {
     Audio
 };
 
-class Array : public Ship::Resource<void> {
+class Array : public Ship::Resource<void>, public Fast::IVertexSource {
   public:
     using Resource::Resource;
 
@@ -77,10 +77,13 @@ class Array : public Ship::Resource<void> {
 
     void* GetPointer() override;
     size_t GetPointerSize() override;
+    uint32_t GetVertexRecordSize() const override {
+        return ArrayType == ArrayResourceType::Vertex ? 16 : 0;
+    }
 
-    ArrayResourceType ArrayType;
-    ScalarType ArrayScalarType;
-    size_t ArrayCount;
+    ArrayResourceType ArrayType = ArrayResourceType::Error;
+    ScalarType ArrayScalarType = ScalarType::ZSCALAR_NONE;
+    size_t ArrayCount = 0;
     // OTRTODO: Should be a vector of resource pointers...
     std::vector<ScalarData> Scalars;
     std::vector<Fast::F3DVtx> Vertices;

@@ -380,7 +380,7 @@ void EnHammergeist_DefuseLeftHammer(EnHammergeist* self, PlayState* play) {
     self->leftHammerInfused = false;
 
     for (i = 0; i <= 7; i++) { // The pushing ice energy gets visualized by ice fragments
-        EffectSsEnIce_SpawnFlyingVec3s(play, &self->actor, &self->hammerLeftCollider.dim.pos, 150, 150, 150, 250, 235,
+        EffectSsEnIce_SpawnFlyingVec3f(play, &self->actor, &self->hammerLeftCollider.dim.pos, 150, 150, 150, 250, 235,
                                        245, 255, 4);
     }
 }
@@ -391,7 +391,7 @@ void EnHammergeist_DefuseRightHammer(EnHammergeist* self, PlayState* play) {
     self->rightHammerInfused = false;
 
     for (i = 0; i <= 7; i++) { // The pushing fire energy gets visualized as a big flame
-        EffectSsEnFire_SpawnVec3s(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
+        EffectSsEnFire_SpawnVec3f(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
     }
 }
 
@@ -915,7 +915,7 @@ void EnHammergeist_SetupInfuse(EnHammergeist* self, PlayState* play) {
 
 void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play) {
     s32 i;
-    Vec3s newIcePos = self->hammerLeftCollider.dim.pos;
+    Vec3f newIcePos = self->hammerLeftCollider.dim.pos;
     newIcePos.y += 70; // ice fragments needed a better offset
 
     if (self->skelAnime.curFrame == 9.0f) {
@@ -925,7 +925,7 @@ void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play) {
     if (self->skelAnime.curFrame == 15.0f) {
         self->rightHammerInfused = true;
         for (i = 0; i <= 7; i++) { // Big flame appears
-            EffectSsEnFire_SpawnVec3s(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
+            EffectSsEnFire_SpawnVec3f(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
         }
         EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_NORMAL);
     }
@@ -937,7 +937,7 @@ void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play) {
     if (self->skelAnime.curFrame == 37.0f) {
         self->leftHammerInfused = true;
         for (i = 0; i <= 7; i++) { // Ice fragments appear
-            EffectSsEnIce_SpawnFlyingVec3s(play, &self->actor, &newIcePos, 150, 150, 150, 250, 235, 245, 255, 4);
+            EffectSsEnIce_SpawnFlyingVec3f(play, &self->actor, &newIcePos, 150, 150, 150, 250, 235, 245, 255, 4);
         }
         EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_LAUGH);
     }

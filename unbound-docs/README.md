@@ -76,7 +76,8 @@ behind them and likely next targets:
 - No minimap / pause map for custom scenes: `Map_Init` is keyed by vanilla scene ranges; needs a
   registry field for map data.
 - Save data: `sceneFlags[124]` stays positional for vanilla scenes; custom scenes are keyed by
-  name in the `unbound` save section; save states don't capture custom flags.
+  name in the `unbound` save section. This combined build also snapshots custom and extended room
+  flags with same-room savestates, together with external collision storage.
 - Alternate setups are stored in full; `SetAlternateHeaders` arrays grow with the highest index
   (13 seen in vanilla). Not a cap.
 - MQ: the converter emits `_mq` scenes only when `oot-mq.o2r` is mounted at export time.

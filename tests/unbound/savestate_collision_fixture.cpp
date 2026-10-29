@@ -130,6 +130,9 @@ int main() {
     countAllocations=true;allocationIndex=0;failAllocation=1;
     assert(state.Save()==SaveStateReturn::FAIL_NO_MEMORY);
     countAllocations=false;assert(state.info.get()==originalSnapshot);
+    CollisionContext other;
+    std::memset(&other,0xA5,sizeof(other));BgCheck_InitEmpty(&other,play);
+    auto otherEpoch=BgCheck_GetAllocationEpoch(&other);
     auto* originalPoly=actor->floorPoly;
     CollisionHeader large{};large.numVertices=16385;large.numPolygons=16385;
     auto grow=[&] {
@@ -140,7 +143,20 @@ int main() {
         originalPoly->dist=999;actor->params=99;sCustomSceneFlags[128].chest=99;
         sExtClearFlags[128]={99};sExtLiveClearFlags[128]={99};sExtTempClearFlags[128]={99};
     };
+    play->colCtx.dyna.bgActorFlags[1]=1;play->colCtx.dyna.bgActors[1].colHeader=&large;
+    size_t ownedBefore=BgCheck_GetGeometryBuffers(&play->colCtx,nullptr,0);
+    auto* originalVertices=play->colCtx.dyna.vtxList;
+    for(size_t failure=1;failure<=4;++failure) {
+        countAllocations=true;allocationIndex=0;failAllocation=failure;
+        assert(!Fixture_GrowGeometry(&play->colCtx));countAllocations=false;
+        assert(play->colCtx.dyna.polyList==originalPoly && play->colCtx.dyna.vtxList==originalVertices);
+        assert(BgCheck_GetGeometryBuffers(&play->colCtx,nullptr,0)==ownedBefore);
+    }
     grow();
+    auto* newerPolys=play->colCtx.dyna.polyList;
+    originalPoly->dist=456;newerPolys[0].dist=789;
+    SaveState second;assert(second.Save()==SaveStateReturn::SUCCESS);
+    originalPoly->dist=999;newerPolys[0].dist=888;
     // Measure staging only; all allocation sites then fail in turn before a single world byte changes.
     countAllocations=true;allocationIndex=0;failAllocation=SIZE_MAX;
     auto plan=saved.collision->Prepare(&play->colCtx);
@@ -159,6 +175,7 @@ int main() {
     for(int retry=0;retry<18;++retry) {
         assert(state.Load()==SaveStateReturn::SUCCESS);
         assert(actor->params==7 && actor->floorPoly==originalPoly && originalPoly->dist==123);
+        assert(BgCheck_GetAllocationEpoch(&other)==otherEpoch);
         assert(play->colChkCtx.colATCount==1 && play->colChkCtx.colACCount==1);
         assert(play->colChkCtx.colAT[0]->actor->floorPoly->dist==123);
         assert(sCustomSceneFlags[128].chest==7 && sExtClearFlags[128][1]==2 && sExtLiveClearFlags[128][1]==4 && sExtTempClearFlags[128][1]==6);
@@ -167,8 +184,14 @@ int main() {
         if(retry<17) grow();
     }
     assert(BgCheck_GetGeometryBuffers(&play->colCtx,nullptr,0)>32 && resets==18 && surfaceResets==18);
+    // Another slot may target a newer current buffer and an older retired buffer; neither may be freed by load.
+    assert(second.Load()==SaveStateReturn::SUCCESS);
+    assert(play->colCtx.dyna.polyList==newerPolys && newerPolys[0].dist==789);
+    assert(actor->floorPoly==originalPoly && originalPoly->dist==456);
     before.assign(gSystemHeap,gSystemHeap+SYSTEM_HEAP_SIZE);
+    auto stale=saved.collision->Prepare(&play->colCtx);assert(stale && stale->Validate());
     BgCheck_InvalidateRoomSnapshots(&play->colCtx);
+    assert(!stale->Validate() && !stale->Commit());stale.reset();
     assert(state.Load()==SaveStateReturn::FAIL_STATE_MISMATCH && std::memcmp(before.data(),gSystemHeap,SYSTEM_HEAP_SIZE)==0);
     CollisionCheck_DestroyContext(play,&play->colChkCtx);
     BgCheck_Free(&play->colCtx);BgCheck_Free(&play->colCtx);
@@ -176,7 +199,8 @@ int main() {
     BgCheck_InitEmpty(&play->colCtx,play);CheckEmptyContext(play);
     assert(state.Load()==SaveStateReturn::FAIL_STATE_MISMATCH);
     BgCheck_Free(&play->colCtx);
-    state.info.reset();gPlayState=nullptr;
+    assert(BgCheck_GetAllocationEpoch(&other)==otherEpoch);BgCheck_Free(&other);
+    state.info.reset();second.info.reset();gPlayState=nullptr;
     std::free(gSystemHeap);std::free(gAudioHeap);
     assert(trackedCount==0);
 }

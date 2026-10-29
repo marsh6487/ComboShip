@@ -8,6 +8,8 @@ from pathlib import Path
 import subprocess
 import time
 
+from native_test_abi import NativeTestCompilers
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,35 +36,36 @@ def main():
     if summary_path:
         with open(summary_path, "a") as summary:
             summary.write(f"## Regression group: {args.suite}\n\n| Check | Result | Seconds |\n|---|---|---:|\n")
-    for task in selected:
-        print(f"::group::{task['name']}", flush=True)
-        started = time.monotonic()
-        env = {**os.environ, **task.get("env", {})}
-        shell = ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail"]
-        if task.get("origin") == "nei":
-            # The original umbrella supplied these headers only to its own
-            # children and enabled nounset. Preserve both boundaries.
-            shell.append("-u")
-            if env.get("COMBO_NEI_FIXTURE_CPATH"):
-                env["CPATH"] = env["COMBO_NEI_FIXTURE_CPATH"]
-        result = subprocess.run(
-            [*shell, "-c", task["run"]], cwd=ROOT, env=env,
-        )
-        elapsed = time.monotonic() - started
-        code = result.returncode if result.returncode >= 0 else 128 - result.returncode
-        status = "success" if code == 0 else f"failure (exit {code})"
-        print(f"{status}: {elapsed:.2f}s\n::endgroup::", flush=True)
-        if summary_path:
-            name = task["name"].replace("|", "\\|").replace("\n", " ")
-            with open(summary_path, "a") as summary:
-                summary.write(f"| {name} | {status} | {elapsed:.2f} |\n")
-        if code:
-            # Surface the actual check in the workflow annotations immediately;
-            # the final aggregate job may run much later than this failure.
-            message = f"[{args.suite}] {task['name']} failed (exit {code}). Run: {task['run']}"
-            message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-            print(f"::error title=Regression failed::{message}", flush=True)
-            return code
+    with NativeTestCompilers(os.environ) as compilers:
+        for task in selected:
+            print(f"::group::{task['name']}", flush=True)
+            started = time.monotonic()
+            env = compilers.environment_for_task(task)
+            shell = ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail"]
+            if task.get("origin") == "nei":
+                # The original umbrella supplied these headers only to its own
+                # children and enabled nounset. Preserve both boundaries.
+                shell.append("-u")
+                if env.get("COMBO_NEI_FIXTURE_CPATH"):
+                    env["CPATH"] = env["COMBO_NEI_FIXTURE_CPATH"]
+            result = subprocess.run(
+                [*shell, "-c", task["run"]], cwd=ROOT, env=env,
+            )
+            elapsed = time.monotonic() - started
+            code = result.returncode if result.returncode >= 0 else 128 - result.returncode
+            status = "success" if code == 0 else f"failure (exit {code})"
+            print(f"{status}: {elapsed:.2f}s\n::endgroup::", flush=True)
+            if summary_path:
+                name = task["name"].replace("|", "\\|").replace("\n", " ")
+                with open(summary_path, "a") as summary:
+                    summary.write(f"| {name} | {status} | {elapsed:.2f} |\n")
+            if code:
+                # Surface the actual check in the workflow annotations immediately;
+                # the final aggregate job may run much later than this failure.
+                message = f"[{args.suite}] {task['name']} failed (exit {code}). Run: {task['run']}"
+                message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                print(f"::error title=Regression failed::{message}", flush=True)
+                return code
     return 0
 
 

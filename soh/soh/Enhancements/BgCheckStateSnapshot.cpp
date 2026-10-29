@@ -164,12 +164,22 @@ bool BgCheckStateRestore::Validate() const noexcept {
     return true;
 }
 
-void BgCheckStateRestore::Commit() noexcept {
+bool BgCheckStateRestore::Commit() noexcept {
     if (!data || data->committed) {
-        return;
+        return false;
     }
     auto& saved = *data->snapshot;
     auto* context = data->context;
+    // Heap fields have already been rewound. Validate only the authoritative external owner here.
+    if (BgCheck_GetAllocationEpoch(context) != saved.allocationEpoch ||
+        BgCheck_GetRoomEpoch(context) != saved.roomEpoch) {
+        return false;
+    }
+    for (const auto& buffer : saved.geometry) {
+        if (!BgCheck_OwnsGeometryBuffer(context, buffer.address, buffer.bytes.size())) {
+            return false;
+        }
+    }
     // Actor fields restored by the system heap copy still target these exact retained allocations.
     for (const auto& buffer : saved.geometry) {
         if (!buffer.bytes.empty()) {
@@ -190,4 +200,5 @@ void BgCheckStateRestore::Commit() noexcept {
     std::free(data->previous.dyna.bgActorFlags);
     std::free(data->previous.dyna.polyNodes.tbl);
     data->committed = true;
+    return true;
 }

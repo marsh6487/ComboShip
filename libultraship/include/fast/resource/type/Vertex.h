@@ -6,7 +6,15 @@
 union Vtx;
 
 namespace Fast {
-class Vertex final : public Ship::Resource<Vtx> {
+// Render resources can expose vertices without sharing game-specific classes.
+// The archive stride is independent of the padded/widened runtime vertex ABI.
+class IVertexSource {
+  public:
+    virtual ~IVertexSource() = default;
+    virtual uint32_t GetVertexRecordSize() const = 0;
+};
+
+class Vertex final : public Ship::Resource<Vtx>, public IVertexSource {
   public:
     using Resource::Resource;
 
@@ -14,6 +22,7 @@ class Vertex final : public Ship::Resource<Vtx> {
 
     Vtx* GetPointer() override;
     size_t GetPointerSize() override;
+    uint32_t GetVertexRecordSize() const override { return RecordSize; }
 
     std::vector<Vtx> VertexList;
 

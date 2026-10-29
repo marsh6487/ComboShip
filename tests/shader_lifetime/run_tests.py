@@ -12,6 +12,13 @@ from run_time_pedestal_tests import block_from
 
 
 def configured_imgui_root():
+    # Standalone CI groups prepare the same pinned headers without configuring a build tree.
+    candidates = [os.environ.get('IMGUI_DIR', '')]
+    candidates += os.environ.get('COMBO_NEI_FIXTURE_CPATH', '').split(os.pathsep)
+    candidates += os.environ.get('CPATH', '').split(os.pathsep)
+    for candidate in candidates:
+        if candidate and (Path(candidate) / 'imconfig.h').is_file():
+            return Path(candidate)
     for build in ('build-cmake', 'build'):
         cache = ROOT / build / 'CMakeCache.txt'
         if cache.exists():

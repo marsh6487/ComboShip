@@ -387,7 +387,7 @@ bool Extractor::ClassifyRom(std::string rom) {
     if (!ValidateNotCompressed()) {
         return false;
     }
-    return verMap.contains(GetRomVerCrc());
+    return RomInfo::IsKnownVersion(GetRomVerCrc());
 }
 
 bool Extractor::RunFileStandalone(std::string rom) {

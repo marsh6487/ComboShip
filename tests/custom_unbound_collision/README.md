@@ -1,7 +1,7 @@
 # Custom collision adapters under Unbound
 
 Run `python tests/custom_unbound_collision/run_tests.py` from the repository root.
-Optional cases: `shared sm64 water grapple actors bridges motion timectl abi enemy`.
+Optional cases: `shared sm64 water grapple actors bridges motion timectl abi enemy effects`.
 
 The native GCC tests compile current production functions and game headers with
 `GBI_FLOAT_MTX`, `GBI_S32_VTX`, AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -37,6 +37,11 @@ They cover:
   legacy room/position restrictions, native timer fixes and full-width Tp/Skb
   collider initialization. Random choice and floor/spawn services are explicit
   boundary doubles; this does not prove randomizer gameplay or scene progression.
+- Hammergeist's actual defuse/infuse functions and native float ice/fire helpers,
+  preserving wide fractional effect positions, eight-particle bursts, frame
+  guards, colors/scales, sounds and the 70-unit ice offset. Animation advancement,
+  idle setup and final effect submission are explicit boundary doubles; particle
+  rendering and configured actor gameplay are not executed.
 
 Rendering is not executed. The extracted native units replace logging, return the
 native decision from `GameInteractor_Should`, and disable second-update/frame-

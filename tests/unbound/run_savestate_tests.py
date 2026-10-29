@@ -88,6 +88,27 @@ def cpp_fixture():
     return fixture.replace("/* ACTUAL SCENE FLAGS */", bodies)
 
 
+def scene_save_fixture():
+    scene = (ROOT / "soh/soh/unbound/SceneDB.cpp").read_text()
+    save = (ROOT / "soh/soh/SaveManager.cpp").read_text()
+    fixture = (ROOT / "tests/unbound/scene_save_fixture.cpp").read_text()
+    bodies = "\n".join(function(scene, name) for name in ["SceneDB_CaptureState", "SceneDB_RestoreState"])
+    for signature in ["SceneDBSaveScope::SceneDBSaveScope(", "SceneDBSaveScope::~SceneDBSaveScope("]:
+        start = scene.index(signature)
+        opening = scene.index("{", start)
+        end, depth = opening + 1, 1
+        while depth:
+            depth += (scene[end] == "{") - (scene[end] == "}")
+            end += 1
+        bodies += "\n" + scene[start:end]
+    fixture = fixture.replace("/* ACTUAL SCENE PAYLOAD */", bodies)
+    fixture = fixture.replace("/* ACTUAL UNBOUND SAVE */", function(scene, "SaveUnboundSection"))
+    bodies = "\n".join(function(save, name) for name in [
+        "SaveManager::SaveFileThreaded", "SaveManager::SaveSection", "SaveManager::SaveToJsonObject",
+    ])
+    return fixture.replace("/* ACTUAL SAVE DISPATCH */", bodies)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="unbound-savestate-") as directory:
         work = Path(directory)
@@ -110,6 +131,13 @@ def main():
         # malloc/realloc/free directly and requires zero remaining allocations after teardown.
         subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
         print("PASS production savestate external collision/flags lifecycle, epochs and transactional OOM under ASan/UBSan")
+        cpp = work / "scene_save.cpp"
+        cpp.write_text(scene_save_fixture())
+        binary = work / "scene_save"
+        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *common, str(cpp),
+                        "-pthread", "-no-pie", "-Wl,--gc-sections", "-o", str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+        print("PASS production immutable SceneDB worker/synchronous save payload and nested scopes under ASan/UBSan")
 
 
 if __name__ == "__main__":

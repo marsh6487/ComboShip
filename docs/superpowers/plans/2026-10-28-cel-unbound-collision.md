@@ -20,13 +20,13 @@
 
 - [x] Pin host and donor references; create isolated branch and remote baseline checkpoint `integration/cel-unbound-collision-20261028`.
 - [x] Independent Rich and Unbound donor audits, with exact pins, changed paths and compatibility constraints.
-- [ ] Shared engine renderer/GBI, backend/shader transport, float/s32 ABI and build/archive wiring (root).
-- [ ] Unbound OoT native structs, factories, registry, scene and text systems, preserving host seams (Unbound worker).
-- [ ] New cel/sky/light policy modules, menu and cloud resources (cel worker).
-- [ ] MM native matrix/vertex producer compatibility (MM worker).
-- [ ] Host NEI/custom geometry/dynamic-collision consumers and shared OOT/MM guards (custom-collision worker).
-- [ ] Growable OoT actor queues with native admission/contact/damage and teardown tests (queue worker after header handoff).
-- [ ] Central game hooks, OTR/SaveManager/legacy archive compatibility, recovered resource capture, package/build integration (root).
+- [x] Shared engine renderer/GBI, backend/shader transport, float/s32 ABI and build/archive wiring (root).
+- [x] Unbound OoT native structs, factories, registry, scene and text systems, preserving host seams (Unbound worker).
+- [x] New cel/sky/light policy modules, menu and cloud resources (cel worker).
+- [x] MM native matrix/vertex producer compatibility (MM worker).
+- [x] Host NEI/custom geometry/dynamic-collision consumers and shared OOT/MM guards (custom-collision worker).
+- [x] Growable OoT actor queues with native admission/contact/damage and teardown tests (queue worker after header handoff).
+- [x] Central game hooks, OTR/SaveManager/legacy archive compatibility, recovered resource capture, package/build integration (root).
 - [ ] Focused native tests, full build checks, independent final preservation review and recoverable source checkpoint; one combined candidate/PR.
 
 ## Recovery and acceptance
@@ -36,3 +36,9 @@ The initial host checkpoint is already on GitHub and does not trigger the develo
 ## Review focus
 
 Legacy scene archives and Alt paths remain effective; MM and foreign models use the correct common resource ABI; native pickup and randomizer progression remain intact; no cel opcode/shader state corrupts existing materials; all queues and dynamic collision consumers respect their actual capacities and lifetimes.
+
+## Review remediation status — 2026-10-29
+
+All seven Important findings from the fresh whole-branch review have production fixes and focused native proofs. See `docs/poc/combined-review-fixes-20261029.md` and the final verification record. Hash vertex commands remain immutable and resolve through the current owner's resource cache; `IVertexSource` covers both engine vertices and legacy MM arrays without making the engine depend on game headers. Actual hidden-visibility MM shared-library casts, virtual data access and destruction passed native and sanitizer tests.
+
+The complete source is an integration candidate. Full matching-binary build, CI platform gates and configured runtime acceptance remain separate until their results are recorded. A draft PR may run those gates; no merge or release is authorized.

@@ -11,7 +11,7 @@ class BgCheckStateRestore {
     ~BgCheckStateRestore();
     bool Validate() const noexcept;
     // Call immediately after the raw heap copy, after Validate succeeded, without running game code between.
-    void Commit() noexcept;
+    bool Commit() noexcept;
 
   private:
     friend class BgCheckStateSnapshot;
