@@ -36,6 +36,7 @@ extern "C" {
 #include "mm_strict_texture_binding.h"
 #include <fast/resource/type/Vertex.h>
 #include <fast/resource/ResourceType.h>
+#include <libultraship/libultra/gbi.h>
 #include <libultraship/libultraship.h>
 #include <libultraship/log/luslog.h>
 #include <ship/utils/binarytools/MemoryStream.h>
@@ -883,7 +884,7 @@ static uintptr_t MmAssets_ResolveDisplayListReference(void* context, MmDisplayLi
             vertexArray != nullptr ? vertexArray->GetRawPointer() : nullptr,
             vertexArray != nullptr ? vertexArray->GetPointerSize() : 0,
             vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, vertexView,
-            sizeof(Fast::F3DVtx), vertex != nullptr ? vertex->GetVertexRecordSize() : 16)) {
+            sizeof(Vtx), vertex != nullptr ? vertex->GetVertexRecordSize() : 16)) {
         MMASSETS_LOG("[MM Assets] STRICT graph vertex type/miss: %s", pathIt->second.c_str());
         return 0;
     }
