@@ -25,6 +25,10 @@ with tempfile.TemporaryDirectory(prefix='market-door-collision-') as directory:
         production=(block_from(text,text.index('void SyncShopDoorCollision(')) if 'void SyncShopDoorCollision(' in text
                     else 'void SyncShopDoorCollision() {}')
         fixture=(ROOT/'tests/black_market/door_collision_native_test.cpp').read_text().replace('/* PRODUCTION SYNC */',production)
+        if oot:
+            importer=(ROOT/'soh/soh/resource/importer/CollisionHeaderFactory.cpp').read_text()
+            fixture=fixture.replace('/* LEGACY_VERTEX_WORD */',
+                block_from(importer,importer.index('static uint32_t UnpackLegacyVtxWord(')))
         cpp=work/(host+'.cpp'); cpp.write_text(fixture)
         names=['z_bgcheck.c','sys_math3d.c','z_lib.c','z_skin_matrix.c','z_bg_item.c']
         sources=[ROOT/host/'src/code'/name for name in names]
@@ -32,6 +36,7 @@ with tempfile.TemporaryDirectory(prefix='market-door-collision-') as directory:
             sources.append(ROOT/'mm/src/code/stubs.c')
         else:
             sources += [ROOT/'soh/src/libultra/gu'/n for n in ('sins.c','coss.c')]
+            sources.append(ROOT/'soh/src/code/bgcheck_ownership.c')
         objects=[]
         for index,path in enumerate(sources):
             obj=work/f'{host}-{index}.o'

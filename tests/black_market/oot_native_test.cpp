@@ -267,6 +267,8 @@ static void PlaceDoor() {
     nativeDoor.actor.id = ACTOR_EN_DOOR;
     nativeDoor.actor.category = ACTORCAT_DOOR;
     nativeDoor.actor.params = 1 << 10;
+    // Native Actor_SpawnTransitionActors also supplies the full stored index.
+    nativeDoor.actor.transitionIndex = 1;
     nativeDoor.actor.home.pos = nativeDoor.actor.world.pos = {
         static_cast<float>(placed.pos.x), static_cast<float>(placed.pos.y), static_cast<float>(placed.pos.z) };
     nativeDoor.actor.home.rot.y = nativeDoor.actor.shape.rot.y = placed.rotY;
@@ -279,6 +281,8 @@ static void TestDoorMarker() {
         Reset(); PlaceDoor();
         play.transiActorCtx.numActors = count;
         placedDoors[2] = placedDoors[1];
+        assert(GET_TRANSITION_ACTOR_INDEX(&nativeDoor.actor) == 1 &&
+               OotBlackMarketDoorNative::MarkerActor(&play, &nativeDoor.actor));
         sDoorArmed = true;
         player.actor.world.pos = { 410, 0, -300 };
         PlayerUpdate();
@@ -289,6 +293,14 @@ static void TestDoorMarker() {
             assert(diagnostics.back()["reason"] == "door_marker_ambiguous" &&
                    diagnostics.back()["checks"]["unique_marker"] == false);
         }
+    }
+    for (bool legacy : { false, true }) {
+        Reset(); PlaceDoor();
+        nativeDoor.actor.transitionIndex = legacy ? -1 : 1;
+        if (!legacy)
+            nativeDoor.actor.params = 0; // Stored metadata takes precedence over legacy index bits.
+        assert(GET_TRANSITION_ACTOR_INDEX(&nativeDoor.actor) == 1);
+        assert(ComboBlackMarketOot_TryDoorEntrance(&play, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_ENTERED);
     }
     Reset(); PlaceDoor();
     placedDoors[1].sides[1].room = 1; // ordinary native room-to-room door
@@ -329,11 +341,15 @@ static void TestDoorEntry() {
         if (unrelated == 4) placedDoors[1].sides[1].room = 1;
         if (unrelated == 5) nativeDoor.actor.id = ACTOR_DOOR_SHUTTER;
         if (unrelated == 6) nativeDoor.actor.home.pos.x += 2;
-        if (unrelated == 7) nativeDoor.actor.params = 0;
+        if (unrelated == 7) { nativeDoor.actor.params = 0; nativeDoor.actor.transitionIndex = 0; }
         if (unrelated == 8) placedDoors[1].params = 0x80;
         assert(ComboBlackMarketOot_TryDoorEntrance(&play, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);
         assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF);
     }
+    Reset(); PlaceDoor();
+    nativeDoor.actor.transitionIndex = -1; nativeDoor.actor.params = 0;
+    assert(ComboBlackMarketOot_TryDoorEntrance(&play, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);
+    assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF);
     Reset(); PlaceDoor(); PlayState another = play;
     assert(ComboBlackMarketOot_TryDoorEntrance(&another, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);
     assert(ComboBlackMarketOot_TryDoorEntrance(nullptr, nullptr) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);

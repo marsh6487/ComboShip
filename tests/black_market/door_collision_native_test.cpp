@@ -3,17 +3,20 @@
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
 #ifdef DOOR_COLLISION_OOT
 #include "OotBlackMarketDoorNative.h"
+#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #else
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "BlackMarketDoorNative.h"
 #endif
 #include <array>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <type_traits>
 #if __has_include("BlackMarketDoorCollision.h")
 #include "BlackMarketDoorCollision.h"
 static BlackMarketDoorCollision::Fixture<
@@ -64,7 +67,7 @@ CollisionHeader *ResourceMgr_LoadColByName(const char *) {
   return nullptr;
 }
 s16 R_ROOM_MESH_CULL_DIST = 0;
-s32 GameInteractor_Should(s32, u32 result, ...) { return result; }
+bool GameInteractor_Should(GIVanillaBehavior, u32 result, ...) { return result; }
 void *GameState_Alloc(GameState *, size_t n, char *, s32) {
   void *p = std::calloc(1, n);
   allocations.push_back(p);
@@ -112,14 +115,48 @@ static u32 Read32(FILE *f) {
   assert(std::fread(&n, 4, 1, f) == 1);
   return n;
 }
+#ifdef DOOR_COLLISION_OOT
+/* LEGACY_VERTEX_WORD */
+#endif
 struct NativeRoom {
   CollisionHeader header{};
-  std::vector<Vec3s> vertices;
+  using Vertex = std::remove_pointer_t<decltype(CollisionHeader::vtxList)>;
+  std::vector<Vertex> vertices;
   std::vector<CollisionPoly> polygons;
   std::vector<SurfaceType> surfaces;
   explicit NativeRoom(const char *path) {
     FILE *f = std::fopen(path, "rb");
     assert(f && !std::fseek(f, 64, SEEK_SET));
+#ifdef DOOR_COLLISION_OOT
+    Vec3s bounds[2];
+    assert(std::fread(bounds, sizeof(Vec3s), 2, f) == 2);
+    header.minBounds = {bounds[0].x, bounds[0].y, bounds[0].z};
+    header.maxBounds = {bounds[1].x, bounds[1].y, bounds[1].z};
+    vertices.resize(Read32(f));
+    for (auto& vertex : vertices) {
+      Vec3s packed;
+      assert(std::fread(&packed, sizeof(packed), 1, f) == 1);
+      vertex = {packed.x, packed.y, packed.z};
+    }
+    polygons.resize(Read32(f));
+    for (auto& polygon : polygons) {
+      u16 indices[4];
+      s16 plane[4];
+      assert(std::fread(indices, sizeof(indices), 1, f) == 1);
+      assert(std::fread(plane, sizeof(plane), 1, f) == 1);
+      polygon.type = indices[0];
+      polygon.flags_vIA = UnpackLegacyVtxWord(indices[1]);
+      polygon.flags_vIB = UnpackLegacyVtxWord(indices[2]);
+      polygon.vIC = UnpackLegacyVtxWord(indices[3]);
+      polygon.normal = {plane[0], plane[1], plane[2]};
+      polygon.dist = plane[3];
+    }
+    surfaces.resize(Read32(f));
+    for (auto& surface : surfaces) {
+      const u32 data1 = Read32(f), data0 = Read32(f);
+      surface = SurfaceType_Unpack(data0, data1);
+    }
+#else
     assert(std::fread(&header.minBounds, sizeof(Vec3s), 1, f) == 1 &&
            std::fread(&header.maxBounds, sizeof(Vec3s), 1, f) == 1);
     vertices.resize(Read32(f));
@@ -131,6 +168,7 @@ struct NativeRoom {
     surfaces.resize(Read32(f));
     assert(std::fread(surfaces.data(), sizeof(SurfaceType), surfaces.size(),
                       f) == surfaces.size());
+#endif
     std::fclose(f);
     header.numVertices = vertices.size();
     header.vtxList = vertices.data();
@@ -170,6 +208,9 @@ static bool Line(Vec3f a, Vec3f b, bool camera = false) {
 #endif
 }
 static void Prepare(NativeRoom &room) {
+#ifdef DOOR_COLLISION_OOT
+  BgCheck_Free(&play.colCtx);
+#endif
   for (void *p : allocations)
     std::free(p);
   allocations.clear();
@@ -213,6 +254,7 @@ int main(int argc, char **argv) {
   NativeRoom room(argv[1]);
   const auto originalVertices = room.vertices;
   const auto originalPolygons = room.polygons;
+  const auto originalSurfaces = room.surfaces;
   Prepare(room);
   assert(!Line({-10, 50, 390}, {-10, 50, 450}) &&
          "negative control: actual room doorway has no leaf collision");
@@ -346,18 +388,48 @@ int main(int argc, char **argv) {
   sDoorCollision.Release(&play);
   Index();
   assert(!Line({-10, 50, 390}, {-10, 50, 450}));
-  for (auto &flags : play.colCtx.dyna.bgActorFlags)
-    flags = 1;
+#ifdef DOOR_COLLISION_OOT
+  DynaPolyActor occupied{};
+  occupied.actor.scale = {1, 1, 1};
+  occupied.actor.update = ActorCallback;
+  while (play.colCtx.dyna.bgActorMax < BGCHECK_SCENE) {
+    auto& dyna = play.colCtx.dyna;
+    const s32 previous = dyna.bgActorMax;
+    std::fill_n(dyna.bgActorFlags, previous, 1);
+    const s32 id = DynaPoly_SetBgActor(&play, &dyna, &occupied.actor, &room.header);
+    assert(id >= 0 && id < BGCHECK_SCENE && dyna.bgActorMax > previous);
+  }
+  std::fill_n(play.colCtx.dyna.bgActorFlags, play.colCtx.dyna.bgActorMax, 1);
+#else
+  for (auto &flags : play.colCtx.dyna.bgActorFlags) flags = 1;
+#endif
   SyncShopDoorCollision();
   assert(sDoorCollision.OwnedBgId(&play) < 0 &&
          "capacity exhaustion cannot install a partial blocker");
-  for (auto &flags : play.colCtx.dyna.bgActorFlags)
-    flags = 0;
+#ifdef DOOR_COLLISION_OOT
+  // Native setup clears pending deletions together with their actor pointers.
+  // Clearing only the flags would leave invalid inactive-slot references.
+  std::fill_n(play.colCtx.dyna.bgActorFlags, play.colCtx.dyna.bgActorMax, 2);
+  Index();
+  for (s32 id = 0; id < play.colCtx.dyna.bgActorMax; ++id)
+    assert(play.colCtx.dyna.bgActorFlags[id] == 0 && play.colCtx.dyna.bgActors[id].actor == nullptr);
+#else
+  for (auto &flags : play.colCtx.dyna.bgActorFlags) flags = 0;
+#endif
+#ifndef DOOR_COLLISION_OOT
   const auto max = play.colCtx.dyna.polyListMax;
+#endif
   play.colCtx.dyna.polyListMax = 3;
   SyncShopDoorCollision();
+#ifdef DOOR_COLLISION_OOT
+  assert(sDoorCollision.OwnedBgId(&play) >= 0);
+  Index();
+  assert(play.colCtx.dyna.polyListMax >= 4 && Line({-10, 50, 390}, {-10, 50, 450}) &&
+         "OoT geometry grows before the actual blocker queries");
+#else
   assert(sDoorCollision.OwnedBgId(&play) < 0);
   play.colCtx.dyna.polyListMax = max;
+#endif
   SyncShopDoorCollision();
   Index();
   assert(Line({-10, 50, 390}, {-10, 50, 450}));
@@ -367,9 +439,15 @@ int main(int argc, char **argv) {
   assert(Line({-10, 50, 390}, {-10, 50, 450}));
 
   assert(std::memcmp(room.vertices.data(), originalVertices.data(),
-                     room.vertices.size() * sizeof(Vec3s)) == 0);
+                     room.vertices.size() * sizeof(NativeRoom::Vertex)) == 0);
   assert(std::memcmp(room.polygons.data(), originalPolygons.data(),
                      room.polygons.size() * sizeof(CollisionPoly)) == 0);
+  assert(std::memcmp(room.surfaces.data(), originalSurfaces.data(),
+                     room.surfaces.size() * sizeof(SurfaceType)) == 0);
+#endif
+#ifdef DOOR_COLLISION_OOT
+  BgCheck_Free(&play.colCtx);
+  assert(BgCheck_GetAllocationEpoch(&play.colCtx) == 0);
 #endif
   for (void *p : allocations)
     std::free(p);

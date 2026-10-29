@@ -7,6 +7,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+#ifndef SCENE_MUSIC_MM
+#include "z64.h"
+extern "C" {
+PlayState* gPlayState = nullptr;
+}
+#endif
 #include "sequence.h"
 #include "sfx.h"
 #include "AudioCollection.h"
@@ -90,5 +96,40 @@ int main() {
 #endif
     values[marketKey]=0x1235;
     assert(collection.GetReplacementSequence(market)==NA_BGM_SHOP);
+#ifndef SCENE_MUSIC_MM
+    // A scene document's song binds only its own BGM theme. Exercise the native
+    // PlayState layout used by the real collection, including explicit editor
+    // picks, scene aliases, fanfares and the two field-theme request IDs.
+    values.clear();
+    static PlayState play{};
+    gPlayState=&play;
+    play.sequenceCtx.seqId=NA_BGM_SHOP;
+    play.sequenceCtx.unboundSongSeqId=0x1234;
+    assert(collection.GetReplacementSequence(NA_BGM_SHOP)==0x1234);
+    assert(collection.GetReplacementSequence(NA_BGM_SARIA_THEME)==NA_BGM_SARIA_THEME);
+    assert(collection.GetReplacementSequence(market)==NA_BGM_SHOP);
+    const auto shopKey=collection.GetCvarKey(map.at(NA_BGM_SHOP).sfxKey);
+    values[shopKey]=NA_BGM_SARIA_THEME;
+    assert(collection.GetReplacementSequence(NA_BGM_SHOP)==NA_BGM_SARIA_THEME);
+    values.erase(shopKey);
+    play.sequenceCtx.unboundSongSeqId=0;
+    assert(collection.GetReplacementSequence(NA_BGM_SHOP)==NA_BGM_SHOP);
+    play.sequenceCtx.unboundSongSeqId=0x1234;
+    play.sequenceCtx.seqId=NA_BGM_ITEM_GET;
+    assert(collection.GetReplacementSequence(NA_BGM_ITEM_GET)==NA_BGM_ITEM_GET);
+    play.sequenceCtx.seqId=NA_BGM_OCA_SARIA;
+    assert(collection.GetReplacementSequence(NA_BGM_OCA_SARIA)==NA_BGM_OCA_SARIA);
+    for (const auto sceneTheme:{NA_BGM_FIELD_LOGIC,NA_BGM_FIELD_MORNING}) {
+        play.sequenceCtx.seqId=sceneTheme;
+        assert(collection.GetReplacementSequence(NA_BGM_FIELD_LOGIC)==0x1234);
+        assert(collection.GetReplacementSequence(NA_BGM_FIELD_MORNING)==0x1234);
+        values[collection.GetCvarKey(map.at(NA_BGM_FIELD_LOGIC).sfxKey)]=NA_BGM_SHOP;
+        assert(collection.GetReplacementSequence(NA_BGM_FIELD_LOGIC)==NA_BGM_SHOP);
+        assert(collection.GetReplacementSequence(NA_BGM_FIELD_MORNING)==NA_BGM_SHOP);
+        values.clear();
+    }
+    gPlayState=nullptr;
+    assert(collection.GetReplacementSequence(NA_BGM_SHOP)==NA_BGM_SHOP);
+#endif
     std::puts("PASS native audio collection: independent scene rows, valid native defaults, isolated settings, invalid-value fallback and non-playable metadata keys");
 }

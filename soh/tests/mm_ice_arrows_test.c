@@ -153,7 +153,7 @@ void DynaPolyActor_Init(DynaPolyActor* actor, s32 flags) {
 s32 DynaPoly_SetBgActor(PlayState* context, DynaCollisionContext* dyna, Actor* actor, CollisionHeader* col) {
     REQUIRE(col == &collision);
     if (dynaFail)
-        return BG_ACTOR_MAX;
+        return BGACTOR_INVALID;
     return registrations++;
 }
 void DynaPoly_DeleteBgActor(PlayState* context, DynaCollisionContext* dyna, s32 id) {
@@ -204,8 +204,8 @@ static void Setup(void) {
     registrations = deletions = resourcePins = releases = drawn = 0;
     waterBox = (WaterBox){ -1000, 0, -1000, 2000, 2000, 0 };
     // Independently read from native oot.o2r; native model and collision have identical extents.
-    collision.minBounds = (Vec3s){ -1473, -1985, -1696 };
-    collision.maxBounds = (Vec3s){ 1473, 150, 1696 };
+    collision.minBounds = (Vec3i){ -1473, -1985, -1696 };
+    collision.maxBounds = (Vec3i){ 1473, 150, 1696 };
     collision.numVertices = 13;
     collision.numPolygons = 22;
 }
@@ -327,6 +327,7 @@ int main(void) {
     dynaFail = 1;
     EnArrow_Update(&arrow.actor, &play);
     REQUIRE(arrow.actor.update != NULL && resourcePins == 1);
+    REQUIRE(floes[0].dyna.bgId == BGACTOR_INVALID && registrations == 0);
     BgMmIcefloe_Destroy(&floes[0].dyna.actor, &play);
     REQUIRE(resourcePins == 0 && deletions == 0);
 

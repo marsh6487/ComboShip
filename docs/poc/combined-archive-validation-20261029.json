@@ -176,7 +176,7 @@
     }
   },
   "runtime_acceptance": "Configured Kakariko scenes, visual output, pickups/combat/grottos/entrances, night/Keaton stability and OoT/MM inventory/transition acceptance remain pending.",
-  "runtime_refresh": "This records the verified prior runtime checkpoint. A matching binary/bundle refresh after the position-only OoT light correction is pending; port payload hashes are unchanged.",
+  "runtime_refresh": "The light-fixed 40dbb7c build, CTest and both smoke seeds passed, with unchanged canonical port payloads. A final matching binary/package refresh is required after the separately native-tested legacy-message fallback correction; do not treat the prior bundle as runtime accepted.",
   "runtime_source": {
     "compiled_label": "55feb92",
     "local_equivalent": "55feb92847c71b4d3756553ed9ed6296f65defa1",

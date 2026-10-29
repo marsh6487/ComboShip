@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='scene-music-') as temporary:
         cpp=Path(temporary)/(host+'.cpp');cpp.write_text(fixture);binary=Path(temporary)/host
         subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-g','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2',
             '-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie',
-            '-I'+str(ROOT),'-I'+str(ROOT/'combo'),'-I'+str(folder),'-I'+str(ROOT/host/'include'),'-I'+str(ROOT/host/'include/PR'),
+            '-I'+str(ROOT),'-I'+str(ROOT/'combo'),'-I'+str(folder),'-I'+str(ROOT/host),'-I'+str(ROOT/host/'include'),'-I'+str(ROOT/host/'include/PR'),
             '-I'+str(ROOT/'libultraship/include'),*(['-DSCENE_MUSIC_MM'] if host=='mm' else []),
             str(cpp),str(ROOT/'libultraship/src/ship/utils/StringHelper.cpp'),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

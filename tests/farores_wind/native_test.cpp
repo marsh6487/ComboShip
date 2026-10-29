@@ -12,6 +12,20 @@ extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) { return activeChe
 extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void) { return activeCheckpoint; }
 extern "C" void Combo_SOH_RestoreCrossDungeonCheckpoint(int32_t index) { activeCheckpoint = index; ++checkpointRestores; }
 extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) { activeCheckpoint = index; ++checkpointRestores; }
+#ifndef TEST_MM
+#include "soh/unbound/SceneDB.h"
+static std::unordered_map<int32_t,SceneDB::Entry> fixtureScenes;
+SceneDB::SceneDB() = default;
+SceneDB::Entry& SceneDB::RetrieveEntry(int32_t id) { return fixtureScenes[id]; }
+static SceneDB fixtureSceneDB;
+SceneDB* SceneDB::Instance = &fixtureSceneDB;
+std::unordered_map<int32_t,SavedSceneFlags> sCustomSceneFlags;
+using ExtBitset = std::vector<uint32_t>;
+std::unordered_map<int32_t,ExtBitset> sExtClearFlags,sExtLiveClearFlags,sExtTempClearFlags;
+#undef SPDLOG_ERROR
+#define SPDLOG_ERROR(...) ((void)0)
+// NATIVE_SCENE_FLAGS
+#endif
 // NATIVE_FLAG_CAPTURE
 #ifdef TEST_MM
 #include "mods/nei_save.h"
@@ -224,6 +238,29 @@ int main() {
     assert(gSaveContext.save.saveInfo.permanentSceneFlags[3].rooms == 83);
     gPlayState = nullptr;
     MM_CaptureFwDeparture(); // No gameplay context must be harmless.
+#else
+    PlayState play{};
+    gPlayState = &play;
+    play.sceneNum = SCENE_KOKIRI_FOREST;
+    play.actorCtx.flags.chest = 17;
+    play.actorCtx.flags.swch = 23;
+    play.actorCtx.flags.clear = 31;
+    play.actorCtx.flags.collect = 41;
+    SceneFlagsExt_Set(play.sceneNum,SCENE_FLAGS_EXT_CLEAR,40);
+    Play_SaveSceneFlags(&play);
+    const auto& vanilla = gSaveContext.sceneFlags[SCENE_KOKIRI_FOREST];
+    assert(vanilla.chest==17 && vanilla.swch==23 && vanilla.clear==31 && vanilla.collect==41);
+    SceneFlagsExt_LoadClear(play.sceneNum);
+    assert(SceneFlagsExt_Get(play.sceneNum,SCENE_FLAGS_EXT_CLEAR,40));
+    play.sceneNum = SceneDB::CUSTOM_SCENE_ID_BASE;
+    fixtureScenes[play.sceneNum].valid = true;
+    play.actorCtx.flags.chest = 97;
+    SceneFlagsExt_Set(play.sceneNum,SCENE_FLAGS_EXT_CLEAR,70);
+    Play_SaveSceneFlags(&play);
+    assert(SceneFlags_Get(play.sceneNum)->chest==97 && vanilla.chest==17);
+    SceneFlagsExt_LoadClear(play.sceneNum);
+    assert(SceneFlagsExt_Get(play.sceneNum,SCENE_FLAGS_EXT_CLEAR,70));
+    gPlayState = nullptr;
 #endif
     std::cout << "native bridge: legacy adoption, both owners, return rejection, respawn, consumption, slot isolation passed\n";
 }

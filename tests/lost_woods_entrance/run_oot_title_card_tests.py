@@ -17,6 +17,21 @@ sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from, functions
 
 
+def native_scene_registry():
+    registry = (ROOT / "soh/soh/unbound/SceneDB.cpp").read_text()
+    seeds = registry[registry.index("struct VanillaScene {"):
+                     registry.index("// Saved flags for custom scenes;")]
+    definitions = ('#include "soh/unbound/SceneDB.h"\n#include <algorithm>\n' +
+                   block_from(registry, registry.index('extern "C" {')) +
+                   '\nnamespace {\n' + seeds + '\n}\n')
+    for signature in ("SceneDB::SceneDB(", "void SceneDB::SeedVanillaScenes(",
+                      "void SceneDB::SeedVanillaEntrances(", "void SceneDB::RefreshEntranceTablePointer(",
+                      "SceneDB::Entry& SceneDB::RetrieveEntry(",
+                      'extern "C" const char* SceneDB_GetTitleCardTexture('):
+        definitions += block_from(registry, registry.index(signature)) + '\n'
+    return definitions + re.search(r"^SceneDB\* SceneDB::Instance = .*;", registry, re.M)[0] + '\n'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sanitize", action="store_true")
@@ -27,8 +42,8 @@ def main():
     actor = (ROOT / "soh/src/code/z_actor.c").read_text()
     handler = (ROOT / "soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp").read_text()
     start = player.index("void Player_Init(")
-    selection = player.index("        titleFileSize = scene->titleFile", start)
-    selection = player[player.rfind("\n\n", start, selection):player.index("    if (func_80845C68(", selection)]
+    selection = player.index("    const s32 crossGameTitleCard =", start)
+    selection = player[selection:player.index("    if (func_80845C68(", selection)]
     selection = re.sub(r"\bthis\b", "self", selection)
     consume = "Combo_SOH_ConsumeCrossGameTitleCard"
     # The unmodified baseline must fail on the missing card, not a missing API.
@@ -46,8 +61,6 @@ def main():
     texture_headers = "\n".join(re.findall(r'^#include "textures/place_title_cards/[^\n]+', actor, re.M))
     native = functions(actor, ("TitleCard_InitPlaceName", "TitleCard_Update"))
     library = functions((ROOT / "soh/src/code/z_lib.c").read_text(), ("Math_StepToS",))
-    table = (ROOT / "soh/src/code/z_scene_table.c").read_text()
-    table = table[table.index("#define DEFINE_ENTRANCE("):table.index("#undef DEFINE_ENTRANCE")]
     fixture = (ROOT / "tests/lost_woods_entrance/oot_title_card_test.cpp").read_text()
     fixture = fixture.replace("/* TEXTURE_HEADERS */", texture_headers)
     fixture = fixture.replace("/* REQUEST_STATE */", request)
@@ -61,7 +74,7 @@ def main():
         (ROOT / path).read_text().index(signature)) for path, signature in (
             ("soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp", "void Transition("),
             ("soh/soh/Enhancements/Gameplay/ComboSoloForest.cpp", "void ForestTransition("))))
-    fixture = fixture.replace("/* ENTRANCE_TABLE */", table + "\n#undef DEFINE_ENTRANCE\n")
+    fixture = fixture.replace("/* ENTRANCE_TABLE */", native_scene_registry())
     includes = ("soh", "soh/soh", "soh/include", "soh/src", "soh/assets", "libultraship/include", "combo")
     flags = ["-std=c++20", "-fpermissive", "-w", "-fmax-errors=5", "-DF3DEX_GBI_2", "-DFMT_HEADER_ONLY",
              *["-I" + str(ROOT / path) for path in includes]]

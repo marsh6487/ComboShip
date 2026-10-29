@@ -66,6 +66,7 @@ static void SetResourceExterior(const char* forest) {
     door->home.pos = door->world.pos = {float(row.pos.x), float(row.pos.y), float(row.pos.z)};
     door->params = 1 << 10;
 #ifdef OOT_RESOURCE_ENTRY_TEST
+    door->transitionIndex = 1; // Native transition spawn metadata, in addition to legacy params.
     door->home.rot.y = door->shape.rot.y = row.rotY;
     player.actionFunc = Player_Action_80845EF8;
 #else

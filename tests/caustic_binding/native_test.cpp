@@ -15,6 +15,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include <fast/RenderCostProbe.h>
 
 #define G_IM_FMT_RGBA 0
 #define G_IM_FMT_CI 2
@@ -69,6 +70,10 @@ struct ResourceInitData { std::string Path; };
 struct Texture {
     uint8_t* ImageData{};
     uint32_t ImageDataSize{};
+    uint16_t Width{}, Height{};
+    TextureType Type = TextureType::Error;
+    uint32_t Flags{};
+    std::shared_ptr<std::vector<char>> mImageBuffer;
     std::shared_ptr<ResourceInitData> init;
     std::shared_ptr<ResourceInitData> GetInitData() const { return init; }
 };
@@ -76,14 +81,6 @@ struct Texture {
 struct RenderingState { TextureCacheNode* mTextures[SHADER_MAX_TEXTURES]{}; };
 struct ColorCombiner { bool usedTextures[2]{true, true}; };
 struct MaskedTextureEntry { uint8_t* mask; uint8_t* replacementData; };
-struct CostReport { int cacheHits{}, cacheMisses{}, cacheEvictions{}, textureImport{}; };
-struct RenderCostProbe {
-    CostReport report;
-    bool Active() const { return true; }
-    CostReport& MutableReport() { return report; }
-};
-struct RenderCostScope { explicit RenderCostScope(int*) {} };
-struct RenderTextureScope { RenderTextureScope(RenderCostProbe*, const std::string&) {} };
 struct Backend {
     int selections{}, samplerChanges{}, framebufferSelections{}, uploads{};
     uint32_t bound[SHADER_MAX_TEXTURES]{};
@@ -173,6 +170,7 @@ struct Fixture {
     Fixture(const char* firstPath = "scenes/shared/spot00_scene/s00_siro_02_5C000",
             const char* secondPath = "custom/prelude/textures/field_r4_caustics") {
         gfx.mPreludeMaterialBindingReuseEnabled = true;
+        gfx.mRenderCost.BeginFrame(true, 0, true);
         gfx.mTextureCache.map.reserve(TEXTURE_CACHE_MAX_SIZE);
         for (int i = 0; i < 2; ++i) {
             resources[i] = std::make_shared<Texture>();
@@ -180,6 +178,8 @@ struct Fixture {
             resources[i]->init->Path = i ? secondPath : firstPath;
             resources[i]->ImageData = i ? caustic.data() : wall.data();
             resources[i]->ImageDataSize = 2048;
+            resources[i]->Width = resources[i]->Height = 32;
+            resources[i]->Type = TextureType::RGBA16bpp;
             auto& loaded = gfx.mRdp->loaded_texture[i];
             loaded.addr = resources[i]->ImageData;
             loaded.orig_size_bytes = loaded.size_bytes = 2048;
@@ -220,6 +220,7 @@ int main() {
             f.gfx.mRdp->texture_tile[0].fmt = format.format;
             f.gfx.mRdp->texture_tile[0].siz = format.size;
             f.gfx.mRdp->loaded_texture[0].raw_tex_metadata.type = format.type;
+            f.resources[0]->Type = format.type;
             f.Dirty(); f.gfx.Prepare(); f.ResetCounts();
             f.gfx.GfxDpSetTileSize(0, 12, 24, 136, 148); f.gfx.Prepare();
             Check(f.gfx.flushes == 0 && f.gfx.backend.selections == 0 && f.gfx.backend.uploads == 0,

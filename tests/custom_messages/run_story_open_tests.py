@@ -31,6 +31,12 @@ util = (ROOT / "soh/soh/util.cpp").read_text()
 fixture = (ROOT / "tests/custom_messages/story_open_test.cpp").read_text()
 fixture = fixture.replace("/* NATIVE_COPY */", function(util, "size_t SohUtils::CopyStringToCharBuffer("))
 fixture = fixture.replace("/* NATIVE_OPEN_HOOK */", function(hook, "void GameInteractor_ExecuteOnOpenText("))
+messages = (ROOT / "soh/soh/z_message_OTR.cpp").read_text()
+constants = messages[messages.index('constexpr uint16_t kTerminatorId'):messages.index('struct LanguageSpec {')]
+registry = 'namespace {\n' + constants + function(messages, 'struct MessageTable {') + ';\n'
+registry += 'std::array<MessageTable, MSG_LANGUAGE_COUNT> sTables;\n}\n'
+registry += function(messages, 'extern "C" MessageTableEntry* OTRMessage_Find(')
+fixture = fixture.replace('/* NATIVE_UNBOUND_MESSAGES */', registry)
 # Keep native opening/table selection/reset/decoding intact. Icon/receipt,
 # Japanese glyph and graphics services are unused boundaries for these texts.
 engine = r'''
@@ -38,6 +44,7 @@ engine = r'''
 #include "message_data_static.h"
 #include "ComboItemReceiptPresentation.h"
 #include "soh/OTRGlobals.h"
+#include "soh/z_message_OTR.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "textures/message_static/message_static.h"
 #include "textures/message_texture_static/message_texture_static.h"
@@ -108,7 +115,8 @@ with tempfile.TemporaryDirectory(prefix="story-native-open-") as directory:
             obj = work / (source.stem + ".o")
             is_cpp = source.suffix == ".cpp"
             run(os.environ.get("CXX", "c++") if is_cpp else os.environ.get("CC", "cc"),
-                "-std=c++20" if is_cpp else "-std=gnu2x", *selected, "-c", source, "-o", obj)
+                "-std=c++20" if is_cpp else "-std=gnu2x", *selected,
+                *([] if is_cpp else ["-Werror=implicit-function-declaration"]), "-c", source, "-o", obj)
             units.append(obj)
         binary = work / ("story-combo" if combo else "story-solo")
         run(os.environ.get("CXX", "c++"), "-std=c++20", *selected, cpp, *units,

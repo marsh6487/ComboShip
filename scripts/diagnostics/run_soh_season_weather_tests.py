@@ -51,6 +51,13 @@ def run(out, cc, cxx):
     bridge += extract(environment, ['func_800766C4', 'func_8006FB94', 'Environment_UpdateLightningStrike'])
     bridge += extract(root / 'soh/src/code/z_actor.c', ['Flags_GetEventChkInf'])
     environment_source = environment.read_text()
+    # The native outdoor palette now also blends world-unit fog. Keep its
+    # actual type and helpers with the extracted lighting block.
+    fog_type = re.search(r'typedef struct \{[^{}]*\} WorldFogParams;', environment_source, re.S)
+    assert fog_type
+    bridge += fog_type[0] + '\n'
+    bridge += extract(environment, ['Environment_ResolveWorldFog', 'Environment_LerpWorldFogParams',
+                                    'Environment_SetWorldFog'])
     # Exercise the real outdoor time/overcast palette setup before the final
     # clamp, rather than assigning bright synthetic colors straight to it.
     time_type = re.search(r'typedef struct \{[^{}]*\} struct_8011FB48;', environment_source, re.S)

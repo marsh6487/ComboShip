@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory(prefix='granny-vapor-resource-') as directory:
   cpp.write_text((ROOT/'tests/black_market/granny_vapor_resource_test.cpp').read_text().replace('/* PRODUCTION ADAPTER */',adapter))
   subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-DFMT_HEADER_ONLY','-DF3DEX_GBI_2','-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie',
    '-I'+str(ROOT),'-I'+str(ROOT/host/native),'-I'+str(ROOT/'libultraship/include'),
+   *(['-DGRANNY_VAPOR_MM'] if host=='mm' else []),
    str(cpp),str(ROOT/host/native/'resource/type/Array.cpp'),str(ROOT/'libultraship/src/fast/resource/type/Vertex.cpp'),
    str(ROOT/'libultraship/src/ship/resource/Resource.cpp'),'-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

@@ -88,11 +88,9 @@ extern "C" void GameInteractor_ExecuteOnPresentTitleCard(void) { ++presentations
 /* CUSTOM_TRANSITIONS */
 
 static void SelectPlayerTitle(PlayState* play) {
-    SceneTableEntry* scene = play->loadedScene;
     Player player{};
     Player* self = &player;
     s32 respawnFlag = gSaveContext.respawnFlag;
-    u32 titleFileSize;
 /* PLAYER_SELECTION */
 }
 
@@ -107,9 +105,7 @@ static void Boot(int route, int slot = 1) {
     TitleSetup_InitImpl(&state);
 }
 static PlayState Destination(int scene) {
-    static SceneTableEntry sceneEntry{};
     PlayState play{};
-    play.loadedScene = &sceneEntry;
     play.sceneNum = scene;
     return play;
 }

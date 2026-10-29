@@ -15,6 +15,8 @@
 #include <string>
 #include <variant>
 #include <thread>
+#include <type_traits>
+#include <utility>
 
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_TRACE(...) ((void)0)
@@ -39,10 +41,11 @@ namespace BS {
 using priority_t = int;
 namespace pr {
 constexpr int highest = 0;
-}
+constexpr int normal = 0;
+} // namespace pr
 struct FixtureThreadPool {
     template <class F> auto submit_task(F callback, priority_t) {
-        return std::async(std::launch::deferred, std::move(callback)).share();
+        return std::async(std::launch::deferred, std::move(callback));
     }
 };
 } // namespace BS
@@ -88,6 +91,7 @@ class ResourceManager {
     std::shared_ptr<FixtureArchive> mArchiveManager = std::make_shared<FixtureArchive>();
     std::shared_ptr<FixtureLoader> loader = std::make_shared<FixtureLoader>();
     std::shared_ptr<BS::FixtureThreadPool> mThreadPool = std::make_shared<BS::FixtureThreadPool>();
+#include "alt_segment_submit.inc"
     auto GetResourceLoader() {
         return loader;
     }

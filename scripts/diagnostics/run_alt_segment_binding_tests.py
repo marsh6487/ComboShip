@@ -34,8 +34,10 @@ def main():
     parser.add_argument("--game", choices=("oot", "mm", "all"), default="all")
     args = parser.parse_args()
     manager = (ROOT / "libultraship/src/ship/resource/ResourceManager.cpp").read_text()
+    manager_header = (ROOT / "libultraship/include/ship/resource/ResourceManager.h").read_text()
     if args.baseline:
         manager = subprocess.check_output(["git", "show", args.baseline + ":libultraship/src/ship/resource/ResourceManager.cpp"], cwd=ROOT, text=True)
+        manager_header = subprocess.check_output(["git", "show", args.baseline + ":libultraship/include/ship/resource/ResourceManager.h"], cwd=ROOT, text=True)
     load_start = manager.index("std::shared_ptr<IResource> ResourceManager::LoadResourceProcess(const ResourceIdentifier&")
     load_end = manager.index("std::shared_ptr<IResource> ResourceManager::LoadResource(uint64_t", load_start)
     cache_start = manager.index("std::variant<ResourceManager::ResourceLoadError, std::shared_ptr<IResource>>\n"
@@ -47,6 +49,10 @@ def main():
         build = args.build_dir or Path(temporary)
         build.mkdir(parents=True, exist_ok=True)
         (build / "alt_segment_cache.inc").write_text(cache)
+        # Keep cache/load bodies and the native task wrapper from the same
+        # revision; scheduling remains the deterministic fixture boundary.
+        submit = function(manager_header, "SubmitTask") if "auto SubmitTask(" in manager_header else ""
+        (build / "alt_segment_submit.inc").write_text(submit)
         (build / "spdlog").mkdir(exist_ok=True)
         (build / "spdlog/spdlog.h").write_text("#pragma once\n#define SPDLOG_TRACE(...) ((void)0)\n")
         for game in ("oot", "mm"):

@@ -69,5 +69,13 @@ for game in ("soh", "mm"):
     if game == "mm":
         capture = re.sub(r"\bthis\b", "play", capture)
     source = (ROOT / "tests/farores_wind/native_test.cpp").read_text().replace("// NATIVE_FLAG_CAPTURE", capture)
+    if game == "soh":
+        scene=(ROOT/'soh/soh/unbound/SceneDB.cpp').read_text()
+        scene_flags='\n'.join(block_from(scene,scene.index(signature)) for signature in (
+            'std::unordered_map<int32_t, ExtBitset>& ExtFlagMap(', 'bool ExtBitTest(', 'void ExtBitWrite(',
+            'extern "C" SavedSceneFlags* SceneFlags_Get(', 'extern "C" int32_t SceneFlagsExt_Get(',
+            'extern "C" void SceneFlagsExt_Set(', 'extern "C" void SceneFlagsExt_LoadClear(',
+            'extern "C" void SceneFlagsExt_SaveClear('))
+        source=source.replace('// NATIVE_SCENE_FLAGS',scene_flags)
     run(game + " native point bridge", source.replace(
         '"../../mm/', '"' + str(ROOT) + '/mm/').replace('"../../soh/', '"' + str(ROOT) + '/soh/'), flags)

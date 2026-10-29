@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <type_traits>
 
 extern "C" {
 int gComboGameMode;
@@ -687,15 +688,17 @@ void TestPromptOwnershipLifetime() {
 }
 
 void LoadForest(float x, float y, float z) {
-  static Vec3s vertices[13];
+  using CollisionVertex = std::remove_pointer_t<decltype(CollisionHeader::vtxList)>;
+  using Coordinate = decltype(CollisionVertex::x);
+  static CollisionVertex vertices[13];
   static CollisionPoly polys[12];
   static CollisionHeader collision;
-  vertices[0] = {static_cast<s16>(x), static_cast<s16>(y), static_cast<s16>(z)};
+  vertices[0] = {static_cast<Coordinate>(x), static_cast<Coordinate>(y), static_cast<Coordinate>(z)};
   for (int i = 0; i < 12; ++i) {
     const float angle = i * 3.14159265359f / 6;
-    vertices[i + 1] = {static_cast<s16>(std::round(x + 55 * std::cos(angle))),
-                       static_cast<s16>(y),
-                       static_cast<s16>(std::round(z + 56 * std::sin(angle)))};
+    vertices[i + 1] = {static_cast<Coordinate>(std::round(x + 55 * std::cos(angle))),
+                       static_cast<Coordinate>(y),
+                       static_cast<Coordinate>(std::round(z + 56 * std::sin(angle)))};
     polys[i] = {};
     polys[i].vtxData[0] = 0;
     polys[i].vtxData[1] = i + 1;
