@@ -54,7 +54,8 @@ static void setNativePoint() {
 
 SaveContext gSaveContext{};
 #ifndef TEST_MM
-EntranceInfo gEntranceTable[ENTR_MAX]{};
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 #endif
 PlayState* gPlayState = nullptr;
 static ComboFwPoint points[3]{};

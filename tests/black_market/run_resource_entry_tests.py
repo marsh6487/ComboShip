@@ -234,7 +234,7 @@ def build_and_run(host, work, input_path, includes=()):
         fixture = replace_once(fixture, "    s32* bg, Actor*, Vec3f*) {", "    s32* bg, Actor*, Vec3f* realFloorProbe) {")
     else:
         fixture = replace_once(fixture, 'extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return false; }', 'extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return altEnabled; }')
-        fixture = replace_once(fixture, "EntranceInfo gEntranceTable[ENTR_MAX];", '#define DEFINE_ENTRANCE(name, scene, spawn, ...) {scene, spawn, 0},\nEntranceInfo gEntranceTable[ENTR_MAX] = {\n#include "tables/entrance_table.h"\n};\n#undef DEFINE_ENTRANCE')
+        fixture = replace_once(fixture, "static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};", '#define DEFINE_ENTRANCE(name, scene, spawn, ...) {scene, spawn, 0},\nstatic EntranceInfo sFixtureEntranceTable[ENTR_MAX] = {\n#include "tables/entrance_table.h"\n};\n#undef DEFINE_ENTRANCE')
         fixture = replace_once(fixture, "    *poly = floorExists ? &flatFloor : nullptr; *bg = BGCHECK_SCENE;\n    return floorExists ? 0 : BGCHECK_Y_MIN;", "    return RealFloor(poly, bg, realFloorProbe);")
         fixture = replace_once(fixture, "s32* bg, Actor*, Vec3f*) {", "s32* bg, Actor*, Vec3f* realFloorProbe) {")
         helpers = "\n".join(block_from(source, source.index(s)) for s in ("bool CustomKeeperAvailable() {", "bool LoadNativeKeeper() {"))

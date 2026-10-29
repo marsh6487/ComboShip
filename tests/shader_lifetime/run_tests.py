@@ -65,7 +65,11 @@ def main():
         flags = ['-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                  '-fno-omit-frame-pointer', '-fno-pie', '-no-pie'] if args.sanitize else []
         binary = build / 'lifetime'
+        # common.cmake applies imgui-fixes-and-config.patch, whose imconfig.h
+        # hunk defines pointer-valued ImTextureID. CI supplies the raw pinned
+        # ImGui headers, so supply that same production interface explicitly.
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-DF3DEX_GBI_2',
+                        '-DImTextureID=void*',
                         '-include', 'unordered_map', '-ffunction-sections', '-fdata-sections', *flags,
                         '-I' + str(build), '-I' + str(ROOT / 'libultraship/include'),
                         '-I' + str(args.tinyxml2_root), '-I' + str(args.imgui_root), *sources,

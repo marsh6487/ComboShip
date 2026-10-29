@@ -24,6 +24,7 @@ int main() {
                 Gfx* begin=gfx.polyXlu.p;
                 NeiGi_DrawRewardMaterial(&play,profile,"surface","setting","oot");
                 assert(arena.size()==(textures?3u:1u));
+                if (textures) assert(arena[0].size()==3 && arena[1].size()==3);
                 assert(stack.empty() && matrix==1 && matrixY==0);
                 bool tinted=false;
                 for (const auto& v:arena.back()) {

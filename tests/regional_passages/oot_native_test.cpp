@@ -20,7 +20,8 @@
 #include <vector>
 SaveContext gSaveContext{};
 PlayState *gPlayState;
-EntranceInfo gEntranceTable[ENTR_MAX]{};
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 int ComboLakeHyliaBridge_Get(PlayState *, Vec3f *, s16 *);

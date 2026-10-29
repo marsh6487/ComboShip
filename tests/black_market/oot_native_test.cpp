@@ -95,7 +95,8 @@ s8 gSfxDefaultReverb;
 extern "C" void Camera_InitPlayerSettings(Camera* camera, Player* current) {
     assert(camera == &play.mainCamera && current == &player); ++cameraResets;
 }
-EntranceInfo gEntranceTable[ENTR_MAX];
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 int keeperSpawns, nativeInits, customInits;
 ActorDBInit lastProfile;
 int profileRegistrations;

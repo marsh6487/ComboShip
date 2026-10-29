@@ -3,6 +3,9 @@ The native variant omits `--sanitize`. A GNU-compatible C++20 compiler/linker an
 the repository's TinyXML2 sources are required; `--tinyxml2-root` can override
 their location. The configured `build-cmake`/`build` ImGui dependency is discovered
 automatically, or can be supplied with `--imgui-root`.
+The fixture supplies the pointer-valued `ImTextureID` configuration from the
+production `imgui-fixes-and-config.patch`, so raw pinned and patched ImGui
+dependency trees exercise the same engine interface.
 
 The fixture compiles the real XML display-list factory and destructor with the
 production shader push/pop/lookup functions and actual interpreter containers.

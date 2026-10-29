@@ -44,7 +44,7 @@ std::set<std::pair<std::string,std::string>> invalidGiModels;
 alignas(16) Gfx opa[0x2FC0], xlu[0x1000], overlay[0x800];
 Gfx setupDl{};
 Vtx *pendingVertices;
-size_t pendingVertexCount;
+size_t pendingVertexBytes;
 GraphicsContext gfx{};
 PlayState play{};
 GetItemEntry shopEntry{};
@@ -66,6 +66,7 @@ void Reset() {
   portableSongLists=false;
   selectedCustomLists=false;
   pendingVertices = nullptr;
+  pendingVertexBytes = 0;
   vertexLoads.clear();
   std::memset(opa, 0, sizeof(opa));
   std::memset(xlu, 0, sizeof(xlu));
@@ -259,18 +260,34 @@ void *DebitTail(GraphicsContext *context, size_t size) {
   return reinterpret_cast<void *>(tail);
 }
 void *Graph_Alloc(GraphicsContext *context, size_t size) {
-  assert(size <= 1536 * sizeof(Vtx) && size % sizeof(Vtx) == 0);
-  Fixture::arena.emplace_back(size / sizeof(Vtx));
+  // The shared mesh renderer can append a two-command scrolling material to
+  // its vertex allocation. Keep the entire byte allocation in the real arena;
+  // identify its vertex portion after the producer has filled both payloads.
+  assert(size <= 1536 * sizeof(Vtx) + 2 * sizeof(Gfx));
+  assert(size % sizeof(Vtx) == 0 ||
+         (size >= 2 * sizeof(Gfx) && (size - 2 * sizeof(Gfx)) % sizeof(Vtx) == 0));
   Fixture::pendingVertices = static_cast<Vtx *>(DebitTail(context, size));
-  Fixture::pendingVertexCount = size / sizeof(Vtx);
+  Fixture::pendingVertexBytes = size;
   return Fixture::pendingVertices;
 }
 Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
   if (Fixture::pendingVertices) {
+    size_t vertexBytes = Fixture::pendingVertexBytes;
+    if (vertexBytes >= 2 * sizeof(Gfx)) {
+      Gfx scroll[2];
+      std::memcpy(scroll, reinterpret_cast<const uint8_t *>(Fixture::pendingVertices) + vertexBytes - sizeof(scroll),
+                  sizeof(scroll));
+      if (scroll[0].words.w0 >> 24 == G_SETTILESIZE && scroll[1].words.w0 >> 24 == G_ENDDL)
+        vertexBytes -= 2 * sizeof(Gfx);
+    }
+    assert(vertexBytes && vertexBytes <= 1536 * sizeof(Vtx) && vertexBytes % sizeof(Vtx) == 0);
+    const size_t vertexCount = vertexBytes / sizeof(Vtx);
+    Fixture::arena.emplace_back(vertexCount);
     Fixture::effectSubmitted.emplace_back(Fixture::matrix, Fixture::matrixY);
-    std::copy_n(Fixture::pendingVertices, Fixture::pendingVertexCount,
+    std::copy_n(Fixture::pendingVertices, vertexCount,
                 Fixture::arena.back().data());
     Fixture::pendingVertices = nullptr;
+    Fixture::pendingVertexBytes = 0;
   }
   Fixture::submitted.emplace_back(Fixture::matrix, Fixture::matrixY);
   if (Fixture::sunProbe) Fixture::submittedYaw.push_back(Fixture::matrixYaw);

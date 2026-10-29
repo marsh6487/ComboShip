@@ -55,7 +55,7 @@ def build_source():
         ("soh/src/code/code_800FCE80.c", ("Math_FAtanTaylorQF", "Math_FAtanTaylorF", "Math_FAtanContFracF", "Math_FAtanF", "Math_FAtan2F")),
         ("soh/src/code/z_olib.c", ("OLib_VecSphToVec3f", "OLib_VecSphGeoToVec3f", "OLib_Vec3fToVecSph", "OLib_Vec3fToVecSphGeo", "OLib_Vec3fDiffToVecSphGeo")),
         ("soh/src/code/z_actor.c", ("Player_GetHeight", "Actor_GetWorld", "Actor_GetWorldPosShapeRot")),
-        ("soh/src/code/z_bgcheck.c", ("BgCheck_GetCollisionHeader", "BgCheck_GetBgCamSettingImpl")),
+        ("soh/src/code/z_bgcheck.c", ("DynaPoly_IsBgIdBgActor", "DynaPoly_IsBgIdInTable", "BgCheck_GetCollisionHeader", "BgCheck_GetBgCamSettingImpl")),
         ("soh/src/code/z_camera.c", ("Camera_LERPCeilF", "Camera_LERPCeilS", "Camera_LERPCeilVec3f", "func_80043ABC",
                                     "Camera_Vec3fVecSphGeoAdd", "Camera_XZAngle", "Camera_CopyDataToRegs", "func_8005A02C",
                                     "Camera_RequestModeImpl", "Camera_ChangeSettingFlags", "Camera_RequestSetting",
