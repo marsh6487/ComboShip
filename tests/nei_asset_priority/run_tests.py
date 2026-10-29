@@ -77,3 +77,4 @@ int main() {
 print("PASS: base/Alt mod provenance, exact stock/companion paths, live selection changes")
 print("PASS: native MM GI bridge compiles without SoH macros, follows its menu setting and retains all four framing contexts")
 subprocess.run([sys.executable, str(ROOT / 'tests/nei_asset_priority/run_abi_tests.py')], check=True)
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/nei_asset_priority/run_unbound_tests.py')], check=True)

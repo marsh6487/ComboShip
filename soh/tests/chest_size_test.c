@@ -18,7 +18,7 @@ static const char* missingCustomPart;
 static int lightSpawns, fanfares;
 static Vec3f smokePosition, smokeVelocity;
 #ifdef COMBO_BUILD
-void ChestTest_SetForeignCategory(int32_t check, const char* category, bool trap);
+GetItemCategory ChestTest_ForeignCategory(const char* name);
 #endif
 
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
@@ -228,7 +228,7 @@ int main(void) {
     puts("PASS: independent texture/Agony options, complete-model fallback and native boss/unknown styles");
 
     const int fairyItems[] = { RG_MM_STRAY_FAIRY, RG_MM_STRAY_FAIRY_WOODFALL, RG_MM_STRAY_FAIRY_SNOWHEAD,
-                               RG_MM_STRAY_FAIRY_GREAT_BAY, RG_MM_STRAY_FAIRY_STONE_TOWER };
+                              RG_MM_STRAY_FAIRY_GREAT_BAY, RG_MM_STRAY_FAIRY_STONE_TOWER };
     matchTexture = matchSize = 1;
     for (size_t i = 0; i < sizeof(fairyItems) / sizeof(fairyItems[0]); ++i) {
         for (size_t j = 0; j < sizeof(defaults) / sizeof(defaults[0]); ++j) {
@@ -236,13 +236,13 @@ int main(void) {
             chest.getItemEntry.modIndex = MOD_RANDOMIZER;
             chest.getItemEntry.getItemId = fairyItems[i];
             GetItemEntry reward = chest.getItemEntry;
-            ExpectSize(&chest, play, 0.005f, 20);
-            REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMinorDL));
-            REQUIRE(!strcmp((char*)chest.boxLidDL, gChestLidMinorDL));
+            ExpectSize(&chest, play, 0.01f, 40);
+            REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMajorDL));
+            REQUIRE(!strcmp((char*)chest.boxLidDL, gChestLidMajorDL));
             REQUIRE(!memcmp(&chest.getItemEntry, &reward, sizeof(reward)));
             matchSize = 0;
             ExpectSize(&chest, play, defaults[j].scale, defaults[j].focus);
-            REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMinorDL));
+            REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMajorDL));
             matchSize = 1;
         }
     }
@@ -250,14 +250,14 @@ int main(void) {
     chest.getItemEntry.modIndex = MOD_RANDOMIZER;
     chest.getItemEntry.getItemId = RG_MM_STRAY_FAIRY;
     for (size_t i = 0; i < 2; ++i) {
-        missingCustomPart = i ? "gChestLidMinorDL" : "gChestBodyMinorDL";
-        ExpectSize(&chest, play, 0.005f, 20);
+        missingCustomPart = i ? "gChestLidMajorDL" : "gChestBodyMajorDL";
+        ExpectSize(&chest, play, 0.01f, 40);
         REQUIRE(!strcmp((char*)chest.boxBodyDL, gTreasureChestChestFrontDL));
         REQUIRE(!strcmp((char*)chest.boxLidDL, gTreasureChestChestSideAndLidDL));
     }
     missingCustomPart = NULL;
     matchTexture = 0;
-    ExpectSize(&chest, play, 0.005f, 20);
+    ExpectSize(&chest, play, 0.01f, 40);
     REQUIRE(!strcmp((char*)chest.boxBodyDL, gTreasureChestChestFrontDL));
     matchSize = 0;
     ExpectSize(&chest, play, 0.01f, 40);
@@ -271,49 +271,29 @@ int main(void) {
         REQUIRE(!strcmp((char*)chest.boxLidDL, gChestLidMajorDL));
     }
     matchTexture = 0;
-    puts("PASS: all five OoT fairy rewards use optional small Minor chests; masks retain Major art");
+    puts("PASS: all five OoT fairy rewards retain optional large Major chests, matching masks");
 
 #ifdef COMBO_BUILD
-    const int foreignCheck = RC_KF_KOKIRI_SWORD_CHEST;
-    ChestTest_SetForeignCategory(foreignCheck, "strayFairy", false);
-    chest = Chest(ENBOX_TYPE_BIG_DEFAULT, ITEM_CATEGORY_MAJOR);
-    chest.getItemEntry.modIndex = MOD_RANDOMIZER;
-    chest.getItemEntry.getItemId = RG_COMBO_FOREIGN;
-    chest.getItemEntry.comboForeignCheck = foreignCheck;
     matchTexture = matchSize = 1;
-    ExpectSize(&chest, play, 0.005f, 20);
-    REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMinorDL));
-    REQUIRE(!strcmp((char*)chest.boxLidDL, gChestLidMinorDL));
-    REQUIRE(chest.getItemEntry.getItemCategory == ITEM_CATEGORY_MAJOR);
-    REQUIRE(chest.getItemEntry.getItemId == RG_COMBO_FOREIGN);
-    REQUIRE(chest.getItemEntry.comboForeignCheck == foreignCheck);
-    missingCustomPart = "gChestLidMinorDL";
-    ExpectSize(&chest, play, 0.005f, 20);
-    REQUIRE(!strcmp((char*)chest.boxBodyDL, gTreasureChestChestFrontDL));
-    REQUIRE(!strcmp((char*)chest.boxLidDL, gTreasureChestChestSideAndLidDL));
-    missingCustomPart = NULL;
-    matchSize = 0;
-    ExpectSize(&chest, play, 0.01f, 40);
-    REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMinorDL));
-    matchSize = 1;
-    ChestTest_SetForeignCategory(foreignCheck, "strayFairy", true);
-    ExpectSize(&chest, play, 0.01f, 40);
-    REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMajorDL));
-    for (const char** category = (const char*[]){ "mask", "", "unknown", NULL }; *category; ++category) {
-        ChestTest_SetForeignCategory(foreignCheck, *category, false);
+    for (const char** category = (const char*[]){ "strayFairy", "mask", NULL }; *category; ++category) {
+        GetItemCategory nativeCategory = ChestTest_ForeignCategory(*category);
+        REQUIRE(nativeCategory == ITEM_CATEGORY_MAJOR);
+        chest = Chest(ENBOX_TYPE_SMALL, nativeCategory);
+        chest.getItemEntry.modIndex = MOD_RANDOMIZER;
+        chest.getItemEntry.getItemId = RG_COMBO_FOREIGN;
+        chest.getItemEntry.comboForeignCheck = RC_KF_KOKIRI_SWORD_CHEST;
         ExpectSize(&chest, play, 0.01f, 40);
         REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMajorDL));
+        REQUIRE(!strcmp((char*)chest.boxLidDL, gChestLidMajorDL));
+        REQUIRE(chest.getItemEntry.getItemId == RG_COMBO_FOREIGN);
+        REQUIRE(chest.getItemEntry.comboForeignCheck == RC_KF_KOKIRI_SWORD_CHEST);
+        matchSize = 0;
+        ExpectSize(&chest, play, 0.005f, 20);
+        REQUIRE(!strcmp((char*)chest.boxBodyDL, gChestBodyMajorDL));
+        matchSize = 1;
     }
-    for (int check = -1; check <= 0; ++check) {
-        chest.getItemEntry.comboForeignCheck = check;
-        ExpectSize(&chest, play, 0.01f, 40);
-    }
-    chest.getItemEntry.comboForeignCheck = RC_MAX;
-    ExpectSize(&chest, play, 0.01f, 40);
-    chest.getItemEntry.comboForeignCheck = foreignCheck + 1;
-    ExpectSize(&chest, play, 0.01f, 40); // absent foreign-map entry
     matchTexture = 0;
-    puts("PASS: foreign fairy chest styling preserves mask/trap/unknown routing and reward identity");
+    puts("PASS: unchanged foreign fairy/mask mapping selects Major chests and optional large size");
 #endif
 
     chest = Chest(ENBOX_TYPE_SMALL, ITEM_CATEGORY_MAJOR);

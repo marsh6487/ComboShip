@@ -1351,12 +1351,6 @@
   {
     "suite": "systems",
     "origin": "gate",
-    "name": "Missing custom audio data remains silent in OoT and MM",
-    "run": "python3 -B tests/audio_missing_sample/run_tests.py\npython3 -B tests/audio_missing_sample/run_tests.py --sanitize"
-  },
-  {
-    "suite": "systems",
-    "origin": "gate",
     "name": "2Ship weather, item-color, scene-randomization and streamed-audio regressions",
     "run": "python3 scripts/diagnostics/run_mm_scene_randomization_tests.py\npython3 scripts/diagnostics/run_mm_audio_runtime_test.py \"$RUNNER_TEMP/mm-audio-runtime\"\npython3 scripts/diagnostics/run_mm_audio_decoder_tests.py\npython3 scripts/diagnostics/run_mm_streamed_positional_tests.py --sanitize\npython3 scripts/diagnostics/run_mm_audio_pcm_tests.py\nMM_AUDIO_PCM_CFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py\npython3 scripts/diagnostics/run_native_audio_mixer_tests.py\npython3 tests/audio_mixer/run_pcm_diagnostics_tests.py\nNATIVE_AUDIO_CFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 scripts/diagnostics/run_native_audio_mixer_tests.py\npython3 scripts/diagnostics/run_mm_custom_item_color_tests.py\npython3 scripts/diagnostics/run_mm_hud_cosmetics_tests.py\npython3 scripts/diagnostics/run_mm_drop_lifetime_tests.py\npython3 scripts/diagnostics/run_mm_unrestricted_items_tests.py\npython3 scripts/diagnostics/run_mm_item_visuals_tests.py\npython3 tests/dungeon_keys/run_asset_tests.py\npython3 scripts/diagnostics/run_mm_dungeon_key_tests.py\npython3 scripts/diagnostics/run_mm_dungeon_key_tests.py --sanitize\npython3 scripts/diagnostics/run_mm_gfx_patch_tests.py"
   },
@@ -1581,5 +1575,11 @@
     "origin": "gate",
     "name": "Built-in Black Market materials and Granny interior availability",
     "run": "python3 -B tests/black_market/run_granny_availability_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Missing custom audio data remains silent in OoT and MM",
+    "run": "python3 -B tests/audio_missing_sample/run_tests.py\npython3 -B tests/audio_missing_sample/run_tests.py --sanitize"
   }
 ]

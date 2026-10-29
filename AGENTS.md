@@ -19,3 +19,4 @@ handoff. Do not wait for every workstream or the full executable to finish.
   source checks, native compilation, configured runtime proof and user acceptance.
 - Record remaining issues and dependency/load-order requirements with each
   handoff so another chat can continue without relying on agent memory.
+

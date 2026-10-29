@@ -7,3 +7,4 @@ extern "C" bool Test_PatchMmDisplayList(MmDisplayListCommand* commands, size_t c
                                         MmDisplayListPatchStats* stats) {
     return MmDisplayList_PatchCommands(commands, count, resolver, context, stats);
 }
+

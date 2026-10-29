@@ -20,14 +20,11 @@ static const struct {
     const char* body;
     const char* lid;
 } sModels[RITYPE_MAX] = {
-    [RITYPE_MAJOR] = { sBodyMajor, sLidMajor },
-    [RITYPE_LESSER] = { sBodyMinor, sLidMinor },
-    [RITYPE_HEALTH] = { sBodyHeart, sLidHeart },
-    [RITYPE_SMALL_KEY] = { sBodySmallKey, sLidSmallKey },
-    [RITYPE_SKULLTULA_TOKEN] = { sBodyToken, sLidToken },
-    [RITYPE_JUNK] = { sBodyJunk, sLidJunk },
+    [RITYPE_MAJOR] = { sBodyMajor, sLidMajor },           [RITYPE_LESSER] = { sBodyMinor, sLidMinor },
+    [RITYPE_HEALTH] = { sBodyHeart, sLidHeart },          [RITYPE_SMALL_KEY] = { sBodySmallKey, sLidSmallKey },
+    [RITYPE_SKULLTULA_TOKEN] = { sBodyToken, sLidToken }, [RITYPE_JUNK] = { sBodyJunk, sLidJunk },
     [RITYPE_MASK] = { sBodyMajor, sLidMajor },
-    [RITYPE_STRAY_FAIRY] = { sBodyMinor, sLidMinor },
+    [RITYPE_STRAY_FAIRY] = { sBodyMajor, sLidMajor },
 };
 
 static int MMChest_GetNativeItemType(s32 getItemId) {
@@ -161,8 +158,7 @@ float MMChest_PrepareDraw(EnBox* chest, PlayState* play) {
 
     float scale = 1.0f;
     if (matchSize) {
-        bool small = category == RITYPE_JUNK || category == RITYPE_SMALL_KEY || category == RITYPE_SKULLTULA_TOKEN ||
-                     category == RITYPE_STRAY_FAIRY;
+        bool small = category == RITYPE_JUNK || category == RITYPE_SMALL_KEY || category == RITYPE_SKULLTULA_TOKEN;
         scale = (small ? 0.0075f : 0.01f) / (Actor_IsSmallChest(chest) ? 0.0075f : 0.01f);
     }
 
