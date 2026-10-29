@@ -160,17 +160,20 @@ int main() {
     assert(parent.textureImport.nanos == 80 && parent.driverDraw.nanos == 30 && parent.shaderCreate.nanos == 10);
     assert(parent.upload.nanos == 30 && !parent.selfUnknownCommands);
     assert(detailed.Report().passes[1].framebuffer == 7 && detailed.Report().passes[1].self.nanos == 30);
-    assert(detailed.Report().textures[1].sourceDataBytes == 1024 && detailed.Report().textures[1].sourceBackingBytes == 1056);
+    assert(detailed.Report().textures[1].sourceDataBytes == 1024 &&
+           detailed.Report().textures[1].sourceBackingBytes == 1056);
     assert(detailed.Report().textures[1].bytes == 2048 && detailed.Report().textures[1].uploadWidth == 32);
     detailed.DescribeTexture(64, 16, 2, 0, 2048);
     detailed.NoteTextureCache(true);
     detailed.AddUpload(4096, 5, 64, 16);
-    assert(detailed.Report().textures[1].metadataChanges == 1 && detailed.Report().textures[1].uploadDimensionChanges == 1);
+    assert(detailed.Report().textures[1].metadataChanges == 1 &&
+           detailed.Report().textures[1].uploadDimensionChanges == 1);
     assert(detailed.Report().textures[1].cacheHits == 1 && detailed.Report().textures[1].cacheMisses == 1);
     assert(detailed.Report().resources[0].upload.nanos == 5); // Outside a command has no list owner.
     detailed.SetResource("<unresolved-marker>");
     detailed.AddCommand(4, 5, "G_TRI1", 10);
-    assert(detailed.Report().resources[0].commands.nanos == 10 && detailed.Report().resources[0].selfUnknownCommands == 1);
+    assert(detailed.Report().resources[0].commands.nanos == 10 &&
+           detailed.Report().resources[0].selfUnknownCommands == 1);
     assert(detailed.Report().unknownResourceSelections == 1);
     detailed.SetResource("parent");
     detailed.BeginCommand();

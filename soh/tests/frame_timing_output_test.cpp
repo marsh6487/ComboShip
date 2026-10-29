@@ -32,7 +32,8 @@ int main(int argc, char** argv) {
     const auto captureDirectory = std::filesystem::path(logPath).parent_path();
     std::set<std::filesystem::path> previousCaptures;
     for (const auto& entry : std::filesystem::directory_iterator(captureDirectory))
-        if (entry.path().filename().string().starts_with("OoT-RenderFlight-")) previousCaptures.insert(entry.path());
+        if (entry.path().filename().string().starts_with("OoT-RenderFlight-"))
+            previousCaptures.insert(entry.path());
 
     // Exercise the production adapter and the same asynchronous rotating-file
     // sink used by release builds, with normal game logging disabled.
@@ -99,8 +100,8 @@ int main(int argc, char** argv) {
         auto fastDetail = render.Report();
         fastDetail.frameIndex = 2;
         FrameTiming_LogRenderCost(fastDetail, play); // Explicit detailed capture retains ordinary fast frames too.
-        assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
-        assert(spdlog::default_logger() == decoy); // Keep module-local logging unchanged.
+        assert(gameLogger->level() == level);        // Preserve the user's normal logging preference.
+        assert(spdlog::default_logger() == decoy);   // Keep module-local logging unchanged.
     }
     FrameTiming_BeginFrame(play, 0);
     FrameTiming_EndFrame(play, 0);
@@ -119,7 +120,8 @@ int main(int argc, char** argv) {
     // capture retains the complete session and is the supported analysis input.
     std::filesystem::path completeCapture;
     for (const auto& entry : std::filesystem::directory_iterator(captureDirectory)) {
-        if (entry.path().filename().string().starts_with("OoT-RenderFlight-") && !previousCaptures.contains(entry.path())) {
+        if (entry.path().filename().string().starts_with("OoT-RenderFlight-") &&
+            !previousCaptures.contains(entry.path())) {
             assert(completeCapture.empty());
             completeCapture = entry.path();
         }

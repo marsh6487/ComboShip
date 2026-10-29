@@ -1533,10 +1533,9 @@ void SaveManager::SaveSection(int fileNum, int sectionID, bool threaded) {
     auto saveContext = std::make_shared<SaveContext>(gSaveContext);
     auto sceneState = std::make_shared<const SceneDBState>(SceneDB_CaptureState());
     if (threaded) {
-        smThreadPool->detach_task(
-            [this, fileNum, saveContext, sceneState, sectionID] {
-                SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
-            });
+        smThreadPool->detach_task([this, fileNum, saveContext, sceneState, sectionID] {
+            SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
+        });
     } else {
         SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
     }

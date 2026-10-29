@@ -86,13 +86,13 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     template <class Visit> bool WithVertexData(const std::shared_ptr<Ship::IResource>& resource, Visit visit) {
         if (const auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(resource))
             return visit(vertices->VertexList, vertices->RecordSize);
-        // OoT widens binary vertex arrays into Fast::Vertex. MM retains its legacy
-        // Array factory; scalar arrays are not geometry and its declared count must
-        // match the storage filled by that factory.
+            // OoT widens binary vertex arrays into Fast::Vertex. MM retains its legacy
+            // Array factory; scalar arrays are not geometry and its declared count must
+            // match the storage filled by that factory.
 #ifdef MM_BUILD_DLL
         if (const auto array = std::dynamic_pointer_cast<SOH::Array>(resource);
             array && array->ArrayType == SOH::ArrayResourceType::Vertex && array->ArrayCount == array->Vertices.size())
-            return visit(array->Vertices, size_t{16});
+            return visit(array->Vertices, size_t{ 16 });
 #endif
         return false;
     }

@@ -842,8 +842,8 @@ void EnKanban_Draw(Actor* thisx, PlayState* play) {
             gSPDisplayList(POLY_XLU_DISP++, object_kanban_DL_001630);
         }
     }
-    if (!ToonLighting_SuppressVanillaShadows() && (this->actor.projectedPos.z <= 400.0f) && (this->actor.projectedPos.z > 0.0f) &&
-        (this->actor.floorHeight > -3000.0f)) {
+    if (!ToonLighting_SuppressVanillaShadows() && (this->actor.projectedPos.z <= 400.0f) &&
+        (this->actor.projectedPos.z > 0.0f) && (this->actor.floorHeight > -3000.0f)) {
         if ((this->bounceX != 0) || (this->bounceZ != 0)) {
             u16 dayTime = gSaveContext.dayTime;
             f32 shadowAlpha;

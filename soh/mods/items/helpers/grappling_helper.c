@@ -122,8 +122,8 @@ s32 Grapple_AnalyzeSurface(PlayState* play, CollisionPoly* poly, s32 bgId, Vec3f
     } else {
         DynaCollisionContext* dyna = &play->colCtx.dyna;
         u32 polyStart;
-        if (bgId < 0 || bgId >= dyna->bgActorMax || !(dyna->bgActorFlags[bgId] & 1) ||
-            (dyna->bgActorFlags[bgId] & 2) || dyna->polyListMax <= 0 || dyna->vtxListMax <= 0)
+        if (bgId < 0 || bgId >= dyna->bgActorMax || !(dyna->bgActorFlags[bgId] & 1) || (dyna->bgActorFlags[bgId] & 2) ||
+            dyna->polyListMax <= 0 || dyna->vtxListMax <= 0)
             return 0;
         polyStart = dyna->bgActors[bgId].dynaLookup.polyStartIndex;
         if (polyStart >= (u32)dyna->polyListMax || dyna->polyList == NULL)

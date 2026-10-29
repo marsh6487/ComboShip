@@ -320,17 +320,20 @@ extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
 
 nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report) {
     auto counter = [](const Fast::RenderCostCounter& value) {
-        return nlohmann::json{{"calls", value.calls}, {"ms", value.nanos / 1000000.0}};
+        return nlohmann::json{ { "calls", value.calls }, { "ms", value.nanos / 1000000.0 } };
     };
     auto resource = [&](const Fast::RenderResourceCost& value) {
         return nlohmann::json{
-            {"path", value.path}, {"calls", value.commands.calls}, {"ms", value.commands.nanos / 1000000.0},
-            {"self", report.selfAttribution ? counter(value.self) : nlohmann::json(nullptr)},
-            {"self_unknown_commands", value.selfUnknownCommands},
-            {"texture_import", report.operationAttribution ? counter(value.textureImport) : nlohmann::json(nullptr)},
-            {"driver_draw", report.operationAttribution ? counter(value.driverDraw) : nlohmann::json(nullptr)},
-            {"shader_create", report.operationAttribution ? counter(value.shaderCreate) : nlohmann::json(nullptr)},
-            {"upload", counter(value.upload)}};
+            { "path", value.path },
+            { "calls", value.commands.calls },
+            { "ms", value.commands.nanos / 1000000.0 },
+            { "self", report.selfAttribution ? counter(value.self) : nlohmann::json(nullptr) },
+            { "self_unknown_commands", value.selfUnknownCommands },
+            { "texture_import", report.operationAttribution ? counter(value.textureImport) : nlohmann::json(nullptr) },
+            { "driver_draw", report.operationAttribution ? counter(value.driverDraw) : nlohmann::json(nullptr) },
+            { "shader_create", report.operationAttribution ? counter(value.shaderCreate) : nlohmann::json(nullptr) },
+            { "upload", counter(value.upload) }
+        };
     };
     auto texture = [&](const Fast::RenderTextureCost& value) {
         auto result = counter(value.upload);
@@ -343,8 +346,10 @@ nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report) {
         result["source_height"] = value.metadataKnown ? nlohmann::json(value.height) : nlohmann::json(nullptr);
         result["source_format"] = value.metadataKnown ? nlohmann::json(value.format) : nlohmann::json(nullptr);
         result["source_flags"] = value.metadataKnown ? nlohmann::json(value.flags) : nlohmann::json(nullptr);
-        result["source_data_bytes"] = value.metadataKnown ? nlohmann::json(value.sourceDataBytes) : nlohmann::json(nullptr);
-        result["source_backing_bytes"] = value.sourceBackingKnown ? nlohmann::json(value.sourceBackingBytes) : nlohmann::json(nullptr);
+        result["source_data_bytes"] =
+            value.metadataKnown ? nlohmann::json(value.sourceDataBytes) : nlohmann::json(nullptr);
+        result["source_backing_bytes"] =
+            value.sourceBackingKnown ? nlohmann::json(value.sourceBackingBytes) : nlohmann::json(nullptr);
         result["source_backing_shared"] = value.sourceBackingKnown;
         // Fast::Texture may hold packed N64 texels or decoded image data. Its
         // byte count cannot establish a distinct per-texture RGBA allocation.
@@ -360,7 +365,8 @@ nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report) {
         return result;
     };
     auto resourceActive = [](const Fast::RenderResourceCost& value) {
-        return value.commands.calls || value.upload.calls || value.textureImport.calls || value.driverDraw.calls || value.shaderCreate.calls;
+        return value.commands.calls || value.upload.calls || value.textureImport.calls || value.driverDraw.calls ||
+               value.shaderCreate.calls;
     };
     auto textureActive = [](const Fast::RenderTextureCost& value) {
         return value.upload.calls || value.imports.calls || value.metadataKnown || value.cacheHits || value.cacheMisses;
@@ -368,22 +374,29 @@ nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report) {
     auto resources = nlohmann::json::array(), textures = nlohmann::json::array(), passes = nlohmann::json::array();
     std::vector<size_t> order;
     for (size_t i = 0; i < report.resources.size(); ++i)
-        if (i != 0 || resourceActive(report.resources[i])) order.push_back(i);
+        if (i != 0 || resourceActive(report.resources[i]))
+            order.push_back(i);
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
         return report.resources[a].commands.nanos > report.resources[b].commands.nanos;
     });
-    for (const auto index : order) resources.push_back(resource(report.resources[index]));
-    if (resourceActive(report.overflowResource)) resources.push_back(resource(report.overflowResource));
+    for (const auto index : order)
+        resources.push_back(resource(report.resources[index]));
+    if (resourceActive(report.overflowResource))
+        resources.push_back(resource(report.overflowResource));
     order.clear();
     for (size_t i = 0; i < report.textures.size(); ++i)
-        if (i != 0 || textureActive(report.textures[i])) order.push_back(i);
+        if (i != 0 || textureActive(report.textures[i]))
+            order.push_back(i);
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
         return report.textures[a].upload.nanos > report.textures[b].upload.nanos;
     });
-    for (const auto index : order) textures.push_back(texture(report.textures[index]));
-    if (textureActive(report.overflowTexture)) textures.push_back(texture(report.overflowTexture));
+    for (const auto index : order)
+        textures.push_back(texture(report.textures[index]));
+    if (textureActive(report.overflowTexture))
+        textures.push_back(texture(report.overflowTexture));
     for (const auto& value : report.passes) {
-        if (value.framebuffer < 0 && !resourceActive(value)) continue;
+        if (value.framebuffer < 0 && !resourceActive(value))
+            continue;
         auto entry = resource(value);
         entry["framebuffer"] = value.framebuffer < 0 ? nlohmann::json(nullptr) : nlohmann::json(value.framebuffer);
         passes.push_back(std::move(entry));
@@ -393,22 +406,38 @@ nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report) {
         entry["framebuffer"] = nullptr;
         passes.push_back(std::move(entry));
     }
-    return {{"resources", std::move(resources)}, {"textures", std::move(textures)}, {"passes", std::move(passes)},
-            {"resource_keys", report.resources.size()}, {"texture_keys", report.textures.size()}, {"pass_keys", report.passes.size()},
-            {"resource_limit", Fast::RenderCostProbe::MaxResources}, {"texture_limit", Fast::RenderCostProbe::MaxTextures},
-            {"pass_limit", Fast::RenderCostProbe::MaxPasses},
-            {"resource_overflow", report.resourceOverflow}, {"texture_overflow", report.textureOverflow}, {"pass_overflow", report.passOverflow},
-            {"unknown_resource_selections", report.unknownResourceSelections}, {"unknown_texture_selections", report.unknownTextureSelections},
-            {"unmarked_resource_commands", report.resources.empty() ? 0 : report.resources[0].commands.calls},
-            {"invalid_opcodes", report.invalidOpcodes}, {"self_accounting_clamps", report.selfAccountingClamps},
-            {"self_attribution", report.selfAttribution}, {"operation_attribution", report.operationAttribution},
-            {"pass_attribution", report.passAttribution}, {"emission_truncated", false},
-            {"table_semantics", "all collected identities, including separate unknown and limit-overflow rows; limits include one unknown bucket; "
-                                "CPU elapsed on renderer thread includes waits; command time excludes child-list execution; "
-                                "self subtracts union of nested import/draw/shader/upload scopes; operation scopes overlap; "
-                                "draw attribution identifies the submission trigger, not each batched primitive; passes identify framebuffer targets, not GPU passes; "
-                                "texture metadata is last observed source payload and optional shared backing extent, not unique engine/GPU residency; residency unavailable; "
-                                "import scopes include cache lookup, conversion and upload; path keys do not distinguish resource managers"}};
+    return { { "resources", std::move(resources) },
+             { "textures", std::move(textures) },
+             { "passes", std::move(passes) },
+             { "resource_keys", report.resources.size() },
+             { "texture_keys", report.textures.size() },
+             { "pass_keys", report.passes.size() },
+             { "resource_limit", Fast::RenderCostProbe::MaxResources },
+             { "texture_limit", Fast::RenderCostProbe::MaxTextures },
+             { "pass_limit", Fast::RenderCostProbe::MaxPasses },
+             { "resource_overflow", report.resourceOverflow },
+             { "texture_overflow", report.textureOverflow },
+             { "pass_overflow", report.passOverflow },
+             { "unknown_resource_selections", report.unknownResourceSelections },
+             { "unknown_texture_selections", report.unknownTextureSelections },
+             { "unmarked_resource_commands", report.resources.empty() ? 0 : report.resources[0].commands.calls },
+             { "invalid_opcodes", report.invalidOpcodes },
+             { "self_accounting_clamps", report.selfAccountingClamps },
+             { "self_attribution", report.selfAttribution },
+             { "operation_attribution", report.operationAttribution },
+             { "pass_attribution", report.passAttribution },
+             { "emission_truncated", false },
+             { "table_semantics",
+               "all collected identities, including separate unknown and limit-overflow rows; limits include one "
+               "unknown bucket; "
+               "CPU elapsed on renderer thread includes waits; command time excludes child-list execution; "
+               "self subtracts union of nested import/draw/shader/upload scopes; operation scopes overlap; "
+               "draw attribution identifies the submission trigger, not each batched primitive; passes identify "
+               "framebuffer targets, not GPU passes; "
+               "texture metadata is last observed source payload and optional shared backing extent, not unique "
+               "engine/GPU residency; residency unavailable; "
+               "import scopes include cache lookup, conversion and upload; path keys do not distinguish resource "
+               "managers" } };
 }
 
 extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context) {
@@ -559,10 +588,14 @@ nlohmann::json FrameTiming_RenderSummary(const Fast::RenderCostReport& r) {
              { "cache_clears_total", r.cacheClearsTotal },
              { "cache_deletes_total", r.cacheDeletesTotal },
              { "resource_overflow", r.resourceOverflow },
-             { "texture_overflow", r.textureOverflow }, { "pass_overflow", r.passOverflow },
-             { "resource_keys", r.resources.size() }, { "texture_keys", r.textures.size() },
-             { "pass_keys", r.passes.size() }, { "self_attribution", r.selfAttribution },
-             { "operation_attribution", r.operationAttribution }, { "pass_attribution", r.passAttribution },
+             { "texture_overflow", r.textureOverflow },
+             { "pass_overflow", r.passOverflow },
+             { "resource_keys", r.resources.size() },
+             { "texture_keys", r.textures.size() },
+             { "pass_keys", r.passes.size() },
+             { "self_attribution", r.selfAttribution },
+             { "operation_attribution", r.operationAttribution },
+             { "pass_attribution", r.passAttribution },
              { "render_width", r.renderWidth },
              { "render_height", r.renderHeight },
              { "msaa", r.msaa } };

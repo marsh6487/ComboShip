@@ -90,7 +90,7 @@ void BgCheck_InvalidateRoomSnapshots(CollisionContext* colCtx) {
 }
 
 s32 BgCheck_TrackDynaGeometry(DynaCollisionContext* dyna, void* polys, size_t polyBytes, void* vertices,
-                             size_t vertexBytes) {
+                              size_t vertexBytes) {
     BgCheckOwner* owner = sBgCheckOwners;
     BgCheckOwnedBuffer* poly = NULL;
     BgCheckOwnedBuffer* vertex = NULL;

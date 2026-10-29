@@ -854,7 +854,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                             std::filesystem::exists(
                                 Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName)) ||
                             std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
-                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
+                            std::filesystem::exists(
+                                Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
 
                         if (!ootO2RExists) {
                             SohGui::RegisterPopup(
@@ -928,7 +929,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                 const bool ootO2RExists =
                     std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName)) ||
                     std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName)) ||
-                            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
+                    std::filesystem::exists(
+                        Ship::Context::LocateFileAcrossAppDirs(SOH::Unbound::kBaseArchiveName, appShortName));
 
                 if (!ootO2RExists) {
                     SohGui::RegisterPopup("No ROM Archives",
@@ -1146,7 +1148,8 @@ static void FinishUnboundArchiveSetup(bool standalone, const std::string& ootPat
         // Alt assets are a runtime preference. A generated base always describes the clean vanilla archives.
         bool altAssets = resources->IsAltAssetsEnabled();
         resources->SetAltAssetsEnabled(false);
-        std::string dir = std::filesystem::path(std::filesystem::exists(ootPath) ? ootPath : mqPath).parent_path().string();
+        std::string dir =
+            std::filesystem::path(std::filesystem::exists(ootPath) ? ootPath : mqPath).parent_path().string();
         SOH::Unbound::EnsureBaseArchive(dir);
         resources->SetAltAssetsEnabled(altAssets);
     }

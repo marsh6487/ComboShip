@@ -18,7 +18,8 @@ namespace SOH::Unbound {
 namespace {
 class LegacyGraph {
   public:
-    explicit LegacyGraph(std::shared_ptr<Ship::ResourceManager> owner) : resources(std::move(owner)) {}
+    explicit LegacyGraph(std::shared_ptr<Ship::ResourceManager> owner) : resources(std::move(owner)) {
+    }
 
     int Rank(std::string path) const {
         if (path.starts_with("__OTR__")) {

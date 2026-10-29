@@ -189,8 +189,7 @@ void SohMenu::AddMenuWindWakerStyle() {
         .CVar(CVAR_ENHANCEMENT("Graphics.WorldLighting.FlickerSpeed"))
         .RaceDisable(false)
         .PreFunc([](WidgetInfo& info) {
-            info.options->disabled =
-                !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.WorldLighting.ImproveFlameFlicker"), 1);
+            info.options->disabled = !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.WorldLighting.ImproveFlameFlicker"), 1);
             info.options->disabledTooltip = "Enable \"Improve Flame Flicker\" to adjust this.";
         })
         .Options(FloatSliderOptions()
@@ -294,12 +293,12 @@ void SohMenu::AddMenuWindWakerStyle() {
                      .Min(0.0f)
                      .Max(3.0f)
                      .DefaultValue(1.0f));
-    addSliderWithReset("Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.SphereSize"), 0.1f, 4.0f, 0.5f,
-                       "%.2fx", false, hideUnlessLightCastEnabled,
+    addSliderWithReset("Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.SphereSize"), 0.1f, 4.0f, 0.5f, "%.2fx",
+                       false, hideUnlessLightCastEnabled,
                        "Size of each light's cast pool, as a multiplier on the light's radius. Smaller keeps "
                        "the pool tight around the source; larger spreads it wider.");
-    addSliderWithReset("Light Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.Intensity"), 0.0f, 2.0f,
-                       0.2f, nullptr, true, hideUnlessLightCastEnabled, "Brightness of the cast light pools.");
+    addSliderWithReset("Light Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.Intensity"), 0.0f, 2.0f, 0.2f,
+                       nullptr, true, hideUnlessLightCastEnabled, "Brightness of the cast light pools.");
 
     // Navi
     AddWidget(path, "WWLSepNavi", WIDGET_SEPARATOR).RaceDisable(false).PreFunc(hideUnlessLightCastEnabled);
@@ -309,12 +308,12 @@ void SohMenu::AddMenuWindWakerStyle() {
         .PreFunc(hideUnlessLightCastEnabled)
         .Options(CheckboxOptions().DefaultValue(true).Tooltip(
             "Also cast a pool from Link's fairy (Navi). Navi darts around quickly, so her pool moves a lot."));
-    addSliderWithReset("Navi Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviSphereSize"), 0.1f, 4.0f,
-                       0.75f, "%.2fx", false, hideUnlessNaviCast,
+    addSliderWithReset("Navi Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviSphereSize"), 0.1f, 4.0f, 0.75f,
+                       "%.2fx", false, hideUnlessNaviCast,
                        "Navi's pool size, separate from the main Cast Size, so you can keep Navi tight "
                        "without shrinking the torches.");
-    addSliderWithReset("Navi Light Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviIntensity"), 0.0f,
-                       2.0f, 0.2f, nullptr, true, hideUnlessNaviCast,
+    addSliderWithReset("Navi Light Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviIntensity"), 0.0f, 2.0f,
+                       0.2f, nullptr, true, hideUnlessNaviCast,
                        "Navi's pool brightness, separate from the main Light Intensity.");
 
     // Other fairies
@@ -328,12 +327,12 @@ void SohMenu::AddMenuWindWakerStyle() {
             "like Kokiri Forest, and the healing fairies found out in the world (the magic one casts a wider "
             "pool). Since it turns them into real light sources, they then cast light pools AND can light nearby "
             "objects via Cel Shading, the same as Navi. A cluster of them can make the lighting busy."));
-    addSliderWithReset("Other Fairy Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.WildFairySphereSize"),
-                       0.1f, 4.0f, 0.75f, "%.2fx", false, hideUnlessWildFairyCast,
+    addSliderWithReset("Other Fairy Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.WildFairySphereSize"), 0.1f,
+                       4.0f, 0.75f, "%.2fx", false, hideUnlessWildFairyCast,
                        "Pool size for non-Navi fairies (Kokiri Forest fairies + the healing fairies), separate "
                        "from torches and Navi. The magic (big) fairy is already larger than the rest.");
-    addSliderWithReset("Other Fairy Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.WildFairyIntensity"),
-                       0.0f, 2.0f, 0.2f, nullptr, true, hideUnlessWildFairyCast,
+    addSliderWithReset("Other Fairy Intensity", CVAR_ENHANCEMENT("Graphics.WorldLighting.WildFairyIntensity"), 0.0f,
+                       2.0f, 0.2f, nullptr, true, hideUnlessWildFairyCast,
                        "Pool brightness for non-Navi fairies, separate from the main Light Intensity.");
 
     AddWidget(path, "Debug", WIDGET_SEPARATOR_TEXT).PreFunc(hideUnlessLightCastEnabled);
@@ -357,8 +356,8 @@ void SohMenu::AddMenuWindWakerStyle() {
             "Makes a lit, held Deku stick a real light source at its burning tip (it isn't in vanilla). Like a "
             "torch it lights nearby objects via Cel Shading and casts their shadows, and — with Light Casting "
             "on — casts its own pool on the world. This one toggle controls all three."));
-    addSliderWithReset("Deku Stick Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.DekuStickSphereSize"),
-                       0.1f, 4.0f, 0.5f, "%.2fx", false, hideUnlessDekuStickCast,
+    addSliderWithReset("Deku Stick Cast Size", CVAR_ENHANCEMENT("Graphics.WorldLighting.DekuStickSphereSize"), 0.1f,
+                       4.0f, 0.5f, "%.2fx", false, hideUnlessDekuStickCast,
                        "The held Deku stick's pool size, separate from torches, so you can size the stick's "
                        "pool on its own.");
 

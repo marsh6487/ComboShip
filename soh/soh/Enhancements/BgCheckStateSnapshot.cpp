@@ -31,7 +31,9 @@ Bytes Copy(const void* pointer, size_t size) {
 }
 
 struct FreeBytes {
-    void operator()(void* pointer) const noexcept { std::free(pointer); }
+    void operator()(void* pointer) const noexcept {
+        std::free(pointer);
+    }
 };
 using Allocation = std::unique_ptr<void, FreeBytes>;
 
@@ -69,8 +71,10 @@ struct BgCheckRestoreData {
     bool committed = false;
 };
 
-BgCheckStateSnapshot::BgCheckStateSnapshot(std::shared_ptr<BgCheckSnapshotData> data) : data(std::move(data)) {}
-BgCheckStateRestore::BgCheckStateRestore(std::unique_ptr<BgCheckRestoreData> data) : data(std::move(data)) {}
+BgCheckStateSnapshot::BgCheckStateSnapshot(std::shared_ptr<BgCheckSnapshotData> data) : data(std::move(data)) {
+}
+BgCheckStateRestore::BgCheckStateRestore(std::unique_ptr<BgCheckRestoreData> data) : data(std::move(data)) {
+}
 BgCheckStateRestore::~BgCheckStateRestore() = default;
 
 std::unique_ptr<BgCheckStateSnapshot> BgCheckStateSnapshot::Capture(CollisionContext* context) noexcept {
@@ -99,18 +103,16 @@ std::unique_ptr<BgCheckStateSnapshot> BgCheckStateSnapshot::Capture(CollisionCon
         std::vector<BgCheckGeometryBuffer> buffers(BgCheck_GetGeometryBuffers(context, nullptr, 0));
         if (BgCheck_GetGeometryBuffers(context, buffers.data(), buffers.size()) != buffers.size() ||
             !BgCheck_OwnsGeometryBuffer(context, context->dyna.polyList,
-                                       ByteCount(context->dyna.polyListMax, sizeof(CollisionPoly))) ||
+                                        ByteCount(context->dyna.polyListMax, sizeof(CollisionPoly))) ||
             !BgCheck_OwnsGeometryBuffer(context, context->dyna.vtxList,
-                                       ByteCount(context->dyna.vtxListMax, sizeof(Vec3i)))) {
+                                        ByteCount(context->dyna.vtxListMax, sizeof(Vec3i)))) {
             return nullptr;
         }
         for (const auto& buffer : buffers) {
             saved->geometry.push_back({ buffer.address, Copy(buffer.address, buffer.size) });
         }
         return std::unique_ptr<BgCheckStateSnapshot>(new BgCheckStateSnapshot(std::move(saved)));
-    } catch (const std::exception&) {
-        return nullptr;
-    }
+    } catch (const std::exception&) { return nullptr; }
 }
 
 bool BgCheckStateSnapshot::Matches(const CollisionContext* context) const noexcept {
@@ -136,9 +138,7 @@ std::unique_ptr<BgCheckStateRestore> BgCheckStateSnapshot::Prepare(CollisionCont
         restore->dynamicNodes = Clone(data->dynamicNodes);
         auto prepared = std::unique_ptr<BgCheckStateRestore>(new BgCheckStateRestore(std::move(restore)));
         return prepared->Validate() ? std::move(prepared) : nullptr;
-    } catch (const std::exception&) {
-        return nullptr;
-    }
+    } catch (const std::exception&) { return nullptr; }
 }
 
 bool BgCheckStateRestore::Validate() const noexcept {
@@ -148,12 +148,11 @@ bool BgCheckStateRestore::Validate() const noexcept {
     const auto& saved = *data->snapshot;
     const auto* live = data->context;
     const auto& old = data->previous;
-    if (BgCheck_GetAllocationEpoch(live) != saved.allocationEpoch ||
-        BgCheck_GetRoomEpoch(live) != saved.roomEpoch || live->lookupTbl != old.lookupTbl ||
-        live->polyNodes.tbl != old.polyNodes.tbl || live->polyNodes.polyCheckTbl != old.polyNodes.polyCheckTbl ||
-        live->dyna.bgActors != old.dyna.bgActors || live->dyna.bgActorFlags != old.dyna.bgActorFlags ||
-        live->dyna.polyNodes.tbl != old.dyna.polyNodes.tbl || live->dyna.polyList != old.dyna.polyList ||
-        live->dyna.vtxList != old.dyna.vtxList) {
+    if (BgCheck_GetAllocationEpoch(live) != saved.allocationEpoch || BgCheck_GetRoomEpoch(live) != saved.roomEpoch ||
+        live->lookupTbl != old.lookupTbl || live->polyNodes.tbl != old.polyNodes.tbl ||
+        live->polyNodes.polyCheckTbl != old.polyNodes.polyCheckTbl || live->dyna.bgActors != old.dyna.bgActors ||
+        live->dyna.bgActorFlags != old.dyna.bgActorFlags || live->dyna.polyNodes.tbl != old.dyna.polyNodes.tbl ||
+        live->dyna.polyList != old.dyna.polyList || live->dyna.vtxList != old.dyna.vtxList) {
         return false;
     }
     for (const auto& buffer : saved.geometry) {

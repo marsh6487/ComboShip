@@ -1090,7 +1090,9 @@ struct CollisionCheckQueueRestore {
 static CollisionCheckQueueOwner* sCollisionCheckQueueOwners;
 static uint64_t sCollisionCheckQueueEpoch;
 static const s32 sCollisionCheckInitialCapacities[3] = {
-    COLLISION_CHECK_AT_INITIAL_CAPACITY, COLLISION_CHECK_AC_INITIAL_CAPACITY, COLLISION_CHECK_OC_INITIAL_CAPACITY,
+    COLLISION_CHECK_AT_INITIAL_CAPACITY,
+    COLLISION_CHECK_AC_INITIAL_CAPACITY,
+    COLLISION_CHECK_OC_INITIAL_CAPACITY,
 };
 
 static CollisionCheckQueueOwner* CollisionCheck_FindQueueOwner(const CollisionCheckContext* context) {
@@ -1138,10 +1140,10 @@ static s32 CollisionCheck_QueueContextMatchesOwner(const CollisionCheckQueueOwne
     return context->colAT == owner->queues[0] && context->colATCapacity == owner->capacities[0] &&
            context->colAC == owner->queues[1] && context->colACCapacity == owner->capacities[1] &&
            context->colOC == owner->queues[2] && context->colOCCapacity == owner->capacities[2] &&
-           context->colATCount >= 0 && context->colATCount <= owner->capacities[0] &&
-           context->colACCount >= 0 && context->colACCount <= owner->capacities[1] &&
-           context->colOCCount >= 0 && context->colOCCount <= owner->capacities[2] &&
-           context->colLineCount >= 0 && context->colLineCount <= COLLISION_CHECK_OC_LINE_MAX;
+           context->colATCount >= 0 && context->colATCount <= owner->capacities[0] && context->colACCount >= 0 &&
+           context->colACCount <= owner->capacities[1] && context->colOCCount >= 0 &&
+           context->colOCCount <= owner->capacities[2] && context->colLineCount >= 0 &&
+           context->colLineCount <= COLLISION_CHECK_OC_LINE_MAX;
 }
 
 static void CollisionCheck_QueueOwnerChanged(CollisionCheckQueueOwner* owner) {
@@ -1186,9 +1188,9 @@ static s32 CollisionCheck_AppendQueue(CollisionCheckContext* context, s32 kind, 
     if (owner == NULL) {
         // Init can fail to allocate even the owner record. Its zeroed queues may
         // retry at registration; never adopt pointers from an unowned context.
-        if (context->colAT != NULL || context->colAC != NULL || context->colOC != NULL ||
-            context->colATCapacity != 0 || context->colACCapacity != 0 || context->colOCCapacity != 0 ||
-            context->colATCount != 0 || context->colACCount != 0 || context->colOCCount != 0) {
+        if (context->colAT != NULL || context->colAC != NULL || context->colOC != NULL || context->colATCapacity != 0 ||
+            context->colACCapacity != 0 || context->colOCCapacity != 0 || context->colATCount != 0 ||
+            context->colACCount != 0 || context->colOCCount != 0) {
             return -1;
         }
         owner = CollisionCheck_CreateQueueOwner(context);
@@ -1208,8 +1210,8 @@ static s32 CollisionCheck_AppendQueue(CollisionCheckContext* context, s32 kind, 
 
 static s32 CollisionCheck_ReplaceQueue(CollisionCheckContext* context, s32 kind, Collider* collider, s32 index) {
     CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
-    if (owner == NULL || !CollisionCheck_QueueContextMatchesOwner(owner) ||
-        index < 0 || index >= *CollisionCheck_QueueCount(context, kind)) {
+    if (owner == NULL || !CollisionCheck_QueueContextMatchesOwner(owner) || index < 0 ||
+        index >= *CollisionCheck_QueueCount(context, kind)) {
         return -1;
     }
     owner->queues[kind][index] = collider;
@@ -1226,7 +1228,7 @@ static void CollisionCheck_FreeQueueState(CollisionCheckQueueState* state) {
 }
 
 static s32 CollisionCheck_CloneQueueState(CollisionCheckQueueState* destination,
-                                         const CollisionCheckQueueState* source) {
+                                          const CollisionCheckQueueState* source) {
     s32 kind;
     *destination = *source;
     memset(destination->queues, 0, sizeof(destination->queues));
@@ -1295,7 +1297,7 @@ void CollisionCheck_FreeQueueSnapshot(CollisionCheckQueueSnapshot* snapshot) {
 }
 
 CollisionCheckQueueRestore* CollisionCheck_PrepareQueueRestore(CollisionCheckContext* context,
-                                                              const CollisionCheckQueueSnapshot* snapshot) {
+                                                               const CollisionCheckQueueSnapshot* snapshot) {
     CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
     CollisionCheckQueueRestore* restore;
     if (snapshot == NULL || owner == NULL || snapshot->context != context || snapshot->epoch == 0 ||

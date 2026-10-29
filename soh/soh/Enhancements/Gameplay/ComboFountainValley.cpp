@@ -273,7 +273,8 @@ void Init(Actor* actor, PlayState* play) {
     Build(play->colCtx.colHeader);
     if (sCollision.numPolygons) {
         self->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, actor, &sCollision);
-        if (self->dyna.bgId < 0 || self->dyna.bgId == BGACTOR_INVALID || self->dyna.bgId >= play->colCtx.dyna.bgActorMax) {
+        if (self->dyna.bgId < 0 || self->dyna.bgId == BGACTOR_INVALID ||
+            self->dyna.bgId >= play->colCtx.dyna.bgActorMax) {
             Actor_Kill(actor);
             return;
         }

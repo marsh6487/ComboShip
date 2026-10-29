@@ -69,7 +69,7 @@ void TransitionUnk_InitGraphics(TransitionUnk* this) {
     gfx = this->gfx;
     for (colTex = 0, col = 0; col < this->col; colTex += 0x20, col++) {
 
-// Segmented display-list offsets use the legacy 16-byte vertex unit;
+        // Segmented display-list offsets use the legacy 16-byte vertex unit;
         // the interpreter expands that element index to the common runtime Vtx size.
         gSPVertex(gfx++, SEGMENT_ADDR(0xA, (u32)col * (this->row + 1) * 16u), 2 * (this->row + 1), 0);
 

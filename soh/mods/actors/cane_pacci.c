@@ -1137,8 +1137,7 @@ static u8 Pacci_UhTooBig(Actor* actor) {
         f32 halfX;
         f32 halfZ;
 
-        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 ||
-            (bg->actor != actor) || (bg->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 || (bg->actor != actor) || (bg->colHeader == NULL)) {
             continue;
         }
         hdr = bg->colHeader;
@@ -3632,8 +3631,7 @@ static u8 Pacci_FuseGetBox(PlayState* play, Actor* actor, PacciFuseBox* box) {
     for (s32 i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 &&
-            (bg->actor == actor) && (bg->colHeader != NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 && (bg->actor == actor) && (bg->colHeader != NULL)) {
             hdr = bg->colHeader;
             break;
         }
@@ -4194,8 +4192,7 @@ static u8 Pacci_UhDynaTopY(PlayState* play, Actor* actor, f32* outY) {
     for (i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 ||
-            (bg->actor != actor) || (bg->colHeader == NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) != 1 || (bg->actor != actor) || (bg->colHeader == NULL)) {
             continue;
         }
         *outY = actor->world.pos.y + ((f32)bg->colHeader->maxBounds.y * actor->scale.y);

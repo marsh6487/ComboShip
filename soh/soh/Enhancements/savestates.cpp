@@ -427,9 +427,9 @@ void SaveStateMgr::ProcessSaveStateRequests(void) {
                     auto result = this->states[request.slot]->Load();
                     if (result != SaveStateReturn::SUCCESS) {
                         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
-                            2.0f, true, result == SaveStateReturn::FAIL_STATE_MISMATCH
-                                           ? "state %u belongs to another room or scene"
-                                           : "could not load state %u",
+                            2.0f, true,
+                            result == SaveStateReturn::FAIL_STATE_MISMATCH ? "state %u belongs to another room or scene"
+                                                                           : "could not load state %u",
                             request.slot);
                         break;
                     }
@@ -547,9 +547,7 @@ SaveStateReturn SaveState::Load(void) {
     std::optional<SceneDBState> sceneFlags;
     try {
         sceneFlags.emplace(info->sceneFlags);
-    } catch (const std::bad_alloc&) {
-        return SaveStateReturn::FAIL_NO_MEMORY;
-    }
+    } catch (const std::bad_alloc&) { return SaveStateReturn::FAIL_NO_MEMORY; }
     // All allocations and all compatibility checks precede the first world mutation.
     if (!SaveStateMatchesPlay(*info) || !collision->Validate() || !CollisionCheck_ValidateQueueRestore(queues.get())) {
         return SaveStateReturn::FAIL_STATE_MISMATCH;

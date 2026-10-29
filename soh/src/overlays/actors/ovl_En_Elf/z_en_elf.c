@@ -894,9 +894,8 @@ void EnElf_UpdateLights(EnElf* this, PlayState* play) {
 
     if (this->fairyFlags & 0x20) {
         player = GET_PLAYER(play);
-        Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, player->actor.world.pos.x,
-                                  player->actor.world.pos.y + 60.0f, player->actor.world.pos.z, lightR, lightG, lightB,
-                                  200);
+        Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, player->actor.world.pos.x, player->actor.world.pos.y + 60.0f,
+                                  player->actor.world.pos.z, lightR, lightG, lightB, 200);
     } else {
         Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
                                   this->actor.world.pos.z, lightR, lightG, lightB, -1);

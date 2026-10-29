@@ -18,7 +18,7 @@
 #include "z64math.h"
 #include <string.h>
 
-#define TRANSITION_TILE_GFX_COUNT(cols, rows) (((cols) * 9 + 1) * (rows) + 2)
+#define TRANSITION_TILE_GFX_COUNT(cols, rows) (((cols)*9 + 1) * (rows) + 2)
 #if defined(GBI_S32_VTX) || defined(GBI_FLOATS)
 #define TRANSITION_TILE_GFX_FRAME_COUNT 2
 #else
@@ -100,9 +100,10 @@ void TransitionTile_InitGraphics(TransitionTile* this) {
             while (col < this->cols) {
                 gDPPipeSync(gfx++);
 
-                gDPLoadTextureTile(gfx++, SEGMENT_ADDR(0xB, 0), G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WIDTH, SCREEN_HEIGHT,
-                                   colTex, rowTex, colTex + 0x20, rowTex + 0x20, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                                   G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+                gDPLoadTextureTile(gfx++, SEGMENT_ADDR(0xB, 0), G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WIDTH,
+                                   SCREEN_HEIGHT, colTex, rowTex, colTex + 0x20, rowTex + 0x20, 0,
+                                   G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                                   G_TX_NOLOD, G_TX_NOLOD);
 
                 gSP1Quadrangle(gfx++, col, col + 1, col2 + this->cols + 2, this->cols + col2 + 1, 0);
 
@@ -161,7 +162,8 @@ TransitionTile* TransitionTile_Init(TransitionTile* this, s32 cols, s32 rows) {
     this->vtxData = SystemArena_Malloc(gridSize * sizeof(TransitionTileVtxData));
     this->vtxFrame1 = SystemArena_Malloc(gridSize * sizeof(Vtx));
     this->vtxFrame2 = SystemArena_Malloc(gridSize * sizeof(Vtx));
-    this->gfx = SystemArena_Malloc(TRANSITION_TILE_GFX_FRAME_COUNT * TRANSITION_TILE_GFX_COUNT(cols, rows) * sizeof(Gfx));
+    this->gfx =
+        SystemArena_Malloc(TRANSITION_TILE_GFX_FRAME_COUNT * TRANSITION_TILE_GFX_COUNT(cols, rows) * sizeof(Gfx));
 
     if ((this->vtxData == NULL) || (this->vtxFrame1 == NULL) || (this->vtxFrame2 == NULL) || (this->gfx == NULL)) {
         if (this->vtxData != NULL) {

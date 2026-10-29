@@ -44,8 +44,8 @@ const VanillaScene sVanillaScenes[] = {
 #undef DEFINE_SCENE
 #undef none
 
-// SOH [Unbound] Vanilla's horse scenes, formerly the allow-list inside Horse_CanSpawn (func_8006CFC0) in z_horse.c. Seeding
-// them here makes SceneDB_HorseAllowed the single answer for vanilla and custom scenes alike.
+// SOH [Unbound] Vanilla's horse scenes, formerly the allow-list inside Horse_CanSpawn (func_8006CFC0) in z_horse.c.
+// Seeding them here makes SceneDB_HorseAllowed the single answer for vanilla and custom scenes alike.
 constexpr int16_t sVanillaHorseScenes[] = { SCENE_HYRULE_FIELD, SCENE_LAKE_HYLIA, SCENE_GERUDO_VALLEY,
                                             SCENE_GERUDOS_FORTRESS, SCENE_LON_LON_RANCH };
 
@@ -350,7 +350,7 @@ std::string SceneDB::GetScenePath(int32_t id, bool masterQuest) const {
     bool useMq = hasMqVariant && masterQuest;
     const char* sceneVersion = hasMqVariant ? (useMq ? "mq" : "nonmq") : "shared";
     const auto legacyPath = StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion, entry.sceneFileName.c_str(),
-                                                 entry.sceneFileName.c_str());
+                                                  entry.sceneFileName.c_str());
     if (unboundBase) {
         // scenes/<leaf minus _scene>[_mq]/scene.json (unbound-docs/SPEC.md §4.1)
         std::string dir = entry.sceneFileName;

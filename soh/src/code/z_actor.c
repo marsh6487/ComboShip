@@ -3415,8 +3415,8 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                 if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(70) == 0)) {
                     if (CVarGetInteger(CVAR_ENHANCEMENT("DisableDrawDistance"), 1) > 1 ||
                         CVarGetInteger(CVAR_ENHANCEMENT("WidescreenActorCulling"), 0)) {
-                        Ship_CalcShouldDrawAndUpdate(play, actor, &actor->projectedPos, actor->projectedW, &shipShouldDraw,
-                                                     &shipShouldUpdate);
+                        Ship_CalcShouldDrawAndUpdate(play, actor, &actor->projectedPos, actor->projectedW,
+                                                     &shipShouldDraw, &shipShouldUpdate);
 
                         if (shipShouldUpdate) {
                             actor->flags |= ACTOR_FLAG_INSIDE_CULLING_VOLUME;

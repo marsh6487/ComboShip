@@ -344,8 +344,7 @@ static CollisionHeader* Stasis_FindBg(PlayState* play, Actor* actor, s32* bgIdOu
     for (s32 i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 &&
-            (bg->actor == actor) && (bg->colHeader != NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 && (bg->actor == actor) && (bg->colHeader != NULL)) {
             if (bgIdOut != NULL) {
                 *bgIdOut = i;
             }

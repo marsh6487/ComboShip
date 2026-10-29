@@ -72,8 +72,7 @@ static void WandSand_Measure(PlayState* play, Actor* slab) {
         return;
     }
     header = play->colCtx.dyna.bgActors[bgId].colHeader;
-    if (!(play->colCtx.dyna.bgActorFlags[bgId] & 1) ||
-        (play->colCtx.dyna.bgActorFlags[bgId] & 2) ||
+    if (!(play->colCtx.dyna.bgActorFlags[bgId] & 1) || (play->colCtx.dyna.bgActorFlags[bgId] & 2) ||
         play->colCtx.dyna.bgActors[bgId].actor != slab || header == NULL) {
         return;
     }

@@ -127,12 +127,12 @@ void Mtx_SetRotationMtx(Mtx* mtx, s32 angle, f32 axisX, f32 axisY, f32 axisZ) {
     f32 tempY = (axisZ * axisX) * (1.0f - cos);
     f32 tempZ = (axisX * axisY) * (1.0f - cos);
     // Keep the original axisY signs, including the documented vanilla bug below.
-    MtxF mf = {{
+    MtxF mf = { {
         { ((1.0f - tempXX) * cos) + tempXX, tempZ + axisZ * sin, tempY + axisY * sin, 0.0f },
         { tempZ - axisZ * sin, ((1.0f - tempYY) * cos) + tempYY, tempX + axisX * sin, 0.0f },
         { tempY - axisY * sin, tempX - axisX * sin, ((1.0f - tempZZ) * cos) + tempZZ, 0.0f },
         { 0.0f, 0.0f, 0.0f, 1.0f },
-    }};
+    } };
     guMtxF2L(mf.mf, mtx);
 #else
     //! FAKE? The somewhat peculiar distribution of temps in this function seems necessary to match?

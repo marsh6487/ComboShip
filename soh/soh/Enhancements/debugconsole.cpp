@@ -11,7 +11,6 @@
 #include <deque>
 #include <cctype>
 
-
 #include "soh/OTRGlobals.h"
 #include "soh/cvar_prefixes.h"                 // CVAR_RANDOMIZER_ENHANCEMENT (give_all fast)
 #include "soh/Enhancements/enhancementTypes.h" // SGIA_* (Skip Get Item Animation)

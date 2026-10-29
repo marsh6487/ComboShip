@@ -1616,8 +1616,7 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     u64 nodeLimit = BgCheck_TableCapacityLimit(INT32_MAX, sizeof(SSNode));
 
     // Polygon ids/loop bounds are signed; packed vertex words reserve their top three bits for flags.
-    if (colHeader == NULL ||
-        colHeader->numPolygons > BgCheck_TableCapacityLimit(INT32_MAX, sizeof(CollisionPoly)) ||
+    if (colHeader == NULL || colHeader->numPolygons > BgCheck_TableCapacityLimit(INT32_MAX, sizeof(CollisionPoly)) ||
         colHeader->numVertices > BgCheck_TableCapacityLimit((u64)COLPOLY_VTX_INDEX_MASK + 1, sizeof(Vec3i))) {
         osSyncPrintf("[Unbound] static geometry exceeds its index or allocation range\n");
         LOG_HUNGUP_THREAD();
@@ -2724,8 +2723,7 @@ static s32 DynaPoly_EnsureListCapacity(PlayState* play, DynaCollisionContext* dy
         if (dyna->bgActorFlags[i] & 1) {
             CollisionHeader* header = dyna->bgActors[i].colHeader;
 
-            if (header == NULL || header->numPolygons > polyLimit - polys ||
-                header->numVertices > vtxLimit - vtxs) {
+            if (header == NULL || header->numPolygons > polyLimit - polys || header->numVertices > vtxLimit - vtxs) {
                 osSyncPrintf("[Unbound] dyna geometry exceeds its index or allocation range\n");
                 return false;
             }
@@ -2754,7 +2752,7 @@ static s32 DynaPoly_EnsureListCapacity(PlayState* play, DynaCollisionContext* dy
         }
     }
     if (!BgCheck_TrackDynaGeometry(dyna, newPolys, (size_t)polyMax * sizeof(CollisionPoly), newVtxs,
-                                  (size_t)vtxMax * sizeof(Vec3i))) {
+                                   (size_t)vtxMax * sizeof(Vec3i))) {
         free(newPolys);
         free(newVtxs);
         return false;
@@ -2799,7 +2797,7 @@ void DynaPoly_Alloc(PlayState* play, DynaCollisionContext* dyna) {
     DynaPoly_NullVtxList(&dyna->vtxList);
     DynaPoly_AllocVtxList(play, &dyna->vtxList, dyna->vtxListMax);
     if (!BgCheck_TrackDynaGeometry(dyna, dyna->polyList, (size_t)dyna->polyListMax * sizeof(CollisionPoly),
-                                  dyna->vtxList, (size_t)dyna->vtxListMax * sizeof(Vec3i))) {
+                                   dyna->vtxList, (size_t)dyna->vtxListMax * sizeof(Vec3i))) {
         abort();
     }
 
