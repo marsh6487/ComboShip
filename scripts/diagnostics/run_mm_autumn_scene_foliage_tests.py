@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def production_function(source, name):
-    match = re.search(r"^(?:static )?(?:bool|void\*?|int32_t|F3DGfx\*&?)\s+" +
+    match = re.search(r"^(?:static )?(?:bool|void\*?|int32_t|F3D(?:Gfx|Vtx)\*&?)\s+" +
                       re.escape(name) + r"\([^;{}]*\)\s*\{", source, re.M)
     if not match:
         raise RuntimeError(f"Missing production function: {name}")
@@ -27,6 +27,21 @@ def production_function(source, name):
         depth += (masked[pos] == "{") - (masked[pos] == "}")
         pos += 1
     return source[match.start():pos] + "\n"
+
+
+def write_renderer_contract(build):
+    """Use the actual renderer limits and vertex-source interface at its I/O seam."""
+    header = (ROOT / "libultraship/include/fast/interpreter.h").read_text()
+    gbi = (ROOT / "libultraship/include/fast/lus_gbi.h").read_text()
+    vertex = (ROOT / "libultraship/include/fast/resource/type/Vertex.h").read_text()
+    limit = re.search(r"^#define MAX_VERTICES \d+$", header, re.M)
+    stride = re.search(r"^#define OTR_EXPORTED_VTX_SIZE \d+$", gbi, re.M)
+    interface = re.search(r"class IVertexSource \{.*?^\};", vertex, re.M | re.S)
+    if limit is None or stride is None or interface is None:
+        raise RuntimeError("Cannot find native renderer vertex contract")
+    (build / "autumn_scene_vertex_contract.inc").write_text(
+        "#pragma once\n#include <cstdint>\n" + limit[0] + "\n" + stride[0] +
+        "\nnamespace Fast {\n" + interface[0] + "\n}\n")
 
 
 def main():
@@ -100,6 +115,7 @@ def main():
     flags += shlex.split(os.environ.get("MM_FOLIAGE_TEST_CXXFLAGS", ""))
     with tempfile.TemporaryDirectory(prefix="mm-autumn-scene-foliage-") as temporary:
         build = Path(temporary)
+        write_renderer_contract(build)
         # Count parser-only preflights in the extracted fixture; steady cached
         # updates must not rescan/rebuild the large Termina/Moon display lists.
         fixture_source = source[start:]
@@ -110,10 +126,10 @@ def main():
             '#ifdef COMBO_BUILD\n#include "WoodsMysteryNativeBridge.h"\n#endif\n' + fixture_source)
         renderer_functions = ["GfxExecStack::start", "GfxExecStack::stop", "GfxExecStack::currCmd",
                               "GfxExecStack::branch", "GfxExecStack::call", "GfxExecStack::ret",
-                              "Interpreter::SegAddr", "gfx_check_image_signature",
+                              "Interpreter::SegAddr", "Interpreter::SegAddrVtx", "gfx_check_image_signature",
                               "ComboIsUnresolvedSegmentTarget", "ComboResolveDisplayListTarget",
                               "gfx_dl_handler_common", "gfx_end_dl_handler_common", "gfx_marker_handler_otr",
-                              "gfx_vtx_hash_handler_custom", "gfx_set_timg_otr_hash_handler_custom",
+                              "gfx_vtx_hash_handler_custom", "gfx_vtx_handler_f3dex2", "gfx_set_timg_otr_hash_handler_custom",
                               "gfx_set_grayscale_handler_custom", "gfx_set_intensity_handler_custom",
                               "Interpreter::GfxDpSetGrayscaleColor", "gfx_quad_handler_f3dex2", "gfx_tri1_handler_f3dex2"]
         (build / "autumn_scene_renderer_production.inc").write_text(

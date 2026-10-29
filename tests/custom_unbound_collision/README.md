@@ -1,7 +1,7 @@
 # Custom collision adapters under Unbound
 
 Run `python tests/custom_unbound_collision/run_tests.py` from the repository root.
-Optional cases: `shared sm64 water grapple actors bridges motion timectl abi enemy effects`.
+Optional cases: `shared sm64 water grapple actors bridges motion timectl abi enemy effects lights`.
 
 The native GCC tests compile current production functions and game headers with
 `GBI_FLOAT_MTX`, `GBI_S32_VTX`, AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -42,6 +42,11 @@ They cover:
   guards, colors/scales, sounds and the 70-unit ice offset. Animation advancement,
   idle setup and final effect submission are explicit boundary doubles; particle
   rendering and configured actor gameplay are not executed.
+- All ten changed OoT custom light call expressions, using real native actor/
+  light types and an explicitly C-linked float API mock, at fractional +/-70000
+  and vanilla coordinates. Independent expectations retain authored orbit/SW97
+  55/20-unit offsets and every tested color/radius. This isolates argument
+  propagation; individual actor control flow and light rendering are not run.
 
 Rendering is not executed. The extracted native units replace logging, return the
 native decision from `GameInteractor_Should`, and disable second-update/frame-

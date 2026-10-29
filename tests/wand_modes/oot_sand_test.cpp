@@ -13,6 +13,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <array>
 
 SaveContext gSaveContext{};
 PlayState* gPlayState;
@@ -21,6 +22,15 @@ s8 gSfxDefaultReverb = 0;
 std::vector<Actor*> actors;
 CollisionHeader collision{};
 bool onSlab = false;
+static std::array<BgActor, BGACTOR_INITIAL_MAX> registeredBgActors;
+static std::array<u16, BGACTOR_INITIAL_MAX> registeredBgFlags;
+static void BindDynaTable(PlayState& play) {
+    registeredBgActors = {};
+    registeredBgFlags = {};
+    play.colCtx.dyna.bgActors = registeredBgActors.data();
+    play.colCtx.dyna.bgActorFlags = registeredBgFlags.data();
+    play.colCtx.dyna.bgActorMax = registeredBgActors.size();
+}
 #define WAND_WHEEL_HOLD_FRAMES 8
 #define WAND_POSE_IDLE 0
 static u8 sWandPoseStage = WAND_POSE_IDLE;
@@ -79,8 +89,11 @@ Actor* Actor_Spawn(ActorContext*, PlayState* play, s16 id, f32 x, f32 y, f32 z, 
     while (std::any_of(actors.begin(), actors.end(), [&](Actor* other) {
         return other->update && ((DynaPolyActor*)other)->bgId == slab->bgId;
     })) ++slab->bgId;
-    assert(slab->bgId < BG_ACTOR_MAX);
-    play->colCtx.dyna.bgActors[slab->bgId].colHeader = &collision;
+    assert(slab->bgId >= 0 && slab->bgId < play->colCtx.dyna.bgActorMax);
+    auto& registered = play->colCtx.dyna.bgActors[slab->bgId];
+    registered.actor = &slab->actor;
+    registered.colHeader = &collision;
+    play->colCtx.dyna.bgActorFlags[slab->bgId] = 1;
     actors.push_back(&slab->actor); return &slab->actor;
 }
 
@@ -91,6 +104,7 @@ static void SandParityRefill() { gSaveContext.magic = 48; }
 static void ResetSandParity(Player& player, PlayState& play, u16 button, s16 yaw, float halfX) {
     for (Actor* actor : actors) delete (DynaPolyActor*)actor;
     actors.clear(); player = {}; play = {}; gSaveContext = {}; onSlab = false;
+    BindDynaTable(play);
     WandSand_Forget(); sSandMeasured = 0; sSandTopOffset = sSandReach = 0;
     gPlayState = &play;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
@@ -116,6 +130,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     Player player{}; PlayState play{};
+    BindDynaTable(play);
     gPlayState = &play;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
     collision.minBounds = {-100, -60, -50}; collision.maxBounds = {100, 20, 50};

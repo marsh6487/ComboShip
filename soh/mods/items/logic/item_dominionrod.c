@@ -70,14 +70,14 @@ static void DomRod_PlayLoopSound(Actor* actor, u16 sfxId) {
 
 static void DomRod_CreateLight(PlayState* play) {
     domRodLightNode = LightContext_InsertLight(play, &play->lightCtx, &domRodLightInfo);
-    Lights_PointNoGlowSetInfo(&domRodLightInfo, (s16)domRodOrbPos.x, (s16)domRodOrbPos.y, (s16)domRodOrbPos.z,
-                              DOMROD_ORB_ENV_R, DOMROD_ORB_ENV_G, DOMROD_ORB_ENV_B, DOMROD_ORB_LIGHT_RADIUS);
+    Lights_PointNoGlowSetInfo(&domRodLightInfo, domRodOrbPos.x, domRodOrbPos.y, domRodOrbPos.z, DOMROD_ORB_ENV_R,
+                              DOMROD_ORB_ENV_G, DOMROD_ORB_ENV_B, DOMROD_ORB_LIGHT_RADIUS);
 }
 
 static void DomRod_UpdateLight(void) {
     if (domRodLightNode != NULL) {
-        Lights_PointNoGlowSetInfo(&domRodLightInfo, (s16)domRodOrbPos.x, (s16)domRodOrbPos.y, (s16)domRodOrbPos.z,
-                                  DOMROD_ORB_ENV_R, DOMROD_ORB_ENV_G, DOMROD_ORB_ENV_B, DOMROD_ORB_LIGHT_RADIUS);
+        Lights_PointNoGlowSetInfo(&domRodLightInfo, domRodOrbPos.x, domRodOrbPos.y, domRodOrbPos.z, DOMROD_ORB_ENV_R,
+                                  DOMROD_ORB_ENV_G, DOMROD_ORB_ENV_B, DOMROD_ORB_LIGHT_RADIUS);
     }
 }
 

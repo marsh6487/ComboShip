@@ -1,8 +1,10 @@
 #include "global.h"
 #include <array>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #define osSyncPrintf(...) ((void)0)
 uintptr_t gSegments[16]{};
@@ -14,11 +16,28 @@ extern "C" void gSPVertex(Gfx* packet,uintptr_t vertices,int count,int start) {
 /* NATIVE COLLISION */
 #include "combo/BlackMarketShelvesNative.h"
 #include "combo/BlackMarketMmShopLayout.h"
+static void ReleaseDyna(PlayState& play) {
+#ifdef FIXTURE_OOT
+    std::free(play.colCtx.dyna.bgActors);
+    std::free(play.colCtx.dyna.bgActorFlags);
+#endif
+    play.colCtx.dyna={};
+}
+static void ResetDyna(PlayState& play,bool exhausted=false) {
+    ReleaseDyna(play);
+#ifdef FIXTURE_OOT
+    Fixture_GrowBgActorTable(&play,&play.colCtx.dyna,exhausted?BGCHECK_SCENE:BGACTOR_INITIAL_MAX);
+    if(exhausted)std::fill_n(play.colCtx.dyna.bgActorFlags,play.colCtx.dyna.bgActorMax,1);
+#else
+    if(exhausted)for(auto& flag:play.colCtx.dyna.bgActorFlags)flag=1;
+#endif
+}
 int main() {
     static PlayState play;
     static CollisionHeader scene;
     BlackMarketShelvesNative::Fixture fixture;
     assert(!fixture.Ensure(&play));
+    ResetDyna(play);
     play.colCtx.colHeader=&scene;
     assert(fixture.Ensure(&play));
     const auto& bg=play.colCtx.dyna.bgActors[0];
@@ -115,16 +134,15 @@ int main() {
     }
     // Context teardown frees native registration; persistent mesh/owner storage
     // remains valid and can register in the next visit without borrowing a slot.
-    fixture.Reset();play.colCtx.dyna={};
+    fixture.Reset();ResetDyna(play);
     assert(fixture.Ensure(&play) && play.colCtx.dyna.bgActors[0].colHeader==mesh);
-    fixture.Reset();play.colCtx.dyna={};
-    for(auto& flags:play.colCtx.dyna.bgActorFlags)flags=1;
+    fixture.Reset();ResetDyna(play,true);
     assert(!fixture.Ensure(&play));
     // The private MM display supplies its compact mesh and collision together.
     // The original fixture above remains the default for OoT.
     BlackMarketShelvesNative::Fixture compact(BlackMarketMmShopLayout::Vertices(false),
         BlackMarketMmShopLayout::Vertices(true), BlackMarketMmShopLayout::CollisionCorners());
-    play.colCtx.dyna={};
+    ResetDyna(play);
     assert(compact.Ensure(&play));
     const auto* compactMesh=play.colCtx.dyna.bgActors[0].colHeader;
     const auto corners=BlackMarketMmShopLayout::CollisionCorners();
@@ -149,7 +167,8 @@ int main() {
         }
         assert(index==expected.size());
     }
-    compact.Reset();play.colCtx.dyna={};
+    compact.Reset();ResetDyna(play);
     assert(compact.Ensure(&play) && play.colCtx.dyna.bgActors[0].colHeader==compactMesh);
+    compact.Reset();ReleaseDyna(play);
     std::puts("PASS native shelves: real Dyna/camera lookup; immutable identical geometry; scrolling magical material, live/reset tint and uncolored stationary external Granny timber/velvet/trim; missing texture rejection; opaque GBI; re-entry/full-context failure");
 }

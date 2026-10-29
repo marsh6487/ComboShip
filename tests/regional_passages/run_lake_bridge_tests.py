@@ -163,7 +163,7 @@ first=renderer.index('struct NeiGi_ArenaBudget {')
 native_arena=renderer[first:renderer.index('// Child meshes',first)]
 native_arena+='\nextern "C" '+function(renderer,'bool NeiGi_CanDrawLayers(')
 native_interpreter='\n'.join(function(interpreter,signature) for signature in (
-    'void* Interpreter::SegAddr(', 'bool gfx_vtx_handler_f3dex2(',
+    'void* Interpreter::SegAddr(', 'F3DVtx* Interpreter::SegAddrVtx(', 'bool gfx_vtx_handler_f3dex2(',
     'void Interpreter::GenerateCC(', 'void Interpreter::GfxDpSetCombineMode(',
     'void Interpreter::GfxDpSetOtherMode(', 'void Interpreter::GfxSpSetOtherMode(',
     'bool gfx_set_combine_handler_rdp(', 'bool gfx_rdp_set_other_mode_rdp(',
@@ -214,19 +214,26 @@ production=body+register+'}\n'+api
 source=(ROOT/'tests/regional_passages/lake_bridge_test.cpp').read_text()
 dyna=(ROOT/'soh/src/code/z_bgcheck.c').read_text()
 native='\n'.join(function(dyna,signature) for signature in [
-    'void BgActor_SetActor(', 's32 DynaPoly_IsBgIdBgActor(', 's32 DynaPoly_SetBgActor(',
+    'static u64 BgCheck_TableCapacityLimit(', 'static s32 BgCheck_NextTableCapacity(',
+    'static void* BgCheck_ReallocTable(', 'void ScaleRotPos_Initialize(', 'void SSList_SetNull(',
+    'void DynaLookup_ResetLists(', 'void DynaLookup_Reset(', 'void DynaLookup_ResetVtxStartIndex(',
+    'void BgActor_Initialize(', 'static void DynaPoly_GrowBgActorTable(',
+    'void BgActor_SetActor(', 's32 DynaPoly_IsBgIdBgActor(', 's32 DynaPoly_IsBgIdInTable(',
+    'static s32 DynaPoly_IsBgIdAllocated(', 's32 DynaPoly_SetBgActor(',
     'DynaPolyActor* DynaPoly_GetActor(', 'void DynaPoly_DeleteBgActor(',
-    'CollisionHeader* BgCheck_GetCollisionHeader(', 'u32 SurfaceType_GetData(',
+    'CollisionHeader* BgCheck_GetCollisionHeader(', 'static SurfaceType* SurfaceType_Get(',
     'u32 SurfaceType_GetCamDataIndex(', 'u16 BgCheck_GetBgCamSettingImpl(',
     'void ScaleRotPos_SetValue(', 's32 ScaleRotPos_Equals(', 's32 BgActor_IsTransformUnchanged(',
-    'u16 DynaSSNodeList_GetNextNodeIdx(', 'void SSNode_SetValue(', 'void DynaSSNodeList_SetSSListHead(',
-    'void BgCheck_Vec3fToVec3s(', 'void DynaPoly_ExpandSRT(', 'void BgCheck_Vec3sToVec3f(',
+    'u32 DynaSSNodeList_GetNextNodeIdx(', 'void SSNode_SetValue(', 'void DynaSSNodeList_SetSSListHead(',
+    'void DynaPoly_ExpandSRT(',
     'void CollisionPoly_GetNormalF(', 'void CollisionPoly_GetVertices(',
     's32 CollisionPoly_CheckXIntersectApprox(', 's32 CollisionPoly_CheckZIntersectApprox(',
     's32 BgCheck_ComputeWallDisplacement(', 's32 BgCheck_SphVsDynaWallInBgActor(',
     's32 CollisionPoly_CheckYIntersectApprox1(', 's32 CollisionPoly_CheckYIntersectApprox2(',
     'f32 BgCheck_RaycastFloorDynaList(', 's32 BgCheck_CheckDynaCeilingList(',
-    's32 WaterBox_GetSurfaceImpl('])
+    'void WaterBox_UnpackProperties(', 's32 WaterBox_GetSurfaceImpl('])
+native_defines='\n'.join(re.findall(r'^#define (?:SS_NULL|DYNA_RAYCAST_)[^\n]+', dyna, re.M))
+source=source.replace('/* NATIVE_DYNA_CONSTANTS */', native_defines)
 native+='\n'+function((ROOT/'soh/src/code/z_bg_item.c').read_text(),'void DynaPolyActor_Init(')
 math=(ROOT/'soh/src/code/sys_math3d.c').read_text()
 native+='\n'+'\n'.join(function(math,signature) for signature in [
@@ -243,17 +250,32 @@ native+='\n'+'\n'.join(function(skin,signature) for signature in [
     'void SkinMatrix_SetTranslateRotateYXZScale('])
 lib=(ROOT/'soh/src/code/z_lib.c').read_text()
 native+='\n'+'\n'.join(function(lib,signature) for signature in [
-    'void Math_Vec3f_Copy(', 'void Math_Vec3s_ToVec3f(', 'void Math_Vec3f_Diff('])
+    'void Math_Vec3f_Copy(', 'void Math_Vec3i_ToVec3f(', 'void Math_Vec3f_ToVec3i(', 'void Math_Vec3f_Diff('])
 native+='\n'+function((ROOT/'soh/src/code/z_actor.c').read_text(),'PosRot* Actor_GetWorldPosShapeRot(')
 native+='\n'+function((ROOT/'soh/src/code/z_camera.c').read_text(),'s32 Camera_GetDataIdxForPoly(')
 
 source='#define COMBO_LAKE_NATIVE_CASE '+str({'all':0,'camera':1,'shell':2}[a.native_case])+'\n'+source
-source=source.replace('/* NATIVE_PROVIDER */',production).replace('/* NATIVE_DYNA */',native)
+native_declarations='\n'.join(function(native,signature).split('{',1)[0].strip()+';' for signature in (
+    's32 Camera_GetDataIdxForPoly(', 'void DynaPoly_ExpandSRT(', 's32 BgCheck_SphVsDynaWallInBgActor(',
+    'f32 BgCheck_RaycastFloorDynaList(', 's32 BgCheck_CheckDynaCeilingList('))
+source=source.replace('/* NATIVE_PROVIDER */',production).replace('/* NATIVE_DYNA */',
+    native_declarations+'\nvoid Fixture_GrowBgActorTable(PlayState*, DynaCollisionContext*, s32);')
 with tempfile.TemporaryDirectory(prefix='lake-native-') as temp:
     temp=Path(temp);cpp=temp/'test.cpp';cpp.write_text(source);binary=temp/'test'
+    # The allocation helpers are native C, where void* converts to table pointers.
+    # Compile their unmodified bodies as C rather than weakening the C++ consumer.
+    native_file=temp/'native.c';native_object=temp/'native.o'
+    native_file.write_text('#include "global.h"\n#include <assert.h>\n#include <stdlib.h>\n#include <stdint.h>\n'
+        '#undef osSyncPrintf\n#define osSyncPrintf(...) ((void)0)\n'
+        '#undef LOG_HUNGUP_THREAD\n#define LOG_HUNGUP_THREAD() abort()\n' + native_defines + '\n' + native +
+        '\nvoid Fixture_GrowBgActorTable(PlayState* play, DynaCollisionContext* dyna, s32 capacity) {\n'
+        '    DynaPoly_GrowBgActorTable(play, dyna, capacity);\n}\n')
     paths=['combo','combo/menu','soh','soh/soh','soh/include','soh/include/PR','soh/src','soh/assets','libultraship/include']
     command=[os.environ.get('CXX','c++'),'-std=c++20','-w','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DCOMBO_LAKE_NATIVE_TEST','-DFMT_HEADER_ONLY',
              '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',*['-I'+str(ROOT/p) for p in paths]]
     if a.sanitize:command+=['-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-no-pie']
-    subprocess.run(command+[str(cpp),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Werror=implicit-function-declaration',
+                    *[flag for flag in command[2:] if not flag.startswith('-Wl,')],
+                    '-c',str(native_file),'-o',str(native_object)],check=True)
+    subprocess.run(command+[str(cpp),str(native_object),'-lm','-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

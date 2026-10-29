@@ -27,6 +27,21 @@ def function(source, signature):
     return block_from(source, source.index(signature))
 
 
+def native_oot_entrances():
+    # SceneDB owns the table now. Execute its real constructor/seeding methods
+    # with its actual containers, so fade tests consume the native packed flags.
+    registry = (ROOT / "soh/soh/unbound/SceneDB.cpp").read_text()
+    seeds = registry[registry.index("struct VanillaScene {"):
+                     registry.index("// Saved flags for custom scenes;")]
+    instance = re.search(r"^SceneDB\* SceneDB::Instance = .*;", registry, re.M)[0]
+    return ('#include "soh/unbound/SceneDB.h"\n#include <algorithm>\n' +
+            function(registry, 'extern "C" {') + '\nnamespace {\n' + seeds + '\n}\n' +
+            '\n'.join(function(registry, signature) for signature in (
+                "SceneDB::SceneDB(", "void SceneDB::SeedVanillaScenes(",
+                "void SceneDB::SeedVanillaEntrances(", "void SceneDB::RefreshEntranceTablePointer(")) +
+            '\n' + instance + '\n')
+
+
 def native_fade(game):
     mm = game == "mm"
     play = (ROOT / game / "src/code/z_play.c").read_text()
@@ -142,9 +157,7 @@ extern "C" s32 Entrance_GetTransitionFlags(u16 entrance) {
 }
 '''
         else:
-            table = (ROOT / "soh/src/code/z_scene_table.c").read_text()
-            source += table[table.index("#define DEFINE_ENTRANCE("):table.index("#undef DEFINE_ENTRANCE")]
-            source += "\n#undef DEFINE_ENTRANCE\n"
+            source += native_oot_entrances()
         source += native_fade(game)
         market = (ROOT / ("mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp" if mm else
                           "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp")).read_text()

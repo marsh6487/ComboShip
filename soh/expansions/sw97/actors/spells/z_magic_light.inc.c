@@ -324,14 +324,13 @@ void MagicLight_Update(Actor* thisx, PlayState* play) {
     }
     func_800773A8(play, temp * 0.5F, 880.0f, 0.2f, 0.9f);
 
-    Lights_PointNoGlowSetInfo(&this->lightInfo1, (s16)this->actor.world.pos.x, (s16)this->actor.world.pos.y + 55.0f,
-                              (s16)this->actor.world.pos.z, (s32)(255.0f * temp), (s32)(255.0f * temp),
-                              (s32)(200.0f * temp), (s16)(100.0f * temp));
+    Lights_PointNoGlowSetInfo(&this->lightInfo1, this->actor.world.pos.x, this->actor.world.pos.y + 55.0f,
+                              this->actor.world.pos.z, (s32)(255.0f * temp), (s32)(255.0f * temp), (s32)(200.0f * temp),
+                              (s16)(100.0f * temp));
 
-    Lights_PointNoGlowSetInfo(&this->lightInfo2,
-                              (s16)this->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 20.0f,
-                              (s16)this->actor.world.pos.y + 20.0f,
-                              (s16)this->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 20.0f,
+    Lights_PointNoGlowSetInfo(&this->lightInfo2, this->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 20.0f,
+                              this->actor.world.pos.y + 20.0f,
+                              this->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * 20.0f,
                               (s32)(255.0f * temp), (s32)(255.0f * temp), (s32)(200.0f * temp), (s16)(100.0f * temp));
 }
 

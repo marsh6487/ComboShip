@@ -4587,7 +4587,7 @@ static void Pacci_UhLightAt(PlayState* play, Vec3f* pos, f32 strength) {
     // together instead of drifting in and out of phase with each other.
     f32 pulse = strength * (0.86f + (Math_SinS((s16)(play->gameplayFrames * 0x0500)) * 0.14f));
 
-    Lights_PointNoGlowSetInfo(&sUhLightInfo, (s16)pos->x, (s16)pos->y, (s16)pos->z, (u8)(PACCI_UH_LIGHT_R * pulse),
+    Lights_PointNoGlowSetInfo(&sUhLightInfo, pos->x, pos->y, pos->z, (u8)(PACCI_UH_LIGHT_R * pulse),
                               (u8)(PACCI_UH_LIGHT_G * pulse), (u8)(PACCI_UH_LIGHT_B * pulse), PACCI_UH_LIGHT_RADIUS);
     if (sUhLightNode == NULL) {
         sUhLightNode = LightContext_InsertLight(play, &play->lightCtx, &sUhLightInfo);

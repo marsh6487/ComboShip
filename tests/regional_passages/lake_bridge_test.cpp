@@ -2,6 +2,7 @@
 #include "entrances/LakeHyliaBridge.h"
 #include "lake_scene_evidence.h"
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -236,6 +237,7 @@ int main() {
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <type_traits>
@@ -292,10 +294,7 @@ struct RegisterShipInitFunc {
 };
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
-#define SS_NULL 0xFFFF
-#define DYNA_RAYCAST_FLOORS 1
-#define DYNA_RAYCAST_WALLS 2
-#define DYNA_RAYCAST_CEILINGS 4
+/* NATIVE_DYNA_CONSTANTS */
 extern "C" {
 // Exact trigonometry for the authored identity actor transform.
 f32 Math_SinS(s16 angle) {
@@ -332,6 +331,19 @@ static void Destroy(PlayState &play) {
   }
   allocated.clear();
   interactor.destroy();
+}
+static void ReleaseDynaTables(PlayState &play) {
+  assert(allocated.empty());
+  std::free(play.colCtx.dyna.bgActors);
+  std::free(play.colCtx.dyna.bgActorFlags);
+  play.colCtx.dyna = {};
+}
+static void InitScene(PlayState &play, CollisionHeader &native) {
+  ReleaseDynaTables(play);
+  play = {};
+  play.sceneNum = SCENE_LAKE_HYLIA;
+  play.colCtx.colHeader = &native;
+  Fixture_GrowBgActorTable(&play, &play.colCtx.dyna, BGACTOR_INITIAL_MAX);
 }
 static void CameraControl(PlayState &play, CollisionHeader *collision) {
   Player player{};
@@ -384,7 +396,7 @@ static void ShellControl(PlayState &play, CollisionHeader *collision) {
   auto &dyna = play.colCtx.dyna;
   auto &lookup = dyna.bgActors[0].dynaLookup;
   std::vector<CollisionPoly> polys(collision->numPolygons);
-  std::vector<Vec3s> vertices(collision->numVertices);
+  std::vector<Vec3i> vertices(collision->numVertices);
   std::vector<SSNode> nodes(collision->numPolygons * 2);
   dyna.polyList = polys.data();
   dyna.polyListMax = polys.size();
@@ -546,11 +558,12 @@ int main() {
   WaterBox waters[4]{};
   SurfaceType sceneSurface{};
   native.surfaceTypeList = &sceneSurface;
-  waters[2] = {-4577, -1313, 3663, 7680, 5627, 258};
+  waters[2] = {-4577, -1313, 3663, 7680, 5627};
+  WaterBox_UnpackProperties(&waters[2], 258);
+  assert(waters[2].camera == 2 && waters[2].lightSetting == 1 && waters[2].room == 0);
   native.waterBoxes = waters;
   native.numWaterBoxes = 4;
-  play.sceneNum = SCENE_LAKE_HYLIA;
-  play.colCtx.colHeader = &native;
+  InitScene(play, native);
   gPlayState = &play;
   gSaveContext.gameMode = GAMEMODE_NORMAL;
   Vec3f mouth{};
@@ -597,9 +610,7 @@ int main() {
   // Native teardown clears the flagged slot; a new scene gets a fresh context.
   for (int age : {0, 1})
     for (int level : {-1313, -1993, -1313}) {
-      play = {};
-      play.sceneNum = SCENE_LAKE_HYLIA;
-      play.colCtx.colHeader = &native;
+      InitScene(play, native);
       gSaveContext.linkAge = age;
       waters[2].ySurface = level;
       interactor.scene(SCENE_LAKE_HYLIA);
@@ -615,9 +626,7 @@ int main() {
       assert(waters[2].ySurface == level);
       Destroy(play);
     }
-  play = {};
-  play.sceneNum = SCENE_LAKE_HYLIA;
-  play.colCtx.colHeader = &native;
+  InitScene(play, native);
   for (int mode : {COMBO_GAME_OOT, COMBO_GAME_MM}) {
     gComboGameMode = mode;
     assert(!ComboLakeHyliaBridge_Get(&play, nullptr, nullptr));
@@ -628,15 +637,20 @@ int main() {
   gSaveContext.fileNum = 0;
   play.sceneNum = SCENE_GRAVEYARD;
   assert(!ComboLakeHyliaBridge_Get(&play, nullptr, nullptr));
-  // Full native dynamic actor pool: provider must not advertise
-  // invisible/noncolliding geometry.
+  // A full initial table grows; only the reserved scene-id boundary is exhausted.
   play.sceneNum = SCENE_LAKE_HYLIA;
-  for (auto &flag : play.colCtx.dyna.bgActorFlags)
-    flag = 1;
+  const s32 initialMax = play.colCtx.dyna.bgActorMax;
+  std::fill_n(play.colCtx.dyna.bgActorFlags, initialMax, 1);
+  assert(ComboLakeHyliaBridge_Get(&play, nullptr, nullptr));
+  assert(sCave->dyna.bgId == initialMax && play.colCtx.dyna.bgActorMax > initialMax);
+  Destroy(play);
+  Fixture_GrowBgActorTable(&play, &play.colCtx.dyna, BGCHECK_SCENE);
+  std::fill_n(play.colCtx.dyna.bgActorFlags, play.colCtx.dyna.bgActorMax, 1);
   assert(!ComboLakeHyliaBridge_Get(&play, nullptr, nullptr));
   Destroy(play);
+  ReleaseDynaTables(play);
   puts("PASS lake native provider: real DynaPoly register/delete, owned "
        "collision, repeated child/adult full/drained/refilled entry, native "
-       "water preserved, guards and exhausted pool");
+       "water preserved, guards, table growth and exhausted id range");
 }
 #endif

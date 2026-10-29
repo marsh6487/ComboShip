@@ -29,6 +29,9 @@ struct ResourceInitData {
 };
 struct IResource {
     virtual ~IResource() = default;
+    virtual size_t GetPointerSize() {
+        return 0;
+    }
     std::shared_ptr<ResourceInitData> initData;
     std::shared_ptr<ResourceInitData> GetInitData() {
         return initData;
@@ -1716,17 +1719,19 @@ static void CheckCrossSeasonVtxFirst() {
                     MMAutumnSceneFoliage_Update(&play);
                     ForestRendererFixture::Draw(forest->Instructions);
                 }
-                auto intentional = originalFirst;
-                intentional.words.w1 = pointerEdit ? reinterpret_cast<uintptr_t>(alternateVertices) : 16;
-                forest->Instructions[0] = intentional;
+                if (pointerEdit) {
+                    forest->Instructions[0] = originalFirst;
+                    ForestRendererFixture::UseNativeVertexPointer(forest->Instructions, 0, alternateVertices);
+                } else
+                    forest->Instructions[0] = Command(originalFirst.words.w0, 16);
+                const auto intentional = forest->Instructions[0];
                 MMAutumnSceneFoliage_Update(&play);
-                const bool preserved = SameCommand(forest->Instructions[0], intentional) && sActive.empty();
+                const bool preserved = SameCommand(forest->Instructions[0], intentional) && sActive.empty() &&
+                                       (!pointerEdit || SameCommand(forest->Instructions[1], gsSPNoOp()));
                 const auto stats = ForestRendererFixture::Draw(forest->Instructions);
                 const bool untreated = stats.palettes == std::vector<uint32_t>(22, 0);
-                const auto expectedPointer =
-                    pointerEdit
-                        ? reinterpret_cast<uintptr_t>(alternateVertices)
-                        : reinterpret_cast<uintptr_t>(ForestRendererFixture::manager.GetResourceRawPointer(0)) + 16;
+                const auto expectedPointer = pointerEdit ? reinterpret_cast<uintptr_t>(alternateVertices)
+                                                         : ForestRendererFixture::manager.SerializedVertexAddress(16);
                 const bool followsEdit = !stats.vertexPointers.empty() && stats.vertexPointers[0] == expectedPointer;
                 if (!preserved || !untreated || !followsEdit)
                     std::fprintf(
@@ -1792,8 +1797,7 @@ static void CheckExistingSeasonCacheClear() {
                 const unsigned selectedCount = std::count_if(stats.palettes.begin(), stats.palettes.end(),
                                                              [](uint32_t value) { return value != 0; });
                 const uintptr_t expectedVertex =
-                    reinterpret_cast<uintptr_t>(ForestRendererFixture::manager.GetResourceRawPointer(0)) +
-                    kActualForestCommands[28].words.w1;
+                    ForestRendererFixture::manager.SerializedVertexAddress(kActualForestCommands[28].words.w1);
                 const bool followsReload = stats.vertexPointers.size() > 1 && stats.vertexPointers[1] == expectedVertex;
                 if (stats.palettes != std::vector<uint32_t>(22, initialColor) || !followsReload) {
                     std::fprintf(

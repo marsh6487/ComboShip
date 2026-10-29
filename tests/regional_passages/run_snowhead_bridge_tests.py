@@ -110,7 +110,7 @@ with tempfile.TemporaryDirectory(prefix='snowhead-bridge-') as td:
     body+='}\n'+production[production.index('extern "C" int ComboFountainSnowheadBridge_Get('):production.rindex('#endif')]
     import re
     def function(source,name):
-        match=re.search(r'^\w+[ *]+(?:'+re.escape(name)+r')\([^;{]*\)\s*\{',source,re.M)
+        match=re.search(r'^[A-Za-z_][^\n{};]+\b'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
         assert match, name
         begin=match.start();opening=source.index('{',match.start());depth=1;end=opening+1
         while depth:
@@ -121,15 +121,18 @@ with tempfile.TemporaryDirectory(prefix='snowhead-bridge-') as td:
     camera=(ROOT/'soh/src/code/z_camera.c').read_text()
     actor=(ROOT/'soh/src/code/z_bg_item.c').read_text()
     native_bodies=[]
-    for names,source in [(['BgActor_SetActor','DynaPoly_SetBgActor','BgCheck_GetCollisionHeader',
-            'SurfaceType_GetData','SurfaceType_GetCamDataIndex','BgCheck_GetBgCamSettingImpl',
-            'CollisionPoly_GetNormalF','BgCheck_Vec3sToVec3f','CollisionPoly_GetVertices',
+    for names,source in [(['BgCheck_ReallocTable','ScaleRotPos_Initialize','SSList_SetNull',
+            'DynaLookup_ResetLists','DynaLookup_Reset','DynaLookup_ResetVtxStartIndex',
+            'BgActor_Initialize','DynaPoly_GrowBgActorTable','DynaPoly_IsBgIdBgActor','DynaPoly_IsBgIdInTable',
+            'BgActor_SetActor','DynaPoly_SetBgActor','BgCheck_GetCollisionHeader',
+            'SurfaceType_Get','SurfaceType_GetCamDataIndex','BgCheck_GetBgCamSettingImpl',
+            'CollisionPoly_GetNormalF','CollisionPoly_GetVertices',
             'CollisionPoly_CheckXIntersectApprox','CollisionPoly_CheckZIntersectApprox','CollisionPoly_CheckYIntersectApprox1',
             'BgCheck_ComputeWallDisplacement','BgCheck_SphVsDynaWallInBgActor'],collision),
             (['Math3D_CirSquareVsTriSquare','Math3D_PointDistToLine2D','Math3D_Planef',
             'Math3D_DistPlaneToPos','Math3D_TriChkPointParaXImpl','Math3D_TriChkPointParaZImpl',
             'Math3D_TriChkPointParaXIntersect','Math3D_TriChkPointParaZIntersect','Math3D_TriChkPointParaYImpl','Math3D_TriChkPointParaYIntersectDist'],math),
-            (['Math_Vec3s_ToVec3f'],(ROOT/'soh/src/code/z_lib.c').read_text()),
+            (['Math_Vec3i_ToVec3f'],(ROOT/'soh/src/code/z_lib.c').read_text()),
             (['Camera_GetDataIdxForPoly'],camera),(['DynaPolyActor_Init'],actor)]:
         for name in names:
             text=function(source,name)
@@ -137,7 +140,20 @@ with tempfile.TemporaryDirectory(prefix='snowhead-bridge-') as td:
             native_bodies.append(text)
     native=Path(td)/'native.cpp'
     fixture=(ROOT/'tests/regional_passages/snowhead_bridge_test.cpp').read_text()
-    native.write_text(fixture.replace('/* NATIVE_ENGINE */','extern "C" {\n'+'\n'.join(native_bodies)+'\n}').replace('/* NATIVE_PRODUCTION */',body))
+    native_source='\n'.join(native_bodies)
+    native_declarations='\n'.join(function(native_source,name).split('{',1)[0].strip()+';' for name in (
+        'Native_DynaPoly_SetBgActor','Camera_GetDataIdxForPoly','BgCheck_SphVsDynaWallInBgActor',
+        'CollisionPoly_CheckYIntersectApprox1'))
+    native_declarations+='\nvoid Fixture_GrowBgActorTable(PlayState*, DynaCollisionContext*, s32);'
+    native_defines='\n'.join(re.findall(r'^#define SS_NULL[^\n]*',collision,re.M))
+    native.write_text(fixture.replace('/* NATIVE_ENGINE */','extern "C" {\n'+native_declarations+'\n}')
+        .replace('/* NATIVE_CONSTANTS */',native_defines).replace('/* NATIVE_PRODUCTION */',body))
+    native_c=Path(td)/'native.c';native_object=Path(td)/'native.o'
+    native_c.write_text('#include "global.h"\n#include <assert.h>\n#include <stdlib.h>\n#include <stdint.h>\n'
+        '#undef osSyncPrintf\n#define osSyncPrintf(...) ((void)0)\n'
+        '#undef LOG_HUNGUP_THREAD\n#define LOG_HUNGUP_THREAD() abort()\n'+native_defines+'\n'+native_source+
+        '\nvoid Fixture_GrowBgActorTable(PlayState* play, DynaCollisionContext* dyna, s32 capacity) {\n'
+        '    DynaPoly_GrowBgActorTable(play, dyna, capacity);\n}\n')
     env=dict(os.environ)
     if env.get('COMBO_NEI_FIXTURE_CPATH'):
         env['CPATH']=env['COMBO_NEI_FIXTURE_CPATH']+os.pathsep+env.get('CPATH','')
@@ -152,7 +168,11 @@ with tempfile.TemporaryDirectory(prefix='snowhead-bridge-') as td:
         assert any(line.split()==['U',hook]for line in imports.splitlines()), 'Native render hook must retain C linkage: '+hook
     assert not any('FrameInterpolation_Record' in line and '_ZN' in line for line in imports.splitlines())
     print('PASS actual Snowhead render object: native interpolation imports retain unmangled C ABI')
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-DSNOWHEAD_NATIVE_TEST','-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie',str(native),'-o',str(binary)],check=True,env=env)
+    sanitizer=['-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie']
+    subprocess.run([os.environ.get('CC','cc'),'-std=c11',*flags[1:],*sanitizer,
+        '-Werror=implicit-function-declaration','-c',str(native_c),'-o',str(native_object)],check=True,env=env)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-DSNOWHEAD_NATIVE_TEST',*sanitizer,
+        str(native),str(native_object),'-lm','-o',str(binary)],check=True,env=env)
     subprocess.run([str(binary)],check=True,env={**env,'ASAN_OPTIONS':'detect_leaks=0'})
 
 # Execute actual native effect initialization and the actor-owned replacement

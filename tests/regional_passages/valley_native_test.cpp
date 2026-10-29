@@ -4,6 +4,8 @@
 #include "global.h"
 #include "soh/ActorDB.h"
 #include <cassert>
+#include <algorithm>
+#include <cstdlib>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -53,10 +55,13 @@ std::shared_ptr<Ship::IResource> Ship::ResourceManager::LoadResource(
 // Keep the actual renderer's lookup and vertex submission boundaries small;
 // its command parsing and in-place cache mutation remain production code.
 struct VertexLookup {
-  void *GetResourceRawPointer(uint64_t hash) {
+  std::shared_ptr<Ship::IResource> LoadResource(uint64_t hash) {
     assert(hash == UINT64_C(0x5e7003a09feb4255));
-    return resources.at("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8")
-        ->GetRawPointer();
+    return resources.at("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8");
+  }
+  void *GetResourceRawPointer(std::shared_ptr<Ship::IResource> resource) {
+    assert(resource == resources.at("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
+    return resource->GetRawPointer();
   }
 };
 static VertexLookup *ActiveResMgr() {
@@ -66,8 +71,13 @@ static VertexLookup *ActiveResMgr() {
 using F3DGfx = Gfx;
 using F3DVtx = Vtx;
 struct Interpreter {
+  size_t vertices = 0;
   void GfxSpVertex(unsigned count, unsigned offset, const F3DVtx *vertices) {
     assert(count == 6 && offset == 0 && vertices);
+    const auto source = std::dynamic_pointer_cast<Fast::Vertex>(
+        resources.at("scenes/shared/spot08_scene/spot08_room_0Vtx_0023F8"));
+    assert(vertices == source->GetPointer() + this->vertices);
+    this->vertices += count;
   }
 };
 #define C0(shift, width) ((cmd->words.w0 >> (shift)) & ((1U << (width)) - 1))
@@ -75,11 +85,15 @@ struct Interpreter {
 #undef C0
 static void RenderBackdropVertices(Fast::DisplayList &list) {
   Interpreter renderer;
+  const auto before = list.Instructions;
   for (size_t slot : {25, 40}) {
     auto *command = &list.Instructions[slot];
     gfx_vtx_hash_handler_custom(&renderer, &command);
     assert(command == &list.Instructions[slot + 1]);
   }
+  assert(renderer.vertices == 12);
+  assert(std::memcmp(before.data(), list.Instructions.data(), before.size() * sizeof(Gfx)) == 0 &&
+         "rendering must preserve serialized hash packets for resource-owner and Alt changes");
 }
 ActorDB::ActorDB() {}
 ActorDB::Entry::Entry() {}
@@ -223,11 +237,21 @@ int main() {
   assert(NativeBackdropLayout(second->Instructions));
   RenderBackdropVertices(*second);
   const auto vertexBase = reinterpret_cast<uintptr_t>(vertices->GetPointer());
-  assert(second->Instructions[25].words.w1 == vertexBase);
-  assert(second->Instructions[40].words.w1 == vertexBase + 0x60);
+  assert(second->Instructions[25].words.w1 == 0);
+  assert(second->Instructions[40].words.w1 == 0x60);
   assert(PrepareBackdrop() && !sDetailedRender &&
-         "the renderer's cached vertex operands must not hide Snowhead");
+         "the renderer's serialized vertex operands must not hide Snowhead");
   RestoreBackdrop();
+  // Keep the provider's compatibility control for previously cached packets;
+  // the current renderer above must leave their serialized replacements intact.
+  auto previouslyCached = NativeBackdrop();
+  previouslyCached->Instructions[25].words.w1 = vertexBase;
+  previouslyCached->Instructions[40].words.w1 = vertexBase + 0x60;
+  resources[kBackdrop] = previouslyCached;
+  assert(PrepareBackdrop() && !sDetailedRender);
+  RestoreBackdrop();
+  assert(NativeBackdropLayout(previouslyCached->Instructions, vertexBase));
+  resources[kBackdrop] = second;
   vertices->VertexList[0].v.ob[0]++;
   assert(!PrepareBackdrop() && NativeBackdropLayout(second->Instructions, vertexBase));
   vertices->VertexList[0].v.ob[0]--;
@@ -257,14 +281,17 @@ int main() {
   resources[kBackdrop] = NativeBackdrop();
   assert(PrepareBackdrop());
   CollisionHeader native{};
-  Vec3s nativeVertices[3] = {
+  Vec3i nativeVertices[3] = {
       {-1000, 0, -1000}, {-1100, 0, -1000}, {-1000, 0, -1100}};
   CollisionPoly nativePoly{};
   nativePoly.flags_vIB = 1;
   nativePoly.vIC = 2;
   nativePoly.type = 7;
   SurfaceType nativeSurfaces[8]{};
-  nativeSurfaces[7].data[0] = 0x12345678;
+  nativeSurfaces[7].camera = 1000;
+  nativeSurfaces[7].exit = 500;
+  nativeSurfaces[7].material = 11;
+  const auto savedSurface = nativeSurfaces[7];
   WaterBox nativeWater{};
   nativeWater.ySurface = 20;
   CamData nativeCamera{};
@@ -294,7 +321,7 @@ int main() {
       assert(sVertices[i * 3 + j].y == sDrawVertices[i * 3 + j].v.ob[1]);
     }
   }
-  std::vector<Vec3s> donorVertices(sVertices.begin(), sVertices.end());
+  std::vector<Vec3i> donorVertices(sVertices.begin(), sVertices.end());
   std::vector<CollisionPoly> donorPolys(sPolys.begin(), sPolys.end());
   CollisionHeader donor = sCollision;
   donor.vtxList = donorVertices.data();
@@ -308,6 +335,7 @@ int main() {
   assert(sCollision.numPolygons == 22);
   donor.numPolygons = 43;
   PlayState play{};
+  Fixture_GrowBgActorTable(&play, &play.colCtx.dyna, BGACTOR_INITIAL_MAX);
   play.sceneNum = SCENE_ZORAS_FOUNTAIN;
   play.colCtx.colHeader = &native;
   gSaveContext.gameMode = GAMEMODE_NORMAL;
@@ -331,16 +359,17 @@ int main() {
   assert(collisionBuffer[42].type == 0 &&
          cameraBuffer[0].cameraSType == CAM_SET_NONE);
   PlayState alt{};
+  Fixture_GrowBgActorTable(&alt, &alt.colCtx.dyna, BGACTOR_INITIAL_MAX);
   alt.sceneNum = SCENE_ZORAS_FOUNTAIN;
   alt.colCtx.colHeader = &donor;
   assert(ComboFountainValley_Ready(&alt));
-  assert(sCollision.numPolygons == 0 && sActor->dyna.bgId == BG_ACTOR_MAX);
+  assert(sCollision.numPolygons == 0 && sActor->dyna.bgId == BGACTOR_INVALID);
   Destroy(&sActor->dyna.actor, &alt);
   PlayState full{};
+  Fixture_GrowBgActorTable(&full, &full.colCtx.dyna, BGCHECK_SCENE);
   full.sceneNum = SCENE_ZORAS_FOUNTAIN;
   full.colCtx.colHeader = &native;
-  for (auto &flags : full.colCtx.dyna.bgActorFlags)
-    flags = 1;
+  std::fill_n(full.colCtx.dyna.bgActorFlags, full.colCtx.dyna.bgActorMax, 1);
   auto allocationFailureBackdrop = NativeBackdrop();
   resources[kBackdrop] = allocationFailureBackdrop;
   assert(!ComboFountainValley_Ready(&full));
@@ -354,7 +383,11 @@ int main() {
   assert(std::memcmp(&nativePoly, &savedPoly, sizeof nativePoly) == 0);
   assert(std::memcmp(&nativeWater, &savedWater, sizeof nativeWater) == 0);
   assert(std::memcmp(&nativeCamera, &savedCamera, sizeof nativeCamera) == 0);
-  assert(nativeSurfaces[7].data[0] == 0x12345678);
+  assert(std::memcmp(&nativeSurfaces[7], &savedSurface, sizeof savedSurface) == 0);
+  for (auto* context : {&play, &alt, &full}) {
+    std::free(context->colCtx.dyna.bgActors);
+    std::free(context->colCtx.dyna.bgActorFlags);
+  }
   RestoreBackdrop();
   resources.clear();
   foreignResources.clear();

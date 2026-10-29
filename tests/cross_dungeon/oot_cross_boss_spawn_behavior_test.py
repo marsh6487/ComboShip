@@ -12,13 +12,18 @@ text=(ROOT/'soh/soh/Enhancements/randomizer/randomizer_entrance.c').read_text()
 functions='\n'.join(block_from(text,text.index(marker)) for marker in [
     'void Entrance_OverrideSpawnScene(s32 sceneNum, s32 spawn)',
     's32 Entrance_OverrideSpawnSceneRoom(s32 sceneNum, s32 spawn, s32 roomNum)'])
+types=(ROOT/'soh/include/z64.h').read_text()
+entry_end=types.index('} ActorEntry;')+len('} ActorEntry;')
+actor_entry=types[types.rfind('typedef struct {',0,entry_end):entry_end]
 source=r'''
 #include <cassert>
 #include <cstdint>
 #define COMBO_BUILD 1
 using s32=int32_t;
-struct Vec3s { int16_t x,y,z; };
-struct ActorEntry { int16_t id; Vec3s pos,rot; int16_t params; };
+using s16=int16_t;
+struct Vec3s { s16 x,y,z; };
+struct Vec3f { float x,y,z; };
+/* NATIVE_ACTOR_ENTRY */
 static ActorEntry modifiedLinkActorEntry;
 static struct { ActorEntry* linkActorEntry=nullptr; } play;
 static auto* gPlayState=&play;
@@ -51,8 +56,18 @@ int main() {
   assert(room==(repair?(scene==SCENE_JABU_JABU?5:11):19) && "cross-only boss reverse must repair the physical dungeon room");
   assert(nativeBoss==native && crossBoss==cross); // Safety does not rewrite settings.
  }
+ nativeBoss=0;crossBoss=false;
+ ActorEntry wide{1,{100000.25f,-45000.5f,70000.75f},{404,505,606},707};
+ play.linkActorEntry=&wide;
+ Entrance_OverrideSpawnScene(SCENE_FOREST_TEMPLE,0);
+ assert(play.linkActorEntry==&wide && wide.pos.x==100000.25f && wide.pos.y==-45000.5f && wide.pos.z==70000.75f);
+ crossBoss=true;
+ Entrance_OverrideSpawnScene(SCENE_JABU_JABU,1);
+ assert(play.linkActorEntry->pos.x==100000.25f && play.linkActorEntry->pos.y==-45000.5f);
+ assert(play.linkActorEntry->pos.z==static_cast<s16>(0xF7F4) && wide.pos.z==70000.75f);
 }
 '''
+source=source.replace('/* NATIVE_ACTOR_ENTRY */',actor_entry)
 # Range-for initializer lists are a fixture-only library dependency.
 source='#include <initializer_list>\n'+source
 sanitize=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g'] if '--sanitize' in sys.argv else []
@@ -61,3 +76,4 @@ with tempfile.TemporaryDirectory(prefix='oot-boss-spawn-') as temp:
     path=Path(temp);(path/'test.cpp').write_text(source)
     subprocess.run(['c++',*sanitize,'-std=c++20','-Wall','-Wextra','-Werror',str(path/'test.cpp'),'-o',str(path/'test')],check=True)
     subprocess.run([str(path/'test')],check=True)
+print('OoT boss spawn repair: native/cross combinations, signed negative coordinates, preserved wide fractional positions and room repair PASS')

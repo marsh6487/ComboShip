@@ -175,11 +175,17 @@ for host in ('soh','mm'):
         ('ResourceMgr_GetIkanaShieldGiPoseForGame','ResourceMgr_GetIkanaShieldGiTiltXForGame')))
     sources=['libultraship/src/ship/resource/Resource.cpp',
              *['libultraship/src/fast/resource/type/'+name+'.cpp' for name in ('DisplayList','Vertex','Matrix','Texture')],
+             *['libultraship/src/ship/resource/ResourceFactory'+kind+'.cpp' for kind in ('Binary','XML')],
+             *['libultraship/src/ship/utils/binarytools/'+name+'.cpp' for name in ('BinaryReader','MemoryStream','Stream')],
+             *['libultraship/src/fast/resource/factory/'+name+'Factory.cpp' for name in ('Matrix','Vertex')],
+             'ZAPDTR/lib/tinyxml2/tinyxml2.cpp',
              ('soh/soh/resource/type/Array.cpp' if host=='soh' else 'mm/2s2h/resource/type/Array.cpp')]
+    if host=='soh':sources+=['soh/soh/resource/importer/ArrayFactory.cpp']
     for combo in (False,True):
         with tempfile.TemporaryDirectory(prefix='ikana-owner-pose-') as temp:
             cpp=Path(temp)/'test.cpp';cpp.write_text(candidate);binary=Path(temp)/'test'
             nativeflags=[f for f in flags if f!='-DCOMBO_BUILD']
+            nativeflags+=['-I'+str(ROOT/'soh'),'-I'+str(ROOT/'ZAPDTR/lib/tinyxml2')]
             nativeflags+=['-DF3DEX_GBI_2','-DFMT_HEADER_ONLY','-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF']
             if combo:nativeflags+=['-DCOMBO_BUILD']
             if host=='mm':nativeflags+=['-DMM_BUILD_DLL','-DTEST_HOST_MM']

@@ -12,7 +12,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/diagnostics'))
-from run_mm_autumn_scene_foliage_tests import production_function
+from run_mm_autumn_scene_foliage_tests import production_function, write_renderer_contract
 from run_time_pedestal_tests import block_from
 
 p = argparse.ArgumentParser(description=__doc__)
@@ -24,14 +24,15 @@ renderer = (ROOT / 'libultraship/src/fast/interpreter.cpp').read_text()
 manager = (ROOT / 'libultraship/src/ship/resource/ResourceManager.cpp').read_text()
 with tempfile.TemporaryDirectory(prefix='woods-seasonal-') as directory:
     build = Path(directory)
+    write_renderer_contract(build)
     (build / 'autumn_scene_foliage_production.inc').write_text(
         '#ifdef COMBO_BUILD\n#include "WoodsMysteryNativeBridge.h"\n#endif\n' + source[source.index('namespace {'):])
     names = ['GfxExecStack::start', 'GfxExecStack::stop', 'GfxExecStack::currCmd',
              'GfxExecStack::branch', 'GfxExecStack::call', 'GfxExecStack::ret',
-             'Interpreter::SegAddr', 'gfx_check_image_signature',
+             'Interpreter::SegAddr', 'Interpreter::SegAddrVtx', 'gfx_check_image_signature',
              'ComboIsUnresolvedSegmentTarget', 'ComboResolveDisplayListTarget',
              'gfx_dl_handler_common', 'gfx_end_dl_handler_common', 'gfx_marker_handler_otr',
-             'gfx_vtx_hash_handler_custom', 'gfx_set_timg_otr_hash_handler_custom',
+             'gfx_vtx_hash_handler_custom', 'gfx_vtx_handler_f3dex2', 'gfx_set_timg_otr_hash_handler_custom',
              'gfx_set_grayscale_handler_custom', 'gfx_set_intensity_handler_custom',
              'Interpreter::GfxDpSetGrayscaleColor', 'gfx_quad_handler_f3dex2', 'gfx_tri1_handler_f3dex2']
     (build / 'autumn_scene_renderer_production.inc').write_text(

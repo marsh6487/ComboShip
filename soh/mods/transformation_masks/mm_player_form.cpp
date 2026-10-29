@@ -9988,9 +9988,8 @@ static void MmForm_CheckBarrierInput(Player* player, PlayState* play) {
 
         // Insert point light if not already present
         if (gFormState.barrierLight == NULL) {
-            Lights_PointNoGlowSetInfo(&gFormState.barrierLightInfo, (s16)player->actor.world.pos.x,
-                                      (s16)player->actor.world.pos.y, (s16)player->actor.world.pos.z, 100, 200, 255,
-                                      600);
+            Lights_PointNoGlowSetInfo(&gFormState.barrierLightInfo, player->actor.world.pos.x,
+                                      player->actor.world.pos.y, player->actor.world.pos.z, 100, 200, 255, 600);
             gFormState.barrierLight = LightContext_InsertLight(play, &play->lightCtx, &gFormState.barrierLightInfo);
         }
     } else {
@@ -10071,9 +10070,9 @@ static void MmForm_UpdateBarrier(Player* player, PlayState* play) {
         f32 sinB = Math_SinS(angle1) * sinA;
         f32 cosB = Math_CosS(angle1) * sinA;
 
-        Lights_PointNoGlowSetInfo(&gFormState.barrierLightInfo, (s16)(player->actor.world.pos.x + cosA),
-                                  (s16)(player->actor.world.pos.y + sinB), (s16)(player->actor.world.pos.z + cosB), 100,
-                                  200, 255, 600);
+        Lights_PointNoGlowSetInfo(&gFormState.barrierLightInfo, player->actor.world.pos.x + cosA,
+                                  player->actor.world.pos.y + sinB, player->actor.world.pos.z + cosB, 100, 200, 255,
+                                  600);
     }
 
     // Set damage collider (from 2Ship Player_SetCylinderForAttack with DMG_ZORA_BARRIER)

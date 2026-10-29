@@ -33,6 +33,13 @@ std::vector<std::pair<float, float>> effectSubmitted;
 float selectedFitScale=1, selectedFitLift=0;
 std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
+bool SameVertices(const std::vector<Vtx>& a, const std::vector<Vtx>& b) {
+  // Compare every authored field; wide runtime vertices also contain tail padding.
+  return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](const Vtx& x, const Vtx& y) {
+    return !std::memcmp(x.v.ob, y.v.ob, sizeof(x.v.ob)) && x.v.flag == y.v.flag &&
+           !std::memcmp(x.v.tc, y.v.tc, sizeof(x.v.tc)) && !std::memcmp(x.v.cn, y.v.cn, sizeof(x.v.cn));
+  });
+}
 bool portableSongLists=false;
 bool selectedCustomLists=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
@@ -483,7 +490,7 @@ int main() {
     gfx.polyOpa.p = opa + 17;
     gfx.polyXlu.p = xlu + 23;
     const auto needed =
-        3 * sizeof(Vtx) + ((sizeof(Mtx) + 15) & ~size_t(15)) + 2 * sizeof(Gfx);
+        ((3 * sizeof(Vtx) + 15) & ~size_t(15)) + ((sizeof(Mtx) + 15) & ~size_t(15)) + 2 * sizeof(Gfx);
     gfx.polyOpa.d = reinterpret_cast<Gfx *>(
         reinterpret_cast<uintptr_t>(gfx.polyOpa.p) + needed + padding);
     gfx.polyXlu.d = gfx.polyXlu.p + 34;
@@ -637,7 +644,7 @@ int main() {
     assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
     assert(arena.size()==expectedSong.size() && stack.empty() && "MM song must submit its shimmer and selected particle profile");
     for(size_t i=0;i<expectedSong.size();++i)assert(arena[i].size()==expectedSong[i].size() &&
-        !memcmp(arena[i].data(),expectedSong[i].data(),expectedSong[i].size()*sizeof(Vtx)));
+        SameVertices(arena[i],expectedSong[i]));
 #ifdef COMBO_BUILD
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
@@ -656,7 +663,7 @@ int main() {
   assert(NeiGi_Draw(&play,&soaringEntry));
   assert(Drawn()==std::vector<std::string>{gGiSongNoteDL} && arena.size()==expectedFeathers.size() && stack.empty());
   for(size_t i=0;i<arena.size();++i)assert(arena[i].size()==expectedFeathers[i].size() &&
-      !memcmp(arena[i].data(),expectedFeathers[i].data(),arena[i].size()*sizeof(Vtx)));
+      SameVertices(arena[i],expectedFeathers[i]));
 #ifdef COMBO_BUILD
   CwItemDrawInfo soaringInfo{};
   assert(NeiGi_DescribeEntry(&soaringEntry,&soaringInfo) && soaringInfo.itemShimmer && soaringInfo.neiEffect==CW_SONG_SOARING);
@@ -669,7 +676,7 @@ int main() {
   const auto shownRain=arena.front();
   arena.clear();
   NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
-  assert(arena.front().size()==shownRain.size() && !std::memcmp(arena.front().data(),shownRain.data(),shownRain.size()*sizeof(Vtx)) &&
+  assert(arena.front().size()==shownRain.size() && SameVertices(arena.front(),shownRain) &&
          "Storms must render only the existing rain, without lightning geometry");
   struct SongFixture {int rg,gid,song;const char* colorDl;uint32_t hue;};
   const SongFixture shimmerSongs[]={
@@ -703,7 +710,7 @@ int main() {
                                                            std::vector<std::string>{gGiSongNoteDL};
     assert(paths==wanted && "all warp songs preserve their native color display list and clef, including selected Alt/mod assets");
     size_t copies=0;
-    for(const auto& submitted:arena)if(submitted.size()==expected.size() && !std::memcmp(submitted.data(),expected.data(),expected.size()*sizeof(Vtx)))++copies;
+    for(const auto& submitted:arena)if(submitted.size()==expected.size() && SameVertices(submitted,expected))++copies;
     assert(copies==1 && stack.empty() && "one matching shared shimmer is mandatory even with ItemEffects off or no mod present");
     if(song.song==CW_SONG_OOT_BOLERO)ExpectBoleroShimmerOnly();
 #ifdef COMBO_BUILD
@@ -1850,14 +1857,21 @@ int main() {
     assert(NeiGi_DrawShop(&play, &entry));
   }
   assert(gfx.polyXlu.p - xlu < 2700);
-  size_t vertexBytes = 0;
+  size_t vertexCount = 0, vertexBytes = 0;
   for (const auto &vertices : arena)
-    vertexBytes += vertices.size() * sizeof(Vtx);
-  std::cout << "Potion shop: " << vertexBytes << " arena vertex bytes, "
+    vertexCount += vertices.size();
+  vertexBytes = vertexCount * sizeof(Vtx);
+  std::cout << "Potion shop: " << vertexCount << " vertices, " << vertexBytes << " arena vertex bytes, "
             << gfx.polyXlu.p - xlu << " XLU commands, " << allocations << " matrices\n"
             << std::flush;
   // Three crystal sheen passes each add one mesh matrix and one restore.
-  assert(vertexBytes < 80 * 1024 && allocations <= 38 && stack.empty());
+  // Preserve the original 80 KiB / 16-byte vertex-count budget across ABIs,
+  // while checking all aligned vertex, scrolling-list and matrix allocations.
+  const size_t tailBytes = reinterpret_cast<uintptr_t>(std::end(opa)) - reinterpret_cast<uintptr_t>(gfx.polyOpa.d);
+  assert(vertexCount < 5120 && allocations <= 38 && stack.empty());
+  assert(tailBytes >= vertexBytes + allocations * ((sizeof(Mtx) + 15) & ~size_t(15)));
+  assert(tailBytes <= sizeof(opa) && tailBytes <= sizeof(((GfxPool*)nullptr)->polyOpaBuffer));
+  assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d);
 
   // Deku Leaf's optional shimmer is green, including glint centers and halos.
   Reset();

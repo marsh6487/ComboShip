@@ -24,7 +24,8 @@ def function(source, name):
     return source[match.start():cursor]
 
 def main():
-    cases = sys.argv[1:] or ["colors", "mm-fin", "barrier", "swim", "land", "cadence"]
+    cases = sys.argv[1:] or ["colors", "mm-fin", "barrier", "swim", "land", "cadence",
+                            "barrier-light-insert", "barrier-light-orbit"]
     source = (ROOT / "soh/mods/transformation_masks/mm_player_form.cpp").read_text()
     common = ["-O1", "-g", "-fno-pie", "-no-pie", "-fsanitize=address,undefined",
               "-fno-sanitize-recover=all", "-ffunction-sections", "-fdata-sections"]
@@ -54,7 +55,7 @@ def main():
         if audio_cases:
             enum = re.search(r"typedef enum GoronActionId \{.*?\} GoronActionId;", source, re.S).group(0)
             bodies = enum + "\n" + "\n".join(function(source, name) for name in [
-                "MmForm_PlaySfx", "MmForm_UpdateBarrier"])
+                "MmForm_PlaySfx", "MmForm_CheckBarrierInput", "MmForm_UpdateBarrier"])
             cleanup = re.search(r"^static void MmForm_UpdateZoraSwimSfx\(", source, re.M)
             if cleanup:
                 bodies += "\n" + function(source, "MmForm_UpdateZoraSwimSfx")
