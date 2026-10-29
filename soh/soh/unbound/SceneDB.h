@@ -116,6 +116,27 @@ class SceneDB {
     int32_t nextEntranceIndex = 0;
 };
 
+// External flags are not part of gSystemHeap. Capture on the game thread for savestates and async saves.
+struct SceneDBState {
+    std::unordered_map<int32_t, SavedSceneFlags> customSceneFlags;
+    std::unordered_map<int32_t, std::vector<uint32_t>> clearFlags;
+    std::unordered_map<int32_t, std::vector<uint32_t>> liveClearFlags;
+    std::unordered_map<int32_t, std::vector<uint32_t>> tempClearFlags;
+};
+SceneDBState SceneDB_CaptureState();
+void SceneDB_RestoreState(SceneDBState& prepared) noexcept;
+
+class SceneDBSaveScope {
+  public:
+    explicit SceneDBSaveScope(const SceneDBState& state) noexcept;
+    ~SceneDBSaveScope();
+    SceneDBSaveScope(const SceneDBSaveScope&) = delete;
+    SceneDBSaveScope& operator=(const SceneDBSaveScope&) = delete;
+
+  private:
+    const SceneDBState* previous;
+};
+
 class SaveManager;
 void SceneDB_RegisterSaveFunctions(SaveManager& saveManager); // called from the SaveManager ctor
 

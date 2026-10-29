@@ -93,8 +93,8 @@ class RenderCostProbe {
     // Prime cadence avoids locking onto one phase of the usual 2/3/4/6/8
     // interpolated frames per game tick. Reports also carry their exact phase.
     static constexpr unsigned SampleEvery = 31;
-    static constexpr unsigned MaxResources = 512;
-    static constexpr unsigned MaxTextures = 512;
+    static constexpr unsigned MaxResources = 4096;
+    static constexpr unsigned MaxTextures = 4096;
     static constexpr unsigned MaxPasses = 128;
     static constexpr size_t OverflowIndex = std::numeric_limits<size_t>::max();
 
@@ -296,7 +296,7 @@ class RenderCostProbe {
     OperationToken BeginOperation(RenderCostOperation, uint64_t now) {
         if (!active) return {};
         report.operationAttribution = true;
-        return {currentOwner, currentPass, now, report.frameIndex, commandSerial, true, operationDepth++ == 0};
+        return {commandActive ? commandOwner : 0, currentPass, now, report.frameIndex, commandSerial, true, operationDepth++ == 0};
     }
 
     void EndOperation(RenderCostOperation operation, OperationToken token, uint64_t now) {
@@ -332,7 +332,7 @@ class RenderCostProbe {
             texture.uploadWidth = width;
             texture.uploadHeight = height;
         } else ++texture.uploadDimensionsUnknown;
-        Resource(currentOwner).upload.Add(nanos);
+        Resource(commandActive ? commandOwner : 0).upload.Add(nanos);
         Pass(currentPass).upload.Add(nanos);
         if (commandActive && operationDepth == 0) commandExcluded += nanos;
     }

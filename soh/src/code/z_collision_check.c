@@ -1052,10 +1052,103 @@ s32 Collider_ResetLineOC(PlayState* play, OcLine* line) {
 }
 
 /* Actor collider queue ownership */
-// A first Init may receive uninitialized PlayState memory. Track initialized
-// context addresses without inspecting that memory; repeated Init reuses its
-// queues. Destroy must unlink the context before its enclosing state is freed.
-static CollisionCheckContext* sCollisionCheckQueueOwners;
+// Owner records and queue allocations live outside the savestate heap. Never use
+// pointers restored into a context to free storage or traverse the owner registry.
+typedef struct CollisionCheckQueueOwner {
+    CollisionCheckContext* context;
+    Collider** queues[3];
+    s32 capacities[3];
+    uint64_t epoch;
+    uint64_t revision;
+    struct CollisionCheckQueueOwner* next;
+} CollisionCheckQueueOwner;
+
+typedef struct CollisionCheckQueueState {
+    Collider** queues[3];
+    s32 capacities[3];
+    s32 counts[3];
+    u16 sacFlags;
+    s32 lineCount;
+    OcLine* lines[COLLISION_CHECK_OC_LINE_MAX];
+} CollisionCheckQueueState;
+
+typedef struct CollisionCheckQueueSnapshot CollisionCheckQueueSnapshot;
+typedef struct CollisionCheckQueueRestore CollisionCheckQueueRestore;
+struct CollisionCheckQueueSnapshot {
+    const CollisionCheckContext* context;
+    uint64_t epoch;
+    CollisionCheckQueueState state;
+};
+struct CollisionCheckQueueRestore {
+    CollisionCheckQueueOwner* owner;
+    CollisionCheckContext* context;
+    uint64_t epoch;
+    uint64_t revision;
+    CollisionCheckQueueState state;
+};
+
+static CollisionCheckQueueOwner* sCollisionCheckQueueOwners;
+static uint64_t sCollisionCheckQueueEpoch;
+static const s32 sCollisionCheckInitialCapacities[3] = {
+    COLLISION_CHECK_AT_INITIAL_CAPACITY, COLLISION_CHECK_AC_INITIAL_CAPACITY, COLLISION_CHECK_OC_INITIAL_CAPACITY,
+};
+
+static CollisionCheckQueueOwner* CollisionCheck_FindQueueOwner(const CollisionCheckContext* context) {
+    CollisionCheckQueueOwner* owner = sCollisionCheckQueueOwners;
+    while (owner != NULL && owner->context != context) {
+        owner = owner->next;
+    }
+    return owner;
+}
+
+static uint64_t CollisionCheck_NextQueueEpoch(void) {
+    // Exhaustion disables snapshots for new lifetimes rather than reviving an old handle.
+    return sCollisionCheckQueueEpoch == UINT64_MAX ? 0 : ++sCollisionCheckQueueEpoch;
+}
+
+static CollisionCheckQueueOwner* CollisionCheck_CreateQueueOwner(CollisionCheckContext* context) {
+    CollisionCheckQueueOwner* owner = (CollisionCheckQueueOwner*)realloc(NULL, sizeof(*owner));
+    if (owner == NULL) {
+        return NULL;
+    }
+    memset(owner, 0, sizeof(*owner));
+    owner->context = context;
+    owner->epoch = CollisionCheck_NextQueueEpoch();
+    owner->next = sCollisionCheckQueueOwners;
+    sCollisionCheckQueueOwners = owner;
+    return owner;
+}
+
+static s32* CollisionCheck_QueueCount(CollisionCheckContext* context, s32 kind) {
+    return kind == 0 ? &context->colATCount : kind == 1 ? &context->colACCount : &context->colOCCount;
+}
+
+static void CollisionCheck_BindQueueOwner(CollisionCheckQueueOwner* owner) {
+    CollisionCheckContext* context = owner->context;
+    context->colAT = owner->queues[0];
+    context->colATCapacity = owner->capacities[0];
+    context->colAC = owner->queues[1];
+    context->colACCapacity = owner->capacities[1];
+    context->colOC = owner->queues[2];
+    context->colOCCapacity = owner->capacities[2];
+}
+
+static s32 CollisionCheck_QueueContextMatchesOwner(const CollisionCheckQueueOwner* owner) {
+    const CollisionCheckContext* context = owner->context;
+    return context->colAT == owner->queues[0] && context->colATCapacity == owner->capacities[0] &&
+           context->colAC == owner->queues[1] && context->colACCapacity == owner->capacities[1] &&
+           context->colOC == owner->queues[2] && context->colOCCapacity == owner->capacities[2] &&
+           context->colATCount >= 0 && context->colATCount <= owner->capacities[0] &&
+           context->colACCount >= 0 && context->colACCount <= owner->capacities[1] &&
+           context->colOCCount >= 0 && context->colOCCount <= owner->capacities[2] &&
+           context->colLineCount >= 0 && context->colLineCount <= COLLISION_CHECK_OC_LINE_MAX;
+}
+
+static void CollisionCheck_QueueOwnerChanged(CollisionCheckQueueOwner* owner) {
+    if (owner != NULL && owner->revision != UINT64_MAX) {
+        ++owner->revision;
+    }
+}
 
 static s32 CollisionCheck_ReserveQueue(Collider*** queue, s32* capacity, s32 required, s32 initialCapacity) {
     s32 newCapacity;
@@ -1075,7 +1168,7 @@ static s32 CollisionCheck_ReserveQueue(Collider*** queue, s32* capacity, s32 req
     if ((size_t)newCapacity > SIZE_MAX / sizeof(Collider*)) {
         return 0;
     }
-    grown = realloc(*queue, (size_t)newCapacity * sizeof(Collider*));
+    grown = (Collider**)realloc(*queue, (size_t)newCapacity * sizeof(Collider*));
     if (grown == NULL) {
         return 0;
     }
@@ -1085,42 +1178,214 @@ static s32 CollisionCheck_ReserveQueue(Collider*** queue, s32* capacity, s32 req
     return 1;
 }
 
-static s32 CollisionCheck_AppendQueue(Collider*** queue, s32* count, s32* capacity, Collider* collider,
-                                     s32 initialCapacity) {
+static s32 CollisionCheck_AppendQueue(CollisionCheckContext* context, s32 kind, Collider* collider) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
+    s32* count = CollisionCheck_QueueCount(context, kind);
     s32 index;
 
-    if (*count == INT32_MAX || !CollisionCheck_ReserveQueue(queue, capacity, *count + 1, initialCapacity)) {
-        // Preserve already accepted colliders and permit a later registration to retry.
+    if (owner == NULL) {
+        // Init can fail to allocate even the owner record. Its zeroed queues may
+        // retry at registration; never adopt pointers from an unowned context.
+        if (context->colAT != NULL || context->colAC != NULL || context->colOC != NULL ||
+            context->colATCapacity != 0 || context->colACCapacity != 0 || context->colOCCapacity != 0 ||
+            context->colATCount != 0 || context->colACCount != 0 || context->colOCCount != 0) {
+            return -1;
+        }
+        owner = CollisionCheck_CreateQueueOwner(context);
+    }
+    if (owner == NULL || !CollisionCheck_QueueContextMatchesOwner(owner) || *count == INT32_MAX ||
+        !CollisionCheck_ReserveQueue(&owner->queues[kind], &owner->capacities[kind], *count + 1,
+                                     sCollisionCheckInitialCapacities[kind])) {
         osSyncPrintf("CollisionCheck: unable to grow actor collider queue\n");
         return -1;
     }
-    index = *count;
-    (*queue)[(*count)++] = collider;
+    CollisionCheck_BindQueueOwner(owner);
+    index = (*count)++;
+    owner->queues[kind][index] = collider;
+    CollisionCheck_QueueOwnerChanged(owner);
     return index;
 }
 
+static s32 CollisionCheck_ReplaceQueue(CollisionCheckContext* context, s32 kind, Collider* collider, s32 index) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
+    if (owner == NULL || !CollisionCheck_QueueContextMatchesOwner(owner) ||
+        index < 0 || index >= *CollisionCheck_QueueCount(context, kind)) {
+        return -1;
+    }
+    owner->queues[kind][index] = collider;
+    CollisionCheck_QueueOwnerChanged(owner);
+    return index;
+}
+
+static void CollisionCheck_FreeQueueState(CollisionCheckQueueState* state) {
+    s32 kind;
+    for (kind = 0; kind < 3; ++kind) {
+        free(state->queues[kind]);
+        state->queues[kind] = NULL;
+    }
+}
+
+static s32 CollisionCheck_CloneQueueState(CollisionCheckQueueState* destination,
+                                         const CollisionCheckQueueState* source) {
+    s32 kind;
+    *destination = *source;
+    memset(destination->queues, 0, sizeof(destination->queues));
+    for (kind = 0; kind < 3; ++kind) {
+        s32 capacity = source->capacities[kind];
+        if (capacity < 0 || source->counts[kind] < 0 || source->counts[kind] > capacity ||
+            (size_t)capacity > SIZE_MAX / sizeof(Collider*) || (capacity > 0 && source->queues[kind] == NULL)) {
+            CollisionCheck_FreeQueueState(destination);
+            return 0;
+        }
+        if (capacity > 0) {
+            destination->queues[kind] = (Collider**)realloc(NULL, (size_t)capacity * sizeof(Collider*));
+            if (destination->queues[kind] == NULL) {
+                CollisionCheck_FreeQueueState(destination);
+                return 0;
+            }
+            memcpy(destination->queues[kind], source->queues[kind], (size_t)capacity * sizeof(Collider*));
+        }
+    }
+    return 1;
+}
+
+uint64_t CollisionCheck_GetContextEpoch(const CollisionCheckContext* context) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
+    return owner != NULL ? owner->epoch : 0;
+}
+
+CollisionCheckQueueSnapshot* CollisionCheck_CaptureQueueSnapshot(const CollisionCheckContext* context) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
+    CollisionCheckQueueSnapshot* snapshot;
+    CollisionCheckQueueState state;
+    s32 kind;
+
+    if (owner == NULL || owner->epoch == 0 || !CollisionCheck_QueueContextMatchesOwner(owner)) {
+        return NULL;
+    }
+    snapshot = (CollisionCheckQueueSnapshot*)realloc(NULL, sizeof(*snapshot));
+    if (snapshot == NULL) {
+        return NULL;
+    }
+    memset(&state, 0, sizeof(state));
+    for (kind = 0; kind < 3; ++kind) {
+        state.queues[kind] = owner->queues[kind];
+        state.capacities[kind] = owner->capacities[kind];
+    }
+    state.counts[0] = context->colATCount;
+    state.counts[1] = context->colACCount;
+    state.counts[2] = context->colOCCount;
+    state.sacFlags = context->sacFlags;
+    state.lineCount = context->colLineCount;
+    memcpy(state.lines, context->colLine, sizeof(state.lines));
+    snapshot->context = context;
+    snapshot->epoch = owner->epoch;
+    if (!CollisionCheck_CloneQueueState(&snapshot->state, &state)) {
+        free(snapshot);
+        return NULL;
+    }
+    return snapshot;
+}
+
+void CollisionCheck_FreeQueueSnapshot(CollisionCheckQueueSnapshot* snapshot) {
+    if (snapshot != NULL) {
+        CollisionCheck_FreeQueueState(&snapshot->state);
+        free(snapshot);
+    }
+}
+
+CollisionCheckQueueRestore* CollisionCheck_PrepareQueueRestore(CollisionCheckContext* context,
+                                                              const CollisionCheckQueueSnapshot* snapshot) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(context);
+    CollisionCheckQueueRestore* restore;
+    if (snapshot == NULL || owner == NULL || snapshot->context != context || snapshot->epoch == 0 ||
+        snapshot->epoch != owner->epoch || owner->revision == UINT64_MAX ||
+        !CollisionCheck_QueueContextMatchesOwner(owner)) {
+        return NULL;
+    }
+    restore = (CollisionCheckQueueRestore*)realloc(NULL, sizeof(*restore));
+    if (restore == NULL) {
+        return NULL;
+    }
+    restore->owner = owner;
+    restore->context = context;
+    restore->epoch = owner->epoch;
+    restore->revision = owner->revision;
+    if (!CollisionCheck_CloneQueueState(&restore->state, &snapshot->state)) {
+        free(restore);
+        return NULL;
+    }
+    return restore;
+}
+
+s32 CollisionCheck_ValidateQueueRestore(const CollisionCheckQueueRestore* restore) {
+    CollisionCheckQueueOwner* owner;
+    if (restore == NULL || restore->owner == NULL) {
+        return 0;
+    }
+    owner = CollisionCheck_FindQueueOwner(restore->context);
+    // Deliberately do not inspect context contents: Commit runs just after the
+    // raw heap copy, when its pointers and counts have not yet been rebound.
+    return owner != NULL && owner == restore->owner && owner->epoch == restore->epoch &&
+           owner->revision == restore->revision && owner->revision != UINT64_MAX;
+}
+
+s32 CollisionCheck_CommitQueueRestore(CollisionCheckQueueRestore* restore) {
+    CollisionCheckQueueOwner* owner;
+    CollisionCheckContext* context;
+    s32 kind;
+    if (!CollisionCheck_ValidateQueueRestore(restore)) {
+        return 0;
+    }
+    owner = restore->owner;
+    context = restore->context;
+    for (kind = 0; kind < 3; ++kind) {
+        free(owner->queues[kind]);
+        owner->queues[kind] = restore->state.queues[kind];
+        owner->capacities[kind] = restore->state.capacities[kind];
+        restore->state.queues[kind] = NULL;
+    }
+    CollisionCheck_BindQueueOwner(owner);
+    context->colATCount = restore->state.counts[0];
+    context->colACCount = restore->state.counts[1];
+    context->colOCCount = restore->state.counts[2];
+    context->sacFlags = restore->state.sacFlags;
+    context->colLineCount = restore->state.lineCount;
+    memcpy(context->colLine, restore->state.lines, sizeof(context->colLine));
+    CollisionCheck_QueueOwnerChanged(owner);
+    restore->owner = NULL; // A committed plan is consumed; Free cannot free live queues.
+    return 1;
+}
+
+void CollisionCheck_FreeQueueRestore(CollisionCheckQueueRestore* restore) {
+    if (restore != NULL) {
+        CollisionCheck_FreeQueueState(&restore->state);
+        free(restore);
+    }
+}
+
 /**
- * Initializes owned collider queues, disables SAC, and sets flags for drawing colliders.
- * Initial allocation failure leaves an empty queue that registration can retry.
+ * Initializes queues without reading uninitialized caller storage. Reinitializing
+ * a live address reuses its allocations and begins a new savestate epoch.
  */
 void CollisionCheck_InitContext(PlayState* play, CollisionCheckContext* colChkCtx) {
-    CollisionCheckContext* owner = sCollisionCheckQueueOwners;
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(colChkCtx);
+    s32 kind;
 
-    while (owner != NULL && owner != colChkCtx) {
-        owner = owner->queueOwnerNext;
-    }
+    memset(colChkCtx, 0, sizeof(*colChkCtx));
     if (owner == NULL) {
-        memset(colChkCtx, 0, sizeof(*colChkCtx));
-        colChkCtx->queueOwnerNext = sCollisionCheckQueueOwners;
-        sCollisionCheckQueueOwners = colChkCtx;
+        owner = CollisionCheck_CreateQueueOwner(colChkCtx);
+    } else {
+        owner->epoch = CollisionCheck_NextQueueEpoch();
+        owner->revision = 0;
     }
-    CollisionCheck_ReserveQueue(&colChkCtx->colAT, &colChkCtx->colATCapacity,
-                                COLLISION_CHECK_AT_INITIAL_CAPACITY, COLLISION_CHECK_AT_INITIAL_CAPACITY);
-    CollisionCheck_ReserveQueue(&colChkCtx->colAC, &colChkCtx->colACCapacity,
-                                COLLISION_CHECK_AC_INITIAL_CAPACITY, COLLISION_CHECK_AC_INITIAL_CAPACITY);
-    CollisionCheck_ReserveQueue(&colChkCtx->colOC, &colChkCtx->colOCCapacity,
-                                COLLISION_CHECK_OC_INITIAL_CAPACITY, COLLISION_CHECK_OC_INITIAL_CAPACITY);
-    colChkCtx->sacFlags = 0;
+    if (owner != NULL) {
+        for (kind = 0; kind < 3; ++kind) {
+            CollisionCheck_ReserveQueue(&owner->queues[kind], &owner->capacities[kind],
+                                        sCollisionCheckInitialCapacities[kind], sCollisionCheckInitialCapacities[kind]);
+        }
+        CollisionCheck_BindQueueOwner(owner);
+    }
     CollisionCheck_ClearContext(play, colChkCtx);
     AREG(21) = true;
     AREG(22) = true;
@@ -1128,39 +1393,46 @@ void CollisionCheck_InitContext(PlayState* play, CollisionCheckContext* colChkCt
 }
 
 void CollisionCheck_DestroyContext(PlayState* play, CollisionCheckContext* colChkCtx) {
-    CollisionCheckContext** owner = &sCollisionCheckQueueOwners;
+    CollisionCheckQueueOwner** link = &sCollisionCheckQueueOwners;
+    CollisionCheckQueueOwner* owner;
+    s32 kind;
 
     DinFireSword_FinishTeardown(play);
-    while (*owner != NULL && *owner != colChkCtx) {
-        owner = &(*owner)->queueOwnerNext;
+    while (*link != NULL && (*link)->context != colChkCtx) {
+        link = &(*link)->next;
     }
-    if (*owner == NULL) {
-        return;
+    owner = *link;
+    if (owner != NULL) {
+        *link = owner->next;
+        for (kind = 0; kind < 3; ++kind) {
+            free(owner->queues[kind]);
+        }
+        free(owner);
     }
-    *owner = colChkCtx->queueOwnerNext;
-    free(colChkCtx->colAT);
-    free(colChkCtx->colAC);
-    free(colChkCtx->colOC);
     memset(colChkCtx, 0, sizeof(*colChkCtx));
 }
 
 /**
- * Clears all collider lists in CollisionCheckContext when not in SAC mode.
+ * Clears collider lists when not in SAC mode, retaining authoritative storage.
  */
 void CollisionCheck_ClearContext(PlayState* play, CollisionCheckContext* colChkCtx) {
+    CollisionCheckQueueOwner* owner = CollisionCheck_FindQueueOwner(colChkCtx);
+    s32 kind;
+    if (owner != NULL) {
+        CollisionCheck_BindQueueOwner(owner);
+    }
     if (!(colChkCtx->sacFlags & 1)) {
         colChkCtx->colATCount = 0;
         colChkCtx->colACCount = 0;
         colChkCtx->colOCCount = 0;
         colChkCtx->colLineCount = 0;
-        if (colChkCtx->colATCapacity > 0) {
-            memset(colChkCtx->colAT, 0, (size_t)colChkCtx->colATCapacity * sizeof(Collider*));
-        }
-        if (colChkCtx->colACCapacity > 0) {
-            memset(colChkCtx->colAC, 0, (size_t)colChkCtx->colACCapacity * sizeof(Collider*));
-        }
-        if (colChkCtx->colOCCapacity > 0) {
-            memset(colChkCtx->colOC, 0, (size_t)colChkCtx->colOCCapacity * sizeof(Collider*));
+        if (owner != NULL) {
+            for (kind = 0; kind < 3; ++kind) {
+                if (owner->capacities[kind] > 0) {
+                    memset(owner->queues[kind], 0, (size_t)owner->capacities[kind] * sizeof(Collider*));
+                }
+            }
+            CollisionCheck_QueueOwnerChanged(owner);
         }
         memset(colChkCtx->colLine, 0, sizeof(colChkCtx->colLine));
     }
@@ -1171,6 +1443,7 @@ void CollisionCheck_ClearContext(PlayState* play, CollisionCheckContext* colChkC
  */
 void CollisionCheck_EnableSAC(PlayState* play, CollisionCheckContext* colChkCtx) {
     colChkCtx->sacFlags |= 1;
+    CollisionCheck_QueueOwnerChanged(CollisionCheck_FindQueueOwner(colChkCtx));
 }
 
 /**
@@ -1178,6 +1451,7 @@ void CollisionCheck_EnableSAC(PlayState* play, CollisionCheckContext* colChkCtx)
  */
 void CollisionCheck_DisableSAC(PlayState* play, CollisionCheckContext* colChkCtx) {
     colChkCtx->sacFlags &= ~1;
+    CollisionCheck_QueueOwnerChanged(CollisionCheck_FindQueueOwner(colChkCtx));
 }
 
 /**
@@ -1283,8 +1557,7 @@ s32 CollisionCheck_SetAT(PlayState* play, CollisionCheckContext* colChkCtx, Coll
     if (colChkCtx->sacFlags & 1) {
         return -1;
     }
-    return CollisionCheck_AppendQueue(&colChkCtx->colAT, &colChkCtx->colATCount, &colChkCtx->colATCapacity, collider,
-                                      COLLISION_CHECK_AT_INITIAL_CAPACITY);
+    return CollisionCheck_AppendQueue(colChkCtx, 0, collider);
 }
 
 /**
@@ -1313,10 +1586,9 @@ s32 CollisionCheck_SetAT_SAC(PlayState* play, CollisionCheckContext* colChkCtx, 
             osSyncPrintf("CollisionCheck_setAT_SAC():全データ数より大きいところに登録しようとしている。\n");
             return -1;
         }
-        colChkCtx->colAT[index] = collider;
+        index = CollisionCheck_ReplaceQueue(colChkCtx, 0, collider, index);
     } else {
-        index = CollisionCheck_AppendQueue(&colChkCtx->colAT, &colChkCtx->colATCount, &colChkCtx->colATCapacity,
-                                          collider, COLLISION_CHECK_AT_INITIAL_CAPACITY);
+        index = CollisionCheck_AppendQueue(colChkCtx, 0, collider);
     }
     return index;
 }
@@ -1350,8 +1622,7 @@ s32 CollisionCheck_SetAC(PlayState* play, CollisionCheckContext* colChkCtx, Coll
     if (colChkCtx->sacFlags & 1) {
         return -1;
     }
-    index = CollisionCheck_AppendQueue(&colChkCtx->colAC, &colChkCtx->colACCount, &colChkCtx->colACCapacity, collider,
-                                      COLLISION_CHECK_AC_INITIAL_CAPACITY);
+    index = CollisionCheck_AppendQueue(colChkCtx, 1, collider);
     if (index < 0) {
         return -1;
     }
@@ -1389,10 +1660,9 @@ s32 CollisionCheck_SetAC_SAC(PlayState* play, CollisionCheckContext* colChkCtx, 
             osSyncPrintf("CollisionCheck_setAC_SAC():全データ数より大きいところに登録しようとしている。\n");
             return -1;
         }
-        colChkCtx->colAC[index] = collider;
+        index = CollisionCheck_ReplaceQueue(colChkCtx, 1, collider, index);
     } else {
-        index = CollisionCheck_AppendQueue(&colChkCtx->colAC, &colChkCtx->colACCount, &colChkCtx->colACCapacity,
-                                          collider, COLLISION_CHECK_AC_INITIAL_CAPACITY);
+        index = CollisionCheck_AppendQueue(colChkCtx, 1, collider);
     }
     return index;
 }
@@ -1426,8 +1696,7 @@ s32 CollisionCheck_SetOC(PlayState* play, CollisionCheckContext* colChkCtx, Coll
     if (colChkCtx->sacFlags & 1) {
         return -1;
     }
-    return CollisionCheck_AppendQueue(&colChkCtx->colOC, &colChkCtx->colOCCount, &colChkCtx->colOCCapacity, collider,
-                                      COLLISION_CHECK_OC_INITIAL_CAPACITY);
+    return CollisionCheck_AppendQueue(colChkCtx, 2, collider);
 }
 
 /**
@@ -1456,10 +1725,9 @@ s32 CollisionCheck_SetOC_SAC(PlayState* play, CollisionCheckContext* colChkCtx, 
             osSyncPrintf("CollisionCheck_setOC_SAC():全データ数より大きいところに登録しようとしている。\n");
             return -1;
         }
-        colChkCtx->colOC[index] = collider;
+        index = CollisionCheck_ReplaceQueue(colChkCtx, 2, collider, index);
     } else {
-        index = CollisionCheck_AppendQueue(&colChkCtx->colOC, &colChkCtx->colOCCount, &colChkCtx->colOCCapacity,
-                                          collider, COLLISION_CHECK_OC_INITIAL_CAPACITY);
+        index = CollisionCheck_AppendQueue(colChkCtx, 2, collider);
     }
     return index;
 }
@@ -1479,13 +1747,14 @@ s32 CollisionCheck_SetOCLine(PlayState* play, CollisionCheckContext* colChkCtx, 
         return -1;
     }
     Collider_ResetLineOC(play, collider);
-    if (!(colChkCtx->colLineCount < COLLISION_CHECK_OC_LINE_MAX)) {
+    if (colChkCtx->colLineCount < 0 || colChkCtx->colLineCount >= COLLISION_CHECK_OC_LINE_MAX) {
         // "Index exceeded and cannot add more"
         osSyncPrintf("CollisionCheck_setOCLine():インデックスがオーバして追加不能\n");
         return -1;
     }
     index = colChkCtx->colLineCount;
     colChkCtx->colLine[colChkCtx->colLineCount++] = collider;
+    CollisionCheck_QueueOwnerChanged(CollisionCheck_FindQueueOwner(colChkCtx));
     return index;
 }
 

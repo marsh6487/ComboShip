@@ -1516,7 +1516,9 @@ void Interpreter::ImportTexture(int i, int tile, bool importReplacement) {
     if (mRenderCost.Active() && textureResource) {
         mRenderCost.DescribeTexture(textureResource->Width, textureResource->Height,
                                    static_cast<uint32_t>(textureResource->Type), textureResource->Flags,
-                                   textureResource->ImageDataSize);
+                                   textureResource->ImageDataSize,
+                                   textureResource->mImageBuffer ? textureResource->mImageBuffer->size() : 0,
+                                   static_cast<bool>(textureResource->mImageBuffer));
     }
 
     // Use palette_dram_addr (the original DRAM source) instead of palettes[]
@@ -4743,7 +4745,7 @@ bool gfx_push_shader(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
     const char* path = (const char*)gfx->SegAddr(cmd->words.w1);
 
-    if (!gfx_check_image_signature(path)) {
+    if (path == nullptr || !gfx_check_image_signature(path) || path[7] == '\0') {
         SPDLOG_ERROR("G_PUSH_SHADER: Shader is not a valid OTR resource name, unable to register push shader");
         return false;
     }
@@ -4752,15 +4754,18 @@ bool gfx_push_shader(Interpreter* gfx, F3DGfx** cmd0) {
 
     size_t shaderId = static_cast<size_t>(-1);
     for (const auto& shader : gfx->mShaders) {
-        if (strcmp(shader.second, path) == 0) {
+        if (shader.second == path) {
             shaderId = shader.first;
             break;
         }
     }
 
     if (shaderId == static_cast<size_t>(-1)) {
-        shaderId = gfx->mShadersIndex++;
-        gfx->mShaders[shaderId] = path;
+        shaderId = gfx->mShadersIndex;
+        // This registry survives display-list/resource teardown. Keep its own
+        // path rather than retaining the command's display-list-owned string.
+        gfx->mShaders.emplace(shaderId, path);
+        ++gfx->mShadersIndex;
     }
 
     gfx->mShaderStack.push(shaderId);
@@ -4769,24 +4774,21 @@ bool gfx_push_shader(Interpreter* gfx, F3DGfx** cmd0) {
 }
 
 bool gfx_pop_shader(Interpreter* gfx, F3DGfx** cmd0) {
-    F3DGfx* cmd = *cmd0;
-
-    gfx->mShaderStack.pop();
+    if (!gfx->mShaderStack.empty()) {
+        gfx->mShaderStack.pop();
+    }
 
     return false;
 }
 
 const char* gfx_get_shader(int16_t id) {
-    Interpreter* gfx = mInstance.lock().get();
-
-
-    for (const std::pair<size_t, const char*>& shader : gfx->mShaders) {
-        if (shader.first == id) {
-            return shader.second;
-        }
+    auto gfx = mInstance.lock();
+    if (gfx == nullptr || id < 0) {
+        return nullptr;
     }
 
-    return nullptr; // Use no shader
+    const auto shader = gfx->mShaders.find(static_cast<size_t>(id));
+    return shader != gfx->mShaders.end() ? shader->second.c_str() : nullptr;
 }
 
 bool gfx_moveword_handler_f3dex2(Interpreter* gfx, F3DGfx** cmd0) {
@@ -4848,46 +4850,47 @@ bool gfx_vtx_handler_f3d(Interpreter* gfx, F3DGfx** cmd0) {
 }
 
 bool gfx_vtx_hash_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
-    // Offset added to the start of the vertices
-    const uintptr_t offset = (*cmd0)->words.w1;
-    // This is a two-part display list command, so increment the instruction pointer so we can get the CRC64
-    // hash from the second
+    F3DGfx* cmd = *cmd0;
+    const uintptr_t offset = cmd->words.w1;
+    const uint32_t count = C0(12, 8);
+    const uint32_t end = C0(1, 7);
+    // Archive packets store w1 as u32. Consume their hash word on every path.
     (*cmd0)++;
-    const uint64_t hash = ((uint64_t)(*cmd0)->words.w0 << 32) + (*cmd0)->words.w1;
-
-    // We need to know if the offset is a cached pointer or not. An offset greater than one million is not a
-    // real offset, so it must be a real pointer
-    if (offset > 0xFFFFF) {
-        (*cmd0)--;
-        F3DGfx* cmd = *cmd0;
-        gfx->GfxSpVertex(C0(12, 8), C0(1, 7) - C0(12, 8), (F3DVtx*)offset);
-        (*cmd0)++;
-    } else {
-        // The exported offset is a BYTE offset into the vertex resource. Its unit is that resource's own
-        // on-disk record size (16 for vanilla v0, 22 for the s32 v1 form) - never sizeof(F3DVtx), which is
-        // the padded runtime struct. Ask the resource rather than assuming.
-        auto resourceMgr = ActiveResMgr();
-        auto res = resourceMgr->LoadResource(hash);
-        F3DVtx* vtx = (F3DVtx*)resourceMgr->GetResourceRawPointer(res);
-
-        if (vtx != NULL) {
-            // dynamic_cast, not static: a hash that resolved to some other resource type would otherwise be
-            // undefined behaviour. Falls back to the vanilla record size, which is what this assumed before.
-            auto vertexRes = std::dynamic_pointer_cast<Fast::Vertex>(res);
-            const uint32_t recordSize =
-                (vertexRes != nullptr && vertexRes->RecordSize != 0) ? vertexRes->RecordSize : OTR_EXPORTED_VTX_SIZE;
-            vtx += offset / recordSize;
-
-            (*cmd0)--;
-            F3DGfx* cmd = *cmd0;
-
-            // TODO: WTF??
-            cmd->words.w1 = (uintptr_t)vtx;
-
-            gfx->GfxSpVertex(C0(12, 8), C0(1, 7) - C0(12, 8), vtx);
-            (*cmd0)++;
-        }
+    const uint64_t hash = (static_cast<uint64_t>((*cmd0)->words.w0) << 32) |
+                          static_cast<uint32_t>((*cmd0)->words.w1);
+    if (count == 0 || end < count || end > MAX_VERTICES) {
+        return false;
     }
+
+    // This is always a serialized byte offset. Resolve through the current
+    // owner's normal resource cache each execution, including after Alt changes.
+    if (offset > UINT32_MAX) {
+        return false;
+    }
+    auto resourceMgr = ActiveResMgr();
+    if (resourceMgr == nullptr) {
+        return false;
+    }
+    auto resource = resourceMgr->LoadResource(hash);
+    auto* vertexSource = dynamic_cast<Fast::IVertexSource*>(resource.get());
+    if (vertexSource == nullptr) {
+        return false;
+    }
+    const uint32_t recordSize = vertexSource->GetVertexRecordSize();
+    if ((recordSize != 16 && recordSize != 22) || offset % recordSize != 0) {
+        return false;
+    }
+    const size_t bytes = resource->GetPointerSize();
+    const size_t vertexCount = bytes / sizeof(F3DVtx);
+    const size_t index = offset / recordSize;
+    if (bytes % sizeof(F3DVtx) != 0 || index > vertexCount || count > vertexCount - index) {
+        return false;
+    }
+    auto* vertices = reinterpret_cast<F3DVtx*>(resourceMgr->GetResourceRawPointer(resource));
+    if (vertices == nullptr) {
+        return false;
+    }
+    gfx->GfxSpVertex(count, end - count, vertices + index);
     return false;
 }
 

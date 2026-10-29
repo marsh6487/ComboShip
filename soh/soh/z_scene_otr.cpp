@@ -551,6 +551,10 @@ extern "C" s32 OTRRoom_RequestNewRoom(PlayState* play, RoomContext* roomCtx, s32
     u32 size;
 
     if (roomCtx->status == 0) {
+        if (roomNum < 0 || roomNum >= play->numRooms) {
+            return 0;
+        }
+        BgCheck_InvalidateRoomSnapshots(&play->colCtx);
         roomCtx->prevRoom = roomCtx->curRoom;
         roomCtx->curRoom.num = roomNum;
         roomCtx->curRoom.segment = NULL;

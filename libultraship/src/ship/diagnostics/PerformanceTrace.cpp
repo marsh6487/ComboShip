@@ -234,7 +234,7 @@ nlohmann::json EndTick() noexcept {
             resourceTotals.push_back({{"origin_tick", origin}, {"name", name}, {"manager", manager},
                                       {"cache_owner", owner}, {"stages", std::move(stageTotals)}});
         }
-        return {{"collector_record_ns", measuredRecordNs}, {"collector_count_ns", measuredCountNs},
+        return {{"schema", 2}, {"collector_record_ns", measuredRecordNs}, {"collector_count_ns", measuredCountNs},
                 {"collector_record_calls", measuredRecordCalls}, {"collector_count_calls", measuredCountCalls},
                 {"collector_errors", errors}, {"outstanding_scopes", outstanding}, {"peak_records", output.size()},
                 {"lifetime_peak_records", peakRecords}, {"peak_aggregate_keys", summary.size()},

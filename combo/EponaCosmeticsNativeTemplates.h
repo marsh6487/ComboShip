@@ -114,7 +114,8 @@ inline bool NativeTemplateMatches(std::string_view path, const std::vector<Gfx>&
                 kNativeCacheOperands[cacheIndex].index == index) {
                 // Fast3D replaces these exact SETTIMG_HASH/VTX_HASH operands with host pointers.
                 // Normalize only a cached pointer; a changed native offset must still be rejected.
-                if (operand > 0xFFFFF) {
+                const uintptr_t cacheThreshold = (command.words.w0 >> 24) == 0x32 ? UINT32_MAX : 0xFFFFF;
+                if (operand > cacheThreshold) {
                     operand = kNativeCacheOperands[cacheIndex].original;
                 }
                 ++cacheIndex;

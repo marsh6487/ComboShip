@@ -28,9 +28,6 @@ struct DynaPolyActor;
 #define BGCHECK_SCENE 0x7FFF
 #define BGACTOR_INVALID BGCHECK_SCENE
 #define BGACTOR_INITIAL_MAX 64
-// Superseded dyna poly/vtx buffers parked per scene (see DynaCollisionContext.retiredBuffers). Growth doubles
-// from 16 384, so a list retires one buffer per doubling; 32 covers both lists past 2^31 entries.
-#define DYNA_RETIRED_BUFFERS_MAX 32
 // SOH [Unbound] World extent: positions are f32 end to end; 2^20 keeps ~0.06-unit precision at the edge.
 // BGCHECK_Y_MIN is the "no floor" sentinel (exactly representable in f32).
 #define BGCHECK_Y_MIN -2147483648.0f
@@ -249,10 +246,8 @@ typedef struct {
     BgActor* bgActors;  // bgActorMax slots; grown by DynaPoly_SetBgActor
     u16* bgActorFlags; // & 0x0008 = no dyna ceiling
     s32 bgActorMax;
-    // polyList/vtxList grow in DynaPoly_Setup; superseded buffers are parked here until BgCheck_Free because
-    // actors keep CollisionPoly* into them (already stale each frame, but they must stay readable).
-    void* retiredBuffers[DYNA_RETIRED_BUFFERS_MAX];
-    s32 retiredCount;
+    // Current and superseded geometry buffers belong to the external allocation owner until BgCheck_Free.
+    // Savestates restore their contents at retained addresses because actors keep raw CollisionPoly* values.
     CollisionPoly* polyList;
     Vec3i* vtxList; // s16 -> s32 (world extent). Baked world-space, so these quantise to whole units
                     // each frame as they did in vanilla.
@@ -273,6 +268,29 @@ typedef struct CollisionContext {
     SSNodeList polyNodes;
     DynaCollisionContext dyna;
 } CollisionContext; // SOH [Unbound] memSize (the N64 byte budget) is gone; see BgCheck_Allocate
+
+typedef struct {
+    void* address;
+    size_t size;
+} BgCheckGeometryBuffer;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Authoritative ownership and epochs live outside gSystemHeap and survive a raw savestate heap restore.
+void BgCheck_BeginOwnership(CollisionContext* colCtx);
+void BgCheck_ReleaseOwnership(CollisionContext* colCtx);
+u64 BgCheck_GetAllocationEpoch(const CollisionContext* colCtx);
+u64 BgCheck_GetRoomEpoch(const CollisionContext* colCtx);
+void BgCheck_InvalidateRoomSnapshots(CollisionContext* colCtx);
+s32 BgCheck_TrackDynaGeometry(DynaCollisionContext* dyna, void* polys, size_t polyBytes, void* vertices,
+                             size_t vertexBytes);
+size_t BgCheck_GetGeometryBuffers(const CollisionContext* colCtx, BgCheckGeometryBuffer* out, size_t capacity);
+s32 BgCheck_OwnsGeometryBuffer(const CollisionContext* colCtx, const void* address, size_t size);
+void BgCheck_InitEmpty(CollisionContext* colCtx, struct PlayState* play);
+#ifdef __cplusplus
+}
+#endif
 
 typedef struct {
     /* 0x00 */ struct PlayState* play;

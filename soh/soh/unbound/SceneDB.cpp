@@ -99,6 +99,7 @@ using ExtBitset = std::vector<uint32_t>;
 std::unordered_map<int32_t, ExtBitset> sExtClearFlags;     // persisted
 std::unordered_map<int32_t, ExtBitset> sExtLiveClearFlags; // current play state
 std::unordered_map<int32_t, ExtBitset> sExtTempClearFlags; // live-only
+thread_local const SceneDBState* sSaveState;
 
 std::unordered_map<int32_t, ExtBitset>& ExtFlagMap(SceneFlagsExtKind kind) {
     return kind == SCENE_FLAGS_EXT_TEMP_CLEAR ? sExtTempClearFlags : sExtLiveClearFlags;
@@ -125,6 +126,25 @@ void ExtBitWrite(ExtBitset& bits, int32_t bit, bool value) {
 }
 
 } // namespace
+
+SceneDBState SceneDB_CaptureState() {
+    return { sCustomSceneFlags, sExtClearFlags, sExtLiveClearFlags, sExtTempClearFlags };
+}
+
+void SceneDB_RestoreState(SceneDBState& prepared) noexcept {
+    sCustomSceneFlags.swap(prepared.customSceneFlags);
+    sExtClearFlags.swap(prepared.clearFlags);
+    sExtLiveClearFlags.swap(prepared.liveClearFlags);
+    sExtTempClearFlags.swap(prepared.tempClearFlags);
+}
+
+SceneDBSaveScope::SceneDBSaveScope(const SceneDBState& state) noexcept : previous(sSaveState) {
+    sSaveState = &state;
+}
+
+SceneDBSaveScope::~SceneDBSaveScope() {
+    sSaveState = previous;
+}
 
 // ---- construction ---------------------------------------------------------------------------------
 
@@ -672,13 +692,16 @@ void LoadSavedSceneName() {
 }
 
 void SaveUnboundSection(const SaveContext& saveContext, int sectionID, bool fullSave) {
+    if (sSaveState == nullptr) {
+        throw std::logic_error("Unbound save requires a game-thread SceneDB snapshot");
+    }
     SaveHorseScene(&saveContext);
     SaveSavedSceneName(&saveContext);
     SaveEntranceName("entrance", saveContext.entranceIndex);
     SaveEntranceName("fwEntrance", saveContext.fw.entranceIndex);
     SaveEntranceName("backupFwEntrance", saveContext.ship.backupFW.entranceIndex);
     SaveManager::Instance->SaveStruct("sceneFlags", []() {
-        for (const auto& [id, flags] : sCustomSceneFlags) {
+        for (const auto& [id, flags] : sSaveState->customSceneFlags) {
             const SceneDB::Entry& entry = SceneDB::Instance->RetrieveEntry(id);
             if (!entry.valid) {
                 continue;
@@ -696,7 +719,7 @@ void SaveUnboundSection(const SaveContext& saveContext, int sectionID, bool full
     });
     // Rooms >= 32: one word array per scene, keyed by name so it survives id reassignment.
     SaveManager::Instance->SaveStruct("roomClearExt", []() {
-        for (const auto& [id, bits] : sExtClearFlags) {
+        for (const auto& [id, bits] : sSaveState->clearFlags) {
             const SceneDB::Entry& entry = SceneDB::Instance->RetrieveEntry(id);
             if (!entry.valid || bits.empty()) {
                 continue;

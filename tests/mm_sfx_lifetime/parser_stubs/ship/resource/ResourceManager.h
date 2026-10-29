@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Ship {
 struct File;
@@ -13,6 +14,7 @@ class ResourceLoader;
 class ArchiveManager {
   public:
     int32_t GetFilePriority(const std::string& path);
+    std::vector<std::shared_ptr<File>> LoadFileFromAllLayers(const std::string& path);
 };
 
 class ResourceManager {

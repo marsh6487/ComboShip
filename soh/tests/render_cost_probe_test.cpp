@@ -75,15 +75,35 @@ int main() {
     // Nested upload time is not added a second time to command or frame totals.
     assert(r.resources[1].commands.nanos == 60);
 
+    Fast::RenderCostProbe dense;
+    assert(dense.BeginFrame(true, 0, true));
+    dense.SyncDepth(1);
+    for (unsigned i = 0; i < 1000; ++i) {
+        dense.SetResource("dense/resource/" + std::to_string(i));
+        dense.BeginCommand();
+        dense.SelectTexture("dense/texture/" + std::to_string(i));
+        dense.AddUpload(4, 1, 1, 1);
+        dense.AddCommand(4, 5, "G_TRI1", 1);
+    }
+    assert(dense.Report().resources.size() == 1001 && dense.Report().textures.size() == 1001);
+    assert(!dense.Report().resourceOverflow && !dense.Report().textureOverflow);
+    for (unsigned i = 0; i < 1000; ++i) {
+        assert(dense.Report().resources[i + 1].path == "dense/resource/" + std::to_string(i));
+        assert(dense.Report().textures[i + 1].path == "dense/texture/" + std::to_string(i));
+        assert(dense.Report().resources[i + 1].commands.calls == 1);
+        assert(dense.Report().textures[i + 1].bytes == 4);
+    }
+    dense.EndFrame(10000);
+
     Fast::RenderCostProbe bounded;
     assert(bounded.BeginFrame(true, 1000));
     bounded.SyncDepth(1);
-    for (unsigned i = 0; i < Fast::RenderCostProbe::MaxResources + 7; ++i) {
+    for (unsigned i = 0; i < 4103; ++i) {
         bounded.SetResource("resource/" + std::to_string(i));
         bounded.AddCommand(4, 5, "G_TRI1", 1);
     }
-    assert(bounded.Report().resources.size() == Fast::RenderCostProbe::MaxResources);
-    assert(bounded.Report().resourceOverflow > 0);
+    assert(bounded.Report().resources.size() == 4096);
+    assert(bounded.Report().resourceOverflow == 8);
     assert(bounded.Report().resources[0].commands.calls == 0);
     assert(bounded.Report().overflowResource.commands.calls == 8);
     // Invalid microcode must not index outside fixed arrays.
@@ -147,6 +167,7 @@ int main() {
     detailed.AddUpload(4096, 5, 64, 16);
     assert(detailed.Report().textures[1].metadataChanges == 1 && detailed.Report().textures[1].uploadDimensionChanges == 1);
     assert(detailed.Report().textures[1].cacheHits == 1 && detailed.Report().textures[1].cacheMisses == 1);
+    assert(detailed.Report().resources[0].upload.nanos == 5); // Outside a command has no list owner.
     detailed.SetResource("<unresolved-marker>");
     detailed.AddCommand(4, 5, "G_TRI1", 10);
     assert(detailed.Report().resources[0].commands.nanos == 10 && detailed.Report().resources[0].selfUnknownCommands == 1);
@@ -156,12 +177,12 @@ int main() {
     detailed.AddUpload(1, 20);
     detailed.AddCommand(4, 5, "G_TRI1", 10);
     assert(detailed.Report().selfAccountingClamps == 1);
-    for (unsigned i = 0; i < Fast::RenderCostProbe::MaxTextures + 5; ++i) {
+    for (unsigned i = 0; i < 4101; ++i) {
         detailed.SelectTexture("texture/" + std::to_string(i));
         detailed.AddUpload(4, 1, 1, 1);
     }
-    assert(detailed.Report().textures.size() == Fast::RenderCostProbe::MaxTextures);
-    assert(detailed.Report().textureOverflow > 0 && detailed.Report().overflowTexture.upload.calls > 0);
+    assert(detailed.Report().textures.size() == 4096);
+    assert(detailed.Report().textureOverflow == 7 && detailed.Report().overflowTexture.upload.calls == 7);
     for (unsigned i = 0; i < Fast::RenderCostProbe::MaxPasses + 5; ++i) {
         detailed.SetPass(i);
         detailed.BeginCommand();

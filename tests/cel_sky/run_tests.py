@@ -49,6 +49,10 @@ cloud = function(graphics / "WWClouds.cpp", "static void WriteVtx(")
 wisp = function(graphics / "WWWindWisps.cpp", "static void WriteWispVtx(")
 stick_remove = function(graphics / "DekuStickLight.cpp", "void RemoveStickLight(")
 stick_update = function(graphics / "DekuStickLight.cpp", "void UpdateDekuStickLight()")
+stick_text = (graphics / "DekuStickLight.cpp").read_text()
+stick_signature = 'extern "C" void DekuStickLight_SaveState('
+stick_state = block_from(stick_text, stick_text.index(stick_signature)) if stick_signature in stick_text else 'extern "C" void DekuStickLight_SaveState(SaveStateCtx*) {}'
+
 compiler = os.environ.get("CXX", "c++")
 flags = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if args.sanitize else []
 with tempfile.TemporaryDirectory(prefix="cel-sky-") as temporary:
@@ -64,7 +68,8 @@ with tempfile.TemporaryDirectory(prefix="cel-sky-") as temporary:
         cpp.write_text(fixture.read_text().replace("/* " + marker + " */", production)
                        .replace("/* PRODUCTION_MENU_REGISTRATION */", registration)
                        .replace("/* PRODUCTION_WISP_WRITER */", wisp)
-                       .replace("/* PRODUCTION_STICK_REMOVE */", stick_remove))
+                       .replace("/* PRODUCTION_STICK_REMOVE */", stick_remove)
+                       .replace("/* PRODUCTION_STICK_SAVESTATE */", stick_state))
         binary = build / name
         subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                         *flags, "-I" + str(ROOT), str(cpp), "-o", str(binary)], check=True)

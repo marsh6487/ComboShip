@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z64save.h"
+struct SceneDBState;
 
 #define SECTION_PARENT_NONE -1
 typedef struct {
@@ -167,7 +168,7 @@ class SaveManager {
     void ConvertFromUnversioned();
     void CreateDefaultGlobal();
 
-    void SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID);
+    void SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID, const SceneDBState& sceneState);
 
     void InitMeta(int slotNum);
     void StartupCheckAndInitMeta(int slotNum);

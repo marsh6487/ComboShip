@@ -59,12 +59,36 @@ void Vertex(const char* name,uint64_t hash,std::initializer_list<std::array<int1
     loader.files[name]=vertices;loader.names[hash]=name;
 }
 void LegacyVertex(const char* name,uint64_t hash,std::initializer_list<std::array<int16_t,3>> points) {
+#ifdef MM_BUILD_DLL
     auto vertices=std::make_shared<SOH::Array>();
     vertices->ArrayType=SOH::ArrayResourceType::Vertex;
     vertices->ArrayScalarType=SOH::ScalarType::ZSCALAR_NONE;
     vertices->ArrayCount=points.size();
     for(auto p:points){Fast::F3DVtx vertex{};std::copy(p.begin(),p.end(),vertex.v.ob);vertices->Vertices.push_back(vertex);}
     loader.files[name]=vertices;loader.names[hash]=name;
+#else
+    // The Unbound OoT factory now widens legacy Array vertices into Fast::Vertex.
+    Vertex(name,hash,points);
+#endif
+}
+void SetRuntimeMatrix(Mtx* out,const float* values) {
+#if defined(GBI_FLOAT_MTX) || defined(GBI_FLOATS)
+    std::memcpy(out->mf,values,64);
+#else
+    auto* words=reinterpret_cast<uint32_t*>(out);
+    for(int i=0;i<8;++i) {
+        const uint32_t a=int32_t(values[i*2]*65536.f),b=int32_t(values[i*2+1]*65536.f);
+        words[i]=(a&0xffff0000u)|(b>>16);words[i+8]=(a<<16)|(b&0xffffu);
+    }
+#endif
+}
+void SetMatrixFromArchive(Mtx* out,const uint32_t* words) {
+    float values[16]{};
+    for(int i=0;i<8;++i) {
+        values[2*i]=int32_t((words[i]&0xffff0000u)|(words[i+8]>>16))/65536.f;
+        values[2*i+1]=int32_t((words[i]<<16)|(words[i+8]&0xffffu))/65536.f;
+    }
+    SetRuntimeMatrix(out,values);
 }
 using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
@@ -138,13 +162,13 @@ int main(){
     // Binary O2R sword vertices use the registered SOH_Array factory, not
     // Fast::Vertex. Preserve that type before and after interpreter caching.
     LegacyVertex("guard/legacyVertices",105,{{10,-10,0},{20,20,2},{30,30,3}});
-    auto legacy=std::dynamic_pointer_cast<SOH::Array>(loader("guard/legacyVertices"));
+    auto legacy=loader("guard/legacyVertices");
     List("guard/legacy",106,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("guard/legacyVertices")},{3,0},
                             {uintptr_t(G_ENDDL)<<24,0}});
     NeiGi::ModelBoundsReader<Loader> legacyReader(loader,0);
     assert(legacyReader.Read("guard/legacy",guard)&&guard.minimum.y==-10&&guard.maximum.y==30 &&
            "binary SOH_Array vertices must receive the same fit as XML Fast::Vertex");
-    for(auto offset:{uintptr_t(sizeof(Vtx)),uintptr_t(legacy->GetPointer())+sizeof(Vtx)}) {
+    for(auto offset:{uintptr_t(16),uintptr_t(legacy->GetRawPointer())+sizeof(Vtx)}) {
         List("guard/legacyHash",107,{{uintptr_t(G_VTX_OTR_HASH)<<24 | 2u<<12,offset},{0,105},
                                     {uintptr_t(G_ENDDL)<<24,0}});
         NeiGi::ModelBoundsReader<Loader> legacyHash(loader,0);
@@ -154,17 +178,39 @@ int main(){
     ++legacyDl->Instructions[0].words.w1;
     NeiGi::ModelBoundsReader<Loader> misalignedLegacy(loader,0);
     assert(!misalignedLegacy.Read("guard/legacyHash",guard));
-    legacyDl->Instructions[0].words.w1=3*sizeof(Vtx);
+    legacyDl->Instructions[0].words.w1=3*16;
     NeiGi::ModelBoundsReader<Loader> pastLegacyEnd(loader,0);
     assert(!pastLegacyEnd.Read("guard/legacyHash",guard));
-    legacy->ArrayType=SOH::ArrayResourceType::Scalar;
+    auto scalar=std::make_shared<SOH::Array>();
+    scalar->ArrayType=SOH::ArrayResourceType::Scalar;
+    loader.files["guard/legacyVertices"]=scalar;
     NeiGi::ModelBoundsReader<Loader> scalarArray(loader,0);
     assert(!scalarArray.Read("guard/legacy",guard));
-    legacy->ArrayType=SOH::ArrayResourceType::Vertex;
-    ++legacy->ArrayCount;
+    loader.files["guard/legacyVertices"]=legacy;
+#ifdef MM_BUILD_DLL
+    auto legacyArray=std::dynamic_pointer_cast<SOH::Array>(legacy);
+    ++legacyArray->ArrayCount;
     NeiGi::ModelBoundsReader<Loader> malformedArray(loader,0);
     assert(!malformedArray.Read("guard/legacy",guard));
-    --legacy->ArrayCount;
+    --legacyArray->ArrayCount;
+#else
+    // Scalar/vector-only OoT arrays cannot masquerade as geometry.
+    scalar->ArrayType=SOH::ArrayResourceType::Vertex;
+    scalar->ArrayCount=3;
+    loader.files["guard/legacyVertices"]=scalar;
+    NeiGi::ModelBoundsReader<Loader> malformedArray(loader,0);
+    assert(!malformedArray.Read("guard/legacy",guard));
+    loader.files["guard/legacyVertices"]=legacy;
+#endif
+    auto wide=std::make_shared<Fast::Vertex>();
+    wide->RecordSize=22;
+    wide->VertexList.resize(47666);
+    for(int i=0;i<3;++i){wide->VertexList[47663+i].v.ob[0]=10+10*i;wide->VertexList[47663+i].v.ob[1]=-10+20*i;}
+    loader.files["guard/wideVertices"]=wide;loader.names[108]="guard/wideVertices";
+    List("guard/wideHash",109,{{uintptr_t(G_VTX_OTR_HASH)<<24 | 3u<<12,47663u*22u},{0,108},
+                              {uintptr_t(G_ENDDL)<<24,0}});
+    NeiGi::ModelBoundsReader<Loader> wideReader(loader,0);
+    assert(wideReader.Read("guard/wideHash",guard)&&guard.minimum.y==-10&&guard.maximum.y==30);
     auto cachedDl=std::dynamic_pointer_cast<Fast::DisplayList>(loader("guard/cached"));
     ++cachedDl->Instructions[0].words.w1;
     NeiGi::ModelBoundsReader<Loader> stale(loader,0);
@@ -182,11 +228,7 @@ int main(){
     // transformed vertices, with modelview state shared across child calls.
     auto matrix=std::make_shared<Fast::Matrix>();
     const float values[16]={.5f,0,0,0, 0,.5f,0,0, 0,0,.5f,0, 0,20,0,1};
-    auto* words=reinterpret_cast<uint32_t*>(&matrix->Matrx);
-    for(int i=0;i<8;++i) {
-        const uint32_t a=int32_t(values[i*2]*65536.f),b=int32_t(values[i*2+1]*65536.f);
-        words[i]=(a&0xffff0000u)|(b>>16);words[i+8]=(a<<16)|(b&0xffffu);
-    }
+    SetRuntimeMatrix(&matrix->Matrx,values);
     loader.files["guard/matrix"]=matrix;loader.names[103]="guard/matrix";
     List("guard/transformed",104,{{uintptr_t(G_MTX_OTR_FILEPATH)<<24,uintptr_t("guard/matrix")},
       {uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("guard/vertices")},{3,0},

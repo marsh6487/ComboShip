@@ -1,5 +1,6 @@
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <cmath>
 
 #include "functions.h"
 #include "macros.h"
@@ -306,7 +307,7 @@ static bool IsTimedRoom(bool mq, s16 sceneNum, s16 roomNum) {
     }
 }
 
-static bool IsEnemyAllowedToSpawn(s16 sceneNum, s16 roomNum, EnemyEntry enemy, s16 posY, bool fromBari) {
+static bool IsEnemyAllowedToSpawn(s16 sceneNum, s16 roomNum, EnemyEntry enemy, f32 posY, bool fromBari) {
     bool mq = ResourceMgr_IsSceneMasterQuest(sceneNum);
 
     if (IsExcludedFromClearRooms(enemy.id, enemy.params) && IsClearRoom(mq, sceneNum, roomNum)) {
@@ -349,7 +350,7 @@ static bool IsEnemyAllowedToSpawn(s16 sceneNum, s16 roomNum, EnemyEntry enemy, s
     // - Lizalfos/Dinolfos, Bari: they drop in
     // - Skulltulla: they appear above
     // - Flying Peehat: they rise above the ceiling
-    if (mq && sceneNum == SCENE_FIRE_TEMPLE && roomNum == 15 && posY == 64 &&
+    if (mq && sceneNum == SCENE_FIRE_TEMPLE && roomNum == 15 && std::trunc(posY) == 64 &&
         (enemy.id == ACTOR_EN_ZF || enemy.id == ACTOR_EN_VALI || enemy.id == ACTOR_EN_ST ||
          enemy.id == ACTOR_EN_PEEHAT)) {
         return false;
@@ -386,7 +387,7 @@ static void UpdateSelectedEnemies() {
     }
 }
 
-static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, s16 posY, bool fromBari) {
+static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, f32 posY, bool fromBari) {
     std::vector<EnemyEntry> filteredEnemyList = {};
 
     if (selectedEnemyList.size() == 0) {
@@ -418,6 +419,8 @@ static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, s16 posY, b
 
 static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 params, f32 posX) {
     u32 isMQ = ResourceMgr_IsSceneMasterQuest(sceneNum);
+    // Preserve authored integer-position exceptions without narrowing the spawn.
+    const f32 legacyPosX = std::trunc(posX);
 
     for (int i = 0; i < ARRAY_COUNT(enemiesToRandomize); i++) {
         if (actorId != enemiesToRandomize[i]) {
@@ -434,7 +437,7 @@ static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 
             // Don't randomize the OoB wallmaster in the Silver Rupee room because it's only there to
             // not trigger unlocking the door after killing the other wallmaster in authentic gameplay.
             case ACTOR_EN_WALLMAS:
-                return !(!isMQ && sceneNum == SCENE_GERUDO_TRAINING_GROUND && roomNum == 2 && posX == -2345);
+                return !(!isMQ && sceneNum == SCENE_GERUDO_TRAINING_GROUND && roomNum == 2 && legacyPosX == -2345);
             // Only randomize initial Floormaster actor (it can split and does some spawning on init).
             case ACTOR_EN_FLOORMAS:
                 return params == 0 || params == -32768;
@@ -458,7 +461,7 @@ static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 
             // Don't randomize the right baby dodongo on the first tunnel in Dodongo's Cavern as in vanilla you use them
             // isntead of bombs to blow up a wall
             case ACTOR_EN_DODOJR:
-                return !(sceneNum == SCENE_DODONGOS_CAVERN && roomNum == 1 && posX == 1972);
+                return !(sceneNum == SCENE_DODONGOS_CAVERN && roomNum == 1 && legacyPosX == 1972);
             // Don't randomize the Wolfos in SFM because it's needed to open the gate.
             case ACTOR_EN_WF:
                 return params != 7936;
@@ -471,7 +474,7 @@ static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 
             // Leave one Armos unrandomized in the Spirit Temple room where an armos is needed to push down a
             // button.
             case ACTOR_EN_AM:
-                return (params == -1 || params == 255) && !(sceneNum == SCENE_SPIRIT_TEMPLE && posX == 2141);
+                return (params == -1 || params == 255) && !(sceneNum == SCENE_SPIRIT_TEMPLE && legacyPosX == 2141);
             // Don't randomize Shell Blades and Spikes in the underwater portion in Water Temple as it's impossible
             // to kill most other enemies underwater with just hookshot and they're required to be killed for a
             // grate to open.
@@ -490,7 +493,16 @@ static bool IsEnemyFoundToRandomize(s16 sceneNum, s16 roomNum, s16 actorId, s16 
     return false;
 }
 
-static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, s16* posX, s16* posY, s16* posZ, s16* rotX, s16* rotY,
+static u32 EnemyRando_SeedCoordinate(f32 position) {
+    // Quantize only the selection seed; native spawn coordinates stay precise.
+    // Wrap wide integer values explicitly instead of overflowing a signed cast.
+    if (!std::isfinite(position))
+        return 0;
+    const double integer = std::fmod(std::trunc(static_cast<double>(position)), 4294967296.0);
+    return static_cast<u32>(integer < 0 ? integer + 4294967296.0 : integer);
+}
+
+static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, f32* posX, f32* posY, f32* posZ, s16* rotX, s16* rotY,
                              s16* rotZ, s16* params, s16 offset = 0, bool fromBari = false) {
     u32 isMQ = ResourceMgr_IsSceneMasterQuest(play->sceneNum);
 
@@ -532,7 +544,7 @@ static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, s16* posX, s16* posY
 
         // Move like-likes in MQ Jabu Jabu down into the room as they otherwise get stuck on Song of Time blocks.
         if (*actorId == ACTOR_EN_RR && play->sceneNum == SCENE_JABU_JABU && play->roomCtx.curRoom.num == 11) {
-            if (*posX == 1003) {
+            if (std::trunc(*posX) == 1003) {
                 *posX = *posX - 75;
             } else {
                 *posX = *posX + 75;
@@ -541,8 +553,9 @@ static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, s16* posX, s16* posY
         }
 
         // One enemy in GTG hammer room doesn't raycast properly, move it slightly
-        if (*posY == 117 && play->sceneNum == SCENE_GERUDO_TRAINING_GROUND && play->roomCtx.curRoom.num == 5) {
-            *posY = 118;
+        if (std::trunc(*posY) == 117 && play->sceneNum == SCENE_GERUDO_TRAINING_GROUND &&
+            play->roomCtx.curRoom.num == 5) {
+            *posY += 1;
         }
 
         // Do a raycast from the original position of the actor to find the ground below it, then try to place
@@ -553,7 +566,7 @@ static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, s16* posX, s16* posY
         f32 raycastResult;
 
         pos.x = *posX;
-        pos.y = static_cast<f32>(*posY + 50);
+        pos.y = *posY + 50;
         pos.z = *posZ;
 
         // the forest temple second twisted hallway spawns after the enemies so we need to "find the floor" manually
@@ -573,13 +586,14 @@ static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, s16* posX, s16* posY
 
             // If ground is found below actor, move actor to that height.
             if (raycastResult > BGCHECK_Y_MIN) {
-                *posY = static_cast<s16>(raycastResult);
+                *posY = raycastResult;
             }
         }
 
         // Get randomized enemy ID and parameter.
-        u32 seed =
-            play->sceneNum + *actorId + (int)*posX + (int)*posY + (int)*posZ + *rotX + *rotY + *rotZ + *params + offset;
+        u32 seed = static_cast<u32>(play->sceneNum) + *actorId + EnemyRando_SeedCoordinate(*posX) +
+                   EnemyRando_SeedCoordinate(*posY) + EnemyRando_SeedCoordinate(*posZ) + *rotX + *rotY + *rotZ +
+                   *params + offset;
         EnemyEntry randomEnemy = GetRandomizedEnemyEntry(seed, play, *posY, fromBari);
 
         *actorId = randomEnemy.id;
@@ -636,11 +650,9 @@ void FixClubMoblinScale(void* ptr) {
 void EnemyRando_SetColliderPosTp(void* ptr) {
     EnTp* enTp = (EnTp*)ptr;
 
-    enTp->collider.elements[0].dim.worldSphere.center.x = (s16)enTp->actor.world.pos.x;
-    enTp->collider.elements[0].dim.worldSphere.center.y = (s16)enTp->actor.world.pos.y;
-    enTp->collider.elements[0].dim.worldSphere.center.z = (s16)enTp->actor.world.pos.z;
+    enTp->collider.elements[0].dim.worldSphere.center = enTp->actor.world.pos;
     enTp->collider.elements[0].dim.worldSphere.radius =
-        (s16)(enTp->collider.elements[0].dim.modelSphere.radius * enTp->collider.elements[0].dim.scale);
+        enTp->collider.elements[0].dim.modelSphere.radius * enTp->collider.elements[0].dim.scale;
 }
 
 void EnemyRando_SetColliderPosSkb(void* ptr) {
@@ -648,11 +660,9 @@ void EnemyRando_SetColliderPosSkb(void* ptr) {
     u8 i;
 
     for (i = 0; i < 2; i++) {
-        enSkb->collider.elements[i].dim.worldSphere.center.x = (s16)enSkb->actor.world.pos.x;
-        enSkb->collider.elements[i].dim.worldSphere.center.y = (s16)enSkb->actor.world.pos.y;
-        enSkb->collider.elements[i].dim.worldSphere.center.z = (s16)enSkb->actor.world.pos.z;
+        enSkb->collider.elements[i].dim.worldSphere.center = enSkb->actor.world.pos;
         enSkb->collider.elements[i].dim.worldSphere.radius =
-            (s16)(enSkb->collider.elements[i].dim.modelSphere.radius * enSkb->collider.elements[i].dim.scale);
+            enSkb->collider.elements[i].dim.modelSphere.radius * enSkb->collider.elements[i].dim.scale;
     }
 }
 
@@ -784,9 +794,9 @@ void RegisterEnemyRandomizer() {
         Actor** actor = va_arg(args, Actor**);
 
         s16 actorId = actorEntry->id;
-        s16 posX = static_cast<s16>(actorEntry->pos.x); // SOH [Unbound] pos is f32
-        s16 posY = static_cast<s16>(actorEntry->pos.y); // SOH [Unbound] pos is f32
-        s16 posZ = static_cast<s16>(actorEntry->pos.z); // SOH [Unbound] pos is f32
+        f32 posX = actorEntry->pos.x;
+        f32 posY = actorEntry->pos.y;
+        f32 posZ = actorEntry->pos.z;
         s16 rotX = actorEntry->rot.x;
         s16 rotY = actorEntry->rot.y;
         s16 rotZ = actorEntry->rot.z;
@@ -806,9 +816,9 @@ void RegisterEnemyRandomizer() {
         double posZ = va_arg(args, double);
 
         s16 actorId = ACTOR_EN_TEST;
-        s16 posX2 = static_cast<s16>(posX);
-        s16 posY2 = static_cast<s16>(posY);
-        s16 posZ2 = static_cast<s16>(posZ);
+        f32 posX2 = static_cast<f32>(posX);
+        f32 posY2 = static_cast<f32>(posY);
+        f32 posZ2 = static_cast<f32>(posZ);
         s16 rotX = 0;
         s16 rotY = static_cast<s16>(
             Math_FAtan2F(playerPos->x - static_cast<f32>(posX), playerPos->z - static_cast<f32>(posZ)) *
@@ -834,9 +844,9 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_TORCH2;
-        s16 posX = static_cast<s16>(blkobj->dyna.actor.world.pos.x);
-        s16 posY = static_cast<s16>(blkobj->dyna.actor.world.pos.y);
-        s16 posZ = static_cast<s16>(blkobj->dyna.actor.world.pos.z);
+        f32 posX = blkobj->dyna.actor.world.pos.x;
+        f32 posY = blkobj->dyna.actor.world.pos.y;
+        f32 posZ = blkobj->dyna.actor.world.pos.z;
         s16 rotX = 0;
         s16 rotY = blkobj->dyna.actor.yawTowardsPlayer;
         s16 seededRotY = 6969;
@@ -862,9 +872,9 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_FIREFLY;
-        s16 posX = static_cast<s16>(hakaTubo->dyna.actor.world.pos.x);
-        s16 posY = static_cast<s16>(hakaTubo->dyna.actor.world.pos.y) + 80;
-        s16 posZ = static_cast<s16>(hakaTubo->dyna.actor.world.pos.z);
+        f32 posX = hakaTubo->dyna.actor.world.pos.x;
+        f32 posY = hakaTubo->dyna.actor.world.pos.y + 80;
+        f32 posZ = hakaTubo->dyna.actor.world.pos.z;
         s16 rotX = 0;
         s16 rotY = hakaTubo->dyna.actor.shape.rot.y;
         s16 rotZ = 0;
@@ -888,9 +898,9 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_POH;
-        s16 posX = static_cast<s16>(haka->dyna.actor.world.pos.x);
-        s16 posY = static_cast<s16>(haka->dyna.actor.world.pos.y);
-        s16 posZ = static_cast<s16>(haka->dyna.actor.world.pos.z);
+        f32 posX = haka->dyna.actor.world.pos.x;
+        f32 posY = haka->dyna.actor.world.pos.y;
+        f32 posZ = haka->dyna.actor.world.pos.z;
         s16 rotX = 0;
         s16 rotY = haka->dyna.actor.shape.rot.y;
         s16 rotZ = 0;
@@ -911,17 +921,17 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_BILI;
-        s16 posX = static_cast<s16>(vali->actor.world.pos.x);
-        s16 posY = static_cast<s16>(vali->actor.world.pos.y);
-        s16 posZ = static_cast<s16>(vali->actor.world.pos.z);
+        f32 posX = vali->actor.world.pos.x;
+        f32 posY = vali->actor.world.pos.y;
+        f32 posZ = vali->actor.world.pos.z;
         s16 rotX = 0;
         s16 rotY = vali->actor.world.rot.y;
         s16 rotZ = 0;
         s16 params = 0;
 
-        s16 homePosX = static_cast<s16>(vali->actor.home.pos.x);
-        s16 homePosY = static_cast<s16>(vali->actor.home.pos.y);
-        s16 homePosZ = static_cast<s16>(vali->actor.home.pos.z);
+        f32 homePosX = vali->actor.home.pos.x;
+        f32 homePosY = vali->actor.home.pos.y;
+        f32 homePosZ = vali->actor.home.pos.z;
 
         s16 homeRotX = vali->actor.home.rot.x;
         s16 homeRotY = vali->actor.home.rot.y;
@@ -950,9 +960,9 @@ void RegisterEnemyRandomizer() {
         // have to use int instead of s16 in the va_arg call due to integer promotion
         s16 actorId = va_arg(args, int);
         Vec3f spawnPos = va_arg(args, Vec3f);
-        s16 posX = static_cast<s16>(spawnPos.x);
-        s16 posY = static_cast<s16>(spawnPos.y);
-        s16 posZ = static_cast<s16>(spawnPos.z);
+        f32 posX = spawnPos.x;
+        f32 posY = spawnPos.y;
+        f32 posZ = spawnPos.z;
         s16 rotX = 0;
         s16 rotY = 0;
         s16 rotZ = 0;
@@ -982,9 +992,9 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_TEST;
-        s16 posX = 70;
-        s16 posY = 827;
-        s16 posZ = -3383;
+        f32 posX = 70;
+        f32 posY = 827;
+        f32 posZ = -3383;
         s16 rotX = 0;
         s16 rotY = 0;
         s16 rotZ = 0;
@@ -1071,13 +1081,11 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_FIREFLY;
-        s16 posX =
-            static_cast<s16>(hakaHuta->dyna.actor.world.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
-                             40.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y));
-        s16 posY = static_cast<s16>(hakaHuta->dyna.actor.world.pos.y) - 10;
-        s16 posZ =
-            static_cast<s16>(hakaHuta->dyna.actor.world.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
-                             40.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y));
+        f32 posX = hakaHuta->dyna.actor.world.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
+                   40.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y);
+        f32 posY = hakaHuta->dyna.actor.world.pos.y - 10;
+        f32 posZ = hakaHuta->dyna.actor.world.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
+                   40.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y);
         s16 rotX = 0;
         s16 rotY = hakaHuta->dyna.actor.shape.rot.y + 0x8000;
         s16 rotZ = 0;
@@ -1091,13 +1099,11 @@ void RegisterEnemyRandomizer() {
                     static_cast<f32>(posZ), rotX, rotY, rotZ, params);
 
         actorId = ACTOR_EN_FIREFLY;
-        posX =
-            static_cast<s16>(hakaHuta->dyna.actor.world.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
-                             80.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y));
-        posY = static_cast<s16>(hakaHuta->dyna.actor.world.pos.y) - 10;
-        posZ =
-            static_cast<s16>(hakaHuta->dyna.actor.world.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
-                             80.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y));
+        posX = hakaHuta->dyna.actor.world.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
+               80.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y);
+        posY = hakaHuta->dyna.actor.world.pos.y - 10;
+        posZ = hakaHuta->dyna.actor.world.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
+               80.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y);
         rotX = 0;
         rotY = hakaHuta->dyna.actor.shape.rot.y;
         rotZ = 0;
@@ -1118,13 +1124,11 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_RD;
-        s16 posX =
-            static_cast<s16>(hakaHuta->dyna.actor.home.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
-                             100.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y));
-        s16 posY = static_cast<s16>(hakaHuta->dyna.actor.home.pos.y) - 40;
-        s16 posZ =
-            static_cast<s16>(hakaHuta->dyna.actor.home.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
-                             100.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y));
+        f32 posX = hakaHuta->dyna.actor.home.pos.x + (-25.0f) * Math_CosS(hakaHuta->dyna.actor.shape.rot.y) +
+                   100.0f * Math_SinS(hakaHuta->dyna.actor.shape.rot.y);
+        f32 posY = hakaHuta->dyna.actor.home.pos.y - 40;
+        f32 posZ = hakaHuta->dyna.actor.home.pos.z - (-25.0f) * Math_SinS(hakaHuta->dyna.actor.shape.rot.y) +
+                   100.0f * Math_CosS(hakaHuta->dyna.actor.shape.rot.y);
         s16 rotX = 0;
         s16 rotY = hakaHuta->dyna.actor.shape.rot.y;
         s16 rotZ = 0;
@@ -1145,9 +1149,9 @@ void RegisterEnemyRandomizer() {
         PlayState* play = va_arg(args, PlayState*);
 
         s16 actorId = ACTOR_EN_PEEHAT;
-        s16 homePosX = static_cast<s16>(peehat->actor.home.pos.x);
-        s16 homePosY = static_cast<s16>(peehat->actor.home.pos.y) + 50;
-        s16 homePosZ = static_cast<s16>(peehat->actor.home.pos.z);
+        f32 homePosX = peehat->actor.home.pos.x;
+        f32 homePosY = peehat->actor.home.pos.y + 50;
+        f32 homePosZ = peehat->actor.home.pos.z;
         s16 rotX = 0;
         s16 rotY = 0;
         s16 rotZ = 0;

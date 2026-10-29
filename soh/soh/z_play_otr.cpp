@@ -89,6 +89,9 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
 }
 
 void OTRPlay_InitScene(PlayState* play, s32 spawn) {
+    // A legal JSON setup may omit collision entirely. Start from owned, queryable empty tables rather
+    // than uninitialized PlayState bytes; a collision command replaces this context during setup.
+    BgCheck_InitEmpty(&play->colCtx, play);
     play->curSpawn = spawn;
     play->linkActorEntry = nullptr;
     play->unk_11DFC = nullptr;

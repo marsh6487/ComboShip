@@ -23,20 +23,45 @@ static void CollisionCheck_HitEffects(PlayState* play, Collider* at, ColliderInf
 #define osSyncPrintf(...) ((void)0)
 void CollisionCheck_ClearContext(PlayState*, CollisionCheckContext*);
 
-/* Faults intercept only the allocator boundary. Native realloc/free own memory. */
-static int failAllocation, allocationCalls, liveAllocations;
+/* Intercept only allocation boundaries. Force moves to reproduce stale savestate pointers. */
+static int failAllocation, failAtAllocation, allocationCalls, liveAllocations, moveAllocations;
+typedef struct QueueTestAllocation { void* pointer; size_t size; } QueueTestAllocation;
+static QueueTestAllocation queueTestAllocations[512];
+static int QueueTest_FindAllocation(void* ptr) {
+    for (int i = 0; i < 512; ++i) if (queueTestAllocations[i].pointer == ptr) return i;
+    return -1;
+}
 static void* QueueTest_Realloc(void* ptr, size_t size) {
     ++allocationCalls;
-    if (failAllocation) {
-        --failAllocation;
+    if (failAllocation || allocationCalls == failAtAllocation) {
+        if (failAllocation) --failAllocation;
         return NULL;
     }
-    void* result = realloc(ptr, size);
-    if (result && !ptr) ++liveAllocations;
+    int slot = QueueTest_FindAllocation(ptr);
+    assert(slot >= 0 && size > 0);
+    void* result;
+    if (moveAllocations && ptr) {
+        result = malloc(size);
+        if (result) {
+            memcpy(result, ptr, queueTestAllocations[slot].size < size ? queueTestAllocations[slot].size : size);
+            free(ptr);
+        }
+    } else {
+        result = realloc(ptr, size);
+    }
+    if (result) {
+        if (!ptr) ++liveAllocations;
+        queueTestAllocations[slot] = (QueueTestAllocation){result, size};
+    }
     return result;
 }
 static void QueueTest_Free(void* ptr) {
-    if (ptr) --liveAllocations;
+    if (ptr) {
+        int slot = QueueTest_FindAllocation(ptr);
+        assert(slot >= 0); /* A saved heap pointer must never free an obsolete allocation. */
+        queueTestAllocations[slot] = (QueueTestAllocation){0};
+        --liveAllocations;
+    }
     free(ptr);
 }
 #define realloc QueueTest_Realloc

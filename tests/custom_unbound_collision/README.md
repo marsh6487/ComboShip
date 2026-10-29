@@ -1,7 +1,7 @@
 # Custom collision adapters under Unbound
 
 Run `python tests/custom_unbound_collision/run_tests.py` from the repository root.
-Optional cases: `shared sm64 water grapple actors bridges motion timectl`.
+Optional cases: `shared sm64 water grapple actors bridges motion timectl abi enemy`.
 
 The native GCC tests compile current production functions and game headers with
 `GBI_FLOAT_MTX`, `GBI_S32_VTX`, AddressSanitizer and UndefinedBehaviorSanitizer.
@@ -28,11 +28,21 @@ They cover:
 - TimeCtl AC cache growth through 160 real native registrations, exemption and
   duplicate policies, hard-stop and partial-slow hit-frame timing, allocator
   failure/retry, original clock restoration and owned-cache scene/reset cleanup.
+- Granny's packed 22-byte light records converted into the expanded native type
+  with legacy fog defaults, narrow/shared and wide GBI compilation, vapor bounds
+  without re-narrowing, exact original vapor-face filtering/source immutability,
+  and OoT/MM Mirror arrival assignments.
+- Enemy Randomizer's real entry-spawn hook with wide fractional enemy/nonenemy
+  coordinates, raycast floor/offset precision, separate integer seed inputs,
+  legacy room/position restrictions, native timer fixes and full-width Tp/Skb
+  collider initialization. Random choice and floor/spawn services are explicit
+  boundary doubles; this does not prove randomizer gameplay or scene progression.
 
 Rendering is not executed. The extracted native units replace logging, return the
 native decision from `GameInteractor_Should`, and disable second-update/frame-
-advance hooks. They do not prove those hook configurations, native Dyna transform
-baking, full game linking, MSVC/platform builds, asset/Alt combinations, randomizer
-progression or gameplay. MM's unchanged headers emit existing button-macro
+advance hooks. The queue fixtures use real native initialization, external queue
+ownership and destruction. They do not prove those hook configurations, native
+Dyna transform baking, full game linking, MSVC/platform builds, asset/Alt
+combinations, randomizer progression or gameplay. MM's unchanged headers emit existing button-macro
 redefinition warnings in this standalone test setup. Runtime proof and user
 acceptance remain separate.

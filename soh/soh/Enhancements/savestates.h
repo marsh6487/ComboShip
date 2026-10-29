@@ -13,6 +13,7 @@ enum class SaveStateReturn {
     FAIL_STATE_EMPTY,
     FAIL_WRONG_GAMESTATE,
     FAIL_BAD_REQUEST,
+    FAIL_STATE_MISMATCH,
 };
 
 typedef struct SaveStateHeader {

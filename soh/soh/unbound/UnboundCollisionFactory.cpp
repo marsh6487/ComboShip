@@ -23,8 +23,19 @@ namespace {
 constexpr size_t kVertexBytes = 12;
 constexpr size_t kPolyBytes = 28;
 
-size_t BulkSize(uint32_t numVertices, uint32_t numPolys) {
-    return (size_t)numVertices * kVertexBytes + (size_t)numPolys * kPolyBytes;
+bool BulkSize(int64_t numVertices, int64_t numPolys, size_t* byteCount) {
+    // Vertex words have 29 index bits; native polygon ids and iteration bounds are signed 32-bit.
+    // Validate before narrowing JSON integers or doing size_t arithmetic (which may be 32-bit).
+    if (numVertices < 0 || numVertices > 0x20000000ll || numPolys < 0 || numPolys > INT32_MAX) {
+        return false;
+    }
+    uint64_t bytes = (uint64_t)numVertices * kVertexBytes + (uint64_t)numPolys * kPolyBytes;
+    if (bytes > SIZE_MAX || (uint64_t)numVertices > SIZE_MAX / sizeof(Vec3i) ||
+        (uint64_t)numPolys > SIZE_MAX / sizeof(CollisionPoly)) {
+        return false;
+    }
+    *byteCount = (size_t)bytes;
+    return true;
 }
 
 Vec3i ReadVertex(Ship::BinaryReader& r) {
@@ -51,15 +62,23 @@ CollisionPoly ReadPoly(Ship::BinaryReader& r) {
 }
 
 bool ReadBulk(CollisionHeader& col, const Json& bulk, const std::string& docPath) {
+    int64_t vertexCount = Unbound::Field(bulk, K::kVertices);
+    int64_t polyCount = Unbound::Field(bulk, K::kPolys);
+    size_t byteCount;
+    if (!BulkSize(vertexCount, polyCount, &byteCount) || (uint64_t)vertexCount > col.vertices.max_size() ||
+        (uint64_t)polyCount > col.polygons.max_size()) {
+        SPDLOG_ERROR("[Unbound] {}: bulk counts exceed the native index or allocation range", docPath);
+        return false;
+    }
+    uint32_t numVertices = (uint32_t)vertexCount;
+    uint32_t numPolys = (uint32_t)polyCount;
     std::string binPath = Unbound::PathField(bulk, K::kFile);
     std::vector<char> bytes = Unbound::LoadBulk(binPath);
     if (bytes.empty()) {
         SPDLOG_ERROR("[Unbound] {}: bulk file {} missing", docPath, binPath);
         return false;
     }
-    uint32_t numVertices = (uint32_t)Unbound::Field(bulk, K::kVertices);
-    uint32_t numPolys = (uint32_t)Unbound::Field(bulk, K::kPolys);
-    if (bytes.size() < BulkSize(numVertices, numPolys)) {
+    if (bytes.size() < byteCount) {
         SPDLOG_ERROR("[Unbound] {}: bulk file {} is shorter than its declared counts", docPath, binPath);
         return false;
     }
@@ -103,7 +122,11 @@ SurfaceType ReadSurfaceType(const Json& e) {
 }
 
 void ReadSurfaceTypes(CollisionHeader& col, const Json& list, const std::string& docPath) {
-    for (const auto& k : PositionalKeys(list, docPath + " " + K::kSurfaceTypes)) {
+    auto keys = PositionalKeys(list, docPath + " " + K::kSurfaceTypes);
+    if (keys.size() > UINT32_MAX) {
+        throw Unbound::DocumentError(docPath + ": too many surface types for the native count");
+    }
+    for (const auto& k : keys) {
         col.surfaceTypes.push_back(ReadSurfaceType(list[k]));
     }
     col.surfaceTypesCount = (uint32_t)col.surfaceTypes.size();
@@ -112,20 +135,28 @@ void ReadSurfaceTypes(CollisionHeader& col, const Json& list, const std::string&
 
 void ReadCameras(CollisionHeader& col, const Json& cameras, const Json& positions, const std::string& docPath) {
     // Camera positions stay s16: CamData packs them into Vec3s (SPEC.md §9).
-    for (const auto& k : PositionalKeys(positions, docPath + " " + K::kCameraPositions)) {
+    auto positionKeys = PositionalKeys(positions, docPath + " " + K::kCameraPositions);
+    auto cameraKeys = PositionalKeys(cameras, docPath + " " + K::kCameras);
+    if (positionKeys.size() > INT32_MAX || cameraKeys.size() > UINT32_MAX) {
+        throw Unbound::DocumentError(docPath + ": camera list exceeds its native count");
+    }
+    for (const auto& k : positionKeys) {
         col.camPosData.push_back(Unbound::ReadVec3s(positions[k]));
     }
     col.camPosCount = (int32_t)col.camPosData.size();
     col.camPosDataZero = Vec3s{ 0, 0, 0 };
 
-    for (const auto& k : PositionalKeys(cameras, docPath + " " + K::kCameras)) {
+    for (const auto& k : cameraKeys) {
         const Json& c = cameras[k];
         CamData cam{};
         cam.cameraSType = (u16)Unbound::Field(c, K::kSType);
-        cam.numCameras = (s16)Unbound::Field(c, K::kCount);
-        int32_t idx = c.contains(K::kPositionIndex) && !c[K::kPositionIndex].is_null()
-                          ? (int32_t)ToInt(c[K::kPositionIndex])
-                          : -1;
+        int64_t count = Unbound::Field(c, K::kCount);
+        if (count < INT16_MIN || count > INT16_MAX) {
+            throw Unbound::DocumentError(docPath + ": camera count exceeds its native field");
+        }
+        cam.numCameras = (s16)count;
+        int64_t positionIndex = c.contains(K::kPositionIndex) ? ToInt(c[K::kPositionIndex], -1) : -1;
+        int32_t idx = positionIndex >= 0 && positionIndex < col.camPosCount ? (int32_t)positionIndex : -1;
         col.camPosDataIndices.push_back(idx);
         col.camData.push_back(cam);
     }
@@ -140,7 +171,11 @@ void ReadCameras(CollisionHeader& col, const Json& cameras, const Json& position
 }
 
 void ReadWaterBoxes(CollisionHeader& col, const Json& list, const std::string& docPath) {
-    for (const auto& k : PositionalKeys(list, docPath + " " + K::kWaterBoxes)) {
+    auto keys = PositionalKeys(list, docPath + " " + K::kWaterBoxes);
+    if (keys.size() > UINT16_MAX) {
+        throw Unbound::DocumentError(docPath + ": too many water boxes for the native count");
+    }
+    for (const auto& k : keys) {
         const Json& w = list[k];
         WaterBox box{};
         box.xMin = Unbound::IntegralField(w, K::kXMin);

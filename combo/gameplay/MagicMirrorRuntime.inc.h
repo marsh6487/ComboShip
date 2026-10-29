@@ -449,7 +449,11 @@ void PrepareArrival(PlayState* play) {
         return; // Missing/ambiguous geometry keeps the scene's ordinary safe spawn.
     sArrivalOriginal = play->linkActorEntry;
     sArrivalSpawn = *sArrivalOriginal; // Never mutate the cached Prelude resource.
+#ifdef COMBO_MAGIC_MIRROR_MM
     sArrivalSpawn.pos = position;
+#else
+    sArrivalSpawn.pos = { static_cast<f32>(position.x), static_cast<f32>(position.y), static_cast<f32>(position.z) };
+#endif
     sArrivalSpawn.rot.y = yaw;
 #ifdef COMBO_MAGIC_MIRROR_MM
     // Scene preparation supplied the player's missing unscripted ocarina chain.

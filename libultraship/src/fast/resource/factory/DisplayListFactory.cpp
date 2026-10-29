@@ -1178,7 +1178,22 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             g = gsDPSetRenderMode(renderModes[rawMode1], renderModes[rawMode2]);
         } else if (childName == "PushShader") {
             const char* shader = child->Attribute("Shader", nullptr);
-            GsSPPushShader(dl->Instructions, shader);
+            if (shader == nullptr || shader[0] == '\0') {
+                printf("DisplayListXML: PushShader is missing its Shader attribute\n");
+            } else {
+                const size_t length = strlen(shader) + 1;
+                std::unique_ptr<char, decltype(&free)> shaderCopy((char*)malloc(length), &free);
+                if (shaderCopy == nullptr) {
+                    printf("DisplayListXML: unable to allocate PushShader path\n");
+                } else {
+                    memcpy(shaderCopy.get(), shader, length);
+                    // Instructions outlive the XML document. Transfer ownership
+                    // only after Strings accepts the allocation successfully.
+                    dl->Strings.push_back(shaderCopy.get());
+                    const char* ownedPath = shaderCopy.release();
+                    GsSPPushShader(dl->Instructions, ownedPath);
+                }
+            }
         } else if (childName == "PopShader") {
             GsSPPopShader(dl->Instructions);
         } else {

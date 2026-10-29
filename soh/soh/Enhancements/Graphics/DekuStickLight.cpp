@@ -25,6 +25,7 @@
 #include "soh/cvar_prefixes.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "DekuStickLight.h"
+#include "soh/Enhancements/savestate_serialize.h"
 
 #include <memory>
 
@@ -189,6 +190,14 @@ void OnSceneInitResetLight(int16_t sceneNum) {
 }
 
 } // namespace
+
+// These values share ownership with the native light-node pool restored by Lights_SaveState.
+// Restore the pointer, insertion flag and pointed-to light together.
+extern "C" void DekuStickLight_SaveState(SaveStateCtx* ctx) {
+    SaveState_Blob(ctx, &sStickLight, sizeof(sStickLight));
+    SaveState_Blob(ctx, &sStickNode, sizeof(sStickNode));
+    SaveState_Blob(ctx, &sInserted, sizeof(sInserted));
+}
 
 void* DekuStickLight_GetActiveLightInfo() {
     return sInserted ? &sStickLight : nullptr;

@@ -10,6 +10,7 @@ import argparse
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,9 +52,19 @@ def native_unit(host, names):
             defines + declarations + "\n" + "\n".join(functions))
 
 
+def native_queue_owner():
+    source = (ROOT / "soh/src/code/z_collision_check.c").read_text()
+    begin = source.index("/* Actor collider queue ownership */")
+    ending = function(source, "CollisionCheck_DisableSAC")
+    end = source.index(ending) + len(ending)
+    return ('\n#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n'
+            '#undef AREG\nstatic s16 sFixtureAregs[24];\n#define AREG(index) sFixtureAregs[index]\n'
+            'void DinFireSword_FinishTeardown(PlayState* play) { (void)play; }\n' + source[begin:end])
+
+
 def native_oc_queue():
     source = (ROOT / "soh/src/code/z_collision_check.c").read_text()
-    names = ["CollisionCheck_ReserveQueue", "CollisionCheck_AppendQueue", "Collider_ResetOCBase",
+    names = ["Collider_ResetOCBase",
              "Collider_ResetOCInfo", "Collider_ResetJntSphElementOC", "Collider_ResetTrisElementOC",
              "Collider_ResetJntSphOC", "Collider_ResetCylinderOC", "Collider_ResetTrisOC", "Collider_ResetQuadOC"]
     bodies = [function(source, name) for name in names]
@@ -63,14 +74,13 @@ def native_oc_queue():
     return ('\n#include <stdint.h>\n#include <string.h>\n'
             'u8 GameInteractor_SecondCollisionUpdate(void) { return 0; }\n'
             's32 FrameAdvance_IsEnabled(PlayState* play) { return 0; }\n'
-            'typedef s32 (*ColChkResetFunc)(PlayState*, Collider*);\n' + declarations + "\n" +
+            'typedef s32 (*ColChkResetFunc)(PlayState*, Collider*);\n' + native_queue_owner() + declarations + "\n" +
             "\n".join(bodies) + "\n" + source[begin:end] + "\n" + function(source, "CollisionCheck_SetOC"))
 
 
 def native_ac_queue():
     source = (ROOT / "soh/src/code/z_collision_check.c").read_text()
-    names = ["CollisionCheck_ReserveQueue", "CollisionCheck_AppendQueue", "CollisionCheck_ClearContext",
-             "Collider_ResetACBase", "Collider_ResetACInfo", "Collider_ResetJntSphElementAC", "Collider_ResetTrisElementAC",
+    names = ["Collider_ResetACBase", "Collider_ResetACInfo", "Collider_ResetJntSphElementAC", "Collider_ResetTrisElementAC",
              "Collider_ResetJntSphAC", "Collider_ResetCylinderAC", "Collider_ResetTrisAC", "Collider_ResetQuadAC"]
     bodies = [function(source, name) for name in names]
     declarations = "\n".join(body[:body.index("{")].strip() + ";" for body in bodies)
@@ -81,7 +91,7 @@ def native_ac_queue():
             'u8 GameInteractor_SecondCollisionUpdate(void) { return 0; }\n'
             's32 FrameAdvance_IsEnabled(PlayState* state) { return 0; }\n'
             'void TimeCtl_NoteAcCollider(Collider* collider);\n'
-            'typedef s32 (*ColChkResetFunc)(PlayState*, Collider*);\n' + declarations + "\n" +
+            'typedef s32 (*ColChkResetFunc)(PlayState*, Collider*);\n' + native_queue_owner() + declarations + "\n" +
             "\n".join(bodies) + "\n" + source[begin:end] + "\n" + function(source, "CollisionCheck_SetAC"))
 
 
@@ -161,9 +171,9 @@ def bridge_adapters():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("cases", nargs="*", choices=("shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl"))
+    parser.add_argument("cases", nargs="*", choices=("shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy"))
     args = parser.parse_args()
-    cases = args.cases or ["shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl"]
+    cases = args.cases or ["shared", "sm64", "water", "grapple", "actors", "bridges", "motion", "timectl", "abi", "enemy"]
     env = {**os.environ, "ASAN_OPTIONS": "detect_leaks=0"}
     with tempfile.TemporaryDirectory(prefix="custom-unbound-collision-") as tmp:
         work = Path(tmp)
@@ -284,6 +294,9 @@ int main() {
                 "-o", str(binary)], check=True)
             for case in ("growth", "filters", "failure", "lifetime"):
                 subprocess.run([str(binary), case], check=True, env=env)
+    for case, script in (("abi", "run_adapter_abi_tests.py"), ("enemy", "run_enemy_randomizer_tests.py")):
+        if case in cases:
+            subprocess.run([sys.executable, "-B", str(Path(__file__).with_name(script))], check=True)
     return 0
 
 

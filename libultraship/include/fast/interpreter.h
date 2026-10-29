@@ -704,11 +704,11 @@ class Interpreter {
 
     const std::unordered_map<Mtx*, MtxF>* mCurMtxReplacements;
     bool mMarkerOn; // This was originally a debug feature. Now it seems to control s2dex?
-    std::unordered_map<size_t, const char*> mShaders;
+    std::unordered_map<size_t, std::string> mShaders;
 
     typedef size_t ShaderId;
     std::stack<ShaderId> mShaderStack;
-    size_t mShadersIndex;
+    size_t mShadersIndex = 0;
     int mInterpolationIndex;
     int mInterpolationIndexTarget;
     // Interpolation factor for the current rendered frame within a game tick:

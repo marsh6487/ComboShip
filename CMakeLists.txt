@@ -50,6 +50,9 @@ include(CMake/lus-cvars.cmake)
 
 # In-game banner (gBuildVersion): release version + readable upstream identity.
 set(PROJECT_BUILD_NAME "ComboShip v${COMBO_RELEASE_VERSION} | Combo Build e${COMBO_EPOCH} soh-${COMBO_SOH_SHORT} mm-${COMBO_MM_SHORT}" CACHE STRING "" FORCE)
+# Presentation provenance is independent of release/save/archive compatibility versions.
+set(PROJECT_FORK_NAME "ComboShip cel + Unbound")
+set(PROJECT_FORK_VERSION "cel0.11-unbound0.11-collision")
 # Company field per binary: each game DLL credits its upstream, the launcher is ComboShip.
 set(PROJECT_TEAM "github.com/harbourmasters" CACHE STRING "" FORCE)
 set(COMBO_PROJECT_TEAM "github.com/Varuuna/ComboShip")
@@ -460,6 +463,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom/shaders/
     # ComboShip: Torch's packer replaced ZAPD here (mm still packs with ZAPD). Manual, not ALL.
     COMMAND $<TARGET_FILE:soh-o2r-packer> ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r ${CMAKE_PROJECT_VERSION}
+    COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/scripts/packaging/normalize_candidate_o2r.py ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR=${CMAKE_SOURCE_DIR}/x64/$<CONFIG> -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLYSOHOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/CMake/copy-existing-otrs.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/soh
     COMMENT "Generating soh.o2r..."
@@ -472,6 +476,7 @@ add_custom_target(
     # Overlay defaults so MM's separate Prism shaders (for example flatavg) survive.
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom/shaders/
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --norom --custom-otr-file 2ship.o2r "--custom-assets-path" ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
+    COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/scripts/packaging/normalize_candidate_o2r.py ${CMAKE_CURRENT_SOURCE_DIR}/mm/2ship.o2r
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLY2SHIPOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/CMake/copy-existing-otrs.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mm
     COMMENT "Generating 2ship.o2r..."

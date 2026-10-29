@@ -1439,8 +1439,10 @@ void SaveManager::InitFileMaxed() {
 
 // Threaded SaveFile takes copy of gSaveContext for local unmodified storage
 
-void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID) {
+void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID,
+                                   const SceneDBState& sceneState) {
     std::lock_guard<std::mutex> guard(saveMtx);
+    SceneDBSaveScope sceneSaveScope(sceneState);
     SPDLOG_INFO("Save File - fileNum: {}", fileNum);
     // Needed for first time save, hasn't changed in forever anyway
     saveBlock["version"] = 1;
@@ -1526,11 +1528,14 @@ void SaveManager::SaveSection(int fileNum, int sectionID, bool threaded) {
     }
 
     auto saveContext = std::make_shared<SaveContext>(gSaveContext);
+    auto sceneState = std::make_shared<const SceneDBState>(SceneDB_CaptureState());
     if (threaded) {
         smThreadPool->detach_task(
-            [this, fileNum, saveContext, sectionID] { SaveFileThreaded(fileNum, *saveContext, sectionID); });
+            [this, fileNum, saveContext, sceneState, sectionID] {
+                SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
+            });
     } else {
-        SaveFileThreaded(fileNum, *saveContext, sectionID);
+        SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
     }
 }
 
@@ -1544,6 +1549,8 @@ void SaveManager::SaveFile(int fileNum) {
 // the member saveBlock is left alone so an in-flight threaded save isn't disturbed).
 nlohmann::json SaveManager::SaveToJsonObject() {
     std::lock_guard<std::mutex> guard(saveMtx);
+    const auto sceneState = SceneDB_CaptureState();
+    SceneDBSaveScope sceneSaveScope(sceneState);
     nlohmann::json block;
     block["version"] = 1;
     if (IS_RANDO) {

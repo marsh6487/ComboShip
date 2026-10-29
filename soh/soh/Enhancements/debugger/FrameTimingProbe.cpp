@@ -150,7 +150,12 @@ void ReportOutputState(bool enabled) {
           { { "attempts_per_batch", 1024 },
             { "ticks_per_batch", 128 },
             { "capture_bytes", MaxCaptureBytes },
-            { "capture_seconds", 900 } } },
+            { "capture_seconds", 900 },
+            { "render_resource_keys", Fast::RenderCostProbe::MaxResources },
+            { "render_texture_keys", Fast::RenderCostProbe::MaxTextures },
+            { "render_framebuffer_keys", Fast::RenderCostProbe::MaxPasses } } },
+        { "resource_schema", 2 },
+        { "resource_tables", "all collected identities on every detailed draw; collection overflow explicit" },
     };
     Emit("FrameTimingProbe", state);
     previousEnabled = static_cast<int>(enabled);

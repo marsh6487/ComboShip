@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdint.h>
 
 // Power-ups that FORCE the NoClip wall-bypass for the player (independent of the
 // gCheats.NoClip CVar): SM64 Mario's Vanish Cap and Hylia's Grace fairy flight.
@@ -22,16 +23,46 @@ extern s32 SwitchHook_PlayerNoClip(void);
 
 #define SS_NULL 0xFFFFFFFFu // SOH [Unbound] node indices are 32-bit
 
+// Limits follow the stored index/count types and the allocator's byte range, rather than a geometry budget.
+static u64 BgCheck_TableCapacityLimit(u64 indexLimit, size_t elemSize) {
+    u64 allocationLimit = elemSize == 0 ? 0 : SIZE_MAX / elemSize;
+
+    return indexLimit < allocationLimit ? indexLimit : allocationLimit;
+}
+
+static s32 BgCheck_NextTableCapacity(u64 required, u64 current, u64 indexLimit, size_t elemSize, u64* next) {
+    u64 limit = BgCheck_TableCapacityLimit(indexLimit, elemSize);
+    u64 doubled;
+
+    if (required > limit || current > limit) {
+        return false;
+    }
+    if (required <= current) {
+        *next = current;
+        return true;
+    }
+    doubled = current > limit / 2 ? limit : current * 2;
+    *next = required > doubled ? required : doubled;
+    return true;
+}
+
 /**
  * SOH [Unbound] Grow a heap table to `newMax` entries. Every table that goes through here is addressed by
  * index, so callers only re-derive pointers they held across the call. Running out of heap is fatal, as
  * running out of arena was on N64.
  */
-static void* BgCheck_ReallocTable(void* tbl, s32 newMax, size_t elemSize) {
-    void* newTbl = realloc(tbl, (size_t)newMax * elemSize);
+static void* BgCheck_ReallocTable(void* tbl, size_t newMax, size_t elemSize) {
+    void* newTbl;
+
+    if (elemSize == 0 || newMax == 0 || newMax > SIZE_MAX / elemSize) {
+        LOG_HUNGUP_THREAD();
+        abort();
+    }
+    newTbl = realloc(tbl, newMax * elemSize);
 
     if (newTbl == NULL) {
         LOG_HUNGUP_THREAD();
+        abort(); // LOG_HUNGUP_THREAD is compiled out in release builds.
     }
     return newTbl;
 }
@@ -142,9 +173,10 @@ void DynaSSNodeList_Initialize(PlayState* play, DynaSSNodeList* nodeList) {
  */
 void DynaSSNodeList_Alloc(PlayState* play, DynaSSNodeList* nodeList, s32 max) {
     // SOH [Unbound] heap-allocated and growable; freed by BgCheck_Free
-    nodeList->tbl = malloc(max * sizeof(SSNode));
-
-    assert(nodeList->tbl != NULL);
+    if (max <= 0) {
+        abort();
+    }
+    nodeList->tbl = BgCheck_ReallocTable(NULL, (size_t)max, sizeof(SSNode));
 
     nodeList->max = max;
     nodeList->count = 0;
@@ -162,13 +194,19 @@ void DynaSSNodeList_ResetCount(DynaSSNodeList* nodeList) {
  * SOH [Unbound] grows the table instead of returning SS_NULL when it is full
  */
 u32 DynaSSNodeList_GetNextNodeIdx(DynaSSNodeList* nodeList) {
-    u32 idx = nodeList->count++;
+    u64 newMax;
+    u32 idx;
 
-    if ((s32)idx >= nodeList->max) {
-        nodeList->max *= 2;
-        nodeList->tbl = BgCheck_ReallocTable(nodeList->tbl, nodeList->max, sizeof(SSNode));
+    if (nodeList->count < 0 || nodeList->max < 0 ||
+        !BgCheck_NextTableCapacity((u64)nodeList->count + 1, nodeList->max, INT32_MAX, sizeof(SSNode), &newMax)) {
+        LOG_HUNGUP_THREAD();
+        abort();
     }
-
+    if (newMax > nodeList->max) {
+        nodeList->tbl = BgCheck_ReallocTable(nodeList->tbl, (size_t)newMax, sizeof(SSNode));
+        nodeList->max = (s32)newMax;
+    }
+    idx = (u32)nodeList->count++;
     return idx;
 }
 
@@ -1516,7 +1554,10 @@ static void BgCheck_ScaleSubdivisionsForPolyCount(CollisionContext* colCtx, u32 
  * SOH [Unbound] Release everything BgCheck_Allocate / DynaPoly_Alloc put on the heap.
  */
 void BgCheck_Free(CollisionContext* colCtx) {
-    s32 i;
+    if (BgCheck_GetAllocationEpoch(colCtx) == 0) {
+        memset(colCtx, 0, sizeof(*colCtx));
+        return;
+    }
 
     free(colCtx->lookupTbl);
     colCtx->lookupTbl = NULL;
@@ -1524,10 +1565,6 @@ void BgCheck_Free(CollisionContext* colCtx) {
     colCtx->polyNodes.tbl = NULL;
     free(colCtx->polyNodes.polyCheckTbl);
     colCtx->polyNodes.polyCheckTbl = NULL;
-    free(colCtx->dyna.polyList);
-    colCtx->dyna.polyList = NULL;
-    free(colCtx->dyna.vtxList);
-    colCtx->dyna.vtxList = NULL;
     free(colCtx->dyna.polyNodes.tbl);
     colCtx->dyna.polyNodes.tbl = NULL;
     free(colCtx->dyna.bgActors);
@@ -1535,10 +1572,8 @@ void BgCheck_Free(CollisionContext* colCtx) {
     free(colCtx->dyna.bgActorFlags);
     colCtx->dyna.bgActorFlags = NULL;
     colCtx->dyna.bgActorMax = 0;
-    for (i = 0; i < colCtx->dyna.retiredCount; i++) {
-        free(colCtx->dyna.retiredBuffers[i]);
-    }
-    colCtx->dyna.retiredCount = 0;
+    BgCheck_ReleaseOwnership(colCtx); // owns current and every superseded geometry allocation
+    memset(colCtx, 0, sizeof(*colCtx));
 }
 
 /**
@@ -1577,8 +1612,19 @@ static void BgCheck_SetVanillaSubdivisions(CollisionContext* colCtx, PlayState* 
  * Allocate CollisionContext
  */
 void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader* colHeader) {
-    u32 tblMax;
+    u64 tblMax;
+    u64 nodeLimit = BgCheck_TableCapacityLimit(INT32_MAX, sizeof(SSNode));
 
+    // Polygon ids/loop bounds are signed; packed vertex words reserve their top three bits for flags.
+    if (colHeader == NULL ||
+        colHeader->numPolygons > BgCheck_TableCapacityLimit(INT32_MAX, sizeof(CollisionPoly)) ||
+        colHeader->numVertices > BgCheck_TableCapacityLimit((u64)COLPOLY_VTX_INDEX_MASK + 1, sizeof(Vec3i))) {
+        osSyncPrintf("[Unbound] static geometry exceeds its index or allocation range\n");
+        LOG_HUNGUP_THREAD();
+        abort();
+    }
+
+    BgCheck_BeginOwnership(colCtx);
     colCtx->colHeader = colHeader;
 
     // SOH [Unbound] Everything below is heap-allocated, sized from the header, grown on demand and released by
@@ -1589,6 +1635,7 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
         malloc(colCtx->subdivAmount.x * sizeof(StaticLookup) * colCtx->subdivAmount.y * colCtx->subdivAmount.z);
     if (colCtx->lookupTbl == NULL) {
         LOG_HUNGUP_THREAD();
+        abort();
     }
     // SOH [Unbound] header bounds are s32; the subdivision maths below is f32
     Math_Vec3i_ToVec3f(&colCtx->minBounds, &colCtx->colHeader->minBounds);
@@ -1604,13 +1651,20 @@ void BgCheck_Allocate(CollisionContext* colCtx, PlayState* play, CollisionHeader
     colCtx->dyna.vtxListMax = UNBOUND_DYNA_VTX_MAX;
     colCtx->dyna.polyNodesMax = UNBOUND_DYNA_NODES_INITIAL;
 
-    tblMax = CLAMP_MIN(colCtx->colHeader->numPolygons * 2, UNBOUND_STATIC_NODES_MIN);
+    tblMax = (u64)colCtx->colHeader->numPolygons * 2;
+    tblMax = tblMax < UNBOUND_STATIC_NODES_MIN ? UNBOUND_STATIC_NODES_MIN : tblMax;
+    tblMax = tblMax > nodeLimit ? nodeLimit : tblMax;
     SSNodeList_Initialize(&colCtx->polyNodes);
-    SSNodeList_Alloc(play, &colCtx->polyNodes, tblMax, colCtx->colHeader->numPolygons);
+    SSNodeList_Alloc(play, &colCtx->polyNodes, (s32)tblMax, (s32)colCtx->colHeader->numPolygons);
     BgCheck_InitializeStaticLookup(colCtx, play, colCtx->lookupTbl);
 
     DynaPoly_Init(play, &colCtx->dyna);
     DynaPoly_Alloc(play, &colCtx->dyna);
+}
+
+void BgCheck_InitEmpty(CollisionContext* colCtx, PlayState* play) {
+    static CollisionHeader emptyHeader;
+    BgCheck_Allocate(colCtx, play, &emptyHeader);
 }
 
 /**
@@ -2426,48 +2480,56 @@ void SSNodeList_Initialize(SSNodeList* this) {
  */
 void SSNodeList_Alloc(PlayState* play, SSNodeList* this, s32 tblMax, s32 numPolys) {
     // SOH [Unbound] heap-allocated and growable (SSNodeList_Grow); freed by BgCheck_Free
+    if (tblMax <= 0 || numPolys < 0) {
+        abort();
+    }
     this->max = tblMax;
     this->count = 0;
-    this->tbl = malloc(tblMax * sizeof(SSNode));
-
-    assert(this->tbl != NULL);
+    this->tbl = BgCheck_ReallocTable(NULL, (size_t)tblMax, sizeof(SSNode));
 
     this->polyCheckTbl = malloc(numPolys > 0 ? numPolys : 1);
 
-    assert(this->polyCheckTbl != NULL);
+    if (this->polyCheckTbl == NULL) {
+        LOG_HUNGUP_THREAD();
+        abort();
+    }
 }
 
 /**
  * SOH [Unbound] Double the SSNodeList table. Callers must not hold SSNode pointers across this.
  */
 static void SSNodeList_Grow(SSNodeList* this) {
-    this->max *= 2;
-    this->tbl = BgCheck_ReallocTable(this->tbl, this->max, sizeof(SSNode));
+    u64 newMax;
+
+    if (!BgCheck_NextTableCapacity((u64)this->count + 1, this->max, SS_NULL, sizeof(SSNode), &newMax)) {
+        LOG_HUNGUP_THREAD();
+        abort();
+    }
+    this->tbl = BgCheck_ReallocTable(this->tbl, (size_t)newMax, sizeof(SSNode));
+    this->max = (u32)newMax;
 }
 
 /**
  * Get next SSNodeList SSNode
  */
 SSNode* SSNodeList_GetNextNode(SSNodeList* this) {
-    SSNode* result;
-
-    if (this->count >= this->max) {
-        SSNodeList_Grow(this);
-    }
-    result = &this->tbl[this->count];
-    this->count++;
-    return result;
+    return &this->tbl[SSNodeList_GetNextNodeIdx(this)];
 }
 
 /**
  * Get next SSNodeList SSNode index
  */
 u32 SSNodeList_GetNextNodeIdx(SSNodeList* this) {
-    u32 new_index = this->count++;
+    u32 new_index;
 
-    if (new_index >= this->max) {
+    if (this->count == SS_NULL) {
+        LOG_HUNGUP_THREAD();
+        abort();
+    }
+    if (this->count >= this->max) {
         SSNodeList_Grow(this);
     }
+    new_index = this->count++;
     return new_index;
 }
 
@@ -2572,8 +2634,10 @@ void DynaPoly_NullPolyList(CollisionPoly** polyList) {
  * Allocate dyna.polyList
  */
 void DynaPoly_AllocPolyList(PlayState* play, CollisionPoly** polyList, s32 numPolys) {
-    *polyList = malloc(numPolys * sizeof(CollisionPoly)); // SOH [Unbound] heap; freed by BgCheck_Free
-    assert(*polyList != NULL);
+    if (numPolys <= 0) {
+        abort();
+    }
+    *polyList = BgCheck_ReallocTable(NULL, (size_t)numPolys, sizeof(CollisionPoly));
 }
 
 /**
@@ -2587,8 +2651,10 @@ void DynaPoly_NullVtxList(Vec3i** vtxList) {
  * Allocate dyna.vtxList
  */
 void DynaPoly_AllocVtxList(PlayState* play, Vec3i** vtxList, s32 numVtx) {
-    *vtxList = malloc(numVtx * sizeof(Vec3i)); // SOH [Unbound] heap; freed by BgCheck_Free
-    assert(*vtxList != NULL);
+    if (numVtx <= 0) {
+        abort();
+    }
+    *vtxList = BgCheck_ReallocTable(NULL, (size_t)numVtx, sizeof(Vec3i));
 }
 
 /**
@@ -2639,48 +2705,73 @@ static void DynaPoly_GrowBgActorTable(PlayState* play, DynaCollisionContext* dyn
 }
 
 /**
- * SOH [Unbound] Park a superseded poly/vtx buffer until BgCheck_Free (see DynaCollisionContext.retiredBuffers).
- * Growth doubles, so the two lists retire at most ~2 x log2(final size / initial size) buffers per scene.
- */
-static void DynaPoly_RetireBuffer(DynaCollisionContext* dyna, void* buffer) {
-    if (dyna->retiredCount >= DYNA_RETIRED_BUFFERS_MAX) {
-        LOG_HUNGUP_THREAD();
-    }
-    dyna->retiredBuffers[dyna->retiredCount++] = buffer;
-}
-
-/**
  * SOH [Unbound] Make sure polyList/vtxList can hold every live dyna actor's geometry this frame. Called from
  * DynaPoly_Setup before any DynaPoly_ExpandSRT, the only writer of those lists. Growth forces a full rebuild
  * (DYNAPOLY_INVALIDATE_LOOKUP) so the "transform unchanged" fast path never re-links polys in the old buffer.
  */
-static void DynaPoly_EnsureListCapacity(PlayState* play, DynaCollisionContext* dyna) {
+static s32 DynaPoly_EnsureListCapacity(PlayState* play, DynaCollisionContext* dyna) {
     s32 i;
-    s32 polys = 0;
-    s32 vtxs = 0;
+    u64 polys = 0;
+    u64 vtxs = 0;
+    u64 polyMax;
+    u64 vtxMax;
+    u64 polyLimit = BgCheck_TableCapacityLimit(INT32_MAX, sizeof(CollisionPoly));
+    u64 vtxLimit = BgCheck_TableCapacityLimit((u64)COLPOLY_VTX_INDEX_MASK + 1, sizeof(Vec3i));
+    CollisionPoly* newPolys = NULL;
+    Vec3i* newVtxs = NULL;
 
     for (i = 0; i < dyna->bgActorMax; i++) {
-        if ((dyna->bgActorFlags[i] & 1) && dyna->bgActors[i].colHeader != NULL) {
-            polys += dyna->bgActors[i].colHeader->numPolygons;
-            vtxs += dyna->bgActors[i].colHeader->numVertices;
+        if (dyna->bgActorFlags[i] & 1) {
+            CollisionHeader* header = dyna->bgActors[i].colHeader;
+
+            if (header == NULL || header->numPolygons > polyLimit - polys ||
+                header->numVertices > vtxLimit - vtxs) {
+                osSyncPrintf("[Unbound] dyna geometry exceeds its index or allocation range\n");
+                return false;
+            }
+            polys += header->numPolygons;
+            vtxs += header->numVertices;
         }
     }
-    if (polys > dyna->polyListMax) {
-        s32 newMax = (polys > dyna->polyListMax * 2) ? polys : dyna->polyListMax * 2;
-        DynaPoly_RetireBuffer(dyna, dyna->polyList);
-        DynaPoly_AllocPolyList(play, &dyna->polyList, newMax);
-        dyna->polyListMax = newMax;
-        dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
-        osSyncPrintf("[Unbound] dyna polyList grown to %d\n", newMax);
+    if (dyna->polyListMax < 0 || dyna->vtxListMax < 0 ||
+        !BgCheck_NextTableCapacity(polys, dyna->polyListMax, polyLimit, sizeof(CollisionPoly), &polyMax) ||
+        !BgCheck_NextTableCapacity(vtxs, dyna->vtxListMax, vtxLimit, sizeof(Vec3i), &vtxMax)) {
+        return false;
     }
-    if (vtxs > dyna->vtxListMax) {
-        s32 newMax = (vtxs > dyna->vtxListMax * 2) ? vtxs : dyna->vtxListMax * 2;
-        DynaPoly_RetireBuffer(dyna, dyna->vtxList);
-        DynaPoly_AllocVtxList(play, &dyna->vtxList, newMax);
-        dyna->vtxListMax = newMax;
-        dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
-        osSyncPrintf("[Unbound] dyna vtxList grown to %d\n", newMax);
+    // Allocate both replacements before publishing either one. A failed allocation leaves the old buffers,
+    // capacities and retirement list intact, and Setup must not enter the geometry writer for this frame.
+    if (polyMax > dyna->polyListMax) {
+        newPolys = (CollisionPoly*)malloc((size_t)polyMax * sizeof(CollisionPoly));
+        if (newPolys == NULL) {
+            return false;
+        }
     }
+    if (vtxMax > dyna->vtxListMax) {
+        newVtxs = (Vec3i*)malloc((size_t)vtxMax * sizeof(Vec3i));
+        if (newVtxs == NULL) {
+            free(newPolys);
+            return false;
+        }
+    }
+    if (!BgCheck_TrackDynaGeometry(dyna, newPolys, (size_t)polyMax * sizeof(CollisionPoly), newVtxs,
+                                  (size_t)vtxMax * sizeof(Vec3i))) {
+        free(newPolys);
+        free(newVtxs);
+        return false;
+    }
+    if (newPolys != NULL) {
+        dyna->polyList = newPolys;
+        dyna->polyListMax = (s32)polyMax;
+        dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
+        osSyncPrintf("[Unbound] dyna polyList grown to %d\n", dyna->polyListMax);
+    }
+    if (newVtxs != NULL) {
+        dyna->vtxList = newVtxs;
+        dyna->vtxListMax = (s32)vtxMax;
+        dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
+        osSyncPrintf("[Unbound] dyna vtxList grown to %d\n", dyna->vtxListMax);
+    }
+    return true;
 }
 
 /**
@@ -2701,13 +2792,16 @@ void DynaPoly_Alloc(PlayState* play, DynaCollisionContext* dyna) {
     dyna->bgActors = NULL;
     dyna->bgActorFlags = NULL;
     dyna->bgActorMax = 0;
-    dyna->retiredCount = 0;
     DynaPoly_GrowBgActorTable(play, dyna, BGACTOR_INITIAL_MAX);
     DynaPoly_NullPolyList(&dyna->polyList);
     DynaPoly_AllocPolyList(play, &dyna->polyList, dyna->polyListMax);
 
     DynaPoly_NullVtxList(&dyna->vtxList);
     DynaPoly_AllocVtxList(play, &dyna->vtxList, dyna->vtxListMax);
+    if (!BgCheck_TrackDynaGeometry(dyna, dyna->polyList, (size_t)dyna->polyListMax * sizeof(CollisionPoly),
+                                  dyna->vtxList, (size_t)dyna->vtxListMax * sizeof(Vec3i))) {
+        abort();
+    }
 
     DynaSSNodeList_Initialize(play, &dyna->polyNodes);
     DynaSSNodeList_Alloc(play, &dyna->polyNodes, dyna->polyNodesMax);
@@ -3073,7 +3167,11 @@ void DynaPoly_Setup(PlayState* play, DynaCollisionContext* dyna) {
     }
     vtxStartIndex = 0;
     polyStartIndex = 0;
-    DynaPoly_EnsureListCapacity(play, dyna); // SOH [Unbound]
+    if (!DynaPoly_EnsureListCapacity(play, dyna)) {
+        dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
+        osSyncPrintf("[Unbound] dyna geometry rebuild refused; buffers remain unchanged\n");
+        return;
+    }
     for (i = 0; i < dyna->bgActorMax; i++) {
         if (dyna->bgActorFlags[i] & 1) {
             DynaPoly_ExpandSRT(play, dyna, i, &vtxStartIndex, &polyStartIndex);

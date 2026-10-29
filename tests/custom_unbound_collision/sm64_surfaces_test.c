@@ -39,6 +39,7 @@ int main(void) {
 
     /* Register through the real grown OC queue, preserving admission order.
        More than 64 blockers need a complete snapshot, never a 1024-triangle prefix. */
+    CollisionCheck_InitContext(&play, &play.colChkCtx);
     Actor actors[96] = { 0 };
     ColliderCylinder cylinders[96] = { 0 };
     for (int i = 0; i < 96; ++i) {
@@ -75,9 +76,7 @@ int main(void) {
     assert(extracted && count == 1); /* Vanish mode retains floors, excludes actor walls. */
     free(extracted);
     Sm64Surfaces_RefreshActorColliders(NULL);
-    free(play.colChkCtx.colOC);
-    play.colChkCtx.colOC = NULL;
-    play.colChkCtx.colOCCount = play.colChkCtx.colOCCapacity = 0;
+    CollisionCheck_DestroyContext(&play, &play.colChkCtx);
     poly.normal.y = 0;
     extracted = Sm64Surfaces_ExtractFiltered(&play, &count, 1);
     assert(extracted == NULL && count == 0); /* Empty extraction owns no leaked allocation. */

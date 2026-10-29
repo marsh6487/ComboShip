@@ -69,4 +69,13 @@ class FlightAnalysisTest(unittest.TestCase):
         self.assertEqual(errors.get('overflow_resources',0),4)
         self.assertEqual(errors.get('truncated_names',0),1)
 
+    def test_shutdown_tail_retains_resources_and_marks_incomplete_workers(self):
+        tail = {'reason':'shutdown','incomplete_tail_possible':True,
+                'trace':{'resource_aggregates':[{'name':'late/texture','origin_tick':3,
+                         'stages':{'resource.archive_read':{'count':1,'total_ns':50,'max_ns':50}}}],
+                         'events':[], 'outstanding_scopes':1}}
+        result = analyze('[RenderFlightTail] '+json.dumps(tail))
+        self.assertEqual(len(result.get('resource_capture',{}).get('resource_stages',[])),1)
+        self.assertEqual(result['coverage']['errors'].get('incomplete_tail_events',0),1)
+
 if __name__=='__main__': unittest.main()

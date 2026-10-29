@@ -54,6 +54,9 @@ def capture_tables(renders, ticks, errors):
             for field in ('resources', 'textures', 'passes'):
                 if not isinstance(render.get(field), list):
                     errors['missing_renderer_tables'] += 1
+            for prefix in ('resource', 'texture', 'pass'):
+                if prefix + '_keys' not in render or prefix + '_limit' not in render:
+                    errors['missing_renderer_limits'] += 1
             for field, prefix in (('resources', 'resource'), ('textures', 'texture'), ('passes', 'pass')):
                 # One reserved unknown bucket can legitimately have no observations.
                 minimum = max(0, render.get(prefix + '_keys', 0) - 1)
@@ -91,6 +94,7 @@ def capture_tables(renders, ticks, errors):
                 row[field] = max(row.get(field, 0), entry.get(field, 0))
         for entry in trace.get('resource_aggregates', []):
             row = target(stage_groups, tick, entry, ('name', 'manager', 'cache_owner'))
+            row['origin_tick_last'] = entry.get('origin_tick')
             stages = row.setdefault('stages', {})
             for stage, value in entry.get('stages', {}).items():
                 combined = stages.setdefault(stage, {'count':0, 'total_ns':0, 'max_ns':0})
@@ -105,12 +109,12 @@ def capture_tables(renders, ticks, errors):
 
 
 def analyze(text):
-    attempts, ticks, renders, configurations = [], [], [], []
+    attempts, ticks, renders, configurations, tails = [], [], [], [], []
     errors = collections.Counter()
     for line in text.splitlines():
         if '[RenderFlightState] ' in line: errors["capture_limit_events"] += 1
         for marker, output in [("[FrameFlightRecorder] ", None), ("[RenderCostProbe] ", renders),
-                               ("[RenderFlightConfiguration] ", configurations)]:
+                               ("[RenderFlightConfiguration] ", configurations), ("[RenderFlightTail] ", tails)]:
             if marker not in line:
                 continue
             try:
@@ -155,16 +159,17 @@ def analyze(text):
             'repeated_matrix_pose_pairs_same_tick':repeated,
             'detail_modes':sorted(set(r.get('detail_mode',-1) for r in rows))})
     resource_events = []
-    for tick in ticks:
+    for tick in [*ticks, *tails]:
         if tick.get('trace') is None: errors['missing_tick_trace'] += 1
         trace = tick.get('trace') or {}
         for key in ['overflow_events','overflow_aggregates','overflow_counters','overflow_phases','overflow_actors','collector_errors']:
             errors[key] += trace.get(key,0)
         resource_events.extend(e for e in trace.get('events',[]) if e.get('category','').startswith('resource.'))
+    errors['incomplete_tail_events'] += sum(bool(tail.get('incomplete_tail_possible')) for tail in tails)
     slow = sorted(ticks,key=lambda r:r.get('wall_ms',0),reverse=True)[:20]
-    tables = capture_tables(renders, ticks, errors)
+    tables = capture_tables(renders, [*ticks, *tails], errors)
     return {'coverage':{'configurations':len(configurations),'attempts':len(attempts),'ticks':len(ticks),
-                       'detailed_draws':len(renders),'resource_events':len(resource_events),'errors':dict(errors)},
+                       'detailed_draws':len(renders),'resource_events':len(resource_events),'tail_records':len(tails),'errors':dict(errors)},
             'scenes':summaries,'slow_ticks':slow,
             'resource_capture':tables,
             'slow_resource_events':sorted(resource_events,key=lambda e:e.get('duration_ns',0),reverse=True)[:30],

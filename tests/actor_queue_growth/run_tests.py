@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+CASES = ("growth", "sac", "lifecycle", "failure", "guards", "contacts", "wide", "rewind_teardown",
+         "snapshot_rebind", "snapshot_oom", "snapshot_epochs")
 
 
 def function(source, name):
@@ -77,7 +79,7 @@ def production():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sanitize", action="store_true")
-    parser.add_argument("--case", choices=("growth", "sac", "lifecycle", "failure", "guards", "contacts", "wide"))
+    parser.add_argument("--case", choices=CASES)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="actor-queue-growth-") as directory:
         path = Path(directory)
@@ -87,7 +89,7 @@ def main():
             flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-no-pie"]
         subprocess.run([os.environ.get("CC", "cc"), *flags, "-I", str(ROOT / "soh/include"),
                         str(path / "native_test.c"), "-lm", "-o", str(path / "native_test")], check=True)
-        cases = [args.case] if args.case else ("growth", "sac", "lifecycle", "failure", "guards", "contacts", "wide")
+        cases = [args.case] if args.case else CASES
         for case in cases:
             subprocess.run([str(path / "native_test"), case], check=True)
             print(f"PASS: production actor queue {case}", flush=True)

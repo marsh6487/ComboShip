@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory(prefix="oot-frame-timing-") as temporary:
     render_test = temporary / "render_cost_test"
     subprocess.run([
         os.environ.get("CXX", "g++"), "-std=c++20", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        *shlex.split(os.environ.get("FRAME_TIMING_CXXFLAGS", "")),
         "-I", str(ROOT / "libultraship/include"), str(ROOT / "soh/tests/render_cost_probe_test.cpp"),
         "-o", str(render_test),
     ], check=True)

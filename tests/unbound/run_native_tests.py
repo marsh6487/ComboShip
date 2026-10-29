@@ -20,7 +20,7 @@ def function(source, signature):
     return source[start:end]
 
 
-def compile_run(test, body, name):
+def compile_run(test, body, name, extra_flags=()):
     with tempfile.TemporaryDirectory(prefix="unbound-" + name + "-") as tmp:
         src = Path(tmp) / (name + ".cpp")
         src.write_text(body)
@@ -28,12 +28,59 @@ def compile_run(test, body, name):
         includes = [ROOT, ROOT / "soh/include", ROOT / "soh", ROOT / "libultraship/include"]
         if os.environ.get("UNBOUND_JSON_INCLUDE"):
             includes.insert(0, Path(os.environ["UNBOUND_JSON_INCLUDE"]))
-        command = ["g++", "-std=c++20", "-DF3DEX_GBI_2"]
+        command = ["g++", "-std=c++20", "-DF3DEX_GBI_2", *extra_flags]
         for include in includes:
             command += ["-I", str(include)]
         subprocess.run(command + [str(src), "-o", str(exe)], check=True)
         run = subprocess.run([str(exe)], capture_output=True, text=True)
         test.assertEqual(run.returncode, 0, run.stderr)
+
+
+class CheckedCollisionGrowth(unittest.TestCase):
+    def test_static_initial_capacity_does_not_wrap_or_narrow_header_counts(self):
+        source = (ROOT / "soh/src/code/z_bgcheck.c").read_text()
+        fixture = (ROOT / "tests/unbound/static_capacity_fixture.cpp").read_text()
+        body = function(source, "static u64 BgCheck_TableCapacityLimit(") + "\n" + function(source, "void BgCheck_Allocate(")
+        compile_run(self, fixture.replace("/* ACTUAL STATIC ALLOCATION */", body), "checked-static-growth", extra_flags=("-fsanitize=undefined", "-fno-sanitize-recover=all"))
+
+    def test_collision_bulk_rejects_wrapping_or_unrepresentable_counts_before_io_or_reserve(self):
+        source = (ROOT / "soh/soh/unbound/UnboundCollisionFactory.cpp").read_text()
+        numeric = (ROOT / "soh/soh/unbound/UnboundJson.cpp").read_text()
+        fixture = (ROOT / "tests/unbound/collision_bulk_fixture.cpp").read_text()
+        numbers = "\n".join(function(numeric, signature) for signature in [
+            "static bool IsDigitOf(", "bool ParseIntString(", "int64_t ToInt(", "int64_t Field(", "std::string PathField(",
+        ])
+        fixture = fixture.replace("/* ACTUAL NUMERIC READERS */", numbers)
+        start = source.index("constexpr size_t kVertexBytes")
+        end = source.index("Vec3i ReadVertex(", start)
+        body = source[start:end] + "\n" + "\n".join(function(source, signature) for signature in [
+            "Vec3i ReadVertex(", "CollisionPoly ReadPoly(", "bool ReadBulk(",
+        ])
+        compile_run(self, fixture.replace("/* ACTUAL COLLISION BULK */", body), "checked-collision-bulk", extra_flags=("-fsanitize=undefined", "-fno-sanitize-recover=all"))
+
+    def test_node_growth_stops_before_count_or_byte_overflow_and_failed_realloc(self):
+        source = (ROOT / "soh/src/code/z_bgcheck.c").read_text()
+        fixture = (ROOT / "tests/unbound/node_capacity_fixture.cpp").read_text()
+        signatures = [
+            "static u64 BgCheck_TableCapacityLimit(", "static s32 BgCheck_NextTableCapacity(",
+            "static void* BgCheck_ReallocTable(", "u32 DynaSSNodeList_GetNextNodeIdx(",
+            "static void SSNodeList_Grow(", "u32 SSNodeList_GetNextNodeIdx(",
+        ]
+        body = "\n".join(function(source, signature) for signature in signatures)
+        # C's parameter name and implicit void* conversion require spelling adapters in this C++ fixture.
+        body = re.sub(r"\bthis\b", "list", body).replace("= BgCheck_ReallocTable(", "= (SSNode*)BgCheck_ReallocTable(")
+        compile_run(self, fixture.replace("/* ACTUAL NODE GROWTH */", body), "checked-node-growth", extra_flags=("-fsanitize=undefined", "-fno-sanitize-recover=all"))
+
+    def test_dyna_rejects_unrepresentable_counts_and_failed_allocations_before_writing(self):
+        source = (ROOT / "soh/src/code/z_bgcheck.c").read_text()
+        fixture = (ROOT / "tests/unbound/dyna_capacity_fixture.cpp").read_text()
+        body = ""
+        for signature in ["static u64 BgCheck_TableCapacityLimit(", "static s32 BgCheck_NextTableCapacity("]:
+            if signature in source:
+                body += function(source, signature) + "\n"
+        match = re.search(r"static (?:void|s32) DynaPoly_EnsureListCapacity\(", source)
+        body += function(source, match.group()) + "\n" + function(source, "void DynaPoly_Setup(")
+        compile_run(self, fixture.replace("/* ACTUAL DYNA CAPACITY */", body), "checked-dyna-growth", extra_flags=("-fsanitize=undefined", "-fno-sanitize-recover=all"))
 
 
 class NativeWidths(unittest.TestCase):

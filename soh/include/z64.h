@@ -1136,9 +1136,8 @@ typedef struct CollisionCheckContext {
     s32 colOCCapacity;
     s32 colLineCount;
     OcLine* colLine[COLLISION_CHECK_OC_LINE_MAX];
-    // Internal ownership registry permits first init on uninitialized storage and
-    // repeated init without losing owned queues. Init/Destroy must bracket use.
-    struct CollisionCheckContext* queueOwnerNext;
+    // Queue ownership and savestate epochs live outside this heap-restored context.
+    // Init/Destroy must bracket use; savestates must capture/prepare/commit queues.
 } CollisionCheckContext;
 
 typedef struct ListAlloc {

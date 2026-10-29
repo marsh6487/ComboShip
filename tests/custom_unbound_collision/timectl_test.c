@@ -39,6 +39,7 @@ void Audio_StopSfxByPos(Vec3f* position) { (void)position; }
 static void ActorUpdate(Actor* actor, PlayState* state) { (void)actor; (void)state; }
 
 static void Setup(int count) {
+    CollisionCheck_InitContext(&play, &play.colChkCtx);
     play.sceneNum = 1;
     player.actor.category = ACTORCAT_PLAYER;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
@@ -135,7 +136,7 @@ int main(int argc, char** argv) {
         assert(!TimeCtl_ReapplyAc(&play, &actors[159]) && play.colChkCtx.colACCount == 0);
         TimeCtl_Reset(&play);
     }
-    free(play.colChkCtx.colAC);
+    CollisionCheck_DestroyContext(&play, &play.colChkCtx);
     assert(sOwnedCacheAllocations == 0);
     printf("PASS TimeCtl %s: grown native AC queue, unchanged filters/timing and safe owned-cache lifecycle\n", argv[1]);
 }

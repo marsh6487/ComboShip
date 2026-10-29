@@ -184,7 +184,7 @@ void MmSfx_Stop(u16 id) { stopped.push_back(id); }
 Gfx* MmAssets_LoadDisplayListGraphStrict(const char*) { static Gfx dummy[1]; return maskFailure ? nullptr : dummy; }
 LightNode* LightContext_InsertLight(PlayState*, LightContext*, LightInfo*) { ++lightCreates; return &nativeLight; }
 void LightContext_RemoveLight(PlayState*, LightContext*, LightNode*) { ++lightClears; }
-void Lights_PointNoGlowSetInfo(LightInfo*, s16, s16, s16, u8, u8, u8, s16) {}
+void Lights_PointNoGlowSetInfo(LightInfo*, f32, f32, f32, u8, u8, u8, s16) {}
 f32 Math_SinS(s16 value) { return std::sin(value * (3.14159265358979323846f / 32768.0f)); }
 f32 Math_CosS(s16 value) { return std::cos(value * (3.14159265358979323846f / 32768.0f)); }
 f32 Rand_ZeroOne() { return cameraRandom; }
