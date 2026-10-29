@@ -89,6 +89,9 @@ class GfxRenderingAPIOGL final : public GfxRenderingAPI {
     void SetScissor(int x, int y, int width, int height) override;
     void SetUseAlpha(bool useAlpha) override;
     void DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) override;
+    bool SupportsIndexedTriangles() const override { return true; }
+    void DrawIndexedTriangles(float vertices[], size_t floatCount, const uint16_t* indices,
+                              size_t indexCount, size_t stride) override;
     void Init() override;
     void OnResize() override;
     void StartFrame() override;
@@ -116,6 +119,9 @@ class GfxRenderingAPIOGL final : public GfxRenderingAPI {
     ImTextureID GetTextureById(int id) override;
 
   private:
+    void InitializeTriangleIndexBuffer();
+    void SubmitIndexedTriangles(const uint16_t* indices, size_t indexCount);
+    void DrawTrianglesInternal(float vertices[], size_t floatCount, size_t triangleCount, const uint16_t* indices);
     void SetUniforms(ShaderProgram* prg) const;
     std::string BuildFsShader(const CCFeatures& cc_features);
     void SetPerDrawUniforms();
@@ -136,6 +142,7 @@ class GfxRenderingAPIOGL final : public GfxRenderingAPI {
     ShaderProgram* mLastLoadedShader = nullptr;
 
     GLuint mOpenglVbo = 0;
+    GLuint mOpenglIbo = 0;
 #if defined(__APPLE__) || defined(USE_OPENGLES)
     GLuint mOpenglVao;
 #endif

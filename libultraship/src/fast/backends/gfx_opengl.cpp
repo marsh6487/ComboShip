@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <cassert>
 
 #include <map>
 #include <unordered_map>
@@ -683,7 +684,34 @@ void GfxRenderingAPIOGL::SetUseAlpha(bool use_alpha) {
     }
 }
 
+void GfxRenderingAPIOGL::InitializeTriangleIndexBuffer() {
+    glGenBuffers(1, &mOpenglIbo);
+}
+
+void GfxRenderingAPIOGL::SubmitIndexedTriangles(const uint16_t* indices, size_t indexCount) {
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mOpenglIbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(uint16_t), indices, GL_STREAM_DRAW);
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount), GL_UNSIGNED_SHORT, nullptr);
+}
+
 void GfxRenderingAPIOGL::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) {
+    DrawTrianglesInternal(buf_vbo, buf_vbo_len, buf_vbo_num_tris, nullptr);
+}
+
+void GfxRenderingAPIOGL::DrawIndexedTriangles(float vertices[], size_t floatCount, const uint16_t* indices,
+                                            size_t indexCount, size_t stride) {
+    if (indexCount == 0) return;
+    if (stride == 0 || floatCount % stride != 0 || indexCount % 3 != 0 ||
+        indexCount > TRIANGLE_BATCH_MAX_TRIANGLES * 3 ||
+        floatCount > TRIANGLE_BATCH_MAX_TRIANGLES * 3 * VBO_MAX_FLOATS_PER_VERTEX) {
+        assert(false && "Invalid indexed triangle batch");
+        return;
+    }
+    DrawTrianglesInternal(vertices, floatCount, indexCount / 3, indices);
+}
+
+void GfxRenderingAPIOGL::DrawTrianglesInternal(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris,
+                                             const uint16_t* indices) {
     // SOH [Enhancement] The decal flag participates because the depth func below depends on it; without
     // it a decal-only change kept the previous compare function (mLastZmodeDecal itself is updated by
     // the polygon-offset block further down, so it is only TESTED here, not assigned).
@@ -769,7 +797,11 @@ void GfxRenderingAPIOGL::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size
 
     // printf("flushing %d tris\n", buf_vbo_num_tris);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * buf_vbo_len, buf_vbo, GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, 3 * buf_vbo_num_tris);
+    if (indices != nullptr) {
+        SubmitIndexedTriangles(indices, buf_vbo_num_tris * 3);
+    } else {
+        glDrawArrays(GL_TRIANGLES, 0, 3 * buf_vbo_num_tris);
+    }
 }
 
 void GfxRenderingAPIOGL::Init() {
@@ -779,6 +811,7 @@ void GfxRenderingAPIOGL::Init() {
 
     glGenBuffers(1, &mOpenglVbo);
     glBindBuffer(GL_ARRAY_BUFFER, mOpenglVbo);
+    InitializeTriangleIndexBuffer();
 
 #if defined(__APPLE__) || defined(USE_OPENGLES)
     glGenVertexArrays(1, &mOpenglVao);

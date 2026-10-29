@@ -155,7 +155,7 @@ static std::shared_ptr<Ship::ResourceManager> ActiveResMgr() {
     return Ship::Context::GetRawInstance()->GetResourceManager();
 }
 
-constexpr size_t MAX_TRI_BUFFER = 256;
+constexpr size_t MAX_TRI_BUFFER = TRIANGLE_BATCH_MAX_TRIANGLES;
 
 Interpreter::Interpreter() {
     mRsp = new RSP();
@@ -181,6 +181,7 @@ static constexpr float N64_PRIM_DEPTH_MAX = 32767.0f;
 
 void Interpreter::Flush() {
     mTriangleState.packedVertexMask = 0;
+    mIndexedVertexMask = 0;
     if (mBufVboLen > 0) {
         RenderOperationScope timing(&mRenderCost, RenderCostOperation::DriverDraw);
         if (mRenderCost.Active()) {
@@ -190,10 +191,19 @@ void Interpreter::Flush() {
         // SOH [Enhancement] Push the dominant toon light for this batch. The backend only consumes it
         // when the bound shader is a toon variant, so it is a no-op for ordinary draws.
         mRapi->SetToonLighting(mRsp->toon_light_dir, mRsp->toon_light_color, mRsp->toon_ambient);
-        mRapi->DrawTriangles(mBufVbo, mBufVboLen, mBufVboNumTris);
+        // With no reused vertices the records already form the exact expanded
+        // stream. Avoid an extra index upload/map when it cannot save anything.
+        if (mBufUsesIndices && mBufIndexedVertices < mBufIndexLen) {
+            mRapi->DrawIndexedTriangles(mBufVbo, mBufVboLen, mBufIndices, mBufIndexLen, mBufVertexStride);
+        } else {
+            mRapi->DrawTriangles(mBufVbo, mBufVboLen, mBufVboNumTris);
+        }
         mBufVboLen = 0;
         mBufVboNumTris = 0;
     }
+    mBufIndexLen = mBufIndexedVertices = mBufVertexStride = 0;
+    mBufUsesIndices = false;
+    mBufIndexable = false;
 }
 
 ShaderProgram* Interpreter::LookupOrCreateShaderProgram(uint64_t id0, uint64_t id1) {
@@ -2639,10 +2649,36 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
     // unchanged. LOD fraction can depend on this triangle's FIRST vertex, so
     // conservatively retain the original packing whenever that mode is enabled.
     // Cheap layouts use the separate PackVertices=false specialization.
-    const bool reuseVertices = PackVertices && mTriangleState.valid && mTriangleState.reusePackedVertices && !is_rect;
+    const bool indexable = mIndexedTrianglesEnabled && !is_rect && vtx1_idx < MAX_VERTICES &&
+                         vtx2_idx < MAX_VERTICES && vtx3_idx < MAX_VERTICES &&
+                         !(mRdp->other_mode_l & G_TL_LOD) &&
+                         !(usedTextures[0] && usedTextures[1] &&
+                           mRenderingState.mTextures[0] == mRenderingState.mTextures[1]);
+    if (mBufVboLen != 0 && indexable != mBufIndexable) Flush();
+    mBufIndexable = indexable;
+    const uint64_t triangleMask = indexable ? (uint64_t{1} << vtx1_idx) | (uint64_t{1} << vtx2_idx) |
+                                                (uint64_t{1} << vtx3_idx) : 0;
+    // Start with the ordinary stream. Promote only after an actual shared
+    // reference appears; old records already have identity indices, so no
+    // vertex copy or additional draw is needed to change representation.
+    if (indexable && !mBufUsesIndices && (mIndexedVertexMask & triangleMask)) {
+        const size_t previousVertices = mBufVboNumTris * 3;
+        assert(mBufVertexStride != 0 && mBufVboLen == previousVertices * mBufVertexStride);
+        for (size_t i = 0; i < previousVertices; ++i) mBufIndices[i] = static_cast<uint16_t>(i);
+        mBufIndexLen = mBufIndexedVertices = previousVertices;
+        mBufUsesIndices = true;
+    }
+    const bool indexed = indexable && mBufUsesIndices;
+    const bool reuseVertices = !indexed && PackVertices && mTriangleState.valid &&
+                               mTriangleState.reusePackedVertices && !is_rect;
     const uint8_t vertexIndices[3] = { vtx1_idx, vtx2_idx, vtx3_idx };
+    const size_t triangleStart = mBufVboLen;
     for (int i = 0; i < 3; i++) {
         const auto index = vertexIndices[i];
+        if (indexed && index < MAX_VERTICES && (mIndexedVertexMask & (uint64_t{1} << index))) {
+            mBufIndices[mBufIndexLen++] = mIndexedVertexIds[index];
+            continue;
+        }
         if (reuseVertices && index < MAX_VERTICES && (mTriangleState.packedVertexMask & (uint64_t{1} << index))) {
             const auto& packed = mPackedTriangleVertices[index];
             memcpy(mBufVbo + mBufVboLen, mBufVbo + packed.offset, packed.count * sizeof(float));
@@ -2842,7 +2878,17 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
             }
         }
 
-        if (reuseVertices && index < MAX_VERTICES) {
+        if (indexed) {
+            const auto count = mBufVboLen - vertexStart;
+            assert(mBufVertexStride == 0 || mBufVertexStride == count);
+            mBufVertexStride = count;
+            const auto emitted = static_cast<uint16_t>(mBufIndexedVertices++);
+            mBufIndices[mBufIndexLen++] = emitted;
+            if (index < MAX_VERTICES) {
+                mIndexedVertexIds[index] = emitted;
+                mIndexedVertexMask |= uint64_t{1} << index;
+            }
+        } else if (reuseVertices && index < MAX_VERTICES) {
             auto& packed = mPackedTriangleVertices[index];
             const auto count = mBufVboLen - vertexStart;
             if (count <= std::numeric_limits<uint8_t>::max()) {
@@ -2851,6 +2897,13 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
                 mTriangleState.packedVertexMask |= uint64_t{1} << index;
             }
         }
+    }
+
+    if (indexable && !indexed) {
+        mBufVertexStride = (mBufVboLen - triangleStart) / 3;
+        const size_t first = mBufVboNumTris * 3;
+        for (unsigned i = 0; i < 3; ++i) mIndexedVertexIds[vertexIndices[i]] = static_cast<uint16_t>(first + i);
+        mIndexedVertexMask |= triangleMask;
     }
 
     if (++mBufVboNumTris == MAX_TRI_BUFFER) {
@@ -3752,6 +3805,7 @@ void Interpreter::RenderShadowVolumes() {
     const bool savedReuse = mTriangleStateReuseAllowed;
     mTriangleStateReuseAllowed = false;
     mTriangleState.valid = false;
+    mIndexedVertexMask = 0;
     decltype(mShaderStack) savedShaders;
     savedShaders.swap(mShaderStack);
 
@@ -3980,6 +4034,7 @@ void Interpreter::RenderShadowVolumes() {
     savedShaders.swap(mShaderStack);
     mTriangleStateReuseAllowed = savedReuse;
     mTriangleState.valid = false;
+    mIndexedVertexMask = 0;
 
     clearAccums();
 }
@@ -6258,12 +6313,15 @@ class UcodeHandler {
     }
 
     inline bool invoke(int8_t opcode, F3DGfx** cmd, Interpreter* gfx) const {
-        const bool reuse = gfx->mTriangleStateReuseEnabled && mTriangleHandlers[static_cast<uint8_t>(opcode)];
+        const bool triangle = mTriangleHandlers[static_cast<uint8_t>(opcode)];
+        const bool reuse = gfx->mTriangleStateReuseEnabled && triangle;
+        if (!triangle) gfx->mIndexedVertexMask = 0;
         gfx->mTriangleStateReuseAllowed = reuse;
         if (!reuse) {
             gfx->mTriangleState.valid = false;
         }
         const bool result = at(opcode).second(gfx, cmd);
+        if (!triangle) gfx->mIndexedVertexMask = 0;
         gfx->mTriangleStateReuseAllowed = false;
         // Rectangle and S2DEX handlers can draw with temporary state and then
         // restore it. Never carry their prepared state into the next command.
@@ -6517,6 +6575,7 @@ static void gfx_step(Interpreter* gfx) {
 
     if (opcode == F3DEX2_G_LOAD_UCODE) {
         gfx->mTriangleState.valid = false;
+        gfx->mIndexedVertexMask = 0;
         gfx_set_ucode_handler(gfx, (UcodeHandlers)(cmd->words.w0 & 0xFFFFFF));
         ++cmd;
         return;
@@ -6537,6 +6596,7 @@ static void gfx_step(Interpreter* gfx) {
 #endif
             ) {
                 gfx->mTriangleState.valid = false;
+                gfx->mIndexedVertexMask = 0;
                 ++g_exec_stack.currCmd();
                 return;
             }
@@ -6555,11 +6615,13 @@ static void gfx_step(Interpreter* gfx) {
             }
         } else {
             gfx->mTriangleState.valid = false;
+            gfx->mIndexedVertexMask = 0;
             SPDLOG_CRITICAL("Unhandled OP code: 0x{:X}, for loaded ucode: {}", (uint8_t)opcode,
                             (uint32_t)ucode_handler_index);
         }
     } else {
         gfx->mTriangleState.valid = false;
+        gfx->mIndexedVertexMask = 0;
         SPDLOG_CRITICAL("Unhandled OP code: 0x{:X}, invalid ucode: {}", (uint8_t)opcode, (uint32_t)ucode_handler_index);
     }
 
@@ -6568,6 +6630,7 @@ static void gfx_step(Interpreter* gfx) {
 
 void Interpreter::SpReset() {
     mTriangleState.valid = false;
+    mIndexedVertexMask = 0;
     mTriangleStateReuseAllowed = false;
     mRdp->toon = false;
     mRdp->toon_shadow = false;
@@ -6776,6 +6839,8 @@ void Interpreter::RunGuiOnly() {
 }
 
 void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_replacements) {
+    SetIndexedTrianglesEnabled(Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
+        "gEnhancements.IndexedTriangles", 1) != 0);
     mPreludeMaterialBindingReuseEnabled = Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
         "gEnhancements.PreludeMaterialBindingReuse", 0) != 0;
     std::fill(std::begin(mPreludeMaterialBoundResources), std::end(mPreludeMaterialBoundResources), nullptr);

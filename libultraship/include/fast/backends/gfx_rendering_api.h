@@ -5,6 +5,9 @@
 
 #include <unordered_map>
 #include <set>
+#include <algorithm>
+#include <cassert>
+#include <vector>
 #include "imconfig.h"
 #include "fast/toon_shading.h"
 
@@ -76,6 +79,26 @@ class GfxRenderingAPI {
     virtual void SetScissor(int x, int y, int width, int height) = 0;
     virtual void SetUseAlpha(bool useAlpha) = 0;
     virtual void DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) = 0;
+    virtual bool SupportsIndexedTriangles() const { return false; }
+    // Full packed vertex records plus ordered uint16 triangle indices. Unsupported
+    // backends keep DrawTriangles; expansion is a correctness fallback for callers.
+    virtual void DrawIndexedTriangles(float vertices[], size_t floatCount, const uint16_t* indices,
+                                      size_t indexCount, size_t stride) {
+        if (stride == 0 || floatCount % stride != 0 || indexCount % 3 != 0) {
+            assert(false && "Invalid indexed triangle layout");
+            return;
+        }
+        const size_t vertexCount = floatCount / stride;
+        std::vector<float> expanded(indexCount * stride);
+        for (size_t i = 0; i < indexCount; ++i) {
+            if (indices[i] >= vertexCount) {
+                assert(false && "Indexed triangle vertex outside submitted buffer");
+                return;
+            }
+            std::copy_n(vertices + size_t(indices[i]) * stride, stride, expanded.data() + i * stride);
+        }
+        DrawTriangles(expanded.data(), expanded.size(), indexCount / 3);
+    }
     // Diagnostic hooks are opt-in and unsupported on backends without GPU queries.
     virtual void BeginGpuTiming(uint64_t, bool) {}
     virtual void EndGpuTiming() {}

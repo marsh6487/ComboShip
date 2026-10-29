@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cassert>
 
 #include <map>
 #include <unordered_map>
@@ -398,6 +399,7 @@ void GfxRenderingAPIDX11::Init() {
 
     ThrowIfFailed(mDevice->CreateBuffer(&vertex_buffer_desc, nullptr, mVertexBuffer.GetAddressOf()),
                   mWindowBackend->GetWindowHandle(), "Failed to create vertex buffer.");
+    InitializeTriangleIndexBuffer();
 
     // Create per-frame constant buffer
 
@@ -810,7 +812,43 @@ void GfxRenderingAPIDX11::SetUseAlpha(bool use_alpha) {
     // Already part of the pipeline state from shader info
 }
 
+void GfxRenderingAPIDX11::InitializeTriangleIndexBuffer() {
+    D3D11_BUFFER_DESC desc{};
+    desc.Usage = D3D11_USAGE_DYNAMIC;
+    desc.ByteWidth = TRIANGLE_BATCH_MAX_TRIANGLES * 3 * sizeof(uint16_t);
+    desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    ThrowIfFailed(mDevice->CreateBuffer(&desc, nullptr, mIndexBuffer.GetAddressOf()),
+                  mWindowBackend->GetWindowHandle(), "Failed to create triangle index buffer.");
+}
+
+void GfxRenderingAPIDX11::SubmitIndexedTriangles(const uint16_t* indices, size_t indexCount) {
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    ThrowIfFailed(mContext->Map(mIndexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
+    memcpy(mapped.pData, indices, indexCount * sizeof(uint16_t));
+    mContext->Unmap(mIndexBuffer.Get(), 0);
+    mContext->IASetIndexBuffer(mIndexBuffer.Get(), DXGI_FORMAT_R16_UINT, 0);
+    mContext->DrawIndexed(static_cast<UINT>(indexCount), 0, 0);
+}
+
 void GfxRenderingAPIDX11::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) {
+    DrawTrianglesInternal(buf_vbo, buf_vbo_len, buf_vbo_num_tris, nullptr);
+}
+
+void GfxRenderingAPIDX11::DrawIndexedTriangles(float vertices[], size_t floatCount, const uint16_t* indices,
+                                             size_t indexCount, size_t stride) {
+    if (indexCount == 0) return;
+    if (stride == 0 || floatCount % stride != 0 || indexCount % 3 != 0 ||
+        indexCount > TRIANGLE_BATCH_MAX_TRIANGLES * 3 ||
+        floatCount > TRIANGLE_BATCH_MAX_TRIANGLES * 3 * VBO_MAX_FLOATS_PER_VERTEX) {
+        assert(false && "Invalid indexed triangle batch");
+        return;
+    }
+    DrawTrianglesInternal(vertices, floatCount, indexCount / 3, indices);
+}
+
+void GfxRenderingAPIDX11::DrawTrianglesInternal(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris,
+                                              const uint16_t* indices) {
 
     // SOH [Enhancement] World light casting: also rebuild when the stencil mode changes. The decal
     // flag participates because DepthFunc below depends on it; without it a decal-only change kept the
@@ -1026,7 +1064,11 @@ void GfxRenderingAPIDX11::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, siz
         mContext->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
 
-    mContext->Draw(buf_vbo_num_tris * 3, 0);
+    if (indices != nullptr) {
+        SubmitIndexedTriangles(indices, buf_vbo_num_tris * 3);
+    } else {
+        mContext->Draw(buf_vbo_num_tris * 3, 0);
+    }
 }
 
 void GfxRenderingAPIDX11::OnResize() {

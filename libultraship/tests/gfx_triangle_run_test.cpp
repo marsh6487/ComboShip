@@ -28,6 +28,10 @@ class RecordingBackend : public BackendDefaults {
     std::vector<uint64_t> events;
     GfxClipParameters clip{true, false};
     size_t queries = 0, triangles = 0;
+    size_t indexedDraws = 0, indexedFloats = 0;
+    std::vector<uint16_t> submittedIndices;
+    size_t lastIndexedStride = 0;
+    bool supportsIndexed = true;
     bool recording = true;
     GfxClipParameters GetClipParameters() override { return clip; }
     ShaderProgram* LookupShader(uint64_t a, uint64_t b) override {
@@ -67,6 +71,23 @@ class RecordingBackend : public BackendDefaults {
             memcpy(output.data() + at, data, length * sizeof(float));
         }
     }
+#ifdef GFX_HAS_INDEXED_TRIANGLES
+    bool SupportsIndexedTriangles() const override { return supportsIndexed; }
+    void DrawIndexedTriangles(float* data, size_t length, const uint16_t* indices,
+                              size_t count, size_t stride) override {
+        assert(stride != 0 && length % stride == 0 && count % 3 == 0);
+        for (size_t i = 0; i < count; ++i) assert(indices[i] < length / stride);
+        ++indexedDraws;
+        indexedFloats += length;
+        lastIndexedStride = stride;
+        if (recording) {
+            submittedIndices.insert(submittedIndices.end(), indices, indices + count);
+            GfxRenderingAPI::DrawIndexedTriangles(data, length, indices, count, stride);
+        } else {
+            triangles += count / 3;
+        }
+    }
+#endif
     void event(uint64_t kind, uint64_t value) { if (recording) { events.push_back(kind); events.push_back(value); } }
 };
 
@@ -129,6 +150,7 @@ template<class T> void beginRun(T& gfx, bool enabled) {
         gfx.mTriangleState.valid = false;
         gfx.mTriangleStateReuseAllowed = enabled;
     }
+    if constexpr (requires { gfx.mIndexedVertexMask; }) gfx.mIndexedVertexMask = 0;
 }
 
 struct Fixture {
@@ -186,6 +208,176 @@ static void reuseTest() {
 }
 
 static void configure(Fixture& f, unsigned variant);
+
+static void indexedSubmissionTest() {
+#ifdef GFX_HAS_INDEXED_TRIANGLES
+    for (bool preparationReuse : {false, true}) {
+        for (unsigned material : {0u, 3u}) {
+            Fixture legacy, indexed;
+            configure(legacy, material); configure(indexed, material);
+            beginRun(legacy.gfx, preparationReuse); beginRun(indexed.gfx, preparationReuse);
+            indexed.gfx.SetIndexedTrianglesEnabled(true);
+            for (auto* f : {&legacy, &indexed}) {
+                f->gfx.GfxSpTri1(0, 1, 2, false);
+                if (f == &indexed) require(!f->gfx.mBufUsesIndices,
+                                           "first triangle must stay direct until sharing is observed");
+                f->gfx.GfxSpTri1(2, 1, 3, false);
+                f->gfx.Flush();
+            }
+            require(legacy.backend.output == indexed.backend.output && legacy.backend.events == indexed.backend.events,
+                    "indexed shared-edge triangles must preserve full ordered attributes and state events");
+            require(indexed.backend.indexedDraws == 1 && indexed.backend.triangles == 2,
+                    "eligible batch must use one indexed draw and preserve both triangles");
+            require(indexed.backend.indexedFloats / indexed.backend.lastIndexedStride == 4,
+                    "two shared-edge triangles must pack four unique complete vertex records");
+            require(indexed.backend.submittedIndices == std::vector<uint16_t>({0,1,2,2,1,3}),
+                    "indexed submission must preserve the original triangle order");
+        }
+    }
+    Fixture unsupported;
+    unsupported.backend.supportsIndexed = false;
+    unsupported.gfx.SetIndexedTrianglesEnabled(true);
+    beginRun(unsupported.gfx, false);
+    unsupported.triangles(2); unsupported.gfx.Flush();
+    require(unsupported.backend.indexedDraws == 0 && unsupported.backend.triangles == 2,
+            "unsupported backend must retain ordinary triangle submission");
+    std::cout << "PASS indexed shared-edge geometry, exact attributes/order and unsupported-backend fallback\n";
+#else
+    require(false, "indexed triangle submission is not implemented");
+#endif
+}
+
+#ifdef GFX_HAS_INDEXED_TRIANGLES
+static bool changeIndexedVertex(Interpreter* gfx, F3DGfx**) {
+    gfx->mRsp->loaded_vertices[1].u += 93;
+    return false;
+}
+static void indexedBoundariesTest() {
+    Fixture legacy, indexed;
+    UcodeHandler barrier{{1, {"change vertex", changeIndexedVertex}}};
+    for (auto* f : {&legacy, &indexed}) {
+        configure(*f, 3);
+        f->gfx.SetIndexedTrianglesEnabled(f == &indexed);
+        beginRun(f->gfx, true);
+        f->gfx.GfxSpTri1(63, 1, 2, false);
+        F3DGfx command{}; auto cursor = &command;
+        barrier.invoke(1, &cursor, &f->gfx);
+        f->gfx.GfxSpTri1(63, 1, 2, false);
+        f->gfx.Flush();
+        // Explicit flush and rollover must retire offsets/indices.
+        f->triangles(600); f->gfx.Flush();
+        // Toggle with data still pending; the old representation must be drawn first.
+        f->gfx.GfxSpTri1(0,1,2,false);
+        if (f == &legacy) f->gfx.Flush(); // Match the indexed toggle's required representation boundary.
+        f->gfx.SetIndexedTrianglesEnabled(false);
+        f->gfx.GfxSpTri1(0,1,2,false);
+        f->gfx.Flush();
+    }
+    require(legacy.backend.output == indexed.backend.output && legacy.backend.events == indexed.backend.events,
+            "indexed barriers/slot63/flush/rollover/toggle must preserve the expanded stream and draw boundaries");
+    for (bool rectangle : {false, true}) {
+        Fixture fallback;
+        configure(fallback, 3); beginRun(fallback.gfx, true);
+        fallback.gfx.SetIndexedTrianglesEnabled(true);
+        if (!rectangle) fallback.gfx.mRdp->other_mode_l |= G_TL_LOD;
+        fallback.gfx.GfxSpTri1(0,1,2,rectangle); fallback.gfx.Flush();
+        require(fallback.backend.indexedDraws == 0 && fallback.backend.triangles == 1,
+                "rectangle and triangle-dependent LOD retain direct emission");
+    }
+    Fixture generated;
+    configure(generated, 3); beginRun(generated.gfx, true);
+    generated.gfx.SetIndexedTrianglesEnabled(true);
+    for (unsigned i = 0; i < 3; ++i)
+        generated.gfx.mRsp->loaded_vertices[MAX_VERTICES + i] = generated.gfx.mRsp->loaded_vertices[i];
+    generated.gfx.GfxSpTri1(MAX_VERTICES, MAX_VERTICES + 1, MAX_VERTICES + 2, false);
+    generated.gfx.mRsp->loaded_vertices[MAX_VERTICES].x += 0.1f;
+    generated.gfx.GfxSpTri1(MAX_VERTICES, MAX_VERTICES + 1, MAX_VERTICES + 2, false);
+    generated.gfx.Flush();
+    require(generated.backend.indexedDraws == 0 && generated.backend.triangles == 2,
+            "generated shadow/temp vertex slots retain the direct path");
+
+    Fixture shadowLegacy, shadowIndexed;
+    for (auto* f : {&shadowLegacy, &shadowIndexed}) {
+        configure(*f, 3); beginRun(f->gfx, true);
+        f->gfx.SetIndexedTrianglesEnabled(f == &shadowIndexed);
+        f->gfx.mRdp->toon_shadow = true;
+        f->gfx.mRsp->geometry_mode |= G_LIGHTING;
+        for (unsigned i = 0; i < 4; ++i) {
+            auto& v = f->gfx.mRsp->loaded_vertices[i];
+            v.wx = float(i); v.wy = float(i + 1); v.wz = float(i + 2);
+        }
+        f->gfx.GfxSpTri1(0,1,2,false); f->gfx.GfxSpTri1(2,1,3,false); f->gfx.Flush();
+    }
+    require(shadowLegacy.gfx.mShadowVerts == shadowIndexed.gfx.mShadowVerts &&
+            shadowIndexed.gfx.mShadowVerts.size() == 18,
+            "vertex sharing must retain the full ordered shadow geometry capture");
+    std::cout << "PASS indexed invalidation, slot63, flush, rollover, toggle and dependent-output fallback\n";
+}
+
+static void indexedEquivalenceTest() {
+    for (bool preparationReuse : {false, true}) {
+        Fixture legacy, indexed;
+        indexed.gfx.SetIndexedTrianglesEnabled(true);
+        for (unsigned variant = 0; variant < 16384; ++variant) {
+            configure(legacy, variant); configure(indexed, variant);
+            beginRun(legacy.gfx, preparationReuse); beginRun(indexed.gfx, preparationReuse);
+            const unsigned count = variant % 127 == 0 ? 600 : 17;
+            legacy.triangles(count); indexed.triangles(count);
+            legacy.gfx.Flush(); indexed.gfx.Flush();
+            require(legacy.backend.output == indexed.backend.output && legacy.backend.events == indexed.backend.events,
+                    "indexed variants must retain every float bit, triangle and state event");
+            legacy.backend.output.clear(); indexed.backend.output.clear();
+            legacy.backend.events.clear(); indexed.backend.events.clear();
+        }
+    }
+    std::cout << "PASS indexed output: 16384 material/clip/cull variants in both preparation modes\n";
+}
+
+static void indexedSpecialCasesTest() {
+    for (unsigned special = 0; special < 4; ++special) {
+        Fixture legacy, indexed;
+        UcodeHandler barrier{{1, {"vertex barrier", changeIndexedVertex}}};
+        for (auto* f : {&legacy, &indexed}) {
+            configure(*f, 3); beginRun(f->gfx, true);
+            f->gfx.SetIndexedTrianglesEnabled(f == &indexed);
+            if (special == 0) f->gfx.mRenderingState.mTextures[1] = f->gfx.mRenderingState.mTextures[0];
+            if (special == 1) {
+                f->gfx.mRdp->toon = true;
+                for (unsigned i = 0; i < MAX_VERTICES; ++i) {
+                    auto& v = f->gfx.mRsp->loaded_vertices[i];
+                    v.nx = float(i)/64; v.ny = -.25f; v.nz = .75f;
+                }
+            }
+            if (special == 2) {
+                // Force all768 records to be unique within one maximum-sized GPU batch.
+                for (unsigned tri = 0; tri < 256; ++tri) {
+                    F3DGfx command{}; auto cursor = &command;
+                    barrier.invoke(1, &cursor, &f->gfx);
+                    f->gfx.GfxSpTri1(0,1,2,false);
+                }
+            } else if (special == 3) {
+                f->gfx.GfxSpTri1(0,1,2,false);
+                f->gfx.GfxSpTri1(2,1,3,false);
+                if (f == &legacy) f->gfx.Flush();
+                f->gfx.GfxSpTri1(0,1,2,true);
+                if (f == &legacy) f->gfx.Flush();
+                f->gfx.GfxSpTri1(2,1,3,false);
+                f->gfx.GfxSpTri1(0,1,2,false);
+            } else {
+                f->triangles(32);
+            }
+            f->gfx.Flush();
+        }
+        require(legacy.backend.output == indexed.backend.output && legacy.backend.events == indexed.backend.events,
+                "shared samplers/toon/full unique batch/index-direct transitions must preserve exact output");
+        if (special == 0) require(indexed.backend.indexedDraws == 0, "shared samplers use direct fallback");
+        if (special == 2) require(indexed.backend.triangles == 256 && indexed.backend.indexedDraws == 0,
+                                  "full unique batch preserves all768 records without unnecessary indexed upload");
+        if (special == 3) require(indexed.backend.indexedDraws == 2, "populated rectangle transition returns to indexed mode");
+    }
+    std::cout << "PASS indexed shared samplers, toon normals, 768 unique records and representation transitions\n";
+}
+#endif
 
 template<class T> uint64_t packedMask(const T& gfx) {
     if constexpr (requires { gfx.mTriangleState.packedVertexMask; }) return gfx.mTriangleState.packedVertexMask;
@@ -574,6 +766,47 @@ static void benchmark() {
     }
 }
 
+template<class T> static void indexBenchmarkMode(T& gfx, bool enabled) {
+    if constexpr (requires { gfx.SetIndexedTrianglesEnabled(enabled); }) gfx.SetIndexedTrianglesEnabled(enabled);
+}
+static bool indexBenchmarkBarrier(Interpreter* gfx, F3DGfx**) {
+    gfx->mRsp->loaded_vertices[1].u += 1;
+    return false;
+}
+static void indexedBenchmark() {
+    constexpr unsigned batches = 2048, perBatch = 16;
+    UcodeHandler barrier{{1, {"vertex mutation", indexBenchmarkBarrier}}};
+    for (unsigned material : {0u, 1u, 3u, 15u, 127u}) {
+        for (bool disjoint : {false, true}) {
+            std::vector<double> times[2];
+            for (unsigned repeat = 0; repeat < 11; ++repeat) {
+                for (unsigned pass = 0; pass < 2; ++pass) {
+                    const unsigned mode = (pass + repeat) % 2;
+                    Fixture f; configure(f, material); f.backend.recording = false;
+                    indexBenchmarkMode(f.gfx, mode != 0);
+                    F3DGfx command{}; auto cursor = &command;
+                    const auto start = std::chrono::steady_clock::now();
+                    for (unsigned batch = 0; batch < batches; ++batch) {
+                        beginRun(f.gfx, true);
+                        for (unsigned tri = 0; tri < perBatch; ++tri) {
+                            if (disjoint) barrier.invoke(1, &cursor, &f.gfx);
+                            f.gfx.GfxSpTri1(tri, tri + 1, tri + 2, false);
+                        }
+                    }
+                    f.gfx.Flush();
+                    const auto end = std::chrono::steady_clock::now();
+                    require(f.backend.triangles == batches * perBatch, "index benchmark must retain all triangles");
+                    if (repeat) times[mode].push_back(std::chrono::duration<double, std::milli>(end - start).count());
+                }
+            }
+            for (auto& t : times) std::sort(t.begin(), t.end());
+            std::cout << "INDEX_BENCH material=" << material << " disjoint=" << disjoint
+                      << " triangles=" << batches * perBatch << " legacy_ms=" << times[0][5]
+                      << " indexed_ms=" << times[1][5] << '\n';
+        }
+    }
+}
+
 static void commandBenchmark() {
     const UcodeHandler table = {{1, {"tri", gfx_tri2_handler_f3dex}},
                                {2, {"depth", gfx_set_prim_depth_handler_rdp}},
@@ -765,12 +998,18 @@ static void forestTintTraceTest() {
 }
 
 int main(int argc, char** argv) {
-    bool reference = false, bench = false;
+    bool reference = false, bench = false, indexBench = false;
     for (int i = 1; i < argc; ++i) {
         reference |= std::string(argv[i]) == "--reference";
         bench |= std::string(argv[i]) == "--benchmark";
+        indexBench |= std::string(argv[i]) == "--index-benchmark";
     }
     if (bench) { benchmark(); commandBenchmark(); return 0; }
+    if (indexBench) { indexedBenchmark(); return 0; }
+    if (!reference) indexedSubmissionTest();
+#ifdef GFX_HAS_INDEXED_TRIANGLES
+    if (!reference) { indexedBoundariesTest(); indexedEquivalenceTest(); indexedSpecialCasesTest(); }
+#endif
     if (!reference) {
         grayscaleBrightnessTest();
         forestTintTraceTest();

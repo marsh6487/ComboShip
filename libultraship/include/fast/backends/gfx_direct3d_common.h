@@ -113,6 +113,9 @@ class GfxRenderingAPIDX11 final : public GfxRenderingAPI {
     void SetScissor(int x, int y, int width, int height) override;
     void SetUseAlpha(bool useAlpha) override;
     void DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) override;
+    bool SupportsIndexedTriangles() const override { return true; }
+    void DrawIndexedTriangles(float vertices[], size_t floatCount, const uint16_t* indices,
+                              size_t indexCount, size_t stride) override;
     void BeginGpuTiming(uint64_t frameId, bool enabled) override;
     void EndGpuTiming() override;
     nlohmann::json GetGpuTimingTelemetry() override;
@@ -148,6 +151,9 @@ class GfxRenderingAPIDX11 final : public GfxRenderingAPI {
     D3D_FEATURE_LEVEL mFeatureLevel;
 
   private:
+    void InitializeTriangleIndexBuffer();
+    void SubmitIndexedTriangles(const uint16_t* indices, size_t indexCount);
+    void DrawTrianglesInternal(float vertices[], size_t floatCount, size_t triangleCount, const uint16_t* indices);
     struct GpuTimingSlot {
         Microsoft::WRL::ComPtr<ID3D11Query> disjoint, start, end;
         uint64_t frameId = 0;
@@ -179,6 +185,7 @@ class GfxRenderingAPIDX11 final : public GfxRenderingAPI {
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> mDepthStencilStates[64];
     int mLastStencilMode = -1;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mVertexBuffer;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> mIndexBuffer;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mPerFrameCb;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mPerDrawCb;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mPerPrimDepthCb;
