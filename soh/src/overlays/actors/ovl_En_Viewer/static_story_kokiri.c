@@ -144,10 +144,9 @@ static s32 StaticStoryKokiri_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gf
             Matrix_RotateX(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.y), MTXMODE_APPLY);
             Matrix_RotateZ(BINANG_TO_RAD(this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         } else if (limbIndex == 15) {
-            bool authoredHead =
-                (this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL &&
-                 NativeNpcModel_IsActive(&sKokiriGirlNpcModel)) ||
-                (this->staticState.type == STATIC_STORY_ACTOR_FADO && YoungFadoNpc_IsActive());
+            bool authoredHead = (this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL &&
+                                 NativeNpcModel_IsActive(&sKokiriGirlNpcModel)) ||
+                                (this->staticState.type == STATIC_STORY_ACTOR_FADO && YoungFadoNpc_IsActive());
             Vec3f pivot = authoredHead ? *pos : (Vec3f){ 1200.0f, 0.0f, 0.0f };
             Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.headRot.y), MTXMODE_APPLY);

@@ -204,7 +204,8 @@ int main() {
     fixture.alternate = &wide;
     MmDisplayListCommand mixed[] = {
         { UINT32_C(0x32001002), 16 }, { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
-        { UINT32_C(0x32001002), 22 }, { 0, 7 }, { UINT32_C(0xDF000000), 0 },
+        { UINT32_C(0x32001002), 22 }, { 0, 7 },
+        { UINT32_C(0xDF000000), 0 },
     };
     REQUIRE(MmDisplayList_PatchCommands(mixed, 5, ResolveResource, &fixture, &stats));
     REQUIRE(mixed[0].w1 == reinterpret_cast<uintptr_t>(&nativeVertices[1]));
@@ -215,44 +216,53 @@ int main() {
         fixture.vertexRecordSize = recordSize;
         MmDisplayListCommand last[] = {
             { UINT32_C(0x32001002), 2 * recordSize },
-            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+            { UINT32_C(0xDF000000), 0 },
         };
         REQUIRE(MmDisplayList_PatchCommands(last, 3, ResolveResource, &fixture, &stats));
         REQUIRE(last[0].w1 == reinterpret_cast<uintptr_t>(&nativeVertices[2]));
         for (uintptr_t offset : { uintptr_t(1), uintptr_t(3 * recordSize), UINTPTR_MAX }) {
             MmDisplayListCommand bad[] = {
                 { UINT32_C(0x32001002), offset },
-                { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+                { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+                { UINT32_C(0xDF000000), 0 },
             };
             REQUIRE(!MmDisplayList_PatchCommands(bad, 3, ResolveResource, &fixture, &stats));
             REQUIRE(stats.malformed == 1 && bad[0].w0 == UINT32_C(0x32001002));
         }
         MmDisplayListCommand overrunWide[] = {
             { UINT32_C(0x32002004), 2 * recordSize },
-            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+            { UINT32_C(0xDF000000), 0 },
         };
         REQUIRE(!MmDisplayList_PatchCommands(overrunWide, 3, ResolveResource, &fixture, &stats));
     }
     fixture.vertexRecordSize = 16;
     for (unsigned badCase = 0; badCase < 5; ++badCase) {
         ResolveFixture badFixture = fixture;
-        if (badCase == 0) badFixture.vertexRecordSize = 0;
-        if (badCase == 1) badFixture.vertexRecordSize = 24;
-        if (badCase == 2) badFixture.vertexStride = 0;
-        if (badCase == 3) --badFixture.vertexSize;
-        if (badCase == 4) badFixture.vertexPointer = UINTPTR_MAX - 15;
+        if (badCase == 0)
+            badFixture.vertexRecordSize = 0;
+        if (badCase == 1)
+            badFixture.vertexRecordSize = 24;
+        if (badCase == 2)
+            badFixture.vertexStride = 0;
+        if (badCase == 3)
+            --badFixture.vertexSize;
+        if (badCase == 4)
+            badFixture.vertexPointer = UINTPTR_MAX - 15;
         MmDisplayListCommand bad[] = {
             { UINT32_C(0x32001002), 16 },
-            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) }, { UINT32_C(0xDF000000), 0 },
+            { UINT32_C(0xFEDCBA98), UINT32_C(0x76543210) },
+            { UINT32_C(0xDF000000), 0 },
         };
         REQUIRE(!MmDisplayList_PatchCommands(bad, 3, ResolveResource, &badFixture, &stats));
         REQUIRE(stats.malformed == 1);
     }
-    REQUIRE(MmDisplayList_SelectVertexResource(nativeVertices, sizeof(nativeVertices), nullptr, 0, false,
-                                               &vertexView, sizeof(WideVertex), 22));
+    REQUIRE(MmDisplayList_SelectVertexResource(nativeVertices, sizeof(nativeVertices), nullptr, 0, false, &vertexView,
+                                               sizeof(WideVertex), 22));
     REQUIRE(vertexView.recordSize == 22 && vertexView.stride == sizeof(WideVertex));
-    REQUIRE(MmDisplayList_SelectVertexResource(nullptr, 0, nativeVertices, sizeof(nativeVertices), true,
-                                               &vertexView, sizeof(WideVertex), 22));
+    REQUIRE(MmDisplayList_SelectVertexResource(nullptr, 0, nativeVertices, sizeof(nativeVertices), true, &vertexView,
+                                               sizeof(WideVertex), 22));
     REQUIRE(vertexView.recordSize == 16 && vertexView.stride == sizeof(WideVertex));
     return 0;
 }
