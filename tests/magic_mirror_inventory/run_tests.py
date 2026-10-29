@@ -82,6 +82,7 @@ static u8 sSlateSelectorActive = 0;
 static u8 sWandSelectorActive = 0;
 u32 gBitFlags[32]{};
 extern "C" uint8_t Picto_IsOwned() { return 0; }
+extern "C" uint8_t Picto_IsOnLensActive() { return 0; }
 extern "C" uint8_t PowerKeg_IsOwned() { return 0; }
 Vec3f gSfxDefaultPos{};
 f32 gSfxDefaultFreqAndVolScale = 1;

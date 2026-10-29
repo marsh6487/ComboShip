@@ -63,7 +63,7 @@ void BgMmIceblock_Init(Actor* thisx, PlayState* play) {
     f32 width;
     f32 height;
 
-    this->dyna.bgId = BG_ACTOR_MAX;
+    this->dyna.bgId = BGACTOR_INVALID;
     this->resources = MmIceArrows_AcquireBlockResources(&collision, &this->model);
     if ((this->resources == NULL) || (collision == NULL) || (this->model == NULL)) {
         Actor_Kill(thisx);
@@ -80,7 +80,7 @@ void BgMmIceblock_Init(Actor* thisx, PlayState* play) {
     Actor_SetScale(thisx, 0.0f);
     DynaPolyActor_Init(&this->dyna, DPM_UNK);
     this->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, thisx, collision);
-    if (this->dyna.bgId == BG_ACTOR_MAX) {
+    if (this->dyna.bgId == BGACTOR_INVALID) {
         Actor_Kill(thisx);
         return;
     }
@@ -100,9 +100,9 @@ void BgMmIceblock_Destroy(Actor* thisx, PlayState* play) {
         thisx->parent->child = NULL;
     }
     thisx->parent = NULL;
-    if (this->dyna.bgId != BG_ACTOR_MAX) {
+    if (this->dyna.bgId != BGACTOR_INVALID) {
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, this->dyna.bgId);
-        this->dyna.bgId = BG_ACTOR_MAX;
+        this->dyna.bgId = BGACTOR_INVALID;
     }
     if (this->colliderInitialized) {
         Collider_DestroyCylinder(play, &this->collider);

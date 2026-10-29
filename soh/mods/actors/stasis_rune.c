@@ -341,10 +341,10 @@ static CollisionHeader* Stasis_FindBg(PlayState* play, Actor* actor, s32* bgIdOu
     if ((play == NULL) || (actor == NULL)) {
         return NULL;
     }
-    for (s32 i = 0; i < BG_ACTOR_MAX; i++) {
+    for (s32 i = 0; i < play->colCtx.dyna.bgActorMax; i++) {
         BgActor* bg = &play->colCtx.dyna.bgActors[i];
 
-        if ((bg->actor == actor) && (bg->colHeader != NULL)) {
+        if ((play->colCtx.dyna.bgActorFlags[i] & (1 | 2)) == 1 && (bg->actor == actor) && (bg->colHeader != NULL)) {
             if (bgIdOut != NULL) {
                 *bgIdOut = i;
             }
@@ -382,7 +382,7 @@ static CollisionHeader* Stasis_FindBg(PlayState* play, Actor* actor, s32* bgIdOu
 // happened. One neutral entry, and every poly points at index 0.
 static CamData sStasisCamData[1];
 
-static Vec3s sStasisVtxPool[STASIS_BOX_VTX];
+static Vec3i sStasisVtxPool[STASIS_BOX_VTX];
 static CollisionPoly sStasisPolyPool[STASIS_BOX_POLY];
 static SurfaceType sStasisSurfPool[1];
 static CollisionHeader sStasisHeader;
@@ -396,7 +396,7 @@ static const f32 sStasisRingZ[STASIS_RING_SIDES] = {
     0.0f, STASIS_OCT, 1.0f, STASIS_OCT, 0.0f, -STASIS_OCT, -1.0f, -STASIS_OCT,
 };
 
-static void Stasis_MakePoly(CollisionPoly* poly, u16 ia, u16 ib, u16 ic) {
+static void Stasis_MakePoly(CollisionPoly* poly, u32 ia, u32 ib, u32 ic) {
     Vec3f a;
     Vec3f b;
     Vec3f c;
@@ -406,9 +406,9 @@ static void Stasis_MakePoly(CollisionPoly* poly, u16 ia, u16 ib, u16 ic) {
     f32 len;
 
     poly->type = 0;
-    poly->flags_vIA = ia & 0x1FFF;
-    poly->flags_vIB = ib & 0x1FFF;
-    poly->vIC = ic & 0x1FFF;
+    poly->flags_vIA = COLPOLY_VTX_INDEX(ia);
+    poly->flags_vIB = COLPOLY_VTX_INDEX(ib);
+    poly->vIC = COLPOLY_VTX_INDEX(ic);
 
     a.x = (f32)sStasisVtxPool[ia].x;
     a.y = (f32)sStasisVtxPool[ia].y;
@@ -437,7 +437,7 @@ static void Stasis_MakePoly(CollisionPoly* poly, u16 ia, u16 ib, u16 ic) {
         poly->normal.x = (s16)(n.x * 32767.0f);
         poly->normal.y = (s16)(n.y * 32767.0f);
         poly->normal.z = (s16)(n.z * 32767.0f);
-        poly->dist = (s16) - ((n.x * a.x) + (n.y * a.y) + (n.z * a.z));
+        poly->dist = (s32) - ((n.x * a.x) + (n.y * a.y) + (n.z * a.z));
     }
 }
 
@@ -509,8 +509,8 @@ static void Stasis_CarrierSync(Actor* target) {
 #define STASIS_FALLBACK_HEIGHT 90
 
 typedef struct {
-    s16 y;
-    s16 radius;
+    s32 y;
+    s32 radius;
 } StasisRing;
 
 // A body can be more than one lathe, because a tree is not one solid of revolution: it is a pole
@@ -598,8 +598,8 @@ static s32 Stasis_GetProfile(Actor* actor, StasisRing* rings, StasisStack* stack
             continue;
         }
         for (j = 0; j < body->ringCount; j++) {
-            rings[j].y = (s16)((f32)body->ring[j].y * sy);
-            rings[j].radius = (s16)((f32)body->ring[j].radius * sx);
+            rings[j].y = (s32)((f32)body->ring[j].y * sy);
+            rings[j].radius = (s32)((f32)body->ring[j].radius * sx);
             // An apex is a real part of the shape, but a zero-area ring makes degenerate polys with
             // no usable normal, so the tip keeps the smallest radius that still builds.
             if (rings[j].radius < 3) {
@@ -629,10 +629,10 @@ static s32 Stasis_GetProfile(Actor* actor, StasisRing* rings, StasisStack* stack
     if (gPlayState != NULL) {
         s32 bg;
 
-        for (bg = 0; bg < BG_ACTOR_MAX; bg++) {
+        for (bg = 0; bg < gPlayState->colCtx.dyna.bgActorMax; bg++) {
             BgActor* bgActor = &gPlayState->colCtx.dyna.bgActors[bg];
 
-            if (!(gPlayState->colCtx.dyna.bgActorFlags[bg] & 1) || (bgActor->actor != actor) ||
+            if ((gPlayState->colCtx.dyna.bgActorFlags[bg] & (1 | 2)) != 1 || (bgActor->actor != actor) ||
                 (bgActor->colHeader == NULL)) {
                 continue;
             }
@@ -641,15 +641,15 @@ static s32 Stasis_GetProfile(Actor* actor, StasisRing* rings, StasisStack* stack
                 f32 rx = (f32)((h->maxBounds.x - h->minBounds.x)) * 0.5f * sx;
                 f32 rz = (f32)((h->maxBounds.z - h->minBounds.z)) * 0.5f * sx;
 
-                rings[0].y = (s16)((f32)h->minBounds.y * sy);
-                rings[1].y = (s16)((f32)h->maxBounds.y * sy);
-                rings[0].radius = (s16)((rx > rz) ? rx : rz);
+                rings[0].y = (s32)((f32)h->minBounds.y * sy);
+                rings[1].y = (s32)((f32)h->maxBounds.y * sy);
+                rings[0].radius = (s32)((rx > rz) ? rx : rz);
                 rings[1].radius = rings[0].radius;
                 if (rings[0].radius < 3) {
                     rings[0].radius = rings[1].radius = 3;
                 }
                 if (rings[1].y <= rings[0].y) {
-                    rings[1].y = (s16)(rings[0].y + (rings[0].radius * 2));
+                    rings[1].y = (s32)(rings[0].y + (rings[0].radius * 2));
                 }
                 stacks[0].first = 0;
                 stacks[0].count = 2;
@@ -666,7 +666,7 @@ static s32 Stasis_GetProfile(Actor* actor, StasisRing* rings, StasisStack* stack
     rings[1].y = (actor->colChkInfo.cylHeight > 0) ? actor->colChkInfo.cylHeight : STASIS_FALLBACK_HEIGHT;
     rings[1].radius = rings[0].radius;
     if (rings[1].y <= rings[0].y) {
-        rings[1].y = (s16)(rings[0].radius * 2);
+        rings[1].y = (s32)(rings[0].radius * 2);
     }
     stacks[0].first = 0;
     stacks[0].count = 2;
@@ -676,26 +676,11 @@ static s32 Stasis_GetProfile(Actor* actor, StasisRing* rings, StasisStack* stack
     return 2;
 }
 
-// Is there room in the scene's dynapoly pool for one more body?
-//
-// That pool is SHARED and small — z_bgcheck.c gives a scene either 256 or 512 polys and the same
-// number of vertices, for every moving platform, door and gate in it at once. DynaPoly_ExpandSRT
-// asserts on overflow, and an assert that is compiled out in a release build is a write past the
-// end of the list. So the profile is only registered if it genuinely fits; a scene that is already
-// full simply gets no climbable box, which is a missing feature rather than a corrupted heap.
-static s32 Stasis_DynaHasRoom(PlayState* play, s32 needVtx, s32 needPoly) {
-    DynaCollisionContext* dyna = &play->colCtx.dyna;
-    s32 usedVtx = 0;
-    s32 usedPoly = 0;
-    s32 i;
-
-    for (i = 0; i < BG_ACTOR_MAX; i++) {
-        if ((dyna->bgActorFlags[i] & 1) && (dyna->bgActors[i].colHeader != NULL)) {
-            usedVtx += dyna->bgActors[i].colHeader->numVertices;
-            usedPoly += dyna->bgActors[i].colHeader->numPolygons;
-        }
-    }
-    return ((usedVtx + needVtx) <= dyna->vtxListMax) && ((usedPoly + needPoly) <= dyna->polyListMax);
+// OoT grows native Dyna tables during registration/setup. Only our process-owned
+// profile buffers are fixed-size, so validate those rather than rejecting a body
+// because the current native allocation has not grown yet.
+static s32 Stasis_ProfileFits(s32 needVtx, s32 needPoly) {
+    return needVtx >= 0 && needVtx <= STASIS_BOX_VTX && needPoly >= 0 && needPoly <= STASIS_BOX_POLY;
 }
 
 // The body's real dimensions, in world units relative to its own position: bottom, top, the widest
@@ -735,9 +720,9 @@ static s32 Stasis_BuildCollision(PlayState* play, Actor* actor, u8 climbable) {
     s32 count;
     s32 nVtx = 0;
     s32 nPoly = 0;
-    s16 minY;
-    s16 maxY;
-    s16 maxR;
+    s32 minY;
+    s32 maxY;
+    s32 maxR;
     // The carrier is registered at scale 1, so the dimensions go in as-is — Stasis_GetProfile has
     // already folded the frozen actor's own scale into them.
     s32 needPoly = 0;
@@ -754,7 +739,7 @@ static s32 Stasis_BuildCollision(PlayState* play, Actor* actor, u8 climbable) {
         needPoly += (stack[s].capBottom ? (STASIS_RING_SIDES - 2) : 0);
         needPoly += (stack[s].capTop ? (STASIS_RING_SIDES - 2) : 0);
     }
-    if (!Stasis_DynaHasRoom(play, STASIS_RING_SIDES * count, needPoly)) {
+    if (!Stasis_ProfileFits(STASIS_RING_SIDES * count, needPoly)) {
         return -1;
     }
 
@@ -762,9 +747,9 @@ static s32 Stasis_BuildCollision(PlayState* play, Actor* actor, u8 climbable) {
     maxR = ring[0].radius;
     for (r = 0; r < count; r++) {
         for (i = 0; i < STASIS_RING_SIDES; i++) {
-            sStasisVtxPool[nVtx].x = (s16)(sStasisRingX[i] * (f32)ring[r].radius);
+            sStasisVtxPool[nVtx].x = (s32)(sStasisRingX[i] * (f32)ring[r].radius);
             sStasisVtxPool[nVtx].y = ring[r].y;
-            sStasisVtxPool[nVtx].z = (s16)(sStasisRingZ[i] * (f32)ring[r].radius);
+            sStasisVtxPool[nVtx].z = (s32)(sStasisRingZ[i] * (f32)ring[r].radius);
             nVtx++;
         }
         if (ring[r].radius > maxR) {
@@ -820,19 +805,19 @@ static s32 Stasis_BuildCollision(PlayState* play, Actor* actor, u8 climbable) {
     // It has to be zeroed for a body that is not meant to be climbed: the baked value is read by
     // the engine's own SurfaceType_GetWallFlags, so leaving 4 here would make a frozen pot climbable
     // through the vanilla path no matter what Stasis_IsClimbableBgId says.
-    // Bits 0..7 of data[0] are the camera index — it must stay 0, which is the one entry above.
-    sStasisSurfPool[0].data[0] = (u32)((climbable ? STASIS_WALL_TYPE_CLIMBABLE : 0) << 21);
-    sStasisSurfPool[0].data[1] = 0;
+    // Camera index stays zero, selecting the neutral owned entry above.
+    memset(&sStasisSurfPool[0], 0, sizeof(sStasisSurfPool[0]));
+    sStasisSurfPool[0].wallType = climbable ? STASIS_WALL_TYPE_CLIMBABLE : 0;
 
-    sStasisHeader.minBounds.x = (s16)-maxR;
+    sStasisHeader.minBounds.x = -maxR;
     sStasisHeader.minBounds.y = minY;
-    sStasisHeader.minBounds.z = (s16)-maxR;
+    sStasisHeader.minBounds.z = -maxR;
     sStasisHeader.maxBounds.x = maxR;
     sStasisHeader.maxBounds.y = maxY;
     sStasisHeader.maxBounds.z = maxR;
-    sStasisHeader.numVertices = (u16)nVtx;
+    sStasisHeader.numVertices = (u32)nVtx;
     sStasisHeader.vtxList = sStasisVtxPool;
-    sStasisHeader.numPolygons = (u16)nPoly;
+    sStasisHeader.numPolygons = (u32)nPoly;
     sStasisHeader.polyList = sStasisPolyPool;
     sStasisHeader.surfaceTypeList = sStasisSurfPool;
     sStasisCamData[0].cameraSType = 0;
@@ -850,7 +835,8 @@ static s32 Stasis_BuildCollision(PlayState* play, Actor* actor, u8 climbable) {
     sStasisCarrier.actor.scale.x = sStasisCarrier.actor.scale.y = sStasisCarrier.actor.scale.z = 1.0f;
     Stasis_CarrierSync(actor);
 
-    return DynaPoly_SetBgActor(play, &play->colCtx.dyna, &sStasisCarrier.actor, &sStasisHeader);
+    s32 bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, &sStasisCarrier.actor, &sStasisHeader);
+    return (bgId >= 0 && bgId != BGACTOR_INVALID && bgId < play->colCtx.dyna.bgActorMax) ? bgId : -1;
 }
 
 static u8 Stasis_IsFreezableEnemy(Actor* actor) {
@@ -1079,7 +1065,11 @@ static void Stasis_TintDraw(Actor* actor, PlayState* play) {
 // Unregister the collision we built, if we built any. Only ever deletes what WE registered:
 // deleting an actor's own bgId would leave a pushblock without collision for the rest of the scene.
 static void Stasis_DropCollision(void) {
-    if (sStasis.bgIsOurs && (sStasis.bgId >= 0) && (gPlayState != NULL)) {
+    if (sStasis.bgIsOurs && (sStasis.bgId >= 0) && (gPlayState != NULL) &&
+        sStasis.bgId < gPlayState->colCtx.dyna.bgActorMax &&
+        (gPlayState->colCtx.dyna.bgActorFlags[sStasis.bgId] & (1 | 2)) == 1 &&
+        gPlayState->colCtx.dyna.bgActors[sStasis.bgId].actor == &sStasisCarrier.actor &&
+        gPlayState->colCtx.dyna.bgActors[sStasis.bgId].colHeader == &sStasisHeader) {
         DynaPoly_DeleteBgActor(gPlayState, &gPlayState->colCtx.dyna, sStasis.bgId);
     }
     sStasis.bgIsOurs = 0;
@@ -1743,9 +1733,9 @@ static void Stasis_Begin(PlayState* play, Actor* target, u8 kind, s32 bgId) {
         // wider one over it would land sword hits on thin air beside the trunk.
         sStasis.extraCollider = (u8)((hiY - ownTop) > 8.0f);
         if (sStasis.extraCollider) {
-            sStasis.collider.dim.radius = (s16)maxR;
-            sStasis.collider.dim.yShift = (s16)ownTop;
-            sStasis.collider.dim.height = (s16)(hiY - ownTop);
+            sStasis.collider.dim.radius = maxR;
+            sStasis.collider.dim.yShift = ownTop;
+            sStasis.collider.dim.height = hiY - ownTop;
         }
         if (sStasis.ownColliderCount > 0) {
             sStasis.collider.base.colType = sStasis.ownCollider[0]->base.colType;
@@ -2076,7 +2066,7 @@ void Stasis_Update(PlayState* play, Player* player) {
             // Every dyna query gates on bit 0 of bgActorFlags (z_bgcheck.c), and DynaPoly_Setup has
             // already run for this frame, so clearing it and putting it straight back is invisible
             // to everything else.
-            s32 hide = sStasis.bgIsOurs && (sStasis.bgId >= 0) && (sStasis.bgId < BG_ACTOR_MAX);
+            s32 hide = sStasis.bgIsOurs && (sStasis.bgId >= 0) && (sStasis.bgId < play->colCtx.dyna.bgActorMax);
             f32 step;
             s32 substeps;
             s32 i;

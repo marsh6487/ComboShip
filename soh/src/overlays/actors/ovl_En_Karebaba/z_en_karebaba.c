@@ -1,3 +1,4 @@
+#include "soh/Enhancements/Graphics/ToonLighting.h"
 /**
  * File: z_en_karebaba.c
  * Overlay: ovl_En_Karebaba
@@ -442,6 +443,10 @@ void EnKarebaba_Update(Actor* thisx, PlayState* play) {
 }
 
 void EnKarebaba_DrawBaseShadow(EnKarebaba* this, PlayState* play) {
+    if (ToonLighting_SuppressVanillaShadows()) {
+        return;
+    }
+
     MtxF mf;
 
     OPEN_DISPS(play->state.gfxCtx);

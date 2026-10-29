@@ -46,6 +46,8 @@ set(ADDITIONAL_LIB_INCLUDES "")
 # ========= Configuration Options =========
 option(INCLUDE_MPQ_SUPPORT "Enable StormLib and MPQ archive support" OFF)
 option(GBI_UCODE "Specify the GBI ucode version" F3DEX_GBI_2)
+option(GBI_FLOAT_MTX "Use float Mtx in the public graphics ABI" OFF)
+option(GBI_S32_VTX "Use s32 vertex positions in the public graphics ABI" OFF)
 
 # =========== Dependencies =============
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")

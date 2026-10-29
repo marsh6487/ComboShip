@@ -17,6 +17,7 @@ SaveContext gSaveContext;
 static int spawns, animationStarts;
 static AnimationHeader* playedAnimation;
 static bool cutscene;
+/* NATIVE TRANSITION INDEX STATE */
 static constexpr bool oot =
 #ifdef EXIT_DOOR_OOT
     true;
@@ -70,6 +71,9 @@ Actor* Spawn(s16 id, f32 x, f32 y, f32 z, s16 yaw, s16 params) {
     assert(id == ACTOR_EN_DOOR); ++spawns; door = {};
     auto& actor = DoorActor();
     actor.id = id; actor.category = ACTORCAT_DOOR; actor.params = params; actor.room = 0;
+#ifdef EXIT_DOOR_OOT
+    /* NATIVE TRANSITION INDEX BINDING */
+#endif
     actor.world.pos = actor.home.pos = { x, y, z };
     actor.home.rot.y = actor.shape.rot.y = yaw;
     actor.update = actor.draw = ActorCallback;
@@ -126,6 +130,9 @@ int main() {
     for (int reload = 0; reload < 3; ++reload) {
         Actor_SpawnTransitionActors(&play, &play.actorCtx);
         assert(spawns == reload + 1 && entry.id == -ACTOR_EN_DOOR);
+#ifdef EXIT_DOOR_OOT
+        assert(DoorActor().transitionIndex == 0 && sSpawnTransitionIndex == -1);
+#endif
         assert(BlackMarketExitDoor::Live<oot>(&play) == &DoorActor());
         Actor_SpawnTransitionActors(&play, &play.actorCtx);
         assert(spawns == reload + 1 && "native negative marker prevents duplicate spawning");
@@ -187,5 +194,27 @@ int main() {
 #endif
         assert(!BlackMarketExitDoor::Live<oot>(&play));
     }
+#ifdef EXIT_DOOR_OOT
+    // Beyond the legacy six-bit params field, native spawn and door teardown
+    // must agree on the full transition-list index stored before actor Init.
+    TransitionActorEntry expanded[66]{};
+    for (auto& candidate:expanded) candidate.id=-ACTOR_EN_DOOR;
+    expanded[65]=entry;
+    play.transiActorCtx.list=expanded;
+    play.transiActorCtx.numActors=66;
+    const int before=spawns;
+    Actor_SpawnTransitionActors(&play,&play.actorCtx);
+    assert(spawns==before+1 && DoorActor().transitionIndex==65);
+    assert((static_cast<u16>(DoorActor().params)>>10)==1);
+    assert(sSpawnTransitionIndex==-1 && TRANSITION_ACTOR_INDEX(&DoorActor())==65);
+    assert(expanded[65].id==-ACTOR_EN_DOOR && expanded[1].id==-ACTOR_EN_DOOR);
+    Actor_SpawnTransitionActors(&play,&play.actorCtx);
+    assert(spawns==before+1);
+    EnDoor_Destroy(&DoorActor(),&play);
+    assert(expanded[65].id==ACTOR_EN_DOOR && expanded[1].id==-ACTOR_EN_DOOR);
+    Actor_SpawnTransitionActors(&play,&play.actorCtx);
+    assert(spawns==before+2 && DoorActor().transitionIndex==65 && sSpawnTransitionIndex==-1);
+    EnDoor_Destroy(&DoorActor(),&play);
+#endif
     std::puts("PASS native door actors: actual scene spawn/proximity, all host forms/ages and both sides, animation dispatch, concrete door limb list, duplicate prevention and three teardown/reload cycles");
 }

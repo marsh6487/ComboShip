@@ -1,0 +1,14 @@
+soh/src/code/z_actor.c
+soh/src/code/z_play.c
+soh/src/code/z_lights.c
+soh/src/code/z_kankyo.c
+soh/src/overlays/actors/ovl_En_Elf/z_en_elf.c
+soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c
+soh/soh/Enhancements/game-interactor/GameInteractor_HookTable.h
+soh/soh/Enhancements/game-interactor/GameInteractor_Hooks.h
+soh/soh/Enhancements/game-interactor/GameInteractor_Hooks.cpp
+soh/src/overlays/actors/ovl_Bg_Jya_Cobra/z_bg_jya_cobra.c
+soh/src/overlays/actors/ovl_En_Dekubaba/z_en_dekubaba.c
+soh/src/overlays/actors/ovl_En_Heishi1/z_en_heishi1.c
+soh/src/overlays/actors/ovl_En_Kanban/z_en_kanban.c
+soh/src/overlays/actors/ovl_En_Karebaba/z_en_karebaba.c

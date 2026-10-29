@@ -4,6 +4,7 @@
 #include "overlays/actors/ovl_En_Horse_Link_Child/z_en_horse_link_child.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/unbound/SceneDB.h"
 #include "objects/object_horse_link_child/rideable_young_epona.h"
 #if __has_include("young_epona.h")
 #include "young_epona.h"
@@ -129,7 +130,7 @@ static void Reset(void) {
     gSaveContext.inventory.questItems = 1 << QUEST_SONG_EPONA;
     gSaveContext.inventory.items[SLOT_OCARINA] = ITEM_OCARINA_FAIRY;
     gSaveContext.horseData.scene = SCENE_HYRULE_FIELD;
-    gSaveContext.horseData.pos = (Vec3s){ 123, 456, 789 };
+    gSaveContext.horseData.pos = (Vec3f){ 123, 456, 789 };
     play.sceneNum = SCENE_HYRULE_FIELD;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
 }

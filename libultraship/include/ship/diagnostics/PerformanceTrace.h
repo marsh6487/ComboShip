@@ -42,5 +42,6 @@ class Scope {
     uintptr_t mManager, mOwner;
     uint64_t mStart = 0, mMinimum;
     const char* mDetail = "";
+    bool mNameTruncated = false;
 };
 }

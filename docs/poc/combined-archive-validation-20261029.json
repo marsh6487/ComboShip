@@ -1,0 +1,198 @@
+{
+  "headless_smokes": [
+    {
+      "args": [
+        "--seed",
+        "ci-linux-smoke",
+        "--count",
+        "1"
+      ],
+      "attempted": 1,
+      "completable": 1,
+      "cross_game_placements": 198,
+      "exit": 0,
+      "seed": "ci-linux-smoke"
+    },
+    {
+      "args": [
+        "--seed",
+        "ci-door-interiors",
+        "--count",
+        "1",
+        "--cross-dungeon-entrances=0",
+        "--cross-boss-entrances=0",
+        "--cross-interior-entrances=0",
+        "--cross-grotto-entrances=0",
+        "--cross-shop-entrances=1",
+        "--cross-door-interior-entrances=1"
+      ],
+      "attempted": 1,
+      "completable": 1,
+      "cross_game_placements": 200,
+      "exit": 0,
+      "seed": "ci-door-interiors"
+    }
+  ],
+  "ports": {
+    "mm": {
+      "bytes": 138461531,
+      "compression_counts": {
+        "0": 1683,
+        "8": 5441
+      },
+      "copies_match": [
+        "build-cmake/mm/2ship.o2r",
+        "2ship.o2r"
+      ],
+      "entries": 7124,
+      "entry_flag_counts": {
+        "0": 1683,
+        "2": 5441
+      },
+      "normalization": {
+        "archive": "mm/2ship.o2r",
+        "archive_after": "06c2d2afbe0599edfdf548b5bdbae5dedacb98461c8ba1f7c53a85b1cc093b94",
+        "archive_before": "5428bc807ea78ca63ad9b8d51d136f4ee77bcc8d0c96518d632634eaff7d3a61",
+        "changed": true,
+        "entries": 7124,
+        "payload_manifest_after": "e45e753ac19d2718748f02025bffadc1c99f0d76c74429184acfecaeb53f6053",
+        "payload_manifest_before": "e45e753ac19d2718748f02025bffadc1c99f0d76c74429184acfecaeb53f6053"
+      },
+      "path": "mm/2ship.o2r",
+      "sha256": "06c2d2afbe0599edfdf548b5bdbae5dedacb98461c8ba1f7c53a85b1cc093b94",
+      "verified_resources": {
+        "shaders/directx/default.shader.hlsl": {
+          "bytes": 13159,
+          "matches_engine_template": true,
+          "sha256": "0aef8c762885a74d77e2e68ae18e4563ef2a6df2d8da1a8b329ac9445ae959c6"
+        },
+        "shaders/flatavg.glsl": {
+          "bytes": 9710,
+          "protected_git_blob": "0ee493bc1a913c64ffdd85a897f4383fa5abcee1",
+          "sha256": "f170f33b853f81205cc3d3ec2e5f34faef0c0bfcc987766b51e683f089db99a8"
+        },
+        "shaders/flatavg.hlsl": {
+          "bytes": 12054,
+          "protected_git_blob": "502f0fef5d59e5faa58051a8e34ad683c6f9eee3",
+          "sha256": "7840c82011d36648c902ba2cfeca80920c79faa72f104a1a39f22f18c1fb5fac"
+        },
+        "shaders/flatavg.metal": {
+          "bytes": 10138,
+          "protected_git_blob": "baa1dcf16bdd76f144530c3a1b183addbaff644f",
+          "sha256": "8611b33c6113215ce90c71f6425826d361668b88199b135513cff20bcf074209"
+        },
+        "shaders/metal/default.shader.metal": {
+          "bytes": 11365,
+          "matches_engine_template": true,
+          "sha256": "7e806309fa74f475b3be58e49437f7e30b60119b503bb3a0cef71915fbcde481"
+        },
+        "shaders/opengl/default.shader.glsl": {
+          "bytes": 10911,
+          "matches_engine_template": true,
+          "sha256": "ae5704f16cd4360cd4ba869a3c76be165bb902df9beefe2afa0440d3c9fa4c7e"
+        }
+      }
+    },
+    "soh": {
+      "bytes": 226689188,
+      "compression_counts": {
+        "8": 11598
+      },
+      "copies_match": [
+        "build-cmake/soh/soh.o2r"
+      ],
+      "entries": 11598,
+      "entry_flag_counts": {
+        "0": 11598
+      },
+      "normalization": {
+        "archive": "soh/soh.o2r",
+        "archive_after": "165746aca16c1bc4670581bb41af7fc8c03ce39948b3717b1757d079cc0e134b",
+        "archive_before": "c296e8e7e02e6135d9162e36f15c794cf7fec21d219f83d540274b7a20858af8",
+        "changed": true,
+        "entries": 11598,
+        "payload_manifest_after": "9329edbabab9398ed8e2fc7a1391cccc421ff1bffbe42a8b581d91bffa5fef16",
+        "payload_manifest_before": "9329edbabab9398ed8e2fc7a1391cccc421ff1bffbe42a8b581d91bffa5fef16"
+      },
+      "path": "soh/soh.o2r",
+      "sha256": "165746aca16c1bc4670581bb41af7fc8c03ce39948b3717b1757d079cc0e134b",
+      "verified_resources": {
+        "shaders/directx/default.shader.hlsl": {
+          "bytes": 13159,
+          "matches_engine_template": true,
+          "sha256": "0aef8c762885a74d77e2e68ae18e4563ef2a6df2d8da1a8b329ac9445ae959c6"
+        },
+        "shaders/metal/default.shader.metal": {
+          "bytes": 11365,
+          "matches_engine_template": true,
+          "sha256": "7e806309fa74f475b3be58e49437f7e30b60119b503bb3a0cef71915fbcde481"
+        },
+        "shaders/opengl/default.shader.glsl": {
+          "bytes": 10911,
+          "matches_engine_template": true,
+          "sha256": "ae5704f16cd4360cd4ba869a3c76be165bb902df9beefe2afa0440d3c9fa4c7e"
+        },
+        "textures/wind-waker/clouds/cloud_mae": {
+          "bytes": 65616,
+          "height": 64,
+          "matches_png_rgba": true,
+          "rgba_pixels_sha256": "98c498c131ea5af3234998b30ef8238102c83dc024057d0f70274ba5abe64c7b",
+          "sha256": "30914d3e39fd30e9955a5ad68e8a41730701df61dabd65747412249fbdb786d2",
+          "width": 256
+        },
+        "textures/wind-waker/clouds/cloud_naka": {
+          "bytes": 65616,
+          "height": 64,
+          "matches_png_rgba": true,
+          "rgba_pixels_sha256": "22b4c980f7200532455932346b2ff699007bdead95dc0163f462ca8594d8c2f4",
+          "sha256": "ea25fddec3cdec323126776fc53da7eb8876095407de621139e725dd78069870",
+          "width": 256
+        },
+        "textures/wind-waker/clouds/cloudtx_01": {
+          "bytes": 16464,
+          "height": 64,
+          "matches_png_rgba": true,
+          "rgba_pixels_sha256": "36fce30c17067a9c1a74f221742d95aab35cfb04f724d5e6f457c5d08d0333a2",
+          "sha256": "4e995c53a315e1a202d79cc915e199fd27ad576f8d16aae9fa88190f0e5089d9",
+          "width": 64
+        },
+        "textures/wind-waker/clouds/cloudtx_02": {
+          "bytes": 16464,
+          "height": 64,
+          "matches_png_rgba": true,
+          "rgba_pixels_sha256": "02631bdbd25bfbb4ba214bc159b0f2d7a495828ee907002a7e7dc0d616ada59d",
+          "sha256": "ba89aa7fcb7e3fea264c5d2612005279e74f0118aa91352dfc077b52c288a547",
+          "width": 64
+        },
+        "textures/wind-waker/clouds/cloudtx_03": {
+          "bytes": 16464,
+          "height": 64,
+          "matches_png_rgba": true,
+          "rgba_pixels_sha256": "90a082fc1f37e35e422af2f1646643af96a8ad86c9d233727c19819fcef6964d",
+          "sha256": "a074469ae7a44d37d633149bcb7028f74c7c36f9fa3b5fe34a676a3b4a4ae529",
+          "width": 64
+        }
+      }
+    }
+  },
+  "runtime_acceptance": "Configured Kakariko scenes, visual output, pickups/combat/grottos/entrances, night/Keaton stability and OoT/MM inventory/transition acceptance remain pending.",
+  "runtime_refresh": "The light-fixed 40dbb7c build, CTest and both smoke seeds passed, with unchanged canonical port payloads. A final matching binary/package refresh is required after the separately native-tested legacy-message fallback correction; do not treat the prior bundle as runtime accepted.",
+  "runtime_source": {
+    "compiled_label": "55feb92",
+    "local_equivalent": "55feb92847c71b4d3756553ed9ed6296f65defa1",
+    "remote_commit": "9b84996b27628a738686035a03ad2ad724c31c05",
+    "tree": "e1d9cf90b26297b6e8c5397ecabfa9e0ed0d3442"
+  },
+  "schema": 1,
+  "verification": {
+    "all_archive_copies": "pass",
+    "all_zip_entry_crc_checks": "pass",
+    "canonical_metadata": "pass",
+    "five_cloud_resources_match_source_png_pixels": "pass",
+    "mm_target_exit": 0,
+    "payload_hashes_unchanged_by_normalization": "pass",
+    "six_default_shader_payloads_match_engine": "pass",
+    "soh_target_exit": "unknown after exec transport interruption; final Done/normalization/copy log and complete archive verified",
+    "three_protected_custom_prism_shaders_unchanged": "pass"
+  }
+}

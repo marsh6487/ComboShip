@@ -35,9 +35,8 @@ def run(out, sanitize):
         water += '#include "soh/Enhancements/Graphics/ZorasDomain.h"\n'
     water += 'extern "C" int zoraWaterLook;\n'
     water += '#define SEASON_WATER_GONE (-32000)\n#define SEASON_MAX_WATERBOXES 32\n'
-    water += ('static CollisionHeader* sSuppressedHeader;\n'
-              'static s16 sWaterSurfaceBackup[SEASON_MAX_WATERBOXES];\n'
-              'static s32 sSuppressedCount;\n')
+    for name in ("sSuppressedHeader", "sWaterSurfaceBackup", "sSuppressedCount"):
+        water += re.search(r"^static [^;\n]*\b" + name + r"\b[^;\n]*;", source, re.M)[0] + '\n'
     water += re.search(r"typedef enum \{\s*SEASON_LOOK_VANILLA,.*?} SeasonWaterLook;", source, re.S)[0]
     water += '\nstatic void SeasonScene_SetWaterLook(u8 look) { zoraWaterLook = look; }\n'
     water += extract(scene, ["SeasonScene_Active", "SeasonScene_RestoreWaterBoxes",

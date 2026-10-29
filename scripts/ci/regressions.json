@@ -2,6 +2,44 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "name": "Native wide custom collision, movement and enemy placement",
+    "run": "python3 -B tests/custom_unbound_collision/run_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native Unbound formats, legacy routing and transactional state ownership",
+    "run": "python3 -B tests/unbound/run_native_tests.py -v\npython3 -B tests/unbound/run_savestate_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM legacy/wide graphics and immutable cross-game vertex resources",
+    "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native cel policy, backend state and shader lifetime preservation",
+    "run": "python3 -B tests/cel_sky/run_tests.py --sanitize\npython3 -B tests/cel_sky/run_native_tests.py --sanitize\npython3 -B tests/cel_interpreter/run_tests.py --sanitize\npython3 -B tests/cel_render_backends/run_tests.py\npython3 -B tests/shader_lifetime/run_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Standalone native compiler ABI selection and candidate archive reproducibility",
+    "run": "python3 -B tests/ci_native_abi/run_tests.py\npython3 -B tests/packaging/test_normalize_candidate_o2r.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Native growable OoT actor collider queues, contact ordering, lifetimes and SAC",
+    "run": "python3 -B tests/actor_queue_growth/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/actor_queue_growth/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "name": "Native Skulltula pickup gates and collision admission tracing",
     "run": "python3 -B tests/keaton_melee/skull_pickup_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/skull_pickup_test.py --sanitize"
   },
@@ -1374,7 +1412,7 @@
     "suite": "render",
     "origin": "gate",
     "name": "Shared renderer texture-address regressions",
-    "run": "git apply --reverse --check --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch || git apply --check --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch\npython3 scripts/diagnostics/test_custom_scroll_runtime.py\nGFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py\npython3 scripts/diagnostics/run_gfx_texture_address_tests.py --low-module\npython3 scripts/diagnostics/run_texture_failure_command_tests.py --sanitize\nGFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py\npython3 scripts/diagnostics/run_alt_segment_binding_tests.py\npython3 -B scripts/diagnostics/run_carpet_segment_restore_tests.py"
+    "run": "git apply --reverse --check --unidiff-zero --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch || git apply --check --unidiff-zero --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch\npython3 scripts/diagnostics/test_custom_scroll_probe.py\npython3 scripts/diagnostics/test_custom_scroll_runtime.py\nGFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py\npython3 scripts/diagnostics/run_gfx_texture_address_tests.py --low-module\npython3 scripts/diagnostics/run_texture_failure_command_tests.py --sanitize\nGFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py\npython3 scripts/diagnostics/run_alt_segment_binding_tests.py\npython3 -B scripts/diagnostics/run_carpet_segment_restore_tests.py"
   },
   {
     "suite": "render",

@@ -38,7 +38,7 @@ const Lake::SurfaceGeometry& SurfaceGeometry() {
     return geometry;
 }
 struct CaveCollision {
-    std::vector<Vec3s> vertices;
+    std::vector<Vec3i> vertices;
     std::vector<CollisionPoly> polygons;
     SurfaceType surface{};
     // Surface0 selects camera index0 even for dynamic floors. Native camera
@@ -50,11 +50,11 @@ struct CaveCollision {
         for (const auto& q : geometry.solid) {
             if (!q.collides)
                 continue;
-            const u16 first = vertices.size();
+            const u32 first = vertices.size();
             for (const auto p : { q.a, q.b, q.c, q.d })
-                vertices.push_back({ static_cast<s16>(std::lround(p.x)), static_cast<s16>(std::lround(p.y)),
-                                     static_cast<s16>(std::lround(p.z)) });
-            auto triangle = [&](u16 a, u16 b, u16 c) {
+                vertices.push_back({ static_cast<s32>(std::lround(p.x)), static_cast<s32>(std::lround(p.y)),
+                                     static_cast<s32>(std::lround(p.z)) });
+            auto triangle = [&](u32 a, u32 b, u32 c) {
                 const auto va = vertices[a], vb = vertices[b], vc = vertices[c];
                 const float ux = vb.x - va.x, uy = vb.y - va.y, uz = vb.z - va.z;
                 const float vx = vc.x - va.x, vy = vc.y - va.y, vz = vc.z - va.z;
@@ -71,7 +71,7 @@ struct CaveCollision {
                 polygon.vtxData[2] = c;
                 polygon.normal = { static_cast<s16>(std::lround(nx * 32767)), static_cast<s16>(std::lround(ny * 32767)),
                                    static_cast<s16>(std::lround(nz * 32767)) };
-                polygon.dist = static_cast<s16>(std::lround(-(nx * va.x + ny * va.y + nz * va.z)));
+                polygon.dist = static_cast<s32>(std::lround(-(nx * va.x + ny * va.y + nz * va.z)));
                 polygons.push_back(polygon);
             };
             triangle(first, first + 1, first + 2);
@@ -103,7 +103,7 @@ void CaveInit(Actor* actor, PlayState* play) {
     Actor_SetScale(actor, 1);
     DynaPolyActor_Init(&cave->dyna, 0);
     cave->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, actor, &Collision().header);
-    if (cave->dyna.bgId < 0 || cave->dyna.bgId >= BG_ACTOR_MAX) {
+    if (cave->dyna.bgId < 0 || cave->dyna.bgId == BGACTOR_INVALID || cave->dyna.bgId >= play->colCtx.dyna.bgActorMax) {
         cave->dyna.bgId = -1;
         Actor_Kill(actor);
         return;
@@ -114,7 +114,7 @@ void CaveInit(Actor* actor, PlayState* play) {
 }
 void CaveDestroy(Actor* actor, PlayState* play) {
     auto* cave = reinterpret_cast<CaveActor*>(actor);
-    if (cave->dyna.bgId >= 0 && cave->dyna.bgId < BG_ACTOR_MAX) {
+    if (cave->dyna.bgId >= 0 && cave->dyna.bgId < play->colCtx.dyna.bgActorMax) {
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, cave->dyna.bgId);
         cave->dyna.bgId = -1;
     }
@@ -319,7 +319,7 @@ extern "C" int ComboLakeHyliaBridge_Get(PlayState* play, Vec3f* mouth, s16* yaw)
         Actor_Spawn(&play->actorCtx, play, sActorId, 0, 0, 0, 0, 0, 0, 0);
     }
     if (!sCave || sCavePlay != play || !sCave->dyna.actor.update || sCave->dyna.bgId < 0 ||
-        sCave->dyna.bgId >= BG_ACTOR_MAX)
+        sCave->dyna.bgId == BGACTOR_INVALID || sCave->dyna.bgId >= play->colCtx.dyna.bgActorMax)
         return 0;
     if (mouth)
         *mouth = { Lake::kMouth.x, Lake::kMouth.y, Lake::kMouth.z };

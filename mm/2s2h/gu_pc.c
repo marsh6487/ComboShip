@@ -3,6 +3,13 @@
 
 void guMtxF2L(float mf[4][4], Mtx* m) {
     unsigned int r, c;
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+    for (r = 0; r < 4; r++) {
+        for (c = 0; c < 4; c++) {
+            m->mf[r][c] = mf[r][c];
+        }
+    }
+#else
     s32 tmp1;
     s32 tmp2;
     s32* m1 = &m->m[0][0];
@@ -15,10 +22,18 @@ void guMtxF2L(float mf[4][4], Mtx* m) {
             *m2++ = ((tmp1 << 0x10) & 0xffff0000) | (tmp2 & 0xffff);
         }
     }
+#endif
 }
 
 void guMtxL2F(float mf[4][4], Mtx* m) {
     unsigned int r, c;
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+    for (r = 0; r < 4; r++) {
+        for (c = 0; c < 4; c++) {
+            mf[r][c] = m->mf[r][c];
+        }
+    }
+#else
     u32 tmp1;
     u32 tmp2;
     u32* m1;
@@ -36,6 +51,7 @@ void guMtxL2F(float mf[4][4], Mtx* m) {
             mf[r][c * 2 + 1] = stmp2 / 65536.0f;
         }
     }
+#endif
 }
 
 void guMtxIdentF(f32 mf[4][4]) {
@@ -52,7 +68,11 @@ void guMtxIdentF(f32 mf[4][4]) {
 }
 
 void guMtxIdent(Mtx* m) {
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+    guMtxIdentF(m->mf);
+#else
     guMtxIdentF(m->m);
+#endif
 }
 
 void guTranslateF(float m[4][4], float x, float y, float z) {

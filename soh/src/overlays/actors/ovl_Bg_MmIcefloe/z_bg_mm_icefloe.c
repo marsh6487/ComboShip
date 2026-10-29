@@ -69,7 +69,7 @@ void BgMmIcefloe_Init(Actor* thisx, PlayState* play) {
     s32 count = 0;
     f32 extent;
 
-    this->dyna.bgId = BG_ACTOR_MAX;
+    this->dyna.bgId = BGACTOR_INVALID;
     this->resources = MmIceArrows_AcquireResources(&collision, &this->model);
     if ((this->resources == NULL) || (collision == NULL) || (this->model == NULL)) {
         Actor_Kill(thisx);
@@ -89,7 +89,7 @@ void BgMmIcefloe_Init(Actor* thisx, PlayState* play) {
     thisx->world.pos.y = thisx->home.pos.y + this->surfaceOffset;
     DynaPolyActor_Init(&this->dyna, DPM_UNK);
     this->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, thisx, collision);
-    if (this->dyna.bgId == BG_ACTOR_MAX) {
+    if (this->dyna.bgId == BGACTOR_INVALID) {
         Actor_Kill(thisx);
         return;
     }
@@ -112,9 +112,9 @@ void BgMmIcefloe_Init(Actor* thisx, PlayState* play) {
 
 void BgMmIcefloe_Destroy(Actor* thisx, PlayState* play) {
     BgMmIcefloe* this = (BgMmIcefloe*)thisx;
-    if (this->dyna.bgId != BG_ACTOR_MAX) {
+    if (this->dyna.bgId != BGACTOR_INVALID) {
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, this->dyna.bgId);
-        this->dyna.bgId = BG_ACTOR_MAX;
+        this->dyna.bgId = BGACTOR_INVALID;
     }
     MmIceArrows_ReleaseResources(this->resources);
     this->resources = NULL;

@@ -1,11 +1,12 @@
 // Run the native forest through production call/branch, hash resolution, color
 // and triangle handlers. Archive services and triangle rasterization are seams;
-// the renderer's writes into the executed GBI are deliberately NOT substituted.
+// packet resolution and texture writebacks execute the real renderer bodies.
 #include <limits>
 #include <stack>
 #include <unordered_set>
 #define SPDLOG_TRACE(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)
+#include "autumn_scene_vertex_contract.inc"
 namespace Ship {
 #include "autumn_scene_renderer_signature.inc"
 }
@@ -46,6 +47,7 @@ struct RawTexMetadata {
 };
 struct Stats {
     unsigned triangles = 0, tinted = 0, vertexLoads = 0;
+    size_t vertexResourceLookups = 0;
     std::vector<uintptr_t> vertexPointers;
     std::vector<uint32_t> palettes;
     std::vector<unsigned> tintModes;
@@ -60,6 +62,7 @@ struct Interpreter {
     std::string texture;
     Stats stats;
     void* SegAddr(uintptr_t);
+    F3DVtx* SegAddrVtx(uintptr_t);
     void GfxDpSetGrayscaleColor(uint8_t, uint8_t, uint8_t, uint8_t);
     void GfxSpVertex(unsigned, unsigned, const F3DVtx* vertices) {
         ++stats.vertexLoads;
@@ -86,9 +89,26 @@ struct Interpreter {
         }
     }
 };
+struct VertexSource final : Ship::IResource, Fast::IVertexSource {
+    F3DVtx* data;
+    size_t count;
+    VertexSource(F3DVtx* vertices, size_t size) : data(vertices), count(size) {
+    }
+    size_t GetPointerSize() override {
+        return count * sizeof(F3DVtx);
+    }
+    uint32_t GetVertexRecordSize() const override {
+        return OTR_EXPORTED_VTX_SIZE;
+    }
+};
 struct Manager {
-    alignas(16) F3DVtx vertices[128]{};
-    alignas(16) F3DVtx refreshedVertices[128]{};
+    // Material-only rasterization still provides bounded backing for room-wide resources.
+    alignas(16) F3DVtx vertices[65536]{};
+    alignas(16) F3DVtx refreshedVertices[65536]{};
+    std::shared_ptr<VertexSource> source = std::make_shared<VertexSource>(vertices, std::size(vertices));
+    std::shared_ptr<VertexSource> refreshedSource =
+        std::make_shared<VertexSource>(refreshedVertices, std::size(refreshedVertices));
+    size_t vertexResourceLookups = 0;
     uint8_t pixels[2][4]{};
     bool alt = false;
     bool refreshed = false;
@@ -112,6 +132,20 @@ struct Manager {
     void* GetResourceRawPointer(uint64_t) {
         return refreshed ? refreshedVertices : vertices;
     }
+    std::shared_ptr<Ship::IResource> LoadResource(uint64_t) {
+        ++vertexResourceLookups;
+        return refreshed ? refreshedSource : source;
+    }
+    void* GetResourceRawPointer(const std::shared_ptr<Ship::IResource>& resource) {
+        const auto* vertexSource = dynamic_cast<VertexSource*>(resource.get());
+        return vertexSource ? vertexSource->data : nullptr;
+    }
+    uintptr_t SerializedVertexAddress(uintptr_t offset) {
+        assert(offset % OTR_EXPORTED_VTX_SIZE == 0);
+        const size_t index = offset / OTR_EXPORTED_VTX_SIZE;
+        assert(index < std::size(vertices));
+        return reinterpret_cast<uintptr_t>(static_cast<F3DVtx*>(GetResourceRawPointer(0)) + index);
+    }
     std::shared_ptr<Ship::IResource> LoadResourceProcess(const char* path) {
         const auto rm = Ship::Context::GetRawInstance()->rm;
         for (const auto& name : { (rm->alt ? "alt/" : "") + std::string(path), std::string(path) }) {
@@ -133,10 +167,12 @@ static void ReportTextureLoadFailure(const char*, const char*, const char*, uint
 #define C0(pos, width) ((cmd->words.w0 >> (pos)) & ((1U << width) - 1))
 #define C1(pos, width) ((cmd->words.w1 >> (pos)) & ((1U << width) - 1))
 #include "autumn_scene_renderer_production.inc"
+#undef MAX_VERTICES
 #undef C0
 #undef C1
 static Stats Draw(std::vector<Gfx>& root) {
     Interpreter gfx;
+    const size_t lookups = manager.vertexResourceLookups;
     g_exec_stack.start(root.data());
     unsigned steps = 0;
     while (!g_exec_stack.cmd_stack.empty()) {
@@ -155,6 +191,9 @@ static Stats Draw(std::vector<Gfx>& root) {
                 break;
             case G_VTX_OTR_HASH:
                 gfx_vtx_hash_handler_custom(&gfx, &cmd);
+                break;
+            case G_VTX:
+                gfx_vtx_handler_f3dex2(&gfx, &cmd);
                 break;
             case G_SETTIMG_OTR_HASH:
                 gfx_set_timg_otr_hash_handler_custom(&gfx, &cmd);
@@ -176,7 +215,16 @@ static Stats Draw(std::vector<Gfx>& root) {
             ++cmd;
     }
     assert(!gfx.rdp.grayscale && !gfx.rdp.grayscale_normalize);
+    gfx.stats.vertexResourceLookups = manager.vertexResourceLookups - lookups;
     return gfx.stats;
+}
+static void UseNativeVertexPointer(std::vector<Gfx>& commands, size_t index, Vtx* vertices) {
+    assert(index + 1 < commands.size() && (commands[index].words.w0 >> 24) == G_VTX_OTR_HASH);
+    const unsigned count = (commands[index].words.w0 >> 12) & 0xFF;
+    const unsigned end = (commands[index].words.w0 >> 1) & 0x7F;
+    assert(count && end >= count);
+    __gSPVertex(&commands[index], reinterpret_cast<uintptr_t>(vertices), count, end - count);
+    commands[index + 1] = gsSPNoOp();
 }
 static void CheckDraw(const Stats& stats, bool tinted, const std::string& phase = {}) {
     const auto wall = stats.materials.at("scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_034098");
@@ -184,12 +232,13 @@ static void CheckDraw(const Stats& stats, bool tinted, const std::string& phase 
     if (stats.tinted != (tinted ? 22u : 0u)) {
         std::fprintf(stderr,
                      "FAIL rendered forest: wall %u/14 and canopy %u/8 Scarlet triangles after "
-                     "untinted renderer pointer writebacks\n",
+                     "untinted rendering\n",
                      wall.second, canopy.second);
     }
-    assert(stats.triangles == 22 && stats.vertexLoads == 3);
-    const auto base = reinterpret_cast<uintptr_t>(manager.GetResourceRawPointer(0));
-    const std::vector<uintptr_t> expectedVertices = { base + 0x250, base, base + 0x150 };
+    assert(stats.triangles == 22 && stats.vertexLoads == 3 && stats.vertexResourceLookups == 3);
+    const std::vector<uintptr_t> expectedVertices = { manager.SerializedVertexAddress(0x250),
+                                                      manager.SerializedVertexAddress(0),
+                                                      manager.SerializedVertexAddress(0x150) };
     if (stats.vertexPointers != expectedVertices)
         std::fprintf(stderr,
                      "FAIL forest draw [%s]: tinted copy retained old vertex addresses after source hash resolution\n",
@@ -298,15 +347,19 @@ static void CheckRenderedForestTransitions() {
             CheckDraw(Draw(forest->Instructions), false);
             unsigned writebacks = 0;
             for (size_t i = 0; i < kActualForestCommands.size(); ++i) {
+                if ((kActualForestCommands[i].words.w0 >> 24) == G_VTX_OTR_HASH) {
+                    assert(SameCommand(forest->Instructions[i], kActualForestCommands[i]));
+                    assert(SameCommand(forest->Instructions[i + 1], kActualForestCommands[i + 1]));
+                }
                 if (!SameCommand(forest->Instructions[i], kActualForestCommands[i])) {
                     const auto opcode = kActualForestCommands[i].words.w0 >> 24;
-                    assert(opcode == G_VTX_OTR_HASH || opcode == G_SETTIMG_OTR_HASH);
+                    assert(opcode == G_SETTIMG_OTR_HASH);
                     assert(forest->Instructions[i].words.w0 == kActualForestCommands[i].words.w0);
                     assert(forest->Instructions[i].words.w1 > 0xFFFFF);
                     ++writebacks;
                 }
             }
-            assert(writebacks == 7); // Three vertex and four texture pointer caches.
+            assert(writebacks == 4); // Vertex packets stay serialized; texture caches still write back.
             const auto resolvedCommands = forest->Instructions;
             season = SEASON_AUTUMN;
             MMAutumnSceneFoliage_Update(&play);
@@ -345,7 +398,8 @@ static void CheckRenderedForestTransitions() {
         }
     }
     std::puts("PASS production renderer forest transitions: 14/14 wallpaper + 8/8 canopy stay Scarlet after Off, "
-              "scene reset and texture-pointer changes; seven real writebacks, both namespaces and Alt");
+              "scene reset and texture-pointer changes; four texture writebacks and immutable vertices, both "
+              "namespaces and Alt");
 
     // The copy can resolve an address before the source has ever drawn Off.
     // Re-resolving that source against a refreshed vertex resource must carry
@@ -383,11 +437,11 @@ static void CheckRenderedForestTransitions() {
             season = SEASON_AUTUMN;
             MMAutumnSceneFoliage_Update(&play);
             CheckDraw(Draw(forest->Instructions), true, caseName + "/cache-observed");
-            // Clearing existing native pointer caches must refresh the copied
-            // addresses too. The material variant inserts commands, so its vertex
-            // slots have different indices from the whole-list forest wrapper.
-            for (const size_t index : { 2u, 28u, 53u })
-                forest->Instructions[index].words.w1 = kActualForestCommands[index].words.w1;
+            // Returning to the original current-RM resource needs no packet edits.
+            for (const size_t index : { 2u, 28u, 53u }) {
+                assert(SameCommand(forest->Instructions[index], kActualForestCommands[index]));
+                assert(SameCommand(forest->Instructions[index + 1], kActualForestCommands[index + 1]));
+            }
             manager.refreshed = false;
             MMAutumnSceneFoliage_Update(&play);
             CheckDraw(Draw(forest->Instructions), true, caseName + "/cache-clear");
@@ -395,7 +449,8 @@ static void CheckRenderedForestTransitions() {
             manager.refreshed = false;
         }
     }
-    std::puts("PASS resumed tint follows new vertex resources and cleared caches; whole-list and material copies, "
+    std::puts("PASS resumed tint follows current vertex resources with immutable archive packets; whole-list and "
+              "material copies, "
               "with and without a rendered Off frame");
 
     // Index zero is temporarily our branch. Restoring a VTX-first source also
@@ -424,16 +479,14 @@ static void CheckRenderedForestTransitions() {
             // resolved vertex pointers remain stable and must remain intact.
             manager.refreshed = refreshed;
             auto stats = Draw(forest->Instructions);
-            assert(stats.tinted == 0 &&
-                   stats.vertexPointers[0] == reinterpret_cast<uintptr_t>(manager.GetResourceRawPointer(0)) + 0x250);
+            assert(stats.tinted == 0 && stats.vertexPointers[0] == manager.SerializedVertexAddress(0x250));
             season = SEASON_AUTUMN;
             MMAutumnSceneFoliage_Update(&play);
             stats = Draw(forest->Instructions);
             if (stats.tinted != 22)
                 std::fprintf(stderr, "FAIL %s VTX-first: restored source offset was treated as a pointer edit\n",
                              drawName);
-            assert(stats.tinted == 22 &&
-                   stats.vertexPointers[0] == reinterpret_cast<uintptr_t>(manager.GetResourceRawPointer(0)) + 0x250);
+            assert(stats.tinted == 22 && stats.vertexPointers[0] == manager.SerializedVertexAddress(0x250));
         }
         ClearCache();
         manager.refreshed = false;
@@ -469,10 +522,12 @@ static void CheckRenderedForestTransitions() {
             CheckDraw(Draw(forest->Instructions), true);
         }
         const size_t index = kind == 0 ? 19 : kind == 1 ? 26 : kind == 2 ? 30 : 28;
-        forest->Instructions[index].words.w1 = kind == 0   ? reinterpret_cast<uintptr_t>(manager.vertices)
-                                               : kind == 3 ? 16
-                                               : kind == 4 ? reinterpret_cast<uintptr_t>(alternateVertices)
-                                                           : 0x80909055;
+        if (kind == 4)
+            UseNativeVertexPointer(forest->Instructions, index, alternateVertices);
+        else
+            forest->Instructions[index].words.w1 = kind == 0   ? reinterpret_cast<uintptr_t>(manager.vertices)
+                                                   : kind == 3 ? 16
+                                                               : 0x80909055;
         const auto changed = forest->Instructions[index];
         MMAutumnSceneFoliage_Update(&play);
         if (!SameCommand(forest->Instructions[0], original[0]))
@@ -480,6 +535,8 @@ static void CheckRenderedForestTransitions() {
                          kind);
         assert(SameCommand(forest->Instructions[0], original[0]));
         assert(SameCommand(forest->Instructions[index], changed) && sActive.empty());
+        if (kind == 4)
+            assert(SameCommand(forest->Instructions[index + 1], gsSPNoOp()));
         for (unsigned repeat = 0; repeat < 12; ++repeat)
             MMAutumnSceneFoliage_Update(&play);
         assert(ReportCount("[AutumnForest] refusing") == 1);

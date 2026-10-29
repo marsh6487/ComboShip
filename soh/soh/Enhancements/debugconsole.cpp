@@ -1,14 +1,16 @@
+#include "soh/unbound/UnboundExporter.h"
+#include "soh/unbound/SceneDB.h"
+#include "debugconsole.h"
+#include <ship/utils/Utils.h>
+#include "savestates.h"
+#include "soh/ActorDB.h"
+
 #include <vector>
 #include <string>
 #include <map>
 #include <deque>
 #include <cctype>
 
-#include <ship/utils/Utils.h>
-
-#include "debugconsole.h"
-#include "savestates.h"
-#include "soh/ActorDB.h"
 #include "soh/OTRGlobals.h"
 #include "soh/cvar_prefixes.h"                 // CVAR_RANDOMIZER_ENHANCEMENT (give_all fast)
 #include "soh/Enhancements/enhancementTypes.h" // SGIA_* (Skip Get Item Animation)
@@ -20,6 +22,7 @@
 #include "soh/Enhancements/randomizer/logic.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/randomizer_check_tracker.h"
+#include "soh/Enhancements/Warping.h"
 
 #define Path _Path
 #define PATH_HACK
@@ -1093,6 +1096,40 @@ static bool GiveAllHandler(std::shared_ptr<Ship::Console> Console, const std::ve
     return 0;
 }
 
+// SOH [Unbound]
+static bool UnboundExportHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& args,
+                                 std::string* output) {
+    std::string out = args.size() >= 2 ? args[1] : "oot-unbound.o2r";
+    if (Unbound_Export(out.c_str()) != 0) {
+        ERROR_MESSAGE("[Unbound] export failed; see the log");
+        return 1;
+    }
+    INFO_MESSAGE("[Unbound] wrote %s", out.c_str());
+    return 0;
+}
+
+// SOH [Unbound] hex parse that rejects trailing garbage; -1 when the whole string is not a hex number
+static int32_t ParseWholeHex(const std::string& text) {
+    try {
+        size_t consumed = 0;
+        int32_t value = std::stoi(text, &consumed, 16);
+        return (consumed == text.size() && value >= 0) ? value : -1;
+    } catch (std::exception const&) { return -1; }
+}
+
+// SOH [Unbound] An entrance argument: a registered entrance name (vanilla ENTR_* or "<scene id>/<entrance id>"),
+// which wins over hex since stoi would otherwise accept the hex-looking prefix of a name such as
+// "ENTR_DEKU_TREE_0", or a hex index into the entrance table (custom entrances included). -1 for neither.
+static int32_t ParseEntrance(const std::string& token) {
+    int32_t entrance = EntranceDB_RetrieveIndex(token.c_str());
+    if (entrance < 0) {
+        entrance = ParseWholeHex(token);
+    }
+    return entrance < EntranceDB_GetEntryCount() ? entrance : -1;
+}
+
+#define ENTRANCE_ARGUMENT_ERROR "[SOH] Entrance must be a registered entrance name or a hex number below %X."
+
 static bool EntranceHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& args,
                             std::string* output) {
     if (args.size() < 2) {
@@ -1100,12 +1137,16 @@ static bool EntranceHandler(std::shared_ptr<Ship::Console> Console, const std::v
         return 1;
     }
 
-    unsigned int entrance;
+    int32_t entrance = ParseEntrance(args[1]);
+    if (entrance < 0) {
+        ERROR_MESSAGE(ENTRANCE_ARGUMENT_ERROR, EntranceDB_GetEntryCount());
+        return 1;
+    }
 
-    try {
-        entrance = std::stoi(args[1], nullptr, 16);
-    } catch ([[maybe_unused]] std::invalid_argument const& ex) {
-        ERROR_MESSAGE("[SOH] Entrance value must be a Hex number.");
+    // SOH [Port] Reachable from outside the game now (see EmbedderBridge.cpp), so refuse
+    // politely instead of dereferencing a null play state on the title screen.
+    if (gPlayState == NULL) {
+        ERROR_MESSAGE("[SOH] Not in game; load a file first.");
         return 1;
     }
 
@@ -1113,6 +1154,113 @@ static bool EntranceHandler(std::shared_ptr<Ship::Console> Console, const std::v
     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
     gPlayState->transitionType = TRANS_TYPE_INSTANT;
     gSaveContext.nextTransitionType = TRANS_TYPE_INSTANT;
+    return 0;
+}
+
+// ---- warp <entrance hex> [adult|child] [time] [room x y z yaw] ---------------------------
+// The console splits on spaces, so the optional parts are told apart by what is left after
+// the entrance: a word is the age, then one token is a time, five are a point, six are both.
+
+// The whole token as an integer in `base`, within [min, max].
+static bool ParseInt(const std::string& token, int base, long min, long max, int32_t* out) {
+    try {
+        size_t used = 0;
+        long value = std::stol(token, &used, base);
+        if (used != token.size() || value < min || value > max) {
+            return false;
+        }
+        *out = (int32_t)value;
+        return true;
+    } catch (std::exception const&) { return false; }
+}
+
+static bool ParseFloat(const std::string& token, float* out) {
+    try {
+        size_t used = 0;
+        *out = std::stof(token, &used);
+        return used == token.size();
+    } catch (std::exception const&) { return false; }
+}
+
+static bool ParseAge(const std::string& word, int32_t* linkAge) {
+    if (word == "adult") {
+        *linkAge = LINK_AGE_ADULT;
+    } else if (word == "child") {
+        *linkAge = LINK_AGE_CHILD;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// `day` and `night` name the two layers; anything else is the u16 dayTime in hex.
+static bool ParseDayTime(const std::string& token, int32_t* dayTime) {
+    if (token == "day") {
+        *dayTime = 0x8000;
+        return true;
+    }
+    if (token == "night") {
+        *dayTime = 0;
+        return true;
+    }
+    return ParseInt(token, 16, 0, 0xFFFF, dayTime);
+}
+
+// room x y z yaw: the room decimal, the position as floats, the yaw a decimal binary angle.
+static bool ParsePoint(const std::vector<std::string>& tokens, size_t at, WarpPoint* point) {
+    int32_t room, yaw;
+    if (!ParseInt(tokens[at], 10, INT16_MIN, INT16_MAX, &room) || !ParseFloat(tokens[at + 1], &point->pos.x) ||
+        !ParseFloat(tokens[at + 2], &point->pos.y) || !ParseFloat(tokens[at + 3], &point->pos.z) ||
+        !ParseInt(tokens[at + 4], 10, INT16_MIN, INT16_MAX, &yaw)) {
+        return false;
+    }
+    point->roomNum = (int16_t)room; // SOH [Unbound] rooms are s16
+    point->rotY = (int16_t)yaw;
+    return true;
+}
+
+static bool WarpHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& args,
+                        std::string* output) {
+    if (args.size() < 2) {
+        ERROR_MESSAGE("[SOH] Usage: warp <entrance> [adult|child] [time] [room x y z yaw]");
+        return 1;
+    }
+
+    WarpPoint point;
+    point.entranceId = ParseEntrance(args[1]); // SOH [Unbound] a name, or hex below the table's size
+    if (point.entranceId < 0) {
+        ERROR_MESSAGE(ENTRANCE_ARGUMENT_ERROR, EntranceDB_GetEntryCount());
+        return 1;
+    }
+
+    size_t at = 2;
+    if (at < args.size() && ParseAge(args[at], &point.linkAge)) {
+        at++;
+    }
+    size_t left = args.size() - at;
+    if (left == 1 || left == 6) {
+        if (!ParseDayTime(args[at], &point.dayTime)) {
+            ERROR_MESSAGE("[SOH] Time must be day, night, or a hex number up to FFFF.");
+            return 1;
+        }
+        at++;
+        left--;
+    }
+    bool atPoint = left == 5;
+    if (atPoint && !ParsePoint(args, at, &point)) {
+        ERROR_MESSAGE("[SOH] Point must be: room x y z yaw");
+        return 1;
+    }
+    if (left != 0 && left != 5) {
+        ERROR_MESSAGE("[SOH] Usage: warp <entrance> [adult|child] [time] [room x y z yaw]");
+        return 1;
+    }
+
+    if (atPoint) {
+        Warping_WarpToPoint(point);
+    } else {
+        Warping_WarpToEntrance(point.entranceId, point.linkAge, point.dayTime);
+    }
     return 0;
 }
 
@@ -2249,11 +2397,27 @@ void DebugConsole_Init(void) {
                          {
                              { "clear|warp|backup", Ship::ArgumentType::TEXT },
                          } });
+    CMD_REGISTER("unbound-export", { UnboundExportHandler,
+                                     "Writes the mounted vanilla archive in the Unbound layout (SOH: Unbound)",
+                                     {
+                                         { "out.o2r", Ship::ArgumentType::TEXT },
+                                     } });
+
     CMD_REGISTER("entrance", { EntranceHandler,
-                               "Sends player to the entered entrance (hex)",
+                               "Sends player to the entered entrance (hex, or a registered entrance name)",
                                {
                                    { "entrance", Ship::ArgumentType::NUMBER },
                                } });
+    CMD_REGISTER("warp", { WarpHandler,
+                           "Warps to an entrance (hex, or a registered entrance name) as adult or child at a time of "
+                           "day (day, night, or hex), "
+                           "optionally standing at room x y z yaw. Starts a fresh game when not in one.",
+                           {
+                               { "entrance", Ship::ArgumentType::NUMBER },
+                               { "adult|child", Ship::ArgumentType::TEXT, true },
+                               { "time", Ship::ArgumentType::TEXT, true },
+                               { "room x y z yaw", Ship::ArgumentType::TEXT, true },
+                           } });
 
     // Gameplay
     CMD_REGISTER("kill", { KillPlayerHandler, "Commit suicide." });

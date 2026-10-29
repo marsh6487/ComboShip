@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compile real interpreter methods and its complete triangle texture loop.
 
-This partial checkout cannot build the engine. Resource ownership and rendering
-API boundaries are supplied by native_test.cpp; production cache types, guard,
+Resource ownership and rendering API boundaries are supplied by native_test.cpp;
+production cache types, render-cost observation, guard,
 lookup/import/invalidation methods, tile changes, and texture preparation loop
 are compiled unchanged. Decoder bodies are sentinels: uploaded pixel conversion,
 shader selection, non-UV vertex packing, and a real GPU are outside this fixture.
@@ -62,7 +62,8 @@ def run(root, sanitize):
         cpp, binary = Path(work) / 'native.cpp', Path(work) / 'native'
         cpp.write_text(translation_unit)
         command = ['c++', '-std=c++20', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-                   '-Wno-parentheses', '-Wno-missing-field-initializers']
+                   '-Wno-parentheses', '-Wno-missing-field-initializers',
+                   '-I' + str(root / 'libultraship/include')]
         if sanitize:
             command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-no-pie']
         subprocess.run(command + [str(cpp), '-o', str(binary)], check=True)

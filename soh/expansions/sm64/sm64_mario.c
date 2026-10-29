@@ -1588,7 +1588,7 @@ void Sm64Mario_Update(PlayState* play, Player* player) {
         {
             DynaCollisionContext* dyna = &play->colCtx.dyna;
             s32 bgId;
-            for (bgId = 0; bgId < BG_ACTOR_MAX; bgId++) {
+            for (bgId = 0; bgId < dyna->bgActorMax; bgId++) {
                 if (!(dyna->bgActorFlags[bgId] & 1)) {
                     continue;
                 }

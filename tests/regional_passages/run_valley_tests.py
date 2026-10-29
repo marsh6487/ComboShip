@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Portable native valley fixtures; optional actual archives verify the active graph."""
 from pathlib import Path
-import os, subprocess, tempfile, json
+import os, subprocess, tempfile, json, sys
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'tests/custom_unbound_collision'))
+from run_tests import native_unit
 with tempfile.TemporaryDirectory(prefix='combo-valley-') as td:
     for name in ('valley_test','valley_resource_test'):
         binary=Path(td)/name
@@ -26,14 +28,22 @@ with tempfile.TemporaryDirectory(prefix='combo-valley-') as td:
     source=host.read_text()
     body=source.replace(function(source,'Draw'),'void Draw(Actor*,PlayState*) {}')
     body=body.replace(function(body,'Register'),'').replace('RegisterShipInitFunc valleyInit(Register);','')
-    bg=(ROOT/'soh/src/code/z_bgcheck.c').read_text()
-    dyna=(ROOT/'soh/src/code/z_bg_item.c').read_text()
-    native='extern "C" {\n'+'\n'.join(function(bg,name) for name in ('BgActor_SetActor','DynaPoly_IsBgIdBgActor','DynaPoly_SetBgActor','DynaPoly_GetActor','DynaPoly_DeleteBgActor'))+'\n'+function(dyna,'DynaPolyActor_Init')+'\n}'
+    native_names=['BgCheck_ReallocTable','ScaleRotPos_Initialize','SSList_SetNull',
+        'DynaLookup_ResetLists','DynaLookup_Reset','DynaLookup_ResetVtxStartIndex','BgActor_Initialize',
+        'DynaPoly_GrowBgActorTable','BgActor_SetActor','DynaPoly_IsBgIdBgActor','DynaPoly_IsBgIdInTable',
+        'DynaPoly_IsBgIdAllocated','DynaPoly_SetBgActor','DynaPoly_GetActor','DynaPoly_DeleteBgActor','DynaPolyActor_Init']
+    native_c=Path(td)/'native.c';native_object=Path(td)/'native.o'
+    native_c.write_text(native_unit('soh',native_names)+
+        '\nvoid Fixture_GrowBgActorTable(PlayState* play, DynaCollisionContext* dyna, s32 capacity) {\n'
+        '    DynaPoly_GrowBgActorTable(play, dyna, capacity);\n}\n')
+    native='extern "C" void Fixture_GrowBgActorTable(PlayState*, DynaCollisionContext*, s32);'
     fixture=(ROOT/'tests/regional_passages/valley_native_test.cpp').read_text()
-    # The native hash-vertex handler caches resolved pointers into the display
-    # list itself. Exercise that production mutation before the valley guard.
+    # The native hash handler resolves typed vertex owners on each execution.
+    # Exercise its actual pointer/stride handling and packet preservation.
     renderer=function((ROOT/'libultraship/src/fast/interpreter.cpp').read_text(),
                       'gfx_vtx_hash_handler_custom')
+    renderer=re.search(r'^#define MAX_VERTICES[^\n]*',
+        (ROOT/'libultraship/include/fast/interpreter.h').read_text(),re.M)[0]+'\n'+renderer
     generated=Path(td)/'native.cpp';generated.write_text(fixture.replace('/* NATIVE_ENGINE */',native).replace('/* NATIVE_PRODUCTION */',body).replace('/* NATIVE_RENDERER */',renderer))
     env=dict(os.environ)
     if env.get('COMBO_NEI_FIXTURE_CPATH'):env['CPATH']=env['COMBO_NEI_FIXTURE_CPATH']+os.pathsep+env.get('CPATH','')
@@ -46,5 +56,9 @@ with tempfile.TemporaryDirectory(prefix='combo-valley-') as td:
     subprocess.run([os.environ.get('PYTHON','python3'),str(ROOT/'tests/regional_passages/valley_linkage_test.py'),str(host_object)],env=env,check=True)
     sources=['libultraship/src/fast/resource/type/DisplayList.cpp','libultraship/src/fast/resource/type/Vertex.cpp','libultraship/src/ship/resource/Resource.cpp']
     binary=Path(td)/'native'
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie',str(generated),*[str(ROOT/p)for p in sources],'-o',str(binary)],env=env,check=True)
+    sanitizer=['-fsanitize=address,undefined','-fno-sanitize-recover=all','-no-pie']
+    subprocess.run([os.environ.get('CC','cc'),'-std=c11',*flags[1:],*sanitizer,
+        '-Werror=implicit-function-declaration','-c',str(native_c),'-o',str(native_object)],env=env,check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,*sanitizer,str(generated),str(native_object),
+        *[str(ROOT/p)for p in sources],'-o',str(binary)],env=env,check=True)
     subprocess.run([str(binary)],env={**env,'ASAN_OPTIONS':'detect_leaks=0'},check=True)

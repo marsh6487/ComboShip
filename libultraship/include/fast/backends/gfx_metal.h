@@ -14,6 +14,11 @@
 #include <simd/simd.h>
 
 static constexpr size_t kMaxVertexBufferPoolSize = 3;
+// SOH [Enhancement] Initial per-frame vertex buffer size (bytes). Matches the CPU mBufVbo stride
+// (256 tris * VBO_MAX_FLOATS_PER_VERTEX floats/vertex * 3 verts) with room for ~50 flushes/frame.
+// Large scenes (e.g. Hyrule Field) can need more, so the buffer grows on demand in StartFrame (see
+// mVertexBufferTargetLength) and can never overflow/crash.
+static constexpr size_t kInitialVertexBufferLength = 256 * VBO_MAX_FLOATS_PER_VERTEX * 3 * sizeof(float) * 50;
 static constexpr size_t METAL_MAX_MULTISAMPLE_SAMPLE_COUNT = 8;
 static constexpr size_t MAX_PIXEL_DEPTH_COORDS = 1024;
 
@@ -32,6 +37,7 @@ class RenderPipelineState;
 class ComputePipelineState;
 class CommandQueue;
 class Viewport;
+class DepthStencilState;
 } // namespace MTL
 
 namespace CA {
@@ -48,7 +54,7 @@ static size_t cantor(uint64_t a, uint64_t b) {
 }
 
 struct hash_pair_shader_ids {
-    size_t operator()(const std::pair<uint64_t, uint32_t>& p) const {
+    size_t operator()(const std::pair<uint64_t, uint64_t>& p) const {
         auto value1 = p.first;
         auto value2 = p.second;
         return cantor(value1, value2);
@@ -65,6 +71,7 @@ struct ShaderProgramMetal {
     uint8_t numFloats;
     bool usedTextures[SHADER_MAX_TEXTURES];
     bool markedForDeletion = false;
+    bool opt_toon = false;
 
     // hashed by msaa_level
     MTL::RenderPipelineState* pipeline_state_variants[9];
@@ -87,6 +94,10 @@ struct FramebufferMetal {
 
     MTL::Texture* mDepthTexture;
     MTL::Texture* mMsaaDepthTexture;
+    // SOH [Enhancement] World light casting: a separate Stencil8 plane for the stencil light-volume
+    // technique, attached alongside the (unchanged) depth texture so depth + GetPixelDepth are untouched.
+    MTL::Texture* mStencilTexture = nullptr;
+    MTL::Texture* mMsaaStencilTexture = nullptr;
     uint32_t mTextureId;
     bool mHasDepthBuffer;
     uint32_t mMsaaLevel;
@@ -106,6 +117,7 @@ struct FramebufferMetal {
     int8_t mLastDepthTest = -1;
     int8_t mLastDepthMask = -1;
     int8_t mLastZmodeDecal = -1;
+    int mLastStencilMode = -1;
 
     // When true, command buffer is created on the readback queue (no enqueue ordering).
     // First ReadFramebufferToCPU returns zeros and flips this; real data from frame 2+.
@@ -120,7 +132,20 @@ struct FrameUniforms {
 struct DrawUniforms {
     simd::int1 textureFiltering[SHADER_MAX_TEXTURES];
     simd::float1 prim_depth;
+    // Packed float3s match the Metal shader's DrawUniforms on every variant.
+    simd::float1 toonLightDir[3];
+    simd::float1 toonLightColor[3];
+    simd::float1 toonAmbient[3];
+    simd::float1 toonRampCenter;
+    simd::float1 toonRampSoftness;
+    simd::float1 toonHighlightIntensity;
+    simd::float1 toonShadowIntensity;
+    simd::float1 toonDebug;
 };
+
+static_assert(offsetof(DrawUniforms, prim_depth) == 24, "Metal primitive-depth offset must match the shader");
+static_assert(offsetof(DrawUniforms, toonLightDir) == 28, "Metal toon offset must match packed_float3");
+static_assert(sizeof(DrawUniforms) == 84, "Metal DrawUniforms must match every shader variant");
 
 struct CoordUniforms {
     simd::uint2 coords[MAX_PIXEL_DEPTH_COORDS];
@@ -128,7 +153,7 @@ struct CoordUniforms {
 
 class GfxRenderingAPIMetal final : public GfxRenderingAPI {
   public:
-    ~GfxRenderingAPIMetal() override = default;
+    ~GfxRenderingAPIMetal() override;
     const char* GetName() override;
     int GetMaxTextureSize() override;
     GfxClipParameters GetClipParameters() override;
@@ -191,14 +216,16 @@ class GfxRenderingAPIMetal final : public GfxRenderingAPI {
 
     int mCurrentVertexBufferPoolIndex = 0;
     MTL::Buffer* mVertexBufferPool[kMaxVertexBufferPoolSize];
-    std::unordered_map<std::pair<uint64_t, uint32_t>, struct ShaderProgramMetal, hash_pair_shader_ids>
+    // SOH [Enhancement] Desired pool-buffer size (bytes); ratchets up when a frame overflows.
+    size_t mVertexBufferTargetLength = kInitialVertexBufferLength;
+    std::unordered_map<std::pair<uint64_t, uint64_t>, struct ShaderProgramMetal, hash_pair_shader_ids>
         mShaderProgramPool;
 
     std::vector<struct TextureDataMetal> mTextures;
     std::vector<FramebufferMetal> mFramebuffers;
     FrameUniforms mFrameUniforms;
     CoordUniforms mCoordUniforms;
-    DrawUniforms mDrawUniforms;
+    DrawUniforms mDrawUniforms{};
     MTL::Buffer* mFrameUniformBuffer;
 
     uint32_t mMsaaNumQualityLevels[METAL_MAX_MULTISAMPLE_SAMPLE_COUNT];
@@ -234,6 +261,13 @@ class GfxRenderingAPIMetal final : public GfxRenderingAPI {
     int mCurrentFramebuffer;
     size_t mCurrentVertexBufferOffset;
     FilteringMode mCurrentFilterMode = FILTER_THREE_POINT;
+
+    // SOH [Enhancement] Depth-stencil states, created lazily and cached for the device's lifetime.
+    // Metal wants these built at load time, not per draw — and the stencil features (actor shadows,
+    // light casting) change the mode many times per frame, which used to create (and leak) a fresh
+    // driver object on every change. Key: depthTest | depthMask<<1 | zmodeDecal<<2 | stencilMode<<3
+    // (three stencil bits — StencilMode currently reaches 4, VolumeIncrDecr).
+    MTL::DepthStencilState* mDepthStencilStates[64] = {};
 
     bool mNonUniformThreadgroupSupported;
 };

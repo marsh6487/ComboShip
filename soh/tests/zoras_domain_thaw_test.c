@@ -66,7 +66,7 @@ s32 DynaPoly_SetBgActor(PlayState* current, DynaCollisionContext* dyna, Actor* a
 }
 void DynaPoly_DeleteBgActor(PlayState* current, DynaCollisionContext* dyna, s32 id) {
     REQUIRE(current == &play && dyna == &play.colCtx.dyna);
-    if (id == BGACTOR_NEG_ONE || id == BG_ACTOR_MAX) {
+    if (id == BGACTOR_NEG_ONE || id == BGACTOR_INVALID) {
         return;
     }
     REQUIRE(id >= 0 && id < 2 && alive[id]);
@@ -255,12 +255,31 @@ static void WaterAndCaustics(void) {
     }
 }
 
+static void WideWaterRestoration(void) {
+    Configure(1, SEASON_SUMMER, 0, 0);
+    waterBoxes[0].ySurface = 70000;
+    waterBoxes[1].ySurface = -70000;
+    nativeCollision.waterBoxes = waterBoxes;
+    nativeCollision.numWaterBoxes = ARRAY_COUNT(waterBoxes);
+    play.colCtx.colHeader = &nativeCollision;
+    SeasonScene_UpdateWater(&play);
+    REQUIRE(waterBoxes[0].ySurface == -32000 && waterBoxes[1].ySurface == -32000);
+    Nei_Save()->season = SEASON_OFF;
+    SeasonScene_UpdateWater(&play);
+    REQUIRE(waterBoxes[0].ySurface == 70000 && waterBoxes[1].ySurface == -70000);
+    REQUIRE(!memcmp(&gSaveContext, &saveBefore, sizeof(gSaveContext)));
+    neiBefore.season = SEASON_OFF;
+    REQUIRE(!memcmp(&nei, &neiBefore, sizeof(nei)));
+}
+
 int main(void) {
     gPlayState = &play;
     play.state.gfxCtx = &gfx;
+    play.colCtx.dyna.bgActorMax = ARRAY_COUNT(alive);
     ActorMatrix();
     LiveToggle();
     WaterAndCaustics();
+    WideWaterRestoration();
     puts("PASS age/season/legacy matrix, native water display lists, collision toggles, save immutability, caustics");
     return 0;
 }

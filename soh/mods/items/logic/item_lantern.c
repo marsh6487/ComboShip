@@ -200,7 +200,7 @@ static void Lantern_UpdateLight(Player* p, PlayState* play) {
     b = (u8)(sLanternLightColors[fireType][2] * flicker);
     radius = (s16)(LANTERN_LIGHT_RADIUS * (0.9f + (flicker * 0.1f)));
 
-    Lights_PointNoGlowSetInfo(&sLanternLightInfo, (s16)lightPos.x, (s16)lightPos.y, (s16)lightPos.z, r, g, b, radius);
+    Lights_PointNoGlowSetInfo(&sLanternLightInfo, lightPos.x, lightPos.y, lightPos.z, r, g, b, radius);
 
     if (sLanternLightNode == NULL) {
         sLanternLightNode = LightContext_InsertLight(play, &play->lightCtx, &sLanternLightInfo);

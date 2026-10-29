@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <memory>
+#include <optional>
+#include <cstdlib>
 
 #include <spdlog/spdlog.h>
 #include <ship/Context.h>
@@ -9,6 +11,8 @@
 #include <soh/OTRGlobals.h>
 #include <soh/OTRAudio.h>
 #include "savestate_serialize.h"
+#include "BgCheckStateSnapshot.h"
+#include "soh/unbound/SceneDB.h"
 
 extern "C" {
 #include "z64.h"
@@ -56,6 +60,9 @@ extern "C" void Player_SaveState(SaveStateCtx* ctx);
 
 extern "C" void Matrix_SaveState(SaveStateCtx* ctx);
 extern "C" void Lights_SaveState(SaveStateCtx* ctx);
+extern "C" void DekuStickLight_SaveState(SaveStateCtx* ctx);
+extern "C" void TimeCtl_Reset(PlayState* play);
+extern "C" void Sm64Surfaces_RefreshActorColliders(PlayState* play);
 extern "C" void MapMark_SaveState(SaveStateCtx* ctx);
 extern "C" void Camera_SaveState(SaveStateCtx* ctx);
 extern "C" void OnePointCutscene_SaveState(SaveStateCtx* ctx);
@@ -83,6 +90,19 @@ static void LoadOverlayState(std::unique_ptr<uint8_t[]>& buf, void (*fn)(SaveSta
     fn(&ctx);
 }
 
+struct QueueSnapshotDeleter {
+    void operator()(CollisionCheckQueueSnapshot* snapshot) const noexcept {
+        CollisionCheck_FreeQueueSnapshot(snapshot);
+    }
+};
+struct QueueRestoreDeleter {
+    void operator()(CollisionCheckQueueRestore* restore) const noexcept {
+        CollisionCheck_FreeQueueRestore(restore);
+    }
+};
+using QueueSnapshot = std::unique_ptr<CollisionCheckQueueSnapshot, QueueSnapshotDeleter>;
+using QueueRestore = std::unique_ptr<CollisionCheckQueueRestore, QueueRestoreDeleter>;
+
 typedef struct SaveStateInfo {
     unsigned char sysHeapCopy[SYSTEM_HEAP_SIZE];
     unsigned char audioHeapCopy[AUDIO_HEAP_SIZE];
@@ -109,6 +129,7 @@ typedef struct SaveStateInfo {
     // Static data (per-translation-unit, serialized via SHIP_SAVESTATE_DEFINE)
     std::unique_ptr<uint8_t[]> matrixState;
     std::unique_ptr<uint8_t[]> lightsState;
+    std::unique_ptr<uint8_t[]> dekuStickLightState;
     std::unique_ptr<uint8_t[]> doorWarp1State;
     std::unique_ptr<uint8_t[]> mapMarkState;
     std::unique_ptr<uint8_t[]> cameraState;
@@ -153,10 +174,29 @@ typedef struct SaveStateInfo {
     std::unique_ptr<uint8_t[]> enHeishi1State;
     std::unique_ptr<uint8_t[]> playerState;
 
-    u8 transitionActorCount_copy;
-    s16 transitionActorIds_copy[256];
+    std::vector<s16> transitionActorIds_copy; // SOH [Unbound] a scene may have more than 255 transition actors
+    PlayState* playState;
+    s16 sceneNum, roomNum, previousRoomNum;
+    void* sceneSegment;
+    void* roomSegment;
+    void* previousRoomSegment;
+    uint64_t queueEpoch;
+    std::unique_ptr<BgCheckStateSnapshot> collision;
+    QueueSnapshot queues;
+    SceneDBState sceneFlags;
 
 } SaveStateInfo;
+
+static bool SaveStateMatchesPlay(const SaveStateInfo& info) {
+    return gPlayState != nullptr && gPlayState == info.playState && gPlayState->state.running &&
+           gPlayState->roomCtx.status == 0 && gPlayState->sceneNum == info.sceneNum &&
+           gPlayState->sceneSegment == info.sceneSegment && gPlayState->roomCtx.curRoom.num == info.roomNum &&
+           gPlayState->roomCtx.curRoom.segment == info.roomSegment &&
+           gPlayState->roomCtx.prevRoom.num == info.previousRoomNum &&
+           gPlayState->roomCtx.prevRoom.segment == info.previousRoomSegment && info.collision &&
+           info.collision->Matches(&gPlayState->colCtx) && info.queueEpoch != 0 &&
+           CollisionCheck_GetContextEpoch(&gPlayState->colChkCtx) == info.queueEpoch;
+}
 
 class SaveState {
     friend class SaveStateMgr;
@@ -169,8 +209,8 @@ class SaveState {
     std::shared_ptr<SaveStateMgr> saveStateMgr;
     std::shared_ptr<SaveStateInfo> info;
 
-    void Save(void);
-    void Load(void);
+    SaveStateReturn Save(void);
+    SaveStateReturn Load(void);
     void BackupSeqScriptState(void);
     void LoadSeqScriptState(void);
     void SaveOverlayStaticData(void);
@@ -190,7 +230,6 @@ SaveStateMgr::~SaveStateMgr() {
 
 SaveState::SaveState(std::shared_ptr<SaveStateMgr> mgr, unsigned int slot)
     : slot(slot), saveStateMgr(mgr), info(nullptr) {
-    this->info = std::make_shared<SaveStateInfo>();
 }
 
 void SaveState::BackupSeqScriptState(void) {
@@ -246,6 +285,7 @@ void SaveState::LoadSeqScriptState(void) {
 void SaveState::SaveOverlayStaticData(void) {
     SaveOverlayState(info->matrixState, Matrix_SaveState);
     SaveOverlayState(info->lightsState, Lights_SaveState);
+    SaveOverlayState(info->dekuStickLightState, DekuStickLight_SaveState);
     SaveOverlayState(info->doorWarp1State, DoorWarp1_SaveState);
     SaveOverlayState(info->mapMarkState, MapMark_SaveState);
     SaveOverlayState(info->cameraState, Camera_SaveState);
@@ -292,6 +332,7 @@ void SaveState::SaveOverlayStaticData(void) {
 void SaveState::LoadOverlayStaticData(void) {
     LoadOverlayState(info->matrixState, Matrix_SaveState);
     LoadOverlayState(info->lightsState, Lights_SaveState);
+    LoadOverlayState(info->dekuStickLightState, DekuStickLight_SaveState);
     LoadOverlayState(info->doorWarp1State, DoorWarp1_SaveState);
     LoadOverlayState(info->mapMarkState, MapMark_SaveState);
     LoadOverlayState(info->cameraState, Camera_SaveState);
@@ -336,15 +377,15 @@ void SaveState::LoadOverlayStaticData(void) {
 }
 
 void SaveState::SaveTransitionActors(void) {
-    info->transitionActorCount_copy = gPlayState->transiActorCtx.numActors;
-    for (u32 i = 0; i < info->transitionActorCount_copy; i++) {
+    info->transitionActorIds_copy.resize(gPlayState->transiActorCtx.numActors);
+    for (size_t i = 0; i < info->transitionActorIds_copy.size(); i++) {
         info->transitionActorIds_copy[i] = gPlayState->transiActorCtx.list[i].id;
     }
 }
 
 void SaveState::LoadTransitionActors(void) {
-    u32 numActors = std::min(info->transitionActorCount_copy, gPlayState->transiActorCtx.numActors);
-    for (u32 i = 0; i < numActors; i++) {
+    size_t numActors = std::min(info->transitionActorIds_copy.size(), (size_t)gPlayState->transiActorCtx.numActors);
+    for (size_t i = 0; i < numActors; i++) {
         gPlayState->transiActorCtx.list[i].id = info->transitionActorIds_copy[i];
     }
 }
@@ -373,13 +414,25 @@ void SaveStateMgr::ProcessSaveStateRequests(void) {
                     this->states[request.slot] =
                         std::make_shared<SaveState>(OTRGlobals::Instance->gSaveStateMgr, request.slot);
                 }
-                this->states[request.slot]->Save();
+                if (this->states[request.slot]->Save() != SaveStateReturn::SUCCESS) {
+                    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
+                        2.0f, true, "could not save state %u", request.slot);
+                    break;
+                }
                 Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
                     1.0f, true, "saved state %u", request.slot);
                 break;
             case RequestType::LOAD:
                 if (this->states.contains(request.slot)) {
-                    this->states[request.slot]->Load();
+                    auto result = this->states[request.slot]->Load();
+                    if (result != SaveStateReturn::SUCCESS) {
+                        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
+                            2.0f, true,
+                            result == SaveStateReturn::FAIL_STATE_MISMATCH ? "state %u belongs to another room or scene"
+                                                                           : "could not load state %u",
+                            request.slot);
+                        break;
+                    }
                     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
                         1.0f, true, "loaded state %u", request.slot);
                 } else {
@@ -422,39 +475,91 @@ SaveStateReturn SaveStateMgr::AddRequest(const SaveStateRequest request) {
     }
 }
 
-void SaveState::Save(void) {
+SaveStateReturn SaveState::Save(void) {
+    if (gPlayState == nullptr || !gPlayState->state.running || gPlayState->roomCtx.status != 0) {
+        return SaveStateReturn::FAIL_WRONG_GAMESTATE;
+    }
     std::unique_lock<std::mutex> Lock(audio.mutex);
-    memcpy(&info->sysHeapCopy, gSystemHeap, SYSTEM_HEAP_SIZE /* sizeof(gSystemHeap) */);
-    memcpy(&info->audioHeapCopy, gAudioHeap, AUDIO_HEAP_SIZE /* sizeof(gAudioContext) */);
+    auto previous = info;
+    try {
+        auto next = std::make_shared<SaveStateInfo>();
+        next->collision = BgCheckStateSnapshot::Capture(&gPlayState->colCtx);
+        next->queues.reset(CollisionCheck_CaptureQueueSnapshot(&gPlayState->colChkCtx));
+        if (!next->collision || !next->queues) {
+            return SaveStateReturn::FAIL_NO_MEMORY;
+        }
+        next->sceneFlags = SceneDB_CaptureState();
+        next->playState = gPlayState;
+        next->sceneNum = gPlayState->sceneNum;
+        next->sceneSegment = gPlayState->sceneSegment;
+        next->roomNum = gPlayState->roomCtx.curRoom.num;
+        next->roomSegment = gPlayState->roomCtx.curRoom.segment;
+        next->previousRoomNum = gPlayState->roomCtx.prevRoom.num;
+        next->previousRoomSegment = gPlayState->roomCtx.prevRoom.segment;
+        next->queueEpoch = CollisionCheck_GetContextEpoch(&gPlayState->colChkCtx);
+        info = std::move(next);
+        memcpy(&info->sysHeapCopy, gSystemHeap, SYSTEM_HEAP_SIZE /* sizeof(gSystemHeap) */);
+        memcpy(&info->audioHeapCopy, gAudioHeap, AUDIO_HEAP_SIZE /* sizeof(gAudioContext) */);
 
-    memcpy(&info->audioContextCopy, &gAudioContext, sizeof(AudioContext));
-    memcpy(&info->gActiveSeqsCopy, gActiveSeqs, sizeof(info->gActiveSeqsCopy));
-    BackupSeqScriptState();
+        memcpy(&info->audioContextCopy, &gAudioContext, sizeof(AudioContext));
+        memcpy(&info->gActiveSeqsCopy, gActiveSeqs, sizeof(info->gActiveSeqsCopy));
+        BackupSeqScriptState();
 
-    memcpy(info->gActiveSoundsCopy, gActiveSounds, sizeof(gActiveSounds));
-    memcpy(&info->gSoundBankMutedCopy, gSoundBankMuted, sizeof(info->gSoundBankMutedCopy));
+        memcpy(info->gActiveSoundsCopy, gActiveSounds, sizeof(gActiveSounds));
+        memcpy(&info->gSoundBankMutedCopy, gSoundBankMuted, sizeof(info->gSoundBankMutedCopy));
 
-    info->D_801333F0_copy = D_801333F0;
-    info->gAudioSfxSwapOff_copy = gAudioSfxSwapOff;
+        info->D_801333F0_copy = D_801333F0;
+        info->gAudioSfxSwapOff_copy = gAudioSfxSwapOff;
 
-    memcpy(&info->gAudioSfxSwapSource_copy, gAudioSfxSwapSource, sizeof(info->gAudioSfxSwapSource_copy));
-    memcpy(&info->gAudioSfxSwapTarget_copy, gAudioSfxSwapTarget, sizeof(info->gAudioSfxSwapTarget_copy));
-    memcpy(&info->gAudioSfxSwapMode_copy, gAudioSfxSwapMode, sizeof(info->gAudioSfxSwapMode_copy));
+        memcpy(&info->gAudioSfxSwapSource_copy, gAudioSfxSwapSource, sizeof(info->gAudioSfxSwapSource_copy));
+        memcpy(&info->gAudioSfxSwapTarget_copy, gAudioSfxSwapTarget, sizeof(info->gAudioSfxSwapTarget_copy));
+        memcpy(&info->gAudioSfxSwapMode_copy, gAudioSfxSwapMode, sizeof(info->gAudioSfxSwapMode_copy));
 
-    info->D_801755D0_copy = D_801755D0;
+        info->D_801755D0_copy = D_801755D0;
 
-    memcpy(&info->saveContextCopy, &gSaveContext, sizeof(gSaveContext));
-    memcpy(&info->gameInfoCopy, gGameInfo, sizeof(*gGameInfo));
-    memcpy(&info->effectContextCopy, &sEffectContext, sizeof(sEffectContext));
+        memcpy(&info->saveContextCopy, &gSaveContext, sizeof(gSaveContext));
+        memcpy(&info->gameInfoCopy, gGameInfo, sizeof(*gGameInfo));
+        memcpy(&info->effectContextCopy, &sEffectContext, sizeof(sEffectContext));
 
-    // Various static data
-    SaveOverlayStaticData();
-    SaveTransitionActors();
+        // Various static data
+        SaveOverlayStaticData();
+        SaveTransitionActors();
+    } catch (const std::bad_alloc&) {
+        info = std::move(previous);
+        return SaveStateReturn::FAIL_NO_MEMORY;
+    }
+    return SaveStateReturn::SUCCESS;
 }
 
-void SaveState::Load(void) {
+SaveStateReturn SaveState::Load(void) {
+    if (!info) {
+        return SaveStateReturn::FAIL_STATE_EMPTY;
+    }
+    if (!SaveStateMatchesPlay(*info)) {
+        return SaveStateReturn::FAIL_STATE_MISMATCH;
+    }
     std::unique_lock<std::mutex> Lock(audio.mutex);
+    auto collision = info->collision->Prepare(&gPlayState->colCtx);
+    QueueRestore queues(CollisionCheck_PrepareQueueRestore(&gPlayState->colChkCtx, info->queues.get()));
+    if (!collision || !queues) {
+        return SaveStateReturn::FAIL_NO_MEMORY;
+    }
+    std::optional<SceneDBState> sceneFlags;
+    try {
+        sceneFlags.emplace(info->sceneFlags);
+    } catch (const std::bad_alloc&) { return SaveStateReturn::FAIL_NO_MEMORY; }
+    // All allocations and all compatibility checks precede the first world mutation.
+    if (!SaveStateMatchesPlay(*info) || !collision->Validate() || !CollisionCheck_ValidateQueueRestore(queues.get())) {
+        return SaveStateReturn::FAIL_STATE_MISMATCH;
+    }
     memcpy(gSystemHeap, &info->sysHeapCopy, SYSTEM_HEAP_SIZE);
+    if (!collision->Commit()) {
+        std::abort(); // A validated, allocation-free commit cannot lose its owner on the paused game thread.
+    }
+    if (!CollisionCheck_CommitQueueRestore(queues.get())) {
+        std::abort(); // A validated, allocation-free commit cannot fail without an intervening queue mutation.
+    }
+    SceneDB_RestoreState(*sceneFlags);
     memcpy(gAudioHeap, &info->audioHeapCopy, AUDIO_HEAP_SIZE);
 
     memcpy(&gAudioContext, &info->audioContextCopy, sizeof(AudioContext));
@@ -478,4 +583,7 @@ void SaveState::Load(void) {
     D_801755D0 = info->D_801755D0_copy;
     LoadOverlayStaticData();
     LoadTransitionActors();
+    TimeCtl_Reset(gPlayState);
+    Sm64Surfaces_RefreshActorColliders(nullptr);
+    return SaveStateReturn::SUCCESS;
 }

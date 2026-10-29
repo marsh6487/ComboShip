@@ -25,6 +25,7 @@
 #include "soh/OTRGlobals.h"
 #include "static_data.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "soh/ShipInit.hpp"
 #include "settings.h"
 #include "soh/util.h"
 #include "randomizerTypes.h"
@@ -1604,13 +1605,49 @@ bool IsRandoGenerating() {
     return randoGenerating;
 }
 
+#ifdef __EMSCRIPTEN__
+// SOH [WASM] Generation blocks the tab, so it runs on the game frame after the click rather
+// than from it. File select only plays the horse music, then the fanfare or the error sound,
+// if it sees IsRandoGenerating() on a frame of its own; generating inside the clicking frame
+// cleared it again before file select looked. OnGameFrameUpdate fires at the end of a game
+// frame, after file select has run and inside the frame guard, so a throw here is reported
+// like any other.
+static std::string sPendingSeed;
+static bool sGenerationPending = false;
+
+static void RunPendingGeneration() {
+    if (sGenerationPending) {
+        sGenerationPending = false;
+        GenerateRandomizerImgui(sPendingSeed);
+    }
+}
+
+static void GenerateOnNextFrame(const std::string& seed) {
+    randoGenerating = true;
+    sPendingSeed = seed;
+    sGenerationPending = true;
+}
+
+static RegisterShipInitFunc initFunc_PendingGeneration([]() {
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(RunPendingGeneration);
+});
+#endif
+
 bool GenerateRandomizer(std::string seed /*= ""*/) {
     if (randoGenerating) {
         return false;
     }
     WaitForRandoGeneration();
+#ifdef __EMSCRIPTEN__
+    // SOH [WASM] Single-threaded: generate on the next game frame (see GenerateOnNextFrame).
+    // This blocks the browser tab until the seed is done, where desktop keeps drawing a
+    // progress UI -- but blocking beats the alternative, since constructing a std::thread
+    // aborts in a build without pthreads.
+    GenerateOnNextFrame(seed);
+#else
     randoGenerating = true;
     randoThread = std::thread(&GenerateRandomizerImgui, seed);
+#endif
     return true;
 }
 

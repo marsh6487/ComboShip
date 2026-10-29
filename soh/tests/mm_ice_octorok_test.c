@@ -103,7 +103,7 @@ s32 Collider_DestroyCylinder(PlayState* p, ColliderCylinder* c) {
     return 0;
 }
 void Collider_UpdateCylinder(Actor* a, ColliderCylinder* c) {
-    c->dim.pos = (Vec3s){ a->world.pos.x, a->world.pos.y, a->world.pos.z };
+    c->dim.pos = (Vec3f){ a->world.pos.x, a->world.pos.y, a->world.pos.z };
 }
 s32 CollisionCheck_SetAC(PlayState* p, CollisionCheckContext* c, Collider* col) {
     ++acRegistrations;
@@ -169,7 +169,7 @@ void DynaPolyActor_Init(DynaPolyActor* a, s32 flags) {
 s32 DynaPoly_SetBgActor(PlayState* p, DynaCollisionContext* d, Actor* a, CollisionHeader* c) {
     REQUIRE(c == &collision);
     if (dynaFail)
-        return BG_ACTOR_MAX;
+        return BGACTOR_INVALID;
     ++registrations;
     return 0;
 }
@@ -217,8 +217,8 @@ static void Setup(void) {
     spawns = spawnFail = resourceFail = dynaFail = linkVeto = registrations = deletions = pins = solidCollision =
         cutscene = 0;
     water.ySurface = 0;
-    collision.minBounds = (Vec3s){ -600, 0, -600 };
-    collision.maxBounds = (Vec3s){ 600, 1000, 600 };
+    collision.minBounds = (Vec3i){ -600, 0, -600 };
+    collision.maxBounds = (Vec3i){ 600, 1000, 600 };
     collision.numVertices = 8;
     collision.numPolygons = 12;
     octorok.actor.id = ACTOR_EN_OKUTA;
@@ -348,6 +348,7 @@ int main(void) {
     dynaFail = 1;
     EnOkuta_ColliderCheck(&octorok, &play);
     REQUIRE(octorok.actor.colChkInfo.health == 0 && finishes == 1 && !octorok.actor.child);
+    REQUIRE(block.dyna.bgId == BGACTOR_INVALID && registrations == 0);
     BgMmIceblock_Destroy(&block.dyna.actor, &play);
     REQUIRE(pins == 0 && deletions == 0 && colliderDeletions == 0);
     Setup();

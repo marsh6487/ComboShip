@@ -424,7 +424,7 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 using namespace ComboRando::CrossDungeon;
 '''
     if is_oot:
-        body += 'EntranceInfo gEntranceTable[ENTR_MAX]{};\n'
+        body += 'static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};\nEntranceInfo* gEntranceTable = sFixtureEntranceTable;\n'
     else:
         body += r'''
 static int32_t ComboMmMaterializeGrotto(int32_t index) { return index; }

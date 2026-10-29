@@ -99,7 +99,8 @@ struct MaskShader {
     auto *v1 = &vertex;
     Vertex *v_arr[] = {&vertex};
     const int i = 0, numInputs = 7;
-    const bool use_alpha = true, use_fog = false, use_blend_color = false;
+    // ParticleBlendState verifies that the actual draw clears G_LIGHTING.
+    const bool use_alpha = true, use_fog = false, use_blend_color = false, use_toon = false;
     mBufVboLen = 0;
     /* NATIVE_PACKED_INPUTS */
   }

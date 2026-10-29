@@ -1,3 +1,4 @@
+#include "soh/Enhancements/Graphics/ToonLighting.h"
 /*
  * File: z_en_heishi1.c
  * Overlay: ovl_En_Heishi1
@@ -167,7 +168,7 @@ void EnHeishi1_SetupWalk(EnHeishi1* this, PlayState* play) {
 
 void EnHeishi1_Walk(EnHeishi1* this, PlayState* play) {
     Path* path;
-    Vec3s* pointPos;
+    Vec3f* pointPos;
     f32 pathDiffX;
     f32 pathDiffZ;
     s16 randOffset;
@@ -513,7 +514,9 @@ void EnHeishi1_Draw(Actor* thisx, PlayState* play) {
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     SkelAnime_DrawSkeletonOpa(play, &this->skelAnime, EnHeishi1_OverrideLimbDraw, NULL, this);
-    func_80033C30(&this->actor.world.pos, &matrixScale, 0xFF, play);
+    if (!ToonLighting_SuppressVanillaShadows()) {
+        func_80033C30(&this->actor.world.pos, &matrixScale, 0xFF, play);
+    }
 
     if ((this->path == BREG(1)) && (BREG(0) != 0)) {
         DebugDisplay_AddObject(this->actor.world.pos.x, this->actor.world.pos.y + 100.0f, this->actor.world.pos.z,

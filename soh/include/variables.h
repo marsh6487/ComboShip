@@ -53,6 +53,8 @@ extern "C"
 	extern const char gGitCommitHash[];
 	extern u8 gGitCommitTag[];
 	extern u8 gBuildTeam[];
+	extern const char gBuildForkName[];
+	extern const char gBuildForkVersion[];
 	extern u8 gBuildDate[];
 	extern u8 gBuildMakeOption[];
 	extern OSMesgQueue gPiMgrCmdQ;
@@ -111,8 +113,7 @@ extern "C"
 	extern s16 gLinkObjectIds[2];
 	extern u32 gObjectTableSize;
 	extern RomFile gObjectTable[OBJECT_ID_MAX];
-	extern EntranceInfo gEntranceTable[ENTR_MAX];
-	extern SceneTableEntry gSceneTable[SCENE_ID_MAX];
+	extern EntranceInfo* gEntranceTable; // SOH [Unbound] backed by SceneDB; ENTR_MAX is the vanilla count only
 	extern u16 gSramSlotOffsets[];
 	// 4 16-colors palettes
 	extern u64 gMojiFontTLUTs[4][4]; // original name: "moji_tlut"

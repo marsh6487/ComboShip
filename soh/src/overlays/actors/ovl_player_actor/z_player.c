@@ -12465,8 +12465,6 @@ static Vec3f D_80854778 = { 0.0f, 50.0f, 0.0f };
 void Player_Init(Actor* thisx, PlayState* play2) {
     Player* this = (Player*)thisx;
     PlayState* play = play2;
-    SceneTableEntry* scene = play->loadedScene;
-    u32 titleFileSize;
     s32 startMode;
     s32 respawnFlag;
     s32 respawnMode;
@@ -12557,7 +12555,6 @@ void Player_Init(Actor* thisx, PlayState* play2) {
         !ComboRegionalPassagesOot_IsArrivalPending(play) &&
 #endif
         (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1))) {
-        titleFileSize = scene->titleFile.vromEnd - scene->titleFile.vromStart;
         if (GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard)) {
             if ((gSaveContext.sceneLayer < 4) &&
                 (crossGameTitleCard ||

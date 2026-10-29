@@ -870,6 +870,22 @@ void EnElf_UpdateLights(EnElf* this, PlayState* play) {
     s16 glowLightRadius;
     Player* player;
 
+    // Tint the source so cel shading, world pools and native lighting agree.
+    u8 lightR = 255;
+    u8 lightG = 255;
+    u8 lightB = 255;
+    if (this->actor.params == FAIRY_NAVI) {
+        f32 saturation = CVarGetFloat(CVAR_ENHANCEMENT("Graphics.WorldLighting.NaviSaturation"), 0.2f);
+        if (saturation > 0.0f) {
+            if (saturation > 1.0f) {
+                saturation = 1.0f;
+            }
+            lightR = (u8)(255.0f + (this->outerColor.r - 255.0f) * saturation);
+            lightG = (u8)(255.0f + (this->outerColor.g - 255.0f) * saturation);
+            lightB = (u8)(255.0f + (this->outerColor.b - 255.0f) * saturation);
+        }
+    }
+
     glowLightRadius = 100;
 
     if (this->unk_2A8 == 8) {
@@ -878,12 +894,11 @@ void EnElf_UpdateLights(EnElf* this, PlayState* play) {
 
     if (this->fairyFlags & 0x20) {
         player = GET_PLAYER(play);
-        Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, player->actor.world.pos.x,
-                                  (s16)(player->actor.world.pos.y) + 60.0f, player->actor.world.pos.z, 255, 255, 255,
-                                  200);
+        Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, player->actor.world.pos.x, player->actor.world.pos.y + 60.0f,
+                                  player->actor.world.pos.z, lightR, lightG, lightB, 200);
     } else {
         Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
-                                  this->actor.world.pos.z, 255, 255, 255, -1);
+                                  this->actor.world.pos.z, lightR, lightG, lightB, -1);
     }
 
     /* The light context draws its spherical halo separately from EnElf_Draw.
@@ -893,10 +908,10 @@ void EnElf_UpdateLights(EnElf* this, PlayState* play) {
         ResourceMgr_FileExists("objects/midna_navi/poc1/MidnaFloatDL") &&
         ResourceMgr_LoadGfxByName("objects/midna_navi/poc1/MidnaFloatDL") != NULL) {
         Lights_PointNoGlowSetInfo(&this->lightInfoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
-                                  this->actor.world.pos.z, 255, 255, 255, glowLightRadius);
+                                  this->actor.world.pos.z, lightR, lightG, lightB, glowLightRadius);
     } else {
         Lights_PointGlowSetInfo(&this->lightInfoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
-                                this->actor.world.pos.z, 255, 255, 255, glowLightRadius);
+                                this->actor.world.pos.z, lightR, lightG, lightB, glowLightRadius);
     }
 
     // The light-context halo is independent of the actor's draw callback.
@@ -1572,6 +1587,17 @@ void EnElf_Update(Actor* thisx, PlayState* play) {
 
     if (this->fairyFlags & FAIRY_FLAG_BIG) {
         func_80A04D90(this, play);
+    }
+
+    // Optional ambient/healing-fairy lights; keep bottled/revive/Navi policies.
+    if (CVarGetInteger(CVAR_ENHANCEMENT("Graphics.WorldLighting.OtherFairyLights"), 0)) {
+        s32 fairyType = this->actor.params;
+        if (fairyType == FAIRY_KOKIRI || fairyType == FAIRY_HEAL || fairyType == FAIRY_HEAL_BIG ||
+            fairyType == FAIRY_HEAL_TIMED) {
+            s16 radius = (this->fairyFlags & FAIRY_FLAG_BIG) ? 150 : 100;
+            Lights_PointNoGlowSetInfo(&this->lightInfoNoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
+                                      this->actor.world.pos.z, 255, 255, 255, radius);
+        }
     }
 }
 

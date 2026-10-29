@@ -11,6 +11,7 @@ from sword_archive_fixture import Archive, crc64, roots_for
 ROOT=Path(__file__).resolve().parents[2]
 parser=argparse.ArgumentParser();parser.add_argument('--archives',type=Path)
 parser.add_argument('--sanitize',action='store_true')
+parser.add_argument('--wide',action='store_true',help='Use the combined float-matrix/s32-vertex runtime ABI')
 parser.add_argument('--host',choices=('oot','mm','both'),default='both')
 args=parser.parse_args()
 owner=functions((ROOT/'combo/menu/ComboItemDrawOOT.h').read_text())
@@ -105,7 +106,7 @@ def build(lists,vertices,matrices,expect,available):
     for name,(kind,coords) in vertices.items():
         src+=kind+'('+json.dumps(name)+f',{crc64(name)}ULL,'+'{'+','.join('{'+','.join(map(str,p))+'}' for p in coords)+'});\n'
     for name,words in matrices.items():
-        src+='{auto m=std::make_shared<Fast::Matrix>();const uint32_t words[]={'+','.join(str(w)+'u' for w in words)+'};memcpy(&m->Matrx,words,sizeof(words));loader.files['+json.dumps(name)+']=m;loader.names['+str(crc64(name))+'ULL]='+json.dumps(name)+';}\n'
+        src+='{auto m=std::make_shared<Fast::Matrix>();const uint32_t words[]={'+','.join(str(w)+'u' for w in words)+'};SetMatrixFromArchive(&m->Matrx,words);loader.files['+json.dumps(name)+']=m;loader.names['+str(crc64(name))+'ULL]='+json.dumps(name)+';}\n'
     for name,commands in lists.items():
         src+='List('+json.dumps(name)+f',{crc64(name)}ULL,'+'{'+','.join('{'+str(w0)+','+str(w1)+'}' for w0,w1 in commands)+'});\n'
     def coordinates(points):
@@ -137,6 +138,7 @@ with tempfile.TemporaryDirectory(prefix='sword-mod-gi-') as temporary:
             array=ROOT/('mm/2s2h' if host=='mm' else 'soh/soh')/'resource/type/Array.cpp'
             command=[os.environ.get('CXX','c++'),'-std=c++20','-DF3DEX_GBI_2','-I'+str(ROOT),'-I'+str(ROOT/'libultraship/include'),str(source),str(array),'-o',str(binary)]
             if host=='mm':command+=['-DMM_BUILD_DLL']
+            if args.wide:command+=['-DGBI_FLOAT_MTX=1','-DGBI_S32_VTX=1']
             if args.sanitize:command+=['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
             subprocess.run(command,check=True)
             subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

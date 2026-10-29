@@ -29,7 +29,7 @@ static int scopes = 0, children = 0, stack = 0, matrices = 0, setupCalls = 0, fl
 static bool floorValid = true;
 static float aspect = 16.0f / 9.0f;
 static Gfx xlu[2048], opa[2048];
-static Mtx matrix;
+static size_t peakVertexCount, peakVertexBytes, peakAllocationBytes;
 static Vec3f currentTranslation;
 static const void* currentIdentity;
 static int currentGeneration;
@@ -119,9 +119,12 @@ extern "C" void Matrix_Pop() {
 extern "C" void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode) {
     currentTranslation = { x, y, z };
 }
-extern "C" Mtx* Matrix_Finalize(GraphicsContext*) {
+extern "C" Mtx* Matrix_Finalize(GraphicsContext* gfx) {
     ++matrices;
-    return &matrix;
+    // The native finalizer allocates one aligned Mtx from this same OPA tail.
+    auto* matrix = static_cast<Mtx*>(GRAPH_ALLOC(gfx, sizeof(Mtx)));
+    std::memset(matrix, 0, sizeof(*matrix));
+    return matrix;
 }
 extern "C" void gSPDisplayList(Gfx* pkt, Gfx* list) {
     __gSPDisplayList(pkt, list);
@@ -166,12 +169,25 @@ static size_t Draw(PlayState& play) {
     assert(std::memcmp(&camera, GET_ACTIVE_CAM(&play), sizeof(camera)) == 0 && gWeatherMode == weather);
     const size_t commands = gfx.polyXlu.p - xlu;
     assert(commands < 300 && matrices <= 13 && meshes.size() <= 15);
-    size_t allocated = 0;
-    for (const auto& mesh : meshes)
-        allocated += ALIGN16(mesh.vertices.size() * sizeof(Vtx));
-    assert(allocated <= 252 * sizeof(Vtx));
+    size_t vertexCount = 0, vertexBytes = 0, mistMeshes = 0, auroraMeshes = 0;
+    for (const auto& mesh : meshes) {
+        vertexCount += mesh.vertices.size();
+        vertexBytes += ALIGN16(mesh.vertices.size() * sizeof(Vtx));
+        mistMeshes += mesh.vertices.size() == 15;
+        auroraMeshes += mesh.vertices.size() == 24;
+    }
+    assert(mistMeshes <= 12 && auroraMeshes <= 3 && vertexCount <= 252);
+    // GRAPH_ALLOC rounds each mesh separately: wide 15-vertex mist meshes
+    // need 368 bytes, rather than their 360-byte payload. Geometry caps stay fixed.
+    const size_t maxVertexBytes = 12 * ALIGN16(15 * sizeof(Vtx)) + 3 * ALIGN16(24 * sizeof(Vtx));
+    assert(vertexBytes <= maxVertexBytes);
+    const size_t allocated = vertexBytes + matrices * ALIGN16(sizeof(Mtx));
+    assert(allocated <= sizeof(opa) && allocated <= sizeof(((GfxPool*)nullptr)->polyOpaBuffer));
     assert(reinterpret_cast<const u8*>(opa + 2048) - reinterpret_cast<const u8*>(gfx.polyOpa.d) ==
            static_cast<ptrdiff_t>(allocated));
+    peakVertexCount = std::max(peakVertexCount, vertexCount);
+    peakVertexBytes = std::max(peakVertexBytes, vertexBytes);
+    peakAllocationBytes = std::max(peakAllocationBytes, allocated);
     assert(gfx.polyOpa.p == opa && scopes == 0 && children == 0 && stack == 0);
     if (!matrices) {
         assert(commands == 0 && setupCalls == 0);
@@ -645,6 +661,10 @@ int main() {
     play.cameraPtrs[0] = &camera;
     play.state.gfxCtx = nullptr;
     MMWinterAtmosphere_Draw(&play);
+    std::printf("PASS MM winter native allocation: %zu-byte vertices, peak %zu vertices / %zu aligned vertex bytes, "
+                "%zu bytes including matrices within %zu-byte OPA fixture and %zu-byte native pool\n",
+                sizeof(Vtx), peakVertexCount, peakVertexBytes, peakAllocationBytes, sizeof(opa),
+                sizeof(((GfxPool*)nullptr)->polyOpaBuffer));
     std::puts("PASS MM winter renderer/controller: terrain feathering, snow independence, actual story/interior/Rod "
               "gates, pause/live controls, frame/scene/room/game lifetimes, blue/green night ribbons, far clip, "
               "native camera frustum, frost contrast/footprint, full alpha/depth material, native texture restoration "

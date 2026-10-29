@@ -1,9 +1,15 @@
 #ifndef Z_COLLISION_CHECK_H
 #define Z_COLLISION_CHECK_H
 
-#define COLLISION_CHECK_AT_MAX 50
-#define COLLISION_CHECK_AC_MAX 60
-#define COLLISION_CHECK_OC_MAX 50
+#include <stdint.h>
+
+#define COLLISION_CHECK_AT_INITIAL_CAPACITY 50
+#define COLLISION_CHECK_AC_INITIAL_CAPACITY 60
+#define COLLISION_CHECK_OC_INITIAL_CAPACITY 50
+// Compatibility names for mods. These are initial reservations, not admission limits.
+#define COLLISION_CHECK_AT_MAX COLLISION_CHECK_AT_INITIAL_CAPACITY
+#define COLLISION_CHECK_AC_MAX COLLISION_CHECK_AC_INITIAL_CAPACITY
+#define COLLISION_CHECK_OC_MAX COLLISION_CHECK_OC_INITIAL_CAPACITY
 #define COLLISION_CHECK_OC_LINE_MAX 3
 
 // From z64.h
@@ -202,12 +208,13 @@ typedef struct {
     /* 0x0C */ ColliderTrisElementInit* elements;
 } ColliderTrisInitType1; // size = 0x10
 
+// SOH [Unbound] Midpoints retain world-coordinate precision like the quad vertices.
 typedef struct {
-    /* 0x00 */ Vec3f quad[4];
-    /* 0x30 */ Vec3s dcMid; // midpoint of vectors d, c
-    /* 0x36 */ Vec3s baMid; // midpoint of vectors b, a
-    /* 0x3C */ f32 acDist; // distance to nearest AC collision this frame.
-} ColliderQuadDim; // size = 0x40
+    Vec3f quad[4];
+    Vec3f dcMid; // midpoint of vectors d, c
+    Vec3f baMid; // midpoint of vectors b, a
+    f32 acDist; // distance to nearest AC collision this frame.
+} ColliderQuadDim;
 
 typedef struct {
     /* 0x00 */ Vec3f quad[4];
@@ -408,5 +415,29 @@ typedef enum {
 #define DMG_ARROW (DMG_ARROW_NORMAL | DMG_ARROW_FIRE | DMG_ARROW_ICE | DMG_ARROW_LIGHT | DMG_ARROW_UNK1 | DMG_ARROW_UNK2 | DMG_ARROW_UNK3)
 #define DMG_RANGED (DMG_ARROW | DMG_HOOKSHOT | DMG_SLINGSHOT)
 #define DMG_DEFAULT ~(DMG_SHIELD | DMG_MIR_RAY)
+
+// Queues are external to the raw savestate heap. Snapshots remain reusable only
+// within the captured Init/Destroy lifetime at this exact context address.
+struct CollisionCheckContext;
+typedef struct CollisionCheckQueueSnapshot CollisionCheckQueueSnapshot;
+typedef struct CollisionCheckQueueRestore CollisionCheckQueueRestore;
+#ifdef __cplusplus
+extern "C" {
+#endif
+uint64_t CollisionCheck_GetContextEpoch(const struct CollisionCheckContext* context);
+CollisionCheckQueueSnapshot* CollisionCheck_CaptureQueueSnapshot(const struct CollisionCheckContext* context);
+void CollisionCheck_FreeQueueSnapshot(CollisionCheckQueueSnapshot* snapshot);
+// Prepare owns independent staged buffers and never changes the live queues.
+CollisionCheckQueueRestore* CollisionCheck_PrepareQueueRestore(struct CollisionCheckContext* context,
+                                                              const CollisionCheckQueueSnapshot* snapshot);
+// Validate all external restore plans before copying the game heap. With no
+// intervening queue calls, Commit after the copy cannot fail or allocate.
+s32 CollisionCheck_ValidateQueueRestore(const CollisionCheckQueueRestore* restore);
+s32 CollisionCheck_CommitQueueRestore(CollisionCheckQueueRestore* restore);
+// Free an abandoned plan or its consumed handle; transferred live buffers survive.
+void CollisionCheck_FreeQueueRestore(CollisionCheckQueueRestore* restore);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

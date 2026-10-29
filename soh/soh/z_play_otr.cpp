@@ -1,10 +1,12 @@
+#include "ResourceManagerHelpers.h"
+#include "soh/unbound/SceneDB.h"
+#include <libultraship/libultraship.h>
+#include "soh/resource/type/Scene.h"
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
 #include <ship/utils/StringHelper.h>
 #include <spdlog/spdlog.h>
 
-#include "ResourceManagerHelpers.h"
-#include "soh/resource/type/Scene.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/audio/SceneRainPolicy.h"
 
@@ -51,36 +53,27 @@ Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
 }
 
 extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
-    SceneTableEntry* scene = &gSceneTable[sceneId];
+    // SOH [Unbound] scene identity comes from SceneDB
+    SceneDB::Entry& scene = SceneDB::Instance->RetrieveEntry(sceneId);
 
-    scene->unk_13 = 0;
-    play->loadedScene = scene;
-    play->sceneNum = sceneId;
-    play->sceneConfig = scene->config;
-
-    // osSyncPrintf("\nSCENE SIZE %fK\n", (scene->sceneFile.vromEnd - scene->sceneFile.vromStart) / 1024.0f);
-
-    // Scenes considered "dungeon" with a MQ variant
-    int16_t inNonSharedScene = (sceneId >= SCENE_DEKU_TREE && sceneId <= SCENE_ICE_CAVERN) ||
-                               sceneId == SCENE_GERUDO_TRAINING_GROUND || sceneId == SCENE_INSIDE_GANONS_CASTLE;
-
-    std::string sceneVersion = "shared";
-    if (inNonSharedScene) {
-        sceneVersion = ResourceMgr_IsGameMasterQuest() ? "mq" : "nonmq";
+    if (!scene.valid) {
+        SPDLOG_ERROR("[Unbound] spawn requested for unknown scene id {:#x}; defaulting to Dodongo's Cavern", sceneId);
+        OTRPlay_SpawnScene(play, SCENE_DODONGOS_CAVERN, 0);
+        return;
     }
-    std::string scenePath = StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion.c_str(), scene->sceneFile.fileName,
-                                                  scene->sceneFile.fileName);
 
+    play->sceneNum = sceneId;
+    play->sceneConfig = scene.drawConfig < SDC_MAX ? scene.drawConfig : SDC_DEFAULT;
+
+    std::string scenePath = SceneDB::Instance->GetScenePath(sceneId);
     play->sceneSegment = OTRPlay_LoadFile(play, scenePath.c_str());
 
     // Failed to load scene... default to doodongs cavern
     if (play->sceneSegment == nullptr) {
         SPDLOG_INFO("Unable to load scene {}... Defaulting to Doodong's Cavern!", scenePath);
-        OTRPlay_SpawnScene(play, 0x01, 0);
+        OTRPlay_SpawnScene(play, SCENE_DODONGOS_CAVERN, 0);
         return;
     }
-
-    scene->unk_13 = 0;
 
     // gSegments[2] = VIRTUAL_TO_PHYSICAL(play->sceneSegment);
 
@@ -96,6 +89,9 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
 }
 
 void OTRPlay_InitScene(PlayState* play, s32 spawn) {
+    // A legal JSON setup may omit collision entirely. Start from owned, queryable empty tables rather
+    // than uninitialized PlayState bytes; a collision command replaces this context during setup.
+    BgCheck_InitEmpty(&play->colCtx, play);
     play->curSpawn = spawn;
     play->linkActorEntry = nullptr;
     play->unk_11DFC = nullptr;
@@ -104,6 +100,12 @@ void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     play->cUpElfMsgs = nullptr;
     play->setupPathList = nullptr;
     play->numSetupActors = 0;
+    // SOH [Unbound] the fields an Unbound scene document's commands fill are reset here with the vanilla ones:
+    // PlayState is not zero-initialized, a document may omit the command, and the previous scene's command
+    // resources are gone with it.
+    play->sequenceCtx.unboundSongSeqId = 0;
+    play->sceneMaterialAnims = nullptr;
+    play->sceneMaterialAnimCount = 0;
     Object_InitBank(play, &play->objectCtx);
     LightContext_Init(play, &play->lightCtx);
     TransitionActor_InitContext(&play->state, &play->transiActorCtx);

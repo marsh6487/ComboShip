@@ -10,6 +10,8 @@ set(CMAKE_C_STANDARD 23 CACHE STRING "The C standard to use")
 include(CTest)
 include(tests/frame_timing_output.cmake)
 if(BUILD_TESTING)
+    add_test(NAME candidate_port_archive_metadata_test
+        COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/../tests/packaging/test_normalize_candidate_o2r.py)
     add_executable(pak_selection_test tests/pak_selection_test.cpp)
     target_include_directories(pak_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME pak_selection_test COMMAND pak_selection_test)
@@ -163,6 +165,16 @@ if(BUILD_TESTING)
     )
     target_compile_definitions(hyrule_field_night_runtime_test PRIVATE CVAR_PREFIX_AUDIO="gAudioEditor")
     add_test(NAME hyrule_field_night_runtime_test COMMAND hyrule_field_night_runtime_test)
+
+    # The production updater includes engine bridge APIs and COMBO_BUILD ShipInit uses
+    # OwnRMScope. Inherit the engine's public headers and link that shared implementation.
+    foreach(night_music_test hyrule_field_night_music_test hyrule_field_night_runtime_test)
+        target_link_libraries(${night_music_test} PRIVATE libultraship)
+        if(WIN32)
+            set_property(TARGET ${night_music_test} PROPERTY RUNTIME_OUTPUT_DIRECTORY
+                "$<TARGET_FILE_DIR:libultraship>")
+        endif()
+    endforeach()
 
     add_executable(audio_font_id_test tests/audio_font_id_test.c)
     target_include_directories(audio_font_id_test PRIVATE

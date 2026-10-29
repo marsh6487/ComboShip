@@ -77,7 +77,9 @@ def native_camera_path(camera, play):
         (actor, ("f32 Player_GetHeight(", "PosRot* Actor_GetWorldPosShapeRot(")),
         (atan, ("f32 Math_FAtanTaylorQF(", "f32 Math_FAtanTaylorF(", "f32 Math_FAtanContFracF(", "f32 Math_FAtanF(", "f32 Math_FAtan2F(")),
         (olib, ("f32 OLib_Vec3fDist(", "f32 OLib_ClampMaxDist(", "Vec3f* OLib_VecSphToVec3f(", "Vec3f* OLib_VecSphGeoToVec3f(", "VecSph* OLib_Vec3fToVecSph(", "VecSph* OLib_Vec3fToVecSphGeo(", "VecSph* OLib_Vec3fDiffToVecSphGeo(")),
-        (bgcheck, ("CollisionHeader* BgCheck_GetCollisionHeader(", "u16 BgCheck_GetBgCamSettingImpl(", "Vec3s* BgCheck_GetBgCamFuncDataImpl(")),
+        (bgcheck, ("s32 DynaPoly_IsBgIdBgActor(", "s32 DynaPoly_IsBgIdInTable(",
+                   "CollisionHeader* BgCheck_GetCollisionHeader(", "u16 BgCheck_GetBgCamSettingImpl(",
+                   "Vec3s* BgCheck_GetBgCamFuncDataImpl(")),
         (camera, ("f32 Camera_LERPCeilF(", "void Camera_LERPCeilVec3f(", "void func_80043ABC(", "void func_80043B60(", "Vec3f* Camera_Vec3sToVec3f(", "Vec3f* Camera_Vec3fVecSphGeoAdd(", "void Camera_CopyDataToRegs(", "f32 Camera_CalcSlopeYAdj(", "s32 Camera_CalcAtDefault(", "s32 func_8005A02C(", "s32 Camera_RequestModeImpl(", "s16 Camera_ChangeSettingFlags(", "s32 Camera_RequestSetting(", "s16 Camera_GetBgCamSetting(", "Vec3s* Camera_GetCamBGData(", "s32 Camera_ChangeDataIdx(", "s32 Camera_QRegInit(", "void func_80057FC4(", "void Camera_InitPlayerSettings(", "s16 Camera_ChangeStatus(", "void Camera_SetCameraData(", "s32 Camera_Data4(")),
         (play, ("void Play_SetShopBrowsingViewpoint(", "void Play_RequestViewpointBgCam(")),
     ):

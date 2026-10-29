@@ -58,6 +58,11 @@ int Player_InCsMode(PlayState* play) {
 u16 AudioEditor_GetReplacementSeq(u16 id) {
     return id;
 }
+// Scene routing is covered separately; retain the resolved ID for the complete
+// production night updater, COMBO_BUILD ShipInit registration and command queue.
+u16 AudioEditor_ResolveSceneSequence(u16, u16 resolved) {
+    return resolved;
+}
 void Audio_QueueCmdS32(u32 command, s32) {
     commands.push_back(command);
 }

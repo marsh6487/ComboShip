@@ -1,3 +1,4 @@
+#include "FreezeTime.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -27,6 +28,12 @@ void OnGameFrameUpdateFreezeTime() {
     }
 
     gSaveContext.dayTime = CVAR_PREV_TIME_VALUE;
+}
+
+void FreezeTime_Retime(int32_t dayTime) {
+    if (CVAR_FREEZE_TIME_VALUE) {
+        CVarSetInteger(CVAR_PREV_TIME_NAME, dayTime);
+    }
 }
 
 void RegisterFreezeTime() {

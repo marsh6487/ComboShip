@@ -14,6 +14,12 @@
 #include <string>
 #include <vector>
 #include <libultraship/libultra/types.h>
+#ifndef SCENE_MUSIC_MM
+#include "z64.h"
+extern "C" {
+PlayState* gPlayState = nullptr;
+}
+#endif
 #include "sequence.h"
 #include "sfx.h"
 #include "AudioCollection.h"
@@ -24,6 +30,7 @@
 /* AUDIO CONSTANTS */
 #define GAMEMODE_NORMAL 0
 #define GAMEMODE_END_CREDITS 3
+#undef IS_RANDO
 #define IS_RANDO false
 static std::map<std::string,int> values;
 int CVarGetInteger(const char* key,int fallback) {
@@ -45,7 +52,16 @@ struct Context {
     uint32_t GetSeed() { return 0x12345678; }
 };
 }
+#ifdef SCENE_MUSIC_MM
 struct { int gameMode=GAMEMODE_NORMAL;struct { struct { uint64_t fileCreatedAt=99; } stats; } ship; } gSaveContext;
+#else
+SaveContext gSaveContext=[] {
+    SaveContext save{};
+    save.gameMode=GAMEMODE_NORMAL;
+    save.ship.stats.fileCreatedAt=99;
+    return save;
+}();
+#endif
 class GameInteractor {
 public:
     struct OnSceneInit { using Callback=std::function<void(int16_t)>; };

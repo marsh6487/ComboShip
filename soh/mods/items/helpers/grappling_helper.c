@@ -39,9 +39,9 @@ static void SortDims3(f32* a, f32* b, f32* c) {
 }
 
 // =============================================================================
-// Internal: expand bounding box with a Vec3s vertex
+// Internal: expand bounding box with a wide collision vertex
 // =============================================================================
-static void ExpandBBox(Vec3f* bMin, Vec3f* bMax, Vec3s* vtx) {
+static void ExpandBBox(Vec3f* bMin, Vec3f* bMax, Vec3i* vtx) {
     if (vtx->x < bMin->x)
         bMin->x = vtx->x;
     if (vtx->y < bMin->y)
@@ -59,10 +59,10 @@ static void ExpandBBox(Vec3f* bMin, Vec3f* bMax, Vec3s* vtx) {
 // =============================================================================
 // Internal: get center of a polygon
 // =============================================================================
-static void GetPolyCenterF(Vec3s* vtxList, u16 idxA, u16 idxB, u16 idxC, Vec3f* out) {
-    out->x = (vtxList[idxA].x + vtxList[idxB].x + vtxList[idxC].x) / 3.0f;
-    out->y = (vtxList[idxA].y + vtxList[idxB].y + vtxList[idxC].y) / 3.0f;
-    out->z = (vtxList[idxA].z + vtxList[idxB].z + vtxList[idxC].z) / 3.0f;
+static void GetPolyCenterF(Vec3i* vtxList, u32 idxA, u32 idxB, u32 idxC, Vec3f* out) {
+    out->x = ((f32)vtxList[idxA].x + vtxList[idxB].x + vtxList[idxC].x) / 3.0f;
+    out->y = ((f32)vtxList[idxA].y + vtxList[idxB].y + vtxList[idxC].y) / 3.0f;
+    out->z = ((f32)vtxList[idxA].z + vtxList[idxB].z + vtxList[idxC].z) / 3.0f;
 }
 
 // =============================================================================
@@ -81,12 +81,14 @@ static s32 NormalsAreSimilar(CollisionPoly* p1, CollisionPoly* p2) {
 // =============================================================================
 s32 Grapple_AnalyzeSurface(PlayState* play, CollisionPoly* poly, s32 bgId, Vec3f* hitPos, GrappleTarget* outTarget) {
     CollisionHeader* colHeader;
-    Vec3s* vtxList;
-    u16 idxA, idxB, idxC;
+    Vec3i* vtxList;
+    CollisionPoly* polyList;
+    u32 vtxCount, polyCount;
+    u32 idxA, idxB, idxC;
     Vec3f bMin, bMax, hitCenter;
     f32 dx, dy, dz, aspectRatio;
 
-    if (outTarget == NULL || poly == NULL)
+    if (play == NULL || outTarget == NULL || poly == NULL)
         return 0;
 
     // Initialize output
@@ -114,23 +116,42 @@ s32 Grapple_AnalyzeSurface(PlayState* play, CollisionPoly* poly, s32 bgId, Vec3f
     // Get vertex list
     if (bgId == BGCHECK_SCENE) {
         vtxList = colHeader->vtxList;
+        vtxCount = colHeader->numVertices;
+        polyList = colHeader->polyList;
+        polyCount = colHeader->numPolygons;
     } else {
-        vtxList = play->colCtx.dyna.vtxList;
+        DynaCollisionContext* dyna = &play->colCtx.dyna;
+        u32 polyStart;
+        if (bgId < 0 || bgId >= dyna->bgActorMax || !(dyna->bgActorFlags[bgId] & 1) || (dyna->bgActorFlags[bgId] & 2) ||
+            dyna->polyListMax <= 0 || dyna->vtxListMax <= 0)
+            return 0;
+        polyStart = dyna->bgActors[bgId].dynaLookup.polyStartIndex;
+        if (polyStart >= (u32)dyna->polyListMax || dyna->polyList == NULL)
+            return 0;
+        vtxList = dyna->vtxList;
+        vtxCount = dyna->vtxListMax;
+        // The registered header is model-space. Both the hit and its neighbors
+        // must use the current baked polygon range with the world-space pool.
+        polyList = &dyna->polyList[polyStart];
+        polyCount = MIN(colHeader->numPolygons, (u32)dyna->polyListMax - polyStart);
     }
-    if (vtxList == NULL)
+    if (vtxList == NULL || polyList == NULL)
         return 0;
 
     // Get hit poly vertex indices
     idxA = COLPOLY_VTX_INDEX(poly->flags_vIA);
     idxB = COLPOLY_VTX_INDEX(poly->flags_vIB);
     idxC = poly->vIC;
+    if (idxA >= vtxCount || idxB >= vtxCount || idxC >= vtxCount)
+        return 0;
 
     // Get hit poly center for proximity checks
     GetPolyCenterF(vtxList, idxA, idxB, idxC, &hitCenter);
 
     // Initialize bounding box from hit poly vertices
-    bMin.x = bMin.y = bMin.z = 99999.0f;
-    bMax.x = bMax.y = bMax.z = -99999.0f;
+    bMin.x = bMax.x = vtxList[idxA].x;
+    bMin.y = bMax.y = vtxList[idxA].y;
+    bMin.z = bMax.z = vtxList[idxA].z;
 
     ExpandBBox(&bMin, &bMax, &vtxList[idxA]);
     ExpandBBox(&bMin, &bMax, &vtxList[idxB]);
@@ -144,9 +165,9 @@ s32 Grapple_AnalyzeSurface(PlayState* play, CollisionPoly* poly, s32 bgId, Vec3f
         neighborDist = (ny < -0.5f) ? (GRAPPLE_NEIGHBOR_DIST * 2.0f) : GRAPPLE_NEIGHBOR_DIST;
 
         // Walk neighbor polygons: similar normal AND (shared vertex OR within distance)
-        for (u16 i = 0; i < colHeader->numPolygons; i++) {
-            CollisionPoly* other = &colHeader->polyList[i];
-            u16 oA, oB, oC;
+        for (u32 i = 0; i < polyCount; i++) {
+            CollisionPoly* other = &polyList[i];
+            u32 oA, oB, oC;
             s32 shared;
             Vec3f otherCenter;
             f32 distSq;
@@ -161,6 +182,8 @@ s32 Grapple_AnalyzeSurface(PlayState* play, CollisionPoly* poly, s32 bgId, Vec3f
             oA = COLPOLY_VTX_INDEX(other->flags_vIA);
             oB = COLPOLY_VTX_INDEX(other->flags_vIB);
             oC = other->vIC;
+            if (oA >= vtxCount || oB >= vtxCount || oC >= vtxCount)
+                continue;
 
             // Check if shares at least 1 vertex with hit poly
             shared = (oA == idxA || oA == idxB || oA == idxC || oB == idxA || oB == idxB || oB == idxC || oC == idxA ||

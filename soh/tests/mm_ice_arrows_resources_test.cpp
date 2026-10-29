@@ -94,8 +94,8 @@ static void Resources(bool block) {
     ownLoads = foreignLoads = 0;
     auto meta = std::make_shared<Ship::ResourceInitData>();
     auto col = std::make_shared<SOH::CollisionHeader>(meta);
-    col->vertices = block ? std::vector<Vec3s>{ { -600, 0, -600 }, { 600, 1000, 600 } }
-                          : std::vector<Vec3s>{ { -1473, -1985, -1696 }, { 1473, 150, 1696 } };
+    col->vertices = block ? std::vector<Vec3i>{ { -600, 0, -600 }, { 600, 1000, 600 } }
+                          : std::vector<Vec3i>{ { -1473, -1985, -1696 }, { 1473, 150, 1696 } };
     col->collisionHeaderData.minBounds = col->vertices[0];
     col->collisionHeaderData.maxBounds = col->vertices[1];
     col->collisionHeaderData.vtxList = col->vertices.data();

@@ -94,6 +94,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
                  "gfx_quad_handler_f3dex2", "gfx_quad_handler_f3dex", "Interpreter::SpReset",
                  "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir",
                  "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp"]
+        if "Interpreter::SelectToonLight(" in source:
+            names.insert(names.index("Interpreter::GfxSpVertex"), "Interpreter::SelectToonLight")
         if "Interpreter::PrepareTriangleState(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:

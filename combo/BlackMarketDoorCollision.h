@@ -2,6 +2,7 @@
 // Closed-leaf collision belongs only to the controller's exact live native door.
 // The visible native actor and its Open action remain the interaction authority.
 #include <array>
+#include <type_traits>
 
 namespace BlackMarketDoorCollision {
 template <bool Oot> class Fixture {
@@ -10,7 +11,11 @@ template <bool Oot> class Fixture {
         constexpr int faces[4][3] = { { 0, 1, 2 }, { 0, 2, 3 }, { 2, 1, 0 }, { 3, 2, 0 } };
         for (size_t i = 0; i < mPolygons.size(); ++i) {
             auto& p = mPolygons[i];
-            p.flags_vIA = faces[i][0] | (1 << 13); // camera exclusion, both native formats
+#ifdef BGACTOR_INVALID
+            p.flags_vIA = faces[i][0] | (1u << COLPOLY_VIA_FLAGS_SHIFT);
+#else
+            p.flags_vIA = faces[i][0] | (1u << 13);
+#endif
             p.flags_vIB = faces[i][1];
             p.vIC = faces[i][2];
             p.normal = { 0, 0, s16(i < 2 ? 32767 : -32767) };
@@ -22,6 +27,11 @@ template <bool Oot> class Fixture {
         mCollision.numPolygons = mPolygons.size();
         mCollision.polyList = mPolygons.data();
         mCollision.surfaceTypeList = mSurface.data();
+#ifdef BGACTOR_INVALID
+        mSurface[0].wallType = 1;
+#else
+        mSurface[0].data[0] = 1u << 21;
+#endif
         AttachCamera(mCollision);
     }
     Fixture(const Fixture&) = delete;
@@ -33,13 +43,13 @@ template <bool Oot> class Fixture {
     }
     int OwnedBgId(const PlayState* play) const {
         if (play)
-            for (int id = 0; id < BG_ACTOR_MAX; ++id)
+            for (int id = 0; id < ActorCapacity(play->colCtx.dyna); ++id)
                 if (Owns(&play->colCtx, id))
                     return id;
         return -1;
     }
     bool Owns(const CollisionContext* context, int id) const {
-        if (!context || id < 0 || id >= BG_ACTOR_MAX)
+        if (!context || id < 0 || id >= ActorCapacity(context->dyna))
             return false;
         const auto& dyna = context->dyna;
         return (dyna.bgActorFlags[id] & 1) && !(dyna.bgActorFlags[id] & 2) &&
@@ -79,13 +89,24 @@ template <bool Oot> class Fixture {
         mOwner.actor.shape.rot.y = closedDoor->home.rot.y;
         mOwner.actor.update = [](Actor*, PlayState*) {};
         const int id = DynaPoly_SetBgActor(play, &play->colCtx.dyna, &mOwner.actor, &mCollision);
-        if (id < 0 || id >= BG_ACTOR_MAX)
+        if (id < 0 || id >= ActorCapacity(play->colCtx.dyna)
+#ifdef BGACTOR_INVALID
+            || id == BGACTOR_INVALID
+#endif
+        )
             return false;
         mOwner.bgId = id;
         return true;
     }
 
   private:
+    static int ActorCapacity(const DynaCollisionContext& dyna) {
+#ifdef BGACTOR_INVALID
+        return dyna.bgActorMax;
+#else
+        return BG_ACTOR_MAX;
+#endif
+    }
     static int MaxNodes(const auto& dyna) {
         if constexpr (requires { dyna.polyNodes.maxNodes; })
             return dyna.polyNodes.maxNodes;
@@ -93,6 +114,10 @@ template <bool Oot> class Fixture {
             return dyna.polyNodes.max;
     }
     bool HasCapacity(const DynaCollisionContext& dyna) const {
+#ifdef BGACTOR_INVALID
+        // OoT grows the actor table at registration and geometry at setup.
+        return true;
+#else
         if (!dyna.polyList || !dyna.vtxList || !dyna.polyNodes.tbl)
             return false;
         size_t polygons = mPolygons.size(), vertices = mVertices.size();
@@ -112,6 +137,7 @@ template <bool Oot> class Fixture {
         return free && dyna.polyListMax > 0 && dyna.vtxListMax > 0 && MaxNodes(dyna) > 0 &&
                polygons <= size_t(dyna.polyListMax) && vertices <= size_t(dyna.vtxListMax) &&
                polygons <= size_t(MaxNodes(dyna));
+#endif
     }
     void AttachCamera(auto& header) {
         if constexpr (requires { header.bgCamList; })
@@ -123,10 +149,11 @@ template <bool Oot> class Fixture {
     }
     // The native default wooden leaf is sixty units wide and one hundred high.
     // Overlap its lintel/floor by a few units; no floor/top/ledge faces are added.
-    std::array<Vec3s, 4> mVertices{ { { -30, -8, 0 }, { 30, -8, 0 }, { 30, 110, 0 }, { -30, 110, 0 } } };
+    using CollisionVertex = std::remove_pointer_t<decltype(CollisionHeader::vtxList)>;
+    std::array<CollisionVertex, 4> mVertices{ { { -30, -8, 0 }, { 30, -8, 0 }, { 30, 110, 0 }, { -30, 110, 0 } } };
     std::array<CollisionPoly, 4> mPolygons{};
-    // Both hosts encode WALL_TYPE_1 at bit21: native no-ledge-climb surface.
-    std::array<SurfaceType, 1> mSurface{ { { { 1u << 21, 0 } } } };
+    // Native no-ledge-climb surface; OoT stores named fields, MM packed words.
+    std::array<SurfaceType, 1> mSurface{};
     std::array<CamData, 1> mCamera{ { { CAM_SET_NONE, 0, nullptr } } };
     CollisionHeader mCollision{};
     DynaPolyActor mOwner{};

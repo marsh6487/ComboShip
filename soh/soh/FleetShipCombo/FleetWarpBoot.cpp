@@ -1,3 +1,4 @@
+#include "soh/unbound/SceneDB.h"
 // FleetWarpBoot.cpp — UNIFIED cross-game warp arrival pipeline (OoT side) + combo-pair save
 // validation + title-screen temp cleanup + Temple of Time fleet-hole spawner.
 //
@@ -200,14 +201,10 @@ void LimboEnterFromGameplay() {
 
 // Repoint the unused test scene at our custom room. Runs once at init.
 void LimboInstallScene() {
-    SceneTableEntry* entry = &gSceneTable[kLimboSceneId];
-    entry->sceneFile.vromStart = 0;
-    entry->sceneFile.vromEnd = 0;
-    entry->sceneFile.fileName = (char*)"fleet_scene"; // -> scenes/shared/fleet_scene/fleet_scene (soh.o2r)
-    entry->titleFile.vromStart = 0;
-    entry->titleFile.vromEnd = 0;
-    entry->titleFile.fileName = NULL;
-    entry->config = SDC_DEFAULT;
+    auto& entry = SceneDB::Instance->RetrieveEntry(kLimboSceneId);
+    entry.sceneFileName = "fleet_scene";
+    entry.titleCardTexture.clear();
+    entry.drawConfig = SDC_DEFAULT;
     SPDLOG_INFO("[FleetLimbo] waiting room installed over SCENE_TEST01 (entrance {:#06x})", (int)kLimboEntrance);
 }
 

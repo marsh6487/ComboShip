@@ -37,7 +37,17 @@ def main():
         "SaveManager::SaveToJsonObject", "SaveManager::LoadFromJsonObject",
     )
     buttons = (ROOT / "soh/mods/ext_buttons/ext_buttons.cpp").read_text()
-    production = extract(buttons, "ExtButton_ResetSaveData") + "\n\n"
+    scenes = (ROOT / "soh/soh/unbound/SceneDB.cpp").read_text()
+    # Full-file saves now snapshot the registry alongside SaveContext. Retain
+    # the real empty registry state and save scope; horse assertions stay intact.
+    state_start = scenes.index("std::unordered_map<int32_t, SavedSceneFlags> sCustomSceneFlags;")
+    state_end = scenes.index("std::unordered_map<int32_t, ExtBitset>& ExtFlagMap(", state_start)
+    production = '#include "soh/unbound/SceneDB.h"\n' + scenes[state_start:state_end]
+    for signature in ("SceneDBState SceneDB_CaptureState()",
+                      "SceneDBSaveScope::SceneDBSaveScope(const SceneDBState& state)",
+                      "SceneDBSaveScope::~SceneDBSaveScope()"):
+        production += block_from(scenes, scenes.index(signature)) + "\n\n"
+    production += extract(buttons, "ExtButton_ResetSaveData") + "\n\n"
     production += "\n\n".join(extract(source, name) for name in names)
     production += "\n" + extract((ROOT / "soh/soh/util.cpp").read_text(), "SohUtils::CopyStringToCharArray")
     # Preserve the actual base registration and init registration, while leaving

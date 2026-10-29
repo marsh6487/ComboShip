@@ -85,35 +85,47 @@ class CollisionAudio(unittest.TestCase):
         module = load_module()
         _, old_polys, old_types, _ = parts(synthetic())
         _, polys, types, _ = parts(module.apply(synthetic()))
-        before = old_types[old_polys[0][0]][0]
-        corrected = types[polys[0][0]][0]
+        before_data1, before_data0 = old_types[old_polys[0][0]]
+        corrected_data1, corrected_data0 = types[polys[0][0]]
         source = (ROOT / 'soh/src/code/z_bgcheck.c').read_text()
         table_start = source.index('u16 D_80119E10[14]')
         table = source[table_start:source.index(';', table_start) + 1]
-        names = ['GROUND', 'SAND', 'CONCRETE', 'DIRT', 'WATER0', 'WATER1', 'WATER2',
-                 'MAGMA', 'GRASS', 'GLASS', 'LADDER', 'ICE', 'IRON']
-        fixture = '#include <cassert>\n#include <cstdint>\n'
-        fixture += 'using u16=uint16_t; using u32=uint32_t; using s32=int32_t; using s8=int8_t;\n'
-        fixture += 'struct CollisionContext {}; struct CollisionPoly {};\n'
-        fixture += 'enum { SFX_FLAG=0, ' + ', '.join('NA_SE_PL_WALK_' + n + '=' + str(i + 100) for i, n in enumerate(names)) + ' };\n'
-        fixture += 'static u32 data; static s8 sAudioCodeReverb;\nu32 SurfaceType_GetData(CollisionContext*,CollisionPoly*,s32,s32){return data;}\n'
+        fixture = '#include "global.h"\n#include "vt.h"\n#include <assert.h>\n#include <stdint.h>\n'
+        fixture += '#undef osSyncPrintf\n#define osSyncPrintf(...) ((void)0)\n'
+        fixture += 'uintptr_t gSegments[16]; s8 sAudioCodeReverb;\n'
         fixture += table + '\n'
-        for sig in ('u32 func_80041F10(', 'u16 SurfaceType_GetSfx(', 'u32 SurfaceType_GetEcho('):
+        for sig in ('s32 DynaPoly_IsBgIdBgActor(', 's32 DynaPoly_IsBgIdInTable(',
+                    'CollisionHeader* BgCheck_GetCollisionHeader(', 'SurfaceType SurfaceType_Unpack(',
+                    'static SurfaceType* SurfaceType_Get(', 'u32 func_80041F10(',
+                    'u16 SurfaceType_GetSfx(', 'u32 SurfaceType_GetEcho('):
             fixture += function(source, sig) + '\n'
         audio = (ROOT / 'soh/src/code/code_800EC960.c').read_text()
         fixture += function(audio, 'void Audio_SetCodeReverb(') + '\n'
-        fixture += ('int main(){ CollisionContext c; CollisionPoly p; data=' + str(before) + 'u;'
-                    'assert(SurfaceType_GetSfx(&c,&p,0)!=NA_SE_PL_WALK_CONCRETE);'
-                    'data=' + str(corrected) + 'u;'
-                    'assert(SurfaceType_GetSfx(&c,&p,0)==NA_SE_PL_WALK_CONCRETE);'
-                    'assert(SurfaceType_GetEcho(&c,&p,0)==63);'
-                    'Audio_SetCodeReverb(SurfaceType_GetEcho(&c,&p,0)); assert(sAudioCodeReverb==63);}\n')
+        native_source = fixture
+        fixture = '#include "global.h"\n#include <cassert>\nextern "C" { extern s8 sAudioCodeReverb; }\n'
+        # The legacy importer reads stored words as data1, data0, then passes
+        # data0, data1 to the native unpacker. Use that actual native path.
+        fixture += ('int main(){ CollisionContext c{}; CollisionPoly p{}; CollisionHeader h{};'
+                    'SurfaceType surface=SurfaceType_Unpack(' + str(before_data0) + 'u,' + str(before_data1) + 'u);'
+                    'const auto original=surface; h.surfaceTypeList=&surface; c.colHeader=&h;'
+                    'assert(SurfaceType_GetSfx(&c,&p,BGCHECK_SCENE)!=NA_SE_PL_WALK_CONCRETE-SFX_FLAG);'
+                    'surface=SurfaceType_Unpack(' + str(corrected_data0) + 'u,' + str(corrected_data1) + 'u);'
+                    'assert(surface.camera==original.camera && surface.exit==original.exit);'
+                    'assert(SurfaceType_GetSfx(&c,&p,BGCHECK_SCENE)==NA_SE_PL_WALK_CONCRETE-SFX_FLAG);'
+                    'assert(SurfaceType_GetEcho(&c,&p,BGCHECK_SCENE)==63);'
+                    'Audio_SetCodeReverb(SurfaceType_GetEcho(&c,&p,BGCHECK_SCENE)); assert(sAudioCodeReverb==63);}\n')
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'native.cpp'
             path.write_text(fixture)
-            subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror',
-                            '-Wno-unused-parameter', '-fsanitize=address,undefined',
-                            '-fno-sanitize-recover=all', '-no-pie', str(path), '-o', str(path.with_suffix(''))], check=True)
+            native_path = Path(directory) / 'native.c'
+            native_path.write_text(native_source)
+            obj = Path(directory) / 'native.o'
+            flags = ['-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-fsanitize=address,undefined',
+                     '-fno-sanitize-recover=all', '-no-pie', '-DF3DEX_GBI_2', '-DCOMBO_BUILD',
+                     *['-I' + str(ROOT / p) for p in ('.', 'soh', 'soh/include', 'soh/include/PR',
+                         'soh/src', 'soh/assets', 'soh/soh', 'libultraship/include', 'combo')]]
+            subprocess.run(['cc', '-std=c11', *flags, '-c', str(native_path), '-o', str(obj)], check=True)
+            subprocess.run(['c++', '-std=c++20', *flags, str(path), str(obj), '-o', str(path.with_suffix(''))], check=True)
             subprocess.run([str(path.with_suffix(''))], check=True,
                            env={**__import__('os').environ, 'ASAN_OPTIONS': 'detect_leaks=0'})
 

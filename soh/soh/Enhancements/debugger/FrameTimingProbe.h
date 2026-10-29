@@ -63,6 +63,7 @@ namespace Fast {
 struct RenderCostReport;
 }
 nlohmann::json FrameTiming_RenderSummary(const Fast::RenderCostReport& report);
+nlohmann::json FrameTiming_RenderTables(const Fast::RenderCostReport& report);
 extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context);
 
 namespace FrameTiming {

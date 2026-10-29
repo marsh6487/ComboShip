@@ -1,3 +1,4 @@
+#include "soh/unbound/SceneDB.h"
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -217,9 +218,62 @@ bool IsOotrsExtension(std::string extension) {
     return StringHelper::IEquals(extension, ".ootrs");
 }
 
+// The mods folder, or an empty string when this install has none.
+static std::string ModsFolder() {
+    std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods/" + appShortName, appShortName);
+    return (modsPath.empty() || !std::filesystem::is_directory(modsPath)) ? "" : modsPath;
+}
+
+// Scans the mods folder into filePaths and ootrsFiles, appending any mod not yet in the enabled
+// list. Returns whether the enabled list changed.
+static bool ScanModsFolder(const std::string& modsPath, std::vector<std::filesystem::path>& ootrsFiles) {
+    std::map<std::string, std::string> newMods;
+    for (const std::filesystem::directory_entry& p : std::filesystem::recursive_directory_iterator(
+             modsPath, std::filesystem::directory_options::follow_directory_symlink)) {
+        if (p.is_directory()) {
+            continue;
+        }
+        std::string filename =
+            p.path().filename().generic_string().substr(0, p.path().filename().generic_string().rfind("."));
+        std::string extension = p.path().extension().generic_string();
+        if (IsOotrsExtension(extension)) {
+            ootrsFiles.push_back(p.path());
+            continue;
+        }
+        if (!IsValidExtension(extension)) {
+            continue;
+        }
+        if (!SohUtils::Contains(filename, enabledModFiles)) {
+            newMods.emplace(p.path().lexically_normal().generic_string(), filename);
+        }
+        filePaths.emplace(filename, p.path());
+    }
+    for (auto& [path, name] : newMods) {
+        enabledModFiles.push_back(name);
+    }
+    return !newMods.empty();
+}
+
+// Drops enabled mods with no file behind them. The list is saved in the config, so it can
+// name mods this install does not have: a config written by another install (a desktop
+// config handed to a browser build), or a file deleted since. Returns whether any were dropped.
+static bool PruneMissingMods() {
+    return std::erase_if(enabledModFiles, [](const std::string& mod) { return !filePaths.contains(mod); }) > 0;
+}
+
+// Mods without a file are not loaded: the folder is absent, so the list was kept as it is.
+static void LoadEnabledModArchives(std::vector<std::filesystem::path>& ootrsFiles) {
+    for (const std::string& mod : enabledModFiles) {
+        if (filePaths.contains(mod)) {
+            GetArchiveManager()->AddArchive(filePaths.at(mod).generic_string());
+        }
+    }
+    std::sort(ootrsFiles.begin(), ootrsFiles.end());
+    SOH::MountOotrsArchives(ootrsFiles);
+}
+
 void UpdateModFiles(bool init = false, bool reset = false) {
     if (init || reset) {
-        enabledModFiles.clear();
         enabledModFiles = GetEnabledModsFromCVar();
         ClearSelectedMods();
     }
@@ -227,57 +281,25 @@ void UpdateModFiles(bool init = false, bool reset = false) {
     unsupportedFiles.clear();
     filePaths.clear();
     bool changed = false;
-    std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods/" + appShortName, appShortName);
-    std::map<std::string, std::string> tempMods;
     std::vector<std::filesystem::path> ootrsFiles;
-    if (modsPath.length() > 0 && std::filesystem::exists(modsPath)) {
-        std::vector<std::filesystem::path> enabledFiles;
-        if (std::filesystem::is_directory(modsPath)) {
-            for (const std::filesystem::directory_entry& p : std::filesystem::recursive_directory_iterator(
-                     modsPath, std::filesystem::directory_options::follow_directory_symlink)) {
-                if (p.is_directory()) {
-                    continue;
-                }
-                std::string filename =
-                    p.path().filename().generic_string().substr(0, p.path().filename().generic_string().rfind("."));
-                std::string extension = p.path().extension().generic_string();
-                if (IsOotrsExtension(extension)) {
-                    ootrsFiles.push_back(p.path());
-                    continue;
-                }
-                if (!IsValidExtension(extension)) {
-                    continue;
-                }
-                bool enabled = SohUtils::Contains(filename, enabledModFiles);
-                if (!enabled) {
-                    tempMods.emplace(p.path().lexically_normal().generic_string(), filename);
-                }
-                filePaths.emplace(filename, p.path());
-            }
-            if (tempMods.size() > 0) {
-                changed = true;
-                for (auto [path, name] : tempMods) {
-                    enabledModFiles.push_back(name);
-                }
-                tempMods.clear();
-            }
-            if (init) {
-                std::vector<std::string> enabledTemp(enabledModFiles);
-                for (std::string mod : enabledTemp) {
-                    if (filePaths.contains(mod)) {
-                        GetArchiveManager()->AddArchive(filePaths.at(mod).generic_string());
-                    } else {
-                        enabledModFiles.erase(std::find(enabledModFiles.begin(), enabledModFiles.end(), mod));
-                        changed = true;
-                    }
-                }
-                std::sort(ootrsFiles.begin(), ootrsFiles.end());
-                SOH::MountOotrsArchives(ootrsFiles);
-            }
-        }
-        if (changed) {
-            SetEnabledModsCVarValue();
-        }
+    std::string modsPath = ModsFolder();
+    if (!modsPath.empty()) {
+        changed = ScanModsFolder(modsPath, ootrsFiles);
+        // Only a scan can tell a deleted mod from one this install never had. Pruning used to
+        // happen only while loading archives; it happens before the list is drawn too, since
+        // the Mod Menu draws each entry's file. Without the folder (moved aside, an unmounted
+        // drive) the list is kept, order and all, so that putting the folder back restores it:
+        // nothing is loaded, and the Mod Menu shows each entry as missing.
+        changed |= PruneMissingMods();
+    }
+    if (init) {
+        LoadEnabledModArchives(ootrsFiles);
+    }
+    if (changed) {
+        SetEnabledModsCVarValue();
+    }
+    if (init) {
+        SceneDB::Instance->LoadCustomScenes(); // SOH [Unbound] archives are all mounted now
     }
 }
 
@@ -301,6 +323,15 @@ void DisableMod(std::string file) {
     // GetArchiveManager()->RemoveArchive(file);
     ClearSelectedMods();
     AfterModChange();
+}
+
+// The mod's file name, or the enabled-list name marked missing when there is no file behind it.
+static std::string ModDisplayName(const std::string& mod) {
+    auto path = filePaths.find(mod);
+    if (path == filePaths.end()) {
+        return mod + " (missing)";
+    }
+    return path->second.filename().generic_string();
 }
 
 void HandleModDropBoundaries() {
@@ -411,7 +442,7 @@ void DrawMods(bool enabled) {
         }
 
         ImGui::SameLine();
-        std::string displayName = pathIt->second.filename().generic_string();
+        std::string displayName = ModDisplayName(file);
         if (enabled) {
             ImGui::PushID(file.c_str());
             float selectableWidth =

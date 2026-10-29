@@ -1,6 +1,11 @@
 // Real resource-graph reader and owner query; registry/archive loading are seams.
 #include "combo/NeiGiModelBounds.h"
 #include <fast/resource/type/Texture.h>
+#include <fast/resource/factory/MatrixFactory.h>
+#include <ship/utils/binarytools/BinaryReader.h>
+#ifndef MM_BUILD_DLL
+#include "soh/soh/resource/importer/ArrayFactory.h"
+#endif
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -47,21 +52,55 @@ void List(Ship::ResourceManager& owner,const char* path,std::initializer_list<st
     for(auto [w0,w1]:words){Gfx cmd{};cmd.words.w0=w0;cmd.words.w1=w1;list->Instructions.push_back(cmd);}
     owner.files[path]=list;
 }
+static void AppendLittle(std::vector<char>& bytes,uint32_t word,unsigned count){
+    for(unsigned i=0;i<count;++i)bytes.push_back(static_cast<char>(word>>(i*8)));
+}
+template<class Factory> static std::shared_ptr<Ship::IResource> ReadBinary(Factory& factory,std::vector<char>& bytes){
+    auto file=std::make_shared<Ship::File>();
+    auto reader=std::make_shared<Ship::BinaryReader>(bytes.data(),bytes.size());
+    reader->SetEndianness(Ship::Endianness::Little);
+    file->Reader=reader;
+    auto init=std::make_shared<Ship::ResourceInitData>();init->Format=RESOURCE_FORMAT_BINARY;
+    auto resource=factory.ReadResource(file,init);assert(resource);return resource;
+}
 void VertexPoints(Ship::ResourceManager& owner,const char* path,const std::vector<std::array<int16_t,3>>& points,bool binary){
     if(binary){
+#ifdef MM_BUILD_DLL
+        // MM retains native vertex Arrays; OoT's Array factory returns Fast::Vertex.
         auto vertices=std::make_shared<SOH::Array>();vertices->ArrayType=SOH::ArrayResourceType::Vertex;
         vertices->ArrayCount=points.size();
         for(auto point:points){Fast::F3DVtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->Vertices.push_back(v);}
         owner.files[path]=vertices;
+#else
+        std::vector<char> bytes;
+        AppendLittle(bytes,uint32_t(SOH::ArrayResourceType::Vertex),4);
+        AppendLittle(bytes,uint32_t(points.size()),4);
+        for(auto point:points){
+            for(auto coordinate:point)AppendLittle(bytes,uint16_t(coordinate),2);
+            AppendLittle(bytes,0,2); // flag
+            AppendLittle(bytes,0,4); // texture coordinates
+            AppendLittle(bytes,0,4); // colour
+        }
+        SOH::ResourceFactoryBinaryArrayV0 factory;
+        auto resource=ReadBinary(factory,bytes);
+        auto vertices=std::dynamic_pointer_cast<Fast::Vertex>(resource);
+        assert(vertices&&vertices->RecordSize==16&&vertices->VertexList.size()==points.size());
+        owner.files[path]=resource;
+#endif
     }else{
         auto vertices=std::make_shared<Fast::Vertex>();
         for(auto point:points){Vtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->VertexList.push_back(v);}
         owner.files[path]=vertices;
     }
 }
+std::shared_ptr<Fast::Matrix> LegacyMatrix(const std::array<uint32_t,16>& words){
+    std::vector<char> bytes;for(auto word:words)AppendLittle(bytes,word,4);
+    Fast::ResourceFactoryBinaryMatrixV0 factory;
+    auto matrix=std::dynamic_pointer_cast<Fast::Matrix>(ReadBinary(factory,bytes));
+    assert(matrix);return matrix;
+}
 void MatrixWords(Ship::ResourceManager& owner,const char* path,const std::array<uint32_t,16>& words){
-    auto matrix=std::make_shared<Fast::Matrix>();std::copy(words.begin(),words.end(),reinterpret_cast<uint32_t*>(&matrix->Matrx));
-    owner.files[path]=matrix;
+    owner.files[path]=LegacyMatrix(words);
 }
 struct ActualGeometry {
     const char* name;
@@ -77,16 +116,7 @@ std::array<float,3> ApplyPose(std::array<float,3> p,float tilt,float roll){
 void Vertices(Ship::ResourceManager& owner,const char* path,bool flat,bool binary){
     const int16_t y=flat?0:1000,z=flat?1000:20;
     std::array<std::array<int16_t,3>,4> points={{{-600,int16_t(-y),int16_t(-z)},{600,y,z},{-600,y,z},{600,int16_t(-y),int16_t(-z)}}};
-    if(binary){
-        auto vertices=std::make_shared<SOH::Array>();vertices->ArrayType=SOH::ArrayResourceType::Vertex;
-        vertices->ArrayCount=points.size();
-        for(auto point:points){Fast::F3DVtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->Vertices.push_back(v);}
-        owner.files[path]=vertices;
-    }else{
-        auto vertices=std::make_shared<Fast::Vertex>();
-        for(auto point:points){Vtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->VertexList.push_back(v);}
-        owner.files[path]=vertices;
-    }
+    VertexPoints(owner,path,{points.begin(),points.end()},binary);
 }
 int main(){
     auto oot=std::make_shared<Ship::ResourceManager>(),mm=std::make_shared<Ship::ResourceManager>();
@@ -205,13 +235,14 @@ int main(){
         assert(roll==(halfWidth>1050?float(M_PI/2):0.f));
     }
     // Resource matrices contribute before the caller chooses an outer pose.
-    auto matrix=std::make_shared<Fast::Matrix>();
+    std::array<uint32_t,16> packedWords{};
     const float m[4][4]={{1,0,0,0},{0,0,1,0},{0,-1,0,0},{0,0,0,1}};
-    auto* words=reinterpret_cast<uint32_t*>(&matrix->Matrx);
+    auto* words=packedWords.data();
     for(int row=0;row<4;++row)for(int col=0;col<4;col+=2){
         const uint32_t a=int32_t(m[row][col]*65536),b=int32_t(m[row][col+1]*65536);
         words[row*2+col/2]=(a&0xffff0000u)|(b>>16);words[8+row*2+col/2]=(a<<16)|(b&0xffffu);
     }
+    auto matrix=LegacyMatrix(packedWords);
     oot->alt=false;oot->files["pose"]=matrix;
     List(*oot,"transformed",{{(uintptr_t(G_MTX_OTR_FILEPATH)<<24)|G_MTX_PUSH,uintptr_t("pose")},
                             {uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t("body")},{uintptr_t(G_ENDDL)<<24,0}});
@@ -224,6 +255,7 @@ int main(){
         const uint32_t a=int32_t(sidewaysMatrix[row][col]*65536),b=int32_t(sidewaysMatrix[row][col+1]*65536);
         words[row*2+col/2]=(a&0xffff0000u)|(b>>16);words[8+row*2+col/2]=(a<<16)|(b&0xffffu);
     }
+    matrix->Matrx=LegacyMatrix(packedWords)->Matrx;
     Vertices(*oot,"vertices",false,false);
     assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==float(M_PI/2));
     assert(ApplyPose({-1,0,0},tilt,roll)[1]<-.999f);

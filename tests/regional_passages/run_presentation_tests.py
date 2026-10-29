@@ -52,8 +52,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="regional-presentation-") as temporary:
         for name in ("presentation_test", "shimmer_coverage_test"):
             binary = Path(temporary) / name
+            # Coverage visits every authored face/tick under sanitizers. Match
+            # the optimized native graphics fixtures without disabling asserts.
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                            "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
+                            "-O1", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
                             "-I" + str(ROOT / "combo"), str(ROOT / "tests/regional_passages" / (name + ".cpp")),
                             "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True, env=env, timeout=20)

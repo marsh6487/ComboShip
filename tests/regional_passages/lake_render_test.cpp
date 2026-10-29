@@ -95,6 +95,7 @@ struct Interpreter {
     float dryFloorArea = 0, sandFloorArea = 0;
     const GraphicsContext* gfx = nullptr;
     void* SegAddr(uintptr_t);
+    F3DVtx* SegAddrVtx(uintptr_t);
     void GfxDpSetCombineMode(uint32_t, uint32_t, uint32_t, uint32_t);
     void GfxDpSetOtherMode(uint32_t, uint32_t);
     void GfxSpSetOtherMode(uint32_t, uint32_t, uint64_t);
@@ -102,7 +103,7 @@ struct Interpreter {
     static void GenerateCC(ColorCombiner*, const ColorCombinerKey&);
     float mBufVbo[28]{};
     size_t mBufVboLen = 0;
-    void PackInputs(ColorCombiner* comb, uint8_t fogFactor) {
+    void PackInputs(ColorCombiner* comb, uint8_t fogFactor, bool use_toon) {
         struct Vertex { RGBA color; float w; } vertex{{180, 180, 180, fogFactor}, 1};
         auto* v1 = &vertex;
         Vertex* v_arr[] = {&vertex};
@@ -129,15 +130,20 @@ struct Interpreter {
             assert(tileHeight == unsigned(sand ? (sandReplacement ? 32 : 16) : (stoneReplacement ? 64 : 32)));
         }
         if (waterMaterial) {
+          for (bool toon : {false, true})
             for (uint8_t fogFactor : {uint8_t(0), uint8_t(64), uint8_t(255)}) {
-                PackInputs(&comb, fogFactor);
+                PackInputs(&comb, fogFactor, toon);
                 bool mappedAlpha = false;
-                for (int j = 0; j < 7; ++j)
+                for (int j = 0; j < 7; ++j) {
+                    if (comb.shader_input_mapping[0][j] == G_CCMUX_SHADE)
+                        for (int channel = 0; channel < 3; ++channel)
+                            assert(std::fabs(mBufVbo[j * 4 + channel] - (toon ? 1.f : 180 / 255.f)) < .00001f);
                     if (comb.shader_input_mapping[1][j]) {
                         mappedAlpha = true;
                         assert(std::fabs(mBufVbo[j * 4 + 3] - material.prim_color.a / 255.f) < .00001f &&
                                "standard fog must preserve authored water opacity in the actual packed shader input");
                     }
+                }
                 assert(mappedAlpha);
             }
             assert(material.prim_color.a < 255);
@@ -303,6 +309,14 @@ static Counts Walk(Interpreter& interpreter, Gfx* begin, Gfx* end, int depth = 0
 }
 
 int main() {
+    Interpreter addressControl;
+    std::array<Vtx, 3> segmentedVertices{};
+    addressControl.mSegmentPointers[8] = reinterpret_cast<uintptr_t>(segmentedVertices.data());
+    const uintptr_t vertexAddress = (8u << 24) | OTR_EXPORTED_VTX_SIZE | 1u;
+    assert(addressControl.SegAddrVtx(vertexAddress) == &segmentedVertices[1] &&
+           "ROM-authored segment offsets must use the exported stride for widened native vertices");
+    assert(addressControl.SegAddrVtx(reinterpret_cast<uintptr_t>(segmentedVertices.data())) == segmentedVertices.data());
+    assert(addressControl.SegAddrVtx(0x09000011u) == reinterpret_cast<F3DVtx*>(0x09000011u));
     GraphicsContext gfx{};
     PlayState play{};
     CollisionHeader collision{};

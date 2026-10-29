@@ -29,7 +29,7 @@ struct SnowheadActor {
 // Process-owned arrays survive native Actor_Destroy/DynaPoly_DeleteBgActor.
 // Draw and collision are generated from exactly the same authored triangles.
 const Mesh sMesh = BuildMesh();
-std::array<Vec3s, 192 * 3> sVertices{};
+std::array<Vec3i, 192 * 3> sVertices{};
 std::array<CollisionPoly, 192> sPolys{};
 std::array<Vtx, 192 * 3> sDrawVertices{};
 SurfaceType sSurface[1]{};
@@ -58,7 +58,7 @@ void Build() {
         const Point points[] = { t.a, t.b, t.c };
         for (size_t j = 0; j < 3; ++j) {
             auto& v = sVertices[i * 3 + j];
-            v = { s16(std::lround(points[j].x)), s16(std::lround(points[j].y)), s16(std::lround(points[j].z)) };
+            v = { s32(std::lround(points[j].x)), s32(std::lround(points[j].y)), s32(std::lround(points[j].z)) };
             auto& draw = sDrawVertices[i * 3 + j].v;
             draw.ob[0] = v.x;
             draw.ob[1] = v.y;
@@ -91,7 +91,7 @@ void Build() {
         p.flags_vIB = i * 3 + 1;
         p.vIC = i * 3 + 2;
         p.normal = { s16(std::lround(nx * 32767)), s16(std::lround(ny * 32767)), s16(std::lround(nz * 32767)) };
-        p.dist = s16(std::lround(-(nx * a.x + ny * a.y + nz * a.z)));
+        p.dist = s32(std::lround(-(nx * a.x + ny * a.y + nz * a.z)));
     }
     sCollision.minBounds = sCollision.maxBounds = sVertices.front();
     for (size_t i = 1; i < sMesh.count * 3; ++i) {
@@ -119,7 +119,7 @@ void Build() {
 }
 void Destroy(Actor* actor, PlayState* play) {
     auto* self = reinterpret_cast<SnowheadActor*>(actor);
-    if (self->dyna.bgId >= 0 && self->dyna.bgId < BG_ACTOR_MAX)
+    if (self->dyna.bgId >= 0 && self->dyna.bgId < play->colCtx.dyna.bgActorMax)
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, self->dyna.bgId);
     if (sActor == self) {
         sActor = nullptr;
@@ -136,7 +136,7 @@ void Init(Actor* actor, PlayState* play) {
     self->dyna.bgId = DynaPoly_SetBgActor(play, &play->colCtx.dyna, actor, &sCollision);
     LUSLOG_INFO("[SnowheadBridge] collision actor initialized: age=%d layer=%d bgId=%d polygons=%u",
                 gSaveContext.linkAge, gSaveContext.sceneLayer, self->dyna.bgId, unsigned(sCollision.numPolygons));
-    if (self->dyna.bgId < 0 || self->dyna.bgId >= BG_ACTOR_MAX) {
+    if (self->dyna.bgId < 0 || self->dyna.bgId == BGACTOR_INVALID || self->dyna.bgId >= play->colCtx.dyna.bgActorMax) {
         Actor_Kill(actor);
         return;
     }

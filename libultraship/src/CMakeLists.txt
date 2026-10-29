@@ -161,6 +161,9 @@ if (USE_OPENGLES)
         target_link_libraries(libultraship PRIVATE GLESv3)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
         target_link_libraries(libultraship PRIVATE OpenGL::GLES2)
+    elseif(EMSCRIPTEN)
+        # SOH [WASM] Nothing to link: WebGL2 is provided by the runtime, and the GLES3
+        # entry points are resolved by -sMAX_WEBGL_VERSION=2 at link time.
     else()
         find_library(OPENGLES_LIBRARY GLESv2)
         target_link_libraries(libultraship PRIVATE GLESv2)
@@ -177,6 +180,14 @@ endif()
 #=================== Compile Options & Defs ===================
 
 target_compile_definitions(libultraship PRIVATE ${GBI_UCODE})
+if (GBI_FLOAT_MTX)
+    # PUBLIC: Mtx is a typedef in a public header, so consumers must see the same definition
+    target_compile_definitions(libultraship PUBLIC GBI_FLOAT_MTX=1)
+endif()
+if (GBI_S32_VTX)
+    # PUBLIC: Vtx is a struct in a public header, so consumers must see the same definition
+    target_compile_definitions(libultraship PUBLIC GBI_S32_VTX=1)
+endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(${PROJECT_NAME} PRIVATE

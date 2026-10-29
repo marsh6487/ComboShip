@@ -15,7 +15,8 @@
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 /* PRODUCTION_RETURN_SLOT */
-EntranceInfo gEntranceTable[ENTR_MAX];
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 bool isRando = false, heldSaveMutex = false, inCutscene = false;
 u32 seed = 77;

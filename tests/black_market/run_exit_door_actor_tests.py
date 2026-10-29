@@ -21,6 +21,15 @@ with tempfile.TemporaryDirectory(prefix='market-exit-door-') as temporary:
             'void EnDoor_Destroy(Actor* thisx, PlayState* play) {',
             'void EnDoor_Idle(EnDoor* this, PlayState* play) {', 's32 EnDoor_OverrideLimbDraw(')]
         fixture = (ROOT / 'tests/black_market/exit_door_actor_test.cpp').read_text()
+        if host == 'soh':
+            # Native Actor_Spawn consumes this side channel before actor Init;
+            # keep its actual declaration/write/reset alongside the extracted
+            # transition-list producer rather than inventing a params decoder.
+            state = re.search(r'^static s32 sSpawnTransitionIndex = -1;', actor, re.M)
+            binding = re.search(r'actor->transitionIndex = sSpawnTransitionIndex;[^\n]*\n\s*sSpawnTransitionIndex = -1;', actor)
+            assert state and binding
+            fixture = fixture.replace('/* NATIVE TRANSITION INDEX STATE */', state[0])
+            fixture = fixture.replace('/* NATIVE TRANSITION INDEX BINDING */', binding[0].replace('actor->', 'actor.'))
         if host == 'mm':
             start = actor.index('s16 D_801AED48[] = {')
             fixture = fixture.replace('/* NATIVE HALF DAYS */', actor[start:actor.index('};', start) + 2])

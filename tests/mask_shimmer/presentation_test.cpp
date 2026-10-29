@@ -270,6 +270,11 @@ static std::vector<Vtx> ExpandedVertices(bool foreign, const char* owner = "mm")
     assert(owners == 0 && grayscale == 0);
     return result;
 }
+static bool EqualVertexFields(const Vtx& a, const Vtx& b) {
+    // Wide vertices have unused tail padding; compare every authored field.
+    return !memcmp(a.v.ob, b.v.ob, sizeof(a.v.ob)) && a.v.flag == b.v.flag &&
+           !memcmp(a.v.tc, b.v.tc, sizeof(a.v.tc)) && !memcmp(a.v.cn, b.v.cn, sizeof(a.v.cn));
+}
 extern "C" void Fixture_DrawCShimmer(PlayState*, const uint8_t color[4]);
 static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* owner = "mm", Kind palette = Kind::Neutral) {
     assert(depth == 0 && stack.empty() && transform.scale == 1 && transform.x == 0 && transform.y == 0 && transform.z == 0);
@@ -392,7 +397,7 @@ int main() {
         Reset(47); GetItem_Draw(&play, id);
         auto second = Check(color, false, "mm", palette);
         assert(first.size() == second.size());
-        for (size_t i = 0; i < first.size(); ++i) assert(!memcmp(&first[i], &second[i], sizeof(Vtx)));
+        for (size_t i = 0; i < first.size(); ++i) assert(EqualVertexFields(first[i], second[i]));
         missingSparkle = true; Reset(47); GetItem_Draw(&play, id);
         Check(color, false, "mm", palette); assert(resourceLoads == 0);
         missingSparkle = false;
@@ -562,7 +567,7 @@ int main() {
         Reset(frame); NeiGi_DrawSeasonOverlay(&play, season, "oot");
         const auto repeat=ExpandedVertices(true, "oot");
         assert(repeat.size()==actual.size());
-        for(size_t i=0;i<repeat.size();++i) assert(!memcmp(&repeat[i], &actual[i], sizeof(Vtx)));
+        for(size_t i=0;i<repeat.size();++i) assert(EqualVertexFields(repeat[i], actual[i]));
     }
     Reset(47); NeiGi_DrawSeasonOverlay(&play, 0, nullptr); assert(vertexLoads.empty());
     // The summer corona has one bounded, stable I8 tile. Its scroll is emitted
@@ -593,9 +598,13 @@ int main() {
     for (int season = 1; season <= 5; ++season) {
         Reset(227); // The rod is in its summer phase.
         for (int slot = 0; slot < 8; ++slot) NeiGi_DrawSeasonOverlay(&play, season, "oot");
-        size_t vertexBytes = 0;
-        for (const auto& allocation : arena) vertexBytes += allocation.size() * sizeof(Vtx);
-        assert(vertexBytes < 65536 && gfx.polyXlu.p - xlu < 2048);
+        size_t vertexCount = 0;
+        for (const auto& allocation : arena) vertexCount += allocation.size();
+        const size_t vertexBytes = vertexCount * sizeof(Vtx);
+        // Preserve the original 64 KiB / 16-byte vertex count budget across ABIs,
+        // and also check the actual native arena that owns these allocations.
+        assert(vertexCount < 4096 && vertexBytes < sizeof(((GfxPool*)nullptr)->polyOpaBuffer) &&
+               gfx.polyXlu.p - xlu < 2048);
         assert(depth == 0 && stack.empty() && transform.scale == 1 && paths.empty());
         ExpandedVertices(true, "oot");
         printf("Season %d: eight items use %zu vertex bytes and %td XLU commands\n",

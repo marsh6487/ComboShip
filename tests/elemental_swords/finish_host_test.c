@@ -134,7 +134,17 @@ static int Effects(void) {
     count += sFinish.effects[i].life > 0;
   return count;
 }
+static void FinishHostTeardown(void) {
+  CollisionCheck_DestroyContext(&play, &play.colChkCtx);
+}
 static void World(void) {
+  static int cleanupRegistered;
+  if (!cleanupRegistered) {
+    REQUIRE(atexit(FinishHostTeardown) == 0);
+    cleanupRegistered = 1;
+  }
+  // Release actual native ownership before Setup overwrites the PlayState.
+  FinishHostTeardown();
 #ifdef SWORD_FINISH_TEST_MM
   Setup();
 #else
@@ -142,6 +152,7 @@ static void World(void) {
   static int scene;
   play.sceneNum = ++scene;
 #endif
+  CollisionCheck_InitContext(&play, &play.colChkCtx);
   gfx.polyOpa.p = opa;
   gfx.polyXlu.p = xlu;
   finishSoundCount = finishSound = finishStopCount = 0;
@@ -446,7 +457,9 @@ static void LightLoopContextCleanup(void) {
       play.transitionTrigger = TRANS_TRIGGER_START;
     if (teardown == 3) {
       // An unrelated teardown must not read that context or erase our loop.
-      CollisionCheck_DestroyContext((PlayState *)(uintptr_t)1, NULL);
+      CollisionCheckContext unrelated;
+      CollisionCheck_InitContext(&play, &unrelated);
+      CollisionCheck_DestroyContext((PlayState *)(uintptr_t)1, &unrelated);
       REQUIRE(Effects() == 1 && finishStopCount == 0);
       CollisionCheck_DestroyContext(&play, &play.colChkCtx);
       REQUIRE(Effects() == 0 && finishStopCount == 1);

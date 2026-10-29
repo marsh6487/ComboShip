@@ -20,7 +20,8 @@ with tempfile.TemporaryDirectory(prefix='reward-gi-') as folder:
             flags.append(f'-D{key}="{value}"')
     for test in ('policy','surface','renderer','native_recipe'):
         binary = temp/test
-        subprocess.run([os.environ.get('CXX','c++'),*flags,'-O2','-ffunction-sections','-fdata-sections',str(ROOT/'tests/reward_gi'/f'{test}_test.cpp'),'-Wl,--gc-sections','-o',str(binary)],check=True)
+        production = [str(ROOT/'soh/soh/resource/type/Array.cpp')] if test == 'surface' else []
+        subprocess.run([os.environ.get('CXX','c++'),*flags,'-O2','-ffunction-sections','-fdata-sections',str(ROOT/'tests/reward_gi'/f'{test}_test.cpp'),*production,'-Wl,--gc-sections','-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True)
     write_graph_helpers(folder)
     mm_recipes=functions((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text())

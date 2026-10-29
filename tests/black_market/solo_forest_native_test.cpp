@@ -19,7 +19,8 @@ PlayState* gPlayState;
 #ifndef OOT_FOREST_TEST
 GameState* gGameState;
 #else
-EntranceInfo gEntranceTable[ENTR_MAX];
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 #endif
 struct ForestOrigin { int entrance; Vec3f pos; s16 yaw; s8 room; };
 ForestOrigin sForestOrigin, sGroundedOrigin;

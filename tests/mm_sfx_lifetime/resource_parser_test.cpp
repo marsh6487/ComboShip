@@ -78,6 +78,16 @@ int32_t ArchiveManager::GetFilePriority(const std::string& path) {
     }
     return -1;
 }
+std::vector<std::shared_ptr<File>> ArchiveManager::LoadFileFromAllLayers(const std::string& path) {
+    ++globalFileLoads;
+    std::vector<std::shared_ptr<File>> layers;
+    for (const auto& archive : globalArchives) {
+        if (auto file = archive->LoadFile(path); file != nullptr && file->Buffer != nullptr) {
+            layers.push_back(file);
+        }
+    }
+    return layers;
+}
 std::shared_ptr<IResource> ResourceManager::LoadResourceProcess(const std::string&) {
     ++nestedResourceLoads;
     return nullptr;

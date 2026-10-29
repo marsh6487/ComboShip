@@ -87,6 +87,12 @@ extern "C" u16 AudioEditor_GetReplacementSeq(u16 sequence) {
     return GetChainedReplacementSequence(sequence);
 }
 
+// Scene routing has its own production fixture; this boundary keeps the resolved
+// sequence unchanged while the real night-policy and command queue run below.
+extern "C" u16 AudioEditor_ResolveSceneSequence(u16, u16 resolved) {
+    return resolved;
+}
+
 static void ResetPlaybackBoundary() {
     Audio_ProcessSeqCmds();
     gAudioContext = {};

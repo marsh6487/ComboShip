@@ -468,8 +468,8 @@ static Actor* MmForm_RitoSpawnFlame(PlayState* play) {
         // Re-seat the light as a NO-GLOW point of radius 0. EnLight_Init made it a glowing
         // one — that is the wide green disc on the floor. The node keeps pointing at this
         // same LightInfo, so EnLight_Destroy still has something valid to remove.
-        Lights_PointNoGlowSetInfo(&((EnLight*)flame)->lightInfo, (s16)sRitoWindOrigin.x, (s16)sRitoWindOrigin.y,
-                                  (s16)sRitoWindOrigin.z, 0, 0, 0, 0);
+        Lights_PointNoGlowSetInfo(&((EnLight*)flame)->lightInfo, sRitoWindOrigin.x, sRitoWindOrigin.y,
+                                  sRitoWindOrigin.z, 0, 0, 0, 0);
         flame->update = MmForm_RitoFlameUpdate;
     }
     return flame;

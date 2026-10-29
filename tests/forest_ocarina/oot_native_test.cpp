@@ -207,7 +207,30 @@ static void SameView(const OotOcarinaView &view,
               view.fov == control.fov,
           "OoT solo/combined forest camera matches the native outdoor control");
 }
+static void CheckNativeCollisionHeaderBounds() {
+  CollisionContext context{};
+  CollisionHeader sceneHeader{}, dynamicHeader{};
+  context.colHeader = &sceneHeader;
+  context.dyna.bgActorMax = 2;
+  Require(BgCheck_GetCollisionHeader(&context, BGCHECK_SCENE) == &sceneHeader,
+          "static camera metadata uses the scene header without reading dynamic tables");
+  for (s32 id : {-1, 2, BGCHECK_SCENE - 1}) {
+    Require(BgCheck_GetCollisionHeader(&context, id) == nullptr,
+            "invalid dynamic camera ids are refused before table access");
+  }
+  BgActor actors[2]{};
+  u16 flags[2]{};
+  context.dyna.bgActors = actors;
+  context.dyna.bgActorFlags = flags;
+  actors[1].colHeader = &dynamicHeader;
+  Require(BgCheck_GetCollisionHeader(&context, 1) == nullptr,
+          "an unallocated dynamic slot cannot supply camera metadata");
+  flags[1] = 1;
+  Require(BgCheck_GetCollisionHeader(&context, 1) == &dynamicHeader,
+          "an allocated dynamic slot supplies its native camera header");
+}
 int main() {
+  CheckNativeCollisionHeaderBounds();
   InitNativeCameraTable();
   for (int age : {LINK_AGE_CHILD, LINK_AGE_ADULT}) {
     for (bool interaction : {false, true}) {

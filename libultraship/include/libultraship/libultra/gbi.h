@@ -196,12 +196,17 @@
 #define G_DL_INDEX 0x3d
 #define G_READFB 0x3e
 #define G_SETINTENSITY 0x40
+#define G_FOGF 0x41 // SOH [Unbound] float fog factor (see OTR_G_FOGF in fast/lus_gbi.h)
 #define G_PUSH_SHADER 0x43
 #define G_POP_SHADER 0x44
 #define G_SETTILESIZE_INTERP 0x45
 #define G_SETTARGETINTERPINDEX 0x46
 #define G_SETTILESIZE_LERP 0x4a
 #define G_SCROLL_TEXTURE 0x4b
+#define G_SETTOON 0x4c // SOH [Enhancement] toon lighting per-draw marker
+#define G_SETTOONKEY 0x4d // SOH [Enhancement] toon lighting per-object key light (dir + color)
+#define G_SETTOONSHADOW 0x4e // SOH [Enhancement] actor shadow per-object marker (arm/disarm, feet clamp, size)
+#define G_SETSTENCIL 0x4f // SOH [Enhancement] world light casting: per-draw stencil mode
 
 /*
  * The following commands are the "generated" RDP commands; the user
@@ -1027,10 +1032,12 @@
  * Vertex (set up for use with colors)
  */
 typedef struct {
-#ifndef GBI_FLOATS
-    short ob[3]; /* x, y, z */
-#else
+#if defined(GBI_FLOATS)
     float ob[3]; /* x, y, z */
+#elif defined(GBI_S32_VTX)
+    int32_t ob[3]; /* x, y, z */
+#else
+    short ob[3]; /* x, y, z */
 #endif
     unsigned short flag;
     short tc[2];         /* texture coord */
@@ -1041,10 +1048,12 @@ typedef struct {
  * Vertex (set up for use with normals)
  */
 typedef struct {
-#ifndef GBI_FLOATS
-    short ob[3]; /* x, y, z */
-#else
+#if defined(GBI_FLOATS)
     float ob[3]; /* x, y, z */
+#elif defined(GBI_S32_VTX)
+    int32_t ob[3]; /* x, y, z */
+#else
+    short ob[3]; /* x, y, z */
 #endif
     unsigned short flag;
     short tc[2];      /* texture coord */
@@ -1881,6 +1890,8 @@ typedef union Gfx {
 #endif /* F3DEX_GBI_2 */
 
 #define gsSPPushCD(pkt, dl) gDma1p(pkt, G_PUSHCD, dl, 0, G_DL_PUSH)
+// SOH [Unbound] float fog factor: `factor` points at { f32 mul, f32 offset } (same math as gSPFogPosition, unpacked)
+#define gSPFogFactorF(pkt, factor) gDma1p(pkt, G_FOGF, factor, 0, 0)
 #define __gSPDisplayList(pkt, dl) gDma1p(pkt, G_DL, dl, 0, G_DL_PUSH)
 #define gsSPDisplayList(dl) gsDma1p(G_DL, dl, 0, G_DL_PUSH)
 #define gsSPDisplayListOTRHash(dl) gsDma1p(G_DL_OTR_HASH, dl, 0, G_DL_PUSH)
@@ -2877,6 +2888,72 @@ typedef union Gfx {
                                                       \
         _g0->words.w0 = _SHIFTL(G_POP_SHADER, 24, 8); \
     }
+
+// SOH [Enhancement] Toon lighting per-draw marker (mirrors gSPGrayscale).
+#define gSPToon(pkt, state)                       \
+    {                                             \
+        Gfx* _g = (Gfx*)(pkt);                    \
+                                                  \
+        _g->words.w0 = _SHIFTL(G_SETTOON, 24, 8); \
+        _g->words.w1 = state;                     \
+    }
+
+#define gsSPToon(state) \
+    { (_SHIFTL(G_SETTOON, 24, 8)), (state) }
+
+// SOH [Enhancement] Toon lighting per-object key light. dx/dy/dz are the signed key direction
+// (world space, * 127) and r/g/b the key light color, packed into the two command words.
+#define gSPToonKey(pkt, dx, dy, dz, r, g, b)                                                                     \
+    {                                                                                                            \
+        Gfx* _g = (Gfx*)(pkt);                                                                                   \
+                                                                                                                \
+        _g->words.w0 = _SHIFTL(G_SETTOONKEY, 24, 8) | _SHIFTL((dx) & 0xFF, 16, 8) | _SHIFTL((dy) & 0xFF, 8, 8) | \
+                       _SHIFTL((dz) & 0xFF, 0, 8);                                                              \
+        _g->words.w1 = _SHIFTL((r) & 0xFF, 16, 8) | _SHIFTL((g) & 0xFF, 8, 8) | _SHIFTL((b) & 0xFF, 0, 8);      \
+    }
+
+// SOH [Enhancement] Actor shadow per-object marker (low-level primitive; prefer gSPToonShadowArm to arm).
+// `planeD` carries the eased 0..1 shadow SIZE for this object (raw float bits in w1). The three normal bytes
+// are an arm channel: nz is the arm marker (any nonzero byte arms the shadow; all-zero disarms it), and nx:ny
+// carry an s16 "feet-clamp" world Y (see gSPToonShadowArm). Blend strength + length are global (pushed once
+// per frame, not per object). The shadow direction reuses the object's gSPToonKey, so emit this AFTER the key.
+#define gSPToonShadow(pkt, nx, ny, nz, planeD)                                                     \
+    {                                                                                              \
+        Gfx* _g = (Gfx*)(pkt);                                                                     \
+        union {                                                                                    \
+            f32 f;                                                                                 \
+            u32 u;                                                                                 \
+        } _pd;                                                                                     \
+        _pd.f = (f32)(planeD);                                                                     \
+        _g->words.w0 = _SHIFTL(G_SETTOONSHADOW, 24, 8) | _SHIFTL((nx) & 0xFF, 16, 8) |             \
+                       _SHIFTL((ny) & 0xFF, 8, 8) | _SHIFTL((nz) & 0xFF, 0, 8);                    \
+        _g->words.w1 = _pd.u;                                                                      \
+    }
+
+// SOH [Enhancement] Actor shadow: arm this object's drop shadow with an eased `size` (0..1) and an optional
+// `feetClampY` — an s16 world Y the renderer raises the shadow's feet UP to before building the ground slab.
+// Models whose geometry dips far below the floor (e.g. a signpost's buried post) otherwise sink the whole
+// slab below ground and cast no shadow; clamping the feet to the floor Y keeps the slab at ground level. Pass
+// TOON_SHADOW_NO_CLAMP to leave the feet at the captured geometry (the default for normal actors). nz holds
+// the arm marker so the shadow arms even when the clamp bytes are zero.
+#define TOON_SHADOW_NO_CLAMP (-32768)
+#define gSPToonShadowArm(pkt, feetClampY, size)                                                    \
+    gSPToonShadow(pkt, ((s32)(feetClampY) >> 8) & 0xFF, (s32)(feetClampY) & 0xFF, 0x7F, (size))
+
+// SOH [Enhancement] Actor shadow: render the frame's accumulated shadow volumes now. Emitted at the pre-actor
+// hook (after the room, before actors) so the shadows land only on the environment. A zero normal + the
+// sentinel planeD (-1e30) tells gfx_set_toon_shadow_handler_custom to call RenderShadowVolumes().
+#define gSPToonShadowFlush(pkt) gSPToonShadow(pkt, 0, 0, 0, -1.0e30f)
+
+// SOH [Enhancement] World light casting: set the stencil mode for the following draws (see StencilMode).
+#define gSPStencil(pkt, mode)                        \
+    {                                                \
+        Gfx* _g = (Gfx*)(pkt);                       \
+                                                     \
+        _g->words.w0 = _SHIFTL(G_SETSTENCIL, 24, 8); \
+        _g->words.w1 = (mode);                       \
+    }
+
 
 // ComboShip: bracket a span of RAW Gfx* submissions (no "__OTR__@game:" path marker, e.g. skeletal
 // limb DLs) so their inner hash/path resource refs resolve against the named game's

@@ -143,10 +143,12 @@ class Vapor {
                                          { 59, 37, 66, 86, 200, 67 },    { -104, 51, 43, -79, 218, 43 },
                                          { -117, 51, 24, -91, 218, 25 }, { -93, 51, 20, -68, 218, 22 } };
         for (int quad = 0; quad < 6; ++quad) {
-            short low[3]{ 32767, 32767, 32767 }, high[3]{ -32767, -32767, -32767 };
+            std::array<int32_t, 3> low{}, high{};
+            for (int axis = 0; axis < 3; ++axis)
+                low[axis] = high[axis] = vertices.data[24 + quad * 4].v.ob[axis];
             for (int vertex = 0; vertex < 4; ++vertex)
                 for (int axis = 0; axis < 3; ++axis) {
-                    const auto value = vertices.data[24 + quad * 4 + vertex].v.ob[axis];
+                    const int32_t value = vertices.data[24 + quad * 4 + vertex].v.ob[axis];
                     low[axis] = std::min(low[axis], value);
                     high[axis] = std::max(high[axis], value);
                 }

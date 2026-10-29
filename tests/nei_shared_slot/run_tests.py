@@ -56,6 +56,8 @@ uint16_t ExtInv_GetSlotItem(int slot) { return state.ownedItems[slot - 24]; }
 void ExtInv_SetSlotItem(int slot, uint16_t item) { state.ownedItems[slot - 24] = item; }
 extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) { return ExtInv_GetSlotItem(slot); }
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { ExtInv_SetSlotItem(slot, item); }
+extern "C" uint8_t Picto_IsOwned() { return 0; }
+extern "C" uint8_t Picto_IsOnLensActive() { return 0; }
 static void reset() {
     state = {};
     for (auto& item : state.ownedItems) item = 0xFF;

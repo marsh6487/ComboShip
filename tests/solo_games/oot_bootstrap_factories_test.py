@@ -17,7 +17,8 @@ def function(marker):
 ctor=s[s.index('    context->InitResourceManager({ portArchivePath }'):s.index('    context->InitConsole();',s.index('OTRGlobals::OTRGlobals()'))]
 a=s.index('    auto loader = context->GetResourceManager()->GetResourceLoader();',s.index('void OTRGlobals::Initialize'))
 full=s[a:s.index('    Lang::LoadLangs();',a)]
-helper=function('static void RegisterRenderingFactories(') if 'static void RegisterRenderingFactories(' in s else ''
+helper=''.join(function(marker) for marker in ('static void RegisterUnboundFactories(',
+                                              'static void RegisterRenderingFactories(') if marker in s)
 registration=full+helper
 cpp=r'''
 #include <cassert>
@@ -27,17 +28,26 @@ cpp=r'''
 #include <string>
 #include <tuple>
 #include <initializer_list>
-constexpr int RESOURCE_FORMAT_BINARY=0,RESOURCE_FORMAT_XML=1;
+constexpr int RESOURCE_FORMAT_BINARY=0,RESOURCE_FORMAT_XML=1,RESOURCE_FORMAT_JSON=2;
 struct ResourceFactory{virtual ~ResourceFactory()=default;};
 struct Loader{
  std::map<std::tuple<int,std::string,int>,int> counts;
- template<class T>void RegisterResourceFactory(std::shared_ptr<T>,int format,std::string name,uint32_t,int version){++counts[{format,name,version}];}
+ std::map<std::tuple<int,std::string,int>,std::shared_ptr<ResourceFactory>> factories;
+ template<class T>void RegisterResourceFactory(std::shared_ptr<T> factory,int format,std::string name,uint32_t,int version){auto key=std::tuple{format,name,version};++counts[key];factories[key]=factory;}
 };
 namespace Ship{struct ResourceManager{std::shared_ptr<Loader> loader=std::make_shared<Loader>();std::shared_ptr<Loader> GetResourceLoader(){return loader;}void* GetArchiveManager(){return nullptr;}};
 struct CrossRMRegistry{static void Register(const char*,std::shared_ptr<ResourceManager>){};};}
 struct Context{std::shared_ptr<Ship::ResourceManager> manager;void InitResourceManager(std::initializer_list<std::string>,std::initializer_list<std::string>,int,bool){manager=std::make_shared<Ship::ResourceManager>();}std::shared_ptr<Ship::ResourceManager> GetResourceManager(){return manager;}};
 std::shared_ptr<Ship::ResourceManager> sOOTResourceManager;std::string portArchivePath="soh.o2r";
 '''
+schema=(ROOT/'soh/soh/unbound/UnboundSchema.h').read_text()
+schema_names=sorted(set(re.findall(r'SOH::Unbound::Schema::(\w+)',registration)))
+cpp+='namespace SOH::Unbound::Schema{\n'
+for name in schema_names:
+ declaration=re.search(r'^inline constexpr const char\* '+re.escape(name)+r' = "[^"]*";',schema,re.M)
+ if declaration is None:raise RuntimeError('Missing production schema declaration: '+name)
+ cpp+=declaration[0]+'\n'
+cpp+='}\n'
 for namespace in ('Fast','Ship','SOH'):
  values=sorted(set(re.findall(namespace+r'::ResourceType::(\w+)',registration)))
  if values:cpp+=f'namespace {namespace}{{enum class ResourceType{{'+','.join(values)+'};}\n'
@@ -51,9 +61,15 @@ int main(){
  for(auto key : {std::tuple{0,std::string("Texture"),0},std::tuple{0,std::string("Texture"),1},
                  std::tuple{0,std::string("Vertex"),0},std::tuple{1,std::string("Vertex"),0},
                  std::tuple{0,std::string("DisplayList"),0},std::tuple{1,std::string("DisplayList"),0},
-                 std::tuple{0,std::string("Matrix"),0},std::tuple{0,std::string("Blob"),0}}){
+                 std::tuple{0,std::string("Matrix"),0},std::tuple{0,std::string("Blob"),0},
+                 std::tuple{0,std::string("Array"),0},std::tuple{0,std::string("Vertex"),1},
+                 std::tuple{0,std::string("Array"),1},std::tuple{2,std::string("unbound/scene"),1},
+                 std::tuple{2,std::string("unbound/room"),1},std::tuple{2,std::string("unbound/collision"),3},
+                 std::tuple{2,std::string("unbound/paths"),1}}){
    assert(loader->counts[key]==1 && "MM-only bootstrap has every authored model resource factory");
  }
+ const auto scene=std::tuple{2,std::string("unbound/scene"),1},room=std::tuple{2,std::string("unbound/room"),1};
+ assert(loader->factories.at(scene)==loader->factories.at(room) && "scene and room schemas share the native factory");
  FullFactories(&context);
  for(auto& [key,count]:loader->counts)assert(count==1 && "full OoT initialization never duplicates bootstrap bindings");
 }

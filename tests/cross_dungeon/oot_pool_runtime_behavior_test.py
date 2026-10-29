@@ -28,7 +28,8 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
 SaveContext gSaveContext{};
-EntranceInfo gEntranceTable[ENTR_MAX]{};
+static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
+EntranceInfo* gEntranceTable = sFixtureEntranceTable;
 PlayState* gPlayState=nullptr;
 static std::map<int,u8> settings;
 u8 Randomizer_GetSettingValue(RandomizerSettingKey key) { return settings[key]; }

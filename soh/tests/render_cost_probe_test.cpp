@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <string>
 
 int main() {
@@ -74,15 +75,37 @@ int main() {
     // Nested upload time is not added a second time to command or frame totals.
     assert(r.resources[1].commands.nanos == 60);
 
+    Fast::RenderCostProbe dense;
+    assert(dense.BeginFrame(true, 0, true));
+    dense.SyncDepth(1);
+    for (unsigned i = 0; i < 1000; ++i) {
+        dense.SetResource("dense/resource/" + std::to_string(i));
+        dense.BeginCommand();
+        dense.SelectTexture("dense/texture/" + std::to_string(i));
+        dense.AddUpload(4, 1, 1, 1);
+        dense.AddCommand(4, 5, "G_TRI1", 1);
+    }
+    assert(dense.Report().resources.size() == 1001 && dense.Report().textures.size() == 1001);
+    assert(!dense.Report().resourceOverflow && !dense.Report().textureOverflow);
+    for (unsigned i = 0; i < 1000; ++i) {
+        assert(dense.Report().resources[i + 1].path == "dense/resource/" + std::to_string(i));
+        assert(dense.Report().textures[i + 1].path == "dense/texture/" + std::to_string(i));
+        assert(dense.Report().resources[i + 1].commands.calls == 1);
+        assert(dense.Report().textures[i + 1].bytes == 4);
+    }
+    dense.EndFrame(10000);
+
     Fast::RenderCostProbe bounded;
     assert(bounded.BeginFrame(true, 1000));
     bounded.SyncDepth(1);
-    for (unsigned i = 0; i < Fast::RenderCostProbe::MaxResources + 7; ++i) {
+    for (unsigned i = 0; i < 4103; ++i) {
         bounded.SetResource("resource/" + std::to_string(i));
         bounded.AddCommand(4, 5, "G_TRI1", 1);
     }
-    assert(bounded.Report().resources.size() == Fast::RenderCostProbe::MaxResources);
-    assert(bounded.Report().resourceOverflow > 0);
+    assert(bounded.Report().resources.size() == 4096);
+    assert(bounded.Report().resourceOverflow == 8);
+    assert(bounded.Report().resources[0].commands.calls == 0);
+    assert(bounded.Report().overflowResource.commands.calls == 8);
     // Invalid microcode must not index outside fixed arrays.
     bounded.AddCommand(255, 255, "invalid", 1);
     bounded.EndFrame(900); // defensively reject a backward test clock
@@ -114,5 +137,79 @@ int main() {
     assert(continuous.Report().totalNanos == 500000000);
     assert(continuous.Report().resources[1].commands.nanos == 16);
     assert(continuous.Report().resources[2].commands.nanos == 7);
+
+    Fast::RenderCostProbe detailed;
+    assert(detailed.BeginFrame(true, 0, true));
+    detailed.SyncDepth(1);
+    detailed.SetResource("parent");
+    detailed.SetPass(7);
+    detailed.BeginCommand();
+    auto importing = detailed.BeginOperation(Fast::RenderCostOperation::TextureImport, 100);
+    auto drawing = detailed.BeginOperation(Fast::RenderCostOperation::DriverDraw, 120);
+    detailed.EndOperation(Fast::RenderCostOperation::DriverDraw, drawing, 150);
+    detailed.SelectTexture("texture/packed-n64");
+    detailed.DescribeTexture(32, 16, 2, 0, 1024, 1056, true);
+    detailed.NoteTextureCache(false);
+    detailed.AddUpload(2048, 30, 32, 16);
+    detailed.EndOperation(Fast::RenderCostOperation::TextureImport, importing, 180);
+    auto shader = detailed.BeginOperation(Fast::RenderCostOperation::ShaderCreate, 190);
+    detailed.EndOperation(Fast::RenderCostOperation::ShaderCreate, shader, 200);
+    detailed.AddCommand(4, 5, "G_TRI1", 120);
+    const auto& parent = detailed.Report().resources[1];
+    assert(parent.commands.nanos == 120 && parent.self.nanos == 30 && parent.self.calls == 1);
+    assert(parent.textureImport.nanos == 80 && parent.driverDraw.nanos == 30 && parent.shaderCreate.nanos == 10);
+    assert(parent.upload.nanos == 30 && !parent.selfUnknownCommands);
+    assert(detailed.Report().passes[1].framebuffer == 7 && detailed.Report().passes[1].self.nanos == 30);
+    assert(detailed.Report().textures[1].sourceDataBytes == 1024 &&
+           detailed.Report().textures[1].sourceBackingBytes == 1056);
+    assert(detailed.Report().textures[1].bytes == 2048 && detailed.Report().textures[1].uploadWidth == 32);
+    detailed.DescribeTexture(64, 16, 2, 0, 2048);
+    detailed.NoteTextureCache(true);
+    detailed.AddUpload(4096, 5, 64, 16);
+    assert(detailed.Report().textures[1].metadataChanges == 1 &&
+           detailed.Report().textures[1].uploadDimensionChanges == 1);
+    assert(detailed.Report().textures[1].cacheHits == 1 && detailed.Report().textures[1].cacheMisses == 1);
+    assert(detailed.Report().resources[0].upload.nanos == 5); // Outside a command has no list owner.
+    detailed.SetResource("<unresolved-marker>");
+    detailed.AddCommand(4, 5, "G_TRI1", 10);
+    assert(detailed.Report().resources[0].commands.nanos == 10 &&
+           detailed.Report().resources[0].selfUnknownCommands == 1);
+    assert(detailed.Report().unknownResourceSelections == 1);
+    detailed.SetResource("parent");
+    detailed.BeginCommand();
+    detailed.AddUpload(1, 20);
+    detailed.AddCommand(4, 5, "G_TRI1", 10);
+    assert(detailed.Report().selfAccountingClamps == 1);
+    for (unsigned i = 0; i < 4101; ++i) {
+        detailed.SelectTexture("texture/" + std::to_string(i));
+        detailed.AddUpload(4, 1, 1, 1);
+    }
+    assert(detailed.Report().textures.size() == 4096);
+    assert(detailed.Report().textureOverflow == 7 && detailed.Report().overflowTexture.upload.calls == 7);
+    for (unsigned i = 0; i < Fast::RenderCostProbe::MaxPasses + 5; ++i) {
+        detailed.SetPass(i);
+        detailed.BeginCommand();
+        detailed.AddCommand(4, 5, "G_TRI1", 1);
+    }
+    assert(detailed.Report().passes.size() == Fast::RenderCostProbe::MaxPasses);
+    assert(detailed.Report().passOverflow > 0 && detailed.Report().overflowPass.commands.calls > 0);
+    auto oldOperation = detailed.BeginOperation(Fast::RenderCostOperation::TextureImport, 300);
+    auto oldTexture = std::make_unique<Fast::RenderTextureScope>(&detailed, "texture/old");
+    detailed.EndFrame(400);
+    detailed.BeginFrame(true, 500, true);
+    detailed.EndOperation(Fast::RenderCostOperation::TextureImport, oldOperation, 600);
+    oldTexture.reset();
+    detailed.AddUpload(4, 1, 1, 1);
+    assert(detailed.Report().textures.size() == 1 && detailed.Report().textures[0].bytes == 4);
+    assert(detailed.Report().textureImport.calls == 0 && !detailed.Report().resourceOverflow);
+    detailed.EndFrame(700);
+
+    Fast::RenderCostProbe disabled;
+    disabled.BeginFrame(false, 0);
+    disabled.SelectTexture("ignored");
+    disabled.DescribeTexture(1, 1, 1, 1, 1);
+    disabled.NoteTextureCache(false);
+    disabled.AddUpload(4, 1, 1, 1);
+    assert(disabled.Report().textures.empty() && disabled.Report().upload.calls == 0);
     std::cout << "Render cost probe: cadence, attribution, bounds, reset and accounting passed\n";
 }

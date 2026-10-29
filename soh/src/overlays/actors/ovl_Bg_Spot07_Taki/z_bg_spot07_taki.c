@@ -87,7 +87,7 @@ void BgSpot07Taki_Init(Actor* thisx, PlayState* play) {
 void BgSpot07Taki_Destroy(Actor* thisx, PlayState* play) {
     BgSpot07Taki* this = (BgSpot07Taki*)thisx;
 
-    if (this->dyna.bgId >= 0 && this->dyna.bgId < BG_ACTOR_MAX) {
+    if (this->dyna.bgId >= 0 && this->dyna.bgId < play->colCtx.dyna.bgActorMax) {
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, this->dyna.bgId);
     }
 }
@@ -99,7 +99,7 @@ void BgSpot07Taki_UpdateFrozenState(BgSpot07Taki* this, PlayState* play) {
     if (isFrozen == this->isFrozen) {
         return;
     }
-    if (this->dyna.bgId >= 0 && this->dyna.bgId < BG_ACTOR_MAX) {
+    if (this->dyna.bgId >= 0 && this->dyna.bgId < play->colCtx.dyna.bgActorMax) {
         DynaPoly_DeleteBgActor(play, &play->colCtx.dyna, this->dyna.bgId);
     }
     this->dyna.bgId = BGACTOR_NEG_ONE;

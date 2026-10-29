@@ -161,8 +161,13 @@ s32 Collider_SetCylinder(PlayState *p, ColliderCylinder *c, Actor *a,
   return 1;
 }
 s32 Collider_DestroyCylinder(PlayState *p, ColliderCylinder *c) { return 1; }
+#ifdef HOST_MM
 void Lights_PointNoGlowSetInfo(LightInfo *i, s16 x, s16 y, s16 z, u8 r, u8 g,
-                               u8 b, s16 rad) {}
+                              u8 b, s16 rad) {}
+#else
+void Lights_PointNoGlowSetInfo(LightInfo *i, f32 x, f32 y, f32 z, u8 r, u8 g,
+                              u8 b, s16 rad) {}
+#endif
 LightNode *LightContext_InsertLight(PlayState *p, LightContext *l,
                                     LightInfo *i) {
   return &node;

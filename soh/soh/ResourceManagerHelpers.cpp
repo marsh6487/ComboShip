@@ -451,10 +451,6 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
         return (char*)&((std::static_pointer_cast<Fast::DisplayList>(res))->Instructions[0]);
     }
 
-    if (res->GetInitData()->Type == static_cast<uint32_t>(SOH::ResourceType::SOH_Array)) {
-        return (char*)(std::static_pointer_cast<SOH::Array>(res))->Vertices.data();
-    }
-
     // Retain the already resolved owner; a second local lookup would reject
     // the routed texture again. The draw still receives its original path.
     return (char*)res->GetRawPointer();

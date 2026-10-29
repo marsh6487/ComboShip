@@ -36,7 +36,7 @@ int main() {
                                    : kind == Kind::Ice ? 1
                                                        : 2];
     const auto &flow = flows[kind == Kind::Fire ? 0 : kind == Kind::Ice ? 1 : 2];
-    size_t maxBytes = 0, maxCommands = 0;
+    size_t maxBytes = 0, maxVertices = 0, maxTailBytes = 0, maxCommands = 0;
     for (const auto &camera : cameras)
       for (uint32_t frame = 0; frame < 180; ++frame) {
         Reset();
@@ -93,22 +93,36 @@ int main() {
                                flow);
         NeiGi_DrawMesh(&play, NeiGi::SampleOrb(kind, camera), kind);
         NeiGi_DrawMesh(&play, NeiGi::SampleEnergy(kind, frame, camera));
-        size_t bytes = 0;
+        size_t vertices = 0;
         for (const auto &a : arena)
-          bytes += a.size() * sizeof(Vtx);
+          vertices += a.size();
+        const size_t bytes = vertices * sizeof(Vtx);
+        const size_t tailBytes = reinterpret_cast<uintptr_t>(std::end(opa)) -
+                                 reinterpret_cast<uintptr_t>(gfx.polyOpa.d);
         maxBytes = std::max(maxBytes, bytes);
+        maxVertices = std::max(maxVertices, vertices);
+        maxTailBytes = std::max(maxTailBytes, tailBytes);
         maxCommands = std::max(maxCommands, size_t(gfx.polyXlu.p - xlu));
         assert(gfx.polyXlu.p < xlu + 4096 && allocations < 128 &&
                stack.empty() && interpolation == 0 && loads == 0);
+        assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d);
+        assert(tailBytes >= bytes + allocations * ((sizeof(Mtx) + 15) & ~size_t(15)));
+        assert(tailBytes <= sizeof(opa) &&
+               tailBytes <= sizeof(((GfxPool*)nullptr)->polyOpaBuffer));
+        assert(size_t(gfx.polyXlu.p - xlu) <=
+               sizeof(((GfxPool*)nullptr)->polyXluBuffer) / sizeof(Gfx));
       }
     std::cout << (kind == Kind::Fire  ? "Fire"
                   : kind == Kind::Ice ? "Ice"
                                       : "Light")
               << " maximum 15 heads + " << (kind == Kind::Ice ? 15 : 5)
               << " wakes + charge + released spin: " << maxBytes
-              << " vertex bytes, " << maxCommands << " XLU commands\n"
+              << " vertex bytes (" << maxVertices << " vertices), " << maxTailBytes
+              << " aligned tail bytes, " << maxCommands << " XLU commands\n"
               << std::flush;
-    assert(maxBytes < 90000 &&
+    // Preserve the exact original complexity ceiling from 90000 bytes at the
+    // 16-byte legacy vertex ABI; physical allocations are checked above.
+    assert(maxVertices < 90000 / 16 &&
            maxCommands <
                3 * std::size(xlu) / 4); // Real setup/debug commands leave at
                                         // least a quarter for the scene.

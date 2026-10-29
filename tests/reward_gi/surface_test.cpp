@@ -21,11 +21,6 @@ Matrix::Matrix() : Resource(nullptr) {}
 Mtx* Matrix::GetPointer() { return &Matrx; }
 size_t Matrix::GetPointerSize() { return sizeof(Mtx); }
 }
-namespace SOH {
-Array::Array() : Resource(nullptr) {}
-void* Array::GetPointer() { return Vertices.data(); }
-size_t Array::GetPointerSize() { return Vertices.size() * sizeof(Vtx); }
-}
 struct Loader {
     std::map<std::string, std::shared_ptr<Ship::IResource>> files;
     auto operator()(const char* name) const {
@@ -69,15 +64,39 @@ int main() {
     vertices->VertexList.pop_back(); list->Instructions[1]=command(3,0);
     list->Instructions[2] = command(uintptr_t(G_TRI1)<<24 | 2u<<8 | 4u,0);
     assert(NeiGi::ReadRewardSurface(load,"face",surface) && surface.count == 3);
-    // The production traversal must honor destination cache slots and cached
-    // binary vertex pointers, not reinterpret resource packets as triangles.
-    list->Instructions[0] = command(uintptr_t(G_VTX_OTR_HASH)<<24 | 3u<<12 | 6u,
-                                    reinterpret_cast<uintptr_t>(vertices->GetPointer()));
+    // Hash packets retain archive byte offsets. Traversal resolves the current
+    // resource without replacing that offset with a borrowed native pointer.
+    list->Instructions[0] = command(uintptr_t(G_VTX_OTR_HASH)<<24 | 3u<<12 | 6u, 0);
     list->Instructions[1] = command(0,1);
     NeiGi::Mesh hashed{};
     assert(NeiGi::ReadRewardSurface(load,"face",hashed) && hashed.count == surface.count);
     for (size_t i=0;i<surface.count;++i)
         assert(hashed.vertices[i].p.x == surface.vertices[i].p.x && hashed.vertices[i].p.y == surface.vertices[i].p.y);
+    // Skip an archive record under both serialized formats. Neither stride is
+    // sizeof(Vtx) in the widened runtime, and the command must remain immutable.
+    vertices->VertexList.insert(vertices->VertexList.begin(), Vtx{});
+    for (uint32_t stride : {16u,22u}) {
+        vertices->RecordSize = stride;
+        list->Instructions[0].words.w1 = stride;
+        assert(NeiGi::ReadRewardSurface(load,"face",hashed) && hashed.count == surface.count);
+        for (size_t i=0;i<surface.count;++i)
+            assert(hashed.vertices[i].p.x == surface.vertices[i].p.x && hashed.vertices[i].p.y == surface.vertices[i].p.y);
+        assert(list->Instructions[0].words.w1 == stride && list->Instructions[1].words.w0 == 0 &&
+               list->Instructions[1].words.w1 == 1);
+    }
+    vertices->VertexList.erase(vertices->VertexList.begin());
+    vertices->RecordSize = 16;
+    list->Instructions[0].words.w1 = 0;
+    // Production OoT arrays hold scalars; only the vertex factory supplies
+    // geometry. Use the actual Array implementation to test this boundary.
+    auto scalars = std::make_shared<SOH::Array>();
+    scalars->ArrayType = SOH::ArrayResourceType::Scalar;
+    scalars->ArrayScalarType = SOH::ScalarType::ZSCALAR_S16;
+    scalars->ArrayCount = 3;
+    scalars->Scalars.resize(3);
+    load.files["vertices"] = scalars;
+    assert(!NeiGi::ReadRewardSurface(load,"face",hashed) && hashed.count == 0);
+    load.files["vertices"] = vertices;
     list->Instructions[2].words.w0 = uintptr_t(G_TRI1)<<24 | 2u<<8 | 62u;
     assert(!NeiGi::ReadRewardSurface(load,"face",surface) && surface.count == 0);
     list->Instructions[2].words.w0 = uintptr_t(G_TRI1)<<24 | 2u<<8 | 4u;

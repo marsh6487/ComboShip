@@ -52,6 +52,7 @@ class SohMenu : public Ship::Menu {
     void AddMenuDevTools();
     void AddMenuRandomizer();
     void AddMenuNetwork();
+    void AddMenuWindWakerStyle();
     static void UpdateLanguageMap(std::map<int32_t, const char*>& languageMap);
 
     // === ComboShip C-ABI menu export (see combo/menu/ComboMenuExport.h) ===

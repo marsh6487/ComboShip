@@ -24,8 +24,7 @@ size_t Array::GetPointerSize() {
     size_t typeSize = 0;
     switch (ArrayType) {
         case ArrayResourceType::Vertex:
-            typeSize = sizeof(Fast::F3DVtx);
-            break;
+            return Vertices.size() * sizeof(Fast::F3DVtx);
         case ArrayResourceType::Scalar:
         default:
             switch (ArrayScalarType) {

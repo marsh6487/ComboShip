@@ -39,6 +39,7 @@ void EnDoor_Idle(EnDoor*, PlayState*);
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <spdlog/spdlog.h>
 extern "C" {
@@ -198,10 +199,13 @@ void ApplyGrannyInterior() {
         }
         flames[index++] = spawned;
     }
-    static_assert(sizeof(EnvLightSettings) == 22);
-    sGrannyLights.resize(sGrannyResources.Lights().size());
-    std::memcpy(sGrannyLights.data(), sGrannyResources.Lights().data(),
-                sGrannyLights.size() * sizeof(EnvLightSettings));
+    static_assert(offsetof(EnvLightSettings, fogFar) + sizeof(EnvLightSettings::fogFar) == 22);
+    static_assert(offsetof(EnvLightSettings, fogStart) >= 22);
+    // Foreign metadata retains its 22-byte legacy layout. Clear the expanded
+    // world-fog fields so these authored lights keep native legacy behaviour.
+    sGrannyLights.assign(sGrannyResources.Lights().size(), {});
+    for (size_t i = 0; i < sGrannyLights.size(); ++i)
+        std::memcpy(&sGrannyLights[i], sGrannyResources.Lights()[i].data(), sGrannyResources.Lights()[i].size());
     play->envCtx.numLightSettings = sGrannyLights.size();
     play->envCtx.lightSettingsList = sGrannyLights.data();
     play->envCtx.blendIndoorLights = 0;

@@ -85,32 +85,35 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
   private:
     template <class Visit> bool WithVertexData(const std::shared_ptr<Ship::IResource>& resource, Visit visit) {
         if (const auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(resource))
-            return visit(vertices->VertexList);
-        // Binary sword packs use the host's SOH_Array factory; XML vertices
-        // use Fast::Vertex. Scalar arrays are not geometry, and the declared
-        // count must match the storage filled by the binary factory.
+            return visit(vertices->VertexList, vertices->RecordSize);
+            // OoT widens binary vertex arrays into Fast::Vertex. MM retains its legacy
+            // Array factory; scalar arrays are not geometry and its declared count must
+            // match the storage filled by that factory.
+#ifdef MM_BUILD_DLL
         if (const auto array = std::dynamic_pointer_cast<SOH::Array>(resource);
             array && array->ArrayType == SOH::ArrayResourceType::Vertex && array->ArrayCount == array->Vertices.size())
-            return visit(array->Vertices);
+            return visit(array->Vertices, size_t{ 16 });
+#endif
         return false;
     }
 
     bool Vertices(const std::shared_ptr<Ship::IResource>& resource, size_t offset, size_t count,
                   bool byteOffset = false, size_t cacheIndex = 0) {
-        return WithVertexData(resource, [&](const auto& vertices) {
+        return WithVertexData(resource, [&](const auto& vertices, size_t recordSize) {
             if (byteOffset) {
-                const size_t stride = sizeof(vertices[0]);
-                // The interpreter caches a vertex pointer in hash packets.
-                // Validate it against this exact selected resource's storage.
-                if (offset > 0xfffffu) {
+                const size_t runtimeStride = sizeof(vertices[0]);
+                if (offset > UINT32_MAX) {
+                    // Native cache operands use padded runtime storage; serialized offsets use their
+                    // resource's original record size (16-byte v0, 22-byte wide v1).
                     const uintptr_t base = reinterpret_cast<uintptr_t>(vertices.data());
-                    if (offset < base || offset - base >= vertices.size() * stride)
+                    if (offset < base || offset - base >= vertices.size() * runtimeStride)
                         return false;
                     offset -= base;
+                    recordSize = runtimeStride;
                 }
-                if (offset % stride)
+                if (recordSize == 0 || offset % recordSize)
                     return false;
-                offset /= stride;
+                offset /= recordSize;
             }
             if (count == 0 || offset > vertices.size() || count > vertices.size() - offset ||
                 (mVertices += count) > 65536)
@@ -172,7 +175,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
             return false;
         mHasModelMatrix = true;
         Matrix decoded{};
-#ifdef GBI_FLOATS
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
         for (int row = 0; row < 4; ++row)
             for (int column = 0; column < 4; ++column)
                 decoded[row][column] = matrix->Matrx.mf[row][column];

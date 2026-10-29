@@ -43,10 +43,12 @@ int main(int argc, char **) {
 #include "entrances/LostWoodsEntrance.h"
 #include "global.h"
 #include "soh/ActorDB.h"
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
-#define SS_NULL 0xFFFF
+/* NATIVE_CONSTANTS */
 extern "C" void lusprintf(const char*, int32_t, int32_t, const char*, ...) {}
 uintptr_t gSegments[16]{};
 extern "C" PosRot *Actor_GetWorldPosShapeRot(PosRot *p, Actor *a) {
@@ -80,8 +82,8 @@ extern "C" s32 DynaPoly_SetBgActor(PlayState *play, DynaCollisionContext *dyna,
   assert(h->numWaterBoxes == 0);
   ++adds;
   if (failDyna) {
-    for (auto &f : dyna->bgActorFlags)
-      f = 1;
+    Fixture_GrowBgActorTable(play, dyna, BGCHECK_SCENE);
+    std::fill_n(dyna->bgActorFlags, dyna->bgActorMax, 1);
   }
   return Native_DynaPoly_SetBgActor(play, dyna, a, h);
 }
@@ -106,6 +108,7 @@ int main() {
   Player player{};
   Vec3f mouth{};
   s16 yaw = 0;
+  Fixture_GrowBgActorTable(&play, &play.colCtx.dyna, BGACTOR_INITIAL_MAX);
   play.sceneNum = SCENE_ZORAS_FOUNTAIN;
   play.roomCtx.curRoom.num = 0;
   play.state.running = true;
@@ -302,6 +305,8 @@ int main() {
   assert(deletes == 2);
   failDyna = false;
   assert(!ComboFountainSnowheadBridge_Get(nullptr, &mouth, &yaw));
+  std::free(play.colCtx.dyna.bgActors);
+  std::free(play.colCtx.dyna.bgActorFlags);
   puts("PASS native production Snowhead lifecycle: all ages/slots, "
        "repeatedGet/destroy/reentry, allocation failure, plane normals and "
        "local chill");

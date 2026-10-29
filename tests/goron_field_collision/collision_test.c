@@ -212,7 +212,19 @@ s32 CollisionCheck_SetOC(PlayState* state, CollisionCheckContext* ctx, Collider*
 #include "form_collision.inc"
 
 static void reset(MmPlayerTransformation form) {
+    static Collider* atList[16];
+    static Collider* acList[16];
+    static Collider* ocList[16];
     memset(&play, 0, sizeof(play));
+    memset(atList, 0, sizeof(atList));
+    memset(acList, 0, sizeof(acList));
+    memset(ocList, 0, sizeof(ocList));
+    play.colChkCtx.colAT = atList;
+    play.colChkCtx.colATCapacity = ARRAY_COUNT(atList);
+    play.colChkCtx.colAC = acList;
+    play.colChkCtx.colACCapacity = ARRAY_COUNT(acList);
+    play.colChkCtx.colOC = ocList;
+    play.colChkCtx.colOCCapacity = ARRAY_COUNT(ocList);
     memset(&player, 0, sizeof(player));
     memset(&boulder, 0, sizeof(boulder));
     memset(&grotto, 0, sizeof(grotto));

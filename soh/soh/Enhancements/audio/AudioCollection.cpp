@@ -14,6 +14,9 @@
 #include <ship/window/Window.h>
 #include <locale>
 #include <filesystem>
+#include <z64.h>
+
+extern "C" PlayState* gPlayState; // SOH [Unbound] defined in z_play.c (C linkage)
 
 #define SEQUENCE_MAP_ENTRY(sequenceId, label, sfxKey, category, canBeReplaced, canBeUsedAsReplacement) \
     {                                                                                                  \
@@ -426,6 +429,24 @@ uint16_t AudioCollection::GetReplacementSequence(uint16_t seqId) {
     if (nightEntry && (!replacement.canBeUsedAsReplacement ||
                        !(replacement.category & (SEQ_BGM_WORLD | SEQ_BGM_EVENT | SEQ_BGM_BATTLE))))
         return fallback;
+
+    // SOH [Unbound] A scene document can bind a custom song to its theme (`sound.song`): when the id being
+    // resolved is the current scene's own BGM theme, swap in the bound song. This sits after the alias and
+    // validity logic and fires only when the user has no replacement of their own — an Audio Editor or
+    // shuffle pick outranks the binding, so the editor UI stays truthful — and only for BGM categories,
+    // because this path also carries ocarina-instrument and sfx ids a document must not hijack.
+    if (replacementSeq == seqId && gPlayState != NULL && gPlayState->sequenceCtx.unboundSongSeqId != 0) {
+        // The field theme circulates as two ids; treat them as one so a song bound over either keeps
+        // playing through the morning variant.
+        uint16_t resolved = (seqId == NA_BGM_FIELD_MORNING) ? (uint16_t)NA_BGM_FIELD_LOGIC : seqId;
+        uint16_t sceneTheme = (gPlayState->sequenceCtx.seqId == NA_BGM_FIELD_MORNING) ? (uint16_t)NA_BGM_FIELD_LOGIC
+                                                                                      : gPlayState->sequenceCtx.seqId;
+        if (resolved == sceneTheme && sequenceMap.contains(resolved) &&
+            (sequenceMap.at(resolved).category & SEQ_BGM_CUSTOM)) {
+            return gPlayState->sequenceCtx.unboundSongSeqId;
+        }
+    }
+
     return static_cast<uint16_t>(replacementSeq);
 }
 

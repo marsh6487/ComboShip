@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <set>
 #include <ship/Context.h>
 #include <spdlog/async_logger.h>
 #include <spdlog/details/thread_pool.h>
@@ -28,6 +29,11 @@ int main(int argc, char** argv) {
     spdlog::set_default_logger(decoy);
     assert(spdlog::default_logger() != gameLogger);
     gameLogger->set_level(spdlog::level::off);
+    const auto captureDirectory = std::filesystem::path(logPath).parent_path();
+    std::set<std::filesystem::path> previousCaptures;
+    for (const auto& entry : std::filesystem::directory_iterator(captureDirectory))
+        if (entry.path().filename().string().starts_with("OoT-RenderFlight-"))
+            previousCaptures.insert(entry.path());
 
     // Exercise the production adapter and the same asynchronous rotating-file
     // sink used by release builds, with normal game logging disabled.
@@ -59,10 +65,25 @@ int main(int argc, char** argv) {
         render.BeginFrame(true, 1000);
         render.SyncDepth(1);
         render.SetResource("objects/young_din/head");
-        render.AddCommand(4, 5, "G_TRI1", 2000000);
+        render.SetPass(17);
+        render.BeginCommand();
+        auto importing = render.BeginOperation(Fast::RenderCostOperation::TextureImport, 1000);
         {
             Fast::RenderTextureScope texture(&render, "textures/young_din/hair");
-            render.AddUpload(4096, 500000);
+            render.DescribeTexture(32, 32, 2, 0, 2048, 2080, true);
+            render.NoteTextureCache(false);
+            render.AddUpload(4096, 500000, 32, 32);
+        }
+        render.EndOperation(Fast::RenderCostOperation::TextureImport, importing, 601000);
+        render.AddCommand(4, 5, "G_TRI1", 2000000);
+        for (int i = 0; i < 999; ++i) {
+            render.SetResource("objects/complete/" + std::to_string(i));
+            render.BeginCommand();
+            {
+                Fast::RenderTextureScope texture(&render, "textures/complete/" + std::to_string(i));
+                render.AddUpload(16, 0);
+            }
+            render.AddCommand(4, 5, "G_TRI1", 0);
         }
         render.MutableReport().backend = "Direct3D 11";
         render.MutableReport().gameTick = 42;
@@ -76,8 +97,11 @@ int main(int argc, char** argv) {
         render.MutableReport().displayListLookups = { 30, 1 };
         render.EndFrame(3001000);
         FrameTiming_LogRenderCost(render.Report(), play);
-        assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
-        assert(spdlog::default_logger() == decoy); // Keep module-local logging unchanged.
+        auto fastDetail = render.Report();
+        fastDetail.frameIndex = 2;
+        FrameTiming_LogRenderCost(fastDetail, play); // Explicit detailed capture retains ordinary fast frames too.
+        assert(gameLogger->level() == level);        // Preserve the user's normal logging preference.
+        assert(spdlog::default_logger() == decoy);   // Keep module-local logging unchanged.
     }
     FrameTiming_BeginFrame(play, 0);
     FrameTiming_EndFrame(play, 0);
@@ -91,7 +115,19 @@ int main(int argc, char** argv) {
     sink.reset();
     assert(sinkLifetime.expired()); // No probe-owned formatter may survive game DLL teardown.
 
-    std::ifstream log(logPath);
+    assert(std::filesystem::exists(logPath));
+    // Large full tables can rotate the ordinary log. The production dedicated
+    // capture retains the complete session and is the supported analysis input.
+    std::filesystem::path completeCapture;
+    for (const auto& entry : std::filesystem::directory_iterator(captureDirectory)) {
+        if (entry.path().filename().string().starts_with("OoT-RenderFlight-") &&
+            !previousCaptures.contains(entry.path())) {
+            assert(completeCapture.empty());
+            completeCapture = entry.path();
+        }
+    }
+    assert(!completeCapture.empty());
+    std::ifstream log(completeCapture);
     std::string line;
     int samples = 0;
     int renderSamples = 0;
@@ -129,9 +165,34 @@ int main(int argc, char** argv) {
             assert(cost.at("command_sum_ms") == 2.0);
             assert(cost.at("non_command_ms") == 1.0);
             assert(cost.at("opcodes").at(0).at("name") == "G_TRI1");
-            assert(cost.at("top_resources").at(0).at("path") == "objects/young_din/head");
-            assert(cost.at("top_texture_uploads").at(0).at("path") == "textures/young_din/hair");
-            assert(cost.at("top_texture_uploads").at(0).at("bytes") == 4096);
+            assert(cost.at("schema") == 2);
+            assert(cost.at("resources").at(0).at("path") == "objects/young_din/head");
+            assert(cost.at("resources").size() == 1000);
+            assert(cost.at("textures").size() == 1000);
+            assert(cost.at("resource_overflow") == 0 && cost.at("texture_overflow") == 0);
+            std::set<std::string> resourcePaths, texturePaths;
+            for (const auto& row : cost.at("resources"))
+                resourcePaths.insert(row.at("path").get<std::string>());
+            for (const auto& row : cost.at("textures"))
+                texturePaths.insert(row.at("path").get<std::string>());
+            assert(resourcePaths.size() == 1000 && texturePaths.size() == 1000);
+            for (int i = 0; i < 999; ++i) {
+                assert(resourcePaths.contains("objects/complete/" + std::to_string(i)));
+                assert(texturePaths.contains("textures/complete/" + std::to_string(i)));
+            }
+            assert(cost.at("textures").at(0).at("path") == "textures/young_din/hair");
+            assert(cost.at("textures").at(0).at("bytes") == 4096);
+            assert(cost.at("textures").at(0).at("decoded_resident_bytes").is_null());
+            assert(cost.at("textures").at(0).at("source_data_bytes") == 2048);
+            assert(cost.at("textures").at(0).at("source_backing_bytes") == 2080);
+            assert(cost.at("textures").at(0).at("source_resident_bytes").is_null());
+            assert(cost.at("textures").at(0).at("decoded_rgba_upload_bytes") == 4096);
+            assert(cost.at("textures").at(0).at("source_width") == 32);
+            assert(cost.at("resources").at(0).at("self").at("ms") == 1.4);
+            assert(cost.at("resources").at(0).at("texture_import").at("ms") == 0.6);
+            assert(cost.at("passes").size() == 1 && cost.at("passes").at(0).at("framebuffer") == 17);
+            assert(!cost.at("emission_truncated").get<bool>());
+            assert(cost.at("resource_limit") == 4096 && cost.at("texture_limit") == 4096);
             assert(cost.at("cache").at("misses") == 1);
             const auto& lookup = cost.at("alt_render_lookup");
             assert(lookup.at("enabled") == true);
@@ -169,7 +230,7 @@ int main(int argc, char** argv) {
     assert(armed);
     assert(disabled);
     assert(samples == 2);
-    assert(renderSamples == 2);
+    assert(renderSamples == 4);
     assert(flightSamples == 2);
 
     // A fresh Context in the same process must announce itself and bind to its

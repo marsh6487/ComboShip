@@ -16,6 +16,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "SaveManager.h"
+#include "soh/unbound/SceneDB.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -234,6 +235,8 @@ SaveManager::SaveManager() {
 
     AddLoadFunction("randomizer", 1, LoadRandomizer);
     AddSaveFunction("randomizer", 1, SaveRandomizer, true, SECTION_PARENT_NONE);
+
+    SceneDB_RegisterSaveFunctions(*this);
 
     AddInitFunction(InitFileImpl);
 
@@ -1436,27 +1439,32 @@ void SaveManager::InitFileMaxed() {
 
 // Threaded SaveFile takes copy of gSaveContext for local unmodified storage
 
-void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID) {
+void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, int sectionID,
+                                   const SceneDBState& sceneState) {
     std::lock_guard<std::mutex> guard(saveMtx);
+    SceneDBSaveScope sceneSaveScope(sceneState);
+    const auto quest = saveContext.ship.quest.id;
+    const bool isRando = quest == QUEST_RANDOMIZER || quest == QUEST_OOTXMM;
+    const bool isSpeedrun = quest == QUEST_SPEEDRUN || quest == QUEST_SPEEDRUN_MASTER;
     SPDLOG_INFO("Save File - fileNum: {}", fileNum);
     // Needed for first time save, hasn't changed in forever anyway
     saveBlock["version"] = 1;
-    if (IS_RANDO) {
+    if (isRando) {
         saveBlock["fileType"] = FILE_TYPE_SAVE_RANDO;
-    } else if (IS_SPEEDRUN) {
+    } else if (isSpeedrun) {
         saveBlock["fileType"] = FILE_TYPE_SAVE_SPEEDRUN;
     } else {
         saveBlock["fileType"] = FILE_TYPE_SAVE_VANILLA;
     }
     // Fleet Ship Combo: a COMBO save is a rando save (fileType RANDO) PLUS this flag, so on load we
     // can restore QUEST_OOTXMM (the rando fileType alone would reduce it back to QUEST_RANDOMIZER).
-    saveBlock["fleetCombo"] = IS_OOTXMM;
+    saveBlock["fleetCombo"] = (quest == QUEST_OOTXMM);
     if (sectionID == SECTION_ID_BASE) {
         for (auto& sectionHandlerPair : sectionSaveHandlers) {
             auto& saveFuncInfo = sectionHandlerPair.second;
             // Don't call SaveFuncs for sections that aren't tied to game save
-            if (!saveFuncInfo.saveWithBase || (saveFuncInfo.name == "randomizer" && !IS_RANDO) ||
-                (saveFuncInfo.name == "speedrun" && !IS_SPEEDRUN)) {
+            if (!saveFuncInfo.saveWithBase || (saveFuncInfo.name == "randomizer" && !isRando) ||
+                (saveFuncInfo.name == "speedrun" && !isSpeedrun)) {
                 continue;
             }
             nlohmann::json& sectionBlock = saveBlock["sections"][saveFuncInfo.name];
@@ -1523,11 +1531,13 @@ void SaveManager::SaveSection(int fileNum, int sectionID, bool threaded) {
     }
 
     auto saveContext = std::make_shared<SaveContext>(gSaveContext);
+    auto sceneState = std::make_shared<const SceneDBState>(SceneDB_CaptureState());
     if (threaded) {
-        smThreadPool->detach_task(
-            [this, fileNum, saveContext, sectionID] { SaveFileThreaded(fileNum, *saveContext, sectionID); });
+        smThreadPool->detach_task([this, fileNum, saveContext, sceneState, sectionID] {
+            SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
+        });
     } else {
-        SaveFileThreaded(fileNum, *saveContext, sectionID);
+        SaveFileThreaded(fileNum, *saveContext, sectionID, *sceneState);
     }
 }
 
@@ -1541,21 +1551,26 @@ void SaveManager::SaveFile(int fileNum) {
 // the member saveBlock is left alone so an in-flight threaded save isn't disturbed).
 nlohmann::json SaveManager::SaveToJsonObject() {
     std::lock_guard<std::mutex> guard(saveMtx);
+    const SaveContext saveContext = gSaveContext;
+    const auto quest = saveContext.ship.quest.id;
+    const bool isRando = quest == QUEST_RANDOMIZER || quest == QUEST_OOTXMM;
+    const bool isSpeedrun = quest == QUEST_SPEEDRUN || quest == QUEST_SPEEDRUN_MASTER;
+    const auto sceneState = SceneDB_CaptureState();
+    SceneDBSaveScope sceneSaveScope(sceneState);
     nlohmann::json block;
     block["version"] = 1;
-    if (IS_RANDO) {
+    if (isRando) {
         block["fileType"] = FILE_TYPE_SAVE_RANDO;
-    } else if (IS_SPEEDRUN) {
+    } else if (isSpeedrun) {
         block["fileType"] = FILE_TYPE_SAVE_SPEEDRUN;
     } else {
         block["fileType"] = FILE_TYPE_SAVE_VANILLA;
     }
-    block["fleetCombo"] = IS_OOTXMM; // see SaveFileThreaded: restore QUEST_OOTXMM on load
-    const SaveContext saveContext = gSaveContext;
+    block["fleetCombo"] = (quest == QUEST_OOTXMM); // see SaveFileThreaded: restore QUEST_OOTXMM on load
     for (auto& sectionHandlerPair : sectionSaveHandlers) {
         auto& saveFuncInfo = sectionHandlerPair.second;
-        if (!saveFuncInfo.saveWithBase || (saveFuncInfo.name == "randomizer" && !IS_RANDO) ||
-            (saveFuncInfo.name == "speedrun" && !IS_SPEEDRUN)) {
+        if (!saveFuncInfo.saveWithBase || (saveFuncInfo.name == "randomizer" && !isRando) ||
+            (saveFuncInfo.name == "speedrun" && !isSpeedrun)) {
             continue;
         }
         nlohmann::json& sectionBlock = block["sections"][saveFuncInfo.name];

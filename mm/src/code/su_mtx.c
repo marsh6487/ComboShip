@@ -81,7 +81,7 @@ void Mtx_SetTranslateScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, f32 
     MtxF mtxf = {
         { { scaleX, 0, 0, 0 }, { 0, scaleY, 0, 0 }, { 0, 0, scaleZ, 0 }, { translateX, translateY, translateZ, 1 } }
     };
-    guMtxF2L(&mtxf, mtx);
+    guMtxF2L(mtxf.mf, mtx);
 }
 
 // Unused
@@ -117,6 +117,24 @@ void Mtx_SetTranslateScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, f32 
  * @remark Original name: probably something like "suMtxMakeR" or "suMtxMakeRotateVector"
  */
 void Mtx_SetRotationMtx(Mtx* mtx, s32 angle, f32 axisX, f32 axisY, f32 axisZ) {
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+    f32 sin = Math_SinS(angle);
+    f32 cos = Math_CosS(angle);
+    f32 tempXX = axisX * axisX;
+    f32 tempYY = axisY * axisY;
+    f32 tempZZ = axisZ * axisZ;
+    f32 tempX = (axisY * axisZ) * (1.0f - cos);
+    f32 tempY = (axisZ * axisX) * (1.0f - cos);
+    f32 tempZ = (axisX * axisY) * (1.0f - cos);
+    // Keep the original axisY signs, including the documented vanilla bug below.
+    MtxF mf = { {
+        { ((1.0f - tempXX) * cos) + tempXX, tempZ + axisZ * sin, tempY + axisY * sin, 0.0f },
+        { tempZ - axisZ * sin, ((1.0f - tempYY) * cos) + tempYY, tempX + axisX * sin, 0.0f },
+        { tempY - axisY * sin, tempX - axisX * sin, ((1.0f - tempZZ) * cos) + tempZZ, 0.0f },
+        { 0.0f, 0.0f, 0.0f, 1.0f },
+    } };
+    guMtxF2L(mf.mf, mtx);
+#else
     //! FAKE? The somewhat peculiar distribution of temps in this function seems necessary to match?
     f32 tempX;
     f32 tempZ;
@@ -192,6 +210,7 @@ void Mtx_SetRotationMtx(Mtx* mtx, s32 angle, f32 axisX, f32 axisY, f32 axisZ) {
     fixedPoint = (tempZ + axisZ * sin) * 0x10000;
     mtx->intPart[0][1] = ((u32)fixedPoint >> 0x10) & 0xFFFF;
     mtx->fracPart[0][1] = fixedPoint & 0xFFFF;
+#endif
 }
 
 /**
@@ -234,6 +253,19 @@ void Mtx_SetRotationMtx(Mtx* mtx, s32 angle, f32 axisX, f32 axisY, f32 axisZ) {
  */
 void Mtx_SetTranslationRotationScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, s32 angle, f32 axisX, f32 axisY,
                                         f32 axisZ, f32 translateX, f32 translateY, f32 translateZ) {
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+    s32 i;
+
+    Mtx_SetRotationMtx(mtx, angle, axisX, axisY, axisZ);
+    for (i = 0; i < 3; i++) {
+        mtx->mf[0][i] *= scaleX;
+        mtx->mf[1][i] *= scaleY;
+        mtx->mf[2][i] *= scaleZ;
+    }
+    mtx->mf[3][0] = translateX;
+    mtx->mf[3][1] = translateY;
+    mtx->mf[3][2] = translateZ;
+#else
     f32 tempX;
     f32 tempY;
     f32 tempZ;
@@ -315,4 +347,5 @@ void Mtx_SetTranslationRotationScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 sc
     mtx->m[1][3] = fixedPoint;           // [i32, i33]
     mtx->intPart[3][3] = 1;              // clean i33
     mtx->m[3][3] = (fixedPoint << 0x10); // [f32, f33]
+#endif
 }

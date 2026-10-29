@@ -45,17 +45,26 @@ def main():
             native = functions((ROOT / host / "src/code/z_actor.c").read_text(), ["Actor_Kill", "Actor_ApplyDamage", "Enemy_StartFinishingBlow"])
             (directory / "finish_native.inc").write_text("\n".join(native[name] for name in
                 ("Actor_Kill", "Actor_ApplyDamage", "Enemy_StartFinishingBlow")))
-            collision_names = (["CollisionCheck_DestroyContext", "NEI_PlayerDamageBoostActive", "CollisionCheck_ApplyDamage", "CollisionCheck_GetSwordDamage"] if host == "soh" else
-                ["CollisionCheck_DestroyContext", "CollisionCheck_GetElementATDamage", "CollisionCheck_GetDamageAndEffectOnElementAC",
+            collision_names = (["NEI_PlayerDamageBoostActive", "CollisionCheck_ApplyDamage", "CollisionCheck_GetSwordDamage"] if host == "soh" else
+                ["CollisionCheck_InitContext", "CollisionCheck_DestroyContext", "CollisionCheck_ClearContext",
+                 "CollisionCheck_GetElementATDamage", "CollisionCheck_GetDamageAndEffectOnElementAC",
                  "CollisionCheck_ApplyElementATDefense", "CollisionCheck_ApplyDamage"])
-            collision = functions((ROOT / host / "src/code/z_collision_check.c").read_text(), collision_names)
+            collision_text = (ROOT / host / "src/code/z_collision_check.c").read_text()
+            collision = functions(collision_text, collision_names)
+            lifecycle = ""
+            if host == "soh":
+                # The real destructor owns host buffers through an external registry.
+                # Keep its declarations, helpers and Init/Clear/Destroy together.
+                begin = collision_text.index("/* Actor collider queue ownership */")
+                ending = functions(collision_text, ["CollisionCheck_DisableSAC"])["CollisionCheck_DisableSAC"]
+                lifecycle = collision_text[begin:collision_text.index(ending) + len(ending)] + "\n"
             hook_header = ("soh/Enhancements/game-interactor/GameInteractor_Hooks.h" if host == "soh" else
                            "2s2h/GameInteractor/GameInteractor.h")
-            prefix = '#include "global.h"\n#include "din_fire_sword.h"\n#include <assert.h>\n'
+            prefix = '#include "global.h"\n#include "din_fire_sword.h"\n#include <assert.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n'
             prefix += '#include "' + hook_header + '"\n'
             if host == "mm": prefix += '#include "mods/combo_rpg.h"\n'
             collision_source = directory / "finish_collision.c"
-            collision_source.write_text(prefix + "\n".join(collision[name] for name in collision_names))
+            collision_source.write_text(prefix + lifecycle + "\n".join(collision[name] for name in collision_names))
             immune_actor = "En_Rd" if host == "soh" else "En_Am"
             table_source = (ROOT / host / f"src/overlays/actors/ovl_{immune_actor}/z_{immune_actor.lower()}.c").read_text()
             immune = re.search(r'static DamageTable sDamageTable = \{.*?^\};', table_source, re.M | re.S)[0]
