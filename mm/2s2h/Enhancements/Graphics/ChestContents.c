@@ -23,6 +23,8 @@ static const struct {
     [RITYPE_MAJOR] = { sBodyMajor, sLidMajor },           [RITYPE_LESSER] = { sBodyMinor, sLidMinor },
     [RITYPE_HEALTH] = { sBodyHeart, sLidHeart },          [RITYPE_SMALL_KEY] = { sBodySmallKey, sLidSmallKey },
     [RITYPE_SKULLTULA_TOKEN] = { sBodyToken, sLidToken }, [RITYPE_JUNK] = { sBodyJunk, sLidJunk },
+    [RITYPE_MASK] = { sBodyMajor, sLidMajor },
+    [RITYPE_STRAY_FAIRY] = { sBodyMajor, sLidMajor },
 };
 
 static int MMChest_GetNativeItemType(s32 getItemId) {

@@ -17,6 +17,8 @@ def main():
     chest = functions(source)
     actor = functions((ROOT / "soh/src/code/z_actor.c").read_text())
     category = functions((ROOT / "soh/soh/Enhancements/randomizer/item_category_adj.cpp").read_text())
+    hooks = (ROOT / "soh/soh/Enhancements/randomizer/hook_handlers.cpp").read_text()
+    foreign_category = functions(hooks)["ForeignCategoryFromName"]
     selected = [actor[name] for name in ("Actor_SetScale", "Actor_SetFocus")]
     selected += [category["Randomizer_AdjustItemCategory"]]
     selected += [body for name, body in chest.items() if name in {
@@ -39,14 +41,26 @@ def main():
         folder = Path(directory)
         (folder / "chest_size_production.inc").write_text(
             preamble + "\n" + prototypes + "\n" + "\n".join(selected))
-        binary = folder / "chest_size_test"
+        (folder / "chest_foreign_category_production.inc").write_text(foreign_category)
         compiler = os.environ.get("CC", "cc")
-        subprocess.run([compiler, *flags, "-I" + directory, "-fsanitize=undefined",
-                        "-fno-sanitize-recover=undefined", "soh/tests/chest_size_test.c",
-                        "-lm", "-o", str(binary)], cwd=ROOT, check=True)
-        subprocess.run([str(binary)], cwd=ROOT, check=True)
-        subprocess.run([compiler, *flags, "-fsyntax-only", str(source_path)], cwd=ROOT, check=True)
-        print("PASS: complete chest actor compiles against integration headers")
+        cxx = os.environ.get("CXX", "c++")
+        cpp_flags = [flag for flag in flags if flag not in {
+            "-std=gnu11", "-Werror=implicit-function-declaration", "-Wno-incompatible-pointer-types",
+            "-Wno-discarded-array-qualifiers", "-Wno-int-conversion"}]
+        sanitizers = ["-fsanitize=undefined", "-fno-sanitize-recover=undefined"]
+        for mode, defines in (("oot", []), ("combo", ["-DCOMBO_BUILD"])):
+            native = folder / (mode + "_chest.o")
+            bridge = folder / (mode + "_foreign_category.o")
+            binary = folder / (mode + "_chest_size_test")
+            subprocess.run([compiler, *flags, *defines, "-I" + directory, *sanitizers, "-c",
+                            "soh/tests/chest_size_test.c", "-o", str(native)], cwd=ROOT, check=True)
+            subprocess.run([cxx, "-std=c++20", *cpp_flags, *defines, "-I" + directory, *sanitizers, "-c",
+                            "soh/tests/chest_foreign_fixture.cpp", "-o", str(bridge)], cwd=ROOT, check=True)
+            subprocess.run([cxx, *sanitizers, str(native), str(bridge), "-lm", "-o", str(binary)],
+                           cwd=ROOT, check=True)
+            subprocess.run([str(binary)], cwd=ROOT, check=True)
+            subprocess.run([compiler, *flags, *defines, "-fsyntax-only", str(source_path)], cwd=ROOT, check=True)
+            print("PASS: complete chest actor and unchanged foreign-category bridge compile for " + mode)
 
 
 if __name__ == "__main__":

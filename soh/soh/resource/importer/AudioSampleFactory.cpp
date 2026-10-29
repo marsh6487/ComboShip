@@ -339,12 +339,29 @@ ResourceFactoryXMLAudioSampleV0::ReadResource(std::shared_ptr<Ship::File> file,
 
     const char* path = child->Attribute("Path");
 
+    std::shared_ptr<Ship::File> sampleFile;
+    if (path != nullptr && path[0] != '\0') {
 #ifdef COMBO_BUILD
-    // ComboShip: pin OOT's own RM — audio factories race active-RM swaps on other threads.
-    auto sampleFile = Ship::CrossRMRegistry::GetOrActive("oot")->GetArchiveManager()->LoadFile(path);
+        // ComboShip: pin OOT's own RM — audio factories race active-RM swaps on other threads.
+        sampleFile = Ship::CrossRMRegistry::GetOrActive("oot")->GetArchiveManager()->LoadFile(path);
 #else
-    auto sampleFile = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->LoadFile(path);
+        sampleFile = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->LoadFile(path);
 #endif
+    }
+    if (sampleFile == nullptr || sampleFile->Buffer == nullptr || sampleFile->Buffer->empty()) {
+        SPDLOG_ERROR("Audio sample '{}' references missing or empty data '{}'; using silence. "
+                     "Restore the matching audio pack or remove its music definitions.",
+                     initData->Path, path != nullptr ? path : "<missing Path>");
+        // Keep soundfont references valid. This native codec clears the output
+        // without reading sampleAddr; RAM and size zero also prevent preloads.
+        audioSample->sample.codec = CODEC_S16_INMEMORY;
+        audioSample->sample.medium = MEDIUM_RAM;
+        audioSample->sample.unk_bit26 = 0;
+        audioSample->sample.size = 0;
+        audioSample->loop = {};
+        audioSample->loop.end = 16;
+        return audioSample;
+    }
     audioSample->sample.fileSize = static_cast<u32>(sampleFile->Buffer.get()->size());
     if (customFormatStr != nullptr) {
         // Compressed files can take a really long time to decode (~250ms per).

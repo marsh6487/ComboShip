@@ -185,6 +185,7 @@ int main() {
         { GI_KEY_SMALL, "SmallKey", 1.0f },
         { GI_SKULL_TOKEN, "Token", 1.0f },
         { GI_RUPEE_RED, "Junk", 1.0f },
+        { GI_STRAY_FAIRY, "Major", 4.0f / 3.0f },
     };
     matchSize = 1;
     for (const auto& category : categories) {
@@ -203,7 +204,50 @@ int main() {
     }
     puts("PASS: native categories and all 13 authored types; size changes only the draw matrix");
 
-    chest = Chest(ENBOX_TYPE_SMALL, GI_HOOKSHOT);
+    for (int type = ENBOX_TYPE_BIG; type <= ENBOX_TYPE_SMALL_SWITCH_FLAG; ++type) {
+        chest = Chest(type, GI_STRAY_FAIRY);
+        ExpectModel(Draw(chest), "Major");
+        REQUIRE(fabsf(drawScale - (Actor_IsSmallChest(&chest) ? 4.0f / 3.0f : 1.0f)) < 0.00001f);
+        matchSize = 0;
+        ExpectModel(Draw(chest), "Major");
+        REQUIRE(drawScale == 1.0f);
+        matchSize = 1;
+    }
+    matchStyle = 0;
+    chest = Chest(ENBOX_TYPE_BIG, GI_STRAY_FAIRY);
+    lists = Draw(chest);
+    REQUIRE(!strcmp((const char*)lists[0], gBoxChestBaseGildedDL));
+    REQUIRE(drawScale == 1.0f);
+    matchSize = 0;
+    lists = Draw(chest);
+    REQUIRE(!strcmp((const char*)lists[0], gBoxChestBaseGildedDL) && drawScale == 1.0f);
+    matchStyle = matchSize = 1;
+    puts("PASS: native fairy chests use Major art and optional large size independently");
+
+    for (int item = GI_MASK_DEKU; item <= GI_MASK_KAFEIS_MASK; ++item) {
+        chest = Chest(ENBOX_TYPE_SMALL, item);
+        ExpectModel(Draw(chest), "Major");
+        REQUIRE(fabsf(drawScale - 4.0f / 3.0f) < 0.00001f);
+    }
+    puts("PASS: every native mask uses the major-item 3DS model without changing its reward");
+
+    for (int item : { GI_HOOKSHOT, GI_MASK_DEKU }) {
+        chest = Chest(ENBOX_TYPE_SMALL, item);
+        for (const char* part : { "BodyMajor", "LidMajor" }) {
+            missingResource = part;
+            lists = Draw(chest);
+            REQUIRE(!strcmp((const char*)lists[0], gBoxChestBaseDL));
+            REQUIRE(!strcmp((const char*)lists[1], gBoxChestLidDL));
+            missingResource = nullptr;
+            failedResource = part;
+            lists = Draw(chest);
+            REQUIRE(!strcmp((const char*)lists[0], gBoxChestBaseDL));
+            REQUIRE(!strcmp((const char*)lists[1], gBoxChestLidDL));
+            failedResource = nullptr;
+            ExpectModel(Draw(chest), "Major");
+        }
+    }
+    chest = Chest(ENBOX_TYPE_SMALL, GI_STRAY_FAIRY);
     for (const char* part : { "BodyMajor", "LidMajor" }) {
         missingResource = part;
         lists = Draw(chest);
@@ -217,7 +261,7 @@ int main() {
         failedResource = nullptr;
         ExpectModel(Draw(chest), "Major");
     }
-    for (int item : { GI_KEY_BOSS, GI_MASK_DEKU, GI_STRAY_FAIRY, GI_NONE, GI_0B, GI_ICE_TRAP }) {
+    for (int item : { GI_KEY_BOSS, GI_NONE, GI_0B, GI_ICE_TRAP }) {
         chest = Chest(ENBOX_TYPE_BIG_ORNATE, item);
         lists = Draw(chest);
         REQUIRE(!strcmp((const char*)lists[0], gBoxChestBaseOrnateDL));
@@ -280,11 +324,32 @@ int main() {
     } randoCategories[] = {
         { RITYPE_MAJOR, "Major" },        { RITYPE_LESSER, "Minor" },          { RITYPE_HEALTH, "Heart" },
         { RITYPE_SMALL_KEY, "SmallKey" }, { RITYPE_SKULLTULA_TOKEN, "Token" }, { RITYPE_JUNK, "Junk" },
+        { RITYPE_MASK, "Major" },
+        { RITYPE_STRAY_FAIRY, "Major" },
     };
     for (const auto& category : randoCategories) {
         resolvedType = category.type;
         ExpectModel(Draw(chest, true), category.model);
     }
+    resolvedType = RITYPE_STRAY_FAIRY;
+    REQUIRE(MMChest_GetRandoItemType(&chest) == RITYPE_STRAY_FAIRY);
+    ExpectModel(Draw(chest, true), "Major");
+    REQUIRE(fabsf(drawScale - 4.0f / 3.0f) < 0.00001f);
+    EnBox largeFairyChest = Chest(ENBOX_TYPE_BIG, GI_RECOVERY_HEART);
+    largeFairyChest.contentsRandoCheck = chest.contentsRandoCheck;
+    ExpectModel(Draw(largeFairyChest, true), "Major");
+    REQUIRE(drawScale == 1.0f);
+    matchSize = 0;
+    ExpectModel(Draw(largeFairyChest, true), "Major");
+    REQUIRE(drawScale == 1.0f);
+    matchSize = 1;
+    missingResource = "LidMajor";
+    lists = Draw(largeFairyChest, true);
+    REQUIRE(lists.size() == 2 && lists[0] == gBoxChestBaseOrnateCopyDL && lists[1] == gBoxChestLidOrnateCopyDL);
+    REQUIRE(drawScale == 1.0f);
+    missingResource = nullptr;
+    REQUIRE(saved.randoItemId == RI_COMBO_FOREIGN);
+    puts("PASS: randomizer fairy category/reward retained with Major art and optional large size");
     resolvedType = RITYPE_MAJOR;
     ExpectModel(Draw(chest), "Major"); // size/style still classify the shuffled reward in native draw
     missingResource = "LidMajor";
@@ -328,8 +393,17 @@ int main() {
     REQUIRE(lists.size() == 2 && !strcmp((const char*)lists[0], gBoxChestBaseOrnateDL));
     saved.randoItemId = RI_COMBO_FOREIGN;
     resolvedType = RITYPE_MASK;
+    ExpectModel(Draw(chest, true), "Major");
+    REQUIRE(MMChest_GetRandoItemType(&chest) == RITYPE_MASK);
+    missingResource = "LidMajor";
     lists = Draw(chest, true);
-    REQUIRE(lists.size() == 2 && lists[0] == gBoxChestBaseOrnateCopyDL);
+    REQUIRE(lists.size() == 2 && lists[0] == gBoxChestBaseOrnateCopyDL && lists[1] == gBoxChestLidOrnateCopyDL);
+    missingResource = nullptr;
+    failedResource = "BodyMajor";
+    lists = Draw(chest, true);
+    REQUIRE(lists.size() == 2 && lists[0] == gBoxChestBaseOrnateCopyDL && lists[1] == gBoxChestLidOrnateCopyDL);
+    failedResource = nullptr;
+    ExpectModel(Draw(chest, true), "Major");
     resolvedType = RITYPE_MAX;
     lists = Draw(chest, true);
     REQUIRE(lists.size() == 2 && lists[0] == gBoxChestBaseCopyDL && drawScale == 1.0f);

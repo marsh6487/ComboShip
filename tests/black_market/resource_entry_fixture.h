@@ -217,8 +217,9 @@ extern "C" inline void* MmAssets_LoadResourceStrict(const char* path) {
     importedPayloads[name] = std::move(bytes); return importedPayloads.at(name).data() + 92;
 }
 inline MmDisplayListCommand* ImportGraph(const std::string& name);
-inline uintptr_t ResolveGraphResource(void*, MmDisplayListReferenceKind kind, uint64_t hash, size_t* size) {
-    *size = 0;
+inline uintptr_t ResolveGraphResource(void*, MmDisplayListReferenceKind kind, uint64_t hash,
+                                      MmDisplayListVertexResourceView* vertexView) {
+    *vertexView = {};
     if (kind == MM_DISPLAY_LIST_REFERENCE_RENDER_MODE)
         return (hash == 0 || hash == 2) ? reinterpret_cast<uintptr_t>(&opaqueRenderMode[hash]) : 0;
     if (!resourceHashes.count(hash)) return 0;
@@ -233,13 +234,23 @@ inline uintptr_t ResolveGraphResource(void*, MmDisplayListReferenceKind kind, ui
         importedTextureAliases[path] = "__OTR__" + path;
         return reinterpret_cast<uintptr_t>(importedTextureAliases.at(path).c_str());
     }
-    if (bytes.size() < 72 || std::memcmp(bytes.data() + 4, "RRAO", 4) != 0) return 0;
+    if (bytes.size() < 72 || bytes[0] != 0 || std::memcmp(bytes.data() + 4, "RRAO", 4) != 0) return 0;
     ResourceReader reader{bytes};
+    reader.offset = 8;
+    if (reader.Take(4) != 0) return 0; // This stock-native fixture imports only little-endian Array v0.
+    reader.offset = 64;
     if (reader.Take(4) != 25) return 0;
     const auto count = reader.Take(4);
-    if (bytes.size() != 72 + count * 16) return 0;
-    importedPayloads[path] = std::move(bytes); *size = count * 16;
-    return reinterpret_cast<uintptr_t>(importedPayloads.at(path).data() + 72);
+    constexpr size_t recordSize = 16;
+    const size_t payloadSize = bytes.size() - 72;
+    if (payloadSize % recordSize != 0 || payloadSize / recordSize != count) return 0;
+    importedPayloads[path] = std::move(bytes);
+    vertexView->pointer = reinterpret_cast<uintptr_t>(importedPayloads.at(path).data() + 72);
+    vertexView->size = payloadSize;
+    vertexView->recordSize = recordSize;
+    // The test retains serialized records directly; it does not decode widened game Vtx objects.
+    vertexView->stride = recordSize;
+    return vertexView->pointer;
 }
 inline MmDisplayListCommand* ImportGraph(const std::string& name) {
     if (hiddenFiles.count(name)) return nullptr;
