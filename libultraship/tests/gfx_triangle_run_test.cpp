@@ -343,6 +343,7 @@ static void indexedSpecialCasesTest() {
             if (special == 0) f->gfx.mRenderingState.mTextures[1] = f->gfx.mRenderingState.mTextures[0];
             if (special == 1) {
                 f->gfx.mRdp->toon = true;
+                f->gfx.mRsp->geometry_mode |= G_LIGHTING;
                 for (unsigned i = 0; i < MAX_VERTICES; ++i) {
                     auto& v = f->gfx.mRsp->loaded_vertices[i];
                     v.nx = float(i)/64; v.ny = -.25f; v.nz = .75f;
@@ -371,6 +372,18 @@ static void indexedSpecialCasesTest() {
         require(legacy.backend.output == indexed.backend.output && legacy.backend.events == indexed.backend.events,
                 "shared samplers/toon/full unique batch/index-direct transitions must preserve exact output");
         if (special == 0) require(indexed.backend.indexedDraws == 0, "shared samplers use direct fallback");
+        if (special == 1) {
+            const auto& state = indexed.gfx.mTriangleState;
+            require(state.use_toon && indexed.backend.indexedDraws > 0,
+                    "toon equivalence must exercise indexed normal attributes");
+            const size_t inputFloats = state.numInputs * (3 + size_t(state.use_alpha));
+            const size_t stride = indexed.backend.lastIndexedStride;
+            require(stride >= inputFloats + 3, "toon layout must include three normal attributes");
+            const float normal[] = {1.f / 64, -.25f, .75f};
+            require(memcmp(indexed.backend.output.data() + 2 * stride - inputFloats - 3,
+                           normal, sizeof(normal)) == 0,
+                    "the second expanded vertex must retain its exact toon normal");
+        }
         if (special == 2) require(indexed.backend.triangles == 256 && indexed.backend.indexedDraws == 0,
                                   "full unique batch preserves all768 records without unnecessary indexed upload");
         if (special == 3) require(indexed.backend.indexedDraws == 2, "populated rectangle transition returns to indexed mode");
