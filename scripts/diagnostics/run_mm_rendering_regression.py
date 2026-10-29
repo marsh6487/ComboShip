@@ -56,17 +56,24 @@ sys.path.insert(0,str(ROOT/'scripts'))
 from bind_mm_fountain_animation import crc64
 class Command(c.Structure): _fields_=[('w0',c.c_uint32),('w1',c.c_size_t)]
 class Stats(c.Structure): _fields_=[(n,c.c_size_t) for n in ['nested','vertices','unresolved','malformed','renderMode','textures']]
-Resolver=c.CFUNCTYPE(c.c_size_t,c.c_void_p,c.c_int,c.c_uint64,c.POINTER(c.c_size_t))
+class VertexView(c.Structure):
+    _fields_=[(n,c.c_size_t) for n in ['pointer','size','recordSize','stride']]
+Resolver=c.CFUNCTYPE(c.c_size_t,c.c_void_p,c.c_int,c.c_uint64,c.POINTER(VertexView))
 patcher=c.CDLL(str(WORK/'patch.so')).Test_PatchMmDisplayList
 patcher.argtypes=[c.POINTER(Command),c.c_size_t,Resolver,c.c_void_p,c.POINTER(Stats)];patcher.restype=c.c_bool
 storage={}; changed=total=lists=0
 @Resolver
-def resolve(ctx,kind,key,size):
-    size[0]=65536
+def resolve(ctx,kind,key,view):
+    # This legacy audit deliberately retains raw 16-byte archive records.
+    # The separate native_mm_actor_vertices audit expands them to 24 bytes.
+    view.contents.size=65536
+    view.contents.recordSize=16
+    view.contents.stride=16
     if kind==1:
         buf=storage.get(key)
         if buf is None:return 0
-        size[0]=len(buf);return c.addressof(buf)
+        view.contents.pointer=c.addressof(buf)
+        view.contents.size=len(buf);return c.addressof(buf)
     return 0x30000000+key if kind==2 else 0x40000000
 with zipfile.ZipFile(sys.argv[1]) as archive:
     for name in archive.namelist():

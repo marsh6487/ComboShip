@@ -33,3 +33,14 @@ Tech: C++20, native unit tests, Python archive audit, GitHub candidate validatio
 - [ ] Deliver source/build results separately from the pending in-game visual test.
 
 Recovery: fetch the exact baseline above and apply the candidate diff; do not promote or overwrite the accepted repaired branch.
+
+
+## Additional authorized parallel work
+
+- [x] Zelda agent: synchronize cached matrix count in both skeleton-swap paths; seven production traversal cases pass ASan/UBSan.
+- [x] Saria agent: authored-only fitted head pivots in ordinary/static Saria, Twins and Fado callbacks; 1,920 checks pass ASan/UBSan.
+- [x] Root: preserve and repair accepted Twins copy; 545 hash payload changes, all other asset bytes retained, second pass unchanged.
+- [x] Root: update existing ctypes archive diagnostic for the new resolver view; actual Skull Kid packet checks pass.
+- [ ] Fresh whole-candidate review and platform validation.
+
+All fixes are combined on `candidate/native-cutscene-vertices-20261029`; user continues smoke testing the unchanged repaired parent.

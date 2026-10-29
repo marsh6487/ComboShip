@@ -116,6 +116,8 @@ void SkeletonPatcher::UpdateSkeletons() {
 
         if (newSkel != nullptr) {
             skel.skelAnime->skeleton = newSkel->skeletonData.skeletonHeader.segment;
+            // Flex draw callers may use this cached count after a live Alt swap.
+            skel.skelAnime->dListCount = newSkel->dListCount;
             uintptr_t skelPtr = (uintptr_t)newSkel->GetPointer();
             memcpy(&skel.skelAnime->skeletonHeader, &skelPtr,
                    sizeof(uintptr_t)); // Dumb thing that needs to be done because cast is not cooperating
@@ -226,6 +228,7 @@ void SkeletonPatcher::UpdateCustomSkeletonFromPath(const std::string& skeletonPa
 
     if (newSkel != nullptr) {
         skel.skelAnime->skeleton = newSkel->skeletonData.skeletonHeader.segment;
+        skel.skelAnime->dListCount = newSkel->dListCount;
         uintptr_t skelPtr = (uintptr_t)newSkel->GetPointer();
         memcpy(&skel.skelAnime->skeletonHeader, &skelPtr, sizeof(uintptr_t));
     }

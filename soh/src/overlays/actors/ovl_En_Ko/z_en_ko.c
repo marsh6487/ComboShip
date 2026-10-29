@@ -1340,11 +1340,14 @@ s32 EnKo_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* po
         Matrix_RotateZ(BINANG_TO_RAD(sp40.x), MTXMODE_APPLY);
     }
     if (limbIndex == 15) {
-        Matrix_Translate(1200.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+        bool authoredHead = NativeNpcModel_IsActive(NativeNpcModel_Kokiri(ENKO_TYPE)) ||
+                            (ENKO_TYPE == ENKO_TYPE_CHILD_FADO && YoungFadoNpc_IsActive());
+        Vec3f pivot = authoredHead ? *pos : (Vec3f){ 1200.0f, 0.0f, 0.0f };
+        Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
         sp40 = this->interactInfo.headRot;
         Matrix_RotateX(BINANG_TO_RAD(sp40.y), MTXMODE_APPLY);
         Matrix_RotateZ(BINANG_TO_RAD(sp40.x), MTXMODE_APPLY);
-        Matrix_Translate(-1200.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+        Matrix_Translate(-pivot.x, -pivot.y, -pivot.z, MTXMODE_APPLY);
     }
     if (limbIndex == 8 || limbIndex == 9 || limbIndex == 12) {
         rot->y += Math_SinS(this->fidgetTableY[limbIndex]) * 200.0f;
