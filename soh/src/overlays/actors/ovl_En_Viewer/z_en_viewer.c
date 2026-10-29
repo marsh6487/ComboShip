@@ -1706,10 +1706,11 @@ static s32 EnViewer_StaticSariaOverrideLimbDraw(PlayState* play, s32 limbIndex, 
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_SARIA, this->staticState.pose)) {
         if (limbIndex == 16) {
-            Matrix_Translate(900.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Vec3f pivot = NativeNpcModel_IsActive(&sSariaNpcModel) ? *pos : (Vec3f){ 900.0f, 0.0f, 0.0f };
+            Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.headRot.y), MTXMODE_APPLY);
             Matrix_RotateZ(BINANG_TO_RAD(this->staticState.interactInfo.headRot.x), MTXMODE_APPLY);
-            Matrix_Translate(-900.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Matrix_Translate(-pivot.x, -pivot.y, -pivot.z, MTXMODE_APPLY);
         } else if (limbIndex == 9) {
             Matrix_RotateY(BINANG_TO_RAD(this->staticState.interactInfo.torsoRot.y), MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);

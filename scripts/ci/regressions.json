@@ -16,7 +16,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM legacy/wide graphics and immutable cross-game vertex resources",
-    "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide"
+    "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B tests/native_mm_actor_vertices/run_tests.py --sanitize\npython3 -B tests/native_mm_actor_vertices/alt_matrix_test.py --sanitize\npython3 -B tests/native_mm_actor_vertices/saria_tracking_test.py --sanitize\npython3 -B tests/black_market/run_resource_entry_graph_tests.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide"
   },
   {
     "suite": "render",
@@ -1347,6 +1347,12 @@
     "origin": "gate",
     "name": "Contents-based chests and opt-in Midna",
     "run": "python3 scripts/diagnostics/run_chest_size_tests.py\npython3 scripts/diagnostics/run_mm_chest_contents_tests.py\npython3 scripts/diagnostics/run_midna_navi_draw_test.py\npython3 scripts/diagnostics/run_midna_audio_test.py\npython3 scripts/diagnostics/run_mm_midna_test.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Missing custom audio data remains silent in OoT and MM",
+    "run": "python3 -B tests/audio_missing_sample/run_tests.py\npython3 -B tests/audio_missing_sample/run_tests.py --sanitize"
   },
   {
     "suite": "systems",

@@ -676,6 +676,30 @@ extern "C" COMBO_EXPORT void SOH_LoadComboRando(const char* json) {
 }
 #endif
 
+extern "C" bool Randomizer_IsChestStrayFairy(GetItemEntry item) {
+    if (item.modIndex != MOD_RANDOMIZER) {
+        return false;
+    }
+    switch (item.getItemId) {
+        case RG_MM_STRAY_FAIRY:
+        case RG_MM_STRAY_FAIRY_WOODFALL:
+        case RG_MM_STRAY_FAIRY_SNOWHEAD:
+        case RG_MM_STRAY_FAIRY_GREAT_BAY:
+        case RG_MM_STRAY_FAIRY_STONE_TOWER:
+            return true;
+        default:
+            break;
+    }
+#ifdef COMBO_BUILD
+    if (item.getItemId == RG_COMBO_FOREIGN && item.comboForeignCheck > RC_UNKNOWN_CHECK &&
+        item.comboForeignCheck < RC_MAX) {
+        const ComboRando::ForeignItem* foreign = OOT_LookupForeignByCheck((RandomizerCheck)item.comboForeignCheck);
+        return foreign != nullptr && !foreign->trap && foreign->category == "strayFairy";
+    }
+#endif
+    return false;
+}
+
 void RandomizerOnPlayerUpdateForRCQueueHandler() {
     // If we're already queued, don't queue again
     if (randomizerQueuedCheck != RC_UNKNOWN_CHECK)
