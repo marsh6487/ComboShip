@@ -617,6 +617,7 @@ void EnBox_UpdateTexture(EnBox* this, PlayState* play) {
     int requiresStoneAgony = CVarGetInteger(CVAR_ENHANCEMENT("ChestSizeDependsStoneOfAgony"), 0);
     GetItemCategory getItemCategory = ITEM_CATEGORY_JUNK;
     GetItemEntry chestItem = this->getItemEntry;
+    bool strayFairy = false;
 
     // Conceal intermediate vanilla chest-game contents; shuffled checks use normal chest cosmetics.
     bool concealContents = play->sceneNum == SCENE_TREASURE_BOX_SHOP && this->dyna.actor.room != 6 &&
@@ -626,13 +627,17 @@ void EnBox_UpdateTexture(EnBox* this, PlayState* play) {
 
     if (matchSize || !isVanilla) {
         getItemCategory = Randomizer_AdjustItemCategory(chestItem);
+        strayFairy = Randomizer_IsChestStrayFairy(chestItem);
+        if (strayFairy) {
+            getItemCategory = ITEM_CATEGORY_LESSER;
+        }
     }
 
     if (matchSize) {
         // Classic CSMC categories. Keep actor params/type intact: they also
         // control switch, room-clear, song, falling and Lens of Truth behavior.
         bool small = getItemCategory == ITEM_CATEGORY_JUNK || getItemCategory == ITEM_CATEGORY_SMALL_KEY ||
-                     getItemCategory == ITEM_CATEGORY_SKULLTULA_TOKEN;
+                     getItemCategory == ITEM_CATEGORY_SKULLTULA_TOKEN || strayFairy;
         Actor_SetScale(&this->dyna.actor, small ? 0.005f : 0.01f);
         Actor_SetFocus(&this->dyna.actor, small ? 20.0f : 40.0f);
     } else {
