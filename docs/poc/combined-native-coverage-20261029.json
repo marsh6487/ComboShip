@@ -1,0 +1,2192 @@
+{
+  "schema": 1,
+  "manifest_groups": 259,
+  "suites": {
+    "equipment": {
+      "total": 52,
+      "passed": 52,
+      "pending": 0
+    },
+    "world": {
+      "total": 46,
+      "passed": 46,
+      "pending": 0
+    },
+    "render": {
+      "total": 69,
+      "passed": 69,
+      "pending": 0
+    },
+    "systems": {
+      "total": 36,
+      "passed": 36,
+      "pending": 0
+    },
+    "items": {
+      "total": 46,
+      "passed": 46,
+      "pending": 0
+    },
+    "entrances": {
+      "total": 10,
+      "passed": 10,
+      "pending": 0
+    }
+  },
+  "scope": "Retained CI and native group coverage, including corrected fixtures; this is not a claim of one uninterrupted whole-manifest run.",
+  "timings": "Native timings may include fixture-lane waits; no comparative game-performance result is implied.",
+  "local_sanitizers": "ASan/UBSan active. Local LeakSanitizer process scanning is unsupported in this executor; only that scan was disabled.",
+  "additional_light_proof": {
+    "actual_calls": 10,
+    "coordinate_controls": 30,
+    "original_and_wide_zora_cases": 8,
+    "result": "pass",
+    "session_log": "/tmp/combined-light-format-check.log"
+  },
+  "groups": [
+    {
+      "suite": "equipment",
+      "name": "Native wide custom collision, movement and enemy placement",
+      "run": "python3 -B tests/custom_unbound_collision/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419,
+      "additional_current_source_evidence": "Ten actual light-call expressions, 30 wide coordinate controls and eight Zora cases passed after the retained equipment CI run; see additional_light_proof."
+    },
+    {
+      "suite": "world",
+      "name": "Native Unbound formats, legacy routing and transactional state ownership",
+      "run": "python3 -B tests/unbound/run_native_tests.py -v\npython3 -B tests/unbound/run_savestate_tests.py",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367584,
+      "result": "success: 21.56s"
+    },
+    {
+      "suite": "render",
+      "name": "Native MM legacy/wide graphics and immutable cross-game vertex resources",
+      "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide",
+      "status": "pass",
+      "note": "Native group passed; shader lifetime also checked with raw and production-patched pinned ImGui.",
+      "session_log": "/tmp/combined-integration-formatted.log"
+    },
+    {
+      "suite": "render",
+      "name": "Native cel policy, backend state and shader lifetime preservation",
+      "run": "python3 -B tests/cel_sky/run_tests.py --sanitize\npython3 -B tests/cel_sky/run_native_tests.py --sanitize\npython3 -B tests/cel_interpreter/run_tests.py --sanitize\npython3 -B tests/cel_render_backends/run_tests.py\npython3 -B tests/shader_lifetime/run_tests.py --sanitize",
+      "status": "pass",
+      "note": "Native group passed; shader lifetime also checked with raw and production-patched pinned ImGui.",
+      "session_log": "/tmp/combined-integration-formatted.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Standalone native compiler ABI selection and candidate archive reproducibility",
+      "run": "python3 -B tests/ci_native_abi/run_tests.py\npython3 -B tests/packaging/test_normalize_candidate_o2r.py",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 2.30s"
+    },
+    {
+      "suite": "equipment",
+      "name": "Native growable OoT actor collider queues, contact ordering, lifetimes and SAC",
+      "run": "python3 -B tests/actor_queue_growth/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/actor_queue_growth/run_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Native Skulltula pickup gates and collision admission tracing",
+      "run": "python3 -B tests/keaton_melee/skull_pickup_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/skull_pickup_test.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Pictograph shared-slot name and selector refresh",
+      "run": "python3 -B tests/keaton_melee/picto_name_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/picto_name_test.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Keaton native melee ABI and ground/air attack entries",
+      "run": "python3 -B tests/keaton_melee/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/keaton_melee/run_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "world",
+      "name": "Native silver-rupee hooks preserve unregistered scene actors",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/silver_rupee/run_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367584,
+      "result": "success: 0.64s"
+    },
+    {
+      "suite": "items",
+      "name": "Native Ikana GI priority, resource availability and pause icon routing",
+      "run": "python3 -B tests/ikana_gi/run_native_priority_tests.py\npython3 -B tests/ikana_gi/run_native_availability_tests.py\npython3 -B tests/oot_equipment_pause/run_ikana_icon_tests.py",
+      "status": "pass",
+      "result": "success: 7.50s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "world",
+      "name": "Fast shared Granny UI and engine header regression",
+      "run": "python3 -B tests/black_market/run_granny_header_tests.py",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367584,
+      "result": "success: 3.13s"
+    },
+    {
+      "suite": "world",
+      "name": "Native forest ocarina cameras in combined and both solo modes",
+      "run": "python3 -B tests/forest_ocarina/run_tests.py",
+      "status": "pass",
+      "seconds": 71.27,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-3.log"
+    },
+    {
+      "suite": "world",
+      "name": "Verify October 20 bug-fix entry, decoder and particle paths",
+      "run": "bash scripts/diagnostics/run_oct20_bugfix_regressions.sh",
+      "status": "pass",
+      "seconds": 480.71,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-4.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Fast game-picker Windows header regression",
+      "run": "python3 -B tests/solo_games/selection_test.py --windows",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 1.68s"
+    },
+    {
+      "suite": "systems",
+      "name": "Fast headless module loader diagnostics",
+      "run": "python3 -B tests/solo_games/headless_module_load_test.py",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 0.79s"
+    },
+    {
+      "suite": "items",
+      "name": "Native OoT Magic Mirror pickup message completion",
+      "run": "python3 -B tests/magic_mirror/run_receipt_tests.py",
+      "status": "pass",
+      "result": "success: 1.46s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "world",
+      "name": "Native OoT Black Market button glyph colors",
+      "run": "python3 -B tests/black_market/run_oot_button_glyph_tests.py",
+      "status": "pass",
+      "seconds": 8.95,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-5.log"
+    },
+    {
+      "suite": "items",
+      "name": "Fast pickup text and receipt regressions",
+      "run": "python3 -B tests/item_receipts/run_message_replace_tests.py\npython3 -B tests/item_receipts/run_message_replace_tests.py --sanitize\npython3 -B tests/item_receipts/run_chateau_receipt_tests.py\npython3 -B tests/item_receipts/run_chateau_receipt_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_item_receipt_tests.py --layout-only --sanitizers",
+      "status": "pass",
+      "result": "success: 9.61s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Fast audio-worker compile and mixer regressions",
+      "run": "python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 13.12s"
+    },
+    {
+      "suite": "systems",
+      "name": "Native OoT seasonal rain PCM and Song of Storms ownership",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_soh_rain_audio_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 3.36s"
+    },
+    {
+      "suite": "entrances",
+      "name": "Fast entrance compile and linkage preflight",
+      "run": "python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py\npython3 -B tests/cross_dungeon/oot_entrance_metadata_test.py\npython3 -B tests/cross_dungeon/generation_reset_behavior_test.py\npython3 -B tests/lost_woods_entrance/renderer_linkage_test.py",
+      "status": "pass",
+      "seconds": 193.11,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-0.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "Native OoT Blast Mask tutorial and A-action arbitration",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/blast_mask/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Fast Goron lifetime and Somaria GI regressions",
+      "run": "python3 -B tests/goron_audio/run_tests.py\npython3 -B tests/mm_sfx_render/run_tests.py\npython3 -B scripts/diagnostics/run_oot_native_transformation_tests.py\npython3 -B tests/goron_field_collision/run_tests.py --sanitize\npython3 -B tests/nei_quest_held/mm_cane_gi_test.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Fast held equipment XML and action regressions",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_held/run_equipment_regression_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "systems",
+      "name": "Fast vanilla and Master Quest ROM setup regressions",
+      "run": "python3 -B tests/rom_setup/screen_behavior_test.py --sanitize\npython3 -B tests/rom_setup/launcher_behavior_test.py --sanitize\npython3 -B tests/rom_setup/classifier_behavior_test.py --sanitize\npython3 -B tests/rom_setup/async_progress_test.py --sanitize",
+      "status": "pass",
+      "evidence": "retained CI run 40799473977",
+      "job": 123204367575,
+      "result": "success: 6.23s"
+    },
+    {
+      "suite": "systems",
+      "name": "Native MM weather and winter bridge preflight",
+      "run": "python3 -B scripts/diagnostics/run_mm_weather_tests.py\npython3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 47.1,
+      "session_log": "/tmp/mm-weather-group-fixed.log"
+    },
+    {
+      "suite": "render",
+      "name": "Complete spin style native rendering and combat, normal and sanitized",
+      "run": "python3 -B scripts/diagnostics/run_spin_style_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_spin_style_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 108.74,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/00.log"
+    },
+    {
+      "suite": "render",
+      "name": "Native OoT and MM cape visibility during shop camera ownership",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_cape/run_visibility_tests.py",
+      "status": "pass",
+      "seconds": 35.98,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/01.log"
+    },
+    {
+      "suite": "render",
+      "name": "Foreign Great Spin GI preflight",
+      "run": "python3 -B scripts/diagnostics/run_spin_gi_tests.py\npython3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 198.61,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/02.log"
+    },
+    {
+      "suite": "render",
+      "name": "Native elemental sword ice material and frost rendering",
+      "run": "python3 -B scripts/assets/build_sword_finish_ice.py --check\npython3 -B tests/elemental_swords/run_ice_material_tests.py",
+      "status": "pass",
+      "seconds": 326.12,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/03.log"
+    },
+    {
+      "suite": "render",
+      "name": "Native regional passage presentation and graphics translation units",
+      "run": "python3 -B tests/regional_passages/run_presentation_tests.py --syntax",
+      "status": "pass",
+      "seconds": 41.7,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/04.log"
+    },
+    {
+      "suite": "render",
+      "name": "Drop-in regional material packs and native texture metadata",
+      "run": "python3 -B tests/regional_passages/run_material_tests.py",
+      "status": "pass",
+      "seconds": 60.57,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/05.log"
+    },
+    {
+      "suite": "render",
+      "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
+      "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py",
+      "status": "pass",
+      "seconds": 6.23,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/06.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Native cross-game entrance sequencing and forest arrival",
+      "run": "C_INCLUDE_PATH=/usr/include/SDL2 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py mm/src/code/z_play.c soh/src/code/z_play.c\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/transition_fade_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_cold_blue_warp_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_mm_camera_arrival_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/opening_forest_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/portal_save_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/mm3d_pack_test.py --sanitize",
+      "status": "pass",
+      "seconds": 303.95,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-1.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Conditional Lost Woods Great Fairy return",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 52.55,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-2.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Native regional passage geometry, actor entry and cross-game handoff",
+      "run": "python3 -B tests/regional_passages/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 54.97,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-3.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Shared native and alternate Fountain valley geometry and resource lifecycle",
+      "run": "python3 -B tests/regional_passages/run_valley_tests.py",
+      "status": "pass",
+      "seconds": 46.11,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-4.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Retail shops and nonretail interior entrance regressions",
+      "run": "g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/narrow_pools_test.cpp -o /tmp/narrow-pools\nASAN_OPTIONS=detect_leaks=0 /tmp/narrow-pools\ng++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/shop_pool_test.cpp -o /tmp/shop-pools\nASAN_OPTIONS=detect_leaks=0 /tmp/shop-pools\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_native_pool_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_return_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_cli_options_behavior_test.py --sanitize\npython3 -B tests/cross_dungeon/interior_settings_behavior_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/mm_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_pool_runtime_behavior_test.py --sanitize",
+      "status": "pass",
+      "seconds": 357.13,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-5.log"
+    },
+    {
+      "suite": "render",
+      "name": "PAK menu visibility and voice discovery",
+      "run": "python3 scripts/diagnostics/run_combo_pak_visibility_tests.py\npython3 scripts/diagnostics/run_voice_pack_discovery_tests.py",
+      "status": "pass",
+      "seconds": 2.91,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/07.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Settings import and per-game mod load order",
+      "run": "python3 tests/settings_import/run_tests.py --json-include /usr/include",
+      "status": "pass",
+      "seconds": 5.13,
+      "session_log": "/tmp/mm-weather-systems-tail.log"
+    },
+    {
+      "suite": "items",
+      "name": "Shared-item integration regressions",
+      "run": "python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include\npython3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include\npython3 tests/dungeon_rewards/run_tests.py --json-include /usr/include\npython3 tests/item_grant_audit/run_tests.py\npython3 scripts/diagnostics/run_combo_reward_delivery_tests.py\npython3 scripts/diagnostics/run_combo_reward_delivery_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 43.46s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "SoH 9.3 compatibility regressions",
+      "run": "python3 -B scripts/diagnostics/run_actor_db_registration_tests.py\npython3 -B scripts/diagnostics/run_actor_db_registration_tests.py --sanitize\npython3 -B scripts/diagnostics/run_combo_save_compat_tests.py --json-include /usr/include\npython3 -B tests/oot_equipment_pause/run_age_requirement_tests.py\npython3 -B scripts/diagnostics/run_silver_rupee_cosmetic_tests.py\npython3 -B scripts/diagnostics/run_silver_rupee_cosmetic_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_fast_transformation_tests.py\npython3 -B scripts/diagnostics/run_hint_item_area_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "systems",
+      "name": "tests/solo_games/run_tests.py",
+      "run": "python3 -B tests/solo_games/run_tests.py",
+      "status": "pass",
+      "seconds": 181.57,
+      "session_log": "/tmp/mm-weather-solo-fixed.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/emotes/run_tests.py",
+      "run": "python3 -B tests/emotes/run_tests.py",
+      "status": "pass",
+      "seconds": 1.32,
+      "session_log": "/tmp/mm-weather-systems-after-solo.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/emotes/run_native_tests.py",
+      "run": "python3 -B tests/emotes/run_native_tests.py",
+      "status": "pass",
+      "seconds": 18.87,
+      "session_log": "/tmp/mm-weather-systems-after-solo.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/emotes/run_menu_tests.py",
+      "run": "python3 -B tests/emotes/run_menu_tests.py",
+      "status": "pass",
+      "seconds": 4.24,
+      "session_log": "/tmp/mm-weather-systems-after-solo.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/whats_new/run_tests.py",
+      "run": "python3 -B tests/whats_new/run_tests.py",
+      "status": "pass",
+      "seconds": 72.81,
+      "session_log": "/tmp/mm-weather-systems-after-solo.log"
+    },
+    {
+      "suite": "world",
+      "name": "scripts/diagnostics/run_native_npc_model_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_native_npc_model_tests.py",
+      "status": "pass",
+      "seconds": 18.73,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-6.log"
+    },
+    {
+      "suite": "world",
+      "name": "scripts/diagnostics/run_forest_actor_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_forest_actor_tests.py",
+      "status": "pass",
+      "seconds": 40.76,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-7.log"
+    },
+    {
+      "suite": "world",
+      "name": "Regional Stalchild, Mikau and Darmani presentations and placement lifecycle",
+      "run": "python3 -B tests/regional_actors/run_tests.py",
+      "status": "pass",
+      "seconds": 4.47,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-8.log"
+    },
+    {
+      "suite": "world",
+      "name": "scripts/diagnostics/run_solo_forest_actors_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_solo_forest_actors_tests.py",
+      "status": "pass",
+      "seconds": 1.19,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-9.log"
+    },
+    {
+      "suite": "world",
+      "name": "scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize",
+      "status": "pass",
+      "seconds": 29.98,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-10.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_solo_forest_tests.py",
+      "run": "python3 -B tests/black_market/run_solo_forest_tests.py",
+      "status": "pass",
+      "seconds": 14.05,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-11.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_final_forest_scroll_tests.py",
+      "run": "python3 -B tests/black_market/run_final_forest_scroll_tests.py",
+      "status": "pass",
+      "seconds": 4.45,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-12.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_final_forest_mm_config_test.py",
+      "run": "python3 -B tests/black_market/run_final_forest_mm_config_test.py",
+      "status": "pass",
+      "seconds": 0.65,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-13.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/lost_woods_entrance/run_arrival_fade_tests.py",
+      "run": "python3 -B tests/lost_woods_entrance/run_arrival_fade_tests.py",
+      "status": "pass",
+      "seconds": 71.48,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/08.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/lost_woods_entrance/final_scene_segments_test.py",
+      "run": "python3 -B tests/lost_woods_entrance/final_scene_segments_test.py",
+      "status": "pass",
+      "seconds": 19.63,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/09.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror/run_tests.py",
+      "run": "python3 -B tests/magic_mirror/run_tests.py",
+      "status": "pass",
+      "seconds": 7.07,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-14.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror/check_scene.py",
+      "run": "python3 -B tests/magic_mirror/check_scene.py",
+      "status": "pass",
+      "seconds": 0.92,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-15.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror/run_form_tests.py",
+      "run": "python3 -B tests/magic_mirror/run_form_tests.py",
+      "status": "pass",
+      "seconds": 0.27,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-16.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror/run_integration_tests.py",
+      "run": "python3 -B tests/magic_mirror/run_integration_tests.py",
+      "status": "pass",
+      "seconds": 0.16,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-17.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror_inventory/run_tests.py",
+      "run": "python3 -B tests/magic_mirror_inventory/run_tests.py",
+      "status": "pass",
+      "seconds": 3.28,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-18.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror_inventory/run_action_tests.py",
+      "run": "python3 -B tests/magic_mirror_inventory/run_action_tests.py",
+      "status": "pass",
+      "seconds": 2.97,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-19.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror_inventory/run_sync_tests.py",
+      "run": "python3 -B tests/magic_mirror_inventory/run_sync_tests.py",
+      "status": "pass",
+      "seconds": 1.77,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-20.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/magic_mirror_inventory/run_save_tests.py",
+      "run": "python3 -B tests/magic_mirror_inventory/run_save_tests.py",
+      "status": "pass",
+      "seconds": 17.15,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-21.log"
+    },
+    {
+      "suite": "world",
+      "name": "tools/magic_mirror/test_visuals.py",
+      "run": "python3 -B tools/magic_mirror/test_visuals.py",
+      "status": "pass",
+      "seconds": 1.27,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-22.log"
+    },
+    {
+      "suite": "world",
+      "name": "tools/magic_mirror/run_draw_tests.py",
+      "run": "MIRROR_TEST_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -no-pie\" ASAN_OPTIONS=detect_leaks=0 python3 -B tools/magic_mirror/run_draw_tests.py",
+      "status": "pass",
+      "seconds": 3.74,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-23.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_native_tests.py",
+      "run": "python3 -B tests/black_market/run_native_tests.py",
+      "status": "pass",
+      "seconds": 19.51,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-24.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_oot_native_tests.py",
+      "run": "python3 -B tests/black_market/run_oot_native_tests.py",
+      "status": "pass",
+      "seconds": 20.25,
+      "evidence_owner": "/root/custom_wide_collision",
+      "session_log": "/tmp/world25-native-transition-green.log"
+    },
+    {
+      "suite": "world",
+      "name": "Native Black Market shop actor, scenes and dialogue formatting",
+      "run": "python3 -B tests/black_market/oot_shop_camera_parity_tests.py\npython3 -B tests/black_market/run_counter_barrier_native_tests.py\npython3 -B tests/black_market/test_mm_shop_presentation.py\npython3 -B tests/black_market/native_mm_shop_adapter_tests.py\npython3 -B tests/black_market/native_mm_scene_runtime_tests.py\npython3 -B tests/black_market/test_mm_native_shop_scene.py\npython3 -B tests/black_market/run_keeper_dialogue_oot_formatter_tests.py",
+      "status": "pass",
+      "seconds": 83.27,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-26.log"
+    },
+    {
+      "suite": "world",
+      "name": "Black Market optional room assets and native draw ownership",
+      "run": "python3 -B tests/black_market/test_room_magic_assets.py\npython3 -B tests/black_market/run_room_magic_tests.py\npython3 -B tests/black_market/run_room_magic_loader_tests.py\npython3 -B tests/black_market/run_room_magic_draw_exit_tests.py",
+      "status": "pass",
+      "seconds": 57.92,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-27.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_shelves_native_tests.py",
+      "run": "python3 -B tests/black_market/run_shelves_native_tests.py",
+      "status": "pass",
+      "seconds": 7.07,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-28.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_browsing_native_tests.py",
+      "run": "python3 -B tests/black_market/run_browsing_native_tests.py",
+      "status": "pass",
+      "seconds": 68.06,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-29.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_granny_native_tests.py",
+      "run": "python3 -B tests/black_market/run_granny_native_tests.py",
+      "status": "pass",
+      "seconds": 6.27,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-30.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_granny_header_tests.py",
+      "run": "python3 -B tests/black_market/run_granny_header_tests.py",
+      "status": "pass",
+      "seconds": 7.37,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-31.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/chateau_romani_3ds/run_bundling_tests.py",
+      "run": "python3 -B tests/chateau_romani_3ds/run_bundling_tests.py",
+      "status": "pass",
+      "result": "success: 2.13s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/woods_mystery/run_hex_test.py",
+      "run": "python3 -B tests/woods_mystery/run_hex_test.py",
+      "status": "pass",
+      "seconds": 2.15,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-32.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/woods_mystery/run_active_pack_test.py",
+      "run": "python3 -B tests/woods_mystery/run_active_pack_test.py",
+      "status": "pass",
+      "seconds": 0.57,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-33.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/woods_mystery/run_wall_material_test.py",
+      "run": "python3 -B tests/woods_mystery/run_wall_material_test.py",
+      "status": "pass",
+      "seconds": 4.55,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-34.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/woods_mystery/run_shimmer_placement_test.py",
+      "run": "python3 -B tests/woods_mystery/run_shimmer_placement_test.py",
+      "status": "pass",
+      "seconds": 1.09,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-35.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_scene_music_tests.py",
+      "run": "python3 -B tests/black_market/run_scene_music_tests.py",
+      "status": "pass",
+      "seconds": 11.15,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-36.log"
+    },
+    {
+      "suite": "world",
+      "name": "tests/black_market/run_music_shuffle_tests.py",
+      "run": "python3 -B tests/black_market/run_music_shuffle_tests.py",
+      "status": "pass",
+      "seconds": 15.42,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-37.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_din_fire_shield_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_din_fire_shield_tests.py",
+      "status": "pass",
+      "result": "success: 0.54s",
+      "session_log": "/tmp/combined-items-ci-original.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_hint_item_name_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_hint_item_name_tests.py",
+      "status": "pass",
+      "seconds": 50.16,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/10.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_combo_crash_owner_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py",
+      "status": "pass",
+      "seconds": 5.66,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/11.log"
+    },
+    {
+      "suite": "render",
+      "name": "tools/nei_gi/test_tunic_clearance.py",
+      "run": "python3 -B tools/nei_gi/test_tunic_clearance.py",
+      "status": "pass",
+      "seconds": 13.31,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/12.log"
+    },
+    {
+      "suite": "render",
+      "name": "tools/nei_gi/SOURCE/mario_sm64_poc3.py --verify",
+      "run": "python3 -B tools/nei_gi/SOURCE/mario_sm64_poc3.py --verify",
+      "status": "pass",
+      "seconds": 19.1,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/13.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_nei_gi_tests.py --held --combo",
+      "run": "python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo",
+      "status": "pass",
+      "seconds": null,
+      "session_log": "/tmp/combined-nei-gi-focus-2.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/elemental_arrow_gi/run_tests.py",
+      "run": "python3 -B tests/elemental_arrow_gi/run_tests.py",
+      "status": "pass",
+      "seconds": 27.22,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/15.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/reward_gi/run_tests.py",
+      "run": "python3 -B tests/reward_gi/run_tests.py",
+      "status": "pass",
+      "result": "success: 28.16s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/reward_gi/run_asset_packaging_tests.py",
+      "run": "python3 -B tests/reward_gi/run_asset_packaging_tests.py",
+      "status": "pass",
+      "result": "success: 5.56s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_gi/run_flame_arena_tests.py",
+      "run": "python3 -B tests/nei_gi/run_flame_arena_tests.py",
+      "status": "pass",
+      "seconds": 15.91,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/16.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_gi/run_sages_tunic_particle_tests.py",
+      "run": "python3 -B tests/nei_gi/run_sages_tunic_particle_tests.py",
+      "status": "pass",
+      "seconds": 33.39,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/17.log"
+    },
+    {
+      "suite": "items",
+      "name": "tools/nei_gi/check_time_gate_solidity.py",
+      "run": "python3 -B tools/nei_gi/check_time_gate_solidity.py",
+      "status": "pass",
+      "result": "success: 0.66s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_mm_item_presentation_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py",
+      "status": "pass",
+      "seconds": 2.37,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/18.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 6.95,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/19.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_tunic_material_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 4.81,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/20.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_mm_item_receipt_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py",
+      "status": "pass",
+      "result": "success: 176.77s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/item_receipts/run_pickup_catalog_tests.py",
+      "run": "python3 -B tests/item_receipts/run_pickup_catalog_tests.py",
+      "status": "pass",
+      "result": "success: 21.15s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/item_receipts/run_pickup_catalog_tests.py --sanitize",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_pickup_catalog_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 37.79s",
+      "session_log": "/tmp/combined-items-tail-2.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/item_receipts/run_key_receipt_tests.py --sanitizers",
+      "run": "python3 -B tests/item_receipts/run_key_receipt_tests.py --sanitizers",
+      "status": "pass",
+      "result": "success: 91.15s",
+      "session_log": "/tmp/combined-items-remaining.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/cape_choice/run_tests.py",
+      "run": "python3 -B tests/cape_choice/run_tests.py",
+      "status": "pass",
+      "seconds": 3.09,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/21.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/cape_choice/run_tests.py --sanitize",
+      "run": "python3 -B tests/cape_choice/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 4.76,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/22.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_anklet_icon_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_anklet_icon_tests.py",
+      "status": "pass",
+      "result": "success: 187.61s",
+      "session_log": "/tmp/combined-items-remaining.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_native_heart_receipt_icon_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_native_heart_receipt_icon_tests.py",
+      "status": "pass",
+      "result": "success: 301.26s",
+      "session_log": "/tmp/combined-items-remaining.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/item_receipts/run_seed_settings_tests.py --sanitizers",
+      "run": "python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers",
+      "status": "pass",
+      "seconds": 126.12,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/shared_seed_settings/run_tests.py --sanitize",
+      "run": "python3 -B tests/shared_seed_settings/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 18.7,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers",
+      "run": "python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers",
+      "status": "pass",
+      "result": "success: 57.97s",
+      "session_log": "/tmp/combined-items-remaining.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/item_receipts/run_file_select_sdl_main_tests.py",
+      "run": "python3 -B tests/item_receipts/run_file_select_sdl_main_tests.py",
+      "status": "pass",
+      "result": "success: 47.53s",
+      "session_log": "/tmp/combined-items-remaining.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_receipt_syntax_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_receipt_syntax_tests.py",
+      "status": "pass",
+      "result": "success: 122.37s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_song_gi_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_song_gi_tests.py",
+      "status": "pass",
+      "result": "success: 13.24s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_pose_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_sword_pose_tests.py",
+      "status": "pass",
+      "result": "success: 28.80s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_mod_gi_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py",
+      "status": "pass",
+      "result": "success: 18.46s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_fallback_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 12.93s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_receipt_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 186.14s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_asset_toggle_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_sword_asset_toggle_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 36.61s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_sword_resource_view_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 18.61s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_fairy_bottle_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_fairy_bottle_tests.py",
+      "status": "pass",
+      "result": "success: 33.44s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_bottle_polish_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_bottle_polish_tests.py",
+      "status": "pass",
+      "result": "success: 1.95s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_bottle_contents_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_bottle_contents_tests.py",
+      "status": "pass",
+      "result": "success: 15.76s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_bottle_gi_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_bottle_gi_tests.py",
+      "status": "pass",
+      "result": "success: 0.89s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tools/chateau_romani_3ds/run_tests.py",
+      "run": "python3 -B tools/chateau_romani_3ds/run_tests.py",
+      "status": "pass",
+      "result": "success: 33.18s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_tests.py",
+      "run": "python3 -B tests/seasons/run_tests.py",
+      "status": "pass",
+      "seconds": 37.72,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_zoras_domain_thaw_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_zoras_domain_thaw_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 3.23,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/23.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_mode_tests.py",
+      "run": "python3 -B tests/seasons/run_mode_tests.py",
+      "status": "pass",
+      "seconds": 4.39,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_oot_mode_tests.py",
+      "run": "python3 -B tests/seasons/run_oot_mode_tests.py",
+      "status": "pass",
+      "seconds": 0.85,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_mode_pool_tests.py",
+      "run": "python3 -B tests/seasons/run_mode_pool_tests.py",
+      "status": "pass",
+      "seconds": 18.02,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_mode_save_tests.py",
+      "run": "python3 -B tests/seasons/run_mode_save_tests.py",
+      "status": "pass",
+      "seconds": 12.23,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_native_weather_tests.py --sanitize",
+      "run": "python3 -B tests/seasons/run_native_weather_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 11.26,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_generated_leaf_texture_tests.py",
+      "run": "python3 -B tests/seasons/run_generated_leaf_texture_tests.py",
+      "status": "pass",
+      "seconds": 44.79,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_leaf_combiner_tests.py",
+      "run": "python3 -B tests/seasons/run_leaf_combiner_tests.py",
+      "status": "pass",
+      "seconds": 0.18,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "scripts/diagnostics/run_mm_autumn_foliage_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py",
+      "status": "pass",
+      "seconds": 1.24,
+      "session_log": "/tmp/mm-weather-systems-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py",
+      "status": "pass",
+      "seconds": 31.66,
+      "session_log": "/tmp/mm-autumn-scene-focused-3.log"
+    },
+    {
+      "suite": "systems",
+      "name": "scripts/diagnostics/run_mm_autumn_surface_texture_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_autumn_surface_texture_tests.py",
+      "status": "pass",
+      "seconds": 3.08,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "systems",
+      "name": "scripts/diagnostics/run_mm_season_selector_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_season_selector_tests.py",
+      "status": "pass",
+      "seconds": 0.29,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "Native OoT and MM Rod put-away, chooser and lifecycle in solo and Combo",
+      "run": "python3 -B tests/seasons/run_oot_rod_stow_tests.py --sanitize\npython3 -B tests/seasons/run_oot_rod_stow_tests.py --combo --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --combo --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "systems",
+      "name": "tests/seasons/run_oot_shop_tests.py",
+      "run": "python3 -B tests/seasons/run_oot_shop_tests.py",
+      "status": "pass",
+      "seconds": 2.99,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize",
+      "run": "python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "scripts/diagnostics/run_mask_transformation_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mask_transformation_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "scripts/diagnostics/run_oot_native_transformation_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_oot_native_transformation_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "scripts/diagnostics/run_mask_progression_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mask_progression_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "scripts/diagnostics/run_gerudo_mask_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_gerudo_mask_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/great_fairy_facial/run_tests.py",
+      "run": "python3 -B tests/great_fairy_facial/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/oot_zora/run_tests.py",
+      "run": "python3 -B tests/oot_zora/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/mm_presentation/run_foreign_scale_tests.py",
+      "run": "python3 -B tests/mm_presentation/run_foreign_scale_tests.py",
+      "status": "pass",
+      "seconds": 7.76,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/24.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/mm_cape/run_texture_tests.py",
+      "run": "python3 -B tests/mm_cape/run_texture_tests.py",
+      "status": "pass",
+      "seconds": 3.37,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/25.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_mm_nei_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_mm_nei_tests.py",
+      "status": "pass",
+      "seconds": 62.93,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/26.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/mm_wallet/run_tests.py",
+      "run": "python3 -B tests/mm_wallet/run_tests.py",
+      "status": "pass",
+      "result": "success: 9.68s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/mm_editor/run_tests.py",
+      "run": "python3 -B tests/mm_editor/run_tests.py",
+      "status": "pass",
+      "result": "success: 57.46s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/oot_editor/run_tests.py",
+      "run": "python3 -B tests/oot_editor/run_tests.py",
+      "status": "pass",
+      "result": "success: 35.12s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_flight_tests.py",
+      "run": "python3 -B tests/mm_grace/run_flight_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_particle_tests.py",
+      "run": "python3 -B tests/mm_grace/run_particle_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_orientation_tests.py",
+      "run": "python3 -B tests/mm_grace/run_orientation_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_pool_tests.py",
+      "run": "python3 -B tests/mm_grace/run_pool_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_save_tests.py",
+      "run": "python3 -B tests/mm_grace/run_save_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_grace/run_settings_tests.py",
+      "run": "python3 -B tests/mm_grace/run_settings_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "items",
+      "name": "tests/nei_shared_slot/run_tests.py",
+      "run": "python3 -B tests/nei_shared_slot/run_tests.py",
+      "status": "pass",
+      "result": "success: 1.12s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/nei_shared_slot/run_ui_tests.py",
+      "run": "python3 -B tests/nei_shared_slot/run_ui_tests.py",
+      "status": "pass",
+      "result": "success: 16.78s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/nei_shared_slot/run_sync_tests.py",
+      "run": "python3 -B tests/nei_shared_slot/run_sync_tests.py",
+      "status": "pass",
+      "result": "success: 2.00s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "items",
+      "name": "tests/nei_shared_slot/run_save_tests.py",
+      "run": "python3 -B tests/nei_shared_slot/run_save_tests.py",
+      "status": "pass",
+      "result": "success: 22.24s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/moons_tear/run_tests.py",
+      "run": "python3 -B tests/moons_tear/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_skin_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_skin_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_core_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_core_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_material_glow_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_material_glow_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_bundled_asset_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_bundled_asset_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_eye_palette_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_eye_palette_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData",
+      "run": "python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_host_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_host_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_audio_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_audio_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_model_owner_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_model_owner_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_asset_packaging_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_asset_packaging_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_wolf/run_syntax_tests.py",
+      "run": "python3 -B tests/mm_wolf/run_syntax_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/wand_modes/run_tests.py",
+      "run": "python3 -B tests/wand_modes/run_tests.py",
+      "status": "pass",
+      "seconds": 10.7,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/27.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_air_magic/run_tests.py",
+      "run": "python3 -B tests/nei_air_magic/run_tests.py",
+      "status": "pass",
+      "seconds": 16.19,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/28.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_receipt_soul_color_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py",
+      "status": "pass",
+      "result": "success: 0.70s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_nei_identity_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_nei_identity_tests.py",
+      "status": "pass",
+      "seconds": 1.09,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/29.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_held/run_hand_fit_tests.py",
+      "run": "python3 -B tests/nei_held/run_hand_fit_tests.py",
+      "status": "pass",
+      "seconds": 3.68,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/30.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_held/run_articulated_tests.py",
+      "run": "python3 -B tests/nei_held/run_articulated_tests.py",
+      "status": "pass",
+      "seconds": 2.57,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/31.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_asset_priority/run_tests.py",
+      "run": "python3 -B tests/nei_asset_priority/run_tests.py",
+      "status": "pass",
+      "seconds": 3.09,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/32.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_asset_priority/run_oot_gi_tests.py",
+      "run": "python3 -B tests/nei_asset_priority/run_oot_gi_tests.py",
+      "status": "pass",
+      "seconds": 1.08,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/33.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_asset_priority/run_tunic_model_tests.py --sanitize",
+      "run": "python3 -B tests/nei_asset_priority/run_tunic_model_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 50.24,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/34.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/ikana_gi/run_tests.py --sanitize",
+      "run": "python3 -B tests/ikana_gi/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 454.28,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/35.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/nei_held/run_equipment_tests.py",
+      "run": "python3 -B tests/nei_held/run_equipment_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/nei_held/run_vanilla_sword_menu_tests.py",
+      "run": "python3 -B tests/nei_held/run_vanilla_sword_menu_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "items",
+      "name": "tests/nei_held/run_four_sword_visibility_tests.py",
+      "run": "python3 -B tests/nei_held/run_four_sword_visibility_tests.py",
+      "status": "pass",
+      "result": "success: 3.45s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_equipment_pause/run_tests.py --sanitize",
+      "run": "python3 -B tests/mm_equipment_pause/run_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_equipment_pause/run_ownership_tests.py --sanitize",
+      "run": "python3 -B tests/mm_equipment_pause/run_ownership_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/oot_equipment_pause/run_access_tests.py",
+      "run": "python3 -B tests/oot_equipment_pause/run_access_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/oot_equipment_pause/run_access_tests.py --sanitize",
+      "run": "python3 -B tests/oot_equipment_pause/run_access_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_equipment_pause/run_preview_transition_tests.py",
+      "run": "python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_equipment_pause/run_preview_transition_tests.py --sanitize",
+      "run": "python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/mm_pause_inventory/run_tests.py --sanitize",
+      "run": "python3 -B tests/mm_pause_inventory/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 18.66,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/36.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "OoT inventory-page arrow focus and item identity",
+      "run": "python3 -B tests/oot_pause_inventory/run_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/pause_tutorials/run_tests.py",
+      "run": "python3 -B tests/pause_tutorials/run_tests.py",
+      "status": "pass",
+      "seconds": 4.11,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/37.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/pause_tutorials/run_tests.py --sanitize",
+      "run": "python3 -B tests/pause_tutorials/run_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 6.59,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/38.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/combo_button_transfer/run_tests.py --sanitize",
+      "run": "python3 -B tests/combo_button_transfer/run_tests.py --sanitize\npython3 -B tests/combo_button_transfer/run_age_tests.py",
+      "status": "pass",
+      "seconds": 40.82,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/39.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/nei_quest_held/run_tests.py",
+      "run": "python3 -B tests/nei_quest_held/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_used_fx/run_tests.py",
+      "run": "python3 -B tests/nei_used_fx/run_tests.py",
+      "status": "pass",
+      "seconds": 101.49,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/40.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_leaf/run_tests.py",
+      "run": "python3 -B tests/nei_leaf/run_tests.py",
+      "status": "pass",
+      "seconds": 32.24,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/41.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "tests/mm_sfx_lifetime/run_tests.py",
+      "run": "python3 -B tests/mm_sfx_lifetime/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_whip/run_tests.py",
+      "run": "python3 -B tests/nei_whip/run_tests.py",
+      "status": "pass",
+      "seconds": 0.39,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/42.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_lantern_grip/run_tests.py",
+      "run": "python3 -B tests/nei_lantern_grip/run_tests.py",
+      "status": "pass",
+      "seconds": 0.31,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/43.log"
+    },
+    {
+      "suite": "render",
+      "name": "scripts/diagnostics/run_switch_hook_instant_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_switch_hook_instant_tests.py",
+      "status": "pass",
+      "seconds": 0.62,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/44.log"
+    },
+    {
+      "suite": "items",
+      "name": "scripts/diagnostics/run_time_gate_visibility_tests.py",
+      "run": "python3 -B scripts/diagnostics/run_time_gate_visibility_tests.py",
+      "status": "pass",
+      "result": "success: 0.42s",
+      "session_log": "/tmp/combined-items-resume.log"
+    },
+    {
+      "suite": "systems",
+      "name": "tests/mm_nei/run_timegate_audio_tests.py",
+      "run": "python3 -B tests/mm_nei/run_timegate_audio_tests.py",
+      "status": "pass",
+      "seconds": 1.95,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_item_stow/run_ballchain_tests.py",
+      "run": "python3 -B tests/nei_item_stow/run_ballchain_tests.py",
+      "status": "pass",
+      "seconds": 0.44,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/45.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_item_stow/run_lantern_rod_tests.py",
+      "run": "python3 -B tests/nei_item_stow/run_lantern_rod_tests.py",
+      "status": "pass",
+      "seconds": 0.55,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/46.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/nei_item_stow/run_stow_tests.py",
+      "run": "python3 -B tests/nei_item_stow/run_stow_tests.py",
+      "status": "pass",
+      "seconds": 0.42,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/47.log"
+    },
+    {
+      "suite": "render",
+      "name": "tools/nei_held/verify_assets.py",
+      "run": "python3 -B tools/nei_held/verify_assets.py",
+      "status": "pass",
+      "seconds": 7.89,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/48.log"
+    },
+    {
+      "suite": "render",
+      "name": "tools/nei_icons/build.py --verify",
+      "run": "python3 -B tools/nei_icons/build.py --verify",
+      "status": "pass",
+      "seconds": 0.6,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/49.log"
+    },
+    {
+      "suite": "render",
+      "name": "tools/nei_icons/verify_routes.py",
+      "run": "python3 -B tools/nei_icons/verify_routes.py",
+      "status": "pass",
+      "seconds": null,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/50-fixed-history-rerun.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/optional_assets/run_tests.py",
+      "run": "python3 -B tests/optional_assets/run_tests.py",
+      "status": "pass",
+      "seconds": 87.03,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/51.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/build_inputs/run_mod_discovery_tests.py",
+      "run": "python3 -B tests/build_inputs/run_mod_discovery_tests.py",
+      "status": "pass",
+      "seconds": 18.03,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/52.log"
+    },
+    {
+      "suite": "render",
+      "name": "tests/lost_woods_entrance/run_tests.py",
+      "run": "python3 -B tests/lost_woods_entrance/run_tests.py",
+      "status": "pass",
+      "seconds": 406.89,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/53.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "tests/cross_dungeon/run_tests.py",
+      "run": "python3 -B tests/cross_dungeon/run_tests.py",
+      "status": "pass",
+      "seconds": 394.12,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-6.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "tests/farores_wind/run_tests.py",
+      "run": "python3 -B tests/farores_wind/run_tests.py",
+      "status": "pass",
+      "seconds": 80.92,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-7.log"
+    },
+    {
+      "suite": "items",
+      "name": "bash scripts/diagnostics/run_elemental_sword_regressions.sh",
+      "run": "bash scripts/diagnostics/run_elemental_sword_regressions.sh",
+      "status": "pass_across_subcheck_segments",
+      "single_invocation_exit_zero": false,
+      "earlier_12_subchecks": "/tmp/combined-items-resume.log",
+      "last_4_subchecks": "/tmp/combined-elemental-tail-focused.log",
+      "note": "Original umbrella stopped on missing fixture ownership declarations; preceding12 commands completed. Corrected remaining4 exact commands passed separately. Final CI reruns whole original entry."
+    },
+    {
+      "suite": "systems",
+      "name": "OoT diagnostic frame timing accounting",
+      "run": "python3 scripts/diagnostics/run_build_metadata_test.py\npython3 scripts/diagnostics/run_frame_timing_probe_tests.py",
+      "status": "pass",
+      "seconds": 40.81,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Progressive Din swords and Mario cap sound lifetimes",
+      "run": "python3 -B scripts/diagnostics/run_din_fire_sword_tests.py\npython3 -B scripts/diagnostics/run_din_progressive_hand_tests.py\npython3 -B scripts/diagnostics/run_din_fire_sword_damage_tests.py\npython3 -B scripts/diagnostics/run_mm_din_fire_tests.py\npython3 -B scripts/diagnostics/run_mm_din_fire_damage_tests.py\npython3 -B tests/sm64_caps/run_audio_tests.py\npython3 -B tests/oot_timegate/run_audio_tests.py",
+      "status": "pass",
+      "seconds": 113.47,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Contents-based chests and opt-in Midna",
+      "run": "python3 scripts/diagnostics/run_chest_size_tests.py\npython3 scripts/diagnostics/run_mm_chest_contents_tests.py\npython3 scripts/diagnostics/run_midna_navi_draw_test.py\npython3 scripts/diagnostics/run_midna_audio_test.py\npython3 scripts/diagnostics/run_mm_midna_test.py",
+      "status": "pass",
+      "seconds": 17.43,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "systems",
+      "name": "2Ship weather, item-color, scene-randomization and streamed-audio regressions",
+      "run": "python3 scripts/diagnostics/run_mm_scene_randomization_tests.py\npython3 scripts/diagnostics/run_mm_audio_runtime_test.py \"$RUNNER_TEMP/mm-audio-runtime\"\npython3 scripts/diagnostics/run_mm_audio_decoder_tests.py\npython3 scripts/diagnostics/run_mm_streamed_positional_tests.py --sanitize\npython3 scripts/diagnostics/run_mm_audio_pcm_tests.py\nMM_AUDIO_PCM_CFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py\npython3 scripts/diagnostics/run_native_audio_mixer_tests.py\npython3 tests/audio_mixer/run_pcm_diagnostics_tests.py\nNATIVE_AUDIO_CFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 scripts/diagnostics/run_native_audio_mixer_tests.py\npython3 scripts/diagnostics/run_mm_custom_item_color_tests.py\npython3 scripts/diagnostics/run_mm_hud_cosmetics_tests.py\npython3 scripts/diagnostics/run_mm_drop_lifetime_tests.py\npython3 scripts/diagnostics/run_mm_unrestricted_items_tests.py\npython3 scripts/diagnostics/run_mm_item_visuals_tests.py\npython3 tests/dungeon_keys/run_asset_tests.py\npython3 scripts/diagnostics/run_mm_dungeon_key_tests.py\npython3 scripts/diagnostics/run_mm_dungeon_key_tests.py --sanitize\npython3 scripts/diagnostics/run_mm_gfx_patch_tests.py",
+      "status": "pass",
+      "seconds": 52.47,
+      "session_log": "/tmp/mm-weather-systems-after-autumn.log"
+    },
+    {
+      "suite": "systems",
+      "name": "ComboShip seasonal weather and winter atmosphere",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/rod_spin/run_tests.py --sanitize\npython3 -B scripts/diagnostics/run_soh_season_weather_tests.py\npython3 -B scripts/diagnostics/run_soh_season_particle_tests.py --sanitize\npython3 -B scripts/diagnostics/run_soh_season_foliage_tests.py \"$RUNNER_TEMP/soh-season-foliage\" --sanitize\npython3 -B scripts/diagnostics/run_soh_season_actor_tests.py --sanitize\nMM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py\nMM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_grass_tests.py\nMM_FOLIAGE_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py\nMM_FOLIAGE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_autumn_surface_texture_tests.py",
+      "status": "pass",
+      "seconds": 358.53,
+      "session_log": "/tmp/mm-weather-seasonal-group-fixed.log"
+    },
+    {
+      "suite": "render",
+      "name": "Foreign soul replacement skeletons and limb matrices",
+      "run": "python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py\npython3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py --sanitize\npython3 -B scripts/diagnostics/run_barinade_syntax_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 45.57,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/54.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "Static OoT equipment GI bridge",
+      "run": "python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py\npython3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize\npython3 -B scripts/diagnostics/run_tunic_material_tests.py\npython3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "Foreign OoT magic jar cosmetic presentation",
+      "run": "python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py --sanitize",
+      "status": "pass",
+      "seconds": 5.59,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/55.log"
+    },
+    {
+      "suite": "items",
+      "name": "Foreign OoT key and heart cosmetics",
+      "run": "python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py --sanitize\npython3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py --sanitize",
+      "status": "pass",
+      "result": "success: 259.65s",
+      "session_log": "/tmp/combined-items-final-tail.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "Mask and remains shimmer in both engines",
+      "run": "python3 -B scripts/diagnostics/run_mask_shimmer_tests.py\npython3 -B scripts/diagnostics/run_mask_shimmer_tests.py --sanitize",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "render",
+      "name": "2Ship mod GUI fonts",
+      "run": "python3 scripts/diagnostics/run_mm_mod_font_tests.py",
+      "status": "pass",
+      "seconds": 2.12,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/56.log"
+    },
+    {
+      "suite": "render",
+      "name": "Complete render flight recorder coverage",
+      "run": "python3 scripts/diagnostics/run_performance_trace_tests.py\npython3 scripts/diagnostics/run_draw_attribution_tests.py \"$RUNNER_TEMP/draw-attribution\"\npython3 libultraship/tests/gpu_timing_query_test.py /usr/include\npython3 libultraship/tests/dxgi_pacing_test.py /usr/include\npython3 scripts/diagnostics/test_analyze_render_flight.py",
+      "status": "pass",
+      "seconds": 20.11,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/57.log"
+    },
+    {
+      "suite": "render",
+      "name": "OoT triangle submission equivalence",
+      "run": "python3 scripts/diagnostics/run_gfx_triangle_run_tests.py\nGFX_TRIANGLE_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_triangle_run_tests.py",
+      "status": "pass",
+      "seconds": 30.71,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/58.log"
+    },
+    {
+      "suite": "render",
+      "name": "Shared renderer texture-address regressions",
+      "run": "git apply --reverse --check --unidiff-zero --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch || git apply --check --unidiff-zero --directory=libultraship patches/libultraship-custom-tex-scroll-e3cd6591.patch\npython3 scripts/diagnostics/test_custom_scroll_probe.py\npython3 scripts/diagnostics/test_custom_scroll_runtime.py\nGFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py\npython3 scripts/diagnostics/run_gfx_texture_address_tests.py --low-module\npython3 scripts/diagnostics/run_texture_failure_command_tests.py --sanitize\nGFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py\npython3 scripts/diagnostics/run_alt_segment_binding_tests.py\npython3 -B scripts/diagnostics/run_carpet_segment_restore_tests.py",
+      "status": "pass",
+      "seconds": 62.18,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/59.log"
+    },
+    {
+      "suite": "render",
+      "name": "Vertex lighting and texture generation equivalence",
+      "run": "git fetch --no-tags --depth=1 origin 9c084d74a7f7d0ae8cf88b18c0ed74abde03a950\npython3 scripts/diagnostics/run_gfx_vertex_batch_tests.py\nGFX_VERTEX_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_vertex_batch_tests.py --skip-null-test",
+      "status": "pass",
+      "seconds": null,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/60-production-helper-rerun.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "2Ship back equipment and OoT sky compatibility",
+      "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py\npython3 -B tests/adult_mm_flex/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "OoT transformation cosmetics and Zora barrier regressions",
+      "run": "python3 -B tests/oot_zora/run_presentation_tests.py\npython3 scripts/diagnostics/run_oot_custom_cosmetics_tests.py\npython3 scripts/diagnostics/run_zora_barrier_cosmetics_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "equipment",
+      "name": "Young Epona riding and independent Epona cosmetics",
+      "run": "python3 scripts/diagnostics/run_young_epona_tests.py\npython3 scripts/diagnostics/run_young_epona_actor_tests.py\npython3 scripts/diagnostics/run_young_epona_player_tests.py\npython3 scripts/diagnostics/run_young_epona_save_tests.py\npython3 scripts/diagnostics/test_young_epona_assets.py\npython3 scripts/diagnostics/run_epona_mask_tests.py\npython3 scripts/diagnostics/run_epona_cosmetics_tests.py\npython3 scripts/diagnostics/run_mm_epona_cosmetics_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "items",
+      "name": "Shield of Ikana current editor ownership and private icon routing",
+      "run": "python3 -B tests/ikana_editor_icon/run_ui_tests.py\npython3 -B tests/ikana_editor_icon/run_ownership_tests.py\npython3 -B tests/ikana_editor_icon/run_native_syntax_tests.py",
+      "status": "pass",
+      "result": "success: 406.82s",
+      "session_log": "/tmp/combined-items-final-tail.log"
+    },
+    {
+      "suite": "world",
+      "name": "Black Market native closed doors and quiet fairy interactions",
+      "run": "python3 -B tests/black_market/run_door_collision_native_tests.py\npython3 -B tests/black_market/run_fairy_quiet_native_tests.py",
+      "status": "pass",
+      "seconds": 41.55,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-38.log"
+    },
+    {
+      "suite": "world",
+      "name": "Granny vapor accepts real native Array and Vertex resource owners",
+      "run": "python3 -B tests/black_market/run_granny_vapor_resource_tests.py",
+      "status": "pass",
+      "seconds": 42.19,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-39.log"
+    },
+    {
+      "suite": "world",
+      "name": "MM Black Market material context traces are bounded and observation only",
+      "run": "python3 -B tests/black_market/run_room_material_trace_tests.py",
+      "status": "pass",
+      "seconds": 6.34,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-40.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Seasonal water ownership, quiet Winter emergence and native well targets",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_shop/native_regressions.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/season_water/lifetime_test.py soh/mods/season_scene.cpp --sanitize",
+      "status": "pass",
+      "seconds": 9.39,
+      "session_log": "/tmp/mm-weather-systems-final-two.log"
+    },
+    {
+      "suite": "render",
+      "name": "Cross-scene material binding reuse preserves fallback and cache identity",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/caustic_binding/native_regressions.py --sanitize",
+      "status": "pass",
+      "seconds": 13.86,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/61.log"
+    },
+    {
+      "suite": "world",
+      "name": "Mirror button deduplication and single native cast chime",
+      "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/magic_mirror_followups/run.py",
+      "status": "pass",
+      "seconds": 5.85,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-41.log"
+    },
+    {
+      "suite": "items",
+      "name": "Opt-in authored collectible shimmer and owner cosmetic palettes",
+      "run": "python3 -B tests/collectible_shimmer/native_regressions.py\npython3 -B tests/collectible_shimmer/renderer_regressions.py\npython3 -B tests/collectible_shimmer/draw_regressions.py",
+      "status": "pass",
+      "result": "success: 136.50s",
+      "session_log": "/tmp/combined-items-final-tail.log"
+    },
+    {
+      "suite": "render",
+      "name": "Termina native floor packets and additive seasonal coverage",
+      "run": "ASAN_OPTIONS=detect_leaks=0 MM_FOLIAGE_TEST_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py --materials mm/tests/fixtures/termina_season_materials",
+      "status": "pass",
+      "seconds": 93.34,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/62.log"
+    },
+    {
+      "suite": "world",
+      "name": "Sages Chamber travel policy, registered native adapter and confirmation",
+      "run": "python3 -B tests/temple_sages/run_tests.py\npython3 -B tests/temple_sages/run_confirmation_tests.py",
+      "status": "pass",
+      "seconds": 82.48,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-42.log"
+    },
+    {
+      "suite": "render",
+      "name": "Cutscene-only Zelda aura scope and optimized finite-position guards",
+      "run": "python3 -B tests/temple_sages/run_aura_tests.py\npython3 -B tests/temple_sages/run_aura_tests.py --fast-math",
+      "status": "pass",
+      "seconds": 7.61,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/63.log"
+    },
+    {
+      "suite": "render",
+      "name": "Packaged Sages Chamber resource closure with native and Alt rendering",
+      "run": "python3 -B tests/temple_sages/test_packaged_chamber.py",
+      "status": "pass",
+      "seconds": 16.29,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/64.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Packaged Lake Hylia dedicated sand, native and Alt resource parity",
+      "run": "python3 -B -m unittest discover -s tests/lake_tunnel_sand -v",
+      "status": "pass",
+      "seconds": 0.24,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-8.log"
+    },
+    {
+      "suite": "world",
+      "name": "Cutscene actor Zelda dialogue catalogue and native talk lifecycle",
+      "run": "python3 -B tests/custom_messages/run_cutscene_actor_tests.py",
+      "status": "pass",
+      "seconds": 66.22,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-43.log"
+    },
+    {
+      "suite": "render",
+      "name": "Exact cumulative assets from bounded compressed source parts",
+      "run": "python3 -B -m unittest discover -s tests/cumulative_assets -v",
+      "status": "pass",
+      "seconds": 3.58,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/65.log"
+    },
+    {
+      "suite": "render",
+      "name": "Native-texture chamber and optional visual layer compatibility",
+      "run": "python3 -B tests/temple_sages/test_native_chamber_layers.py",
+      "status": "pass",
+      "seconds": 2.08,
+      "session_log": "/tmp/rich-celshade-audit/render-tail/66.log"
+    },
+    {
+      "suite": "world",
+      "name": "Stone chamber footsteps and full walkable surface echo",
+      "run": "python3 -B tests/temple_sages/test_collision_audio.py",
+      "status": "pass",
+      "seconds": 2.3,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-44.log"
+    },
+    {
+      "suite": "equipment",
+      "name": "Shield of Ikana player matrix binding in OoT and MM",
+      "run": "python3 -B tests/ikana_shield_render/run_tests.py",
+      "status": "pass",
+      "evidence": "complete CI equipment invocation",
+      "job": 123204367419
+    },
+    {
+      "suite": "items",
+      "name": "Morning Ikana native missing-icon fallback and OoT editor tile",
+      "run": "python3 -B tests/ikana_editor_icon/run_missing_icon_tests.py\npython3 -B tests/ikana_editor_icon/run_oot_ui_icon_tests.py",
+      "status": "pass",
+      "result": "success: 326.66s",
+      "session_log": "/tmp/combined-items-final-tail.log"
+    },
+    {
+      "suite": "items",
+      "name": "Magic Mirror native shuffle pool ownership save and foreign rewards",
+      "run": "python3 -B tests/magic_mirror_shuffle/registry_test.py\npython3 -B tests/magic_mirror_shuffle/run_pool_tests.py\npython3 -B tests/magic_mirror_shuffle/run_grant_tests.py\npython3 -B tests/magic_mirror_shuffle/run_save_tests.py\npython3 -B tests/magic_mirror_shuffle/run_foreign_tests.py",
+      "status": "pass",
+      "result": "success: 29.38s",
+      "session_log": "/tmp/combined-items-mirror-final.log"
+    },
+    {
+      "suite": "entrances",
+      "name": "Magic Mirror combined route logic policy snapshots and queue invalidation",
+      "run": "python3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py",
+      "status": "pass",
+      "seconds": 39.2,
+      "session_log": "/tmp/unbound93-audit/ci-entrances-9.log"
+    },
+    {
+      "suite": "systems",
+      "name": "Native Mirror editor grants and forest pickup close-up camera",
+      "run": "python3 -B tests/magic_mirror_editor/run_tests.py\npython3 -B tests/magic_mirror_editor/run_pickup_camera_tests.py",
+      "status": "pass",
+      "seconds": 3.96,
+      "session_log": "/tmp/mm-weather-systems-final-two.log"
+    },
+    {
+      "suite": "world",
+      "name": "Built-in Black Market materials and Granny interior availability",
+      "run": "python3 -B tests/black_market/run_granny_availability_tests.py",
+      "status": "pass",
+      "seconds": 2.72,
+      "evidence_owner": null,
+      "session_log": "/tmp/unbound93-audit/ci-world-45.log"
+    }
+  ],
+  "source_checkpoint_before_final_test_commit": {
+    "remote": "d17956c4a1f9e4e45317edaf57f6963f3ff3321c",
+    "local": "a9d57fdcaa125ac001bb1b56028780529f2350bc",
+    "tree": "d617ae98ee540b8be37f6d556a31b623aa1ad5da"
+  },
+  "evidence_retention": "Session log paths identify the measured runs; they are not restoration prerequisites. Every run command is retained with its manifest name. Published source and the final CI run are the durable reproduction route.",
+  "native_forest": {
+    "total": 59,
+    "executed": 44,
+    "explicit_optional_resource_skips": 15,
+    "failed": 0
+  },
+  "final_world4": {
+    "exit": 0,
+    "seconds": 480.71,
+    "session_log": "/tmp/unbound93-audit/ci-world-4.log"
+  }
+}

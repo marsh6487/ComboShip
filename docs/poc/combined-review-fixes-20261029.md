@@ -16,11 +16,11 @@ An independent, read-only whole-branch review identified seven Important compati
 
 Other verified deltas include a 4096-resource/4096-texture renderer capture budget with all retained rows emitted (1000-identity real logger test), explicit overflow/unknown information, complete actor/resource-stage tables, native narrow/wide geometry adapters and deterministic normalization of newly generated candidate port archives. GPU timing and unique decoded/GPU residency remain explicitly unavailable, not inferred from payload bytes.
 
-The shared Linux engine has compiled and linked. The combined default build is still in progress; it was safely resumed after an environment interruption and preserves the old build log. Asset collision checks report no new conflicts. Matching port archives are generated only after final source/build validation; a stale untracked interrupted AtlasTex temporary was quarantined outside the asset tree before packaging.
+The full matching Linux build and both Linux/Windows CI builds passed at earlier candidate checkpoints. Both generated port archives passed CRC, payload, shader/cloud and deterministic metadata validation. The final source adds tested custom-light and message fallback repairs, so its matching binary refresh and platform CI are recorded separately in the recovery record. Asset collision checks report no new conflicts.
 
 ## Verification still required
 
-Complete the final owner/snapshot/thread-save and immutable hash-resource checks, rebuild the frozen matching engine + both games, run the relevant native/CTest/regression gates, generate and verify both port archives, then hand off one identifiable candidate. The Kakariko pickup/bomb/pot/grotto/custom entrance/night/Keaton checks and OoT↔MM inventory/transition checks require configured game runtime. No comparative performance experiment is a prerequisite and no performance gain is claimed.
+The owner/snapshot/thread-save and immutable hash-resource checks passed. All 259 manifest groups have passing retained CI/native coverage, with exact scope in `combined-native-coverage-20261029.json`. Refresh the final matching engine + both games, CTest/smokes, package and platform CI before handoff. Existing verified port archives can be reused when their payload identities are unchanged. Kakariko pickup/bomb/pot/grotto/custom entrance/night/Keaton checks and OoT↔MM inventory/transition checks require configured game runtime. No comparative performance experiment is a prerequisite and no performance gain is claimed.
 
 Known donor custom-dungeon inventory/restriction aliasing and narrow per-actor object-slot assumptions remain documented limitations for new custom content. Native camera/cutscene/path and other unrelated legacy limits were not expanded implicitly. Actual D3D11/Metal driver output, sky appearance and moving-receiver shadow appearance remain runtime checks. Existing custom Prism materials retain their previous shade inputs.
 
@@ -28,7 +28,7 @@ Known donor custom-dungeon inventory/restriction aliasing and narrow per-actor o
 
 The immutable hash fix is complete: archive offsets remain unchanged, both Fast::Vertex and MM vertex arrays declare their serialized stride through the shared renderer interface, and bounds use actual runtime storage. It passed resource/owner retirement and reload tests plus actual hidden-visibility shared-library tests. The final Hammergeist custom-actor adapter retains float effect positions; its native sanitizer fixture and full configured unity source compile pass.
 
-Standalone CI now injects the candidate's two graphics ABI definitions for all supported compiler entry points, including hardcoded compiler names. Intentional legacy/wide format tests select explicit mode. Native runner CLI tests cover argument/environment preservation and cleanup. This prevents CI from silently testing an older layout. The build is still running; source/native checks do not establish configured gameplay acceptance.
+Standalone CI injects the candidate's two graphics ABI definitions for all supported compiler entry points, including hardcoded compiler names. Intentional legacy/wide format tests select explicit mode. Native runner CLI tests cover argument/environment preservation and cleanup. This prevents CI from silently testing an older layout. Source/native checks do not establish configured gameplay acceptance.
 
 ## Final custom light boundary audit
 

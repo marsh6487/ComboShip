@@ -43,15 +43,10 @@ def native_control():
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
-using s16=int16_t;using u16=uint16_t;using s32=int32_t;using u32=uint32_t;using f32=float;
+#include <libultraship/libultra/types.h>
+#include <libultraship/libultra/gbi.h>
+#include "sys_matrix.h"
 #define SHT_MINV (1.0f/32767.0f)
-struct Vtx { struct { s16 ob[3];u16 flag;s16 tc[2];uint8_t cn[4]; } v; };
-union Mtx { s32 m[4][4]; };
-union MtxF {
- float mf[4][4];
- struct {float xx,yx,zx,wx,xy,yy,zy,wy,xz,yz,zz,wz,xw,yw,zw,ww;};
-};
-enum MatrixMode {MTXMODE_NEW,MTXMODE_APPLY};
 MtxF current{};MtxF* sCurrentMatrix=&current;
 void FrameInterpolation_RecordMatrixTranslate(float,float,float,MatrixMode){}
 '''
@@ -59,25 +54,40 @@ void FrameInterpolation_RecordMatrixTranslate(float,float,float,MatrixMode){}
     source += re.sub(r'^#include.*$', '', coss, flags=re.M)
     for contents, signature in ((trig, 'f32 Math_CosS('), (trig, 'f32 Math_SinS('),
                                 (skin, 'void SkinMatrix_SetTranslate('), (matrix, 'void Matrix_Translate('),
-                                (matrix, 'void Matrix_RotateYS('), (gu, 'void guMtxF2L(')):
+                                (matrix, 'void Matrix_RotateYS('), (gu, 'void guMtxF2L('),
+                                (gu, 'void guMtxL2F(')):
         source += function(contents, signature) + '\n'
+    # Archive v0 remains fixed-point even when native Mtx is float. Retain the
+    # actual legacy packing branch as the independent byte-for-byte oracle;
+    # exercise the full current native writers separately with the real types.
+    fixed = function(gu, 'void guMtxF2L(').split('#else', 1)[1].split('#endif', 1)[0]
+    source += 'void PackLegacyArchiveMatrix(float mf[4][4], MtxS* m) { unsigned int r,c;\n' + fixed + '\n}\n'
     source += declarations + function(passage, 'void Vertex(') + '\n' + function(passage, 'void BuildPassage(')
     source += r'''
 int main(){
  BuildPassage();Matrix_Translate(-695,0,-313,MTXMODE_NEW);Matrix_RotateYS(12288,MTXMODE_APPLY);
- Mtx packed{};guMtxF2L(current.mf,&packed);
+ MtxS packed{};PackLegacyArchiveMatrix(current.mf,&packed);
+ Mtx native{};float restored[4][4]{};guMtxF2L(current.mf,&native);guMtxL2F(restored,&native);
  printf("{\"vertices\":[");
  for(size_t i=0;i<sVertices.size();++i){const auto& v=sVertices[i].v;
   printf("%s[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",i?",":"",v.ob[0],v.ob[1],v.ob[2],
          v.flag,v.tc[0],v.tc[1],v.cn[0],v.cn[1],v.cn[2],v.cn[3]);}
  printf("],\"matrix\":[");for(int i=0;i<16;++i)printf("%s%u",i?",":"",((u32*)packed.m)[i]);
- puts("]}");
+ printf("],\"runtime_matrix\":[");for(int i=0;i<16;++i)printf("%s%.17g",i?",":"",(&restored[0][0])[i]);
+ printf("],\"source_matrix\":[");for(int i=0;i<16;++i)printf("%s%.17g",i?",":"",(&current.mf[0][0])[i]);
+#if defined(GBI_FLOATS) || defined(GBI_FLOAT_MTX)
+ puts("],\"float_matrices\":true}");
+#else
+ puts("],\"float_matrices\":false}");
+#endif
 }
 '''
     with tempfile.TemporaryDirectory(prefix='native-portal-control-') as folder:
         path, binary = Path(folder) / 'control.cpp', Path(folder) / 'control'
         path.write_text(source)
-        subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-O0', str(path), '-o', str(binary)], check=True)
+        subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-O0', '-DF3DEX_GBI_2',
+                        '-I' + str(ROOT / 'mm/include'), '-I' + str(ROOT / 'mm/include/PR'),
+                        '-I' + str(ROOT / 'libultraship/include'), str(path), '-o', str(binary)], check=True)
         return json.loads(subprocess.check_output([str(binary)], text=True))
 
 
@@ -93,6 +103,19 @@ def decoded_matrix(words):
 
 
 class PortalTests(unittest.TestCase):
+    def test_native_matrix_roundtrip_preserves_combined_abi_and_legacy_archive_precision(self):
+        control = native_control()
+        if os.environ.get('COMBO_NATIVE_TEST_ABI') == 'combined':
+            self.assertTrue(control['float_matrices'])
+        if control['float_matrices']:
+            self.assertEqual(control['runtime_matrix'], control['source_matrix'])
+        else:
+            self.assertEqual(control['runtime_matrix'],
+                             [value for row in decoded_matrix(control['matrix']) for value in row])
+        archive = [value for row in decoded_matrix(control['matrix']) for value in row]
+        for packed, native in zip(archive, control['source_matrix']):
+            self.assertLess(abs(packed - native), 1 / 65536)
+
     def test_baked_portal_matches_native_builder_and_fixed_matrix_without_extra_rounding(self):
         module = load_module(self)
         native, edit, final = fixture(module)

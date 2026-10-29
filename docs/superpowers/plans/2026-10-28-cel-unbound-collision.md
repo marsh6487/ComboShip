@@ -27,7 +27,8 @@
 - [x] Host NEI/custom geometry/dynamic-collision consumers and shared OOT/MM guards (custom-collision worker).
 - [x] Growable OoT actor queues with native admission/contact/damage and teardown tests (queue worker after header handoff).
 - [x] Central game hooks, OTR/SaveManager/legacy archive compatibility, recovered resource capture, package/build integration (root).
-- [ ] Focused native tests, full build checks, independent final preservation review and recoverable source checkpoint; one combined candidate/PR.
+- [x] Focused native tests, independent final preservation review and recoverable source checkpoint; one combined candidate in draft PR #69. All 259 manifest groups have passing retained CI/native coverage, with segment and optional-resource caveats in the checked-in coverage record.
+- [ ] Final matching binary/package refresh and full platform CI after the tested light/message repairs; configured runtime acceptance remains separate.
 
 ## Recovery and acceptance
 
