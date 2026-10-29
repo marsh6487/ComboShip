@@ -9,7 +9,6 @@ constexpr uint8_t kVertex = 0x01;
 constexpr uint8_t kDisplayList = 0xDE;
 constexpr uint8_t kSetTextureImage = 0x25; // retained filepath alias, full texture metadata
 constexpr uint8_t kEndDisplayList = 0xDF;
-constexpr size_t kVertexSize = 16;
 
 bool IsTwoWordCommand(uint8_t opcode) {
     return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 || opcode == 0x32 ||
@@ -24,7 +23,8 @@ uint64_t ReadHash(const MmDisplayListCommand& payload) {
 
 bool MmDisplayList_SelectVertexResource(void* fastVertexPointer, size_t fastVertexSize, void* arrayPointer,
                                         size_t arraySize, bool arrayContainsVertices,
-                                        MmDisplayListVertexResourceView* view) {
+                                        MmDisplayListVertexResourceView* view, size_t runtimeStride,
+                                        size_t fastRecordSize) {
     if (view == nullptr) {
         return false;
     }
@@ -32,11 +32,15 @@ bool MmDisplayList_SelectVertexResource(void* fastVertexPointer, size_t fastVert
     if (fastVertexPointer != nullptr && fastVertexSize != 0) {
         view->pointer = reinterpret_cast<uintptr_t>(fastVertexPointer);
         view->size = fastVertexSize;
+        view->recordSize = fastRecordSize;
+        view->stride = runtimeStride;
         return true;
     }
     if (arrayContainsVertices && arrayPointer != nullptr && arraySize != 0) {
         view->pointer = reinterpret_cast<uintptr_t>(arrayPointer);
         view->size = arraySize;
+        view->recordSize = 16;
+        view->stride = runtimeStride;
         return true;
     }
     return false;
@@ -69,13 +73,13 @@ bool MmDisplayList_PatchCommands(MmDisplayListCommand* commands, size_t commandC
             // Opaque MM actors use Scene_SetRenderModeXlu(play, 0, 1):
             // indices 0 and 2 both terminate without changing geometry state.
             const uint32_t index = command.w1 & UINT32_C(0x00FFFFFF);
-            size_t resourceSize = 0;
+            MmDisplayListVertexResourceView vertexView = {};
             if (index != 0 && index != 2) {
                 ++result.malformed;
                 return false;
             }
             const uintptr_t target =
-                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_RENDER_MODE, index, &resourceSize);
+                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_RENDER_MODE, index, &vertexView);
             if (target == 0) {
                 ++result.unresolved;
             } else {
@@ -88,9 +92,9 @@ bool MmDisplayList_PatchCommands(MmDisplayListCommand* commands, size_t commandC
         }
         if (opcode == kDisplayListHash) {
             MmDisplayListCommand& payload = commands[i + 1];
-            size_t resourceSize = 0;
+            MmDisplayListVertexResourceView vertexView = {};
             const uintptr_t nested =
-                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_NESTED, ReadHash(payload), &resourceSize);
+                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_NESTED, ReadHash(payload), &vertexView);
             if (nested == 0) {
                 ++result.unresolved;
             } else {
@@ -105,9 +109,9 @@ bool MmDisplayList_PatchCommands(MmDisplayListCommand* commands, size_t commandC
         }
         if (opcode == kTextureHash) {
             MmDisplayListCommand& payload = commands[i + 1];
-            size_t resourceSize = 0;
+            MmDisplayListVertexResourceView vertexView = {};
             const uintptr_t texture =
-                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_TEXTURE, ReadHash(payload), &resourceSize);
+                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_TEXTURE, ReadHash(payload), &vertexView);
             if (texture == 0) {
                 ++result.unresolved;
             } else {
@@ -121,23 +125,31 @@ bool MmDisplayList_PatchCommands(MmDisplayListCommand* commands, size_t commandC
         }
         if (opcode == kVertexHash) {
             MmDisplayListCommand& payload = commands[i + 1];
-            size_t resourceSize = 0;
+            MmDisplayListVertexResourceView vertexView = {};
             const uintptr_t vertexBase =
-                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_VERTEX, ReadHash(payload), &resourceSize);
+                resolveResource(context, MM_DISPLAY_LIST_REFERENCE_VERTEX, ReadHash(payload), &vertexView);
             const size_t vertexCount = (command.w0 >> 12) & UINT32_C(0xFF);
             const uintptr_t byteOffset = command.w1;
             if (vertexBase == 0) {
                 ++result.unresolved;
-            } else if (byteOffset > resourceSize || byteOffset % kVertexSize != 0 ||
-                       vertexCount > (resourceSize - byteOffset) / kVertexSize ||
-                       byteOffset > UINTPTR_MAX - vertexBase) {
+            } else if ((vertexView.recordSize != 16 && vertexView.recordSize != 22) ||
+                       (vertexView.stride != 16 && vertexView.stride != 24) ||
+                       vertexView.size % vertexView.stride != 0 || byteOffset % vertexView.recordSize != 0 ||
+                       vertexCount == 0) {
                 ++result.malformed;
                 return false;
             } else {
-                /* Match gfx_vtx_hash_handler_custom: w1 is a byte offset into
-                 * the resolved resource, not a vertex index or unused word. */
+                const size_t index = byteOffset / vertexView.recordSize;
+                const size_t capacity = vertexView.size / vertexView.stride;
+                if (index > capacity || vertexCount > capacity - index ||
+                    index * vertexView.stride > UINTPTR_MAX - vertexBase) {
+                    ++result.malformed;
+                    return false;
+                }
+                // Match the regular vertex handler: serialized bytes identify
+                // an element, whose runtime stride may be wider than the file.
                 command.w0 = (command.w0 & UINT32_C(0x00FFFFFF)) | (static_cast<uint32_t>(kVertex) << 24);
-                command.w1 = vertexBase + byteOffset;
+                command.w1 = vertexBase + index * vertexView.stride;
                 payload = {};
                 ++result.verticesPatched;
             }

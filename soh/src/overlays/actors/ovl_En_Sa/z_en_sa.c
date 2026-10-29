@@ -792,11 +792,13 @@ s32 EnSa_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* po
     if (limbIndex == 16) {
         *dList = NativeNpcModel_SelectEyes(&sSariaNpcModel, *dList, this->leftEyeIndex, this->rightEyeIndex,
                                            this->mouthIndex);
-        Matrix_Translate(900.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+        /* Authored heads rotate around the fitted neck joint. */
+        Vec3f pivot = NativeNpcModel_IsActive(&sSariaNpcModel) ? *pos : (Vec3f){ 900.0f, 0.0f, 0.0f };
+        Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
         sp18 = this->interactInfo.headRot;
         Matrix_RotateX(BINANG_TO_RAD(sp18.y), MTXMODE_APPLY);
         Matrix_RotateZ(BINANG_TO_RAD(sp18.x), MTXMODE_APPLY);
-        Matrix_Translate(-900.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+        Matrix_Translate(-pivot.x, -pivot.y, -pivot.z, MTXMODE_APPLY);
     }
 
     if (limbIndex == 9) {

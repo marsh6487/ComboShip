@@ -16,7 +16,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM legacy/wide graphics and immutable cross-game vertex resources",
-    "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide"
+    "run": "python3 -B tests/mm_wide_gbi/run_tests.py --sanitize\npython3 -B tests/wide_vertex_hash/run_tests.py --sanitize\npython3 -B tests/native_mm_actor_vertices/run_tests.py --sanitize\npython3 -B tests/native_mm_actor_vertices/alt_matrix_test.py --sanitize\npython3 -B tests/native_mm_actor_vertices/saria_tracking_test.py --sanitize\npython3 -B scripts/diagnostics/run_sword_mod_gi_tests.py --sanitize --wide"
   },
   {
     "suite": "render",
