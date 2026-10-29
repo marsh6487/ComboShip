@@ -42,9 +42,9 @@
 - [x] Apply only the bounded Market fix and Chamber guard/emitter additions to the preserved complete parent.
 - [x] Keep all existing regression groups; run checks relevant to renderer and cumulative changes.
 - [x] Review the whole candidate independently; resolve substantive findings with reproducing tests. The inactive toon test was reproduced and corrected; both reviewers report no unresolved Important findings.
-- [ ] Commit and durably checkpoint exact source/tree using the known complete remote22 base; verify independent restoration.
-- [ ] Deliver source checkpoint, tested behavior, actual build status, runtime limits and rollback. No FPS or visual-acceptance claim without runtime proof.
+- [x] Commit and durably checkpoint exact source/tree using the known complete remote22 base; verify independent restoration.
+- [x] Record source checkpoint, tested behavior, actual build status, runtime limits and rollback for the source handoff. No FPS or visual-acceptance claim without runtime proof.
 
 Verification note: real DX11/OpenGL platform compilation remains unavailable in this host; actual new methods compile against recording GPU API boundaries. CPU repeated/disjoint native measurements are recorded without a game FPS claim.
 
-Publication blocker: automatic approval review rejected the first Git tree upload to marsh6487/ComboShip because explicit approval of that external destination is required. No new remote source object/branch was created. Complete local source commit, recovery package and independent restore checks before asking for that approval; do not retry through an indirect path.
+Publication status: explicit public-destination authorization resolved the earlier blocker. The checkpoint branch is published at 32680828cdd96fec1173d9cd95069857db12f149 with the exact f2ca8f24 source tree e0fe8178202834acdcca45db02acd48d38e39b09. The related candidate adds the recovery mapping, exact original-history objects and focused publication verification; see docs/recovery/oct29-cumulative-publication-20261029.md. Full platform/GPU/runtime proof remains pending. No protected merge or game build/release publication is authorized.

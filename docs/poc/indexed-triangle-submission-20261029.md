@@ -183,20 +183,19 @@ test follow-up and milestone dfc259f7 on a new candidate; do not revert the late
 Market/Chamber integration or overwrite accepted branches. The preserved b43
 parent restores the entire pre-index source when a full rollback is intended.
 
-Planned durable recovery branch:
+Durable recovery branch:
 `checkpoint/oct29-cumulative-indexed-triangles-20261029` in
-`marsh6487/ComboShip`. Publication is currently blocked: automatic approval review
-rejected the first Git tree upload because explicit authorization for this
-external destination was required. No new remote tree, commit or branch was
-created. Source implementation and verification are unaffected; root prepares a
-local recovery bundle, isolated patch and independent restore verification before
-requesting destination approval. A transient local commit alone is not durable.
+`marsh6487/ComboShip`, published at `32680828cdd96fec1173d9cd95069857db12f149`.
+Its source tree `e0fe8178202834acdcca45db02acd48d38e39b09` is exactly the
+authorized local `f2ca8f249994a69caf5d13d47e4d020ee954888f` tree. Explicit
+public-destination authorization resolved the earlier publication blocker.
 
-Once authorized, reconstruct checkpoints as bounded deltas over complete remote
-morning commit22b6569a/treea9abab36, retaining all unchanged assets by Git identity.
-Publish the preservation parent, renderer milestone, toon test correction and
-cumulative integration as recoverable source history. Each remote tree must
-equal its corresponding local tree exactly before creating its commit/branch.
-Record exact local/remote mappings. Restore by cloning the branch into a new
-directory, then `git rev-parse HEAD^{tree}` and compare with that mapping. No
-protected branch merge or release is authorized.
+The preservation parent, renderer milestone, active toon test and cumulative
+integration are retained as mapped source-history checkpoints. See
+`docs/recovery/oct29-cumulative-publication-20261029.md` and its JSON companion
+for exact local/remote identities, focused re-verification, original-object
+recovery, restoration instructions and remaining limits. Additional publication
+records are on the related candidate branch; the checkpoint remains pinned.
+Source publication does not establish a full platform build, GPU execution,
+configured runtime acceptance or measured FPS improvement. No protected branch
+merge or game build/release publication is authorized.
