@@ -316,7 +316,7 @@ void LogMeshAsXML(std::shared_ptr<Ship::IResource> resource) {
         polygon->SetAttribute("ImgXlu", "");
 
         if (setMesh->meshHeader.polygon1.format == 1) {
-            polygon->SetAttribute("BgImageCount", "0");
+            polygon->SetAttribute("BgImageCount", "1");
         } else {
             polygon->SetAttribute("BgImageCount", setMesh->meshHeader.polygon1.multi.count);
         }
@@ -330,13 +330,16 @@ void LogMeshAsXML(std::shared_ptr<Ship::IResource> resource) {
 
         root->InsertEndChild(polygon);
 
-        BgImage* image = setMesh->meshHeader.polygon1.multi.list;
+        // single and multi share a union. In a single-background room the
+        // multi.list bytes hold single.unk_0C, not an image pointer.
+        BgImage* image = setMesh->meshHeader.polygon1.format == 1 ? nullptr : setMesh->meshHeader.polygon1.multi.list;
         int count = setMesh->meshHeader.polygon1.format == 1 ? 1 : setMesh->meshHeader.polygon1.multi.count;
         for (int i = 0; i < count; i += 1) {
             tinyxml2::XMLElement* bgImage = doc.NewElement("BgImage");
             if (setMesh->meshHeader.polygon1.format == 1) {
-                bgImage->SetAttribute("Unknown_00", image->unk_00);
-                bgImage->SetAttribute("Id", image->id);
+                // These two fields exist only in the multi-background layout.
+                bgImage->SetAttribute("Unknown_00", 0);
+                bgImage->SetAttribute("Id", 0);
                 bgImage->SetAttribute("ImagePath", TrimOTRSignature((char*)setMesh->meshHeader.polygon1.single.source));
                 bgImage->SetAttribute("Unknown_0C", setMesh->meshHeader.polygon1.single.unk_0C);
                 bgImage->SetAttribute("TLUT", setMesh->meshHeader.polygon1.single.tlut);
@@ -361,7 +364,9 @@ void LogMeshAsXML(std::shared_ptr<Ship::IResource> resource) {
             }
             polygon->InsertEndChild(bgImage);
 
-            image += 1;
+            if (setMesh->meshHeader.polygon1.format != 1) {
+                image += 1;
+            }
         }
     } else if (setMesh->meshHeader.base.type == 2) {
         root->SetAttribute("PolyNum", setMesh->meshHeader.polygon2.num);

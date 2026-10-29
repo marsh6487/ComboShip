@@ -294,6 +294,10 @@ void PublishTables() {
 
 extern "C" void OTRMessage_Init(void) {
     if (sInitialized) {
+        // Combo's companion-archive reorder clears the public pointers. The
+        // owned tables survive that reorder; rebind them without rebuilding
+        // storage that an active PlayState may still reference.
+        PublishTables();
         return; // the tables are process-lifetime; a second pass would append a second terminator
     }
     sInitialized = true;
