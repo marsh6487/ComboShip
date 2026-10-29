@@ -693,8 +693,7 @@ extern "C" bool Randomizer_IsChestStrayFairy(GetItemEntry item) {
 #ifdef COMBO_BUILD
     if (item.getItemId == RG_COMBO_FOREIGN && item.comboForeignCheck > RC_UNKNOWN_CHECK &&
         item.comboForeignCheck < RC_MAX) {
-        const ComboRando::ForeignItem* foreign =
-            OOT_LookupForeignByCheck((RandomizerCheck)item.comboForeignCheck);
+        const ComboRando::ForeignItem* foreign = OOT_LookupForeignByCheck((RandomizerCheck)item.comboForeignCheck);
         return foreign != nullptr && !foreign->trap && foreign->category == "strayFairy";
     }
 #endif

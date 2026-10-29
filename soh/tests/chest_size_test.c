@@ -228,7 +228,7 @@ int main(void) {
     puts("PASS: independent texture/Agony options, complete-model fallback and native boss/unknown styles");
 
     const int fairyItems[] = { RG_MM_STRAY_FAIRY, RG_MM_STRAY_FAIRY_WOODFALL, RG_MM_STRAY_FAIRY_SNOWHEAD,
-                              RG_MM_STRAY_FAIRY_GREAT_BAY, RG_MM_STRAY_FAIRY_STONE_TOWER };
+                               RG_MM_STRAY_FAIRY_GREAT_BAY, RG_MM_STRAY_FAIRY_STONE_TOWER };
     matchTexture = matchSize = 1;
     for (size_t i = 0; i < sizeof(fairyItems) / sizeof(fairyItems[0]); ++i) {
         for (size_t j = 0; j < sizeof(defaults) / sizeof(defaults[0]); ++j) {

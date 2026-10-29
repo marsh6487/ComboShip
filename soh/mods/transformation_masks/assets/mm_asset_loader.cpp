@@ -883,8 +883,8 @@ static uintptr_t MmAssets_ResolveDisplayListReference(void* context, MmDisplayLi
             vertex != nullptr ? vertex->GetRawPointer() : nullptr, vertex != nullptr ? vertex->GetPointerSize() : 0,
             vertexArray != nullptr ? vertexArray->GetRawPointer() : nullptr,
             vertexArray != nullptr ? vertexArray->GetPointerSize() : 0,
-            vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, vertexView,
-            sizeof(Vtx), vertex != nullptr ? vertex->GetVertexRecordSize() : 16)) {
+            vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, vertexView, sizeof(Vtx),
+            vertex != nullptr ? vertex->GetVertexRecordSize() : 16)) {
         MMASSETS_LOG("[MM Assets] STRICT graph vertex type/miss: %s", pathIt->second.c_str());
         return 0;
     }
