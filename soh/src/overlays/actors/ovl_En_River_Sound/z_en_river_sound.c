@@ -5,6 +5,9 @@
  */
 
 #include "z_en_river_sound.h"
+#ifdef COMBO_BUILD
+#include "chamber_sfx_scope.h"
+#endif
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -205,6 +208,19 @@ void EnRiverSound_Update(Actor* thisx, PlayState* play) {
 }
 
 void EnRiverSound_Draw(Actor* thisx, PlayState* play) {
+#ifdef COMBO_BUILD
+    // This Prelude annex shares Temple room 0. Its native centered ambience
+    // must stop being submitted when Link crosses back into the tunnel.
+    // Restrict ownership to POC14's one exact emitter; native scenes are untouched.
+    if (play->sceneNum == SCENE_TEMPLE_OF_TIME && thisx->params == RS_CHAMBER_OF_SAGES_1 && thisx->home.pos.x == 0.0f &&
+        thisx->home.pos.y == -120.0f && thisx->home.pos.z == -2400.0f) {
+        Player* player = GET_PLAYER(play);
+        if (play->roomCtx.curRoom.num != 0 || !player ||
+            !ChamberSfx_Contains(player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z)) {
+            return;
+        }
+    }
+#endif
     static s16 soundEffects[] = {
         0,
         NA_SE_EV_WATER_WALL - SFX_FLAG,

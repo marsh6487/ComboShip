@@ -1,5 +1,9 @@
 # ComboShip renderer investigation — concrete changes
 
+Historical proposal record at b43e86ea. Indexed submission is now implemented;
+see `docs/poc/indexed-triangle-submission-20261029.md` for the current source,
+verification, cumulative integration and remaining runtime limits.
+
 ## Outcome
 
 Use the existing October 29 captures and the actual vendored SoH/LUS renderer to change CPU rendering work. Preserve full models, texture resolution, scene geometry, effects and gameplay. No new diagnostic build is proposed. The experimental texture-only probe was withdrawn; no probe hooks, new probe tests, CVar or CI entry remain in the source candidate.

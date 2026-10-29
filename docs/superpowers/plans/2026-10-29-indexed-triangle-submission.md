@@ -35,14 +35,16 @@
 
 - [x] Add real DX11 dynamic index buffer/DrawIndexed and OpenGL element buffer/glDrawElements; share original state preparation.
 - [x] Test indexed buffer/draw boundary with actual production functions; run native CPU comparison and report limits.
-- [ ] Check platform compilation where available, review and commit backend milestone.
+- [x] Check platform compilation availability, independently review and commit backend milestone. Full platform compilation is unavailable here; do not treat the native GPU API boundary fixture as that build.
 
 ## Task3: cumulative integration and durable handoff
 
-- [ ] Apply only the bounded Market fix and Chamber guard/emitter additions to the preserved complete parent.
-- [ ] Keep all existing regression groups; run checks relevant to renderer and cumulative changes.
-- [ ] Review the whole candidate independently; resolve substantive findings with reproducing tests.
+- [x] Apply only the bounded Market fix and Chamber guard/emitter additions to the preserved complete parent.
+- [x] Keep all existing regression groups; run checks relevant to renderer and cumulative changes.
+- [x] Review the whole candidate independently; resolve substantive findings with reproducing tests. The inactive toon test was reproduced and corrected; both reviewers report no unresolved Important findings.
 - [ ] Commit and durably checkpoint exact source/tree using the known complete remote22 base; verify independent restoration.
 - [ ] Deliver source checkpoint, tested behavior, actual build status, runtime limits and rollback. No FPS or visual-acceptance claim without runtime proof.
 
 Verification note: real DX11/OpenGL platform compilation remains unavailable in this host; actual new methods compile against recording GPU API boundaries. CPU repeated/disjoint native measurements are recorded without a game FPS claim.
+
+Publication blocker: automatic approval review rejected the first Git tree upload to marsh6487/ComboShip because explicit approval of that external destination is required. No new remote source object/branch was created. Complete local source commit, recovery package and independent restore checks before asking for that approval; do not retry through an indirect path.

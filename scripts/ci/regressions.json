@@ -9,7 +9,7 @@
     "suite": "world",
     "origin": "gate",
     "name": "Native Unbound formats, legacy routing and transactional state ownership",
-    "run": "python3 -B tests/unbound/run_native_tests.py -v\npython3 -B tests/unbound/run_savestate_tests.py\npython3 -B tests/unbound/run_smoke_repair_tests.py -v"
+    "run": "python3 -B tests/unbound/run_native_tests.py -v\npython3 -B tests/unbound/run_savestate_tests.py\npython3 -B tests/unbound/run_smoke_repair_tests.py -v\npython3 -B tests/graphics/run_3d_background_distance_tests.py -v"
   },
   {
     "suite": "render",
@@ -1581,5 +1581,17 @@
     "origin": "gate",
     "name": "Missing custom audio data remains silent in OoT and MM",
     "run": "python3 -B tests/audio_missing_sample/run_tests.py\npython3 -B tests/audio_missing_sample/run_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Indexed triangle backend buffer submission",
+    "run": "python3 -B tests/indexed_triangles/run_backend_tests.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Authored Chamber SFX scope and additive native emitters",
+    "run": "python3 -B tests/temple_sages_bundle/run_chamber_sfx_tests.py --sanitize"
   }
 ]

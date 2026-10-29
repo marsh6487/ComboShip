@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -106,8 +107,10 @@ void Register3DPreRenderedScenes() {
         }
 
         if ((HREG(80) != 10) || (HREG(82) != 0)) {
-            // Furthest possible fog and zFar
-            gPlayState->view.zFar = 12800;
+            // Unbound rebuilds the projection and culls rooms from lightCtx.zFar after this hook.
+            // Keep the 3D-background minimum without shortening a larger authored draw distance.
+            gPlayState->lightCtx.zFar = std::max(gPlayState->lightCtx.zFar, 12800.0f);
+            gPlayState->view.zFar = gPlayState->lightCtx.zFar;
             gPlayState->lightCtx.fogNear = 1000;
             gPlayState->lightCtx.fogFar = 12800;
         }

@@ -324,8 +324,7 @@ int main() {
     } randoCategories[] = {
         { RITYPE_MAJOR, "Major" },        { RITYPE_LESSER, "Minor" },          { RITYPE_HEALTH, "Heart" },
         { RITYPE_SMALL_KEY, "SmallKey" }, { RITYPE_SKULLTULA_TOKEN, "Token" }, { RITYPE_JUNK, "Junk" },
-        { RITYPE_MASK, "Major" },
-        { RITYPE_STRAY_FAIRY, "Major" },
+        { RITYPE_MASK, "Major" },         { RITYPE_STRAY_FAIRY, "Major" },
     };
     for (const auto& category : randoCategories) {
         resolvedType = category.type;
