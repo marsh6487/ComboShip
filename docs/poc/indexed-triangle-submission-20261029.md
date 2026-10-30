@@ -197,5 +197,6 @@ for exact local/remote identities, focused re-verification, original-object
 recovery, restoration instructions and remaining limits. Additional publication
 records are on the related candidate branch; the checkpoint remains pinned.
 Source publication does not establish a full platform build, GPU execution,
-configured runtime acceptance or measured FPS improvement. No protected branch
-merge or game build/release publication is authorized.
+configured runtime acceptance or measured FPS improvement. Normal candidate CI is
+requested by the follow-up; protected branch merges and release publication
+remain unauthorized.

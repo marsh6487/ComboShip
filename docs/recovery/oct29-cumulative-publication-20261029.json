@@ -216,6 +216,10 @@
     "source_only": true,
     "protected_merges": false,
     "game_build_or_release_publication": false,
-    "pr_commit_skip_ci": true
-  }
+    "initial_publication_commit_skip_ci": true,
+    "pr_commit_skip_ci": false,
+    "candidate_ci_builds_and_test_artifacts": true,
+    "release_publication_authorized": false
+  },
+  "candidate_ci_followup": "User requested the missing Windows candidate build; resume normal PR CI without changing the pinned source checkpoint, production code, protected branches or release publication."
 }

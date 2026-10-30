@@ -130,8 +130,9 @@ Use value `1` to enable it again. Keep the normal complete staged engine/port
 set when eventually building; the renderer interface changed.
 
 The original checkpoint branch stays pinned. Additional publication metadata is
-a descendant on the candidate branch. The candidate's documentation commit uses
-`[skip ci]` because the existing PR workflow automatically uploads packaged game
-builds. This authorization covers source publication only: no packaged build or
-release is published, no accepted master is promoted, and no protected branch is
-merged. Full build/regression CI therefore remains pending under this scope.
+a descendant on the candidate branch. The initial publication commit used
+`[skip ci]`; this also blocked the normal Windows candidate build. cor's follow-up
+requests that build, so the latest candidate commit allows the normal PR build
+and regression workflow, including its candidate test artifacts. No accepted
+master is promoted, protected branch merged, or release published. Actual build
+results must be checked before reporting platform compilation as verified.
