@@ -1,0 +1,225 @@
+{
+  "date": "2026-10-29",
+  "repository": "marsh6487/ComboShip",
+  "checkpoint_branch": "checkpoint/oct29-cumulative-indexed-triangles-20261029",
+  "candidate_branch": "candidate/oct29-bugfix-integration-20261029",
+  "pr_base": "candidate/morning-fixes-20261029",
+  "source_checkpoint": {
+    "local_commit": "f2ca8f249994a69caf5d13d47e4d020ee954888f",
+    "remote_commit": "32680828cdd96fec1173d9cd95069857db12f149",
+    "tree": "e0fe8178202834acdcca45db02acd48d38e39b09",
+    "tracked_files": 44907
+  },
+  "lineage": [
+    {
+      "local_commit": "b43e86eaad1b3507367cc84b5d405f7b9f4aca1e",
+      "remote_commit": "f6d4772fa7856ea95fd6335b4e0d99f335a198f6",
+      "tree": "eb7296bcdd76547d6201fdda56cd2d4262f37d44"
+    },
+    {
+      "local_commit": "dfc259f727d5f7aab927327da7e7c756359ca4fa",
+      "remote_commit": "122886753a77b66d3d06b3dba77daf9892b7d388",
+      "tree": "646550de46f4851067761428d68cf11f36ef0d7a"
+    },
+    {
+      "local_commit": "45a7cdbc853395dee39142cffdf90ab860666340",
+      "remote_commit": "e06ee44c0e0e6dd10c216d943b7074f83df04e27",
+      "tree": "859bece940c7eaff4492c5c2cd279663fa4dc74b"
+    },
+    {
+      "local_commit": "f2ca8f249994a69caf5d13d47e4d020ee954888f",
+      "remote_commit": "32680828cdd96fec1173d9cd95069857db12f149",
+      "tree": "e0fe8178202834acdcca45db02acd48d38e39b09"
+    }
+  ],
+  "verification": {
+    "focused_checks": [
+      {
+        "name": "indexed-equivalence-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "scripts/diagnostics/run_gfx_triangle_run_tests.py"
+        ],
+        "env": {
+          "GFX_TRIANGLE_TEST_CXXFLAGS": "-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie",
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 27.64,
+        "log_sha256": "28d8d41e739e6d1f401ffa00ca5238063f5f385f38d05a86bf500af119cfb666"
+      },
+      {
+        "name": "indexed-backends-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "tests/indexed_triangles/run_backend_tests.py",
+          "--sanitize"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 2.26,
+        "log_sha256": "ff45163de5eaf7d23b5e186c2a6fd0d5a2595d0e8926d5f580cfc680f9673f6a"
+      },
+      {
+        "name": "cel-backend-preservation",
+        "command": [
+          "python3",
+          "-B",
+          "tests/cel_render_backends/run_tests.py"
+        ],
+        "env": {},
+        "exit_code": 0,
+        "seconds": 4.07,
+        "log_sha256": "2347db699d65ccc0cefc5dfe2ce1b9f82ad5567f0e38ab937d610bcdc6ac7b25"
+      },
+      {
+        "name": "market-distance",
+        "command": [
+          "python3",
+          "-B",
+          "tests/graphics/run_3d_background_distance_tests.py",
+          "-v"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 1.85,
+        "log_sha256": "1ab58d79c7fc1dac7e00287e5c987d7508b7e30baf995958218a09d7bdc898ea"
+      },
+      {
+        "name": "chamber-sfx-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "tests/temple_sages_bundle/run_chamber_sfx_tests.py",
+          "--sanitize"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 0.45,
+        "log_sha256": "b9ed8f95abba1f61fb1f825a3e9bc67d2212f2717ba948eff6d41cafb291987b"
+      },
+      {
+        "name": "native-mm-actor-abi-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "tests/native_mm_actor_vertices/run_tests.py",
+          "--sanitize"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 9.37,
+        "log_sha256": "20d09c8ca61f70bc1340d2e6abb4b94c66c1707b80928681d165598c9a3537b5"
+      },
+      {
+        "name": "oot-major-chests",
+        "command": [
+          "python3",
+          "-B",
+          "scripts/diagnostics/run_chest_size_tests.py"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 2.34,
+        "log_sha256": "5457d4e1b8a74fb254e64ac438aec72b8c2098e2b26742b62879c4cab76c3bb9"
+      },
+      {
+        "name": "mm-major-chests",
+        "command": [
+          "python3",
+          "-B",
+          "scripts/diagnostics/run_mm_chest_contents_tests.py"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 3.32,
+        "log_sha256": "2ffa8fc2f193038560c58f7522c0130e03e1c58f460e3942bc7701180fbc7631"
+      },
+      {
+        "name": "missing-audio-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "tests/audio_missing_sample/run_tests.py",
+          "--sanitize"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 40.12,
+        "log_sha256": "f24319a7abd076b5b332d85e1a770d301a6f645c4f1e60c13e47991e0d5cad4c"
+      },
+      {
+        "name": "equipment-provenance-sanitized",
+        "command": [
+          "python3",
+          "-B",
+          "tests/nei_asset_priority/run_unbound_tests.py",
+          "--sanitize"
+        ],
+        "env": {
+          "ASAN_OPTIONS": "detect_leaks=0"
+        },
+        "exit_code": 0,
+        "seconds": 9.12,
+        "earlier_environment_failure": "The first invocation omitted the documented ASAN_OPTIONS setting; LeakSanitizer failed because /proc task inspection is unavailable. This run disables leak checking only; ASan and UBSan remain enabled.",
+        "log_sha256": "9f0281edda00dc06024b5e1f237e8ce642439aa1f38c07a46e1369968fdbaa29"
+      }
+    ],
+    "independent_full_source_restore": {
+      "tree": "e0fe8178202834acdcca45db02acd48d38e39b09",
+      "git_fsck_full_exit": 0,
+      "shared_object_alternates": false
+    },
+    "original_history_objects": {
+      "file": "oct29-original-history-20261029.json",
+      "objects": 31,
+      "fresh_object_database_hashes_verified": true,
+      "required_object_coverage_verified": true,
+      "sha256": "108991a10dd708a61a713eae4cad8f4992f318e99f3928ee63462be8184391c0",
+      "test_limit": "The empty object database checks archived object identities, not a full clone; full source restoration was checked separately.",
+      "initial_test_adjustment": "Raw tree import initially requested unavailable snapshot dependencies in the deliberately empty database. The final check writes SHA-verified raw objects and inspects the original commit header without dereferencing absent public trees."
+    },
+    "regression_inventory": {
+      "prior_groups": 260,
+      "current_groups": 262,
+      "prior_names_and_commands_retained": true,
+      "all_262_groups_rerun_in_this_publication_pass": false
+    }
+  },
+  "unverified": [
+    "Full Windows/Linux application build",
+    "Actual DX11/OpenGL GPU execution",
+    "Configured gameplay, visual/audio acceptance and measured FPS improvement"
+  ],
+  "separate_archive_work": [
+    "Hyrule Field recipe doors, Malon timeline and grotto warppad repair",
+    "Market window/texture archive repair",
+    "Standalone NPC/Young Din optimization, dungeon fog/lighting and flame archive POCs"
+  ],
+  "publication_policy": {
+    "source_only": true,
+    "protected_merges": false,
+    "game_build_or_release_publication": false,
+    "initial_publication_commit_skip_ci": true,
+    "pr_commit_skip_ci": false,
+    "candidate_ci_builds_and_test_artifacts": true,
+    "release_publication_authorized": false
+  },
+  "candidate_ci_followup": "User requested the missing Windows candidate build; resume normal PR CI without changing the pinned source checkpoint, production code, protected branches or release publication."
+}

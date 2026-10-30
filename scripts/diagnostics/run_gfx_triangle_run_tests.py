@@ -35,6 +35,7 @@ def function(source, name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--index-benchmark", action="store_true", help="Time repeated/disjoint indexed submission")
     parser.add_argument("--baseline-ref", help="Compile triangle code/header from this git ref")
     args = parser.parse_args()
     def read(path):
@@ -132,10 +133,14 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
         (build / "triangle_production.inc").write_text(generated)
         binary = build / "triangle-test"
         flags = shlex.split(os.environ.get("GFX_TRIANGLE_TEST_CXXFLAGS", "-O3"))
+        if "mIndexedTrianglesEnabled" in header:
+            flags += ["-DGFX_HAS_INDEXED_TRIANGLES=1"]
         subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", *flags,
                         "-I" + str(build), "-I" + str(build / "fast"), "-I" + str(ROOT / "libultraship/include"),
                         str(ROOT / "libultraship/tests/gfx_triangle_run_test.cpp"), "-o", str(binary)], check=True)
-        subprocess.run([str(binary), *(["--benchmark"] if args.benchmark else []), *(["--reference"] if args.baseline_ref else [])], check=True)
+        subprocess.run([str(binary), *(["--benchmark"] if args.benchmark else []),
+                        *(["--index-benchmark"] if args.index_benchmark else []),
+                        *(["--reference"] if args.baseline_ref else [])], check=True)
 
 
 if __name__ == "__main__":

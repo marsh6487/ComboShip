@@ -49,6 +49,10 @@ struct ConsoleVariables {
     int reads{};
     std::optional<int> value;
     int GetInteger(const char* name, int fallback) {
+        if (std::string_view(name) == "gEnhancements.IndexedTriangles") {
+            assert(fallback == 1);
+            return 1;
+        }
         assert(std::string_view(name) == "gEnhancements.PreludeMaterialBindingReuse" && fallback == 0);
         ++reads;
         return value.value_or(fallback);
@@ -111,6 +115,8 @@ struct Interpreter {
     bool drawTextures[2]{true, true};
     float packedUv[8]{};
     void Flush() { ++flushes; }
+    // This fixture observes the texture loop, not vertex/index submission.
+    void SetIndexedTrianglesEnabled(bool) {}
     void Prepare(bool is_rect = false);
     void BeginRun();
     void ImportTexture(int i, int tile, bool replacement);

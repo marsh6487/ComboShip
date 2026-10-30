@@ -129,6 +129,8 @@ ogl = (BACKENDS / 'gfx_opengl.cpp').read_text()
 gl_methods = '\n'.join(function(ogl, signature) for signature in [
     'void GfxRenderingAPIOGL::DrawTriangles(', 'void GfxRenderingAPIOGL::StartFrame(',
     'void GfxRenderingAPIOGL::ClearFramebuffer(', 'void GfxRenderingAPIOGL::ClearDepthRegion('])
+if 'void GfxRenderingAPIOGL::DrawTrianglesInternal(' in ogl:
+    gl_methods += '\n' + function(ogl, 'void GfxRenderingAPIOGL::DrawTrianglesInternal(')
 run('opengl-stencil-and-clear', common + r'''
 using GLint = int; using GLfloat = float; using GLboolean = bool;
 constexpr int GL_TRUE=1, GL_FALSE=0, GL_DEPTH_TEST=2, GL_STENCIL_TEST=3,
@@ -165,6 +167,8 @@ struct GfxRenderingAPIOGL {
  struct FB {int height=240;}; std::vector<FB> mFrameBuffers{FB{}};
  void SetPerDrawUniforms() {}
  void DrawTriangles(float*,size_t,size_t); void StartFrame();
+ void DrawTrianglesInternal(float*,size_t,size_t,const uint16_t*);
+ void SubmitIndexedTriangles(const uint16_t*,size_t) {assert(false && "legacy stencil fixture uses direct draws");}
  void ClearFramebuffer(bool,bool); void ClearDepthRegion(int,int,int,int);
 };
 ''' + gl_methods + r'''
@@ -197,8 +201,11 @@ int main() {
 ''')
 
 dx = (BACKENDS / 'gfx_direct3d11.cpp').read_text()
-state = function(dx, 'void GfxRenderingAPIDX11::DrawTriangles(')
+dx_internal = 'void GfxRenderingAPIDX11::DrawTrianglesInternal('
+state = function(dx, dx_internal if dx_internal in dx else 'void GfxRenderingAPIDX11::DrawTriangles(')
 state = state[:state.index('    if (mLastZmodeDecal != mCurrentZmodeDecal)')] + '\n}\n'
+if dx_internal in dx:
+    state = function(dx, 'void GfxRenderingAPIDX11::DrawTriangles(') + '\n' + state
 run('direct3d-stencil-state-cache', common + r'''
 constexpr int D3D11_DEPTH_WRITE_MASK_ALL=1, D3D11_DEPTH_WRITE_MASK_ZERO=0,
  D3D11_COMPARISON_LESS_EQUAL=2, D3D11_COMPARISON_LESS=3, D3D11_COMPARISON_ALWAYS=4,
@@ -221,6 +228,7 @@ struct GfxRenderingAPIDX11 {
  int mLastStencilMode=-1; Ptr mDepthStencilStates[64];
  Device device; Context context; Device* mDevice=&device; Context* mContext=&context;
  void DrawTriangles(float*,size_t,size_t);
+ void DrawTrianglesInternal(float*,size_t,size_t,const uint16_t*);
 };
 '''+state+r'''
 int main() {

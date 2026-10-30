@@ -31,6 +31,7 @@
 // (including toon lighting's world-space normal attribute). The interpreter packs from this and every
 // backend sizes its vertex buffers from it, so they stay in lockstep — change it in one place only.
 #define VBO_MAX_FLOATS_PER_VERTEX 40
+#define TRIANGLE_BATCH_MAX_TRIANGLES 256
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -509,6 +510,12 @@ class Interpreter {
 
     // private: TODO make these private
     void Flush();
+    void SetIndexedTrianglesEnabled(bool enabled) {
+        const bool supported = enabled && mRapi != nullptr && mRapi->SupportsIndexedTriangles();
+        if (supported != mIndexedTrianglesEnabled) Flush();
+        mIndexedTrianglesEnabled = supported;
+        mIndexedVertexMask = 0;
+    }
     bool mRenderCostEveryFrame = false;
     uint64_t mDiagnosticFrameId = 0;
     bool mAltRenderLookup = false; // scoped by OoT RunCommands; never enabled by MM
@@ -631,6 +638,9 @@ class Interpreter {
     PackedTriangleVertex mPackedTriangleVertices[MAX_VERTICES]{};
     bool mTriangleStateReuseEnabled = false; // Port opt-in; MM retains the original path.
     bool mTriangleStateReuseAllowed = false; // Only set while dispatching pure triangle commands.
+    bool mIndexedTrianglesEnabled = false;
+    uint64_t mIndexedVertexMask = 0; // Retired by every nontriangle command and Flush.
+    uint16_t mIndexedVertexIds[MAX_VERTICES]{};
     bool mPreludeMaterialBindingReuseEnabled = false; // Sampled once per Run; compatible material opt-in.
     // Identity only: never dereferenced. Cleared at Run/FB binds; the loaded
     // texture owns the resource and reuse re-finds the live texture cache node.
@@ -658,9 +668,13 @@ class Interpreter {
 
     unsigned int mMsaaLevel = 1;
     bool mDroppedFrame{};
-    float* mBufVbo; // 3 vertices per triangle, VBO_MAX_FLOATS_PER_VERTEX floats per vertex
+    float* mBufVbo; // Expanded records or unique indexed records, bounded by the original allocation.
     size_t mBufVboLen{};
     size_t mBufVboNumTris{};
+    uint16_t mBufIndices[TRIANGLE_BATCH_MAX_TRIANGLES * 3]{};
+    size_t mBufIndexLen{}, mBufIndexedVertices{}, mBufVertexStride{};
+    bool mBufUsesIndices = false;
+    bool mBufIndexable = false;
     // SOH [Enhancement] Actor shadow: world-space positions of the current object's triangles (9 floats
     // per tri), accumulated as the object draws and drained by FlushToonShadow at each object boundary.
     std::vector<float> mShadowVerts;

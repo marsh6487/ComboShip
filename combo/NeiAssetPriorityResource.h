@@ -72,6 +72,7 @@ inline bool IsModAsset(const char* nativeGame, const char* game, const char* pat
                                                        Ship::Context::LocateFileAcrossAppDirs("soh.o2r"),
                                                        Ship::Context::LocateFileAcrossAppDirs("oot.o2r", "soh"),
                                                        Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", "soh"),
+                                                       Ship::Context::LocateFileAcrossAppDirs("oot-unbound.o2r", "soh"),
                                                        FindCompanion("oot") };
     static const std::vector<std::string> mmBuiltins{ Ship::Context::LocateFileAcrossAppDirs("2ship.o2r", "2ship"),
                                                       Ship::Context::LocateFileAcrossAppDirs("2ship.o2r"),
