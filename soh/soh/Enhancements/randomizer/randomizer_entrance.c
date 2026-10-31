@@ -15,6 +15,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/SaveManager.h"
 #include <string.h>
+#include <libultraship/luslog.h>
 
 #include "functions.h"
 #include "macros.h"
@@ -247,6 +248,12 @@ void Entrance_Init(void) {
     }
 
     // Stop playing background music during shuffled entrance transitions
+    LUSLOG_INFO("[EntranceTrace] init slot=%d savedScene=%d entrance=%#x spawnShuffle=%d "
+                "childOverride=%#x adultOverride=%#x",
+                gSaveContext.fileNum, gSaveContext.savedSceneNum, gSaveContext.entranceIndex,
+                Randomizer_GetSettingValue(RSK_SHUFFLE_OVERWORLD_SPAWNS),
+                entranceOverrideTable[ENTR_LINKS_HOUSE_CHILD_SPAWN], entranceOverrideTable[ENTR_HYRULE_FIELD_10]);
+
     // so that we don't get duplicated or overlapping music tracks
     if (Randomizer_GetSettingValue(RSK_SHUFFLE_OVERWORLD_ENTRANCES)) {
 
@@ -296,6 +303,19 @@ s16 Entrance_PeekNextIndexOverride(int16_t nextEntranceIndex) {
     return Grotto_GetEntranceValueHandlingGrottoRando(Entrance_GetOverride(nextEntranceIndex));
 }
 
+static s16 Entrance_TraceResolved(const char* kind, s16 original, s16 resolved, s16 materialized) {
+    LUSLOG_INFO("[EntranceTrace] %s slot=%d scene=%d input=%#x resolved=%#x materialized=%#x respawn=%d", kind,
+                gSaveContext.fileNum, gPlayState ? gPlayState->sceneNum : -1, original, resolved, materialized,
+                gSaveContext.respawnFlag);
+    if (gSaveContext.respawnFlag > 0 && gSaveContext.respawnFlag <= ARRAY_COUNT(gSaveContext.respawn)) {
+        RespawnData* record = &gSaveContext.respawn[gSaveContext.respawnFlag - 1];
+        LUSLOG_INFO("[EntranceTrace] positioned entrance=%#x room=%d pos=(%.2f,%.2f,%.2f) params=%#x",
+                    record->entranceIndex, record->roomIndex, record->pos.x, record->pos.y, record->pos.z,
+                    record->playerParams);
+    }
+    return materialized;
+}
+
 s16 Entrance_OverrideNextIndex(s16 nextEntranceIndex) {
     // Exiting through the crawl space from Hyrule Castle courtyard is the same exit as leaving Ganon's castle
     // Don't override the entrance if we came from the Castle courtyard (day and night scenes)
@@ -311,15 +331,18 @@ s16 Entrance_OverrideNextIndex(s16 nextEntranceIndex) {
 #ifdef COMBO_BUILD
     int32_t composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(nextEntranceIndex, true) : -1;
     if (composed >= 0)
-        return Grotto_OverrideSpecialEntrance(composed);
+        return Entrance_TraceResolved("before-native", nextEntranceIndex, composed,
+                                      Grotto_OverrideSpecialEntrance(composed));
 #endif
     s16 resolved = Entrance_GetOverride(nextEntranceIndex);
+    LUSLOG_INFO("[EntranceTrace] native input=%#x override=%#x", nextEntranceIndex, resolved);
 #ifdef COMBO_BUILD
     composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(resolved, false) : -1;
     if (composed >= 0)
         resolved = composed;
 #endif
-    return Grotto_OverrideSpecialEntrance(resolved);
+    return Entrance_TraceResolved("after-native", nextEntranceIndex, resolved,
+                                  Grotto_OverrideSpecialEntrance(resolved));
 }
 
 s16 Entrance_OverrideDynamicExit(s16 dynamicExitIndex) {
@@ -329,15 +352,18 @@ s16 Entrance_OverrideDynamicExit(s16 dynamicExitIndex) {
     int32_t composed =
         Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(dynamicExitList[dynamicExitIndex], true) : -1;
     if (composed >= 0)
-        return Grotto_OverrideSpecialEntrance(composed);
+        return Entrance_TraceResolved("dynamic-before-native", dynamicExitList[dynamicExitIndex], composed,
+                                      Grotto_OverrideSpecialEntrance(composed));
 #endif
     s16 resolved = Entrance_GetOverride(dynamicExitList[dynamicExitIndex]);
+    LUSLOG_INFO("[EntranceTrace] dynamic-native input=%#x override=%#x", dynamicExitList[dynamicExitIndex], resolved);
 #ifdef COMBO_BUILD
     composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(resolved, false) : -1;
     if (composed >= 0)
         resolved = composed;
 #endif
-    return Grotto_OverrideSpecialEntrance(resolved);
+    return Entrance_TraceResolved("dynamic-after-native", dynamicExitList[dynamicExitIndex], resolved,
+                                  Grotto_OverrideSpecialEntrance(resolved));
 }
 
 u32 Entrance_SceneAndSpawnAre(u8 scene, u8 spawn) {
@@ -419,7 +445,7 @@ void Entrance_SetGameOverEntrance(void) {
 }
 
 // Properly savewarp the player accounting for dungeon entrance randomizer.
-void Entrance_SetSavewarpEntrance(void) {
+static void Entrance_SetSavewarpEntranceImpl(void) {
     s16 scene = gSaveContext.savedSceneNum;
 
     // When in a boss room and boss shuffle is on, use the boss scene to find the savewarp entrance
@@ -479,6 +505,17 @@ void Entrance_SetSavewarpEntrance(void) {
         // (ENTR_HYRULE_FIELD_10) has been repurposed to differentiate from Prelude which also uses 0x5F4
         gSaveContext.entranceIndex = Entrance_OverrideNextIndex(ENTR_HYRULE_FIELD_10);
     }
+}
+
+void Entrance_SetSavewarpEntrance(void) {
+    const s16 previous = gSaveContext.entranceIndex;
+    LUSLOG_INFO("[EntranceTrace] savewarp begin slot=%d savedScene=%d age=%d entrance=%#x respawn=%d "
+                "spawnShuffle=%d rememberLocation=%d",
+                gSaveContext.fileNum, gSaveContext.savedSceneNum, gSaveContext.linkAge, previous,
+                gSaveContext.respawnFlag, Randomizer_GetSettingValue(RSK_SHUFFLE_OVERWORLD_SPAWNS),
+                CVarGetInteger(CVAR_ENHANCEMENT("RememberSaveLocation"), 0));
+    Entrance_SetSavewarpEntranceImpl();
+    Entrance_TraceResolved("savewarp-final", previous, gSaveContext.entranceIndex, gSaveContext.entranceIndex);
 }
 
 void Entrance_SetWarpSongEntrance(void) {
