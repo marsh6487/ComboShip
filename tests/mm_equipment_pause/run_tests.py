@@ -176,7 +176,7 @@ void Kaleido_LoadMapNameStatic(void**, u32) {}
     sEquipCursorY=2; Publish(pause);
     check(pause->cursorItem[PAUSE_MASK] == PAUSE_ITEM_NONE, "unowned Cojiro stays unnamed");
     cojiroOwned=true; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
-    name_is(pause->nameSegment, "__OTR__textures/item_name_static/gCojiroItemNameENGTex", "owned Cojiro uses its own title");
+    name_is(pause->nameSegment, "__OTR__textures/item_name_custom/gCojiroNameTex", "owned Cojiro uses its own title");
     sEquipCursorY=1; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
     name_is(pause->nameSegment, "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex", "Cojiro to Pendant refreshes shared title ID");
     cojiroOwned=false;

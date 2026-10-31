@@ -260,7 +260,7 @@ static s16 KaleidoEquip_UpgradeNameItem(s16 row, s16 value) {
 // Kokiri Tunic cannot inherit the Cape/Champion label, nor a Deku Shield the Hero's Shield label.
 void* KaleidoEquip_GetNameTex(void) {
     if (sEquipCursorX == 0 && sEquipCursorY == 2 && Partners_CojiroOwned())
-        return KaleidoEquip_OotTex("__OTR__textures/item_name_static/gCojiroItemNameENGTex");
+        return (void*)"__OTR__textures/item_name_custom/gCojiroNameTex";
     static const char* sOotNames[4][3] = {
         { NULL, "__OTR__textures/item_name_static/gMasterSwordItemNameENGTex",
           "__OTR__textures/item_name_static/gBiggoronsSwordItemNameENGTex" },
