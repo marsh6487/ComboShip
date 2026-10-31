@@ -112,7 +112,9 @@ def main():
         pool_binding += "\n".join(function(constraints, name) for name in
                                   ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",
                                    "IsSongLocationItem")) + "\n"
-        pool_binding += function(source("mm/2s2h/Rando/Logic/GeneratePools.cpp"), "GeneratePools") + "\n}\n"
+        pools = source("mm/2s2h/Rando/Logic/GeneratePools.cpp")
+        pool_binding += function(pools, "EnsureCommandMelodyInPool") + "\n"
+        pool_binding += function(pools, "GeneratePools") + "\n}\n"
         pool_binding += bindings[bindings.index("struct Binding {"):bindings.index("// Only roots that differ")]
         pool_binding += function(bindings, "HasMmLegacyGiMod") + "\n"
         pool_binding += function(bindings, "GetSelectedOwnerGi") + "\n"
