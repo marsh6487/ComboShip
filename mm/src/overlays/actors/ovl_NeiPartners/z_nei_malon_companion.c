@@ -329,7 +329,7 @@ static void ControlledUpdate(Malon* self, PlayState* play) {
         f32 x = input->cur.stick_x, y = input->cur.stick_y;
         f32 magnitude = sqrtf(x * x + y * y);
         if (magnitude > 10) {
-            s16 yaw = self->cameraYaw + (s16)(atan2f(x, y) * (32768.0f / M_PI));
+            s16 yaw = self->cameraYaw + RAD_TO_BINANG(atan2f(x, y));
             Math_SmoothStepToS(&actor->world.rot.y, yaw, 2, 0x1800, 0x40);
             actor->shape.rot.y = actor->world.rot.y;
         }

@@ -292,7 +292,7 @@ static void UpdateActor(Actor* actor, PlayState* play) {
     if (self->controlled) {
         f32 x = self->input.cur.stick_x, y = self->input.cur.stick_y, m = sqrtf(x * x + y * y);
         if (m > 10) {
-            s16 yaw = self->cameraYaw + (s16)(atan2f(x, y) * 32768 / M_PI);
+            s16 yaw = self->cameraYaw + RAD_TO_BINANG(atan2f(x, y));
             Math_SmoothStepToS(&actor->world.rot.y, yaw, 2, 0x1800, 0x40);
         }
         actor->shape.rot.y = actor->world.rot.y;

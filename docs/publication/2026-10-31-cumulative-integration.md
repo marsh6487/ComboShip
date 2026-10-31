@@ -66,7 +66,7 @@ ROM type. Test classification now uses filenames, and quest-named directories
 exercise that boundary deterministically. No production extraction changes.
 All ROM-setup tests, including MQ-layout seed/save checks, now pass locally.
 
-- Partner/acquisition/title/packaging tests: 19 pass; encounter tests: 4 pass.
+- Partner/acquisition/title/packaging tests: 20 pass; encounter tests: 4 pass.
 - CI routing/failure-handling/workflow tests: 25 pass.
 - Stock generation: 4096 deterministic full-catalog inventories pass quotas,
   eligibility, pricing, validation and purchase checks.
@@ -123,8 +123,17 @@ successful earlier CI groups do not imply all groups or platform builds passed.
 Run `41243312462` on public `c30c52c5` passed the complete Linux build, both
 archive-generation targets, both seed smoke checks and AppImage packaging.
 Windows compile preflight passed; its full build also passed both archive targets,
-confirming the ZIP metadata repair on the actual Windows toolchain. Full Windows
-engine compilation was still running when this record was prepared.
+confirming the ZIP metadata repair on the actual Windows toolchain. OoT compiled
+and linked successfully. MM then failed with MSVC C2065 in the two native
+companion control yaw expressions: `M_PI` is not defined by this toolchain.
+The existing engine `RAD_TO_BINANG` conversion supplies the portable float
+constant and signed angle conversion. The follow-up fixes these two expressions
+and verifies that the added MM sources do not retain this dependency.
+Local `f79e21e28` reproduces the original missing-constant failures in a native
+header regression, then checks both real yaw expressions for cardinal, diagonal
+and wrapped camera directions with undefined-behavior/float-cast sanitizers.
+All 20 partner tests and both actor translation units' Solo/Combo syntax checks
+pass. Full Windows MM compilation remains required on the corrected source.
 
 Systems, equipment, rendering, world and entrances regression groups passed.
 Items reached the MM editor runner, whose extracted `GeneratePools` omitted the

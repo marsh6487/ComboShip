@@ -4,16 +4,46 @@ import subprocess
 import tempfile
 import unittest
 import sys
+import re
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import block_from
 
 class NativeControl(unittest.TestCase):
-    def compile_run(self,code):
+    def compile_run(self,code,extra_flags=()):
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/'test.cpp';p.write_text(code);exe=Path(t)/'test'
-            subprocess.run(['c++','-std=c++17',str(p),'-o',str(exe)],check=True)
+            subprocess.run(['c++','-std=c++17',*extra_flags,str(p),'-o',str(exe)],check=True)
             subprocess.run([str(exe)],check=True)
+
+    def test_mm_control_yaw_uses_portable_native_angle_conversion(self):
+        for actor in ('cojiro','malon'):
+            source=(ROOT/'mm/src/overlays/actors/ovl_NeiPartners'/f'z_nei_{actor}_companion.c').read_text()
+            yaw=re.search(r's16 yaw = self->cameraYaw \+ [^;]+;',source)[0]
+            with self.subTest(actor=actor):
+                self.compile_run(r'''
+#include <cassert>
+#include "libc/math.h"
+#include "z64math.h"
+// MSVC's C math header does not promise this nonstandard constant.
+#undef M_PI
+s16 Facing(f32 x,f32 y,s16 cameraYaw) {
+    struct State { s16 cameraYaw; } state{cameraYaw};
+    auto* self=&state;
+'''+yaw+r'''
+    return yaw;
+}
+int main(){
+    assert(Facing(0,60,0)==0);
+    assert(Facing(60,0,0)==0x4000);
+    assert(Facing(-60,0,0)==-0x4000);
+    assert(Facing(0,-60,0)==-0x8000);
+    assert(Facing(60,60,0)==0x2000);
+    assert(Facing(-60,60,0)==-0x2000);
+    assert(Facing(60,0,0x7000)==-0x5000);
+}
+''', ['-I'+str(ROOT/'mm/include'),'-I'+str(ROOT/'libultraship/include'),
+      '-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_filter_and_release_leave_pause_available(self):
         for game in ('soh','mm'):
