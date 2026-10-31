@@ -50,8 +50,8 @@ struct ConsoleVariables {
     std::optional<int> value;
     int GetInteger(const char* name, int fallback) {
         if (std::string_view(name) == "gEnhancements.IndexedTriangles") {
-            assert(fallback == 1);
-            return 1;
+            assert(fallback == 0);
+            return fallback;
         }
         assert(std::string_view(name) == "gEnhancements.PreludeMaterialBindingReuse" && fallback == 0);
         ++reads;

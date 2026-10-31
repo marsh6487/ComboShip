@@ -60,3 +60,13 @@ Native results:
 The screenshot overflow itself remains unreproduced in this source, so it is traced rather than declared repaired. MM Pictograph wheel identity is repaired; OoT's pre-existing correct resolver/selector invalidation is verified without a speculative rewrite. Native placeholder cubes remain placeholders when authored assets are missing. The private Fados archive case is skipped because that input was not supplied.
 
 CI metadata runs both complete control groups and the GI fallbacks/resource-owner checks using the existing pinned NEI dependency include path. Public GitHub upload remains blocked by automatic review pending explicit authorization for this new pass; full platform CI has not run for this candidate. No accepted source master or input archive was changed.
+
+## Authorized publication and indexed-rendering follow-up
+
+cor explicitly authorized publication of this source checkpoint, tracked GI assets, tests and CI changes on October 31, then requested indexed rendering be disabled by default with an opt-in checkbox. The NEI checkpoint was published as c043a85b26b8ce150c075bfb565119861fac7bc3 on fix/nei-item-regressions-20261031; its tree a40f9df5fafc79e87e6d9f284484b17d9772ca66 is byte-identical to local checkpoint 2d27f023. That resolves the earlier upload authorization block. No protected-branch merge or release is authorized by implication.
+
+The renderer's gEnhancements.IndexedTriangles fallback is now 0, matching its false initial field. Both native Settings > Graphics > Advanced Graphics Options menus expose Indexed Triangle Rendering (Experimental), default false. Combo inherits OoT's shared Graphics model and writes the same runtime CVar store. Absent settings in fresh and existing configurations stay off; explicit saved 1 remains an opt-in. No preference clearing or migration is performed.
+
+Production-function tests cover native/shared checkbox writes through the actual CVar bridge, both interpreter instances, default off, explicit on/off, unsupported backend and safe batch flush transitions. DX11/OpenGL native indexed/legacy submission and caustic binding regression checks pass with sanitization. Full application/GPU execution remains unverified.
+
+cor reports roughly 10 FPS in Kokiri, and separately reports poor performance persisting after removing two twin placements in the Link's House hub. Indexed submission did not improve that observed workload. Source inspection confirms CPU vertex transforms and lighting precede indexed submission; the dominant cost in the current reported scene is still unproven. This setting change is not represented as an NPC performance repair.

@@ -6840,7 +6840,7 @@ void Interpreter::RunGuiOnly() {
 
 void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_replacements) {
     SetIndexedTrianglesEnabled(Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
-        "gEnhancements.IndexedTriangles", 1) != 0);
+        "gEnhancements.IndexedTriangles", 0) != 0);
     mPreludeMaterialBindingReuseEnabled = Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger(
         "gEnhancements.PreludeMaterialBindingReuse", 0) != 0;
     std::fill(std::begin(mPreludeMaterialBoundResources), std::end(mPreludeMaterialBoundResources), nullptr);

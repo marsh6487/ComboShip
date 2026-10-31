@@ -823,6 +823,11 @@ void BenMenu::AddSettings() {
 
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "Advanced Graphics Options", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Indexed Triangle Rendering (Experimental)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.IndexedTriangles")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Experimental vertex reuse with indexed triangle rendering on Direct3D 11 and OpenGL. "
+            "Performance varies by scene and hardware. Disabled by default."));
 
     path.sidebarName = "Controls";
     AddSidebarEntry("Settings", "Controls", 1);

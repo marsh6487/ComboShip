@@ -1585,8 +1585,8 @@
   {
     "suite": "render",
     "origin": "gate",
-    "name": "Indexed triangle backend buffer submission",
-    "run": "python3 -B tests/indexed_triangles/run_backend_tests.py --sanitize"
+    "name": "Indexed triangle opt-in settings and backend buffer submission",
+    "run": "python3 -B tests/indexed_triangles/run_setting_tests.py --sanitize\npython3 -B tests/indexed_triangles/run_backend_tests.py --sanitize"
   },
   {
     "suite": "world",
