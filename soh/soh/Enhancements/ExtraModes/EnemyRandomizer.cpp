@@ -1,3 +1,4 @@
+#include "../../../../combo/encounters/NativeCustomEnemies.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <cmath>
@@ -309,6 +310,23 @@ static bool IsTimedRoom(bool mq, s16 sceneNum, s16 roomNum) {
 
 static bool IsEnemyAllowedToSpawn(s16 sceneNum, s16 roomNum, EnemyEntry enemy, f32 posY, bool fromBari) {
     bool mq = ResourceMgr_IsSceneMasterQuest(sceneNum);
+    int customKind = CustomEnemies_Kind(enemy.id);
+    if (customKind == 2 || customKind == 4) {
+        if (IsTimedRoom(mq, sceneNum, roomNum))
+            return false;
+        // Large fights need outdoor space. Do not place them in progression rooms.
+        switch (sceneNum) {
+            case SCENE_HYRULE_FIELD:
+            case SCENE_LAKE_HYLIA:
+            case SCENE_GERUDO_VALLEY:
+            case SCENE_DESERT_COLOSSUS:
+            case SCENE_HAUNTED_WASTELAND:
+            case SCENE_DEATH_MOUNTAIN_TRAIL:
+                break;
+            default:
+                return false;
+        }
+    }
 
     if (IsExcludedFromClearRooms(enemy.id, enemy.params) && IsClearRoom(mq, sceneNum, roomNum)) {
         return false;
@@ -387,7 +405,7 @@ static void UpdateSelectedEnemies() {
     }
 }
 
-static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, f32 posY, bool fromBari) {
+static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, f32 posX, f32 posY, f32 posZ, bool fromBari) {
     std::vector<EnemyEntry> filteredEnemyList = {};
 
     if (selectedEnemyList.size() == 0) {
@@ -402,6 +420,18 @@ static EnemyEntry GetRandomizedEnemyEntry(u32 seed, PlayState* play, f32 posY, b
 
     if (filteredEnemyList.size() == 0) {
         filteredEnemyList = selectedEnemyList;
+    }
+    if (CVarGetInteger("gEnhancements.CustomEnemies.Randomizer", 0)) {
+        const char* keys[] = { "gEnhancements.CustomEnemies.Miniblin", "gEnhancements.CustomEnemies.Molmauk",
+                               "gEnhancements.CustomEnemies.Beetle", "gEnhancements.CustomEnemies.Lynel" };
+        for (int kind = 1; kind <= 4; ++kind)
+            if (CVarGetInteger(keys[kind - 1], 1)) {
+                int id = CustomEnemies_Id(kind);
+                EnemyEntry enemy = { keys[kind - 1], "Custom Enemy", static_cast<s16>(id), 0 };
+                if (id >= 0 && CustomEnemies_CanSpawn(play, kind, posX, posY, posZ) &&
+                    IsEnemyAllowedToSpawn(play->sceneNum, play->roomCtx.curRoom.num, enemy, posY, fromBari))
+                    filteredEnemyList.push_back(enemy);
+            }
     }
 
     if (CVAR_ENEMY_RANDOMIZER_VALUE == ENEMY_RANDOMIZER_RANDOM_SEEDED) {
@@ -594,7 +624,7 @@ static u8 GetRandomizedEnemy(PlayState* play, s16* actorId, f32* posX, f32* posY
         u32 seed = static_cast<u32>(play->sceneNum) + *actorId + EnemyRando_SeedCoordinate(*posX) +
                    EnemyRando_SeedCoordinate(*posY) + EnemyRando_SeedCoordinate(*posZ) + *rotX + *rotY + *rotZ +
                    *params + offset;
-        EnemyEntry randomEnemy = GetRandomizedEnemyEntry(seed, play, *posY, fromBari);
+        EnemyEntry randomEnemy = GetRandomizedEnemyEntry(seed, play, *posX, *posY, *posZ, fromBari);
 
         *actorId = randomEnemy.id;
         *params = randomEnemy.params;

@@ -620,6 +620,7 @@ void ExtractShared(nlohmann::json& sh) {
     // OR-merging a toggle would make it impossible to turn off). ExtEquip_PendantOwned() is called
     // rather than read raw so the adult-trade-slot grant latches before we publish.
     sh["capeOwned"] = ExtEquip_CapeOwned() != 0;
+    sh["cojiroPartnerOwned"] = Nei_Save()->cojiroPartnerOwned != 0;
     sh["pendantOwned"] = ExtEquip_PendantOwned() != 0;
     // Sword flags: kokiri chain is native; master/bgs base ownership rides the registry.
     int swordNibble = MM_EQ.equipment & 0xF; // 1 kokiri, 2 razor, 3 gilded, 4 deity
@@ -886,6 +887,8 @@ void ApplyShared(const nlohmann::json& sh) {
         SetEquippedShieldCanonical(sh["equippedShield"].get<int>());
     }
     // Upgrade-column equipment — additive, never cleared (mirror of the extract side above).
+    if (sh.value("cojiroPartnerOwned", false))
+        Nei_Save()->cojiroPartnerOwned = 1;
     if (sh.value("capeOwned", false)) {
         ExtEquip_GiveCape();
     }

@@ -13,7 +13,8 @@ from run_mm_weather_tests import production_function
 
 with tempfile.TemporaryDirectory(prefix="seasons-mode-pool-") as td:
     build = Path(td)
-    generator = functions((ROOT / "mm/2s2h/Rando/Logic/GeneratePools.cpp").read_text())["GeneratePools"]
+    pool_functions = functions((ROOT / "mm/2s2h/Rando/Logic/GeneratePools.cpp").read_text())
+    generator = pool_functions["EnsureCommandMelodyInPool"] + "\n" + pool_functions["GeneratePools"]
     constraints = functions((ROOT / "mm/2s2h/Rando/Logic/PlacementConstraints.cpp").read_text())
     helpers = "\n".join(constraints[name] for name in
                         ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",

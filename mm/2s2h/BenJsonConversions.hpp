@@ -126,6 +126,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "capeHidden", n.capeHidden },
         { "pendantEffectOff", n.pendantEffectOff },
         { "capeOwned", n.capeOwned },
+        { "cojiroPartnerOwned", n.cojiroPartnerOwned },
+        { "cojiroPartnerDismissed", n.cojiroPartnerDismissed },
         { "extTunicLayoutVersion", n.extTunicLayoutVersion },
         // Time Gate "adult mode" (Skijer's NEI): OoT adult Link model + collider toggle.
         { "timeGateAdultMode", n.timeGateAdultMode },
@@ -265,6 +267,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.capeHidden = j.value("capeHidden", (uint8_t)0);
     n.pendantEffectOff = j.value("pendantEffectOff", (uint8_t)0);
     n.capeOwned = j.value("capeOwned", (uint8_t)0);
+    n.cojiroPartnerOwned = j.value("cojiroPartnerOwned", (uint8_t)0);
+    n.cojiroPartnerDismissed = j.value("cojiroPartnerDismissed", (uint8_t)0);
     n.extTunicLayoutVersion = j.value("extTunicLayoutVersion", (uint8_t)0);
     // Time Gate "adult mode" — absent key = child (vanilla) model.
     n.timeGateAdultMode = j.value("timeGateAdultMode", (uint8_t)0);

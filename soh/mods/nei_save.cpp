@@ -281,6 +281,8 @@ void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) 
     SaveManager::Instance->SaveData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned);
     SaveManager::Instance->SaveData("timeGateOwned", gNeiSave.timeGateOwned);
     SaveManager::Instance->SaveData("magicMirrorOwned", gNeiSave.magicMirrorOwned);
+    SaveManager::Instance->SaveData("cojiroPartnerOwned", gNeiSave.cojiroPartnerOwned);
+    SaveManager::Instance->SaveData("cojiroPartnerDismissed", gNeiSave.cojiroPartnerDismissed);
     SaveManager::Instance->SaveData("shovelOwned", gNeiSave.shovelOwned);
     SaveManager::Instance->SaveData("dominionOwned", gNeiSave.dominionOwned);
     SaveManager::Instance->SaveData("pokeballOwned", gNeiSave.pokeballOwned);
@@ -394,6 +396,8 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("timeGateOwned", gNeiSave.timeGateOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("magicMirrorOwned", gNeiSave.magicMirrorOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("cojiroPartnerOwned", gNeiSave.cojiroPartnerOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("cojiroPartnerDismissed", gNeiSave.cojiroPartnerDismissed, (uint8_t)0);
     SaveManager::Instance->LoadData("shovelOwned", gNeiSave.shovelOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("dominionOwned", gNeiSave.dominionOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("pokeballOwned", gNeiSave.pokeballOwned, (uint8_t)0);

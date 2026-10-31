@@ -1,3 +1,4 @@
+#include "mods/partners/Partners.h"
 #include "prevent_bss_reordering.h"
 #include "global.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
@@ -4370,6 +4371,8 @@ void Message_SpawnSongEffect(PlayState* play) {
                     player->actor.world.pos.z, 0, 0, 0, 0);
         return;
     }
+    if (msgCtx->songPlayed == OCARINA_SONG_NEI_COMMAND_MELODY)
+        Partners_SongRecognized();
     // Skijer's NEI: custom songs (slots 30-32) — their own ring effect, param = which song
     // (0 Fugue amber, 1 Command magenta, 2 Ballad gold).
     if ((msgCtx->songPlayed >= OCARINA_SONG_NEI_CUSTOM_FIRST) && (msgCtx->songPlayed <= OCARINA_SONG_NEI_CUSTOM_LAST)) {

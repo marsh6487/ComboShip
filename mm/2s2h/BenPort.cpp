@@ -1,3 +1,4 @@
+extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
 #include "../../combo/emotes/EmoteBridge.h"
@@ -3697,6 +3698,7 @@ extern "C" void OTRMessage_ResetForResume(void);
 // ComboShip: OOT->MM forward transition. Stop MM audio without destroying the shared
 // context/window/resource-manager (OOT reuses them). Mirrors SOH_PrepareForTransition.
 extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
+    Partners_Reset(); // Release partner camera/input before the owning game becomes dormant.
     ComboEmotes_Reset();
     ItemGrantAudit::Scope itemGrantAuditScope("MM_PrepareForTransition");
     SaveManager_ThreadPoolWait();

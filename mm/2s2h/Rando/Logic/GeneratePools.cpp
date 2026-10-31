@@ -1,3 +1,4 @@
+#include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -18,6 +19,13 @@ extern "C" int gMMComboGoalPieces;
 namespace Rando {
 
 namespace Logic {
+
+// A combo swap or the OoT quest option may have supplied this already.
+// Always shuffle exactly one, even with unrelated custom-item options disabled.
+static void EnsureCommandMelodyInPool(std::vector<RandoItemId>& itemPool) {
+    if (std::find(itemPool.begin(), itemPool.end(), RI_OOT_SONG_COMMAND_MELODY) == itemPool.end())
+        itemPool.push_back(RI_OOT_SONG_COMMAND_MELODY);
+}
 
 void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool) {
 #ifdef COMBO_BUILD
@@ -525,6 +533,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 
+    // Add before starting-inventory subtraction so a requested starting song
+    // consumes its normal supply rather than being silently re-added afterward.
+    EnsureCommandMelodyInPool(itemPool);
+
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
         auto it = std::find(itemPool.begin(), itemPool.end(), startingItem);
@@ -560,8 +572,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         std::vector<RandoItemId> plentifulItems;
         for (size_t i = 0; i < itemPool.size(); i++) {
             // The user can specify exactly how many pieces they want to shuffle, so skip those
-            if (itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR) {
-                continue; // One physical Mirror in every density, including Plentiful.
+            if (itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR || itemPool[i] == RI_OOT_SONG_COMMAND_MELODY) {
+                continue; // One physical Mirror / Command Melody in every density.
             }
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;

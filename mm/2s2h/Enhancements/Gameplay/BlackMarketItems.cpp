@@ -20,6 +20,8 @@ bool Owned(const ComboRando::BlackMarket::Item& item) {
     const auto id = Id(item);
     const auto* nei = Nei_Save();
     switch (id) {
+        case RI_OOT_SONG_COMMAND_MELODY:
+            return (nei->ootQuestItems & (1u << OOT_QUEST_SONG_COMMAND_MELODY)) != 0;
         case RI_OOT_NEI_SHOVEL:
             return nei->shovelOwned;
         case RI_OOT_NEI_DOMINION_ROD:

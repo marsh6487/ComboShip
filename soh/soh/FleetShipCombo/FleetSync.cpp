@@ -476,6 +476,7 @@ void ExtractShared(nlohmann::json& sh) {
     // OR-merging a toggle would make it impossible to turn off). ExtEquip_PendantOwned() is called
     // rather than read raw so the adult-trade-slot grant latches before we publish.
     sh["capeOwned"] = ExtEquip_CapeOwned() != 0;
+    sh["cojiroPartnerOwned"] = Nei_Save()->cojiroPartnerOwned != 0;
     sh["pendantOwned"] = ExtEquip_PendantOwned() != 0;
     uint16_t equip = gSaveContext.inventory.equipment;
     sh["swordFlags"] = { { "kokiri", (equip & (1 << 0)) != 0 },
@@ -702,6 +703,8 @@ void ApplyShared(const nlohmann::json& sh) {
         SetEquippedShieldCanonical(sh["equippedShield"].get<int>());
     }
     // Upgrade-column equipment — additive, never cleared (mirror of the extract side above).
+    if (sh.value("cojiroPartnerOwned", false))
+        Nei_Save()->cojiroPartnerOwned = 1;
     if (sh.value("capeOwned", false)) {
         ExtEquip_GiveCape();
     }
@@ -2108,6 +2111,7 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.trirodEchoesLo", nei->trirodEchoesLo);
     snapshot.Add("nei.trirodEchoesHi", nei->trirodEchoesHi);
     snapshot.Add("nei.ritoMaskFlags", nei->ritoMaskFlags);
+    snapshot.Add("nei.cojiroPartnerOwned", nei->cojiroPartnerOwned);
     return snapshot;
 }
 static void ItemGrantAuditLog(const std::string& record) {

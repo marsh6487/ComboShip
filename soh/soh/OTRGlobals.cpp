@@ -1,3 +1,4 @@
+extern "C" void Partners_Reset(void);
 // This module accesses GameState::main and owns no SDL entry point.
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
@@ -2620,6 +2621,7 @@ extern "C" void DeinitOTR() {
 // own line BEFORE `extern "C"`) is silently ignored by MSVC (C4091), so this function would not be
 // exported and the MM boot gate would fail.
 extern "C" COMBO_EXPORT void SOH_PrepareForTransition(void) {
+    Partners_Reset(); // Release partner camera/input before the owning game becomes dormant.
     ComboEmotes_Reset();
     ItemGrantAudit::Scope itemGrantAuditScope("SOH_PrepareForTransition");
     SaveManager_ThreadPoolWait();

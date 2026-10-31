@@ -1,3 +1,4 @@
+#include "mods/partners/Partners.h"
 /*
  * File: z_kaleido_equipment.c
  * Overlay: ovl_kaleido_scope
@@ -217,6 +218,8 @@ static s16 KaleidoEquip_UpgradeValue(s16 row) {
             return ExtEquip_CapeOwned();
         case 1:
             return ExtEquip_PendantOwned();
+        case 2:
+            return Partners_CojiroOwned();
     }
     return 0;
 }
@@ -231,6 +234,8 @@ static void* KaleidoEquip_UpgradeIcon(s16 row, s16 value) {
             return ExtEquip_GetCapeIcon();
         case 1:
             return ExtEquip_GetPendantIcon();
+        case 2:
+            return KaleidoEquip_OotTex("__OTR__textures/icon_item_static/gItemIconCojiroTex");
     }
     return NULL;
 }
@@ -246,12 +251,16 @@ static s16 KaleidoEquip_UpgradeNameItem(s16 row, s16 value) {
     if (row == 1) {
         return ITEM_EXT_BOOTS_2;
     }
+    if (row == 2 && Partners_CojiroOwned())
+        return ITEM_EXT_BOOTS_2; // name texture provided by the Cojiro cell resolver
     return -1;
 }
 
 // Vanilla OoT equipment reuses MM/ext ids for fallback icons. Select its title by cell so a
 // Kokiri Tunic cannot inherit the Cape/Champion label, nor a Deku Shield the Hero's Shield label.
 void* KaleidoEquip_GetNameTex(void) {
+    if (sEquipCursorX == 0 && sEquipCursorY == 2 && Partners_CojiroOwned())
+        return KaleidoEquip_OotTex("__OTR__textures/item_name_static/gCojiroItemNameENGTex");
     static const char* sOotNames[4][3] = {
         { NULL, "__OTR__textures/item_name_static/gMasterSwordItemNameENGTex",
           "__OTR__textures/item_name_static/gBiggoronsSwordItemNameENGTex" },
@@ -1020,6 +1029,9 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
                 } else if ((sEquipCursorY == 1) && ExtEquip_PendantOwned()) {
                     ExtEquip_TogglePendantEffect();
                     Audio_PlaySfx(NA_SE_SY_DECIDE);
+                } else if ((sEquipCursorY == 2) && Partners_CojiroOwned()) {
+                    Partners_ToggleCojiro();
+                    Audio_PlaySfx(NA_SE_SY_DECIDE);
                 } else {
                     Audio_PlaySfx(NA_SE_SY_ERROR);
                 }
@@ -1316,6 +1328,8 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             // dims when its moveset is off.
             if (row == 1) {
                 upgAlpha = ExtEquip_PendantActive() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
+            } else if (row == 2) {
+                upgAlpha = Partners_CojiroEnabled() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
             } else {
                 upgAlpha = pauseCtx->alpha;
             }

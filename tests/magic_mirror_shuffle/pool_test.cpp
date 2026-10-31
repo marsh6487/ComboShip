@@ -7,6 +7,7 @@ extern "C" {
 int gComboGameMode = COMBO_GAME_MM;
 int gMMComboGoalHunt = 0, gMMComboGoalRequired = 0, gMMComboGoalPieces = -1;
 int requestMirror = 0;
+bool startWithMelody = false;
 s32 Ship_Random(s32 min, s32) { return min; }
 int FleetCombo_UnifiedPoolActive() { return 0; }
 int32_t CVarGetInteger(const char *key, int32_t fallback) {
@@ -17,7 +18,7 @@ int32_t CVarGetInteger(const char *key, int32_t fallback) {
 }
 namespace Rando {
 std::vector<RandoItemId> GetStartingItemsFromSave(RandoSaveInfo &) {
-  return {};
+  return startWithMelody ? std::vector<RandoItemId>{RI_OOT_SONG_COMMAND_MELODY} : std::vector<RandoItemId>{};
 }
 std::vector<RandoItemId> GetComputedStartingItems(RandoSaveInfo &) {
   return {};
@@ -42,21 +43,27 @@ int main() {
       0,
       RI_OOT_NEI_MAGIC_MIRROR};
   StaticData::Items[RI_OOT_NEI_MAGIC_MIRROR].randoItemType = RITYPE_MAJOR;
+  StaticData::Items[RI_OOT_SONG_COMMAND_MELODY].randoItemType = RITYPE_MAJOR;
   // Native room entrance; combined also relays the actual OoT Lost Woods route.
   Logic::Regions[RR_WOODS_OF_MYSTERY]
       .checks[RC_LOST_WOODS_MAGIC_MIRROR_STUMP] = {[] { return true; }, "true"};
   for (int mode : {COMBO_GAME_MM, COMBO_GAME_BOTH}) {
     gComboGameMode = mode;
     for (int nei : {0, 1})
-      for (int plentiful : {0, 1}) {
+      for (int quest : {0, 1})
+      for (int plentiful : {0, 1})
+      for (bool startingSong : {false, true}) {
+        startWithMelody = startingSong;
         requestMirror = 0;
         auto control = std::make_unique<RandoSaveInfo>();
         control->randoSaveOptions[RO_STARTING_HEALTH] = 3;
         control->randoSaveOptions[RO_SHUFFLE_NEI_ITEMS] = nei;
+        control->randoSaveOptions[RO_SHUFFLE_OOT_QUEST] = quest;
         control->randoSaveOptions[RO_PLENTIFUL_ITEMS] = plentiful;
         std::vector<RandoCheckId> offChecks;
         std::vector<RandoItemId> offItems;
         Logic::GeneratePools(*control, offChecks, offItems);
+        REQUIRE(std::count(offItems.begin(), offItems.end(), RI_OOT_SONG_COMMAND_MELODY) == !startingSong);
         REQUIRE(std::count(offChecks.begin(), offChecks.end(),
                            RC_LOST_WOODS_MAGIC_MIRROR_STUMP) == 0);
         REQUIRE(std::count(offItems.begin(), offItems.end(),
@@ -69,6 +76,7 @@ int main() {
             std::vector<RandoCheckId> checks;
             std::vector<RandoItemId> items;
             Logic::GeneratePools(*save, checks, items);
+            REQUIRE(std::count(items.begin(), items.end(), RI_OOT_SONG_COMMAND_MELODY) == !startingSong);
             const bool enabled = option || (mode == COMBO_GAME_BOTH && request);
             REQUIRE(save->randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] == enabled);
             REQUIRE(std::count(checks.begin(), checks.end(),

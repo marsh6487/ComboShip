@@ -759,3 +759,8 @@
 // Skijer's NEI Four Sword: one clone per formation slot. Authored in
 // mm/mods/equipment/actors/four_sword_clone.c, unity-#included by extended_equipment.c (a C TU).
 /* 0x2C6 */ DEFINE_ACTOR(         FourSwordClone,      ACTOR_NEI_FOUR_SWORD_CLONE, ALLOCTYPE_NORMAL,   "FourSwordClone",      "Four Sword formation clone")
+
+/* 0x2C7 */ DEFINE_ACTOR(EnNeiMalonPartner, ACTOR_EN_NEI_MALON_PARTNER, ALLOCTYPE_NORMAL, "EnNeiMalonPartner", "Malon companion")
+/* 0x2C8 */ DEFINE_ACTOR(EnNeiCojiroPartner, ACTOR_EN_NEI_COJIRO_PARTNER, ALLOCTYPE_NORMAL, "EnNeiCojiroPartner", "Cojiro companion")
+
+/* 0x2C9 */ DEFINE_ACTOR(EnNeiLynel, ACTOR_EN_NEI_LYNEL, ALLOCTYPE_NORMAL, "EnNeiLynel", "Red-maned Lynel miniboss")

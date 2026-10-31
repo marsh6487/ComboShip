@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix="mm-grace-pool-") as temporary:
                         ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",
                          "IsSongLocationItem"))
     (build / "pool.inc").write_text("namespace Rando::Logic {\n" + helpers + "\n" +
-                                  functions(source)["GeneratePools"] + "\n}")
+                                  functions(source)["EnsureCommandMelodyInPool"] + "\n" + functions(source)["GeneratePools"] + "\n}")
     binary = build / "pool"
     # Ubuntu's spdlog uses external fmt. This standalone harness does not link
     # the game's library targets, so compile fmt inline as the save harness does.

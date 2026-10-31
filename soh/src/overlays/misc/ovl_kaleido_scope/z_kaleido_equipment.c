@@ -1,3 +1,4 @@
+#include "mods/partners/Partners.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "z_kaleido_scope.h"
 #include "sword_element.h"
@@ -27,6 +28,8 @@ static s32 KaleidoEquip_UpgradeCellAvailable(s16 cursorY) {
     if (cursorY == 1) {
         return ExtEquip_PendantOwned();
     }
+    if (cursorY == 2)
+        return Partners_CojiroOwned();
     return false;
 }
 
@@ -838,6 +841,8 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 cursorItem = ITEM_EXT_TUNIC_1;
             } else if (pauseCtx->cursorY[PAUSE_EQUIP] == 1 && ExtEquip_PendantOwned()) {
                 cursorItem = ITEM_EXT_BOOTS_2;
+            } else if (pauseCtx->cursorY[PAUSE_EQUIP] == 2 && Partners_CojiroOwned()) {
+                cursorItem = ITEM_COJIRO;
             } else {
                 // Unowned passives and empty slots have no name.
                 cursorItem = PAUSE_ITEM_NONE;
@@ -901,6 +906,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 upgradeToggled = true;
             } else if ((pauseCtx->cursorY[PAUSE_EQUIP] == 1) && ExtEquip_PendantOwned()) {
                 ExtEquip_TogglePendantEffect();
+                upgradeToggled = true;
+            } else if ((pauseCtx->cursorY[PAUSE_EQUIP] == 2) && Partners_CojiroOwned()) {
+                Partners_ToggleCojiro();
                 upgradeToggled = true;
             }
 
@@ -1095,14 +1103,16 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
 
     for (rowStart = 0, j = 0, temp = 0, i = 0; i < 4; i++, rowStart += 4, j += 16) {
         gSPVertex(POLY_OPA_DISP++, &pauseCtx->equipVtx[j], 16, 0);
-        if (i == 0 || i == 1) {
+        if (i == 0 || i == 1 || i == 2) {
             // Upgrade rows 0/1 = Magic Cape / Pendant of Memories. The owned Cape's passive stays
             // active when its cloth is hidden; only the Pendant dims when its moveset is off.
-            u8 upgOwned = (i == 0) ? ExtEquip_CapeOwned() : ExtEquip_PendantOwned();
+            u8 upgOwned = (i == 0) ? ExtEquip_CapeOwned() : (i == 1) ? ExtEquip_PendantOwned() : Partners_CojiroOwned();
 
             if (upgOwned) {
-                u8 upgOn = (i == 0) || ExtEquip_PendantActive();
-                void* upgIcon = (i == 0) ? ExtEquip_GetCapeIcon() : ExtEquip_GetPendantIcon();
+                u8 upgOn = (i == 0) || ((i == 1) ? ExtEquip_PendantActive() : Partners_CojiroEnabled());
+                void* upgIcon = (i == 0)   ? ExtEquip_GetCapeIcon()
+                                : (i == 1) ? ExtEquip_GetPendantIcon()
+                                           : (void*)gItemIconCojiroTex;
 
                 if (upgIcon != NULL) {
                     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,

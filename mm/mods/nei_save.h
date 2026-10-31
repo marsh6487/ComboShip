@@ -335,6 +335,8 @@ typedef struct NeiSaveData {
     // Independent travel tools sharing cell 31. Append to preserve existing save offsets.
     uint8_t timeGateOwned;
     uint8_t magicMirrorOwned;
+    uint8_t cojiroPartnerOwned;     // additive companion ownership; never consumes the trade item
+    uint8_t cojiroPartnerDismissed; // pause equipment summon toggle; defaults to called when unlocked
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

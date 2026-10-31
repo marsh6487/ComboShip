@@ -63,6 +63,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState*, GetItemEntry entry) {
     if (entry.getItemId == RG_LANTERN) nei.ownedItems[SLOT_LANTERN - 24] = ITEM_LANTERN;
     if (entry.getItemId == RG_SHOVEL) nei.ownedItems[SLOT_SHOVEL - 24] = ITEM_SHOVEL;
     if (entry.getItemId == RG_DOMINION_ROD) nei.ownedItems[SLOT_SHOVEL - 24] = ITEM_DOMINION_ROD;
+    if (entry.getItemId == RG_NEI_SONG_COMMAND_MELODY) nei.mmQuestItems |= (1u << 12);
     return 0;
 }
 /* PRODUCTION */
@@ -76,6 +77,13 @@ int main() {
         if (Eligible(item, Games::Oot)) assert(Id(item) != RG_NONE);
         else assert(Id(item) == RG_NONE && !Available(item));
     }
+    Reset();
+    const auto* melody = Find("wildcard.command_melody");
+    assert(melody && Id(*melody) == RG_NEI_SONG_COMMAND_MELODY);
+    assert(Available(*melody) && !Owned(*melody));
+    assert(Grant(*melody) && Owned(*melody) && nativeGrants == 1);
+    assert(lastNative == RG_NEI_SONG_COMMAND_MELODY && !Grant(*melody));
+    assert(nativeGrants == 1);
     static constexpr const char* cane[] = { "nei.cane.statues", "nei.cane.blocks", "nei.cane.trirod",
         "nei.cane.flip", "nei.cane.lift", "nei.cane.ultrahand" };
     for (u8 skill = 0; skill < 6; ++skill) {
