@@ -84,6 +84,22 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
         play->sceneNum = sceneId;
         std::string scenePath = scene.valid ? SceneDB::Instance->GetScenePath(sceneId) : "";
         play->sceneSegment = scene.valid ? OTRPlay_LoadFile(play, scenePath.c_str()) : nullptr;
+        if (play->sceneSegment == nullptr && scene.valid && scenePath.ends_with("/scene.json")) {
+            // Keep the requested world and positioned return when its JSON header cannot load.
+            // The registry returns no native path for custom scenes. Never retry a failing native
+            // override under a different name or change a dungeon's MQ layout during recovery.
+            const auto nativePath = SceneDB::Instance->GetLegacyScenePath(sceneId, ResourceMgr_IsGameMasterQuest());
+            if (!nativePath.empty()) {
+                LUSLOG_ERROR("[SceneSpawn] JSON unavailable scene=%d path='%s'; retry same scene native='%s'", sceneId,
+                             scenePath.c_str(), nativePath.c_str());
+                play->sceneSegment = OTRPlay_LoadFile(play, nativePath.c_str());
+                if (play->sceneSegment != nullptr) {
+                    scenePath = nativePath;
+                    LUSLOG_INFO("[SceneSpawn] native recovery scene=%d entrance=%#x respawn=%d", sceneId,
+                                gSaveContext.entranceIndex, gSaveContext.respawnFlag);
+                }
+            }
+        }
         if (play->sceneSegment != nullptr) {
             play->sceneNum = sceneId;
             play->sceneConfig = scene.drawConfig < SDC_MAX ? scene.drawConfig : SDC_DEFAULT;

@@ -36,6 +36,13 @@ jobs:
         id: route
         run: python3 -B scripts/ci/route_changes.py
 
+      - name: Verify spawn recovery and entrance routing
+        run: |
+          python3 -B tests/spawn_recovery/test_spawn.py
+          python3 -B tests/spawn_recovery/test_room.py
+          python3 -B tests/spawn_recovery/test_entrance.py
+          python3 -B tests/spawn_recovery/test_scene_paths.py
+
       - name: Scan for conflict markers
         shell: bash
         run: |

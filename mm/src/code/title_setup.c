@@ -7,7 +7,6 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "gameplay/CrossGameTitleCard.h"
-#include <libultraship/luslog.h>
 extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
 extern int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void);
@@ -152,11 +151,6 @@ void Setup_InitImpl(SetupState* this) {
             gSaveContext.save.cutsceneIndex = 0;
         }
         s32 crossFwArrival = ComboFw_ApplyArrival(); // Explicit recall wins over ordinary save recovery.
-        LUSLOG_INFO("[EntranceTrace] mm-title-final slot=%d resume=%d arrival=%#x recovery=%#x bossRecovery=%#x "
-                    "farore=%d entrance=%#x cutscene=%#x nextCutscene=%#x respawn=%d day=%d",
-                    gSaveContext.fileNum, gComboEntryIsResume, crossDungeonArrival, crossDungeonRecovery,
-                    crossBossRecovery, crossFwArrival, gSaveContext.save.entrance, gSaveContext.save.cutsceneIndex,
-                    gSaveContext.nextCutsceneIndex, gSaveContext.respawnFlag, gSaveContext.save.day);
         // File select normally initializes showTitleCard. A crossing bypasses
         // it, and may land at a positioned/shuffled entrance without a card bit.
         // Ordinary save resumes keep the native rules, including saved recovery.

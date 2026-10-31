@@ -11,6 +11,9 @@ grotto=(ROOT/'soh/soh/Enhancements/randomizer/randomizer_grotto.c').read_text()
 grotto=grotto[grotto.index('static const GrottoLoadInfo'):]
 runtime=(ROOT/'combo/rando/CrossDungeonOotRuntime.inc.h').read_text()
 runtime=runtime[runtime.index('namespace ComboCrossOotRuntime {'):runtime.index('extern "C" void Combo_SOH_AfterNativeLoadGame')]
+native=(ROOT/'soh/soh/Enhancements/randomizer/randomizer_entrance.c').read_text()
+trace = (native[native.index('static s16 Entrance_TraceResolved('):native.index('\ns16 Entrance_OverrideNextIndex(')]
+         if 'static s16 Entrance_TraceResolved(' in native else '')
 source=r'''
 #include "ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
@@ -27,6 +30,8 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #endif
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
+#undef LUSLOG_INFO
+#define LUSLOG_INFO(...) ((void)0)
 SaveContext gSaveContext{};
 static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
 EntranceInfo* gEntranceTable = sFixtureEntranceTable;
@@ -42,7 +47,7 @@ extern "C" int32_t Combo_SOH_GrottoScene(int32_t);
 extern "C" int32_t Combo_SOH_CrossDungeonGrottoId(void);
 static bool gComboSceneSwitchCallback=true;
 void* Combo_ResolveSym(const char*,const char*) { return nullptr; }
-'''+grotto+'\n'+runtime+r'''
+'''+grotto+'\n'+runtime+'\n'+trace+r'''
 using namespace ComboRando::CrossDungeon;
 using namespace ComboCrossOotRuntime;
 int main() {
