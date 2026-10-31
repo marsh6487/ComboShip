@@ -25,6 +25,16 @@ static bool ValidEntrance(int32_t index) {
 static int32_t Materialize(int32_t index) {
     return Grotto_OverrideSpecialEntrance(static_cast<int16_t>(index));
 }
+static int32_t MaterializeArrival(int32_t index) {
+    // Native load hooks may have positioned a different savewarp before this queued arrival wins.
+    // Start the winning arrival clean; grotto destinations then install their own room/position.
+    const int previousRespawn = gSaveContext.respawnFlag;
+    gSaveContext.respawnFlag = 0;
+    const int32_t materialized = Materialize(index);
+    SPDLOG_INFO("[EntranceTrace] oot-materialize-arrival logical={:#x} materialized={:#x} respawn={}->{}", index,
+                materialized, previousRespawn, gSaveContext.respawnFlag);
+    return materialized;
+}
 static bool SceneMatchesEntrance(int32_t index, int scene) {
     if (index >= ENTRANCE_GROTTO_LOAD_START)
         return Combo_SOH_GrottoScene(index) == scene;
@@ -213,7 +223,7 @@ extern "C" int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void) {
         return -1;
     checkpoint.Arrive(recovery->parent.index, true);
     localDungeonArrival = localArrivalCheckpoint = -1;
-    return Materialize(recovery->parent.index);
+    return MaterializeArrival(recovery->parent.index);
 }
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
     if (!Combo_IsCombinedGame())
@@ -224,7 +234,7 @@ extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
         ComboCrossOotRuntime::checkpoint.Arrive(recovery, recovery >= 0);
         ComboCrossOotRuntime::localDungeonArrival = ComboCrossOotRuntime::localArrivalCheckpoint = -1;
     }
-    const int32_t materialized = index < 0 ? -1 : ComboCrossOotRuntime::Materialize(index);
+    const int32_t materialized = index < 0 ? -1 : ComboCrossOotRuntime::MaterializeArrival(index);
     SPDLOG_INFO("[EntranceTrace] oot-consume-arrival logical={:#x} materialized={:#x} respawn={} checkpoint={:#x}",
                 index, materialized, gSaveContext.respawnFlag, ComboCrossOotRuntime::checkpoint.Saved());
     return materialized;
@@ -275,7 +285,7 @@ extern "C" int32_t Combo_SOH_ConsumeCrossDungeonRecovery(void) {
     if (index < 0)
         return -1;
     const int32_t bossRecovery = RecoverBoss(index);
-    return Materialize(bossRecovery >= 0 ? bossRecovery : index);
+    return MaterializeArrival(bossRecovery >= 0 ? bossRecovery : index);
 }
 
 extern "C" void Combo_SOH_BeforeNativeLoadGame(void) {

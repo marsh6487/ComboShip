@@ -156,6 +156,32 @@ int main() {
     Combo_SOH_LoadCrossDungeonCheckpoint(123);
     assert(Combo_SOH_ConsumeCrossDungeonRecovery()==123);
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==123);
+    // Load hooks can materialize an unrelated savewarp before the queued peer arrival wins.
+    Dungeon dc{"dc",{0,ENTR_DODONGOS_CAVERN_ENTRANCE},{0,ENTR_DEATH_MOUNTAIN_TRAIL_OUTSIDE_DODONGOS_CAVERN},
+               {0,ENTR_DEATH_MOUNTAIN_TRAIL_OUTSIDE_DODONGOS_CAVERN}};
+    Dungeon ist{"ist",{1,0xAC00},{1,0xAC10},{1,0xAC10}};
+    seed=Encode({dc,ist},{1,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    gSaveContext.respawnFlag=2;
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.y=721;
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex=1;
+    assert(SOH_QueueCrossDungeonArrival(ENTR_DODONGOS_CAVERN_ENTRANCE));
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(gSaveContext.respawnFlag==0 && "queued DC arrival must discard unrelated savewarp coordinates");
+    gSaveContext.respawnFlag=2;
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==-1 && gSaveContext.respawnFlag==2);
+    Combo_SOH_LoadCrossDungeonCheckpoint(ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(Combo_SOH_ConsumeCrossDungeonRecovery()==ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(gSaveContext.respawnFlag==0 && "checkpoint recovery must own its room and position");
+    gSaveContext.respawnFlag=2;
+    assert(Combo_SOH_ConsumeCrossDungeonRecovery()==-1 && gSaveContext.respawnFlag==2);
+    // A winning positioned grotto destination must install its own return coordinates after reset.
+    seed=Encode(grottos,{1,2,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    gPlayState=nullptr;
+    assert(SOH_QueueCrossDungeonArrival(0x801));
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==grottoReturnTable[1].entranceIndex);
+    assert(gSaveContext.respawnFlag==2);
+    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.y==grottoReturnTable[1].pos.y);
+    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex==grottoReturnTable[1].room);
     std::cout<<"OoT pool runtime: native-off grotto loading, single composition, physical reverse, synthetic recovery, interior scopes, boss owner checkpoint pass\n";
 }
 '''
