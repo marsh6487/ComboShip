@@ -190,6 +190,7 @@ ALL_ITEMS = [
     # they replace the doubled Epona/Time/Storms rows. Keep the two repos in sync.
     ("gFugueOfHomeNameTex", "Fugue of Home"),
     ("gCommandMelodyNameTex", "Command Melody"),
+    ("gCojiroNameTex", "Cojiro"),
     ("gBalladOfHeroNameTex", "Ballad of Hero"),
 ]
 

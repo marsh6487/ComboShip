@@ -90,6 +90,7 @@ inline std::span<const Item> Catalog() {
         { "nei.bundle.slate", "RI_OOT_NEI_SHEIKAH_SLATE", "Slate: All Runes", 3, 200 },
         { "nei.bundle.seasons", "RI_OOT_NEI_ROD_OF_SEASONS", "Rod: All Seasons", 3, 180 },
         { "nei.bundle.wand", "RI_OOT_NEI_ELEMENTAL_WAND", "Wand: All Rods", 3, 200 },
+        { "wildcard.command_melody", "RI_OOT_SONG_COMMAND_MELODY", "Command Melody", 1, 80, true },
         { "wildcard.deku_mask", "RI_MASK_DEKU", "Deku Mask", 2, 130, true },
         { "wildcard.goron_mask", "RI_MASK_GORON", "Goron Mask", 2, 150, true },
         { "wildcard.zora_mask", "RI_MASK_ZORA", "Zora Mask", 2, 150, true },
@@ -125,8 +126,8 @@ inline bool Eligible(const Item& item, Games games) {
         return true; // Every NEI offer has native implementations in both games.
     const std::string_view key(item.key);
     // OoT-only never requires MM's archive for masks, sword models or bottles.
-    return key == "wildcard.mario_mask" || key == "wildcard.poke_ball" || key == "wildcard.magic_upgrade" ||
-           key == "wildcard.double_defense";
+    return key == "wildcard.command_melody" || key == "wildcard.mario_mask" || key == "wildcard.poke_ball" ||
+           key == "wildcard.magic_upgrade" || key == "wildcard.double_defense";
 }
 
 inline bool MatchesGames(const nlohmann::json& market, Games games) {

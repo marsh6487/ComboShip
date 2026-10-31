@@ -1,3 +1,4 @@
+#include "../../../combo/encounters/NativeCustomEnemies.h"
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #ifdef COMBO_BUILD
@@ -3867,6 +3868,9 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
 }
 
 Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayState* play) {
+    CustomEnemies_RecordEntry(play, actorEntry->id & 0x1FFF, actorEntry->pos.x, actorEntry->pos.y, actorEntry->pos.z,
+                              actorEntry->params);
+
     gMapLoading = 1;
     Actor* ret = NULL;
     s32 shouldSpawn;
@@ -3915,6 +3919,7 @@ Actor* Actor_Delete(ActorContext* actorCtx, Actor* actor, PlayState* play) {
     player = GET_PLAYER(play);
 
     // Execute before actor memory is freed
+    CustomEnemies_ActorDestroyed(actor);
     GameInteractor_ExecuteOnActorDestroy(actor);
 
     if ((player != NULL) && (actor == player->focusActor)) {

@@ -163,6 +163,13 @@ static void PlaceItemsForType(RandomizerCheckType rctype, bool overworldActive =
     }
 }
 
+// Combined generation gets its one copy from MM, like the Magic Mirror.
+// The song is independent of the NEI, MM-song and pool-density options.
+static void AddCommandMelodyToPool() {
+    if (!Combo_IsCombinedGame())
+        AddFixedItemToPool(RG_NEI_SONG_COMMAND_MELODY, 1);
+}
+
 bool GenerateItemPool() {
     // RANDOTODO proper removal of items not in pool or logically relevant instead of dummy checks.
     auto ctx = Rando::Context::GetInstance();
@@ -623,6 +630,8 @@ bool GenerateItemPool() {
     if (ctx->GetOption(RSK_SHUFFLE_MAGIC_MIRROR) && !Combo_IsCombinedGame()) {
         AddFixedItemToPool(RG_MAGIC_MIRROR, 1);
     }
+
+    AddCommandMelodyToPool();
 
     // Skijer's Custom Items (Second Inventory Page) - 24 items
     if (ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS)) {

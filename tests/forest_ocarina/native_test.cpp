@@ -3,6 +3,7 @@
 #include "entrances/SoloForest.h"
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorPlayer.h"
+#include "tests/custom_encounters/disabled_spawn_boundary.h"
 #include "global.h"
 #include "mods/nei_save.h"
 #if __has_include("2s2h/Enhancements/Camera/ComboForestOcarina.h")
@@ -25,6 +26,8 @@ int gComboGameMode = COMBO_GAME_BOTH;
 }
 static PlayState play;
 static Player player;
+using DisabledEncounterFixture::recordedEntries;
+using DisabledEncounterFixture::replacementEntries;
 static int letterbox;
 static PlayerAnimationHeader *D_8085D17C[PLAYER_FORM_MAX];
 static PlayerAnimationHeader *D_8085D190[PLAYER_FORM_MAX];
@@ -352,7 +355,11 @@ static void Load(SOH::Scene &scene, s32 spawn = 0, bool mirror = false) {
             "Mirror arrival preserves cached scene spawn");
   }
 #endif
+  const int recordedBefore = recordedEntries, replacedBefore = replacementEntries;
   Actor_SpawnEntry(&play.actorCtx, play.linkActorEntry, &play);
+  Require(recordedEntries == recordedBefore + 1 &&
+              replacementEntries == replacedBefore + 1,
+          "native spawn visits disabled encounter boundaries exactly once");
   Play_AssignPlayerCsIdsFromScene(&play, player.actor.csId);
 #ifdef COMBO_BUILD
   if (mirror) {

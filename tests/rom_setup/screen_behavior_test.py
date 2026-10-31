@@ -76,6 +76,9 @@ with tempfile.TemporaryDirectory(prefix='rom-setup-screen-') as tmp:
     if args.sanitize: flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
     subprocess.run(['g++',*flags,str(cpp),'-o',str(binary)],check=True)
     for scenario in range(13):
-        directory=Path(tmp)/str(scenario);directory.mkdir()
+        # Auto-scan supplies absolute paths. Parent directory names must not
+        # change a fixture ROM's quest (including random tempfile suffixes).
+        name={9:'9-mq',10:'10-vanilla'}.get(scenario,str(scenario))
+        directory=Path(tmp)/name;directory.mkdir()
         subprocess.run([str(binary),str(scenario)],cwd=directory,check=True)
 print('ROM setup screen: 13 cases PASS (ordering, either quest first, skip, installed archives, rejection, auto-scan/reselection, solo ROM isolation)')

@@ -62,7 +62,7 @@ def main():
                               ",".join(map(str, forest_spawn[1:4])) + "},{" +
                               ",".join(map(str, forest_spawn[4:7])) + "}," + str(forest_spawn[7]) + "}")
     fixture = fixture.replace("/* FOREST_HAS_CUTSCENES */", str(0x1b in forest_commands).lower())
-    includes = ("mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
+    includes = (".", "mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
                 "libultraship/include", "combo")
     with tempfile.TemporaryDirectory(prefix="market-scene-spawn-") as temporary:
         source = Path(temporary) / "test.cpp"

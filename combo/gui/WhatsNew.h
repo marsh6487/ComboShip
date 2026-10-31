@@ -19,6 +19,20 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.CustomEnemies.NaturalEncounters", Kind::New,
+      "Enable additive natural encounters across Hyrule and Termina." },
+    { "gEnhancements.CustomEnemies.Randomizer", Kind::New, "Include native custom enemies in enemy randomization." },
+    { "gEnhancements.CustomEnemies.Miniblin", Kind::New, "Select Miniblin encounters." },
+    { "gEnhancements.CustomEnemies.Molmauk", Kind::New, "Select Molmauk encounters." },
+    { "gEnhancements.CustomEnemies.Beetle", Kind::New, "Select Scissors Beetle encounters." },
+    { "gEnhancements.CustomEnemies.Lynel", Kind::New, "Select red-maned Lynel encounters." },
+    { "gEnhancements.Partners.Malon", Kind::New,
+      "Enable Malon as a following, bow-wielding companion in either game." },
+    { "gEnhancements.Partners.Cojiro", Kind::New,
+      "Enable Cojiro; his equipment slot calls or dismisses him once unlocked." },
+    { "gEnhancements.Partners.CommandMelody", Kind::New,
+      "Control a nearby companion with Command Melody: learned by default in vanilla, shuffled in randomizer, and "
+      "eligible as a Black Market wildcard." },
     { "gEnhancements.RideYoungEpona", Kind::New,
       "Ride Young Epona as Child Link after learning Epona's Song with the Young Epona asset archive installed." },
     { "gEnhancements.TempleSagesTravel", Kind::New,

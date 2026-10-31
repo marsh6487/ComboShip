@@ -2,6 +2,7 @@
 #include "soh/ShipUtils.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/enhancementTypes.h"
+#include "combo/encounters/NativeCustomEnemies.h"
 #include "src/overlays/actors/ovl_En_Tp/z_en_tp.h"
 #include "src/overlays/actors/ovl_En_Skb/z_en_skb.h"
 #include <cassert>
@@ -20,8 +21,26 @@ static f32 floorHeight = BGCHECK_Y_MIN;
 static Vec3f raycastPosition;
 static Actor spawned;
 static Vec3s spawnedRot;
+static bool customRandomizer;
+static int customIdQueries, customSpawnQueries;
+
+// This fixture owns native wide-coordinate placement, with optional custom
+// resources absent. Use the real bridge declarations and fail closed at its
+// resource/collision boundary rather than replacing the production selection.
+extern "C" int CustomEnemies_Kind(int) { return 0; }
+extern "C" int CustomEnemies_Id(int kind) {
+    assert(kind >= 1 && kind <= 4);
+    ++customIdQueries;
+    return -1;
+}
+extern "C" int CustomEnemies_CanSpawn(PlayState*, int, float, float, float) {
+    ++customSpawnQueries;
+    return false;
+}
 
 extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
+    if (std::strcmp(name, "gEnhancements.CustomEnemies.Randomizer") == 0)
+        return customRandomizer;
     return std::strstr(name, "RandomizedEnemies") ? randomizerMode : fallback;
 }
 extern "C" uint32_t ResourceMgr_IsSceneMasterQuest(s16) { return masterQuest; }
@@ -145,6 +164,17 @@ int main() {
     assert(EnemyRando_SeedCoordinate(2147483648.0f) == 0x80000000u);
     assert(EnemyRando_SeedCoordinate(4294967296.0f) == 0);
     assert(EnemyRando_SeedCoordinate(std::numeric_limits<f32>::max()) == 0);
+
+    // All native placement checks above ran with custom randomization disabled:
+    // the optional resource/collision bridge must stay untouched in that mode.
+    assert(customIdQueries == 0 && customSpawnQueries == 0);
+    // Opting in without installed assets still selects the native enemy and
+    // never asks collision code to validate an unavailable custom actor.
+    customRandomizer = true;
+    const EnemyEntry native = GetRandomizedEnemyEntry(77, &play, 85000.75f, 117.5f, -123456.25f, false);
+    assert(native.id == ACTOR_EN_FIREFLY && native.params == 2);
+    assert(customIdQueries == 4 && customSpawnQueries == 0);
+    customRandomizer = false;
 
     EnTp tail{};
     tail.actor.world.pos = { 150000.25f, 85000.5f, -180000.75f };

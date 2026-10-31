@@ -29,6 +29,10 @@ int main() {
         assert(!session.Bind(nlohmann::json::object(), 0));
         assert(!session.Active(0));
     }
+    const auto* melody = Find("wildcard.command_melody");
+    assert(melody && melody->wildcard && !melody->renewable);
+    assert(std::string_view(melody->identity) == "RI_OOT_SONG_COMMAND_MELODY");
+    for (auto game : {Games::Oot, Games::Mm, Games::Both}) assert(Eligible(*melody, game));
     Options options;
     const auto first = Generate(123456u, options);
     assert(Validate(first));
@@ -74,7 +78,7 @@ int main() {
             const auto key = offer["key"].get<std::string>();
             assert(!key.starts_with("wildcard.") || key == "wildcard.mario_mask" ||
                    key == "wildcard.poke_ball" || key == "wildcard.magic_upgrade" ||
-                   key == "wildcard.double_defense");
+                   key == "wildcard.double_defense" || key == "wildcard.command_melody");
         }
     }
     assert(!first.contains("games")); // existing combined seeds stay byte-identical

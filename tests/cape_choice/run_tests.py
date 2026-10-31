@@ -47,6 +47,14 @@ def icon_fixture(game):
         passive = draw[start:draw.index('        // Draw inventory screen icons', start)] + '\n    }\n'
         passive = 's16 rowStart, j, temp, i;\n' + passive
     fixture = (ROOT / 'tests/cape_choice/native_icon_test.c').read_text()
+    accessors = ('#include "mods/partners/Partners.h"\n'
+                 'bool Partners_CojiroOwned(void) { return false; }\n'
+                 'bool Partners_CojiroEnabled(void) { return false; }\n' + accessors)
+    if game == 'mm':
+        accessors = ('static void* KaleidoEquip_OotTex(const char* path) { (void)path; return NULL; }\n' +
+                     accessors)
+    else:
+        accessors = '#include "textures/icon_item_static/icon_item_static.h"\n' + accessors
     return fixture.replace('/* PRODUCTION_ACCESSORS */', accessors).replace('/* PRODUCTION_DRAW */', passive)
 
 

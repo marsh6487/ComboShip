@@ -1,3 +1,4 @@
+#include "mods/partners/Partners.h"
 #include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
 /*
@@ -14208,6 +14209,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
         // logic reads play->state.input[0] (untouched) so cycling still works.
         // Mirrors the TransformMasks_FilterB pattern above.
         GustJar_FilterPlayerInput(&input);
+        Partners_Filter(this, &input);
 
         if (CVarGetFloat(CVAR_CHEAT("SpeedModifier.Value"), 1.0f) != 1.0f &&
             CVarGetInteger(CVAR_CHEAT("SpeedModifier.SpeedToggle"), 0)) {

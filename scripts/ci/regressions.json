@@ -2,6 +2,13 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native companions, Command Melody acquisition and custom encounter lifecycle",
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B -m unittest discover -s tests/partners -v\npython3 -B -m unittest discover -s tests/custom_encounters -v"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "name": "Native wide custom collision, movement and enemy placement",
     "run": "python3 -B tests/custom_unbound_collision/run_tests.py"
   },

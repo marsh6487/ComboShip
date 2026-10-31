@@ -1,3 +1,4 @@
+#include "../../../combo/encounters/NativeCustomEnemies.h"
 #include "din_fire_sword.h"
 /*
  * File: z_actor.c
@@ -4202,6 +4203,9 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
 }
 
 Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayState* play) {
+    CustomEnemies_RecordEntry(play, actorEntry->id & 0x1FFF, actorEntry->pos.x, actorEntry->pos.y, actorEntry->pos.z,
+                              actorEntry->params);
+
     s16 rotX = (actorEntry->rot.x >> 7) & 0x1FF;
     s16 rotY = (actorEntry->rot.y >> 7) & 0x1FF;
     s16 rotZ = (actorEntry->rot.z >> 7) & 0x1FF;
@@ -4224,8 +4228,11 @@ Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayStat
         rotZ -= 360;
     }
 
-    return Actor_SpawnAsChildAndCutscene(actorCtx, play, actorEntry->id & 0x1FFF, actorEntry->pos.x, actorEntry->pos.y,
-                                         actorEntry->pos.z, rotX, rotY, rotZ, actorEntry->params & 0xFFFF,
+    s16 customId = actorEntry->id & 0x1FFF;
+    s16 customParams = actorEntry->params;
+    CustomEnemies_ReplaceEntry(play, &customId, &customParams, actorEntry->pos.x, actorEntry->pos.y, actorEntry->pos.z);
+    return Actor_SpawnAsChildAndCutscene(actorCtx, play, customId, actorEntry->pos.x, actorEntry->pos.y,
+                                         actorEntry->pos.z, rotX, rotY, rotZ, customParams & 0xFFFF,
                                          actorEntry->rot.y & 0x7F,
                                          ((actorEntry->rot.x & 7) << 7) | (actorEntry->rot.z & 0x7F), NULL);
 }
@@ -4237,6 +4244,7 @@ Actor* Actor_Delete(ActorContext* actorCtx, Actor* actor, PlayState* play) {
     ActorOverlay* overlayEntry = actor->overlayEntry;
 
     // Execute before actor memory is freed
+    CustomEnemies_ActorDestroyed(actor);
     GameInteractor_ExecuteOnActorDestroy(actor);
 
     if ((player != NULL) && (actor == player->focusActor)) {

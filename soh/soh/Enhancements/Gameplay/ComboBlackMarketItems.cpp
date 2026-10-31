@@ -75,6 +75,7 @@ RandomizerGet Id(const Item& item) {
         { "nei.bundle.slate", RG_SHEIKAH_SLATE },
         { "nei.bundle.seasons", RG_ROD_OF_SEASONS },
         { "nei.bundle.wand", RG_ELEMENTAL_WAND },
+        { "wildcard.command_melody", RG_NEI_SONG_COMMAND_MELODY },
         { "wildcard.mario_mask", RG_MARIO_MASK },
         { "wildcard.poke_ball", RG_POKEBALL },
         { "wildcard.magic_upgrade", RG_MAGIC_DOUBLE },
@@ -90,6 +91,8 @@ bool Owned(const Item& item) {
     const auto id = Id(item);
     const auto* nei = Nei_Save();
     switch (id) {
+        case RG_NEI_SONG_COMMAND_MELODY:
+            return (nei->mmQuestItems & (1u << 12)) != 0; // canonical Command Melody row
         case RG_SHOVEL:
             return nei->shovelOwned || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL;
         case RG_DOMINION_ROD:

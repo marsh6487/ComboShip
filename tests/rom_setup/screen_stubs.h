@@ -36,7 +36,7 @@ inline std::vector<std::string> prompts, jobs;
 inline std::vector<int> promptFrames;
 inline int visits=0;
 inline int kind(const char* path) {
-    const std::string p=path?path:"";
+    const std::string p=std::filesystem::path(path?path:"").filename().string();
     if(p.find("vanilla")!=std::string::npos) return 1;
     if(p.find("mq")!=std::string::npos) return 2;
     return 0;
