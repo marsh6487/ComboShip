@@ -15,6 +15,8 @@
 #include "global.h"
 #include "mods/nei_save.h"
 #include "mods/ext_buttons/ext_buttons.h"
+#include "mods/extended_equipment.h"
+#include "mods/items/helpers/equip_helper.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorItem.h"
 #endif
@@ -32,11 +34,20 @@ u16 gEquipMasks[] = {0x000F, 0x00F0, 0x0F00, 0xF000};
 u16 gEquipNegMasks[] = {0xFFF0, 0xFF0F, 0xF0FF, 0x0FFF};
 u8 gEquipShifts[] = {0, 4, 8, 12};
 u32 gBitFlags[] = {1, 2, 4, 8, 16, 32, 64, 128};
+// These age/save/HUD checks run with world interaction modes inactive.
+// The production claim policy and full-ID accessors remain under test.
+extern "C" u8 Pacci_UltrahandModeActive() { return 0; }
+extern "C" u8 MasterCycle_IsRiding() { return 0; }
+extern "C" u8 Cryonis_ModeActive() { return 0; }
+extern "C" u8 Picto_IsOwned() { return 0; }
+extern "C" u8 Picto_IsOnLensActive() { return 0; }
+extern "C" u8 PowerKeg_IsOwned() { return 0; }
+extern "C" u8 PowerKeg_IsOnBombActive() { return 0; }
 extern "C" void Flags_SetInfTable(s32) {}
 extern "C" void Flags_UnsetInfTable(s32) {}
 bool GameInteractor_Should(GIVanillaBehavior, uint32_t result, ...) { return result; }
 u8 Randomizer_GetSettingValue(RandomizerSettingKey) { return 0; }
-void ExtEquip_ValidateForAgeWithoutProgression(s32) {}
+void ExtEquip_ValidateForAgeWithoutProgression(u8) {}
 static PlayState* sNonLogicAgeSwitchPlay = nullptr;
 static s32 sNonLogicSourceAge, sNonLogicEntrance;
 #undef osSyncPrintf
