@@ -118,6 +118,25 @@ the game engines; successful compile preflight is recorded separately.
 Fresh full CI on the follow-up head remains required. These local checks and
 successful earlier CI groups do not imply all groups or platform builds passed.
 
+## Second CI follow-up
+
+Run `41243312462` on public `c30c52c5` passed the complete Linux build, both
+archive-generation targets, both seed smoke checks and AppImage packaging.
+Windows compile preflight passed; its full build also passed both archive targets,
+confirming the ZIP metadata repair on the actual Windows toolchain. Full Windows
+engine compilation was still running when this record was prepared.
+
+Systems, equipment, rendering, world and entrances regression groups passed.
+Items reached the MM editor runner, whose extracted `GeneratePools` omitted the
+new production helper `EnsureCommandMelodyInPool`. Local `e4ecb7596`, published
+as recovery checkpoint `544de5c9f950b5e8a7b6c054278f4ad65599135e`, includes that
+exact helper before extracting its caller. The complete editor runner passes
+locally with the original assertions and real-header syntax checks preserved.
+Every other `GeneratePools` extraction consumer was audited for this dependency.
+
+The final PR records the subsequent CI result and merge commit. These fixture
+checks and compilation results do not establish configured gameplay acceptance.
+
 ## Restoration
 
 Restore the public integration by checking out its exact recorded commit, then
