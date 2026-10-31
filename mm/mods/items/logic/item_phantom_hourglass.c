@@ -27,7 +27,7 @@ extern u16 ExtButton_GetInputMask(u16 item);
 // carry every frame, so the two must never be pointed at the same actor.
 extern Actor* Pacci_GetUltrahandHeld(void);
 
-#define HOURGLASS_UPPER_SKEL(player) (&(player)->skelAnimeUpper) // MM: OoT names it upperSkelAnime
+#define HOURGLASS_UPPER_SKEL(player) (&(player)->skelAnimeUpper)             // MM: OoT names it upperSkelAnime
 #define HOURGLASS_ACTIVE_CAM(play) ((play)->cameraPtrs[(play)->activeCamId]) // MM: OoT names it activeCamera
 #define HOURGLASS_AT_DAMAGE(c) ((c).elem.atDmgInfo.damage)                   // MM: OoT spells this info.toucher.damage
 
@@ -59,7 +59,6 @@ typedef enum {
     HOURGLASS_STATE_AIMING,
     HOURGLASS_STATE_RECALLING,
 } HourglassState;
-
 
 static HourglassState sHourglassState = HOURGLASS_STATE_IDLE;
 static Actor* sHourglassOffer = NULL;  // under the reticle while aiming

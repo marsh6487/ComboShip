@@ -873,7 +873,7 @@ s32 func_801235DC(PlayState* play, f32 arg1, s16 arg2) {
 }
 
 // #region 2S2H [Dpad]
-u8 MasterCycle_IsRiding(void); // mods/actors/master_cycle.c
+u8 MasterCycle_IsRiding(void);      // mods/actors/master_cycle.c
 u8 Pacci_UltrahandModeActive(void); // mods/actors/cane_pacci.c
 
 ItemId Player_Dpad_GetItemOnButton(PlayState* play, Player* player, DpadEquipSlot slot) {

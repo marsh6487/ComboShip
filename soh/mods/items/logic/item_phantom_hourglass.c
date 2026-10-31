@@ -26,7 +26,7 @@
 // carry every frame, so the two must never be pointed at the same actor.
 extern Actor* Pacci_GetUltrahandHeld(void);
 
-#define HOURGLASS_UPPER_SKEL(player) (&(player)->upperSkelAnime) // OoT: MM names it skelAnimeUpper
+#define HOURGLASS_UPPER_SKEL(player) (&(player)->upperSkelAnime)              // OoT: MM names it skelAnimeUpper
 #define HOURGLASS_ACTIVE_CAM(play) ((play)->cameraPtrs[(play)->activeCamera]) // OoT: MM names it activeCamId
 #define HOURGLASS_AT_DAMAGE(c) ((c).info.toucher.damage) // OoT: MM spells this elem.atDmgInfo.damage
 
