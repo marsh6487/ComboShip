@@ -17,6 +17,7 @@ source=r'''
 #include <optional>
 #define COMBO_BUILD
 #define COMBO_EXPORT
+#define SPDLOG_INFO(...) ((void)0)
 #include "combo/ComboGameMode.h"
 extern "C" {int gComboGameMode=COMBO_GAME_BOTH;}
 struct {int gameMode=0,fileNum=1;} gSaveContext;
