@@ -1,5 +1,6 @@
 #include "entrances/BlackMarketEntrance.h"
 #include "global.h"
+#include "tests/custom_encounters/disabled_spawn_boundary.h"
 #ifdef COMBO_BUILD
 #include "2s2h/Enhancements/Camera/ComboForestOcarina.h"
 #endif

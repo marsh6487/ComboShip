@@ -44,6 +44,7 @@ def converter_rows(source, payload, engine):
 
 FIXTURE = r'''
 #include "global.h"
+#include "tests/custom_encounters/disabled_spawn_boundary.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -150,7 +151,7 @@ def main():
             fixture = fixture.replace("/* TRANSITION ROW */", transition_row).replace("/* CASE */", cases[args.case])
             target = Path(temporary) / (engine + ".cpp"); target.write_text(fixture)
             binary = Path(temporary) / engine
-            includes = (engine, engine + "/include", engine + "/include/PR", engine + "/src", engine + "/assets",
+            includes = (".", engine, engine + "/include", engine + "/include/PR", engine + "/src", engine + "/assets",
                         engine + ("/soh" if engine == "soh" else "/2s2h"), "libultraship/include", "combo")
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                             *(["-DOOT_NATIVE"] if engine == "soh" else []), "-g", "-fsanitize=address,undefined",

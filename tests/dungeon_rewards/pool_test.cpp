@@ -95,7 +95,9 @@ int main() {
   for (bool quest : {false, true}) {
     for (bool plentiful : {false, true}) {
       for (bool shuffleRemains : {false, true}) {
-        for (bool startWith : {false, true}) {
+        for (int starting = 0; starting < 4; ++starting) {
+          const bool startWith = (starting & 1) != 0;
+          const bool startWithCommand = (starting & 2) != 0;
           auto save = std::make_unique<RandoSaveInfo>();
           save->randoSaveOptions[RO_STARTING_HEALTH] = 3;
           save->randoSaveOptions[RO_SHUFFLE_OOT_QUEST] = quest;
@@ -106,6 +108,8 @@ int main() {
               startWith ? std::vector<RandoItemId>{RI_OOT_STONE_ZORA_SAPPHIRE,
                                                    RI_OOT_STONE_OF_AGONY}
                         : std::vector<RandoItemId>{};
+          if (startWithCommand)
+            startingItems.push_back(RI_OOT_SONG_COMMAND_MELODY);
           std::vector<RandoCheckId> checks;
           std::vector<RandoItemId> items;
           Logic::GeneratePools(*save, checks, items);
@@ -125,6 +129,11 @@ int main() {
                    "OoT reward pool ownership (stones/medallions)");
           }
           for (auto item : otherQuestItems) {
+            if (item == RI_OOT_SONG_COMMAND_MELODY) {
+              expect(count(item) == (startWithCommand ? 0 : 1),
+                     "one unconditional Command Melody, consumed by starting inventory");
+              continue;
+            }
             const int want =
                 quest && !(startWith && item == RI_OOT_STONE_OF_AGONY)
                     ? (plentiful ? 2 : 1)
@@ -150,7 +159,7 @@ int main() {
 #else
   const char *mode = "standalone MM";
 #endif
-  std::printf("%s: %s native GeneratePools, 16 configurations, %d failures\n",
+  std::printf("%s: %s native GeneratePools, 32 configurations, %d failures\n",
               failures ? "FAIL" : "PASS", mode, failures);
   return failures ? 1 : 0;
 }

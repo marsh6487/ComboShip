@@ -73,6 +73,8 @@ const char* NeiResource_Route(const char* path) {
     return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();
 }
 static u8 capeOwned, pendantOwned, gExtEquipGridNameContext;
+static bool cojiroOwned;
+extern "C" bool Partners_CojiroOwned(void) { return cojiroOwned; }
 #define osSyncPrintf(...) ((void)0)
 u8 ExtEquip_CapeOwned(void) { return capeOwned; }
 u8 ExtEquip_PendantOwned(void) { return pendantOwned; }
@@ -171,6 +173,13 @@ void Kaleido_LoadMapNameStatic(void**, u32) {}
     name_is(pause->nameSegment, "__OTR__textures/item_name_custom/gMagicCapeNameTex", "Cape through live name panel");
     sEquipCursorY=1; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
     name_is(pause->nameSegment, "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex", "Pendant through live name panel");
+    sEquipCursorY=2; Publish(pause);
+    check(pause->cursorItem[PAUSE_MASK] == PAUSE_ITEM_NONE, "unowned Cojiro stays unnamed");
+    cojiroOwned=true; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
+    name_is(pause->nameSegment, "__OTR__textures/item_name_static/gCojiroItemNameENGTex", "owned Cojiro uses its own title");
+    sEquipCursorY=1; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
+    name_is(pause->nameSegment, "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex", "Cojiro to Pendant refreshes shared title ID");
+    cojiroOwned=false;
     // Same item ID in two contexts must reload, including when both context and slot change.
     sEquipSubPage=1; sEquipCursorY=3; sEquipCursorX=2; Publish(pause); KaleidoScope_UpdateNamePanel(&play);
     name_is(pause->nameSegment, "__OTR__textures/item_name_custom/gClimbBootsNameTex", "Pendant to Climb cache refresh");

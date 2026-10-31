@@ -165,6 +165,10 @@ u8 ExtEquip_CapeOwned() { return save.capeOwned; }
 u8 ExtEquip_PendantOwned() { return save.pendantOwned; }
 u8 ExtEquip_CapeVisible() { return save.capeOwned && !save.capeHidden; }
 u8 ExtEquip_PendantActive() { return save.pendantOwned && !save.pendantEffectOff; }
+static bool cojiroOwned, cojiroEnabled;
+extern "C" bool Partners_CojiroOwned(void) { return cojiroOwned; }
+extern "C" bool Partners_CojiroEnabled(void) { return cojiroOwned && cojiroEnabled; }
+extern "C" void Partners_ToggleCojiro(void) { if (cojiroOwned) cojiroEnabled = !cojiroEnabled; }
 u8 ExtEquip_GetCurrent(s16 type) { return currentExt[type]; }
 u8 ExtEquip_SlotRetired(s16, u8) { return 0; }
 u8 ExtEquip_CheckAgeReq(s16, u8) { return 1; }
@@ -333,6 +337,7 @@ static void Reset() {
     std::memset(buttons, ITEM_NONE, sizeof(buttons));
     MM_EQ.equipment = 0;
     swordLevel = greatFairy = enabled = page = 0;
+    cojiroOwned = cojiroEnabled = false;
     activeGame = 1; errors = equipWrites = iconLoads = 0;
     sEquipCursorX = 1; sEquipCursorY = 0;
 }
@@ -444,6 +449,27 @@ int main() {
         play.state.input.press.button = 0; play.pauseCtx.stickAdjY = -40;
         KaleidoScope_UpdateEquipmentCursor(&play);
         check(sEquipCursorY == 1, "moving down from Pendant skips the retired lower sockets");
+    }
+    for (s16 subpage = 0; subpage <= 1; ++subpage) {
+        Reset(); play = {}; sEquipSubPage = subpage;
+        cojiroOwned = true; sEquipCursorX = 0; sEquipCursorY = 2;
+        const NeiSaveData before = save;
+        Draw(&play);
+        check(upgradeDrawCounts[2] == 1 && upgradeAlphas[2] == (play.pauseCtx.alpha >> 1),
+              "owned inactive Cojiro draws dimmed in its own socket");
+        check(KaleidoEquip_CursorCanSit(2,0), "owned Cojiro is selectable on both pages");
+        Publish(&play.pauseCtx);
+        check(play.pauseCtx.cursorItem[PAUSE_MASK] == ITEM_EXT_BOOTS_2 && !gExtEquipGridNameContext,
+              "Cojiro publishes a passive title context");
+        play.state.input.press.button = BTN_A;
+        KaleidoScope_UpdateEquipmentCursor(&play); Draw(&play);
+        check(cojiroEnabled && upgradeAlphas[2] == play.pauseCtx.alpha,
+              "A enables Cojiro and restores full icon alpha");
+        KaleidoScope_UpdateEquipmentCursor(&play); Draw(&play);
+        check(!cojiroEnabled && upgradeAlphas[2] == (play.pauseCtx.alpha >> 1),
+              "A disables Cojiro and dims its icon again");
+        check(std::memcmp(&before,&save,sizeof(save)) == 0,
+              "Cojiro actions preserve Cape, Pendant and equipment ownership");
     }
     Reset(); play = {}; sEquipSubPage = 0; sEquipCursorX = sEquipCursorY = 0;
     save.capeOwned = 1; capeVisibilityAvailable = false;

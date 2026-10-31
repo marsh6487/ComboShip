@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, name):
-    match = re.search(r"^(?:static\s+)?(?:u8|u16|u32|s16|s32|void|int)\s+" + re.escape(name) +
+    match = re.search(r'^(?:extern "C"\s+)?(?:static\s+)?(?:bool|u8|u16|u32|s16|s32|void|int)\s+' + re.escape(name) +
                       r"\([^;{}]*\)\s*\{", source, re.M)
     if not match:
         raise ValueError(name)
@@ -30,6 +30,7 @@ def function(source, name):
 def fixture():
     equipment = (ROOT / "soh/mods/extended_equipment.c").read_text()
     pause = (ROOT / "soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_equipment.c").read_text()
+    partners = (ROOT / "soh/mods/partners/Partners.cpp").read_text()
     first = pause.index("        // Tick ExtEquip cooldown here")
     cycle = pause[first:pause.index("        // On extended page", first)]
     prefix = r'''
@@ -119,6 +120,9 @@ void KaleidoScope_SetCursorVtx(PauseContext*, s16, void*) {}
         "ExtEquip_RemoveItem", "ExtEquip_Init", "ExtEquip_Update", "ExtEquip_GetPage",
         "ExtEquip_SwitchPage", "ExtEquip_CanSwitch", "ExtEquip_Equip",
         "ExtEquip_CapeOwned", "ExtEquip_GivePendant", "ExtEquip_PendantOwned"))
+    # Retain the actual C-linkage ownership accessor: browsing the owned cell
+    # must not depend on enabled behaviors or the companion's dismissal state.
+    production += "\n" + function(partners, "Partners_CojiroOwned")
     production += "\n" + function(pause, "KaleidoEquip_UpgradeCellAvailable")
     production += "\n" + function(pause, "KaleidoEquip_TransformInput")
     production += "\nstatic void Cycle(Input* input) { u8 extEquipPage = (ExtEquip_GetPage() == 1);\n"
@@ -140,11 +144,14 @@ static void press(u16 button) {
     } else Cycle(&input);
 }
 int main() {
-    for (int cape : {0, 1}) for (int pendant : {0, 1}) {
+    for (int cape : {0, 1}) for (int pendant : {0, 1})
+    for (int cojiro : {0, 1}) for (int dismissed : {0, 1}) {
         reset(0, 0, 0); save.capeOwned=cape; save.pendantOwned=pendant;
+        save.cojiroPartnerOwned=cojiro; save.cojiroPartnerDismissed=dismissed;
         check(KaleidoEquip_UpgradeCellAvailable(0)==cape, "Cape cursor entry follows real ownership");
         check(KaleidoEquip_UpgradeCellAvailable(1)==pendant, "Pendant cursor entry follows real ownership");
-        check(!KaleidoEquip_UpgradeCellAvailable(2), "third equipment-column placeholder cannot receive cursor");
+        check(KaleidoEquip_UpgradeCellAvailable(2)==cojiro,
+              "Cojiro cursor entry follows saved ownership even when dismissed and behaviors disabled");
         check(!KaleidoEquip_UpgradeCellAvailable(3), "fourth equipment-column placeholder cannot receive cursor");
     }
     for (int enable : {0, 1}) for (int ngcMode : {0, 1}) for (int cross : {0, 1}) {
