@@ -24,15 +24,16 @@ static u16 sStowedItemButtons[256];
 static u32 sStowedItemFrames[256];
 static PlayState* sEquipCachePlay;
 
-u8 ItemEquip_GetItemOnSlot(u8 slot) {
-    // sButtonMasks[4..7] is D-Up, D-Down, D-Left, D-Right — keep this table in that same order.
-    static const u8 sDpadSlots[4] = {
-        EQUIP_SLOT_D_UP,
-        EQUIP_SLOT_D_DOWN,
-        EQUIP_SLOT_D_LEFT,
-        EQUIP_SLOT_D_RIGHT,
-    };
+// Logical slots follow sButtonMasks: D-up/down/left/right, unlike the save's
+// D-right/left/down/up order. Both inventory and status reads use this mapping.
+static const u8 sDpadSlots[4] = {
+    EQUIP_SLOT_D_UP,
+    EQUIP_SLOT_D_DOWN,
+    EQUIP_SLOT_D_LEFT,
+    EQUIP_SLOT_D_RIGHT,
+};
 
+u8 ItemEquip_GetItemOnSlot(u8 slot) {
     if (slot == 0) {
         // B is the only per-transformation button.
         return BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B);
@@ -78,7 +79,7 @@ static void EquipCache_Update(PlayState* play) {
 
         sEquipCache.cachedItems[slot] = itemId;
         if (itemId != ITEM_NONE) {
-            sEquipCache.cachedButtons[itemId] = sButtonMasks[slot];
+            sEquipCache.cachedButtons[itemId] |= sButtonMasks[slot];
         }
         // Skijer's NEI — Bomb Arrows has no inventory slot and never reaches a button; it is the
         // 7th value of the weapon's element flag. Everything in item_bombarrows.c asks this cache
@@ -87,14 +88,35 @@ static void EquipCache_Update(PlayState* play) {
         // Both weapons qualify: bomb arrows on the bow, bomb bullets on the slingshot.
         if ((Sw97_IsBowItem(itemId) && (Sw97_EffectiveElement(0) == SW97_ELEM_BOMB)) ||
             (Sw97_IsSlingItem(itemId) && (Sw97_EffectiveElement(1) == SW97_ELEM_BOMB))) {
-            sEquipCache.cachedButtons[ITEM_BOMB_ARROWS] = sButtonMasks[slot];
+            sEquipCache.cachedButtons[ITEM_BOMB_ARROWS] |= sButtonMasks[slot];
         }
     }
 }
 
+u8 Pacci_UltrahandModeActive(void);
+u8 MasterCycle_IsRiding(void);
+u8 Cryonis_ModeActive(void);
+
+u8 ItemInput_ButtonIsClaimed(u16 button) {
+    return ((button & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)) &&
+            (Pacci_UltrahandModeActive() || MasterCycle_IsRiding())) ||
+           ((button & (BTN_DUP | BTN_DDOWN)) && Cryonis_ModeActive());
+}
+
 u16 ItemInput_GetEquippedButton(u8 itemId, PlayState* play) {
     EquipCache_Update(play);
-    return sEquipCache.cachedButtons[itemId];
+    u16 mask = sEquipCache.cachedButtons[itemId];
+    // Status and control ownership can change after this frame's cache was
+    // populated. An unusable duplicate must not contribute an input edge.
+    // B keeps its existing per-form contract; only C/D status is filtered here.
+    for (u8 slot = 1; slot < 8; ++slot) {
+        u8 status =
+            slot < 4 ? gSaveContext.buttonStatus[slot] : gSaveContext.shipSaveContext.dpad.status[sDpadSlots[slot - 4]];
+        if (status == BTN_DISABLED || ItemInput_ButtonIsClaimed(sButtonMasks[slot])) {
+            mask &= ~sButtonMasks[slot];
+        }
+    }
+    return mask;
 }
 
 void ItemInput_SuppressUntilRelease(u8 itemId, PlayState* play) {
@@ -103,24 +125,9 @@ void ItemInput_SuppressUntilRelease(u8 itemId, PlayState* play) {
     sStowedItemFrames[itemId] = play->gameplayFrames;
 }
 
-// mods/actors/cane_pacci.c — while Ultrahand mode is up the D-pad rotates and moves
-// the held object.
-u8 Pacci_UltrahandModeActive(void);
-
 void ItemInput_Update(ItemInputState* out, u8 itemId, Player* player, PlayState* play) {
     out->equippedButton = ItemInput_GetEquippedButton(itemId, play);
     out->wasEquipped = (out->equippedButton != 0);
-
-    // Custom items never go through Player_GetItemOnButton — they find themselves in
-    // buttonItems and read the raw pad here — so the guard placed in that engine
-    // function did nothing for them. Roc's Cape on a D-pad slot kept firing right
-    // through Ultrahand mode because of exactly this second path. An item sitting on
-    // the D-pad is simply not usable while the mode owns those buttons.
-    if (out->wasEquipped && Pacci_UltrahandModeActive() &&
-        (out->equippedButton & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT))) {
-        out->isPressed = out->isHeld = out->isReleased = out->otherButtonPressed = out->damageTaken = 0;
-        return;
-    }
 
     if (!out->wasEquipped) {
         out->isPressed = out->isHeld = out->isReleased = out->otherButtonPressed = out->damageTaken = 0;

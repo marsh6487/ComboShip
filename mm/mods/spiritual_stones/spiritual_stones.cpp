@@ -70,6 +70,10 @@ extern SaveContext gSaveContext;
 // Extended-button infra: stones are C-equipped via the u16 ext ids (buttonItems holds the
 // ITEM_EXT_BUTTON marker), so held-button detection reads through ExtButton_GetItem, not the raw u8.
 u16 ExtButton_GetItem(s32 form, s32 btn);
+u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+u16 ExtButton_GetInputMask(u16 item);
+u8 Pacci_UltrahandModeActive(void);
+u8 MasterCycle_IsRiding(void);
 }
 
 // Pull the statue actor into this translation unit (the .c is NOT in CMake; consumers #include it,
@@ -309,18 +313,7 @@ extern "C" void SpiritualStone_TickHold(PlayState* play, Player* player) {
 
     for (int stone = 0; stone < SPIRITUAL_STONE_COUNT; ++stone) {
         s32 itemId = StoneItemId(stone);
-        u16 mask = 0;
-        // Read through ExtButton_GetItem: the slot's u8 is ITEM_EXT_BUTTON, the real u16 id (compared
-        // here) lives in extButtons. Comparing the raw u8 buttonItems would never match the u16 id.
-        if (ExtButton_GetItem(0, EQUIP_SLOT_C_LEFT) == itemId) {
-            mask |= BTN_CLEFT;
-        }
-        if (ExtButton_GetItem(0, EQUIP_SLOT_C_DOWN) == itemId) {
-            mask |= BTN_CDOWN;
-        }
-        if (ExtButton_GetItem(0, EQUIP_SLOT_C_RIGHT) == itemId) {
-            mask |= BTN_CRIGHT;
-        }
+        u16 mask = ExtButton_GetInputMask((u16)itemId);
         if (mask == 0) {
             sHoldFrames[stone] = 0;
             continue;

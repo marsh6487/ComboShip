@@ -18,6 +18,7 @@
  */
 
 #include "spiritual_stones.h"
+#include "mods/ext_buttons/ext_buttons.h"
 
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -145,40 +146,9 @@ inline int CursorPointToStone(s16 cursorPoint) {
     return -1;
 }
 
-// Returns the C-button slot index (0..6) currently bound to a given stone
-// item, or -1 if none. Mirrors how Sw97_TickShadowExchange scans buttonItems
-// — including DPad slots when the DpadEquips CVar is on.
-int StoneBoundCButtonSlot(int stone) {
-    s32 itemId = StoneItemId(stone);
-    // buttonItems[0]=B, [1..3]=C-Left/Down/Right, [4..7]=DPad U/D/L/R.
-    int maxSlot = CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) ? 7 : 3;
-    for (int slot = 1; slot <= maxSlot; ++slot) {
-        if (gSaveContext.equips.buttonItems[slot] == itemId &&
-            (slot > 3 || gSaveContext.equips.cButtonSlots[slot - 1] == 0xFF)) {
-            return slot;
-        }
-    }
-    return -1;
-}
-
-u16 ButtonMaskForSlot(int slot) {
-    switch (slot) {
-        case 1:
-            return BTN_CLEFT;
-        case 2:
-            return BTN_CDOWN;
-        case 3:
-            return BTN_CRIGHT;
-        case 4:
-            return BTN_DUP;
-        case 5:
-            return BTN_DDOWN;
-        case 6:
-            return BTN_DLEFT;
-        case 7:
-            return BTN_DRIGHT;
-    }
-    return 0;
+// Include every independently assigned C/D button and respect pad claims.
+u16 StoneBoundButtonMask(int stone) {
+    return ExtButton_GetInputMask(StoneItemId(stone));
 }
 
 const char* StoneNameEnglish(int stone) {
@@ -422,10 +392,7 @@ extern "C" s32 SpiritualStone_TryEquipAtCursor(PlayState* play, Input* input) {
 
     s32 itemToEquip = StoneItemId(stone);
     s32 buttonIndex = targetCBtn + 1; // buttonItems[0] is B button
-    gSaveContext.equips.buttonItems[buttonIndex] = itemToEquip;
-    if (targetCBtn < 3) {
-        gSaveContext.equips.cButtonSlots[targetCBtn] = 0xFF; // SW97 sentinel
-    }
+    ExtButton_EquipItem(play, buttonIndex, itemToEquip, SLOT_NONE);
     Interface_LoadItemIcon1(play, buttonIndex);
 
     Audio_PlaySoundGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
@@ -460,12 +427,11 @@ extern "C" void SpiritualStone_TickHold(PlayState* play, Player* player) {
     u16 cur = input->cur.button;
 
     for (int stone = 0; stone < SPIRITUAL_STONE_COUNT; ++stone) {
-        int slot = StoneBoundCButtonSlot(stone);
-        if (slot < 0) {
+        u16 mask = StoneBoundButtonMask(stone);
+        if (mask == 0) {
             sHoldFrames[stone] = 0;
             continue;
         }
-        u16 mask = ButtonMaskForSlot(slot);
         bool held = (cur & mask) != 0;
 
         if (held) {

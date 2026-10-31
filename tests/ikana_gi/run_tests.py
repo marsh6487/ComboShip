@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--sanitize",action="store_true")
+parser.add_argument("--presentation-only",action="store_true")
 parser.add_argument("--archive",type=Path,action="append",default=[],help="optional authored NEI GI O2R geometry proof")
 parser.add_argument("--fados-archive",type=Path,help="local supplied Fados worn-shield O2R; mesh data is not distributed")
 args=parser.parse_args()
@@ -23,11 +24,23 @@ source=source.replace('/* OOT_NATIVE_DRAW */',function(read('soh/soh/Enhancement
 owner=read('combo/menu/ComboItemDrawOOT.h')
 case=re.search(r'        case RG_EXT_SHIELD_OF_IKANA:.*?(?=\n        case )',owner,re.S)[0]
 source=source.replace('/* OOT_DESCRIPTOR */',function(owner,'CwSimple')+'\nint DescribeIkana(CwItemDrawInfo* out){switch(RG_EXT_SHIELD_OF_IKANA){\n'+case+'\n}return 0;}')
-native=function(read('mm/2s2h/Rando/DrawItem.cpp'),'DrawResolvedItem')
+mm_draw=read('mm/2s2h/Rando/DrawItem.cpp')
+native=function(mm_draw,'DrawResolvedItem')
 case=re.search(r'        case RI_SHIELD_MIRROR:.*?(?=\n        case )',native,re.S)
 if case:case=case[0]
 else:case=re.search(r'        default:\s*GetItem_Draw\(gPlayState,.*?break;',native,re.S)[0]
-source=source.replace('/* MM_NATIVE_DRAW */','void DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}')
+# Keep the real namespace-qualified caller: block-scope DISPS declarations in
+# this context must still resolve to the global C interpolation implementation.
+gfx=read('mm/include/gfx.h')
+port=gfx[gfx.index('#define OPEN_DISPS_PORT_HELPERS'):gfx.index('// #endregion',gfx.index('#define OPEN_DISPS_PORT_HELPERS'))]
+source=source.replace('/* MM_NATIVE_DRAW */',port+'\n'
+    '#undef OPEN_DISPS\n#undef CLOSE_DISPS\n'
+    '#define OPEN_DISPS(x) { OPEN_DISPS_PORT_HELPERS(x);\n'
+    '#define CLOSE_DISPS(x) CLOSE_DISPS_PORT_HELPERS(x); }\n'+
+    (function(mm_draw,'DrawNativeIkanaFallback')+'\n' if 'static void DrawNativeIkanaFallback(' in mm_draw else '')+
+    'namespace Rando { void DrawNativeIkanaGI(); }\n'
+    'void Rando::DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}\n'
+    'using Rando::DrawNativeIkanaGI;')
 foreign_mm=read('combo/menu/ComboForeignDrawMM.h')
 source=source.replace('/* MM_SIMPLE_INFO */',re.search(r'struct ComboForeignDrawInfoOOT \{.*?\n\};',foreign_mm,re.S)[0])
 source=source.replace('/* MM_SIMPLE_CONSUMER */',function(foreign_mm,'MM_DrawForeignSimple'))
@@ -56,6 +69,7 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
     cpp=Path(temp)/'test.cpp';cpp.write_text(source);binary=Path(temp)/'test'
     subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
+    if args.presentation_only:raise SystemExit(0)
     foreign=read('tests/item_receipts/foreign_icon_test.cpp')
     foreign=foreign.replace('/* ICON_OWNER_INCLUDE */','#include "combo/menu/ComboItemIconOwnership.h"')
     foreign=foreign.replace('/* FOREIGN_ICON_SELECTOR */',function(read('mm/2s2h/Rando/DrawItem.cpp'),'ComboForeignMessageIcon'))

@@ -49,6 +49,7 @@
 extern s32 func_8083485C(Player* this, PlayState* play); // generic "held item" upper action
 // Ext-button store: which u16 item a button really holds when it shows ITEM_EXT_BUTTON.
 extern u16 ExtButton_GetItem(s32 form, s32 btn);
+extern u16 ExtButton_GetInputMask(u16 item);
 
 /**
  * Per-rune cast. `rune` is a SLATE_RUNE_*; returns 1 if the rune actually fired (so the caller can
@@ -160,18 +161,7 @@ static void Slate_CastPose(PlayState* play, Player* player) {
 // Every C button currently holding the slate. C items live at FORM 0 for every form — only B is
 // per-form — so reading buttonItems[curForm][...] would miss them entirely.
 static u16 Slate_EquippedButtonMask(void) {
-    u16 mask = 0;
-
-    if (ExtButton_GetItem(0, EQUIP_SLOT_C_LEFT) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CLEFT;
-    }
-    if (ExtButton_GetItem(0, EQUIP_SLOT_C_DOWN) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CDOWN;
-    }
-    if (ExtButton_GetItem(0, EQUIP_SLOT_C_RIGHT) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CRIGHT;
-    }
-    return mask;
+    return ExtButton_GetInputMask(EXT_ITEM_SHEIKAH_SLATE);
 }
 
 // The box-menu confirm: the highlighted rune becomes the active one.

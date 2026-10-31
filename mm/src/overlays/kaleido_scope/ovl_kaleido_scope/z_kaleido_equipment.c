@@ -23,6 +23,7 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "sword_element.h"
 #include "sword_element_kaleido.h"
 #include "interface/parameter_static/parameter_static.h"
@@ -731,27 +732,52 @@ void KaleidoEquip_UpdateSwordElement(PlayState* play) {
 static void KaleidoEquip_AssignCButton(PlayState* play, s16 row, s16 col, u16 pressed) {
     EquipCell cell;
     s16 slot;
+    s16 dpadSlot = EQUIP_SLOT_D_NONE;
+    u16 buttonItem;
 
     KaleidoEquip_GetCell(sEquipSubPage, row, col, &cell);
     if (cell.equipType < 0 || !KaleidoEquip_CellOwned(&cell)) {
         Audio_PlaySfx(NA_SE_SY_ERROR);
         return;
     }
+    buttonItem = ExtEquip_GetButtonItemId(cell.equipType, cell.index);
 
     if (pressed & BTN_CLEFT) {
         slot = EQUIP_SLOT_C_LEFT;
     } else if (pressed & BTN_CDOWN) {
         slot = EQUIP_SLOT_C_DOWN;
-    } else {
+    } else if (pressed & BTN_CRIGHT) {
         slot = EQUIP_SLOT_C_RIGHT;
+    } else if (CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
+        if (pressed & BTN_DRIGHT)
+            dpadSlot = EQUIP_SLOT_D_RIGHT;
+        else if (pressed & BTN_DLEFT)
+            dpadSlot = EQUIP_SLOT_D_LEFT;
+        else if (pressed & BTN_DDOWN)
+            dpadSlot = EQUIP_SLOT_D_DOWN;
+        else if (pressed & BTN_DUP)
+            dpadSlot = EQUIP_SLOT_D_UP;
+        if (dpadSlot == EQUIP_SLOT_D_NONE)
+            return;
+        ExtButton_SetDpadItem(0, dpadSlot,
+                              ExtEquip_GetLegacyButtonItem(ExtButton_GetDpadItem(0, dpadSlot)) == (u16)cell.item
+                                  ? (u16)ITEM_NONE
+                                  : buttonItem);
+        DPAD_SLOT_EQUIP(0, dpadSlot) = SLOT_NONE;
+        Interface_Dpad_LoadItemIconImpl(play, dpadSlot);
+        Audio_PlaySfx(NA_SE_SY_DECIDE);
+        return;
+    } else {
+        return;
     }
 
     // Toggle: if the same ext item is already on this button, clear it back to empty.
-    if (BUTTON_ITEM_EQUIP(0, slot) == (u8)cell.item) {
-        BUTTON_ITEM_EQUIP(0, slot) = ITEM_NONE;
+    if (ExtEquip_GetLegacyButtonItem(ExtButton_GetItem(0, slot)) == (u16)cell.item) {
+        ExtButton_ClearItem(0, slot);
     } else {
-        BUTTON_ITEM_EQUIP(0, slot) = (u8)cell.item;
+        ExtButton_SetItem(0, slot, buttonItem);
     }
+    C_SLOT_EQUIP(0, slot) = SLOT_NONE;
     Interface_LoadItemIconImpl(play, slot);
     Audio_PlaySfx(NA_SE_SY_DECIDE);
 }
@@ -1003,10 +1029,9 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
                 }
             }
         } else if ((sEquipSubPage == EQUIP_SUBPAGE_EXT) && (sEquipCursorX != 0) &&
-                   (sEquipCursorY != EQUIP_EXT_ROW_BOOTS) &&
-                   CHECK_BTN_ANY(input->press.button, BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT)) {
-            KaleidoEquip_AssignCButton(play, sEquipCursorY, sEquipCursorX,
-                                       input->press.button & (BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT));
+                   CHECK_BTN_ANY(input->press.button,
+                                 BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | GameInteractor_Dpad(GI_DPAD_EQUIP, BTN_DPAD))) {
+            KaleidoEquip_AssignCButton(play, sEquipCursorY, sEquipCursorX, input->press.button);
         } else if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
             // Cell coordinates distinguish shields, tunics and boots that share
             // fallback icons, and separate passive Cape/Pendant from grid items.

@@ -74,14 +74,18 @@ static u8 sSlateSelectorActive = 0;
 static u8 sWandSelectorActive = 0;
 u32 gBitFlags[32]{};
 extern "C" uint8_t Picto_IsOwned() { return 0; }
+extern "C" uint8_t Picto_IsOnLensActive() { return 0; }
 extern "C" uint8_t PowerKeg_IsOwned() { return 0; }
+extern "C" uint8_t PowerKeg_IsOnBombActive() { return 0; }
 Vec3f gSfxDefaultPos{};
 f32 gSfxDefaultFreqAndVolScale = 1;
 s8 gSfxDefaultReverb = 0;
 extern "C" void Audio_PlaySoundGeneral(u16, Vec3f*, u8, f32*, f32*, s8*) {}
 extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
+extern "C" void Interface_LoadItemIcon2(PlayState*, u16 btn) { ++icons[btn]; }
 '''
-            button_names = ("ExtButton_GetItem", "ExtButton_SetItem", "ExtButton_ClearItem")
+            button_names = ("ExtButton_GetItem", "ExtButton_SetItem", "ExtButton_ClearItem",
+                            "ExtButton_WriteEquip", "ExtButton_EquipItem")
             slate_names = ("Slate_KaleidoCycle", "Slate_HandleKaleidoSelector", "KaleidoScope_ResetItemCycling")
             wand_names = ("Wand_KaleidoCycle", "Wand_HandleKaleidoSelector")
         start = inv.rfind("\n", 0, inv.index("sWandQuest["))
@@ -101,16 +105,12 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
             "KaleidoWheel_Run", "GraceHourglass_KaleidoCycle", "GraceHourglass_KaleidoHandle",
             *(n for n in slate_names if n != "KaleidoScope_ResetItemCycling"), *wand_names))
         if host == "soh":
-            # Use the native completion's final item/slot write. Animation and
-            # duplicate-slot swapping are outside this wheel-selection fixture.
+            # Exercise the same completion helper as production, including full
+            # IDs and independent NEI C/D-pad mappings.
             equip = function(ui, "KaleidoScope_UpdateItemEquip")
-            start = equip.index("            if (pauseCtx->equipTargetItem >= 0x0200)")
+            start = equip.index("            ExtButton_EquipItem(")
             icon_call = "            Interface_LoadItemIcon1(play, targetButtonIndex);"
-            # Bound both assignment branches by braces, excluding the outer
-            # Mirror swap guard that surrounds this write in the native path.
-            assignment = block_from(equip, start)
-            else_start = equip.index("else", start + len(assignment))
-            assignment += " " + block_from(equip, else_start)
+            assignment = equip[start:equip.index(icon_call, start)]
             production += r'''
 static void CompleteNativeButtonEquip(PlayState* play, s32 button, u16 item, u8 slot) {
     PauseContext* pauseCtx = &play->pauseCtx;
@@ -306,10 +306,12 @@ int main() {
         CompleteNativeButtonEquip(&play, 2, ITEM_BOW, SLOT_BOW);
         CompleteNativeButtonEquip(&play, 6, EXT_ITEM_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE);
         CompleteNativeButtonEquip(&play, 3, ITEM_STICK, SLOT_STICK);
-        CompleteNativeButtonEquip(&play, 7, ITEM_STICK, SLOT_STICK);
+        // Seed a legacy duplicate without asking native equip to swap it out
+        // of C-right. These assertions cover zero-valued stick validity.
+        gSaveContext.equips.buttonItems[7] = ITEM_STICK;
         gSaveContext.equips.cButtonSlots[6] = SLOT_NONE;
         assert(ExtButton_GetItem(7) == ITEM_NONE && DPAD_ITEM(3) == ITEM_NONE);
-        CompleteNativeButtonEquip(&play, 7, ITEM_STICK, SLOT_STICK);
+        gSaveContext.equips.cButtonSlots[6] = SLOT_STICK;
         std::memset(icons, 0, sizeof(icons));
         CheckOotGraceButtons(first, 0);
 ''').replace("/* CHECK_BUTTONS */", r'''

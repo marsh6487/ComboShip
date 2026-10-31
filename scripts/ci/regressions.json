@@ -1585,13 +1585,37 @@
   {
     "suite": "render",
     "origin": "gate",
-    "name": "Indexed triangle backend buffer submission",
-    "run": "python3 -B tests/indexed_triangles/run_backend_tests.py --sanitize"
+    "name": "Indexed triangle opt-in settings and backend buffer submission",
+    "run": "python3 -B tests/indexed_triangles/run_setting_tests.py --sanitize\npython3 -B tests/indexed_triangles/run_backend_tests.py --sanitize"
   },
   {
     "suite": "world",
     "origin": "gate",
     "name": "Authored Chamber SFX scope and additive native emitters",
     "run": "python3 -B tests/temple_sages_bundle/run_chamber_sfx_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Native OOT NEI independent shortcuts, equipment and selection",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_controls_oot/run_all.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Native MM NEI independent shortcuts, equipment and selection",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_controls_mm/run_all.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "nei",
+    "name": "Native NEI foreign GI fallbacks and independent Ikana resources",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_gi/mm_cane_export_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_gi/mm_import_fallback_test.py --sanitize\npython3 -B tests/nei_gi/oot_equipment_bridge_test.py\npython3 -B tests/nei_gi/legacy_cube_asset_test.py\npython3 -B tests/ikana_gi/independent_resources_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --ikana --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Native and cross-game boss-soul receipt icon formats",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_soul_icon_tests.py --sanitize"
   }
 ]

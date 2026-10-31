@@ -1,6 +1,8 @@
 #include "2s2h/Rando/NeiArticulatedPresentation.h"
 #include "2s2h/Rando/NeiLanternPresentation.h"
 #include "mods/items/helpers/equip_helper.h"
+#include "mods/ext_buttons/ext_buttons.h"
+#include "mods/extended_equipment.h"
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 #include "../../../combo/render/sword_element_aura_identity.h"
@@ -871,26 +873,31 @@ s32 func_801235DC(PlayState* play, f32 arg1, s16 arg2) {
 }
 
 // #region 2S2H [Dpad]
-u8 MasterCycle_IsRiding(void); // mods/actors/master_cycle.c
+u8 MasterCycle_IsRiding(void);      // mods/actors/master_cycle.c
+u8 Pacci_UltrahandModeActive(void); // mods/actors/cane_pacci.c
 
 ItemId Player_Dpad_GetItemOnButton(PlayState* play, Player* player, DpadEquipSlot slot) {
     if (slot >= EQUIP_SLOT_D_MAX) {
         return ITEM_NONE;
     }
 
-    // On the Master Cycle the D-pad is the wheelie (up) and its cancel (down), so it must not also
-    // fire whatever is equipped there. Skijer's NEI
-    if (MasterCycle_IsRiding()) {
+    // D-pad modes own their controls before native item/equipment dispatch.
+    static const u16 dButtons[] = { BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
+    if (ItemInput_ButtonIsClaimed(dButtons[slot])) {
         return ITEM_NONE;
     }
 
     ItemId item = DPAD_BTN_ITEM(slot);
+    if (item == ITEM_EXT_BUTTON) {
+        u16 effective = ExtButton_GetDpadItem(0, slot);
+        if (ExtEquip_IsButtonItem(effective)) {
+            item = (ItemId)ExtEquip_GetLegacyButtonItem(effective);
+        }
+    }
     GameInteractor_Should(VB_GET_ITEM_ON_BUTTON, item, slot, &item);
     return item;
 }
 // #endregion
-
-u8 Pacci_UltrahandModeActive(void); // mods/actors/cane_pacci.c
 
 ItemId Player_GetItemOnButton(PlayState* play, Player* player, EquipSlot slot) {
     // mods/actors/cane_pacci.c — while Ultrahand mode is up the D-pad rotates and
@@ -947,12 +954,22 @@ ItemId Player_GetItemOnButton(PlayState* play, Player* player, EquipSlot slot) {
 
     if (slot == EQUIP_SLOT_C_LEFT) {
         ItemId item = C_BTN_ITEM(EQUIP_SLOT_C_LEFT);
+        if (item == ITEM_EXT_BUTTON) {
+            u16 effective = ExtButton_GetItem(0, slot);
+            if (ExtEquip_IsButtonItem(effective))
+                item = (ItemId)ExtEquip_GetLegacyButtonItem(effective);
+        }
         GameInteractor_Should(VB_GET_ITEM_ON_BUTTON, item, slot, &item);
         return item;
     }
 
     if (slot == EQUIP_SLOT_C_DOWN) {
         ItemId item = C_BTN_ITEM(EQUIP_SLOT_C_DOWN);
+        if (item == ITEM_EXT_BUTTON) {
+            u16 effective = ExtButton_GetItem(0, slot);
+            if (ExtEquip_IsButtonItem(effective))
+                item = (ItemId)ExtEquip_GetLegacyButtonItem(effective);
+        }
         GameInteractor_Should(VB_GET_ITEM_ON_BUTTON, item, slot, &item);
         return item;
     }
@@ -960,6 +977,11 @@ ItemId Player_GetItemOnButton(PlayState* play, Player* player, EquipSlot slot) {
     // EQUIP_SLOT_C_RIGHT
     {
         ItemId item = C_BTN_ITEM(EQUIP_SLOT_C_RIGHT);
+        if (item == ITEM_EXT_BUTTON) {
+            u16 effective = ExtButton_GetItem(0, slot);
+            if (ExtEquip_IsButtonItem(effective))
+                item = (ItemId)ExtEquip_GetLegacyButtonItem(effective);
+        }
         GameInteractor_Should(VB_GET_ITEM_ON_BUTTON, item, slot, &item);
         return item;
     }

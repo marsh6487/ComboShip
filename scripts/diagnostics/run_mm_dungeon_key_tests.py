@@ -34,7 +34,14 @@ owner = owner[owner.index('static inline int'):owner.rindex('#endif')]
 owner_sword = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
 master_case = owner_sword[owner_sword.index('        case RG_TRUE_MASTER_SWORD:',owner_sword.index('static int32_t OOT_DescribeCustomDraw')):
                           owner_sword.index('        case RG_DOUBLE_DEFENSE:',owner_sword.index('static int32_t OOT_DescribeCustomDraw'))]
+# Full producer helpers compile against the production item catalog. Only the
+# two synthetic acquisition tiers are appended; real identities stay verbatim.
+item_types = (ROOT / 'mm/2s2h/Rando/Types.h').read_text()
+item_enum = re.search(r'typedef enum \{\s*RI_UNKNOWN,.*?\} RandoItemId;', item_types, re.S)
+assert item_enum, 'Missing production MM item enum'
+item_enum = item_enum[0].replace('} RandoItemId;', '    RI_TEST_SWORD,\n    RI_TEST_COMPASS,\n} RandoItemId;')
 parts = {
+    'ITEM_ENUM': item_enum,
     'SPIN': function((ROOT / 'mm/2s2h/Rando/SpinAttackGi.h').read_text(), 'MM_FillSpinAttackGi'),
     'OWNER': owner,
     'OPS': '\n'.join(function(mm, n) for n in ['MM_Op', 'MM_OpV', 'MM_OpColor', 'MM_OpDL']),
@@ -42,7 +49,7 @@ parts = {
     'OWNER_SWORD': '\n'.join(function(owner_sword,n) for n in ['CwSimple','CwCustomGi','CwAltSwordGi']),
     'OWNER_MASTER_CASE': master_case,
     'PRODUCER': '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',
-                                                   'MM_FillImportedSwordFallback', 'MM_IsSwordAppearanceDependent',
+                                                   'MM_FillImportedSwordFallback', 'MM_FillCaneDrawInfo', 'MM_IsSwordAppearanceDependent',
                                                    'MM_FillElementalSpellDrawInfo', 'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),

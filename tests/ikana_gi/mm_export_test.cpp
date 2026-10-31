@@ -1,6 +1,7 @@
 // Execute the real MM native-fallback export and OoT OPS consumer.
 // Catalog, resource query and graphics services are fixture boundaries.
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboIkanaShieldResources.h"
 #include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
@@ -34,7 +35,7 @@ int queryCalls=0;
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* owner,const char* path,float* tilt) {
     ++queryCalls;
     assert(Ship::ownerActive);
-    assert(!std::strcmp(owner,"mm")&&!std::strcmp(path,"objects/object_gi_shield_3/gGiMirrorShieldDL"));
+    assert(!std::strcmp(owner, "mm") && !std::strcmp(path, COMBO_IKANA_GI_XLU));
     if(!readable)return 0;
     *tilt=flat?1.5707963267948966f:0.f;return 1;
 }
@@ -64,6 +65,12 @@ bool MM_DescribeNeiGi(RandoItemId,CwItemDrawInfo* out) {
     return true;
 }
 int MM_FillImportedSwordFallback(RandoItemId,CwItemDrawInfo*){return 0;}
+int MM_FillCaneDrawInfo(RandoItemId, CwItemDrawInfo*) {
+    return 0;
+}
+int ResourceMgr_IsIkanaShieldGiAvailable() {
+    return 1;
+}
 int MM_FillDungeonKeyModelInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
 int MM_FillDungeonTintInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
 int MM_FillSpinAttackGi(CwItemDrawInfo*){return 0;}
@@ -160,7 +167,7 @@ int main() {
         if(sideways)expectedRotations.push_back(CW_OP_ROTATE_Z);
         if(flat)expectedRotations.push_back(CW_OP_ROTATE_X);
         assert(rotations==expectedRotations&&"roll must precede X tilt without adding caller spin");
-        assert(paths[0].starts_with("__OTR__@mm:")&&paths[1].ends_with("gGiMirrorShieldDL"));
+        assert(paths[0].starts_with("__OTR__@mm:") && paths[1].ends_with("gIkanaShieldGiXluDL"));
         assert(stack.empty()&&rotationX==0&&rotationZ==0);
         assert(out.stateDependent==2&&"selected shield pose must refresh after an owner Alt toggle");
     }

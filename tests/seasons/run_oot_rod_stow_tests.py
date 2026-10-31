@@ -14,6 +14,10 @@ from run_ballchain_tests import flags
 source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 native = extract.functions(source)
 rod = (ROOT / "soh/mods/items/logic/item_rod_of_seasons.c").read_text().split('// Unity include,')[0]
+buttons = extract.functions((ROOT / "soh/mods/ext_buttons/ext_buttons.cpp").read_text())
+equipment = extract.functions((ROOT / "soh/mods/extended_equipment.c").read_text())
+button_boundaries = buttons['ExtButton_GetInputMask'] + '\n' + '\n'.join(
+    equipment[name] for name in ('ExtEquip_IsButtonItem', 'ExtEquip_GetLegacyButtonItem'))
 fixture = (ROOT / "tests/nei_item_stow/stow_contract_test.c").read_text()
 fixture = '#define REAL_SEASONS_STOW\n' + fixture
 fixture = fixture.replace('static void Reset(void) {', 'static void Reset(void) {\n  sRodDrawn = 0;')
@@ -44,7 +48,7 @@ void SeasonScene_SuppressVoidDamage(void) {}
 void SeasonWeather_Update(PlayState*) {}
 f32 gSfxDefaultFreqAndVolScale; s8 gSfxDefaultReverb;
 void Audio_PlaySoundGeneral(u16 sound,Vec3f*,u8,f32*,f32*,s8*) {++rodSounds;}
-''' + rod + '\n#include "mods/items/custom_items_stow.c"')
+''' + button_boundaries + '\n' + rod + '\n#include "mods/items/custom_items_stow.c"')
 fixture = fixture.replace('assert(flag == VB_PLAYER_TOGGLE_NAVI);', '')
 fixture = fixture.replace('item == ITEM_NONE ? PLAYER_IA_NONE : PLAYER_IA_SWORD_MASTER',
                           '(item == ITEM_NONE || item == ITEM_EXT_BUTTON) ? PLAYER_IA_NONE : PLAYER_IA_SWORD_MASTER')

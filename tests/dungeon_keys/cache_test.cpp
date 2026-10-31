@@ -1,4 +1,5 @@
 #include "ComboItemDrawABI.h"
+#include "ComboIkanaShieldResources.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cstdio>
@@ -20,79 +21,7 @@ struct ResourceManagerScope {
  ~ResourceManagerScope() { ownerActive=previous; }
 };
 }
-enum RandoItemId {
-  RI_UNKNOWN = 0,
-  RI_SHIELD_MIRROR,
-  RI_ARROW_FIRE,
-  RI_ARROW_ICE,
-  RI_ARROW_LIGHT,
-  RI_WOODFALL_SMALL_KEY,
-  RI_WOODFALL_BOSS_KEY,
-  RI_WOODFALL_MAP,
-  RI_WOODFALL_COMPASS,
-  RI_SNOWHEAD_SMALL_KEY,
-  RI_SNOWHEAD_BOSS_KEY,
-  RI_SNOWHEAD_MAP,
-  RI_SNOWHEAD_COMPASS,
-  RI_GREAT_BAY_SMALL_KEY,
-  RI_GREAT_BAY_BOSS_KEY,
-  RI_GREAT_BAY_MAP,
-  RI_GREAT_BAY_COMPASS,
-  RI_STONE_TOWER_SMALL_KEY,
-  RI_STONE_TOWER_BOSS_KEY,
-  RI_STONE_TOWER_MAP,
-  RI_STONE_TOWER_COMPASS,
-  RI_PROGRESSIVE_SWORD,
-  RI_OOT_PROGRESSIVE_HAMMER,
-  RI_OOT_PROGRESSIVE_MASTER_SWORD,
-  RI_OOT_PROGRESSIVE_BGS,
-  RI_SWORD_KOKIRI,
-  RI_SWORD_RAZOR,
-  RI_SWORD_GILDED,
-  RI_GREAT_FAIRY_SWORD,
-  RI_OOT_MASTER_SWORD,
-  RI_OOT_TRUE_MASTER_SWORD,
-  RI_OOT_BIGGORON_SWORD,
-  RI_OOT_DINS_FIRE,
-  RI_OOT_FARORES_WIND,
-  RI_OOT_NAYRUS_LOVE,
-  RI_PROGRESSIVE_BOW,
-  RI_PROGRESSIVE_BOMB_BAG,
-  RI_PROGRESSIVE_WALLET,
-  RI_PROGRESSIVE_MAGIC,
-  RI_PROGRESSIVE_LULLABY,
-  RI_TIME_PROGRESSIVE,
-  RI_JUNK,
-  RI_TRAP,
-  RI_TRIFORCE_PIECE,
-  RI_TRIFORCE_PIECE_PREVIOUS,
-  RI_TEST_SWORD,
-  RI_TEST_COMPASS,
-  RI_GREAT_SPIN_ATTACK,
-  RI_OOT_NEI_ROD_OF_SEASONS,
-  RI_OOT_NEI_SEASON_SPRING,
-  RI_OOT_NEI_SEASON_SUMMER,
-  RI_OOT_NEI_SEASON_AUTUMN,
-  RI_OOT_NEI_SEASON_WINTER,
-  RI_OOT_BOTTLE_BIG_POE,
-  RI_OOT_BOTTLE_BLUE_FIRE,
-  RI_OOT_BOTTLE_BLUE_POTION,
-  RI_OOT_BOTTLE_BUGS,
-  RI_OOT_BOTTLE_FAIRY,
-  RI_OOT_BOTTLE_FISH,
-  RI_OOT_BOTTLE_GREEN_POTION,
-  RI_OOT_BOTTLE_MAGIC_MUSHROOM,
-  RI_OOT_BOTTLE_POE,
-  RI_OOT_RUTOS_LETTER,
-  RI_OOT_NEI_LANTERN,
-  RI_OOT_NEI_POKE_BALL,
-  RI_OOT_NEI_MARIO_MASK,
-  RI_OOT_NEI_MAGIC_MIRROR,
-  RI_RED_POTION_REFILL,
-  RI_GREEN_POTION_REFILL,
-  RI_BLUE_POTION_REFILL,
-  RI_BOTTLE_EMPTY
-};
+/* PRODUCTION_ITEM_ENUM */
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
 RandoItemId progression = RI_TEST_SWORD;
@@ -129,6 +58,21 @@ struct Scope {
   Scope(const char *, int, int, bool) {}
 };
 } // namespace ItemGrantAudit
+// Resource selection for non-dungeon GI families is outside this fixture.
+// Execute their real dispatch helpers, but fail if a key/cache case reaches
+// those resource services rather than silently accepting a canned recipe.
+extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char*, const char*) {
+  assert(false && "dungeon fixture selected a Cane GI model");
+  return 0;
+}
+extern "C" int ResourceMgr_IsModAssetForGame(const char*, const char*) {
+  assert(false && "dungeon fixture selected a Cane GI mod");
+  return 0;
+}
+extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
+  assert(false && "dungeon fixture selected an Ikana GI model");
+  return 0;
+}
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*, const char*, float*, float*) { return 0; }
 /* PRODUCTION_OPS */
 /* PRODUCTION_CROSS */

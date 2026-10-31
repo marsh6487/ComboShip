@@ -52,24 +52,7 @@ static void Seasons_TryFinishDraw(PlayState* play, Player* player) {
 }
 
 static u16 Seasons_EquippedButtonMask(void) {
-    static const u16 cButtons[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT };
-    static const u16 dButtons[] = { BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
-    u16 mask = 0;
-    for (s32 i = 0; i < 3; ++i) {
-        if (ExtButton_GetItem(0, i + EQUIP_SLOT_C_LEFT) == EXT_ITEM_ROD_OF_SEASONS &&
-            gSaveContext.buttonStatus[i + EQUIP_SLOT_C_LEFT] != BTN_DISABLED) {
-            mask |= cButtons[i];
-        }
-    }
-    if (CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0) && !Pacci_UltrahandModeActive()) {
-        for (s32 i = 0; i < 4; ++i) {
-            if (ExtButton_GetDpadItem(0, i) == EXT_ITEM_ROD_OF_SEASONS &&
-                gSaveContext.shipSaveContext.dpad.status[i] != BTN_DISABLED) {
-                mask |= dButtons[i];
-            }
-        }
-    }
-    return mask;
+    return ExtButton_GetInputMask(EXT_ITEM_ROD_OF_SEASONS);
 }
 
 static void Seasons_FilterPlayerInput(PlayState* play, Player* player, Input* input) {

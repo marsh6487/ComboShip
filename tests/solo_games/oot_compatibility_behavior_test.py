@@ -25,6 +25,7 @@ struct {struct{int data=0;}respawn[1];struct{struct{struct{int triforcePiecesCol
 struct {struct{int data=0;}respawn[1];struct{struct{struct{struct{int triforcePiecesCollected=1;}randomizer;}data;}quest;}ship;}gSaveContext;
 int ComboFw_HasPoint(int){return 0;}void Sfx_PlaySfxCentered(int){++errors;}
 bool mmOwner=false;
+bool ComboEnsureIkanaShieldBaseOwner(bool owner){return owner;}
 namespace Ship{struct CrossRMRegistry{static bool Get(const char*){return mmOwner;}};}
 struct CwItemDrawInfo { const char* dlists[2]={"__OTR__a","__OTR__b"};float scale=1;uint8_t primColorXlu[4]{};};
 int OOT_DescribeMmSpinAttackDraw(CwItemDrawInfo*){return 1;}
@@ -60,8 +61,8 @@ bool ResourceMgr_IsGiModelAvailableForGame(const char* owner,const char* path){
 }
 Gfx* MmAssets_LoadDisplayListGraphStrict(const char* path){
  ++nativeLoads;assert(optionalMm);
- if(!std::strcmp(path,COMBO_IKANA_GI_OPA))return opaquePresent?&nativeOpaque:nullptr;
- assert(!std::strcmp(path,COMBO_IKANA_GI_XLU));return translucentPresent?&nativeTranslucent:nullptr;
+ if(!std::strcmp(path,COMBO_IKANA_NATIVE_OPA))return opaquePresent?&nativeOpaque:nullptr;
+ assert(!std::strcmp(path,COMBO_IKANA_NATIVE_XLU));return translucentPresent?&nativeTranslucent:nullptr;
 }
 void MmAssets_EnsureStrictTextureBindings(){++bindings;}
 void Matrix_Push(){++matrixDepth;}void Matrix_Pop(){assert(matrixDepth==1);--matrixDepth;}

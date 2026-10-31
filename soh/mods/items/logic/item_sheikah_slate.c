@@ -46,7 +46,7 @@
 
 extern s32 func_8083485C(Player* this, PlayState* play); // generic "held item" upper action
 // Ext-button store: which u16 item a button really holds when it shows ITEM_EXT_BUTTON.
-extern u16 ExtButton_GetItem(s32 btn);
+#include "mods/ext_buttons/ext_buttons.h"
 
 /**
  * Per-rune cast. `rune` is a SLATE_RUNE_*; returns 1 if the rune actually fired (so the caller can
@@ -152,18 +152,7 @@ static void Slate_CastPose(PlayState* play, Player* player) {
 // Every C button currently holding the slate. C items live in the flat button array at 1..3.
 // Not static: the Remote Bomb's throw-suppression hook needs it from its own translation unit.
 u16 Slate_EquippedButtonMask(void) {
-    u16 mask = 0;
-
-    if (ExtButton_GetItem(1) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CLEFT;
-    }
-    if (ExtButton_GetItem(2) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CDOWN;
-    }
-    if (ExtButton_GetItem(3) == EXT_ITEM_SHEIKAH_SLATE) {
-        mask |= BTN_CRIGHT;
-    }
-    return mask;
+    return ExtButton_GetInputMask(EXT_ITEM_SHEIKAH_SLATE);
 }
 
 static void Slate_OnWheelConfirm(s32 index) {

@@ -128,6 +128,12 @@ void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, u8 canCycle, u
         }
         // Close if the cursor left the slot
         gCurrentItemCyclingSlot = (pauseCtx->cursorSlot[PAUSE_ITEM] == slot) ? slot : -1;
+        if (gCurrentItemCyclingSlot == slot) {
+            // The open wheel owns cursor updates, so publish its new item now.
+            // Otherwise the Pictograph/Lens title stays on the previous choice
+            // until the wheel closes and the normal cursor path runs again.
+            pauseCtx->cursorItem[PAUSE_ITEM] = ExtInv_GetSlotItem(realSlot);
+        }
     }
 }
 
@@ -2178,11 +2184,10 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
             cursorSlot = pauseCtx->cursorPoint[PAUSE_ITEM];
             pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_YELLOW;
 
-            if (moveCursorResult == PAUSE_CURSOR_RESULT_SLOT) {
-                cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
-            } else if (moveCursorResult != PAUSE_CURSOR_RESULT_SPECIAL_POS) {
-                cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
-            }
+            // A boundary stick input can report SPECIAL_POS while the cursor
+            // remains on this cell. Resolve ownership every frame before any
+            // C/D action, rather than retaining the previous cached item.
+            cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
 
             if (cursorItem == ITEM_NONE) {
                 cursorItem = PAUSE_ITEM_NONE;

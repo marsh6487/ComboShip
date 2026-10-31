@@ -486,6 +486,11 @@ uint8_t Nei_CaneOwned(void);
 uint8_t Nei_CaneActiveSkill(void);
 
 void* ExtInv_GetItemIcon(uint16_t itemId) {
+    if (ExtEquip_IsButtonItem(itemId)) {
+        const u16 offset = itemId - EXT_EQUIP_BUTTON_ITEM_BASE;
+        return ExtEquip_GetIcon(offset / 3, offset % 3 + 1);
+    }
+
     void* fireShieldIcon = DinFireShield_ItemIcon(itemId);
     if (fireShieldIcon != NULL)
         return fireShieldIcon;

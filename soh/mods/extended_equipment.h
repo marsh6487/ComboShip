@@ -42,6 +42,15 @@ extern "C" {
 #define ITEM_EXT_BOOTS_2 0xEA
 #define ITEM_EXT_BOOTS_3 0xEB
 
+// Button-only identities. The grid's legacy 0xEA is also the Pendant of
+// Memories inventory item, so buttons need an unambiguous full equipment ID.
+// Both hosts reserve the same range; the existing u16 sidecar persists it.
+#define EXT_EQUIP_BUTTON_ITEM_BASE 0x0240
+#define EXT_EQUIP_BUTTON_ITEM_LAST (EXT_EQUIP_BUTTON_ITEM_BASE + 11)
+u16 ExtEquip_GetButtonItemId(s16 equipType, u8 index);
+u8 ExtEquip_IsButtonItem(u16 itemId);
+u16 ExtEquip_GetLegacyButtonItem(u16 itemId);
+
 // ---------------------------------------------------------------------------
 // Extended equipment indices (1-based, 0 = none)
 // ---------------------------------------------------------------------------

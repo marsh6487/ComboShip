@@ -35,7 +35,16 @@ def main():
     buttons = read("soh/mods/ext_buttons/ext_buttons.cpp")
     manager = read("soh/soh/SaveManager.cpp")
     kaleido = read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c")
-    production = buttons[buttons.index('extern "C" {'):]
+    # Native button readers share the mode claim and equipment-alias helpers.
+    # Keep those bodies real; unrelated world-mode activation is a fixture seam.
+    production = ""
+    for path, names in (("soh/mods/items/helpers/equip_helper.c", ("ItemInput_ButtonIsClaimed",)),
+                        ("soh/mods/extended_equipment.c", ("ExtEquip_IsButtonItem", "ExtEquip_GetLegacyButtonItem"))):
+        dependency = read(path)
+        for name in names:
+            if re.search(r"\b" + name + r"\([^;{}]*\)\s*\{", dependency):
+                production += function(dependency, name) + "\n"
+    production += buttons[buttons.index('extern "C" {'):]
     production += "\n" + "\n".join(function(parameter, name) for name in (
         "Rando_Inventory_SwapAgeEquipment", "Inventory_SwapAgeEquipment"))
     production += "\n" + function(age, "SwitchAge_HandleNonLogicEquipmentSwap")
@@ -78,7 +87,7 @@ def main():
         (temp / "button_age_production.inc").write_text(production)
         (temp / "BS_thread_pool.hpp").write_text("#pragma once\nnamespace BS { class thread_pool; }\n")
         includes = ["-I" + str(path) for path in (temp, args.json_include, ROOT, *(ROOT / path for path in (
-            "soh", "soh/include", "soh/include/PR", "soh/src", "soh/assets", "libultraship/include", "combo")))]
+            "soh", "soh/mods", "soh/include", "soh/include/PR", "soh/src", "soh/assets", "libultraship/include", "combo")))]
         flags = ["-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCONTROLLERBUTTONS_T=uint32_t",
                  '-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"',
                  "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g", "-no-pie"]

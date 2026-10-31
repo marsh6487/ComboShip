@@ -18,7 +18,7 @@ info = foreign[foreign.index('struct ComboForeignDrawInfo {'):foreign.index('\n}
 macros = foreign[foreign.index('#define COMBO_FOREIGN_MTX'):foreign.index('// Biggoron')]
 mirror_helper = 'extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "sword dispatch selected Mirror"); }\n'
 mirror_helper += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(),'ComboDrawMagicMirrorForeign')
-handlers = macros + '\n' + mirror_helper + '\n' + '\n'.join(function(foreign,name) for name in [
+handlers = macros + '\n' + mirror_helper + '\nvoid OOT_DrawForeignNativeEquipment(PlayState*,GetItemEntry*,const ComboForeignDrawInfo*){assert(false && "sword fixture dispatched native equipment");}\n' + '\n'.join(function(foreign,name) for name in [
     'OOT_RestoreForeignSegs','OOT_DrawForeignGoronSword','OOT_DrawForeignWeaponFlame',
     'OOT_DrawForeignMasterSword','OOT_DrawForeignCustomGi','OOT_DrawForeignSimple','OOT_DrawComboForeign'])
 flags=['-std=gnu++20','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DLOG_LEVEL_GAME_PRINTS=0',

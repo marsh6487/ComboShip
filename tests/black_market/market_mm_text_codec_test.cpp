@@ -31,6 +31,8 @@ extern "C" void Message_OpenText(PlayState*, u16);
 extern "C" void Message_Decode(PlayState*);
 extern "C" void MarketTest_RenderControls(PlayState*);
 extern "C" void MarketTest_CloseTick(PlayState*);
+// Diagnostic output is a boundary service; keep the real receipt/message path.
+extern "C" void lusprintf(const char*, int, int, const char*, ...) {}
 extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation*);
 extern "C" void Message_SetCapeVisibilityChoice(int);
 extern "C" void SwordElement_MessageAppend(PlayState*, u8) {}

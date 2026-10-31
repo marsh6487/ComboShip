@@ -27,6 +27,7 @@
 #include "functions.h"
 #include "variables.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #include <libultraship/bridge.h>
@@ -915,14 +916,15 @@ extern "C" void PikachuForm_Update(Player* player, PlayState* play) {
             }
         }
     } else if (!Pika_IsAttacking()) {
-        // ── SYSTEM 1 (pokeball): original C-button item dispatch ──
+        // ── SYSTEM 1 (pokeball): assigned C/D-pad item dispatch ──
         // (bypasses OOT's blocked Player_ProcessItemButtons — unchanged behavior)
-        static const u16 cBtns[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT };
+        static const u16 cBtns[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
         u16 pressed = play->state.input[0].press.button;
-        for (s32 ci = 0; ci < 3; ci++) {
+        const s32 end = CVarGetInteger("gEnhancements.DpadEquips", 0) ? 7 : 3;
+        for (s32 ci = 0; ci < end; ci++) {
             if (CHECK_BTN_ALL(pressed, cBtns[ci])) {
-                s32 cItem = gSaveContext.equips.buttonItems[ci + 1]; // [0]=B, [1]=CL, [2]=CD, [3]=CR
-                if (cItem != ITEM_NONE && cItem < ITEM_NONE_FE) {
+                s32 cItem = ExtButton_GetItem(ci + 1);
+                if (cItem != ITEM_NONE && cItem < ITEM_NONE_FE && (ExtButton_GetInputMask(cItem) & cBtns[ci])) {
                     if (TransformMasks_HandleFormItemUse(play, player, cItem)) {
                         goto advance_anim;
                     }

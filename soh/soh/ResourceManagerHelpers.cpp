@@ -1,6 +1,7 @@
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ComboIkanaShieldResources.h"
+#include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
 #include "../../combo/ComboGameMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <fast/interpreter.h>
@@ -1118,7 +1119,9 @@ extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const cha
 }
 
 extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
-    if (Ship::CrossRMRegistry::Get("mm")) {
+    if (const auto owner = Ship::CrossRMRegistry::Get("mm")) {
+        if (!ComboEnsureIkanaShieldBaseOwner(owner))
+            return 0;
         return ResourceMgr_IsGiModelAvailableForGame("mm", COMBO_IKANA_GI_OPA) &&
                ResourceMgr_IsGiModelAvailableForGame("mm", COMBO_IKANA_GI_XLU);
     }
@@ -1128,8 +1131,8 @@ extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
 #endif
     // Solo OoT uses the optional MM archive without starting the other game.
     // Strict graph resolution validates every nested DL, vertex and texture.
-    return MmAssets_IsAvailable() && MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_OPA) &&
-           MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_XLU);
+    return MmAssets_IsAvailable() && MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_NATIVE_OPA) &&
+           MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_NATIVE_XLU);
 }
 
 #ifdef COMBO_BUILD

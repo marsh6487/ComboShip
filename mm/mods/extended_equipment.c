@@ -781,7 +781,23 @@ void ExtEquip_ClearTransformBackup(void) {
     memset(sTransformBackup, 0, sizeof(sTransformBackup));
 }
 
+u16 ExtEquip_GetButtonItemId(s16 equipType, u8 index) {
+    if (equipType < 0 || equipType >= 4 || index < 1 || index > 3) {
+        return ITEM_NONE;
+    }
+    return EXT_EQUIP_BUTTON_ITEM_BASE + equipType * 3 + index - 1;
+}
+
+u8 ExtEquip_IsButtonItem(u16 itemId) {
+    return itemId >= EXT_EQUIP_BUTTON_ITEM_BASE && itemId <= EXT_EQUIP_BUTTON_ITEM_LAST;
+}
+
+u16 ExtEquip_GetLegacyButtonItem(u16 itemId) {
+    return ExtEquip_IsButtonItem(itemId) ? ITEM_EXT_SWORD_1 + itemId - EXT_EQUIP_BUTTON_ITEM_BASE : itemId;
+}
+
 void ExtEquip_ToggleFromCButton(u16 itemId) {
+    itemId = ExtEquip_GetLegacyButtonItem(itemId);
     if (itemId < ITEM_EXT_SWORD_1 || itemId > ITEM_EXT_BOOTS_3)
         return;
     // Pikachu cannot use extended equipment

@@ -39,6 +39,7 @@ run(r'''
 #include "mm/2s2h/Rando/Types.h"
 #include "mm/include/z64item.h"
 #include "combo/menu/ComboSongDrawMM.h"
+#include "combo/menu/ComboBossSoulReceiptIcon.h"
 #include "combo/menu/ComboItemIconOwnership.h"
 using s16 = int16_t; using u8 = uint8_t;
 static const char* gItemIcons[256]{};

@@ -1163,6 +1163,16 @@ void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* present
         if (!ComboReceipt_HasIcon(presentation))
             sItemReceiptPresentation.iconPath[0] = '\0';
     }
+    if (presentation != NULL) {
+        lusprintf(__FILE__, __LINE__, 2,
+                  "[ReceiptTrace] mm stage singleBox=%d rewardLine=%d icon='%s' size=%dx%d format=%s",
+                  presentation->singleBox, presentation->rewardLine,
+                  ComboReceipt_HasIcon(presentation) ? presentation->iconPath : "(none)", presentation->iconWidth,
+                  presentation->iconHeight,
+                  presentation->iconIA8 == 1   ? "IA8"
+                  : presentation->iconIA8 == 0 ? "RGBA32"
+                                               : "INVALID");
+    }
 }
 
 static void Message_ApplyItemReceiptLayout(PlayState* play) {
@@ -1170,10 +1180,17 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
     if (!sItemReceiptPresentation.singleBox)
         return;
     if (!sItemReceiptReflowed) {
+        const unsigned originalLength = msgCtx->msgLength;
         sItemReceiptLayout = ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf.schar + 11,
                                                  msgCtx->msgLength > 11 ? msgCtx->msgLength - 11 : 0,
                                                  sizeof(msgCtx->font.msgBuf.schar) - 11, true, sNESFontWidths, 160);
         msgCtx->msgLength = sItemReceiptLayout.bodySize + 11;
+
+        lusprintf(__FILE__, __LINE__, 2,
+                  "[ReceiptTrace] mm reflow id=%#x position=%u bytes=%u->%u scale=%d firstPage=%u..%u boxWidth=220",
+                  (unsigned)msgCtx->currentTextId, (unsigned)msgCtx->msgBufPos, originalLength,
+                  (unsigned)msgCtx->msgLength, sItemReceiptLayout.textScale, sItemReceiptLayout.iconPageStart,
+                  sItemReceiptLayout.firstPageEnd);
         sItemReceiptReflowed = true;
     }
     const uint32_t pagePosition = msgCtx->msgBufPos > 11 ? msgCtx->msgBufPos - 11 : 0;

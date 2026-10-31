@@ -48,15 +48,21 @@ static void EquipCache_Update(PlayState* play) {
     for (u8 slot = 0; slot < maxSlot; slot++) {
         u8 itemId = gSaveContext.equips.buttonItems[slot];
         sEquipCache.cachedItems[slot] = itemId;
+        const u8 status = slot < 4 ? slot : slot + 1;
+        if (gSaveContext.buttonStatus[status] == BTN_DISABLED || ItemInput_ButtonIsClaimed(sButtonMasks[slot])) {
+            continue;
+        }
         if (itemId != ITEM_NONE && itemId < 256) {
-            sEquipCache.cachedButtons[itemId] = sButtonMasks[slot];
+            // A NEI item can be bound independently to C and D-pad. Keep every
+            // usable binding; the last scanned D slot must not hide the C edge.
+            sEquipCache.cachedButtons[itemId] |= sButtonMasks[slot];
         }
         // Skijer's NEI — Bomb Arrows has no inventory slot and never reaches a button; it is the
         // 7th value of the bow's element flag. Everything in item_bombarrows.c asks this cache
         // "which button is ITEM_BOM_ARROWS on?", so aliasing it onto the bow's button here is what
         // keeps that whole state machine (baButtonMask, press edges, cleanup) working untouched.
         if (Sw97_IsBowItem(itemId) && (Sw97_EffectiveElement(0) == SW97_ELEM_BOMB)) {
-            sEquipCache.cachedButtons[ITEM_BOMB_ARROWS] = sButtonMasks[slot];
+            sEquipCache.cachedButtons[ITEM_BOMB_ARROWS] |= sButtonMasks[slot];
         }
     }
 }

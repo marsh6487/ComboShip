@@ -22,6 +22,7 @@ if '// Static custom GI bridge recipes.' in owner:
     b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)
     helpers += '\n' + owner[a:b]
 fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
+fixture=fixture.replace('int main() {','int main() {\n'+(ROOT/'tests/nei_gi/legacy_catalog_test.inc').read_text(),1)
 # The production resolver uses a once-only warning and the native song-note asset.
 # Logging is outside this draw-submission fixture, as in the mask bridge fixture.
 fixture = ('#include <atomic>\n#define SPDLOG_WARN(...) ((void)0)\n'

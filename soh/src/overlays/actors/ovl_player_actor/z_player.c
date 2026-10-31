@@ -83,6 +83,7 @@ void func_8083C0E8(Player* this, PlayState* play);
 #include "mods/extended_player.c"
 #include "mods/items/logic/custom_items.c"
 #include "mods/extended_equipment.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "mods/extended_equipment.c"
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/transformation_masks/kafei_form.h"
@@ -2851,6 +2852,12 @@ s32 Player_GetItemOnButton(PlayState* play, s32 index) {
         }
     }
 
+    // Resolve only equipment aliases here. Other full-ID items own their input
+    // ticks and must retain the native marker/neutral-action boundary.
+    if (item == ITEM_EXT_BUTTON && ExtEquip_IsButtonItem(ExtButton_GetItem(index))) {
+        item = ExtEquip_GetLegacyButtonItem(ExtButton_GetItem(index));
+    }
+
     GameInteractor_Should(VB_GET_ITEM_ON_BUTTON, item, index, &item, play);
 
     return item;
@@ -2881,7 +2888,7 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
         if (!maskOnButton && CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0) {
             for (int buttonIndex = 0; buttonIndex < 4; buttonIndex++) {
                 maskOnButton |=
-                    Player_ItemIsItemAction(gSaveContext.equips.buttonItems[5 + buttonIndex], maskItemAction);
+                    Player_ItemIsItemAction(gSaveContext.equips.buttonItems[4 + buttonIndex], maskItemAction);
             }
         }
 
@@ -2902,7 +2909,7 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 if (CVarGetInteger(CVAR_ENHANCEMENT("DpadEquips"), 0) != 0) {
                     for (int buttonIndex = 0; buttonIndex < 4; buttonIndex++) {
                         maskOnButton |=
-                            Player_ItemIsItemAction(gSaveContext.equips.buttonItems[5 + buttonIndex], mmMaskAction);
+                            Player_ItemIsItemAction(gSaveContext.equips.buttonItems[4 + buttonIndex], mmMaskAction);
                     }
                 }
             }
@@ -2966,7 +2973,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
 
             // Extended equipment on a C button: toggle equip on/off. On B an ext sword id is the
             // Four Sword / Trident itself and must swing (ExtPlayer_GetItemAction aliases it).
-            if ((i != 0) && item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+            if ((i != 0) && item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3 &&
+                (item != ITEM_EXT_BOOTS_2 || ExtEquip_IsButtonItem(ExtButton_GetItem(i)))) {
                 ExtEquip_ToggleFromCButton(item);
             }
             // Per-form item interception: if transformed, check the form's item list first.

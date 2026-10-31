@@ -117,6 +117,15 @@ def main():
     modes += '\n' + bodies('mm/mods/items/helpers/equip_helper.c', ['ItemEquip_GetItemOnSlot', 'EquipCache_Update',
         'ItemInput_GetEquippedButton', 'ItemInput_Update', 'ItemInput_CheckDamage', 'ItemInput_CheckOtherButtons',
         'ItemInput_IsBlockedEx', 'ItemInput_IsBlocked', 'ItemMagic_IsInfinite', 'ItemMagic_Consume', 'ItemMagic_HasEnough'])
+    # The native C/D readers now resolve full equipment identities and share
+    # the mode-input claim policy. Keep those production bodies and native save
+    # storage; only activation of unrelated world modes stays at the boundary.
+    if 'ItemInput_ButtonIsClaimed' in functions(helper):
+        modes += '\n' + bodies('mm/mods/items/helpers/equip_helper.c', ['ItemInput_ButtonIsClaimed'])
+    for path, names in [('mm/mods/ext_buttons/ext_buttons.cpp', ['ExtButton_GetItem', 'ExtButton_GetDpadItem']),
+                        ('mm/mods/extended_equipment.c', ['ExtEquip_IsButtonItem', 'ExtEquip_GetLegacyButtonItem'])]:
+        available = functions(source(path))
+        modes += '\n' + '\n'.join(available[name] for name in names if name in available)
     inventory = 'mm/mods/extended_inventory.c'
     modes += '\n' + re.search(r'static const uint8_t sWandQuest\[WAND_MODE_COUNT\] = \{.*?\};', source(inventory), re.S)[0]
     modes += '\n' + bodies(inventory, ['Wand_RandoMode', 'Wand_ModeOwned', 'Wand_ModeCount', 'Wand_ModeAt',

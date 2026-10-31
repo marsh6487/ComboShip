@@ -61,6 +61,7 @@ void GameInteractor_ExecuteOnPassPlayerInputs(Input* input){
 }
 u8 MasterCycle_IsRiding(void){return 0;}
 u8 Pacci_UltrahandModeActive(void){return 0;}
+u8 Cryonis_ModeActive(void){return 0;}
 int MMWeather_Season(void){return -1;}
 void Seasons_UpdateWeather(PlayState* play){}
 NeiSaveData* Nei_Save(void){return &gSaveContext.save.shipSaveInfo.nei;}
@@ -93,6 +94,11 @@ ps=(ROOT/player).read_text();ls=(ROOT/lib).read_text()
 parts=[native_decl(ps,'typedef enum ItemChangeType {'),native_decl(ps,'s8 sPlayerItemChangeTypes['),native_decl(ls,'PlayerModelIndices gPlayerModelTypes[')]
 parts+=[body(player,'Player_ItemToItemAction'),body(lib,'Player_ActionToModelGroup')]
 parts+=[body(player,n) for n in ['Player_InitItemAction','Player_UseItem','Player_FinishItemChange']]
+# Native readers and the Rod now share the real equipment-alias and input
+# ownership helpers. Keep only world-mode activation at the engine boundary.
+parts+=[body('mm/mods/extended_equipment.c',n) for n in ['ExtEquip_IsButtonItem','ExtEquip_GetLegacyButtonItem']]
+parts+=[body('mm/mods/items/helpers/equip_helper.c','ItemInput_ButtonIsClaimed')]
+parts+=[body('mm/mods/ext_buttons/ext_buttons.cpp','ExtButton_GetInputMask')]
 parts+=[body(lib,n) for n in ['Player_GetItemOnButton','Player_Dpad_GetItemOnButton']]
 parts+=[body(player,n) for n in ['func_8082FDC4','func_Dpad_8082FDC4','Player_ItemIsInUse','Player_ProcessItemButtons']]
 parts+=[body('mm/mods/items/helpers/equip_helper.c',n) for n in ['ItemInput_IsBlockedEx','ItemInput_IsBlocked']]

@@ -21,14 +21,12 @@
 // translation unit and needs no header — the arrangement the cane and the slate use for theirs.
 #include "hourglass_sfx.inc.c"
 
-extern u16 ExtButton_GetItem(s32 btn);
+#include "mods/ext_buttons/ext_buttons.h"
 // cane_pacci.c, unity-included ahead of this file. Ultrahand drives a body's transform from its
 // carry every frame, so the two must never be pointed at the same actor.
 extern Actor* Pacci_GetUltrahandHeld(void);
 
-#define HOURGLASS_BUTTON_ITEM(btn) ExtButton_GetItem(btn)        // OoT: flat store, MM's is per-form
-#define HOURGLASS_LAST_BUTTON 7                                  // OoT: the ext store spans the D-pad (MM: 3)
-#define HOURGLASS_UPPER_SKEL(player) (&(player)->upperSkelAnime) // OoT: MM names it skelAnimeUpper
+#define HOURGLASS_UPPER_SKEL(player) (&(player)->upperSkelAnime)              // OoT: MM names it skelAnimeUpper
 #define HOURGLASS_ACTIVE_CAM(play) ((play)->cameraPtrs[(play)->activeCamera]) // OoT: MM names it activeCamId
 #define HOURGLASS_AT_DAMAGE(c) ((c).info.toucher.damage) // OoT: MM spells this elem.atDmgInfo.damage
 
@@ -60,9 +58,6 @@ typedef enum {
     HOURGLASS_STATE_AIMING,
     HOURGLASS_STATE_RECALLING,
 } HourglassState;
-
-static const u16 sHourglassButtonMasks[8] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT,
-                                              BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
 
 static HourglassState sHourglassState = HOURGLASS_STATE_IDLE;
 static Actor* sHourglassOffer = NULL;  // under the reticle while aiming
@@ -101,14 +96,7 @@ static ColliderCylinder sHourglassCollider;
 static u8 sHourglassColliderReady = 0;
 
 static u16 Hourglass_EquippedButtonMask(void) {
-    u16 mask = 0;
-
-    for (s32 btn = 1; btn <= HOURGLASS_LAST_BUTTON; btn++) {
-        if (HOURGLASS_BUTTON_ITEM(btn) == EXT_ITEM_PHANTOM_HOURGLASS) {
-            mask |= sHourglassButtonMasks[btn];
-        }
-    }
-    return mask;
+    return ExtButton_GetInputMask(EXT_ITEM_PHANTOM_HOURGLASS);
 }
 
 /**

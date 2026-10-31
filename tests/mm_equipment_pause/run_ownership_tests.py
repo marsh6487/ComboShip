@@ -43,10 +43,10 @@ def native_syntax(directory):
     sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
     from run_mm_nei_tests import flags
     source = directory / "native_ownership.c"
-    source.write_text('#include "mm/mods/extended_equipment.h"\n#include "mm/mods/nei_save.h"\n'
+    source.write_text('#include "mm/include/z64.h"\n#include "mm/mods/extended_equipment.h"\n#include "mm/mods/nei_save.h"\n'
                       '#include "mm/2s2h/FleetShipCombo/FleetComboItems.h"\n#include "mm/include/variables.h"\n' +
                       "\n".join(production_function(equipment, name) for name in names))
-    result = subprocess.run([os.environ.get("CC", "cc"), "-std=gnu11", *flags(), f"-I{ROOT}",
+    result = subprocess.run([os.environ.get("CC", "cc"), "-std=gnu11", *[f"-I{ROOT/p}" for p in ("mm","mm/include","mm/include/PR","mm/src","mm/assets","mm/2s2h","libultraship/include","combo","combo/menu")], "-DF3DEX_GBI_2", f"-I{ROOT}",
                              "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-Werror=implicit-function-declaration",
                              "-fsyntax-only", str(source)], capture_output=True, text=True)
     if result.returncode:
@@ -90,6 +90,18 @@ using s16 = int16_t; using s32 = int32_t;
 #define BTN_CDOWN 8
 #define BTN_CRIGHT 16
 #define BTN_CUP 32
+#define BTN_DRIGHT 64
+#define BTN_DLEFT 128
+#define BTN_DDOWN 256
+#define BTN_DUP 512
+#define BTN_DPAD (BTN_DRIGHT|BTN_DLEFT|BTN_DDOWN|BTN_DUP)
+#define GI_DPAD_EQUIP 0
+#define EQUIP_SLOT_D_NONE -1
+#define EQUIP_SLOT_D_RIGHT 0
+#define EQUIP_SLOT_D_LEFT 1
+#define EQUIP_SLOT_D_DOWN 2
+#define EQUIP_SLOT_D_UP 3
+#define SLOT_NONE 255
 #define CHECK_BTN_ALL(value, bits) (((value) & (bits)) == (bits))
 #define CHECK_BTN_ANY(value, bits) (((value) & (bits)) != 0)
 #define EQUIP_GRID_COL_BASE 2
@@ -173,6 +185,17 @@ void Inventory_ChangeEquipment(u16 value) { nativeEquipment[EQUIP_TYPE_SHIELD] =
 void ExtEquip_ToggleCapeVisibility() { save.capeHidden = !save.capeHidden; }
 void ExtEquip_TogglePendantEffect() { save.pendantEffectOff = !save.pendantEffectOff; }
 void Interface_LoadItemIconImpl(PlayState*, u8) { ++iconLoads; }
+void Interface_Dpad_LoadItemIconImpl(PlayState*, u8) { ++iconLoads; }
+static u16 cExt[4],dExt[4];static u8 cSlots[4],dSlots[4];
+u16 ExtButton_GetItem(s32,u8 btn){return buttons[btn]==ITEM_EXT_BUTTON?cExt[btn]:buttons[btn];}
+void ExtButton_SetItem(s32,u8 btn,u16 item){buttons[btn]=ITEM_EXT_BUTTON;cExt[btn]=item;}
+void ExtButton_ClearItem(s32,u8 btn){buttons[btn]=ITEM_NONE;cExt[btn]=0;}
+u16 ExtButton_GetDpadItem(s32,u8 btn){return dExt[btn];}
+void ExtButton_SetDpadItem(s32,u8 btn,u16 item){dExt[btn]=item;}
+#define C_SLOT_EQUIP(form,button) cSlots[button]
+#define DPAD_SLOT_EQUIP(form,button) dSlots[button]
+s32 CVarGetInteger(const char*,s32 fallback){return fallback;}
+u32 GameInteractor_Dpad(int,u32){return 0;}
 void Audio_PlaySfx(int sfx) { if (sfx == NA_SE_SY_ERROR) ++errors; }
 static int gSfxDefaultPos;
 static float gSfxDefaultFreqAndVolScale;
@@ -248,10 +271,11 @@ void RecordPrimColor(u8, u8, u8, u8 alpha) { primAlpha = alpha; }
 #define gSPGrayscale(gfx, value) (grayscale = (value))
 '''
     code += selectors.defines((ROOT / "mm/mods/extended_equipment.h").read_text(), "ITEM_EXT_")
+    code += selectors.defines((ROOT / "mm/mods/extended_equipment.h").read_text(), "EXT_EQUIP_BUTTON_")
     for prefix in ("EQUIP_SUBPAGE_", "EQUIP_UPGRADE_ROW_", "EQUIP_EXT_ROW_", "CELL_", "OOT_ICON_"):
         code += selectors.defines(pause, prefix)
     code += enhancement_off_boundary(pause)
-    functions = ["ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_GiveItem", "ExtEquip_GetItemId",
+    functions = ["ExtEquip_GetButtonItemId", "ExtEquip_IsButtonItem", "ExtEquip_GetLegacyButtonItem", "ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_GiveItem", "ExtEquip_GetItemId",
                  "ExtEquip_TridentAllowsShield", "ExtEquip_SetCurrentByType", "ExtEquip_ApplyVanillaBase",
                  "ExtEquip_ApplyTridentShieldPolicy", "ExtEquip_SetSlot", "ExtEquip_Equip", "ExtEquip_ToggleFromCButton"]
     if "void ExtEquip_RecordNativeShieldOwnership(" in equipment:
@@ -259,6 +283,8 @@ void RecordPrimColor(u8, u8, u8, u8 alpha) { primAlpha = alpha; }
     if "void ExtEquip_RecordNativeSwordOwnership(" in equipment:
         functions.insert(0, "ExtEquip_RecordNativeSwordOwnership")
     for name in functions:
+        if name in ("ExtEquip_GetButtonItemId", "ExtEquip_IsButtonItem", "ExtEquip_GetLegacyButtonItem") and name+"(" not in equipment:
+            continue
         code += production_function(equipment, name) + "\n"
     for name in ("ExtEquip_GetCapeIcon", "ExtEquip_GetPendantIcon"):
         code += selectors.function(equipment, name) + "\n"

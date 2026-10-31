@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             fallback_class = fallback_class[fallback_class.index("class MM_NeiGiFallbackShimmer"):]
             foreign_source = (ROOT / "combo/menu/ComboForeignDrawOOT.h").read_text()
             foreign_info = re.search(r"struct ComboForeignDrawInfo \{.*?\n\};", foreign_source, re.S)[0]
-            foreign_draw = functions(foreign_source)["OOT_DrawComboForeign"]
+            foreign_draw = functions(foreign_source)["OOT_DrawForeignNativeEquipment"] + "\n" + functions(foreign_source)["OOT_DrawComboForeign"]
             mirror_helper = functions((ROOT / "combo/menu/ComboMagicMirrorForeign.h").read_text())["ComboDrawMagicMirrorForeign"]
             foreign_draw = ('extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "NEI dispatch selected Mirror"); }\n'
                             + mirror_helper + '\n' + foreign_draw)

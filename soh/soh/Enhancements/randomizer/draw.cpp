@@ -2109,8 +2109,8 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     } else
 #endif
     {
-        opaque = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_OPA);
-        translucent = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_GI_XLU);
+        opaque = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_NATIVE_OPA);
+        translucent = MmAssets_LoadDisplayListGraphStrict(COMBO_IKANA_NATIVE_XLU);
         if (!opaque || !translucent)
             return;
         MmAssets_EnsureStrictTextureBindings();

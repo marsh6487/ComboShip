@@ -590,6 +590,47 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     }
 
     switch (rg) {
+        case RG_DOMINION_ROD:
+        case RG_ELEMENTAL_WAND:
+            // The native callbacks intentionally use this green cube until a
+            // dedicated model exists. Keep that fallback portable and exact.
+            return CwCustomGi(out, "__OTR__objects/nei_legacy_gi/dominion_rod/gi_dl", 2.5f);
+        case RG_WHIP:
+            return CwCustomGi(out, "__OTR__objects/object_nei_whip/whip_give_opaque_dl", 0.5f);
+        case RG_SPINNER:
+            return CwCustomGi(out, "__OTR__objects/object_nei_spinner/n0b0_opaque_dl", 0.3f);
+        case RG_DEKU_LEAF:
+            return CwCustomGi(out, "__OTR__objects/object_nei_deku_leaf/g_dekuleaf_dl", 0.5f);
+        case RG_SWITCH_HOOK:
+            return CwCustomGi(out, "__OTR__objects/object_nei_switchhook/gSwitchHookGiveDL", 0.01f);
+        case RG_MOGMA_MITTS:
+            return CwCustomGi(out, "__OTR__objects/object_nei_mogma_mitts/gMogmaMittsGiveDL", 0.5f);
+        case RG_GUST_JAR:
+            return CwCustomGi(out, "__OTR__objects/object_nei_gust_jar/jar_model_dl", 5.0f);
+        case RG_TIME_GATE:
+            return CwCustomGi(out, "__OTR__objects/object_nei_time_gate/g_timegate_dl", 0.5f);
+        case RG_MINISH_CAP:
+            return CwCustomGi(out, "__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl", 0.5f);
+        case RG_ROCS_CAPE:
+            return CwCustomGi(out, "__OTR__objects/object_nei_rocs_cape/rocs_cape_mesh_dl", 0.6f);
+        case RG_FIRE_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_fire_rod/Cylinder_001_opaque_dl", 0.2f);
+        case RG_ICE_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_ice_rod/ice_rod_opaque_dl", 0.2f);
+        case RG_LIGHT_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_light_rod/Cylinder_002_opaque_dl", 0.2f);
+        case RG_BALL_AND_CHAIN:
+            return CwCustomGi(out, "__OTR__objects/object_nei_ball_and_chain/g_ball_and_chain_dl", 0.25f);
+        case RG_BEETLE:
+            return CwCustomGi(out, "__OTR__objects/object_nei_beetle/g_beetle_dl", 0.3f);
+        case RG_SHOVEL:
+            return CwCustomGi(out, "__OTR__objects/object_nei_shovel/gShovelGiveDL_opaque_dl", 0.2f);
+        case RG_HYLIAS_GRACE:
+            return CwCustomGi(out, "__OTR__objects/object_nei_magic_spell/gHyliaGraceGiveDL", 1.0f);
+        case RG_ZONAI_PERMAFROST:
+            return CwCustomGi(out, "__OTR__objects/object_nei_magic_spell/gZonaiPermafrostGiveDL", 1.0f);
+        case RG_DEMISE_DESTRUCTION:
+            return CwCustomGi(out, "__OTR__objects/object_nei_magic_spell/gDemiseDestructionGiveDL", 1.0f);
         case RG_SCARECROWS_SONG: // dark green grayscale note (Randomizer_DrawScarecrowsSong)
             out->drawKind = CW_DRAW_KIND_GRAYSCALE_XLU;
             out->dlistCount = 1;

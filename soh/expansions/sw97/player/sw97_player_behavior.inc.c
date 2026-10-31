@@ -1,3 +1,4 @@
+#include "mods/ext_buttons/ext_buttons.h"
 /**
  * sw97_player_behavior.inc.c - Player behavior hooks for SW97 Medallion Spells
  *
@@ -142,14 +143,8 @@ void Sw97_TickShadowExchange(PlayState* play, Player* player) {
     if (play == NULL || player == NULL)
         return;
 
-    // Find which C-slot has the Shadow medallion. buttonItems[0]=B, [1..3]=C-LDR.
-    u16 medallionMask = 0;
-    if (gSaveContext.equips.buttonItems[1] == ITEM_MEDALLION_SHADOW)
-        medallionMask |= BTN_CLEFT;
-    if (gSaveContext.equips.buttonItems[2] == ITEM_MEDALLION_SHADOW)
-        medallionMask |= BTN_CDOWN;
-    if (gSaveContext.equips.buttonItems[3] == ITEM_MEDALLION_SHADOW)
-        medallionMask |= BTN_CRIGHT;
+    // The same medallion may be bound independently to C and D-pad.
+    u16 medallionMask = ExtButton_GetInputMask(ITEM_MEDALLION_SHADOW);
 
     static s16 sShadowHoldFrames = 0;
     static u8 sShadowExchanged = 0;

@@ -1,4 +1,5 @@
 #include "../../combo/menu/ComboIkanaShieldResources.h"
+#include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
@@ -1718,6 +1719,8 @@ extern "C" void DeinitOTR() {
     BenGui::Destroy();
     benFast3dWindow = nullptr;
 
+    // The stock-only GI view owns workers too; release it before Context/DLL teardown.
+    Ship::CrossRMRegistry::Unregister("mm-ikana-base");
 #ifdef COMBO_BUILD
     // ComboShip: drop the resident-RM refs now so MM's ResourceManager dies on the main thread
     // during shutdown. Left in these statics/registry, it would instead die in DLL-unload static
@@ -5761,6 +5764,24 @@ extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char*
     return NeiAssetPriority::GetGiModelBounds("mm", game, paths, count, minimum, maximum);
 }
 
+extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path) {
+    if (!game || !path || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
+        return 0;
+    auto owner = Ship::CrossRMRegistry::Get(game);
+#ifndef COMBO_BUILD
+    if (!owner && std::strcmp(game, "mm") == 0)
+        if (const auto context = Ship::Context::GetRawInstance())
+            owner = context->GetResourceManager();
+#endif
+    if (!owner)
+        return 0;
+    // XML factories may resolve dependencies through the active Context. The
+    // selected owner's normal load also retains its Alt/.meta/cache policy.
+    Ship::ResourceManagerScope scope(owner);
+    const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
+    return model && !model->Instructions.empty();
+}
+
 extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
     auto owner = Ship::CrossRMRegistry::Get("mm");
 #ifndef COMBO_BUILD
@@ -5769,6 +5790,8 @@ extern "C" int ResourceMgr_IsIkanaShieldGiAvailable(void) {
             owner = context->GetResourceManager();
 #endif
     if (!owner)
+        return 0;
+    if (!ComboEnsureIkanaShieldBaseOwner(owner))
         return 0;
     Ship::ResourceManagerScope scope(owner);
     for (const char* path : { COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU }) {

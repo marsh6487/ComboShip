@@ -2576,10 +2576,12 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
             // Calculate inventory slot with page offset using modular system
             int inventorySlot = ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]);
 
-            if (moveCursorResult == 1) {
-                cursorItem = ExtInv_GetSlotItem(inventorySlot); // Skijer's NEI
-            } else if (moveCursorResult != 2) {
-                cursorItem = ExtInv_GetSlotItem(inventorySlot); // Skijer's NEI
+            // A boundary move can leave the cursor in place after ownership or
+            // shared-cell contents changed. Resolve that cell again even when
+            // movement returned 2; the cached previous item is not ownership.
+            cursorItem = ExtInv_GetSlotItem(inventorySlot);
+            if (cursorItem == ITEM_NONE) {
+                cursorItem = PAUSE_ITEM_NONE;
             }
 
             pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
@@ -3184,61 +3186,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
 
             // If the item is on another button already, swap the two
             uint16_t targetButtonIndex = pauseCtx->equipTargetCBtn + 1;
-#ifdef COMBO_BUILD
-            if (!ExtButton_EquipMagicMirror(play, targetButtonIndex, pauseCtx->equipTargetItem,
-                                            pauseCtx->equipTargetSlot)) {
-#endif
-                for (uint16_t otherSlotIndex = 0; otherSlotIndex < ARRAY_COUNT(gSaveContext.equips.cButtonSlots);
-                     otherSlotIndex++) {
-                    uint16_t otherButtonIndex = otherSlotIndex + 1;
-                    if (otherSlotIndex == pauseCtx->equipTargetCBtn) {
-                        continue;
-                    }
-
-                    if (pauseCtx->equipTargetSlot == gSaveContext.equips.cButtonSlots[otherSlotIndex]) {
-                        // Assign the other button to the target's current item
-                        if (gSaveContext.equips.buttonItems[targetButtonIndex] != ITEM_NONE) {
-                            gSaveContext.equips.buttonItems[otherButtonIndex] =
-                                gSaveContext.equips.buttonItems[targetButtonIndex];
-                            gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                                gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn];
-                            Interface_LoadItemIcon2(play, otherButtonIndex);
-                        } else {
-                            gSaveContext.equips.buttonItems[otherButtonIndex] = ITEM_NONE;
-                            gSaveContext.equips.cButtonSlots[otherSlotIndex] = SLOT_NONE;
-                        }
-                        // break; // 'Assume there is only one possible pre-existing equip'
-                    }
-
-                    // Fix for Equip Dupe
-                    if (pauseCtx->equipTargetItem == ITEM_BOW) {
-                        if (gSaveContext.equips.buttonItems[otherButtonIndex] >= ITEM_BOW_ARROW_FIRE &&
-                            gSaveContext.equips.buttonItems[otherButtonIndex] <= ITEM_BOW_ARROW_LIGHT &&
-                            !CVarGetInteger(CVAR_ENHANCEMENT("SeparateArrows"), 0)) {
-                            gSaveContext.equips.buttonItems[otherButtonIndex] =
-                                gSaveContext.equips.buttonItems[targetButtonIndex];
-                            gSaveContext.equips.cButtonSlots[otherSlotIndex] =
-                                gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn];
-                            Interface_LoadItemIcon2(play, otherButtonIndex);
-                        }
-                    }
-                }
-
-                // Skijer's NEI: a u16 EXT id (>= 0x0200, e.g. the Sheikah Slate) does not fit the u8
-                // buttonItems array, so it rides the ext-button marker — ITEM_EXT_BUTTON parks here and
-                // the real id in the parallel u16 store, which every icon site resolves. Its home slot
-                // is not a vanilla inventory slot either, hence the 0xFF sentinel.
-                if (pauseCtx->equipTargetItem >= 0x0200) {
-                    ExtButton_SetItem(targetButtonIndex, pauseCtx->equipTargetItem);
-                    gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn] = 0xFF;
-                } else {
-                    ExtButton_ClearItem(targetButtonIndex); // drop any stale ext id this button carried
-                    gSaveContext.equips.buttonItems[targetButtonIndex] = pauseCtx->equipTargetItem;
-                    gSaveContext.equips.cButtonSlots[pauseCtx->equipTargetCBtn] = pauseCtx->equipTargetSlot;
-                }
-#ifdef COMBO_BUILD
-            }
-#endif
+            ExtButton_EquipItem(play, targetButtonIndex, pauseCtx->equipTargetItem, pauseCtx->equipTargetSlot);
             Interface_LoadItemIcon1(play, targetButtonIndex);
 
             pauseCtx->unk_1E4 = 0;

@@ -151,12 +151,15 @@ assert(ItemEquip_ClaimUnequipSound(&play,&p,action));
 ''')
 cache=helper[helper.index('typedef struct {'):helper.index('u8 ItemEquip_GetItemOnSlot')]
 run('stowed_input_rearm',cache+r'''
+SaveContext gSaveContext{};
+u8 MasterCycle_IsRiding(){return 0;}
+u8 Cryonis_ModeActive(){return 0;}
 u8 itemSlot[8]={ITEM_NONE,ITEM_WHIP,ITEM_NONE,ITEM_NONE,ITEM_NONE,ITEM_NONE,ITEM_NONE,ITEM_NONE};
 u8 ItemEquip_GetItemOnSlot(u8 slot){return itemSlot[slot];}
 u8 Pacci_UltrahandModeActive(){return 0;}
 u8 Sw97_IsBowItem(u8){return 0;}u8 Sw97_IsSlingItem(u8){return 0;}u8 Sw97_EffectiveElement(u8){return 0;}
 #define SW97_ELEM_BOMB 6
-''',[hf[n] for n in ['EquipCache_Update','ItemInput_GetEquippedButton','ItemInput_SuppressUntilRelease','ItemInput_CheckOtherButtons','ItemInput_Update']],r'''
+''',[hf[n] for n in ['ItemInput_ButtonIsClaimed','EquipCache_Update','ItemInput_GetEquippedButton','ItemInput_SuppressUntilRelease','ItemInput_CheckOtherButtons','ItemInput_Update']],r'''
 Player p{};PlayState play{};ItemInputState in{};play.gameplayFrames=1;
 play.state.input[0].cur.button=play.state.input[0].press.button=BTN_CLEFT;
 ItemInput_Update(&in,ITEM_WHIP,&p,&play);assert(in.isPressed&&in.isHeld);
@@ -452,7 +455,14 @@ def run_caller(name,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name:return
  with tempfile.TemporaryDirectory(prefix='mm-nei-caller-') as td:
   src=Path(td)/'caller.c';binary=Path(td)/'caller'
-  src.write_text(caller_prefix+'\n'.join(caller_parts)+'\nint main(void){'+checks+'\nputs("PASS '+name+'");}')
+  # The reserve-before-tools path reads full button identities. Keep the real
+  # accessor and alias helpers; adapt only the C++ save reference to C syntax.
+  dpad_reader=body('mm/mods/ext_buttons/ext_buttons.cpp','ExtButton_GetDpadItem')
+  dpad_reader=dpad_reader.replace('auto& equips = gSaveContext.save.shipSaveInfo.dpadEquips;',
+      'DpadSaveInfo* equips = &gSaveContext.save.shipSaveInfo.dpadEquips;').replace('equips.extItems','equips->extItems')
+  dependencies=[body('mm/mods/ext_buttons/ext_buttons.cpp','ExtButton_GetItem'),dpad_reader]
+  dependencies += [body('mm/mods/extended_equipment.c',n) for n in ('ExtEquip_IsButtonItem','ExtEquip_GetLegacyButtonItem')]
+  src.write_text('#include "mods/ext_buttons/ext_buttons.h"\n'+caller_prefix+'\n'.join(dependencies+caller_parts)+'\nint main(void){'+checks+'\nputs("PASS '+name+'");}')
   subprocess.run(['cc','-std=gnu17',*flags(),*SANITIZER_FLAGS,'-Werror=implicit-function-declaration','-ffunction-sections','-fdata-sections',str(src),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)
 run_caller('net_native_replacement',r'''
