@@ -4,6 +4,9 @@
 #include "soh/resource/type/Scene.h"
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
+#include <stdexcept>
 #include <ship/utils/StringHelper.h>
 #include <spdlog/spdlog.h>
 
@@ -39,8 +42,22 @@ Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
     // backtrace. Catch it here, log which file failed and why, and return nullptr so the caller hits
     // its existing fallback instead of dying silently.
     try {
+#ifdef COMBO_BUILD
+        LUSLOG_INFO("[SceneSpawn] owner path='%s' active-is-oot=%d", fileName,
+                    Ship::Context::GetRawInstance()->GetResourceManager() == Ship::CrossRMRegistry::GetOrActive("oot"));
+        Ship::OwnRMScope ownerScope("oot");
+#endif
+        auto resources = Ship::Context::GetRawInstance()->GetResourceManager();
+        auto archives = resources->GetArchiveManager();
+        LUSLOG_INFO("[SceneSpawn] lookup path='%s' alt=%d present=%d alt-present=%d", fileName,
+                    resources->IsAltAssetsEnabled(), archives->HasFile(fileName),
+                    archives->HasFile(std::string("alt/") + fileName));
         auto res = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(fileName);
-        return res.get();
+        auto scene = std::dynamic_pointer_cast<SOH::Scene>(res);
+        LUSLOG_INFO("[SceneSpawn] resource path='%s' resolved='%s' result=%s", fileName,
+                    res ? res->GetInitData()->Path.c_str() : "(none)",
+                    scene ? "scene" : (res ? "wrong-type" : "missing"));
+        return scene.get();
     } catch (const std::exception& e) {
         lusprintf(__FILE__, __LINE__, 2, "[ComboShip] OTRPlay_LoadFile FAILED for '%s': %s\n",
                   fileName ? fileName : "(null)", e.what());
@@ -53,31 +70,51 @@ Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
 }
 
 extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
-    // SOH [Unbound] scene identity comes from SceneDB
-    SceneDB::Entry& scene = SceneDB::Instance->RetrieveEntry(sceneId);
-
-    if (!scene.valid) {
-        SPDLOG_ERROR("[Unbound] spawn requested for unknown scene id {:#x}; defaulting to Dodongo's Cavern", sceneId);
-        OTRPlay_SpawnScene(play, SCENE_DODONGOS_CAVERN, 0);
-        return;
-    }
-
-    play->sceneNum = sceneId;
-    play->sceneConfig = scene.drawConfig < SDC_MAX ? scene.drawConfig : SDC_DEFAULT;
-
-    std::string scenePath = SceneDB::Instance->GetScenePath(sceneId);
-    play->sceneSegment = OTRPlay_LoadFile(play, scenePath.c_str());
-
-    // Failed to load scene... default to doodongs cavern
-    if (play->sceneSegment == nullptr) {
-        SPDLOG_INFO("Unable to load scene {}... Defaulting to Doodong's Cavern!", scenePath);
-        OTRPlay_SpawnScene(play, SCENE_DODONGOS_CAVERN, 0);
-        return;
+    LUSLOG_INFO("[SceneSpawn] request scene=%d spawn=%d entrance=%#x layer=%d cutscene=%#x respawn=%d", sceneId, spawn,
+                gSaveContext.entranceIndex, gSaveContext.sceneLayer, gSaveContext.cutsceneIndex,
+                gSaveContext.respawnFlag);
+#ifdef COMBO_BUILD
+    Ship::OwnRMScope ownerScope("oot");
+#endif
+    // A fallback is a new arrival, not a continuation of the failed scene's
+    // grotto/Farore/cutscene spawn. Never apply its room or coordinates here.
+    for (int attempt = 0;; ++attempt) {
+        SceneDB::Entry& scene = SceneDB::Instance->RetrieveEntry(sceneId);
+        // MQ resource resolution consults the requested scene during loading.
+        play->sceneNum = sceneId;
+        std::string scenePath = scene.valid ? SceneDB::Instance->GetScenePath(sceneId) : "";
+        play->sceneSegment = scene.valid ? OTRPlay_LoadFile(play, scenePath.c_str()) : nullptr;
+        if (play->sceneSegment != nullptr) {
+            play->sceneNum = sceneId;
+            play->sceneConfig = scene.drawConfig < SDC_MAX ? scene.drawConfig : SDC_DEFAULT;
+            break;
+        }
+        LUSLOG_ERROR("[SceneSpawn] failed scene=%d path='%s' reason=%s attempt=%d", sceneId, scenePath.c_str(),
+                     scene.valid ? "resource-load" : "unregistered-scene", attempt);
+        if (attempt != 0 || sceneId == SCENE_DODONGOS_CAVERN) {
+            throw std::runtime_error("Scene load failed, including recovery destination: " + scenePath);
+        }
+        sceneId = SCENE_DODONGOS_CAVERN;
+        spawn = 0;
+        gSaveContext.entranceIndex = ENTR_DODONGOS_CAVERN_ENTRANCE;
+        gSaveContext.respawnFlag = 0;
+        gSaveContext.sceneLayer = 0;
+        gSaveContext.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        gSaveContext.cutsceneTrigger = 0;
+        LUSLOG_INFO("[SceneSpawn] recovery entrance=%#x scene=%d spawn=0 layer=0 respawn=0", gSaveContext.entranceIndex,
+                    sceneId);
     }
 
     // gSegments[2] = VIRTUAL_TO_PHYSICAL(play->sceneSegment);
 
     OTRPlay_InitScene(play, spawn);
+    if (play->linkActorEntry != nullptr) {
+        const auto& entry = *play->linkActorEntry;
+        LUSLOG_INFO("[SceneSpawn] header scene=%d spawn=%d rooms=%d pos=(%.2f,%.2f,%.2f) params=%#x", play->sceneNum,
+                    spawn, play->numRooms, static_cast<double>(entry.pos.x), static_cast<double>(entry.pos.y),
+                    static_cast<double>(entry.pos.z), static_cast<unsigned>(static_cast<uint16_t>(entry.params)));
+    }
     auto roomSize = func_80096FE8(play, &play->roomCtx);
 
     osSyncPrintf("ROOM SIZE=%fK\n", roomSize / 1024.0f);
