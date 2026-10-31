@@ -728,6 +728,12 @@ void Play_Init(GameState* thisx) {
     gSaveContext.natureAmbienceId = play->sequenceCtx.natureAmbienceId;
     Actor_InitPlayerHorse(play, GET_PLAYER(play));
     AnimationContext_Update(play, &play->animationCtx);
+    LUSLOG_INFO("[SceneSpawn] ready scene=%d entrance=%#x spawn=%d room=%d layer=%d cutscene=%#x "
+                "respawn=%d pos=(%.2f,%.2f,%.2f) params=%#x collision=%d",
+                play->sceneNum, gSaveContext.entranceIndex, play->curSpawn, play->roomCtx.curRoom.num,
+                gSaveContext.sceneLayer, gSaveContext.cutsceneIndex, gSaveContext.respawnFlag,
+                player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z,
+                (unsigned)(u16)player->actor.params, BgCheck_GetCollisionHeader(&play->colCtx, BGCHECK_SCENE) != NULL);
     gSaveContext.respawnFlag = 0;
 
     // #region SOH [Stats]
