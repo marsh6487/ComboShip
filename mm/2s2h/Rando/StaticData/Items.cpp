@@ -1,6 +1,7 @@
 #include "StaticData.h"
 #include "ComboItemIconOwnership.h"
 #include "ComboSongDrawMM.h"
+#include "ComboBossSoulReceiptIcon.h"
 #include <unordered_map>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -701,10 +702,10 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
     // textbox blit: enemy + OoT boss souls (toast uses gDungeonMapSkullTex, a map-screen texture)
     // get the Captain's Hat keeta-skull icon; clock items (toast uses the HUD sun/moon hour texes)
     // get the Moon's Tear icon. Both are rgba32 32x32 gItemIcons — the toast keeps its themed art
-    // via GetIconTexturePath. MM boss souls already stage their remains icons (safe family).
-    if ((randoItemId >= RI_SOUL_ENEMY_ALIEN && randoItemId <= RI_SOUL_ENEMY_WOLFOS) ||
-        (randoItemId >= RI_SOUL_OOT_BOSS_BARINADE && randoItemId <= RI_SOUL_OOT_BOSS_VOLVAGIA)) {
-        Message_StageCustomItemIcon((void*)gItemIcons[ITEM_MASK_CAPTAIN], 32);
+    // via GetIconTexturePath. The other MM bosses stage their remains icons.
+    if (ComboMmSoulReceiptUsesSkull(randoItemId)) {
+        Message_StageCustomItemIcon(
+            (void*)ComboMmSoulReceiptIconPath(randoItemId, nullptr, (const char*)gItemIcons[ITEM_MASK_CAPTAIN]), 32);
         return 0xF5;
     }
     switch (randoItemId) {

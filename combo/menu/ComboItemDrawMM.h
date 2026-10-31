@@ -91,6 +91,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
+extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);

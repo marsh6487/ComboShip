@@ -1611,5 +1611,11 @@
     "origin": "nei",
     "name": "Native NEI foreign GI fallbacks and independent Ikana resources",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_gi/mm_cane_export_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_gi/mm_import_fallback_test.py --sanitize\npython3 -B tests/nei_gi/oot_equipment_bridge_test.py\npython3 -B tests/nei_gi/legacy_cube_asset_test.py\npython3 -B tests/ikana_gi/independent_resources_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --ikana --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Native and cross-game boss-soul receipt icon formats",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_soul_icon_tests.py --sanitize"
   }
 ]

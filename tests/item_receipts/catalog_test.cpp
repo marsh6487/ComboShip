@@ -9,6 +9,7 @@
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
+#include "ComboBossSoulReceiptIcon.h"
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
 #include "key_receipt_fixtures.h"

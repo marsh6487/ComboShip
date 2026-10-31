@@ -948,9 +948,14 @@ void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* present
             sItemReceiptPresentation.iconPath[0] = '\0';
     }
     if (presentation != NULL) {
-        lusprintf(__FILE__, __LINE__, 2, "[ReceiptTrace] oot stage singleBox=%d rewardLine=%d icon='%s'",
+        lusprintf(__FILE__, __LINE__, 2,
+                  "[ReceiptTrace] oot stage singleBox=%d rewardLine=%d icon='%s' size=%dx%d format=%s",
                   presentation->singleBox, presentation->rewardLine,
-                  ComboReceipt_HasIcon(presentation) ? presentation->iconPath : "(none)");
+                  ComboReceipt_HasIcon(presentation) ? presentation->iconPath : "(none)", presentation->iconWidth,
+                  presentation->iconHeight,
+                  presentation->iconIA8 == 1   ? "IA8"
+                  : presentation->iconIA8 == 0 ? "RGBA32"
+                                               : "INVALID");
     }
 }
 

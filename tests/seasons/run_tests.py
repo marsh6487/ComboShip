@@ -14,6 +14,18 @@ def run(name,prefix,parts,checks):
   parts.insert(0, body('mm/mods/extended_inventory.c', 'Seasons_HasRod'))
   prefix += '\nu16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}\n'
   prefix += 'u8 Seasons_RandoMode(){return NEI_SEASONS_INDIVIDUAL;}\nvoid Seasons_UpdateGates(){}\n'
+ if any('s32 ExtButton_EquipItem(' in part for part in parts):
+  # These fixtures include the actual accessor TU, including its native mode
+  # policy. Supply native save storage and inactive world-mode boundaries.
+  if not re.search(r'\bNei_Save\([^;]*\)\s*\{',prefix):
+   prefix += '\nNeiSaveData* Nei_Save(){return &gSaveContext.save.shipSaveInfo.nei;}\n'
+  if not re.search(r'\bCVarGetInteger\([^;]*\)\s*\{',prefix):
+   prefix += '\nextern "C" int32_t CVarGetInteger(const char*,int32_t fallback){return fallback;}\n'
+  for mode in ('MasterCycle_IsRiding','Pacci_UltrahandModeActive','Cryonis_ModeActive'):
+   if not re.search(r'\b'+mode+r'\([^;]*\)\s*\{',prefix):
+    prefix += '\nu8 '+mode+'(){return 0;}\n'
+  parts.insert(0,body('mm/mods/items/helpers/equip_helper.c','ItemInput_ButtonIsClaimed'))
+  parts[:0]=[body('mm/mods/extended_equipment.c',n) for n in ('ExtEquip_IsButtonItem','ExtEquip_GetLegacyButtonItem')]
  if any('MMSeasonParticles_' in part for part in parts):
   # Extracted native snow/leaf bodies now share the real editor particle policy.
   prefix = '#include "mods/items/helpers/season_particles.h"\n' + prefix
@@ -21,7 +33,7 @@ def run(name,prefix,parts,checks):
    prefix += '\nextern "C" int32_t CVarGetInteger(const char*,int32_t fallback){return fallback;}\n'
  with tempfile.TemporaryDirectory(prefix='seasons-') as td:
   p=Path(td)/'test.cpp'
-  p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
+  p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "mods/extended_equipment.h"\n#include "mods/items/helpers/equip_helper.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/'test'
   # Fold the fixed Rod slot in ExtInv_GiveItem so the unrelated shared Grace
   # grant is not a fixture dependency. The actual season grant still executes.
@@ -52,18 +64,28 @@ assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_C_LEFT,EXT_ITEM_ROD_OF_SEASONS,95))
 assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==EXT_ITEM_ROD_OF_SEASONS);
 assert(C_SLOT_EQUIP(0,EQUIP_SLOT_C_LEFT)==SLOT_NONE);
 assert(ExtButton_GetDpadItem(0,EQUIP_SLOT_D_UP)==ITEM_NONE);
-// Move from C to D-pad over a real mushroom: swap preserves both full identities.
+// D-pad assignment over a real mushroom preserves the complete independent C bank.
+auto cBefore=gSaveContext.save.saveInfo.equips;
+auto extBefore=gSaveContext.save.shipSaveInfo.extButtons;
 ExtButton_SetDpadItem(0,EQUIP_SLOT_D_DOWN,ITEM_MUSHROOM);
 DPAD_SLOT_EQUIP(0,EQUIP_SLOT_D_DOWN)=SLOT_BOTTLE_1;
 assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_D_DOWN,EXT_ITEM_ROD_OF_SEASONS,95));
-assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==ITEM_MUSHROOM);
+assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==EXT_ITEM_ROD_OF_SEASONS);
 assert(ExtButton_GetDpadItem(0,EQUIP_SLOT_D_DOWN)==EXT_ITEM_ROD_OF_SEASONS);
-assert(BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_LEFT)==ITEM_MUSHROOM);
-assert(EXT_BUTTON_ITEM(0,EQUIP_SLOT_C_LEFT)==0);
-// A native item swapped onto a rod-equipped destination moves the rod back to its source.
+assert(BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_LEFT)==ITEM_EXT_BUTTON);
+assert(EXT_BUTTON_ITEM(0,EQUIP_SLOT_C_LEFT)==EXT_ITEM_ROD_OF_SEASONS);
+assert(!memcmp(&cBefore,&gSaveContext.save.saveInfo.equips,sizeof(cBefore)));
+assert(!memcmp(&extBefore,&gSaveContext.save.shipSaveInfo.extButtons,sizeof(extBefore)));
+// A native item keeps its original swap semantics and carries the displaced
+// Rod's full identity back to the native item's previous C slot.
+BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_DOWN)=ITEM_MUSHROOM;
+C_SLOT_EQUIP(0,EQUIP_SLOT_C_DOWN)=SLOT_BOTTLE_1;
 assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_D_DOWN,ITEM_MUSHROOM,SLOT_BOTTLE_1));
 assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==EXT_ITEM_ROD_OF_SEASONS);
 assert(ExtButton_GetDpadItem(0,EQUIP_SLOT_D_DOWN)==ITEM_MUSHROOM);
+assert(ExtButton_GetItem(0,EQUIP_SLOT_C_DOWN)==EXT_ITEM_ROD_OF_SEASONS);
+assert(BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_DOWN)==ITEM_EXT_BUTTON);
+assert(EXT_BUTTON_ITEM(0,EQUIP_SLOT_C_DOWN)==EXT_ITEM_ROD_OF_SEASONS);
 assert(!ExtButton_EquipItem(&play,PAUSE_EQUIP_D_UP,ITEM_BOW,SLOT_BOW));
 ''')
 

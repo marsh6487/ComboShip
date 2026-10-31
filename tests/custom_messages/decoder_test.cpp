@@ -5,6 +5,7 @@
 #include "2s2h/Enhancements/Gameplay/ComboForestActors.h"
 #include <nlohmann/json.hpp>
 #include "2s2h/Rando/Rando.h"
+#include "ComboBossSoulReceiptIcon.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "ComboCapeReceiptChoice.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -30,6 +31,8 @@ static CustomMessage::Entry shownReceipt;
 constexpr u16 kText = 0x8F28, kTeachText = 0x8F29, kTaughtText = 0x8F2A;
 extern "C" f32 sNESFontWidths[160];
 extern "C" const char* fontTbl[156];
+// Diagnostic output is a boundary service; keep the real receipt/message path.
+extern "C" void lusprintf(const char*, int, int, const char*, ...) {}
 extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation*);
 extern "C" void Message_SetCapeVisibilityChoice(int);
 extern "C" void Message_OpenText(PlayState*, u16);

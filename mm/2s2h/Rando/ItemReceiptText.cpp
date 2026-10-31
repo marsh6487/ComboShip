@@ -6,6 +6,7 @@
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboBossSoulReceiptText.h"
+#include "ComboBossSoulReceiptIcon.h"
 #include "ComboCapeReceiptChoice.h"
 #include "ComboVanillaItemReceiptText.h"
 #include "ComboSongReceiptText.h"
@@ -745,7 +746,8 @@ extern "C" COMBO_EXPORT int32_t MM_GetSeedItemIconInfo(const char* name, CwItemI
         for (const auto& [id, item] : Rando::StaticData::Items) {
             if (id == RI_UNKNOWN || id == RI_COMBO_FOREIGN || !item.name || key != item.name)
                 continue;
-            out->path = Rando::StaticData::GetIconTexturePath(id);
+            out->path = ComboMmSoulReceiptIconPath(id, Rando::StaticData::GetIconTexturePath(id),
+                                                   (const char*)gItemIcons[ITEM_MASK_CAPTAIN]);
             if (!out->path || std::strncmp(out->path, "__OTR__", 7))
                 return 0;
             out->width = out->height = std::strstr(out->path, "icon_item_24_static") ? 24 : 32;

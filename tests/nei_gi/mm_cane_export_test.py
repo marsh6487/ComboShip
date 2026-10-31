@@ -1,14 +1,17 @@
 """Exercise the real MM exporter for every concrete cane without optional GI assets."""
 from pathlib import Path
-import os, subprocess, sys, tempfile
+import os, re, subprocess, sys, tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
-from run_time_pedestal_tests import functions
+from run_time_pedestal_tests import block_from, functions
 owner=(ROOT/'combo/menu/ComboItemDrawMM.h').read_text()
 fns=functions(owner)
 fixture=(ROOT/'tests/ikana_gi/mm_export_test.cpp').read_text().split('/* MM_PRODUCER */')[0]
-fixture=fixture.replace('int MM_FillImportedSwordFallback(RandoItemId,CwItemDrawInfo*){return 0;}','')
-fixture=fixture.replace('int MM_FillCaneDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}','')
+# Remove the borrowed fixture's complete stubs, independent of C++ formatting.
+for name in ('MM_FillImportedSwordFallback', 'MM_FillCaneDrawInfo'):
+    stub=functions(fixture)[name]
+    assert fixture.count(stub)==1, name
+    fixture=fixture.replace(stub,'',1)
 a=fixture.index('int GetItem_GetDrawTableEntry(')
 fixture=fixture[:a]+r'''
 bool mmMod=false,ootMod=false,mmPresent=true,ootPresent=true,handPresent=true;
@@ -16,14 +19,20 @@ int nativeCalls=0;
 int GetItem_GetDrawTableEntry(int,void**,int,int*,float*,int*,int*) { ++nativeCalls;return 0; }
 void GetItem_GetDrawSetupDLs(int,void**,void**){}
 int GetItem_GetShimmerColor(s16,u8*){return 0;}
-int ResourceMgr_IsModAssetForGame(const char* game,const char*) {return !strcmp(game,"mm")?mmMod:ootMod;}
+namespace NeiAssetPriority {int IsModAsset(const char* native,const char* game,const char*) {assert(!strcmp(native,"mm"));return !strcmp(game,"mm")?mmMod:ootMod;}}
 int ResourceMgr_IsGiModelAvailableForGame(const char* game,const char* path) {return (!strcmp(game,"mm")?mmPresent:ootPresent)&&(handPresent||!strstr(path,"ultrahand"));}
 const char* NeiResource_Route(const char* p) {static std::map<std::string,std::string> paths;auto& out=paths[p];out=std::string("__OTR__@oot:")+(p+7);return out.c_str();}
 '''
+# Preserve the real consumer's declaration-before-definition boundary. Defining
+# this seam before MM_FillCaneDrawInfo would mask a missing production prototype.
+benport=(ROOT/'mm/2s2h/BenPort.cpp').read_text()
+mod_query=block_from(benport,benport.index('extern "C" int ResourceMgr_IsModAssetForGame('))
+mod_declaration=re.search(r'^extern "C" int ResourceMgr_IsModAssetForGame\([^;{}]*\);',owner,re.M)
+fixture+=(mod_declaration.group(0) if mod_declaration else '')+'\n'
 fixture+='int ComboCollectibleShimmer_ProfileForDrawId(s16){return -1;}\n'+fns['MM_Op']+'\n'+fns['MM_OpV']+'\n'
 fixture+='int DescribeTools(const char* name,CwItemDrawInfo* out){assert(!strcmp(name,\"Dominion Rod\")||!strcmp(name,\"Elemental Wand\"));out->drawKind=CW_DRAW_KIND_CUSTOM_GI;out->dlistCount=1;out->scale=2.5f;out->dlists[0]=\"__OTR__objects/nei_legacy_gi/dominion_rod/gi_dl\";return 1;}\nvoid* Combo_ResolveSym(const char*,const char*){return (void*)DescribeTools;}\n'
 fixture+=fns['MM_FillImportedSwordFallback']+'\n'
-fixture+=fns.get('MM_FillCaneDrawInfo','')+'\n'+fns['MM_IsProgressiveItem']+'\n'+fns['MM_FillElementalSpellDrawInfo']+'\n'+fns['MM_FillItemDrawInfo']
+fixture+=fns['MM_FillCaneDrawInfo']+'\n'+mod_query+'\n'+fns['MM_IsProgressiveItem']+'\n'+fns['MM_FillElementalSpellDrawInfo']+'\n'+fns['MM_FillItemDrawInfo']
 fixture+=r'''
 int main() {
  const RandoItemId ids[]={RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,

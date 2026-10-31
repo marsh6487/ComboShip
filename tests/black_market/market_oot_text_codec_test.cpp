@@ -25,6 +25,8 @@ extern "C" const char* fontTbl[140];
 extern "C" void Message_Decode(PlayState*);
 extern "C" void MarketTest_RenderControls(PlayState*);
 extern "C" void MarketTest_CloseTick(PlayState*);
+// Diagnostic output is a boundary service; keep the real receipt/message path.
+extern "C" void lusprintf(const char*, int, int, const char*, ...) {}
 extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation*) {}
 extern "C" void Message_SetCapeVisibilityChoice(int) {}
 extern "C" int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
