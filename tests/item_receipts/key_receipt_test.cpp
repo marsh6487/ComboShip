@@ -10,12 +10,16 @@
 #include "rando/CrossForeign.h"
 #include "ComboItemReceiptText.h"
 #include "ComboGameMode.h"
+#include "interface/parameter_static/parameter_static.h"
+#include "archives/icon_item_static/icon_item_static_yar.h"
+#include "archives/icon_item_24_static/icon_item_24_static_yar.h"
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 #include "mods/extended_inventory.h"
 }
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <unordered_map>
@@ -196,6 +200,9 @@ static void CheckImportedKeys() {
     assert(KeyFixture_LiveResolutions() == 0);
 }
 int main(int argc, char** argv) {
+    assert(gItemIcons[ITEM_MASK_CAPTAIN] == (TexturePtr)gItemIconCaptainsHatTex);
+    assert((reinterpret_cast<uintptr_t>(gItemIcons[ITEM_MASK_CAPTAIN]) & 1) == 0 &&
+           "receipt fixture must retain the aligned native resource pointer");
     gSaveContext.fileNum = 0;
     gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
     if (argc < 2 || std::strcmp(argv[1], "--imports-only")) CheckNativeKeys();

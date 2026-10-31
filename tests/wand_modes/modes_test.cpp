@@ -9,6 +9,7 @@
 #include "mods/extended_player.h"
 #include "mods/extended_equipment.h"
 #include "mods/extended_inventory.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "mods/oot_asset_loader/oot_asset_loader.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
@@ -67,6 +68,7 @@ NeiSaveData* Nei_Save() { return &gSaveContext.save.shipSaveInfo.nei; }
 u8 ExtEquip_CapeOwned() { return capeOwned; }
 void ExtEquip_ToggleFromCButton(u16) { assert(false && "Wand frame dispatched unrelated equipment"); }
 u8 Pacci_UltrahandModeActive() { return 0; }
+u8 Cryonis_ModeActive() { return 0; }
 u8 Sw97_IsBowItem(u8) { return 0; }
 u8 Sw97_IsSlingItem(u8) { return 0; }
 u8 Sw97_EffectiveElement(u8) { return 0; }

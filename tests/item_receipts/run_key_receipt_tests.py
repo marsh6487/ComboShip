@@ -74,6 +74,12 @@ catalog += 'std::unordered_map<int,int>& ReverseMap() ' + block(glue, 'ReverseMa
 catalog += 'extern "C" int FcCombo_ItemForNative(int nativeId) ' + block(glue, 'int FcCombo_ItemForNative') + '\n'
 font = (ROOT / 'mm/src/code/z_message_nes.c').read_text()
 catalog += 'extern "C" { float sNESFontWidths[160] = ' + block(font, 'f32 sNESFontWidths[160]') + '; }\n'
+# The complete receipt TU reads the native table when choosing its aligned
+# soul-receipt texture. Keep that engine-owned storage and its real asset paths
+# at the fixture boundary, as the umbrella receipt runner does.
+inventory = (ROOT / 'mm/src/code/z_inventory.c').read_text()
+catalog += 'extern "C" { TexturePtr gItemIcons[131] = ' + re.sub(
+    r'(?m)^(\s*)(g\w+),', r'\1(TexturePtr)\2,', block(inventory, 'TexturePtr gItemIcons[]')) + '; }\n'
 receiver = (ROOT / 'tests/item_receipts/key_receipt_test.cpp').read_text()
 queue = (ROOT / 'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp').read_text()
 receiver = receiver.replace('/* QUEUE_RECEIVE */', 'void Receive(Actor* actor, PlayState* play) ' + block(queue, '.giveItem ='))

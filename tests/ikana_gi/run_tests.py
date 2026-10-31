@@ -24,11 +24,23 @@ source=source.replace('/* OOT_NATIVE_DRAW */',function(read('soh/soh/Enhancement
 owner=read('combo/menu/ComboItemDrawOOT.h')
 case=re.search(r'        case RG_EXT_SHIELD_OF_IKANA:.*?(?=\n        case )',owner,re.S)[0]
 source=source.replace('/* OOT_DESCRIPTOR */',function(owner,'CwSimple')+'\nint DescribeIkana(CwItemDrawInfo* out){switch(RG_EXT_SHIELD_OF_IKANA){\n'+case+'\n}return 0;}')
-native=function(read('mm/2s2h/Rando/DrawItem.cpp'),'DrawResolvedItem')
+mm_draw=read('mm/2s2h/Rando/DrawItem.cpp')
+native=function(mm_draw,'DrawResolvedItem')
 case=re.search(r'        case RI_SHIELD_MIRROR:.*?(?=\n        case )',native,re.S)
 if case:case=case[0]
 else:case=re.search(r'        default:\s*GetItem_Draw\(gPlayState,.*?break;',native,re.S)[0]
-source=source.replace('/* MM_NATIVE_DRAW */','void DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}')
+# Keep the real namespace-qualified caller: block-scope DISPS declarations in
+# this context must still resolve to the global C interpolation implementation.
+gfx=read('mm/include/gfx.h')
+port=gfx[gfx.index('#define OPEN_DISPS_PORT_HELPERS'):gfx.index('// #endregion',gfx.index('#define OPEN_DISPS_PORT_HELPERS'))]
+source=source.replace('/* MM_NATIVE_DRAW */',port+'\n'
+    '#undef OPEN_DISPS\n#undef CLOSE_DISPS\n'
+    '#define OPEN_DISPS(x) { OPEN_DISPS_PORT_HELPERS(x);\n'
+    '#define CLOSE_DISPS(x) CLOSE_DISPS_PORT_HELPERS(x); }\n'+
+    (function(mm_draw,'DrawNativeIkanaFallback')+'\n' if 'static void DrawNativeIkanaFallback(' in mm_draw else '')+
+    'namespace Rando { void DrawNativeIkanaGI(); }\n'
+    'void Rando::DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}\n'
+    'using Rando::DrawNativeIkanaGI;')
 foreign_mm=read('combo/menu/ComboForeignDrawMM.h')
 source=source.replace('/* MM_SIMPLE_INFO */',re.search(r'struct ComboForeignDrawInfoOOT \{.*?\n\};',foreign_mm,re.S)[0])
 source=source.replace('/* MM_SIMPLE_CONSUMER */',function(foreign_mm,'MM_DrawForeignSimple'))

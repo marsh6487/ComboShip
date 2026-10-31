@@ -163,6 +163,13 @@ Gfx *MM_DrawForeignMagicJarDList(Gfx *output, const char *, const uint8_t *) {
 /* MM_SIMPLE_CONSUMER */
 /* OOT_NATIVE_DRAW */
 /* OOT_DESCRIPTOR */
+// Native interpolation is a global C service. The real MM DISPS macros must
+// link to it even when the draw entry point is defined as Rando::DrawResolvedItem.
+static int interpolationOpens = 0, interpolationCloses = 0;
+extern "C" void FrameInterpolation_RecordOpenChild(const void*, int) { ++interpolationOpens; }
+extern "C" void FrameInterpolation_RecordCloseChild(void) { ++interpolationCloses; }
+void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, int) {}
+void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, int) {}
 /* MM_NATIVE_DRAW */
 
 int main(){
@@ -187,7 +194,10 @@ int main(){
         xlu = commands + 32;
         rotations.clear();
         drawnPaths.clear();
+        const int opensBefore = interpolationOpens, closesBefore = interpolationCloses;
         DrawNativeIkanaGI();
+        check(interpolationOpens == opensBefore + 1 && interpolationCloses == closesBefore + 1,
+              "native namespaced MM shield draw uses paired global C interpolation calls");
         check(drawnPaths == std::vector<std::string>({ COMBO_IKANA_GI_OPA_MM, COMBO_IKANA_GI_XLU_MM }),
               "native MM GI must pin both dedicated roots to MM under a foreign outer owner");
         check(stack.empty(), "native MM GI matrix stack balanced");

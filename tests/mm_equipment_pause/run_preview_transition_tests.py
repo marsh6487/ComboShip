@@ -123,10 +123,9 @@ struct Vtx { struct { s16 ob[3]; u16 flag; s16 tc[2]; u8 cn[4]; } v; };
 #define PAUSE_MAP 1
 #define PAUSE_QUEST 2
 #define PAUSE_MAIN_STATE_SWITCHING_PAGE 1
-#define BTN_R 64
-#define BTN_Z 128
-#define BTN_DRIGHT 256
-#define BTN_DLEFT 512
+// Reuse the inherited D-pad masks; shoulder controls must remain distinct.
+#define BTN_R 1024
+#define BTN_Z 2048
 #define DEBUG_EDITOR_NONE 0
 #define DEBUG_EDITOR_INVENTORY_INIT 1
 #define DO_ACTION_DECIDE 1
@@ -186,7 +185,6 @@ Mtx gIdentityMtx;
 int gPauseLinkFrameBuffer=7;
 static f32 sPauseMenuVerticalOffset=0,sPauseCursorLeftMoveOffsetX=40,sPauseCursorRightMoveOffsetX=40;
 static s16 sPauseCursorLeftX=0,sPauseCursorRightX=0;
-int CVarGetInteger(const char*,int fallback) { return fallback; }
 bool GameInteractor_Should(int,bool fallback,int) { return fallback; }
 void Interface_SetAButtonDoAction(PlayState*,int) {}
 void Interface_SetHudVisibility(int) {}
