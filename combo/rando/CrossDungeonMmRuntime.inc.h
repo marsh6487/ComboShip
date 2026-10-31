@@ -1,5 +1,6 @@
 // Gameplay route ownership is deliberately separate from CrossDungeonMm.inc.h's oracle state.
 #include "rando/CrossDungeonRuntime.h"
+#include <libultraship/luslog.h>
 #include "ComboGameMode.h"
 #include "rando/CrossEntranceMmGrottos.inc.h"
 extern "C" int Combo_MM_GiantsEscape(int32_t* entrance, int32_t* cutscene, int consume);
@@ -122,6 +123,8 @@ extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
                 throw std::invalid_argument("unknown MM boss source recovery entrance");
         }
     ComboCrossMmRuntime::state.Install(seed);
+    LUSLOG_INFO("[EntranceTrace] mm-runtime-install routes=%zu checkpoint=%#x", routes.size(),
+                ComboCrossMmRuntime::checkpoint.Saved());
     Combo_MM_CancelCrossDungeonTransition();
     ComboCrossMmRuntime::pendingBossRecovery.reset();
     ComboCrossMmRuntime::bossDeathRecoveryRequested = false;
@@ -136,6 +139,7 @@ extern "C" COMBO_EXPORT int MM_QueueCrossDungeonArrival(int32_t index) {
         return 0;
     if (!ComboCrossMmRuntime::state.QueueArrival(index))
         return 0;
+    LUSLOG_INFO("[EntranceTrace] mm-queue-arrival entrance=%#x", index);
     ComboCrossMmRuntime::pendingBossRecovery.reset();
     ComboCrossMmRuntime::bossDeathRecoveryRequested = false;
     return 1;
@@ -191,7 +195,10 @@ extern "C" int32_t Combo_MM_ConsumeCrossDungeonArrival(void) {
     checkpoint.Arrive(recovery, recovery >= 0);
     localDungeonArrival = -1;
     gSaveContext.respawnFlag = 0;
-    return ComboMmMaterializeGrotto(logical);
+    const int32_t materialized = ComboMmMaterializeGrotto(logical);
+    LUSLOG_INFO("[EntranceTrace] mm-consume-arrival logical=%#x materialized=%#x respawn=%d checkpoint=%#x", logical,
+                materialized, gSaveContext.respawnFlag, checkpoint.Saved());
+    return materialized;
 }
 extern "C" void Combo_MM_RequestCrossBossDeathRecovery(void) {
     using namespace ComboCrossMmRuntime;
@@ -242,6 +249,9 @@ extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
         transition = state.Lookup(Phase::AfterNative, source);
     if (!transition)
         return 0;
+    LUSLOG_INFO("[EntranceTrace] mm-cross-route input=%#x canonical=%#x toGame=%d to=%#x checkpoint=%#x respawn=%d",
+                *index, source, transition->to.game, transition->to.index, transition->checkpoint.index,
+                gSaveContext.respawnFlag);
     pendingBossRecovery.reset();
     if (transition->to != Endpoint{ 1, *index }) {
         gSaveContext.nextCutsceneIndex = 0xFFEF;
@@ -265,6 +275,8 @@ extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void) {
     return ComboCrossMmRuntime::checkpoint.Saved();
 }
 extern "C" void Combo_MM_LoadCrossDungeonCheckpoint(int32_t index) {
+    LUSLOG_INFO("[EntranceTrace] mm-load-checkpoint requested=%#x valid=%d", index,
+                ComboCrossMmRuntime::ValidEntrance(index));
     ComboCrossMmRuntime::checkpoint.Load(ComboCrossMmRuntime::ValidEntrance(index) ? index : -1);
     ComboCrossMmRuntime::localDungeonArrival = -1;
     ComboCrossMmRuntime::pendingBossRecovery.reset();
