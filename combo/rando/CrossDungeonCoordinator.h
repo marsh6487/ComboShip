@@ -3,6 +3,7 @@
 #include "CrossDungeonSeed.h"
 #include "CrossEntranceBossMap.h"
 #include <array>
+#include <iostream>
 #include <utility>
 
 namespace ComboRando::CrossDungeon {
@@ -161,7 +162,15 @@ class Coordinator {
     void BindRuntime(const nlohmann::json& consolidated) {
         // Native runtime setters validate their own entrance tables, independent of the oracle's
         // currently generated graph. A slot load must never compare with another candidate's layout.
-        Install(SeedOf(consolidated), runtimeSeed, true);
+        const auto next = SeedOf(consolidated);
+        const bool changed = next != runtimeSeed;
+        Install(next, runtimeSeed, true);
+        std::clog << "[EntranceTrace] bind-runtime masterSeed="
+                  << (consolidated.is_object() ? consolidated.value("masterSeed", nlohmann::json()) : nlohmann::json())
+                  << " startingGame="
+                  << (consolidated.is_object() ? consolidated.value("startingGame", nlohmann::json())
+                                               : nlohmann::json())
+                  << " changed=" << changed << " enabled=" << Enabled(runtimeSeed) << '\n';
     }
 
     template <class Oracle> void ConfigureOracles(Oracle& oot, Oracle& mm) const {
