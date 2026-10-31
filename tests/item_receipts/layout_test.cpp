@@ -1,6 +1,9 @@
 // Execute both engines' per-message stage/apply/draw boundary with the real
 // native font widths. GBI recording replaces only the GPU command sink.
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>
+#include <vector>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -8,6 +11,15 @@
 #include <string>
 #include "combo/menu/ComboItemReceiptText.h"
 #include "combo/menu/ComboItemReceiptPresentation.h"
+static std::vector<std::string> receiptTrace;
+[[maybe_unused]] static void lusprintf(const char*, int, int, const char* fmt, ...) {
+    char message[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    receiptTrace.emplace_back(message);
+}
 using Gfx = int;
 constexpr int G_IM_FMT_IA = 1, G_IM_FMT_RGBA = 2, G_IM_SIZ_8b = 1, G_IM_SIZ_32b = 4;
 static int format, bits, sourceWidth, sourceHeight, x1, y1, x2, y2, red, green, blue, alpha, draws;
@@ -26,7 +38,7 @@ static std::string path;
 namespace Oot {
 struct MessageContext {
     struct { char msgBuf[1280]{}; unsigned msgLength = 0; } font;
-    int msgLength = 0, msgBufPos = 0, textPosX = 0, textPosY = 0, textColorAlpha = 192, textBoxType = 2;
+    int textId = 0, msgLength = 0, msgBufPos = 0, textPosX = 0, textPosY = 0, textColorAlpha = 192, textBoxType = 2;
 };
 struct PlayState { MessageContext msgCtx; } play;
 using u16 = uint16_t;
@@ -42,7 +54,7 @@ using u16 = uint16_t;
 using s16 = int16_t;
 struct MessageContext {
     struct { struct { char schar[1280]{}; } msgBuf; } font;
-    int msgLength = 0, msgBufPos = 0, unk11FFC = 12, unk11F18 = 0, unk11F1A[3]{};
+    int currentTextId = 0, msgLength = 0, msgBufPos = 0, unk11FFC = 12, unk11F18 = 0, unk11F1A[3]{};
     int unk11FF8 = 65, unk11FFA = 28, textColorAlpha = 192;
     int textPosX = 0, textPosY = 0, itemId = 0xFE;
     int textboxY = 12, textBoxType = 2;
@@ -323,12 +335,14 @@ int main() {
     (void)Mm::NativeLineWidth(reward);
     // The reported Spirit/Shadow entrance must never strand its final words
     // on a second page. Multiple inverse entrances retain every name too.
-    for (const std::string entrance : {"Deku Tree", "Shadow Temple", "Shadow Temple Entryway", "GV Behind Tent Grotto Entry",
-            "GV Behind Tent Grotto Entry, Bottom of the Well, Dodongo's Cavern"}) {
+    for (const std::string entrance :
+         { "Deku Tree", "Fire Temple Boss Door", "Shadow Temple", "Shadow Temple Entryway",
+           "GV Behind Tent Grotto Entry", "GV Behind Tent Grotto Entry, Bottom of the Well, Dodongo's Cavern" }) {
         const std::string map = ComboItemReceiptText::FromNeiMarkup(
             "You found the Ice Cavern Map!&It's %gordinary%w.&It seems the entrance is at %c" + entrance + "%w.");
         p = {};
         p.singleBox = 1;
+        const auto traceStart = receiptTrace.size();
         std::memcpy(Mm::play.msgCtx.font.msgBuf.schar + 11, map.data(), map.size());
         Mm::play.msgCtx.font.msgBuf.schar[map.size() + 11] = '\xBF';
         Mm::play.msgCtx.msgLength = map.size() + 12;
@@ -354,6 +368,15 @@ int main() {
         assert(Oot::R_TEXT_CHAR_SCALE >= 55 && Oot::R_TEXT_CHAR_SCALE <= 75);
         CheckReflow(ootMap, Oot::play.msgCtx.font.msgBuf, Oot::play.msgCtx.msgLength,
                     false, Oot::sFontWidths, 144, Oot::R_TEXT_CHAR_SCALE);
+        if (entrance == "Fire Temple Boss Door") {
+            assert(receiptTrace.size() == traceStart + 4 && "both receipt staging and native layout must be traceable");
+            assert(receiptTrace[traceStart + 1].find("mm reflow") != std::string::npos);
+            assert(receiptTrace[traceStart + 3].find("oot reflow") != std::string::npos);
+            auto afterLayout = receiptTrace.size();
+            Oot::Message_ApplyItemReceiptLayout(&Oot::play);
+            Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+            assert(receiptTrace.size() == afterLayout && "receipt logs must not repeat for every decode/frame");
+        }
     }
     // Shrinking a map must not shrink a later attribution page or the next
     // ordinary dialogue. Explicit authored page breaks remain intact.

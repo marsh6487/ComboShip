@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--sanitize",action="store_true")
+parser.add_argument("--presentation-only",action="store_true")
 parser.add_argument("--archive",type=Path,action="append",default=[],help="optional authored NEI GI O2R geometry proof")
 parser.add_argument("--fados-archive",type=Path,help="local supplied Fados worn-shield O2R; mesh data is not distributed")
 args=parser.parse_args()
@@ -56,6 +57,7 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
     cpp=Path(temp)/'test.cpp';cpp.write_text(source);binary=Path(temp)/'test'
     subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
+    if args.presentation_only:raise SystemExit(0)
     foreign=read('tests/item_receipts/foreign_icon_test.cpp')
     foreign=foreign.replace('/* ICON_OWNER_INCLUDE */','#include "combo/menu/ComboItemIconOwnership.h"')
     foreign=foreign.replace('/* FOREIGN_ICON_SELECTOR */',function(read('mm/2s2h/Rando/DrawItem.cpp'),'ComboForeignMessageIcon'))

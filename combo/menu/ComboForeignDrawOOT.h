@@ -123,7 +123,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::NotReady; // MM's rando state isn't up — retry, don't freeze
     }
     if (rcStatic == 0 ||
-        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI && raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
+        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI &&
+         raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
         // ComboShip: no static DL row — try the animated ABI (MM stray fairies). MM only describes
         // the item; ComboForeignAnim_Draw (combo/menu/ComboForeignAnim.h) loads + draws it.
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -190,6 +191,12 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         (raw.neiEffect < 1 || raw.neiEffect > 3 || raw.dlistCount != 1 || raw.opCount != 0))
         return ComboForeignResolve::Unknown;
     if (raw.opCount < 0 || raw.opCount > CW_DRAW_MAX_OPS)
+        return ComboForeignResolve::Unknown;
+    if (raw.drawKind == CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT &&
+        (raw.dlistCount != 0 || raw.opCount != 1 || raw.ops[0].op != CW_OP_NATIVE_EQUIPMENT ||
+         !(raw.ops[0].a >= static_cast<float>(CW_OOT_EQUIP_AXE) &&
+           raw.ops[0].a <= static_cast<float>(CW_OOT_EQUIP_ROC_BOOTS)) ||
+         raw.ops[0].a != static_cast<int32_t>(raw.ops[0].a)))
         return ComboForeignResolve::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_SEASON_GI &&
         (raw.neiEffect < 1 || raw.neiEffect > 6 || (raw.neiEffect != 5 ? n != 0 || raw.opCount != 0 : n < 1)))
@@ -978,6 +985,39 @@ inline void OOT_DrawForeignSimple(PlayState* play, const ComboForeignDrawInfo* i
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// An imported MM alias can return an OoT-only procedural equipment recipe.
+// The concrete callback already owns its model transforms and materials.
+inline void OOT_DrawForeignNativeEquipment(PlayState* play, GetItemEntry* entry, const ComboForeignDrawInfo* info) {
+    Matrix_Push();
+    switch (static_cast<int32_t>(info->ops[0].a)) {
+        case CW_OOT_EQUIP_AXE:
+            Randomizer_DrawIronKnuckleAxe(play, entry);
+            break;
+        case CW_OOT_EQUIP_SPIRIT_TUNIC:
+            Randomizer_DrawExtSpiritBreastplate(play, entry);
+            break;
+        case CW_OOT_EQUIP_CHAMPIONS_TUNIC:
+            Randomizer_DrawExtChampionsTunic(play, entry);
+            break;
+        case CW_OOT_EQUIP_SAGES_TUNIC:
+            Randomizer_DrawExtSagesTunic(play, entry);
+            break;
+        case CW_OOT_EQUIP_PEGASUS_BOOTS:
+            Randomizer_DrawExtPegasusAnklet(play, entry);
+            break;
+        case CW_OOT_EQUIP_TRIDENT:
+            Randomizer_DrawExtTrident(play, entry);
+            break;
+        case CW_OOT_EQUIP_CLIMB_BOOTS:
+            Randomizer_DrawExtClimbBoots(play, entry);
+            break;
+        case CW_OOT_EQUIP_ROC_BOOTS:
+            Randomizer_DrawExtRocBoots(play, entry);
+            break;
+    }
+    Matrix_Pop();
+}
+
 // Draw a foreign (MM-bound) item's real MM model at the current model matrix. Any resolution
 // failure falls back to the sentinel (the RG_COMBO_FOREIGN entry's blue rupee), so we never draw
 // blank. Mirror of MM_DrawComboForeign (combo/menu/ComboForeignDrawMM.h).
@@ -1054,6 +1094,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             NeiGi_DrawElementalArrowForOwner(play, info->neiEffect, 1, shop);
             break;
         }
+        case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
+            OOT_DrawForeignNativeEquipment(play, getItemEntry, info);
+            break;
         case CW_DRAW_KIND_NEI_GI:
             NeiGi_DrawPresentation(play, info->dls[0], info->xluStart == 1 && info->count > 1 ? info->dls[1] : nullptr,
                                    info->scale, info->neiEffect, info->neiEffectCenter,

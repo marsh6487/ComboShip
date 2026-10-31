@@ -1,3 +1,4 @@
+#include "mods/ext_buttons/ext_buttons.h"
 #include "z_kaleido_scope.h"
 #include "sword_element.h"
 #include "sword_element_kaleido.h"
@@ -845,7 +846,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             if (extEquipPage) {
                 // Extended equipment page: map cursor position to ext item ID. The name resolver runs
                 // later (z_kaleido_scope_PAL.c), using the grid context published above.
-                cursorItem = ExtEquip_GetItemId(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
+                cursorItem = ExtEquip_HasItem(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])
+                                 ? ExtEquip_GetItemId(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])
+                                 : PAUSE_ITEM_NONE;
             } else {
                 cursorItem = ITEM_SWORD_KOKIRI + sEquipmentItemOffsets[pauseCtx->cursorPoint[PAUSE_EQUIP]];
             }
@@ -933,7 +936,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                                      &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             } else if (extEquipPage) {
                 u8 extAgeOk = ExtEquip_CheckAgeReq(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
-                if (!extAgeOk) {
+                if (!extAgeOk || !ExtEquip_HasItem(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])) {
                     Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                 } else if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
@@ -942,26 +945,26 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                     pauseCtx->unk_1E4 = 7;
                     sEquipTimer = 10;
-                } else if (CHECK_BTN_ANY(input->press.button, BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT) &&
-                           (pauseCtx->cursorY[PAUSE_EQUIP] != EQUIP_TYPE_BOOTS)) {
-                    // Assign ext equipment to C button for toggle on/off during gameplay. The BOOTS row
-                    // is excluded: all three are real boots (A equips them), and its middle id (0xEA)
-                    // belongs to the Pendant of Memories in the C-button id space. Skijer 2026-07-29
-                    u16 extItemId = ExtEquip_GetItemId(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
-                    // Determine which C button was pressed (1=CLeft, 2=CDown, 3=CRight)
-                    s32 cBtn = CHECK_BTN_ALL(input->press.button, BTN_CLEFT)   ? 0
-                               : CHECK_BTN_ALL(input->press.button, BTN_CDOWN) ? 1
-                                                                               : 2;
-                    s32 buttonIndex = cBtn + 1; // buttonItems[1]=CLeft, [2]=CDown, [3]=CRight
-
-                    // Toggle: if same item already on this button, remove it
-                    if (gSaveContext.equips.buttonItems[buttonIndex] == extItemId) {
-                        gSaveContext.equips.buttonItems[buttonIndex] = ITEM_NONE;
-                        gSaveContext.equips.cButtonSlots[cBtn] = SLOT_NONE;
-                    } else {
-                        gSaveContext.equips.buttonItems[buttonIndex] = extItemId;
-                        gSaveContext.equips.cButtonSlots[cBtn] = SLOT_NONE; // No inventory slot
+                } else {
+                    const u16 extItemId =
+                        ExtEquip_GetButtonItemId(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
+                    static const u16 bindButtons[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP,
+                                                       BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
+                    s32 buttonIndex;
+                    for (buttonIndex = 1; buttonIndex <= ARRAY_COUNT(bindButtons); ++buttonIndex) {
+                        if (CHECK_BTN_ALL(input->press.button, bindButtons[buttonIndex - 1])) {
+                            break;
+                        }
                     }
+                    if (buttonIndex > ARRAY_COUNT(bindButtons)) {
+                        return;
+                    }
+                    if (ExtButton_GetItem(buttonIndex) == extItemId) {
+                        ExtButton_ClearItem(buttonIndex);
+                    } else {
+                        ExtButton_SetItem(buttonIndex, extItemId);
+                    }
+                    gSaveContext.equips.cButtonSlots[buttonIndex - 1] = SLOT_NONE;
                     Interface_LoadItemIcon2(play, buttonIndex);
                     Audio_PlaySoundGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);

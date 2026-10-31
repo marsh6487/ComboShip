@@ -833,6 +833,11 @@ void func_80082850(PlayState* play, s16 maxAlpha) {
     }
 }
 
+static u8 Interface_IsExtEquipmentButton(s32 button) {
+    const u16 item = ExtButton_GetItem(button);
+    return (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) || ExtEquip_IsButtonItem(item);
+}
+
 void func_80083108(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
     Player* player = GET_PLAYER(play);
@@ -967,8 +972,7 @@ void func_80083108(PlayState* play) {
                 for (i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
                     if (((gSaveContext.equips.buttonItems[i] >= ITEM_SHIELD_DEKU) &&
                          (gSaveContext.equips.buttonItems[i] <= ITEM_BOOTS_HOVER)) ||
-                        ((gSaveContext.equips.buttonItems[i] >= ITEM_EXT_SWORD_1) &&
-                         (gSaveContext.equips.buttonItems[i] <= ITEM_EXT_BOOTS_3))) {
+                        Interface_IsExtEquipmentButton(i)) {
                         // Equipment on c-buttons is always enabled
                         if (gSaveContext.buttonStatus[BUTTON_STATUS_INDEX(i)] == BTN_DISABLED) {
                             sp28 = 1;
@@ -1136,8 +1140,7 @@ void func_80083108(PlayState* play) {
                 for (i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
                     if (((gSaveContext.equips.buttonItems[i] >= ITEM_SHIELD_DEKU) &&
                          (gSaveContext.equips.buttonItems[i] <= ITEM_BOOTS_HOVER)) ||
-                        ((gSaveContext.equips.buttonItems[i] >= ITEM_EXT_SWORD_1) &&
-                         (gSaveContext.equips.buttonItems[i] <= ITEM_EXT_BOOTS_3))) {
+                        Interface_IsExtEquipmentButton(i)) {
                         // Equipment on c-buttons is always enabled
                         if (gSaveContext.buttonStatus[BUTTON_STATUS_INDEX(i)] == BTN_DISABLED) {
                             sp28 = 1;
@@ -1323,9 +1326,8 @@ void func_80083108(PlayState* play) {
                               (gSaveContext.equips.buttonItems[i] <= ITEM_POE)) &&
                             !((gSaveContext.equips.buttonItems[i] >= ITEM_SHIELD_DEKU) && // Never disable equipment
                               (gSaveContext.equips.buttonItems[i] <=
-                               ITEM_BOOTS_HOVER)) &&                                      // (tunics/boots) on C-buttons
-                            !((gSaveContext.equips.buttonItems[i] >= ITEM_EXT_SWORD_1) && // Never disable ext equipment
-                              (gSaveContext.equips.buttonItems[i] <= ITEM_EXT_BOOTS_3)) &&
+                               ITEM_BOOTS_HOVER)) &&              // (tunics/boots) on C-buttons
+                            !Interface_IsExtEquipmentButton(i) && // Never disable ext equipment
                             !((gSaveContext.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                               (gSaveContext.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
                             if ((play->sceneNum != SCENE_TREASURE_BOX_SHOP) ||

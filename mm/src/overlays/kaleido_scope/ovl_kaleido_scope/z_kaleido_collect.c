@@ -5,6 +5,7 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "interface/parameter_static/parameter_static.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
@@ -935,8 +936,7 @@ static void OotQuest_HandleSelect(PlayState* play, Input* input) {
         // above the u8 item space, so they can't live in buttonItems directly: they're equipped via
         // the extended-button infra — ExtButton_SetItem parks ITEM_EXT_BUTTON in buttonItems and the
         // real u16 in extButtons, and the ext-aware icon sites (Interface_LoadItemIconImpl / the HUD
-        // draw) resolve it. Stones are C-button-only: the D-pad's dpadItems array is u8 and can't hold
-        // a u16 ext id, so the D-pad equip branch (present in the medallion block above) is omitted.
+        // draw) resolve it. The D-pad uses its own matching u16 payload store.
         extern void ExtButton_SetItem(s32 form, s32 btn, u16 extId);
         static const u16 sSpiritualStoneItemIds[3] = {
             EXT_ITEM_SPIRITUAL_STONE_KOKIRI,
@@ -959,6 +959,19 @@ static void OotQuest_HandleSelect(PlayState* play, Input* input) {
             Interface_LoadItemIconImpl(play, (u8)cBtn);
             Audio_PlaySfx(NA_SE_SY_DECIDE);
             return;
+        }
+
+        if (CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
+            static const u16 dButtons[] = { BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
+            for (s16 dBtn = EQUIP_SLOT_D_RIGHT; dBtn <= EQUIP_SLOT_D_UP; ++dBtn) {
+                if (CHECK_BTN_ALL(input->press.button, dButtons[dBtn])) {
+                    ExtButton_SetDpadItem(0, dBtn, item);
+                    DPAD_SLOT_EQUIP(0, dBtn) = SLOT_NONE;
+                    Interface_Dpad_LoadItemIconImpl(play, (u8)dBtn);
+                    Audio_PlaySfx(NA_SE_SY_DECIDE);
+                    return;
+                }
+            }
         }
 
         if (CHECK_BTN_ALL(input->press.button, BTN_A)) {

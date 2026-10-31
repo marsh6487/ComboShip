@@ -28,7 +28,7 @@
 // declarations are already in scope — it has no header (see the note at its top).
 
 // Ext-button store: which u16 item a button really holds when it shows ITEM_EXT_BUTTON.
-extern u16 ExtButton_GetItem(s32 btn);
+#include "mods/ext_buttons/ext_buttons.h"
 
 // Drains the scene's water in Summer and hands it back otherwise (season_scene.cpp). Called every
 // frame, season included in its own decision, so the restore has one place to happen too.
@@ -133,18 +133,7 @@ static s32 Seasons_BuildWheel(BoxMenuEntry* out) {
 
 // Every C button currently holding the rod. C items live in the flat button array at 1..3.
 static u16 Seasons_EquippedButtonMask(void) {
-    u16 mask = 0;
-
-    if (ExtButton_GetItem(1) == EXT_ITEM_ROD_OF_SEASONS) {
-        mask |= BTN_CLEFT;
-    }
-    if (ExtButton_GetItem(2) == EXT_ITEM_ROD_OF_SEASONS) {
-        mask |= BTN_CDOWN;
-    }
-    if (ExtButton_GetItem(3) == EXT_ITEM_ROD_OF_SEASONS) {
-        mask |= BTN_CRIGHT;
-    }
-    return mask;
+    return ExtButton_GetInputMask(EXT_ITEM_ROD_OF_SEASONS);
 }
 
 // Put it away. Idempotent, so every blocking path can call it unconditionally.

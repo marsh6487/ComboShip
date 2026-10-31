@@ -14179,6 +14179,9 @@ static void Player_UpdateCustomItems(Player* this, PlayState* play) {
         if (play->state.input[0].press.button & sPlayerItemButtons[button]) {
             if (button != EQUIP_SLOT_B) {
                 item = C_BTN_ITEM(button);
+                if (item == ITEM_EXT_BUTTON) {
+                    item = (ItemId)ExtEquip_GetLegacyButtonItem(ExtButton_GetItem(0, button));
+                }
                 if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
                     item = Player_GetItemOnButton(play, this, button);
                     toggleButton = sPlayerItemButtons[button];
@@ -14191,6 +14194,9 @@ static void Player_UpdateCustomItems(Player* this, PlayState* play) {
         for (button = EQUIP_SLOT_D_RIGHT; button < ARRAY_COUNT(sDpadItemButtons); button++) {
             if (play->state.input[0].press.button & sDpadItemButtons[button]) {
                 item = DPAD_BTN_ITEM(button);
+                if (item == ITEM_EXT_BUTTON) {
+                    item = (ItemId)ExtEquip_GetLegacyButtonItem(ExtButton_GetDpadItem(0, button));
+                }
                 if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
                     item = Player_Dpad_GetItemOnButton(play, this, button);
                     toggleButton = sDpadItemButtons[button];

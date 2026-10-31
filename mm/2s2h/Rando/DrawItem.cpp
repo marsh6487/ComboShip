@@ -1,3 +1,4 @@
+#include "ComboIkanaShieldResources.h"
 #include "Rando/Rando.h"
 #include "Rando/DungeonItemVisuals.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
@@ -3946,14 +3947,31 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             break;
 #endif
         case RI_SHIELD_MIRROR: {
+            if (!ResourceMgr_IsIkanaShieldGiAvailable()) {
+                GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
+                break;
+            }
             // The authored GI returns above. Only the native/pack fallback
             // needs to correct a selected horizontal shield mesh.
             float tilt = 0.f, roll = 0.f;
-            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt, &roll);
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", COMBO_IKANA_GI_XLU, &tilt, &roll);
             Matrix_Push();
             Matrix_RotateZF(roll, MTXMODE_APPLY);
             Matrix_RotateXF(tilt, MTXMODE_APPLY);
-            GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
+            OPEN_DISPS(gPlayState->state.gfxCtx);
+            Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+            Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
+            MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+            MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
+#ifdef COMBO_BUILD
+            // Native aliases can be reached inside an OoT-owned foreign span.
+            gSPDisplayList(POLY_OPA_DISP++, (Gfx*)COMBO_IKANA_GI_OPA_MM);
+            gSPDisplayList(POLY_XLU_DISP++, (Gfx*)COMBO_IKANA_GI_XLU_MM);
+#else
+            gSPDisplayList(POLY_OPA_DISP++, (Gfx*)COMBO_IKANA_GI_OPA);
+            gSPDisplayList(POLY_XLU_DISP++, (Gfx*)COMBO_IKANA_GI_XLU);
+#endif
+            CLOSE_DISPS(gPlayState->state.gfxCtx);
             Matrix_Pop();
             break;
         }

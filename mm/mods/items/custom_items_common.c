@@ -763,15 +763,9 @@ void CustomItems_Update(Player* p, PlayState* play) {
             }
             continue;
         }
-        // Skijer's NEI — the Net's id (0xF4) sits ABOVE ITEM_POKEBALL (0xB7), so the
-        // custom-item range guard below rejects it and the switch is never reached.
-        // Same trap as Bomb Arrows above: this clause has to sit before the guard.
-        // Without it Handle_Net never ran and the net could not be put away at all.
-        if (item == ITEM_NET) {
-            Handle_Net(p, play);
-            continue;
-        }
-        if (item < ITEM_ROCS_FEATHER_SKIJER || item > ITEM_POKEBALL)
+        // The Net lives above the main custom-id range, but shares the same
+        // once-per-item dispatch rule when independently bound to C and D-pad.
+        if (item != ITEM_NET && (item < ITEM_ROCS_FEATHER_SKIJER || item > ITEM_POKEBALL))
             continue;
 
         // The same item can now legitimately sit on two buttons (e.g. C-Left and D-Up); its handler
@@ -788,6 +782,9 @@ void CustomItems_Update(Player* p, PlayState* play) {
         dispatched[dispatchedCount++] = item;
 
         switch (item) {
+            case ITEM_NET:
+                Handle_Net(p, play);
+                break;
             case ITEM_ROCS_FEATHER_SKIJER:
                 Handle_RocsFeather(p, play);
                 break;

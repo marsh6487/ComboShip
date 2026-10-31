@@ -16,6 +16,9 @@ static const u16 sButtonMasks[8] = {
     BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT
 };
 
+// Mode-owned controls cannot also activate an independently bound item.
+u8 ItemInput_ButtonIsClaimed(u16 button);
+
 #define ITEM_BLOCK_STATE1                                                                                           \
     (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_ITEM_CS |            \
      PLAYER_STATE1_TALKING | PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_DAMAGED | PLAYER_STATE1_HANGING_OFF_LEDGE | \

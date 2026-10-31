@@ -143,10 +143,8 @@ extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
          (Ship::CrossRMRegistry::Get("mm") || gComboGameMode == COMBO_GAME_OOT);
 }
 Gfx *MmAssets_LoadDisplayListGraphStrict(const char *path) {
-  static Gfx optional[] = {{COMBO_IKANA_GI_OPA}, {COMBO_IKANA_GI_XLU}};
-  return !donorAvailable                          ? nullptr
-         : !std::strcmp(path, COMBO_IKANA_GI_OPA) ? &optional[0]
-                                                  : &optional[1];
+    static Gfx optional[] = { { COMBO_IKANA_NATIVE_OPA }, { COMBO_IKANA_NATIVE_XLU } };
+    return !donorAvailable ? nullptr : !std::strcmp(path, COMBO_IKANA_NATIVE_OPA) ? &optional[0] : &optional[1];
 }
 void MmAssets_EnsureStrictTextureBindings() { ++strictBindings; }
 void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
@@ -187,6 +185,14 @@ int main(){
         scale = 1;
         opa = commands;
         xlu = commands + 32;
+        rotations.clear();
+        drawnPaths.clear();
+        DrawNativeIkanaGI();
+        check(drawnPaths == std::vector<std::string>({ COMBO_IKANA_GI_OPA_MM, COMBO_IKANA_GI_XLU_MM }),
+              "native MM GI must pin both dedicated roots to MM under a foreign outer owner");
+        check(stack.empty(), "native MM GI matrix stack balanced");
+        poseX = poseZ = 0;
+        scale = 1;
         rotations.clear();
         drawnPaths.clear();
         Randomizer_DrawExtShieldOfIkana(&play,nullptr);
@@ -253,8 +259,7 @@ int main(){
     Ship::CrossRMRegistry::owners.erase("mm");
     drawnPaths.clear();
     Randomizer_DrawExtShieldOfIkana(&play, nullptr);
-    check(drawnPaths == std::vector<std::string>(
-                            {COMBO_IKANA_GI_OPA, COMBO_IKANA_GI_XLU}) &&
+    check(drawnPaths == std::vector<std::string>({ COMBO_IKANA_NATIVE_OPA, COMBO_IKANA_NATIVE_XLU }) &&
               strictBindings == 1,
           "Solo OoT uses both strict optional-archive GI pointers and texture "
           "bindings");

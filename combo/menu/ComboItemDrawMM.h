@@ -91,6 +91,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
+extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 
@@ -533,6 +534,10 @@ static int32_t MM_FillGidAliasDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (n <= 0) {
         return 0;
     }
+    if (id == RI_SHIELD_MIRROR && ResourceMgr_IsIkanaShieldGiAvailable() && n == 2 && xluStart == 1) {
+        dls[0] = (void*)COMBO_IKANA_GI_OPA;
+        dls[1] = (void*)COMBO_IKANA_GI_XLU;
+    }
     out->dlistCount = n;
     out->xluStartIndex = xluStart;
     out->scale = scale;
@@ -950,8 +955,8 @@ static bool MM_IsStateDependentDraw(RandoItemId id) {
     }
 }
 
-// These concrete aliases have GID_NONE in MM. The owner already describes its
-// selected standalone/Din weapon and native fallback; do not fall through
+// These imported aliases have GID_NONE in MM. The original owner describes
+// its selected custom model and native fallback; do not fall through
 // to the empty MM row when the authored NEI mesh is unavailable or declined.
 // This is export-only: MM's native NEI hook still returns false for legacy draws.
 static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out) {
@@ -975,6 +980,61 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
         case RI_OOT_NEI_MARIO_MASK:
             name = "Mario Mask";
             break;
+        case RI_OOT_IRON_KNUCKLE_AXE:
+        case RI_OOT_EXT_CANE_OF_BYRNA:
+        case RI_OOT_EXT_CHAMPIONS_TUNIC:
+        case RI_OOT_EXT_DIVINE_SHIELD:
+        case RI_OOT_EXT_FOUR_SWORD:
+        case RI_OOT_EXT_MAGIC_CAPE:
+        case RI_OOT_EXT_PEGASUS_ANKLET:
+        case RI_OOT_EXT_SHEIKAH_SHIELD:
+        case RI_OOT_EXT_SPIRIT_BREASTPLATE:
+        case RI_OOT_EXT_WATER_DRAGON_SCALE:
+        case RI_OOT_EXT_TRIDENT:
+        case RI_OOT_EXT_CLIMB_BOOTS:
+        case RI_OOT_EXT_ROC_BOOTS:
+        case RI_OOT_NEI_SHEIKAH_SLATE:
+        case RI_OOT_NEI_PHANTOM_HOURGLASS:
+        case RI_OOT_NEI_SHADOW_CRYSTAL:
+        case RI_OOT_NEI_SLATE_RUNE_BOMB:
+        case RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE:
+        case RI_OOT_NEI_SLATE_RUNE_STASIS:
+        case RI_OOT_NEI_SLATE_RUNE_CRYONIS:
+        case RI_OOT_NEI_BALL_AND_CHAIN:
+        case RI_OOT_NEI_BEETLE:
+        case RI_OOT_NEI_BOMB_ARROWS:
+        case RI_OOT_NEI_DEKU_LEAF:
+        case RI_OOT_NEI_DEMISE_DESTRUCTION:
+        case RI_OOT_NEI_DESIRE_SENSOR:
+        case RI_OOT_NEI_DOMINION_ROD:
+        case RI_OOT_NEI_ELEMENTAL_WAND:
+        case RI_OOT_NEI_WAND_SAND_ROD:
+        case RI_OOT_NEI_WAND_TORNADO_ROD:
+        case RI_OOT_NEI_WAND_WATER_ROD:
+        case RI_OOT_NEI_WAND_METEOR_ROD:
+        case RI_OOT_NEI_WAND_STORM_ROD:
+        case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
+        case RI_OOT_NEI_FIRE_ROD:
+        case RI_OOT_NEI_GUST_JAR:
+        case RI_OOT_NEI_HYLIAS_GRACE:
+        case RI_OOT_NEI_ICE_ROD:
+        case RI_OOT_NEI_LIGHT_ROD:
+        case RI_OOT_NEI_MINISH_CAP:
+        case RI_OOT_NEI_MOGMA_MITTS:
+        case RI_OOT_NEI_SHOVEL:
+        case RI_OOT_NEI_SPINNER:
+        case RI_OOT_NEI_SWITCH_HOOK:
+        case RI_OOT_NEI_TIME_GATE:
+        case RI_OOT_NEI_WHIP:
+        case RI_OOT_NEI_ZONAI_PERMAFROST:
+        case RI_OOT_NEI_ROCS_FEATHER:
+        case RI_OOT_NEI_ROCS_CAPE: {
+            const auto item = Rando::StaticData::Items.find(id);
+            if (item == Rando::StaticData::Items.end())
+                return 0;
+            name = item->second.name;
+            break;
+        }
         default:
             return 0;
     }
@@ -987,8 +1047,8 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
     const int32_t result = describe(name, &info);
     if (result != 1)
         return result == CW_DRAW_NOT_READY ? result : 0;
-    if (info.dlistCount < 1 || info.dlistCount > CW_DRAW_MAX_DLISTS || info.opCount < 0 ||
-        info.opCount > CW_DRAW_MAX_OPS)
+    if (info.dlistCount < CwMinDlistsForKind(info.drawKind) || info.dlistCount > CW_DRAW_MAX_DLISTS ||
+        info.opCount < 0 || info.opCount > CW_DRAW_MAX_OPS)
         return 0;
     for (int i = 0; i < info.dlistCount; ++i) {
         const char* path = info.dlists[i];
@@ -1048,6 +1108,73 @@ static int32_t MM_FillElementalSpellDrawInfo(RandoItemId id, CwItemDrawInfo* out
     return 1;
 }
 
+// The concrete cane rows have GID_NONE, including Pacci (which deliberately
+// has no authored NEI binding). Export the same legacy model choice as the
+// native callback instead of asking the native table for a nonexistent row.
+static int32_t MM_FillCaneDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    bool pacci = false, upgrade = false, hand = false;
+    switch (id) {
+        case RI_OOT_NEI_CANE_OF_SOMARIA:
+            break;
+        case RI_OOT_NEI_CANE_SOMARIA_BLOCK:
+        case RI_OOT_NEI_CANE_SOMARIA_PLATFORM:
+            upgrade = true;
+            break;
+        case RI_OOT_NEI_CANE_PACCI_FLIP:
+            pacci = true;
+            break;
+        case RI_OOT_NEI_CANE_PACCI_STONE:
+            pacci = upgrade = true;
+            break;
+        case RI_OOT_NEI_CANE_PACCI_ULTRAHAND:
+            pacci = upgrade = hand = true;
+            break;
+        default:
+            return 0;
+    }
+    const char* mmOpa = hand ? "__OTR__objects/object_nei_ultrahand/gUltrahandGiveDL"
+                             : "__OTR__objects/object_somaria/g_somaria_cane_give_dl";
+    const char* ootOpa = hand ? "__OTR__objects/object_nei_ultrahand/gNeiUltrahandDL" : mmOpa;
+    const char* mmXlu = hand ? "__OTR__objects/object_nei_ultrahand/gUltrahandGiveXluDL" : nullptr;
+    const char* ootXlu = hand ? "__OTR__objects/object_nei_ultrahand/gNeiUltrahandXluDL" : nullptr;
+    const bool mmReady = ResourceMgr_IsGiModelAvailableForGame("mm", mmOpa) &&
+                         (!mmXlu || ResourceMgr_IsGiModelAvailableForGame("mm", mmXlu));
+    const bool ootReady = ResourceMgr_IsGiModelAvailableForGame("oot", ootOpa) &&
+                          (!ootXlu || ResourceMgr_IsGiModelAvailableForGame("oot", ootXlu));
+    const bool mmMod =
+        ResourceMgr_IsModAssetForGame("mm", mmOpa) || (mmXlu && ResourceMgr_IsModAssetForGame("mm", mmXlu));
+    const bool ootMod =
+        ResourceMgr_IsModAssetForGame("oot", ootOpa) || (ootXlu && ResourceMgr_IsModAssetForGame("oot", ootXlu));
+    // Match DrawOotNeiUltrahand's retained old-archive fallback. This is a
+    // bounded local recipe retry, preserving the award's existing shimmer.
+    if (hand && !mmReady && !ootReady)
+        return MM_FillCaneDrawInfo(RI_OOT_NEI_CANE_PACCI_STONE, out);
+    const bool donor = ootReady && ((!mmMod && ootMod) || !mmReady);
+    if (!donor && !mmReady)
+        return 0;
+    out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+    out->stateDependent = 2;
+    out->scale = hand ? .17f : .25f;
+    out->dlistCount = hand ? 2 : 1;
+    out->xluStartIndex = hand ? 1 : -1;
+    out->dlists[0] = donor  ? NeiResource_Route(ootOpa)
+                     : hand ? "__OTR__@mm:objects/object_nei_ultrahand/gUltrahandGiveDL"
+                            : "__OTR__@mm:objects/object_somaria/g_somaria_cane_give_dl";
+    if (hand)
+        out->dlists[1] =
+            donor ? NeiResource_Route(ootXlu) : "__OTR__@mm:objects/object_nei_ultrahand/gUltrahandGiveXluDL";
+    if (pacci && !hand) {
+        const uint8_t gold[4] = { 255, 215, 70, 255 };
+        std::memcpy(out->primColorOpa, gold, 4);
+    }
+    if (upgrade && !hand) {
+        const uint8_t flame[4] = { 255, static_cast<uint8_t>(pacci ? 215 : 60), static_cast<uint8_t>(pacci ? 70 : 60),
+                                   255 };
+        std::memcpy(out->primColorXlu, flame, 4);
+    }
+    return 1;
+}
+
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (id == RI_OOT_NEI_MAGIC_MIRROR)
         return CwDescribeMagicMirror(out);
@@ -1095,6 +1222,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->itemShimmer = nei.itemShimmer;
     if (nei.neiShimmer)
         out->stateDependent = 2;
+    if (MM_FillCaneDrawInfo(id, out))
+        return 1;
     const int32_t swordFallback = MM_FillImportedSwordFallback(id, out);
     if (swordFallback != 0)
         return swordFallback;
@@ -1166,6 +1295,10 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (n <= 0) {
         return 0;
     }
+    if (id == RI_SHIELD_MIRROR && ResourceMgr_IsIkanaShieldGiAvailable() && n == 2 && xluStart == 1) {
+        dls[0] = (void*)COMBO_IKANA_GI_OPA;
+        dls[1] = (void*)COMBO_IKANA_GI_XLU;
+    }
     out->dlistCount = n;
     out->xluStartIndex = xluStart;
     out->scale = scale;
@@ -1214,8 +1347,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         out->stateDependent = 2; // The selected owner's Alt geometry can change its pose.
         float tilt = 0.f, roll = 0.f;
         if (drawKind == CW_DRAW_KIND_SIMPLE && n == 2 && xluStart == 1 &&
-            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt,
-                                                    &roll) &&
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", COMBO_IKANA_GI_XLU, &tilt, &roll) &&
             (tilt != 0.f || roll != 0.f)) {
             // Preserve the native split passes and caller spin. CUSTOM_GI
             // would add another spin; OPS carries only this pose correction.

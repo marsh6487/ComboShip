@@ -24,6 +24,7 @@ def main():
 #ifdef COMBO_BUILD
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #endif
+bool ComboEnsureIkanaShieldBaseOwner(const std::shared_ptr<Ship::ResourceManager>& owner) {return bool(owner);}
 static bool optionalAvailable;
 static std::set<std::string> optionalPasses;
 int MmAssets_IsAvailable() { return optionalAvailable; }
@@ -45,8 +46,8 @@ int main() {
     model->Instructions={gsSPEndDisplayList()};
     auto empty=std::make_shared<Fast::DisplayList>();
     auto texture=std::make_shared<Fast::Texture>();
-    const std::string opa="objects/object_gi_shield_3/gGiMirrorShieldEmptyDL";
-    const std::string xlu="objects/object_gi_shield_3/gGiMirrorShieldDL";
+    const std::string opa=COMBO_IKANA_GI_OPA+7;
+    const std::string xlu=COMBO_IKANA_GI_XLU+7;
     oot->files[opa]=model; oot->files[xlu]=model; // wrong-owner distractors
     mm->files[opa]=model; mm->files[xlu]=model;
     for(bool hostAlt:{false,true})for(bool ownerAlt:{false,true}) {
@@ -62,7 +63,7 @@ int main() {
         assert(Ship::context.active==oot);
     }
     mm->files.erase("alt/"+xlu); mm->files.erase(xlu);
-    optionalAvailable=true; optionalPasses={COMBO_IKANA_GI_OPA,COMBO_IKANA_GI_XLU};
+    optionalAvailable=true; optionalPasses={COMBO_IKANA_NATIVE_OPA,COMBO_IKANA_NATIVE_XLU};
     assert(!ResourceMgr_IsIkanaShieldGiAvailable() && !MmNativePairAvailable());
     mm->files[xlu]=model;
     assert(ResourceMgr_IsIkanaShieldGiAvailable() && MmNativePairAvailable());
@@ -73,9 +74,9 @@ int main() {
     gComboGameMode=COMBO_GAME_OOT;
 #endif
     assert(ResourceMgr_IsIkanaShieldGiAvailable());
-    optionalPasses.erase(COMBO_IKANA_GI_XLU);
+    optionalPasses.erase(COMBO_IKANA_NATIVE_XLU);
     assert(!ResourceMgr_IsIkanaShieldGiAvailable());
-    optionalPasses.insert(COMBO_IKANA_GI_XLU);
+    optionalPasses.insert(COMBO_IKANA_NATIVE_XLU);
     assert(ResourceMgr_IsIkanaShieldGiAvailable() && "late optional availability must retry");
     optionalAvailable=false;
     assert(!ResourceMgr_IsIkanaShieldGiAvailable());

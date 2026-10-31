@@ -8,6 +8,7 @@
  */
 
 #include "custom_items.h"
+#include "mods/ext_buttons/ext_buttons.h"
 #include "z64.h"
 #include "macros.h"
 #include "functions.h"
@@ -811,7 +812,7 @@ void CustomItems_Update(Player* p, PlayState* play) {
             if (ItemInput_ButtonIsClaimed(sMaskBtns[mi]))
                 continue;
             if (CHECK_BTN_ALL(ctrl->press.button, sMaskBtns[mi])) {
-                u8 slot = (mi < 3) ? (mi + 1) : (mi - 3 + 5); // C-buttons: slots 1-3, D-pad: slots 5-8
+                u8 slot = mi + 1; // C-buttons: slots 1-3, D-pad: slots 4-7
                 u8 maskItem = gSaveContext.equips.buttonItems[slot];
                 if (maskItem == ITEM_MM_MASK_ZORA || maskItem == ITEM_MASK_ZORA) {
                     extern void TransformMasks_HandleMaskUse(PlayState*, Player*, s32);
@@ -828,7 +829,19 @@ void CustomItems_Update(Player* p, PlayState* play) {
     // Feather equipped to B never had their handler dispatched. Fix:
     // i = 0..7 covers B + 3 C-buttons + 4 D-pad slots cleanly.
     for (u8 i = 0; i < 8; i++) {
-        u8 item = gSaveContext.equips.buttonItems[i];
+        u16 item = ExtButton_GetItem(i);
+        // Independent bindings share one item state machine. Poll its union
+        // of C/D edges once rather than advancing it once per bound slot.
+        u8 alreadyProcessed = false;
+        for (u8 previous = 0; previous < i; ++previous) {
+            if (ExtButton_GetItem(previous) == item) {
+                alreadyProcessed = true;
+                break;
+            }
+        }
+        if (alreadyProcessed) {
+            continue;
+        }
         // Skijer's NEI — Bomb Arrows rides the bow's element flag; the button holds ITEM_BOW, which
         // the custom-item range guard below would reject. This clause must therefore sit ABOVE it.
         if (Sw97_IsBowItem(item) && (Sw97_EffectiveElement(0) == SW97_ELEM_BOMB)) {

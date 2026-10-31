@@ -1,0 +1,62 @@
+# NEI item regression implementation plan and recovery record
+
+Goal: correct item presentation/selection failures and support independent NEI D-pad assignment and equipment toggling in both games.
+
+Spec: cor's October 31 request and screenshots image(20261031-121845).png / image(20261031-121900).png. The first shows an Ice Cavern Map entrance hint overflowing its box; the second labels MM Cane of Pacci (Lift) while drawing a blue rupee.
+
+Baseline: marsh6487/ComboShip commit e1b34337c9d2075dd2663b5983f928439942add2, tree 1fa2abfa867b5b3745d6faf2de2ab7bdb0b66aae. This includes the separate spawn-recovery candidate and is not a runtime-accepted master. The user's running executable commit is unknown. Candidate branch fix/nei-item-regressions-20261031.
+
+Architecture: retain each game's inventory/save and renderer ownership. Fix where full item identities, ownership or presentation metadata are lost. Use existing cross-game draw descriptors and native input dispatch, with per-game regression seams.
+
+Tech stack: C/C++ game modules, Python native compilation harnesses, existing JSON/resource pipeline.
+
+Preservation: accepted archives, progression/seed routing, native item swaps, transformation behavior, other UI/equipment features, original/combined-game guards and prior spawn changes. No accepted-master promotion or release publication. Runtime and Alt Assets verification remain separate from compilation.
+
+Review focus:
+- NEI D-pad writes preserve the entire C bank and its full-ID sidecar.
+- Equipment IDs must not alias trade items, icon selectors or arrow animation sentinels.
+- Shared-cell/empty/unowned selection publishes the currently owned identity only.
+- Native/foreign GI paths avoid recursive exporter fallback and generic Mirror Shield shadowing.
+- Receipt layout retains every word/color and fits the native pen, including long entrance labels.
+
+## Workstreams
+
+- [ ] Receipt typography (parent): execute exact Ice Cavern Map / Fire Temple Boss Door layout with real font widths; trace builder -> staging -> layout; fix confirmed failure only.
+- [ ] GI routing (gi_routing): repair concrete MM canes and confirmed sibling omissions; isolate Ikana GI resources; test native/foreign and optional-asset controls.
+- [ ] OoT controls (oot_controls): independent D-pad assignment, full IDs, all equipment toggles, held-item D-pad dispatch, empty selection and Pictograph names.
+- [ ] MM controls (mm_controls): same contract with native MM slot/form semantics and full-ID/icon controls.
+- [ ] Integration: review diffs; run focused/relevant existing suites, formatting and platform CI; preserve verified milestones and final independently restorable checkpoint.
+
+## Verified milestone 1: MM binding and pause selection
+
+Files: mm/mods/ext_buttons/ext_buttons.cpp; mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_equipment.c; mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c; tests/nei_controls_mm/run_tests.py.
+
+Production-body regression fails on baseline and passes after repair: independent NEI D-pad writes preserve C slots/full IDs, including Roc's Feather/Cape IDs overlapping arrow aliases; equipment accepts C/D directions including boots; Pictograph wheel updates selection/name immediately. Existing unowned equipment titles remain empty.
+
+Owning-worker verification: tests/nei_controls_mm/run_tests.py --sanitize (ASan/UBSan, leak scanning disabled for container compatibility), four modes. Full icon/runtime audit and legacy Mirror test expectation update remain in progress. This is WIP, not in-game acceptance.
+
+## WIP milestone 2: broader implementation preserved
+
+Both control workers have passing production-boundary tests for independent D-pad assignment, all 12 equipment bindings/toggles, full-ID icon identity, stale/empty selection and native/shared-cell controls. Equipment bindings use per-game full IDs 0x0240..0x024B to distinguish trade/icon aliases without changing save format. Runtime all-family audit continues: spiritual stones, mask D offsets, duplicate update/cached-mask handling and alias-aware equipment status need final verification. Independent review confirmed the OoT status-updater omission; correction is in progress.
+
+GI work has passing focused reproductions for missing MM cane export, sibling legacy fallbacks and dedicated Ikana roots plus a stock-only nested resource owner. The original procedural fallback cube is preserved for Dominion Rod/base Elemental Wand; an authored model still takes priority. Final GI matrix/asset parity verification continues.
+
+Exact Ice Cavern Map / Fire Temple Boss Door text fits current native OoT/MM layout with every word retained. The screenshot overflow is not reproduced against this source. One-time receipt staging/reflow traces now report message ID, presentation mode, byte lengths, buffer position and scale; their no-per-frame-repeat regression passes. Full receipt suite first encountered a missing explicit OoT include path in the existing runner, now corrected; rerun remains pending.
+
+This checkpoint is explicitly unfinished. GitHub publication was blocked by automatic approval review (new-pass source disclosure authorization not recognized); local commits and this recoverable archive are preserved. Full platform builds and actual game/Alt Assets acceptance remain unproven.
+
+## Final implementation and verification verdict
+
+All GI and input workstreams are implemented and reviewed. Source remains an unaccepted candidate; no executable, configured gameplay or Alt Assets acceptance is claimed. The first two local commits intentionally preserve earlier unfinished states; the final checkpoint restores temporary test-fixture edits after the MM compatibility headers were hydrated.
+
+Native results:
+- Complete OoT group: six runners, ASan/UBSan, solo/Combo boundaries; 74 binding identities; all 12 equipment pieces across seven inputs; native player toggle/retention and status updater; empty cells and correct Pictograph naming; all 24 custom-item handlers once per frame; stones, medallions, remains and Pikachu C/D input.
+- Complete MM group: seven runners in Combo and Solo with ASan/UBSan; independent binding/full IDs, all equipment icons/toggles, owned/title/empty-cell rules, shared-cell names, claimed-input/status policies, progressive/virtual slot separation, duplicate cache union and Net deduplication.
+- Review corrections include OoT alias status exemptions, MM native D Ultrahand guard, boundary cursor refresh and low-ID trade assignments. Cryonis owns only its up/down distance controls; C/left/right remain usable. Disabled duplicate bindings do not regain input through union masks.
+- GI: actual MM six-skill cane exporter authored present/absent and stock/local/donor roots; canonical imported catalog fallback without sentinel recursion; 18 omitted OoT static recipes; eight native-equipment callback transports; independent Ikana roots/default stock graph and teardown; exact native placeholder geometry for Dominion/base Elemental Wand.
+- Real resource manager/cache/loader under ASan/UBSan: root/vertex/texture/hash pinning, hot caches, independent Alt switches, metadata aliases, in-flight lifetime and stock-owner lifecycle pass.
+- Receipt layout and traces pass with native fonts, including exact Fire Temple Boss Door screenshot text and no repeated frame logging. Full native/foreign receipt catalog passes. The full receipt umbrella later stops in unchanged run_seed_settings_tests.py because external imgui.h is absent; this is a dependency block, not a passing full-suite result.
+
+The screenshot overflow itself remains unreproduced in this source, so it is traced rather than declared repaired. MM Pictograph wheel identity is repaired; OoT's pre-existing correct resolver/selector invalidation is verified without a speculative rewrite. Native placeholder cubes remain placeholders when authored assets are missing. The private Fados archive case is skipped because that input was not supplied.
+
+CI metadata runs both complete control groups and the GI fallbacks/resource-owner checks using the existing pinned NEI dependency include path. Public GitHub upload remains blocked by automatic review pending explicit authorization for this new pass; full platform CI has not run for this candidate. No accepted source master or input archive was changed.

@@ -14,6 +14,12 @@ constexpr u8 ITEM_ARROW_FIRE = 4, ITEM_ARROW_ICE = 12, ITEM_ARROW_LIGHT = 18;
 constexpr u8 ITEM_BOW_ARROW_FIRE = 0x38, ITEM_BOW_ARROW_ICE = 0x39, ITEM_BOW_ARROW_LIGHT = 0x3A;
 constexpr u8 ITEM_BOW_FIRE = 0x4A;
 constexpr int LINK_AGE_CHILD = 1;
+constexpr u16 PAUSE_ITEM_NONE = 999, ITEM_SOLD_OUT = 0x2C, ITEM_LENS = 15, ITEM_BOMB = 2;
+constexpr u16 BTN_B = 0x4000, BTN_CLEFT = 2, BTN_CDOWN = 4, BTN_CRIGHT = 1, BTN_DUP = 0x800, BTN_DDOWN = 0x400,
+              BTN_DLEFT = 0x200, BTN_DRIGHT = 0x100;
+constexpr u8 BTN_DISABLED = 0xFF;
+constexpr u16 ITEM_MM_LETTER_KAFEI = 0x7F, ITEM_MM_SPECIAL_DELIVERY = 0x7E;
+constexpr u8 SLOT_ARROW_LIGHT = 18;
 constexpr int EQUIP_SLOT_C_LEFT = 1, EQUIP_SLOT_C_DOWN = 2, EQUIP_SLOT_C_RIGHT = 3;
 constexpr int EQUIP_SLOT_D_RIGHT = 0, EQUIP_SLOT_D_LEFT = 1, EQUIP_SLOT_D_DOWN = 2, EQUIP_SLOT_D_UP = 3;
 constexpr int PAUSE_EQUIP_C_LEFT = 0, PAUSE_EQUIP_C_DOWN = 1, PAUSE_EQUIP_C_RIGHT = 2;
@@ -27,6 +33,12 @@ struct PauseContext {
 struct PlayState { PauseContext pauseCtx; };
 struct ExtButtons { u16 items[8]{}; };
 struct SaveContext {
+    u8 buttonStatus[9]{};
+    struct {
+        struct {
+            u8 status[4]{};
+        } dpad;
+    } shipSaveContext;
     struct {
         u8 buttonItems[8]{};
         u8 cButtonSlots[7]{};

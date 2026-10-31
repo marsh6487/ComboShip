@@ -30,6 +30,8 @@ void ExtButton_SetItem(s32 form, s32 btn, u16 extId);
 // D-pad slots use the same marker with their own persistent u16 store.
 u16 ExtButton_GetDpadItem(s32 form, s32 btn);
 void ExtButton_SetDpadItem(s32 form, s32 btn, u16 item);
+// Enabled C/D bindings for full-ID listeners; D-pad mode owners retain their input.
+u16 ExtButton_GetInputMask(u16 item);
 // Handles C/D-pad moves involving an extended item. Native-only equips stay with kaleido.
 s32 ExtButton_EquipItem(PlayState* play, s32 pauseButton, u16 item, u8 slot);
 

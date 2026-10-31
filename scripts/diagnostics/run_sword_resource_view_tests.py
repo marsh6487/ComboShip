@@ -12,6 +12,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--sanitize',action='store_true')
 parser.add_argument('--case',choices=('root','alias','lifetime','owner'))
 parser.add_argument('--source-root',type=Path,default=ROOT,help='optional pre-fix production source for regression control')
+parser.add_argument('--ikana',action='store_true',help='exercise the dedicated Ikana stock owner against the same real cache/loader')
 args=parser.parse_args()
 def bodies(source,qualified):
     result=[]
@@ -43,7 +44,13 @@ source=source.replace('/* RESOURCE_LOADER */','\n'.join(bodies(loader,name) for 
 registry=(args.source_root/'libultraship/src/ship/resource/CrossRMRegistry.cpp').read_text()
 source=source.replace('/* RESOURCE_REGISTRY */',registry[registry.index('namespace Ship {'):])
 helpers=(args.source_root/'soh/soh/ResourceManagerHelpers.cpp').read_text()
-source=source.replace('/* BASE_OWNER */',bodies(helpers,'OOT_NeiEnsureGiBaseOwner'))
+if args.ikana:
+    helper=(args.source_root/'combo/menu/ComboIkanaShieldResourceOwner.h').read_text()
+    helper=helper[helper.index('inline bool ComboEnsureIkanaShieldBaseOwner'):]
+    source=source.replace('/* BASE_OWNER */',helper+'\nint OOT_NeiEnsureGiBaseOwner(){return ComboEnsureIkanaShieldBaseOwner(Ship::CrossRMRegistry::Get("mm"));}')
+    source=source.replace('oot-gi-base','mm-ikana-base').replace('"oot"','"mm"').replace('soh.o2r','mm.o2r')
+else:
+    source=source.replace('/* BASE_OWNER */',bodies(helpers,'OOT_NeiEnsureGiBaseOwner'))
 flags=['-std=c++20','-DCOMBO_BUILD','-I'+str(ROOT/'libultraship/include'),'-I'+str(ROOT),'-pthread']
 if args.sanitize:flags+=['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
 with tempfile.TemporaryDirectory(prefix='sword-resource-view-') as tmp:

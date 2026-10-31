@@ -796,6 +796,10 @@ uint8_t Nei_CaneActiveSkill(void);
 u8 KafeiLandmine_Active(void);
 
 void* ExtInv_GetItemIcon(uint16_t itemId) {
+    if (ExtEquip_IsButtonItem(itemId)) {
+        u16 legacyItem = ExtEquip_GetLegacyButtonItem(itemId);
+        return ExtEquip_GetIcon((legacyItem - ITEM_EXT_SWORD_1) / 3, (legacyItem - ITEM_EXT_SWORD_1) % 3 + 1);
+    }
     void* fireShieldIcon = DinFireShield_ItemIcon(itemId);
     if (fireShieldIcon != NULL)
         return fireShieldIcon;

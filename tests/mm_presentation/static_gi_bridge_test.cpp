@@ -58,7 +58,15 @@ struct Item {RandomizerGet rg;std::shared_ptr<GetItemEntry> GetGIEntry(Randomize
  } const Name& GetName() {static Name name;return name;}};
 Item RetrieveItem(RandomizerGet rg) {return {rg};}
 }
-int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
+bool authoredAvailable = false;
+int NeiGi_DescribeEntry(const GetItemEntry*, CwItemDrawInfo* out) {
+    if (!authoredAvailable)
+        return 0;
+    out->drawKind = CW_DRAW_KIND_NEI_GI;
+    out->dlistCount = 1;
+    out->dlists[0] = "__OTR__authored_optional";
+    return 1;
+}
 int ResourceMgr_IsModAssetForGame(const char*,const char*);
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*);
 int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*,const char*,float*,float*);

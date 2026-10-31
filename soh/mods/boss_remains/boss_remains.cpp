@@ -26,6 +26,7 @@
  */
 
 #include "boss_remains.h"
+#include "mods/ext_buttons/ext_buttons.h"
 
 #include <libultraship/bridge.h> // CVarGetInteger
 
@@ -1495,7 +1496,7 @@ extern "C" void BossRemains_TickInput(PlayState* play, Player* player) {
         if (isDpad && !dpadOn) {
             continue;
         }
-        if (!(press & slots[i].btn)) {
+        if (!(press & slots[i].btn & ExtButton_GetInputMask(slots[i].item))) {
             continue;
         }
         if (BossRemains_ItemIndex(slots[i].item) < 0) {

@@ -34,9 +34,16 @@ void ExtButton_SetItem(s32 btn, u16 extId);
 // Clear a button slot: buttonItems -> ITEM_NONE, extButtons -> 0.
 void ExtButton_ClearItem(s32 btn);
 
+// Enabled, unclaimed C/D-pad inputs carrying an effective full item ID.
+u16 ExtButton_GetInputMask(u16 item);
+
+// Pause assignment: NEI bindings are independent; native items retain their
+// inventory-slot swap semantics. Rejects empty/sold-out selections unchanged.
+s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot);
+
 #ifdef COMBO_BUILD
-// Narrow pause-equip path for moves involving Magic Mirror. Preserves full IDs
-// while swapping/clearing the previous C/D mapping; caller reloads the target icon.
+// Compatibility entry point for moves involving Magic Mirror. Uses the same
+// independent NEI assignment contract; caller reloads the target icon.
 // Returns false without changing anything when neither item is the Mirror.
 s32 ExtButton_EquipMagicMirror(PlayState* play, s32 btn, u16 item, u8 slot);
 #endif

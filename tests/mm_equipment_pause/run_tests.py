@@ -246,6 +246,8 @@ void Kaleido_LoadMapNameStatic(void**, u32) {}
 #define PAUSE_EQUIP 3
 #define PAUSE_ITEM_NONE 999
 static const s16 sEquipmentItemOffsets[16] = {};
+static u8 gridOwned = 1;
+u8 ExtEquip_HasItem(s16, u8) { return gridOwned; }
 typedef struct {
     s16 cursorX[4], cursorY[4], cursorPoint[4], cursorSpecialPos, cursorColorSet;
     u16 namedItem;
@@ -267,6 +269,8 @@ u16 Publish(PauseContext* pauseCtx, bool extEquipPage) {
     pause.namedItem=0xE6;
     check(Publish(&pause,true)==0xE6,"SoH Champion publishes same shared ID");
     check(pause.namedItem==PAUSE_ITEM_NONE && gExtEquipGridNameContext,"SoH passive-to-grid refresh");
+    gridOwned=0;
+    check(Publish(&pause,true)==PAUSE_ITEM_NONE,"SoH unowned extended grid cell stays unnamed");
 '''
     return code + '\nint main() {\n' + tests + f'\nprintf("{host}: %d checks, %d failures\\n", checks, failures); return failures ? 1 : 0; }}\n'
 
