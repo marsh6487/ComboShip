@@ -11,6 +11,9 @@ grotto=(ROOT/'soh/soh/Enhancements/randomizer/randomizer_grotto.c').read_text()
 grotto=grotto[grotto.index('static const GrottoLoadInfo'):]
 runtime=(ROOT/'combo/rando/CrossDungeonOotRuntime.inc.h').read_text()
 runtime=runtime[runtime.index('namespace ComboCrossOotRuntime {'):runtime.index('extern "C" void Combo_SOH_AfterNativeLoadGame')]
+native=(ROOT/'soh/soh/Enhancements/randomizer/randomizer_entrance.c').read_text()
+trace = (native[native.index('static s16 Entrance_TraceResolved('):native.index('\ns16 Entrance_OverrideNextIndex(')]
+         if 'static s16 Entrance_TraceResolved(' in native else '')
 source=r'''
 #include "ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
@@ -27,6 +30,8 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #endif
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
+#undef LUSLOG_INFO
+#define LUSLOG_INFO(...) ((void)0)
 SaveContext gSaveContext{};
 static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};
 EntranceInfo* gEntranceTable = sFixtureEntranceTable;
@@ -42,7 +47,7 @@ extern "C" int32_t Combo_SOH_GrottoScene(int32_t);
 extern "C" int32_t Combo_SOH_CrossDungeonGrottoId(void);
 static bool gComboSceneSwitchCallback=true;
 void* Combo_ResolveSym(const char*,const char*) { return nullptr; }
-'''+grotto+'\n'+runtime+r'''
+'''+grotto+'\n'+runtime+'\n'+trace+r'''
 using namespace ComboRando::CrossDungeon;
 using namespace ComboCrossOotRuntime;
 int main() {
@@ -151,6 +156,32 @@ int main() {
     Combo_SOH_LoadCrossDungeonCheckpoint(123);
     assert(Combo_SOH_ConsumeCrossDungeonRecovery()==123);
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==123);
+    // Load hooks can materialize an unrelated savewarp before the queued peer arrival wins.
+    Dungeon dc{"dc",{0,ENTR_DODONGOS_CAVERN_ENTRANCE},{0,ENTR_DEATH_MOUNTAIN_TRAIL_OUTSIDE_DODONGOS_CAVERN},
+               {0,ENTR_DEATH_MOUNTAIN_TRAIL_OUTSIDE_DODONGOS_CAVERN}};
+    Dungeon ist{"ist",{1,0xAC00},{1,0xAC10},{1,0xAC10}};
+    seed=Encode({dc,ist},{1,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    gSaveContext.respawnFlag=2;
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.y=721;
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex=1;
+    assert(SOH_QueueCrossDungeonArrival(ENTR_DODONGOS_CAVERN_ENTRANCE));
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(gSaveContext.respawnFlag==0 && "queued DC arrival must discard unrelated savewarp coordinates");
+    gSaveContext.respawnFlag=2;
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==-1 && gSaveContext.respawnFlag==2);
+    Combo_SOH_LoadCrossDungeonCheckpoint(ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(Combo_SOH_ConsumeCrossDungeonRecovery()==ENTR_DODONGOS_CAVERN_ENTRANCE);
+    assert(gSaveContext.respawnFlag==0 && "checkpoint recovery must own its room and position");
+    gSaveContext.respawnFlag=2;
+    assert(Combo_SOH_ConsumeCrossDungeonRecovery()==-1 && gSaveContext.respawnFlag==2);
+    // A winning positioned grotto destination must install its own return coordinates after reset.
+    seed=Encode(grottos,{1,2,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    gPlayState=nullptr;
+    assert(SOH_QueueCrossDungeonArrival(0x801));
+    assert(Combo_SOH_ConsumeCrossDungeonArrival()==grottoReturnTable[1].entranceIndex);
+    assert(gSaveContext.respawnFlag==2);
+    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.y==grottoReturnTable[1].pos.y);
+    assert(gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex==grottoReturnTable[1].room);
     std::cout<<"OoT pool runtime: native-off grotto loading, single composition, physical reverse, synthetic recovery, interior scopes, boss owner checkpoint pass\n";
 }
 '''

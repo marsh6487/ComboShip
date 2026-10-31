@@ -25,6 +25,16 @@ static bool ValidEntrance(int32_t index) {
 static int32_t Materialize(int32_t index) {
     return Grotto_OverrideSpecialEntrance(static_cast<int16_t>(index));
 }
+static int32_t MaterializeArrival(int32_t index) {
+    // Native load hooks may have positioned a different savewarp before this queued arrival wins.
+    // Start the winning arrival clean; grotto destinations then install their own room/position.
+    const int previousRespawn = gSaveContext.respawnFlag;
+    gSaveContext.respawnFlag = 0;
+    const int32_t materialized = Materialize(index);
+    SPDLOG_INFO("[EntranceTrace] oot-materialize-arrival logical={:#x} materialized={:#x} respawn={}->{}", index,
+                materialized, previousRespawn, gSaveContext.respawnFlag);
+    return materialized;
+}
 static bool SceneMatchesEntrance(int32_t index, int scene) {
     if (index >= ENTRANCE_GROTTO_LOAD_START)
         return Combo_SOH_GrottoScene(index) == scene;
@@ -155,6 +165,8 @@ extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try 
                 throw std::invalid_argument("unknown OoT boss source recovery entrance");
         }
     ComboCrossOotRuntime::state.Install(seed);
+    SPDLOG_INFO("[EntranceTrace] oot-runtime-install routes={} checkpoint={:#x}", routes.size(),
+                ComboCrossOotRuntime::checkpoint.Saved());
     Combo_SOH_CancelCrossDungeonTransition();
     ComboCrossOotRuntime::pendingBossRecovery.reset();
     ComboCrossOotRuntime::localDungeonArrival = ComboCrossOotRuntime::localArrivalCheckpoint = -1;
@@ -187,6 +199,7 @@ extern "C" COMBO_EXPORT int SOH_QueueCrossDungeonArrival(int32_t index) {
         return 0;
     if (!ComboCrossOotRuntime::state.QueueArrival(index))
         return 0;
+    SPDLOG_INFO("[EntranceTrace] oot-queue-arrival entrance={:#x}", index);
     ComboCrossOotRuntime::pendingBossRecovery.reset();
     return 1;
 }
@@ -210,7 +223,7 @@ extern "C" int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void) {
         return -1;
     checkpoint.Arrive(recovery->parent.index, true);
     localDungeonArrival = localArrivalCheckpoint = -1;
-    return Materialize(recovery->parent.index);
+    return MaterializeArrival(recovery->parent.index);
 }
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
     if (!Combo_IsCombinedGame())
@@ -221,7 +234,10 @@ extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
         ComboCrossOotRuntime::checkpoint.Arrive(recovery, recovery >= 0);
         ComboCrossOotRuntime::localDungeonArrival = ComboCrossOotRuntime::localArrivalCheckpoint = -1;
     }
-    return index < 0 ? -1 : ComboCrossOotRuntime::Materialize(index);
+    const int32_t materialized = index < 0 ? -1 : ComboCrossOotRuntime::MaterializeArrival(index);
+    SPDLOG_INFO("[EntranceTrace] oot-consume-arrival logical={:#x} materialized={:#x} respawn={} checkpoint={:#x}",
+                index, materialized, gSaveContext.respawnFlag, ComboCrossOotRuntime::checkpoint.Saved());
+    return materialized;
 }
 // Called on each side of native lookup, never on a composed/queued arrival or death/save respawn.
 extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative) {
@@ -233,6 +249,10 @@ extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative) 
     auto transition = state.Lookup(beforeNative ? Phase::BeforeNative : Phase::AfterNative, index);
     if (!transition)
         return -1;
+    SPDLOG_INFO("[EntranceTrace] oot-cross-route phase={} from={:#x} toGame={} to={:#x} checkpoint={:#x} "
+                "nativeLoad={} respawn={}",
+                beforeNative ? "before-native" : "after-native", index, transition->to.game, transition->to.index,
+                transition->checkpoint.index, nativeLoadDispatch, gSaveContext.respawnFlag);
     pendingBossRecovery.reset();
     if (transition->to.game == 0) {
         localDungeonArrival = transition->to.index;
@@ -250,6 +270,8 @@ extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) {
     return ComboCrossOotRuntime::checkpoint.Saved();
 }
 extern "C" void Combo_SOH_LoadCrossDungeonCheckpoint(int32_t index) {
+    SPDLOG_INFO("[EntranceTrace] oot-load-checkpoint requested={:#x} valid={}", index,
+                ComboCrossOotRuntime::ValidEntrance(index));
     ComboCrossOotRuntime::checkpoint.Load(ComboCrossOotRuntime::ValidEntrance(index) ? index : -1);
     ComboCrossOotRuntime::localDungeonArrival = ComboCrossOotRuntime::localArrivalCheckpoint = -1;
     ComboCrossOotRuntime::pendingBossRecovery.reset();
@@ -263,7 +285,7 @@ extern "C" int32_t Combo_SOH_ConsumeCrossDungeonRecovery(void) {
     if (index < 0)
         return -1;
     const int32_t bossRecovery = RecoverBoss(index);
-    return Materialize(bossRecovery >= 0 ? bossRecovery : index);
+    return MaterializeArrival(bossRecovery >= 0 ? bossRecovery : index);
 }
 
 extern "C" void Combo_SOH_BeforeNativeLoadGame(void) {
@@ -272,6 +294,13 @@ extern "C" void Combo_SOH_BeforeNativeLoadGame(void) {
 // This runs after the complete native OnLoadGame dispatch; hook containers have no ordering contract.
 extern "C" void Combo_SOH_AfterNativeLoadGame(void) {
     ComboCrossOotRuntime::nativeLoadDispatch = false;
+    SPDLOG_INFO("[EntranceTrace] oot-after-load slot={} entrance={:#x} savedScene={} cross={} "
+                "nativeShuffle={} spawnShuffle={} pending={}",
+                gSaveContext.fileNum, gSaveContext.entranceIndex, gSaveContext.savedSceneNum,
+                ComboCrossOotRuntime::state.Enabled(),
+                (int)OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_ENTRANCES).Get(),
+                (int)OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_OVERWORLD_SPAWNS).Get(),
+                ComboCrossOotRuntime::pending.has_value());
     if (ComboCrossOotRuntime::state.Enabled()) {
         Entrance_ApplyCrossDungeonSafety();
         // Native-off contexts skipped the entrance savewarp branch while the slot was binding.
@@ -284,4 +313,7 @@ extern "C" void Combo_SOH_AfterNativeLoadGame(void) {
         gSaveContext.entranceIndex = checkpoint;
         gSaveContext.cutsceneIndex = 0;
     }
+    SPDLOG_INFO("[EntranceTrace] oot-after-load final entrance={:#x} recovery={:#x} respawn={} pending={}",
+                gSaveContext.entranceIndex, checkpoint, gSaveContext.respawnFlag,
+                ComboCrossOotRuntime::pending.has_value());
 }

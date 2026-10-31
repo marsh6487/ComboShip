@@ -90,6 +90,8 @@ class SceneDB {
     // mq/nonmq copy selected by `masterQuest`; the one-argument form uses the mounted game's MQ setting.
     std::string GetScenePath(int32_t id) const;
     std::string GetScenePath(int32_t id, bool masterQuest) const;
+    // Same vanilla scene/layout, for recovery from an unavailable JSON header. Custom scenes have no native fallback.
+    std::string GetLegacyScenePath(int32_t id, bool masterQuest) const;
 
     // Registers every scene in the layer-merged unbound/scenes.json (SPEC.md §7), and notes whether an
     // Unbound-format archive (unbound.json of a readable version) is mounted so vanilla scenes resolve to scene.json.

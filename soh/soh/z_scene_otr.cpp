@@ -1,10 +1,13 @@
 #include <memory>
+#include <libultraship/luslog.h>
 #include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include <cassert>
 #include <algorithm>
 #include <vector>
 
 #include <ship/resource/type/Blob.h>
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include <spdlog/spdlog.h>
 
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -552,6 +555,8 @@ extern "C" s32 OTRRoom_RequestNewRoom(PlayState* play, RoomContext* roomCtx, s32
 
     if (roomCtx->status == 0) {
         if (roomNum < 0 || roomNum >= play->numRooms) {
+            LUSLOG_ERROR("[SceneSpawn] invalid-room scene=%d requested=%d rooms=%d respawn=%d layer=%d", play->sceneNum,
+                         roomNum, play->numRooms, gSaveContext.respawnFlag, gSaveContext.sceneLayer);
             return 0;
         }
         BgCheck_InvalidateRoomSnapshots(&play->colCtx);
@@ -573,8 +578,22 @@ extern "C" s32 OTRRoom_RequestNewRoom(PlayState* play, RoomContext* roomCtx, s32
         // DmaMgr_SendRequest2(&roomCtx->dmaRequest, roomCtx->unk_34, play->roomList[roomNum].vromStart, size, 0,
         //&roomCtx->loadQueue, NULL, __FILE__, __LINE__);
 
-        auto roomData = std::static_pointer_cast<SOH::Scene>(
-            ResourceMgr_GetResourceByNameHandlingMQ(play->roomList[roomNum].fileName));
+        LUSLOG_INFO("[SceneSpawn] room-request scene=%d room=%d path='%s' respawn=%d layer=%d", play->sceneNum, roomNum,
+                    play->roomList[roomNum].fileName, gSaveContext.respawnFlag, gSaveContext.sceneLayer);
+#ifdef COMBO_BUILD
+        Ship::OwnRMScope ownerScope("oot");
+#endif
+        std::shared_ptr<SOH::Scene> roomData;
+        try {
+            roomData = std::dynamic_pointer_cast<SOH::Scene>(
+                ResourceMgr_GetResourceByNameHandlingMQ(play->roomList[roomNum].fileName));
+        } catch (const std::exception& e) {
+            LUSLOG_ERROR("[SceneSpawn] room-exception scene=%d room=%d path='%s' error='%s'", play->sceneNum, roomNum,
+                         play->roomList[roomNum].fileName, e.what());
+            throw;
+        }
+        LUSLOG_INFO("[SceneSpawn] room-result scene=%d room=%d resolved='%s' loaded=%d", play->sceneNum, roomNum,
+                    roomData ? roomData->GetInitData()->Path.c_str() : "(none)", roomData != nullptr);
         roomCtx->status = 1;
         roomCtx->roomToLoad = roomData.get();
 

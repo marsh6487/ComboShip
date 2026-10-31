@@ -144,7 +144,9 @@ int main() {
     Combo_SOH_LoadCrossDungeonCheckpoint(volvagia.returnTo.index);
     assert(Combo_SOH_ConsumeCrossDungeonRecovery()==-1); // Dedicated resume follows native hooks.
     gSaveContext.entranceIndex=999;
+    gSaveContext.respawnFlag=2; // Earlier load hooks positioned a different savewarp.
     NativeTitleArrival();
+    assert(gSaveContext.respawnFlag==0 && "boss source resume must discard the superseded savewarp position");
     assert(gSaveContext.entranceIndex==volvagia.deathCheckpoint->index &&
            "MM->OoT recovery must bypass the fixed portal arrival");
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==volvagia.reverseCheckpoint->index);

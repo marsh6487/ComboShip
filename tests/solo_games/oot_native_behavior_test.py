@@ -41,6 +41,8 @@ using u8=uint8_t; using u16=uint16_t; using s16=int16_t;
 #define CVAR_ENHANCEMENT(x) "enh." x
 #define CVAR_GENERAL(x) "gen." x
 #define SPDLOG_INFO(...) ((void)0)
+#define LUSLOG_INFO(...) ((void)0)
+#define ARRAY_COUNT(x) (sizeof(x)/sizeof((x)[0]))
 std::map<std::string,int> integers;
 std::map<std::string,std::string> strings;
 int CVarGetInteger(const char* s,int fallback) { auto i=integers.find(s); return i==integers.end()?fallback:i->second; }
@@ -51,7 +53,9 @@ bool original=true,mq=true;
 bool ResourceMgr_GameHasOriginal(){ return original; }
 bool ResourceMgr_GameHasMasterQuest(){ return mq; }
 /* native enum inserted below */
-struct { int entranceIndex,linkAge,dayTime,cutsceneIndex,language,n64ddFlag,fileNum;
+struct RespawnData { int entranceIndex,roomIndex,playerParams; struct {float x,y,z;} pos; };
+struct { int entranceIndex,linkAge,dayTime,cutsceneIndex,language,n64ddFlag,fileNum,respawnFlag;
+  RespawnData respawn[3];
   u8 playerName[8]; struct { int filenameLanguage; struct { int id; } quest; } ship;
   struct { int dungeonItems[32]; } inventory; } gSaveContext{};
 struct FileChooseContext { int buttonIndex=0,n64ddFlag=0,speedrunIndex=0; u8 questType[3]{}; };
@@ -102,7 +106,10 @@ source+=function('soh/soh/Enhancements/FileSelectEnhancements.cpp','bool SohFile
 source+=function('soh/soh/Enhancements/FileSelectEnhancements.cpp','u8 SohFileSelect_CountVisibleQuests(')
 source+=function('soh/src/code/z_sram.c','void Sram_InitSave(')
 source+=function('soh/soh/Enhancements/randomizer/randomizer.cpp','bool Rando_HandleSpoilerDrop(')
-source+=function('soh/soh/Enhancements/randomizer/randomizer_entrance.c','s16 Entrance_OverrideNextIndex(')
+entrance_path='soh/soh/Enhancements/randomizer/randomizer_entrance.c'
+if 'static s16 Entrance_TraceResolved(' in read(entrance_path):
+    source+=function(entrance_path,'static s16 Entrance_TraceResolved(')
+source+=function(entrance_path,'s16 Entrance_OverrideNextIndex(')
 source+=function('soh/soh/Enhancements/randomizer/hook_handlers.cpp','void CheckTriggers(')
 source+=function('soh/soh/FleetShipCombo/FleetShipCombo.cpp','int FleetCombo_BeatBothBosses(')
 source+=r'''

@@ -1,4 +1,5 @@
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <libultraship/luslog.h>
 
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
@@ -103,6 +104,12 @@ void HandleSaveMenu(bool* should, PlayState* play) {
         case 4:
             *should = false;
             if (Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE && Message_ShouldAdvance(play)) {
+                LUSLOG_INFO("[EntranceTrace] pause-choice slot=%d choice=%d scene=%d savedScene=%d "
+                            "entrance=%#x respawn=%d spawnShuffle=%d rememberLocation=%d",
+                            gSaveContext.fileNum, play->msgCtx.choiceIndex, play->sceneNum, gSaveContext.savedSceneNum,
+                            gSaveContext.entranceIndex, gSaveContext.respawnFlag,
+                            IS_RANDO ? Randomizer_GetSettingValue(RSK_SHUFFLE_OVERWORLD_SPAWNS) : 0,
+                            CVarGetInteger(CVAR_ENHANCEMENT("RememberSaveLocation"), 0));
                 switch (play->msgCtx.choiceIndex) {
                     case 0:
                         // Continue
@@ -165,7 +172,11 @@ void HandleSaveMenu(bool* should, PlayState* play) {
                     SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                     gSaveContext.seqId = static_cast<uint8_t>(NA_BGM_DISABLED);
                     gSaveContext.natureAmbienceId = 0xFF;
+                    LUSLOG_INFO("[EntranceTrace] pause-load begin entrance=%#x respawn=%d resetToSpawn=%d",
+                                gSaveContext.entranceIndex, gSaveContext.respawnFlag, gSaveContext.ship.resetToSpawn);
                     GameInteractor_ExecuteOnLoadGame(gSaveContext.fileNum);
+                    LUSLOG_INFO("[EntranceTrace] pause-load hooks entrance=%#x respawn=%d resetToSpawn=%d",
+                                gSaveContext.entranceIndex, gSaveContext.respawnFlag, gSaveContext.ship.resetToSpawn);
                     if (gSaveContext.ship.resetToSpawn) {
                         gSaveContext.respawnFlag = 0;
                         if (!IS_RANDO) {
@@ -181,6 +192,8 @@ void HandleSaveMenu(bool* should, PlayState* play) {
                         }
                         gSaveContext.ship.resetToSpawn = 0;
                     }
+                    LUSLOG_INFO("[EntranceTrace] pause-load final entrance=%#x respawn=%d cutscene=%#x",
+                                gSaveContext.entranceIndex, gSaveContext.respawnFlag, gSaveContext.cutsceneIndex);
                 }
             }
             break;

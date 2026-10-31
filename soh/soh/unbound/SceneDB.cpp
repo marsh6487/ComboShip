@@ -335,6 +335,21 @@ std::string SceneDB::GetScenePath(int32_t id) const {
     return GetScenePath(id, ResourceMgr_IsGameMasterQuest());
 }
 
+std::string SceneDB::GetLegacyScenePath(int32_t id, bool masterQuest) const {
+    const Entry& entry = RetrieveEntry(id);
+    if (!entry.valid || entry.isCustom) {
+        return "";
+    }
+
+    // Vanilla dungeons with a Master Quest variant live under mq/ or nonmq/; everything else is shared.
+    bool hasMqVariant = (id >= SCENE_DEKU_TREE && id <= SCENE_ICE_CAVERN) || id == SCENE_GERUDO_TRAINING_GROUND ||
+                        id == SCENE_INSIDE_GANONS_CASTLE;
+    bool useMq = hasMqVariant && masterQuest;
+    const char* sceneVersion = hasMqVariant ? (useMq ? "mq" : "nonmq") : "shared";
+    return StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion, entry.sceneFileName.c_str(),
+                                 entry.sceneFileName.c_str());
+}
+
 std::string SceneDB::GetScenePath(int32_t id, bool masterQuest) const {
     const Entry& entry = RetrieveEntry(id);
     if (!entry.valid) {
@@ -343,14 +358,8 @@ std::string SceneDB::GetScenePath(int32_t id, bool masterQuest) const {
     if (entry.isCustom) {
         return entry.scenePath;
     }
-
-    // Vanilla dungeons with a Master Quest variant live under mq/ or nonmq/; everything else is shared.
-    bool hasMqVariant = (id >= SCENE_DEKU_TREE && id <= SCENE_ICE_CAVERN) || id == SCENE_GERUDO_TRAINING_GROUND ||
-                        id == SCENE_INSIDE_GANONS_CASTLE;
-    bool useMq = hasMqVariant && masterQuest;
-    const char* sceneVersion = hasMqVariant ? (useMq ? "mq" : "nonmq") : "shared";
-    const auto legacyPath = StringHelper::Sprintf("scenes/%s/%s/%s", sceneVersion, entry.sceneFileName.c_str(),
-                                                  entry.sceneFileName.c_str());
+    const auto legacyPath = GetLegacyScenePath(id, masterQuest);
+    const bool useMq = legacyPath.starts_with("scenes/mq/");
     if (unboundBase) {
         // scenes/<leaf minus _scene>[_mq]/scene.json (unbound-docs/SPEC.md §4.1)
         std::string dir = entry.sceneFileName;
