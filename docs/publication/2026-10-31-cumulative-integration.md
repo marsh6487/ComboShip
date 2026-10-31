@@ -66,7 +66,7 @@ ROM type. Test classification now uses filenames, and quest-named directories
 exercise that boundary deterministically. No production extraction changes.
 All ROM-setup tests, including MQ-layout seed/save checks, now pass locally.
 
-- Partner/acquisition/packaging tests: 16 pass; encounter tests: 4 pass.
+- Partner/acquisition/title/packaging tests: 19 pass; encounter tests: 4 pass.
 - CI routing/failure-handling/workflow tests: 25 pass.
 - Stock generation: 4096 deterministic full-catalog inventories pass quotas,
   eligibility, pricing, validation and purchase checks.
@@ -82,6 +82,41 @@ Fresh full platform builds and all six regression groups run on the published
 integration. Record their actual outcome after they finish. No configured game
 runtime, GPU/FPS performance, visual acceptance or user acceptance is claimed.
 Windows build output is a CI artifact, not a game release.
+
+## First CI follow-up
+
+Published candidate `f9aa0b2a` passed source preflight, Windows compile preflight,
+entrances and systems. Full builds continued independently. The world, equipment,
+items and render groups exposed extracted-function fixtures missing the new
+encounter/Cojiro boundaries and an old conditional-song pool expectation.
+
+Repairs preserve the existing assertions and add typed disabled-feature boundary
+checks, explicit Command Melody starting-item subtraction, and owned/unowned
+Cojiro cell/title/alpha/toggle controls. Exact complete affected runners pass
+locally, including camera/spawn, wide collision/enemy randomizer, shared-item
+integration, OoT access, MM ownership/selectors and Cape receipt/icon suites.
+Local checkpoints: `e76c7f0b6`, `0e9eb5651`, `a84a945a9`, `d96ed1fc9`, `cb4c9945f`.
+Published fixture recovery: `1eda1324fb01a207dceb7babca4df0e105013188`.
+
+The audit also found MM's owned Cojiro title requested an unbundled OoT resource,
+which could fall back to a boots label in Solo MM. Local `74d525c3a` supplies a
+128x16 IA4 title through the existing font pipeline and selects it without an
+OoT owner. Tests verify native no-donor selection, exact source hash, IA4 bounds
+and byte-identical regeneration. Published candidate recovery:
+`0c89ac85d368a909c06224f6751ca55bbcbe6da0`.
+
+Windows's full first build then reached MM archive normalization and failed:
+CMake selected Python3.14.9, whose ZIP append writer clears the UTF8 flag in
+existing ASCII central records while ZAPD's local headers retain that flag.
+Local `c70f96938` preserves the original local region and raw central records,
+and adjusts offsets only for separately generated additions. The unchanged
+normalizer now passes the reproduced case. Tests retain compressed payloads,
+forced ZIP64 local metadata, data descriptors, extras and comments byte-for-byte.
+All 19 partner tests pass after repair. This first Windows run did not compile
+the game engines; successful compile preflight is recorded separately.
+
+Fresh full CI on the follow-up head remains required. These local checks and
+successful earlier CI groups do not imply all groups or platform builds passed.
 
 ## Restoration
 

@@ -1,14 +1,17 @@
 """Native archives contain the exact authored partners and Solo MM dependencies."""
 import importlib.util
+import io
 import base64
 import json
 import zlib
 import sys
+import struct
+from unittest.mock import patch
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
-from zipfile import ZipFile, ZipInfo
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('partner_resources', ROOT / 'scripts/packaging/partner_resources.py')
@@ -108,6 +111,54 @@ class Packaging(unittest.TestCase):
                 module.merge(archive, ROOT, '2ship')
                 outputs.append(archive.read_bytes())
             self.assertEqual(*outputs)
+
+    def test_python314_append_does_not_rewrite_zapd_utf8_central_flags(self):
+        module = self.merger()
+        spec = importlib.util.spec_from_file_location(
+            'normalize_candidate', ROOT / 'scripts/packaging/normalize_candidate_o2r.py')
+        normalizer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(normalizer)
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / 'game.o2r'
+            class DescriptorStream(io.BytesIO):
+                def seek(self, *args):
+                    raise io.UnsupportedOperation('write with a data descriptor')
+            stream = DescriptorStream()
+            with ZipFile(stream, 'w') as output:
+                info = ZipInfo('zapd/ascii_resource')
+                info.compress_type = ZIP_DEFLATED
+                info.comment = b'preserved entry comment'
+                info.extra = struct.pack('<HH4s', 0xCAFE, 4, b'test')
+                with output.open(info, 'w', force_zip64=True) as resource:
+                    resource.write(b'preserve compressed bytes')
+            archive.write_bytes(stream.getvalue())
+            # libzip can retain explicit UTF-8 encoding even for ASCII names.
+            raw = bytearray(archive.read_bytes())
+            central_at = raw.index(b'PK\x01\x02')
+            struct.pack_into('<H', raw, 6, 0x808)
+            struct.pack_into('<H', raw, central_at + 8, 0x808)
+            archive.write_bytes(raw)
+            original_central = bytes(raw[central_at:-22])
+            original_local = bytes(raw[:central_at])
+            # CPython 3.14 clears bit11 for ASCII names on central serialization.
+            # Reproduce the selected Windows CMake interpreter under Python3.12.
+            encode = ZipInfo._encodeFilenameFlags
+            def python314_encode(info):
+                if info.filename.isascii():
+                    return info.filename.encode('ascii'), info.flag_bits & ~0x800
+                return encode(info)
+            with patch.object(ZipInfo, '_encodeFilenameFlags', python314_encode):
+                module.merge(archive, ROOT, '2ship')
+            merged = archive.read_bytes()
+            self.assertEqual(merged[:central_at], original_local)
+            with ZipFile(archive) as output:
+                self.assertEqual(output.getinfo('zapd/ascii_resource').flag_bits, 0x808)
+                self.assertEqual(merged[output.start_dir:output.start_dir + len(original_central)],
+                                 original_central)
+            normalizer.normalize_candidate_archive(archive)
+            with ZipFile(archive) as output:
+                self.assertEqual(output.read('zapd/ascii_resource'), b'preserve compressed bytes')
+                self.assertEqual(output.getinfo('zapd/ascii_resource').flag_bits, 0x808)
 
     def test_corrupt_source_is_rejected_before_mutation(self):
         module = self.merger()
