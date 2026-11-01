@@ -5,7 +5,8 @@ tree `f55b402803767ec7dbb6794cec912da8dbbc312f`, descended from the tested-build
 source `628e891c683f5cd5b02a5570b1572ad62d42dd37`. The existing companion/enemy
 integrations, morning repairs and default-off indexed-rendering control remain
 inherited. Publication additions preserve the pot asset recipe/reference data
-and the original source history; they do not modify the verified engine files.
+and the original source history. The CI follow-up below changes only whitespace
+in one shop header.
 
 ## Included repairs
 
@@ -46,6 +47,18 @@ Full Windows/Linux builds of this final source and configured gameplay remain
 pending. Earlier full-build results do not establish this candidate's build or
 gameplay acceptance. No protected/default branch or accepted master is merged,
 and no game release is published.
+
+## CI formatting follow-up
+
+Run `41261081435` passed the other fast source steps and stopped at the pinned
+clang-format 14.0.6 gate. Its complete formatting diff contains three hunks in
+`mm/2s2h/Enhancements/Gameplay/BlackMarketMmNativeShop.h`: line wrapping and
+aggregate-initializer alignment only. Applying that formatter preserves the
+file's exact non-whitespace bytes. A fresh complete `run-clang-format.sh` pass
+changed no other file, and the formatted header is idempotent under the pinned
+version. The existing native behavior checks remain applicable; no receipt or
+camera predicate changed. Preserve the initial publication checkpoint at
+`b76159dffe1333edfef6c7eb591c90b5c63c8559` as the pre-format rollback point.
 
 ## Original history and rollback
 

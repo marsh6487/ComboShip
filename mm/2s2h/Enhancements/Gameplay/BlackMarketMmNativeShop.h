@@ -235,8 +235,7 @@ void MonitorBrowsing() {
     }
     if (sNativeReceiptTalk.ticket &&
         (!sReceipt.pending || sNativeReceiptTalk.ticket != sReceipt.ticket || !NativeReceiptTalkOwned(play) ||
-         !(sNativeShop->actor.flags & ACTOR_FLAG_TALK) ||
-         play->cameraPtrs[CAM_ID_MAIN] != sNativeReceiptTalk.camera ||
+         !(sNativeShop->actor.flags & ACTOR_FLAG_TALK) || play->cameraPtrs[CAM_ID_MAIN] != sNativeReceiptTalk.camera ||
          sNativeReceiptTalk.camera->uid != sNativeReceiptTalk.cameraUid)) {
         EndBrowsing(play);
         CancelReceipt();
@@ -450,9 +449,8 @@ s32 NativeReceiptComplete(EnOssan* shop, PlayState* play) {
     // manager. Accept only the one this handoff started on the same main view.
     const bool ownTalk = continuing && sNativeReceiptTalk.globalTalk && cs == CS_ID_GLOBAL_TALK;
     if (!sReceipt.pending || !sReceipt.delivered || !ReceiptContext() || !player || play->msgCtx.msgMode != 0 ||
-        (player->stateFlags1 & PLAYER_STATE1_400) || !Safe(play) ||
-        Play_GetActiveCamId(play) != CAM_ID_MAIN || (cs != CS_ID_NONE && !ownTalk) ||
-        !ReceiptPlacementIdle())
+        (player->stateFlags1 & PLAYER_STATE1_400) || !Safe(play) || Play_GetActiveCamId(play) != CAM_ID_MAIN ||
+        (cs != CS_ID_NONE && !ownTalk) || !ReceiptPlacementIdle())
         return false;
     if (continuing) {
         // Native StartTalking sets 20000000 itself. Keep all other blocking
@@ -482,8 +480,9 @@ s32 NativeReceiptComplete(EnOssan* shop, PlayState* play) {
     shop->actor.textId = 0;
     Player_StartTalking(play, &shop->actor);
     auto* main = play->cameraPtrs[CAM_ID_MAIN];
-    sNativeReceiptTalk = { sReceipt.ticket, play, player, main, main->uid,
-                           CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_TALK };
+    sNativeReceiptTalk = { sReceipt.ticket, play,
+                           player,          main,
+                           main->uid,       CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_TALK };
     return false;
 }
 s32 NativeKeeperDialogue(EnOssan*, PlayState* play) {
