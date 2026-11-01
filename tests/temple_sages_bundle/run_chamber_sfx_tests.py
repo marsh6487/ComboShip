@@ -17,6 +17,16 @@ sys.path.insert(0, str(ROOT / 'tools/temple_sages'))
 import temple_sages_pool
 import resource_geometry as geometry
 
+UNBOUND_CONTROLS = {
+    'scenes/tokinoma/scene.json',
+    'scenes/tokinoma/rooms/0.json',
+    'scenes/tokinoma/collision.json',
+    'scenes/tokinoma/collision.bin',
+    'alt/scenes/tokinoma/rooms/0.json',
+    'alt/scenes/tokinoma/collision.json',
+    'alt/scenes/tokinoma/collision.bin',
+}
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -39,8 +49,10 @@ def main():
     directory = ROOT / 'tools/temple_sages_bundle'
     manifest = json.loads((directory / 'manifest.json').read_text())
     resources = temple_sages_pool.decode(directory, manifest['bundle'])
-    targets = {p for p in resources if p.endswith(('tokinoma_room_0', 'tokinoma_room_0ZeldaAdult'))}
-    assert len(targets) == 4 and len(resources) == 4096
+    assert UNBOUND_CONTROLS <= resources.keys()
+    legacy = {path: data for path, data in resources.items() if path not in UNBOUND_CONTROLS}
+    targets = {p for p in legacy if p.endswith(('tokinoma_room_0', 'tokinoma_room_0ZeldaAdult'))}
+    assert len(targets) == 4 and len(legacy) == 4096
     emitter = (0x3b, 0, -120, -2400, 0, 0, 0, 0x10)
     for path in targets:
         data = resources[path]
@@ -54,10 +66,20 @@ def main():
         assert hashlib.sha256(data).hexdigest() == expected
         if not path.endswith('ZeldaAdult'):
             assert (42, 0, -110, -2400, 0, 0, 0, 0x7d23) in records
-    protected = {k: hashlib.sha256(v).hexdigest() for k, v in resources.items() if k not in targets}
+    protected = {k: hashlib.sha256(v).hexdigest() for k, v in legacy.items() if k not in targets}
     digest = hashlib.sha256(json.dumps(protected, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     assert digest == '37e8c132a1f314add4be095a9c8e1fb83f48f05e6389aac0f3681c673c813d6f'
-    print('PASS production Chamber guard, four additive emitters, current child Zelda and4092 protected resource bytes')
+    for prefix in ('', 'alt/'):
+        room = json.loads(resources[prefix + 'scenes/tokinoma/rooms/0.json'])
+        for setup in ('0', '2'):
+            actors = room['setups'][setup]['actors'].values()
+            records = [struct.unpack('<8h', struct.pack('<H3h3hH', actor['id'], *actor['pos'],
+                       *actor['rot'], actor['params'] & 0xffff)) for actor in actors]
+            assert len(records) == 14 and records.count(emitter) == 1
+            if setup == '0':
+                assert (42, 0, -110, -2400, 0, 0, 0, 0x7d23) in records
+    print('PASS production Chamber guard, four binary/native Unbound emitters, current child Zelda '
+          'and 4092 unchanged protected resources plus seven explicit controls')
 
 
 if __name__ == '__main__':
