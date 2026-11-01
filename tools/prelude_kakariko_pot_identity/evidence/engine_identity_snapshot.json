@@ -1,0 +1,12 @@
+{
+  "ShufflePots.cpp": {
+    "bytes": 225044,
+    "sha256": "573e27b8d12ab041e3784e9b5fc9129bf9c5ea6d55b8671d3a3f2e804952c2ef"
+  },
+  "notes": "read-only engine evidence; no engine change is required or included",
+  "randomizerTypes.h": {
+    "bytes": 1157,
+    "sha256": "dc86b56177c188419a7b00f600f3f91e45f491dce16989f677cd6dbc609bd2aa"
+  },
+  "repository_head": "21ff7a1c497d63f6687f704b5bfff972fde00207"
+}
