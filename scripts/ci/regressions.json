@@ -1518,6 +1518,12 @@
     "run": "python3 -B tests/temple_sages/test_packaged_chamber.py"
   },
   {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Built-in Sages Chamber native Unbound controls and scoped archive priority",
+    "run": "python3 -B tests/temple_sages/test_unbound_chamber.py\npython3 -B tests/temple_sages/run_builtin_layer_tests.py"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Packaged Lake Hylia dedicated sand, native and Alt resource parity",

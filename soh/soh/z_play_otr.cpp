@@ -39,8 +39,8 @@ extern "C" void GlobalOutdoorRain_Log(const char* message) {
 Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
     // ComboShip: the resource manager loads async and rethrows on .get(); during an MM->OOT resume a
     // scene/resource can fail to load, and the uncaught throw took the whole process down with no
-    // backtrace. Catch it here, log which file failed and why, and return nullptr so the caller hits
-    // its existing fallback instead of dying silently.
+    // backtrace. Catch it here, log which file failed and why, and let the typed caller handle failure.
+    // This loader also serves special-file Blobs; only scene consumers may require SOH::Scene.
     try {
 #ifdef COMBO_BUILD
         LUSLOG_INFO("[SceneSpawn] owner path='%s' active-is-oot=%d", fileName,
@@ -56,8 +56,8 @@ Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
         auto scene = std::dynamic_pointer_cast<SOH::Scene>(res);
         LUSLOG_INFO("[SceneSpawn] resource path='%s' resolved='%s' result=%s", fileName,
                     res ? res->GetInitData()->Path.c_str() : "(none)",
-                    scene ? "scene" : (res ? "wrong-type" : "missing"));
-        return scene.get();
+                    scene ? "scene" : (res ? "resource" : "missing"));
+        return res.get();
     } catch (const std::exception& e) {
         lusprintf(__FILE__, __LINE__, 2, "[ComboShip] OTRPlay_LoadFile FAILED for '%s': %s\n",
                   fileName ? fileName : "(null)", e.what());
@@ -83,7 +83,8 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
         // MQ resource resolution consults the requested scene during loading.
         play->sceneNum = sceneId;
         std::string scenePath = scene.valid ? SceneDB::Instance->GetScenePath(sceneId) : "";
-        play->sceneSegment = scene.valid ? OTRPlay_LoadFile(play, scenePath.c_str()) : nullptr;
+        play->sceneSegment =
+            scene.valid ? dynamic_cast<SOH::Scene*>(OTRPlay_LoadFile(play, scenePath.c_str())) : nullptr;
         if (play->sceneSegment == nullptr && scene.valid && scenePath.ends_with("/scene.json")) {
             // Keep the requested world and positioned return when its JSON header cannot load.
             // The registry returns no native path for custom scenes. Never retry a failing native
@@ -92,7 +93,7 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
             if (!nativePath.empty()) {
                 LUSLOG_ERROR("[SceneSpawn] JSON unavailable scene=%d path='%s'; retry same scene native='%s'", sceneId,
                              scenePath.c_str(), nativePath.c_str());
-                play->sceneSegment = OTRPlay_LoadFile(play, nativePath.c_str());
+                play->sceneSegment = dynamic_cast<SOH::Scene*>(OTRPlay_LoadFile(play, nativePath.c_str()));
                 if (play->sceneSegment != nullptr) {
                     scenePath = nativePath;
                     LUSLOG_INFO("[SceneSpawn] native recovery scene=%d entrance=%#x respawn=%d", sceneId,

@@ -63,7 +63,8 @@ int main(int argc,char** argv){
  Ship::CrossRMRegistry::oot=oot;Ship::Context::GetRawInstance()->rm=oot;
  std::string test=argv[1];
  if(test=="owner") {Ship::Context::GetRawInstance()->rm=mm;assert(OTRPlay_LoadFile(&play,"ok")==oot->resource.get());assert(Ship::Context::GetRawInstance()->rm==mm);}
- else if(test=="type") {oot->resource=std::make_shared<Ship::IResource>();assert(OTRPlay_LoadFile(&play,"ok")==nullptr);}
+ else if(test=="type") {oot->resource=std::make_shared<Ship::IResource>();assert(OTRPlay_LoadFile(&play,"ok")==oot->resource.get());}
+ else if(test=="scene-type") {oot->resource=std::make_shared<Ship::IResource>();bool failed=false;try{OTRPlay_SpawnScene(&play,5,0);}catch(const std::runtime_error&){failed=true;}assert(failed && oot->calls==2);}
  else if(test=="terminal") {oot->missing=true;bool failed=false;try{OTRPlay_SpawnScene(&play,5,0);}catch(const std::runtime_error&){failed=true;}assert(failed && oot->calls==2);}
  else if(test=="native-recovery") {OTRPlay_SpawnScene(&play,6,1);assert(play.sceneNum==6 && observedRespawn==2 && observedEntrance==582 && observedLayer==5 && oot->calls==2);}
  else if(test=="missing-native") {OTRPlay_SpawnScene(&play,7,1);assert(play.sceneNum==1 && observedRespawn==0 && observedEntrance==4 && oot->calls==3);}
@@ -78,7 +79,7 @@ with tempfile.TemporaryDirectory() as tmp:
     cpp.write_text(prefix+function('Ship::IResource* OTRPlay_LoadFile(')+'\n'+function('extern "C" void OTRPlay_SpawnScene(')+main)
     subprocess.run(['c++','-std=c++20','-Werror=format','-fsanitize=undefined','-fno-sanitize-recover=all',str(cpp),'-o',str(binary)],check=True)
     failed=[]
-    for case in ['fallback','invalid','terminal','success','owner','type','native-recovery','missing-native','custom-no-native']:
+    for case in ['fallback','invalid','terminal','success','owner','type','scene-type','native-recovery','missing-native','custom-no-native']:
         p=subprocess.run([str(binary),case],capture_output=True,text=True)
         print(case, 'PASS' if p.returncode==0 else 'FAIL', p.stderr.strip())
         if p.returncode:failed.append(case)

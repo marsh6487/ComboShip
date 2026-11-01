@@ -41,6 +41,10 @@ def verified_resources(manifest_path=DEFAULT_MANIFEST):
     missing = validate_dependencies(resources, manifest_path)
     if missing:
         raise ValueError('Missing packaged chamber dependencies: ' + repr(missing[:8]))
+    # The runtime promotes only these exact port-owned resources above the
+    # clean base. Optional mods retain their later mount priority.
+    index = {'version': 1, 'resources': sorted(resources)}
+    resources['custom/temple_sages/builtin_index.json'] = (json.dumps(index, indent=2) + '\n').encode()
     return resources
 
 

@@ -1,5 +1,6 @@
 """Dependency inspection for the normal packaged Sages Chamber resources."""
 from pathlib import Path
+import json
 import sys
 import xml.etree.ElementTree as ET
 
@@ -17,6 +18,18 @@ def references(data, hashes):
     if data.lstrip().startswith(b'<'):
         return {element.get('Path') for element in ET.fromstring(data).iter()
                 if element.get('Path') and not element.get('Path').startswith('>')}
+    if data.lstrip().startswith(b'{'):
+        document = json.loads(data)
+        schema = document.get('$schema')
+        if schema == 'unbound/scene/1':
+            return {document['collision']} if document.get('collision') else set()
+        if schema == 'unbound/collision/3':
+            return {document['bulk']['file']}
+        if schema == 'unbound/room/1':
+            return {entry[key] for setup in document['setups'].values()
+                    for entry in setup.get('mesh', {}).get('entries', {}).values()
+                    for key in ('opa', 'xlu') if entry.get(key)}
+        return set()
     if data[4:8] == b'TLDO':
         result = set()
         for _, _, _, digest in geometry.words(data):

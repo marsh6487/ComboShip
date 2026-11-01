@@ -20,7 +20,9 @@ def safe_path(name):
     path = PurePosixPath(name)
     return (not path.is_absolute() and str(path) == name and
             not any(part in ('.', '..') for part in path.parts) and
-            name.removeprefix('alt/').startswith(('custom/temple_sages/', 'scenes/shared/tokinoma_scene/')))
+            (name.removeprefix('alt/').startswith(('custom/temple_sages/', 'scenes/shared/tokinoma_scene/')) or
+             name.removeprefix('alt/') in ('scenes/tokinoma/scene.json', 'scenes/tokinoma/rooms/0.json',
+                                           'scenes/tokinoma/collision.json', 'scenes/tokinoma/collision.bin')))
 
 
 def pack(resources, directory):

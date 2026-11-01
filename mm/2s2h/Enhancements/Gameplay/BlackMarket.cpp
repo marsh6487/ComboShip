@@ -76,6 +76,11 @@ u8 ResourceMgr_FileAltExists(const char* path);
 bool ResourceMgr_IsAltAssetsEnabled(void);
 void Player_Action_35(Player* player, PlayState* play);
 void Player_Action_36(Player* player, PlayState* play);
+void Player_Action_Talk(Player* player, PlayState* play);
+void Player_Action_WaitForPutAway(Player* player, PlayState* play);
+void Player_SetupTalk(PlayState* play, Player* player);
+void func_8085B384(Player* player, PlayState* play);
+void Player_StartTalking(PlayState* play, Actor* actor);
 }
 #include "BlackMarketShelvesNative.h"
 #include "BlackMarketMmShopLayout.h"

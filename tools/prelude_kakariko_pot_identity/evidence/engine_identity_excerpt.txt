@@ -1,0 +1,39 @@
+ShufflePots.cpp lines 108-126
+108: static CheckIdentity IdentifyPot(s32 sceneNum, s32 posX, s32 posZ) {
+109:     CheckIdentity potIdentity;
+110:     uint32_t potSceneNum = sceneNum;
+111:
+112:     if (sceneNum == SCENE_GANONDORF_BOSS) {
+113:         potSceneNum = SCENE_GANONS_TOWER;
+114:     }
+115:
+116:     potIdentity.randomizerInf = RAND_INF_MAX;
+117:     potIdentity.randomizerCheck = RC_UNKNOWN_CHECK;
+118:
+119:     s32 actorParams = TWO_ACTOR_PARAMS(posX, posZ);
+120:
+121:     Rando::Location* location =
+122:         OTRGlobals::Instance->gRandomizer->GetCheckObjectFromActor(ACTOR_OBJ_TSUBO, potSceneNum, actorParams);
+123:
+124:     IdentifyCheck(&potIdentity, location);
+125:
+126:     return potIdentity;
+
+ShufflePots.cpp lines 130-138
+130:     bool shouldRegister = IS_RANDO && RAND_GET_OPTION(RSK_SHUFFLE_POTS);
+131:
+132:     COND_ID_HOOK(OnActorInit, ACTOR_OBJ_TSUBO, shouldRegister, [](void* actorRef) {
+133:         Actor* actor = static_cast<Actor*>(actorRef);
+134:         ObjTsubo* potActor = static_cast<ObjTsubo*>(actorRef);
+135:
+136:         auto potIdentity = IdentifyPot(gPlayState->sceneNum, (s16)actor->world.pos.x, (s16)actor->world.pos.z);
+137:         ObjectExtension::GetInstance().Set<CheckIdentity>(actor, std::move(potIdentity));
+138:     });
+
+ShufflePots.cpp lines 260-262
+260:     locationTable[RC_KAK_NEAR_POTION_SHOP_POT_1]    = Location::Pot(RC_KAK_NEAR_POTION_SHOP_POT_1,    RCQUEST_BOTH, RCAREA_KAKARIKO_VILLAGE,      SCENE_KAKARIKO_VILLAGE,            TWO_ACTOR_PARAMS(222, -377),    "Near Potion Shop Pot 1",           RHT_POT_KAKARIKO,                  RG_RECOVERY_HEART,  SpoilerCollectionCheck::RandomizerInf(RAND_INF_KAK_NEAR_POTION_SHOP_POT_1));
+261:     locationTable[RC_KAK_NEAR_POTION_SHOP_POT_2]    = Location::Pot(RC_KAK_NEAR_POTION_SHOP_POT_2,    RCQUEST_BOTH, RCAREA_KAKARIKO_VILLAGE,      SCENE_KAKARIKO_VILLAGE,            TWO_ACTOR_PARAMS(255, -366),    "Near Potion Shop Pot 2",           RHT_POT_KAKARIKO,                  RG_RECOVERY_HEART,  SpoilerCollectionCheck::RandomizerInf(RAND_INF_KAK_NEAR_POTION_SHOP_POT_2));
+262:     locationTable[RC_KAK_NEAR_POTION_SHOP_POT_3]    = Location::Pot(RC_KAK_NEAR_POTION_SHOP_POT_3,    RCQUEST_BOTH, RCAREA_KAKARIKO_VILLAGE,      SCENE_KAKARIKO_VILLAGE,            TWO_ACTOR_PARAMS(284, -356),    "Near Potion Shop Pot 3",           RHT_POT_KAKARIKO,                  RG_RECOVERY_HEART,  SpoilerCollectionCheck::RandomizerInf(RAND_INF_KAK_NEAR_POTION_SHOP_POT_3));
+
+randomizerTypes.h lines 10-10
+10: #define TWO_ACTOR_PARAMS(a, b) ((((a)&0xFFFF) << 16) | ((b)&0xFFFF))

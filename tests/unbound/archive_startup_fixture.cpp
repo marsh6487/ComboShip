@@ -74,6 +74,13 @@ BaseArchiveState EnsureBaseArchive(const std::string& dir) {
     return BaseArchiveState::Converted;
 }
 std::string CheckStandaloneBaseArchive() { events.push_back("validate"); return standaloneProblem; }
+bool MountBuiltinTempleSages(const std::shared_ptr<Ship::ResourceManager>& owner) {
+    assert(owner == Ship::CrossRMRegistry::oot && owner->altAssets);
+    assert(!cachedVanillaScenes && !cachedVanillaText);
+    assert(Ship::Context::active != owner);
+    events.push_back("builtin(soh.o2r)");
+    return true;
+}
 }
 static void AbortUnboundStartup(const std::string& problem) { throw std::runtime_error(problem); }
 
@@ -95,13 +102,13 @@ int main() {
     std::string oot = (root / "oot.o2r").string(), mq = (root / "oot-mq.o2r").string();
     assert(!MountStandaloneUnboundBase(oot, mq));
     FinishUnboundArchiveSetup(false, oot, mq);
-    assert((events == std::vector<std::string>{ "oot-unbound.o2r", "model.ZIP", "scene.o2r" }));
+    assert((events == std::vector<std::string>{ "oot-unbound.o2r", "builtin(soh.o2r)", "model.ZIP", "scene.o2r" }));
     assert(owner->altAssets && Ship::Context::active == mm);
     events.clear(); std::filesystem::remove(oot); std::ofstream(root / "oot-unbound.o2r") << "base";
     assert(MountStandaloneUnboundBase(oot, mq));
     assert(events == std::vector<std::string>{ "oot-unbound.o2r" });
     events.clear(); FinishUnboundArchiveSetup(true, oot, mq);
-    assert((events == std::vector<std::string>{ "validate", "model.ZIP", "scene.o2r" }));
+    assert((events == std::vector<std::string>{ "validate", "builtin(soh.o2r)", "model.ZIP", "scene.o2r" }));
     events.clear(); SOH::Unbound::standaloneProblem = "incompatible format";
     bool rejected = false;
     try { FinishUnboundArchiveSetup(true, oot, mq); } catch (const std::runtime_error&) { rejected = true; }

@@ -1,0 +1,56 @@
+{
+  "authored_dog_paths": {
+    "bytes": 37519315,
+    "excerpt_members": {
+      "alt/scenes/shared/spot01_scene/spot01_scenePathwayList_0003A4": {
+        "bytes": 394,
+        "sha256": "cadbcff635000ca08fb0c6575baa778b12c83e0b2c785e885daad5aa3b7b5e78"
+      },
+      "alt/scenes/shared/spot01_scene/spot01_scenePathwayList_00951C": {
+        "bytes": 188,
+        "sha256": "b5d3575d241c9ec8e939b1692b98251151bcd4bfb4a8b3de1ed08b8b08be1bfe"
+      },
+      "alt/scenes/shared/spot01_scene/spot01_scenePathwayList_009CC4": {
+        "bytes": 206,
+        "sha256": "e6b49a9f1f9ca97d59320cf1bf107888faa97859ff85b31e10b3feeaf4f89e38"
+      }
+    },
+    "original_filename": "Kakariko_POC9_Fences_Restored.prelude.o2r",
+    "sha256": "ef2d70020a5f36969ea222466774fbb5fe643e09f8fdcb5192496b7699aefa1b"
+  },
+  "native": {
+    "bytes": 68473151,
+    "excerpt_members": {
+      "scenes/spot01/paths/spot01_scenePathwayList_00036C.json": {
+        "bytes": 2403,
+        "sha256": "6a8bb8e46a0eb3d938061e155089fac5dec61b4072bd530297dc0312730b70dd"
+      },
+      "scenes/spot01/paths/spot01_scenePathwayList_000380.json": {
+        "bytes": 2403,
+        "sha256": "6a8bb8e46a0eb3d938061e155089fac5dec61b4072bd530297dc0312730b70dd"
+      },
+      "scenes/spot01/paths/spot01_scenePathwayList_0003A4.json": {
+        "bytes": 2403,
+        "sha256": "6a8bb8e46a0eb3d938061e155089fac5dec61b4072bd530297dc0312730b70dd"
+      },
+      "scenes/spot01/paths/spot01_scenePathwayList_00951C.json": {
+        "bytes": 226,
+        "sha256": "d7b2ade313834f0551f9aa22219d788dd542ed67022625322688a8aba49e1088"
+      },
+      "scenes/spot01/paths/spot01_scenePathwayList_009CC4.json": {
+        "bytes": 291,
+        "sha256": "18dea3478d60e36aee568512a2c990aaa417e3fac5e2682123b798068e908f8f"
+      },
+      "scenes/spot01/rooms/0.json": {
+        "bytes": 118324,
+        "sha256": "d4c63ae5ac0f004aae3a2cd5bfeeb5bddff9aa91e1dcdd38e459201bf822e268"
+      },
+      "scenes/spot01/scene.json": {
+        "bytes": 119873,
+        "sha256": "c60c0f0367d3d9a0c94c02d26fc13ed2b5d53b7102bacf2c972afedcce3981d9"
+      }
+    },
+    "original_filename": "oot-unbound.o2r",
+    "sha256": "653bf3efc7d8742416610bc4fef5f10808583090fe6ccaf697adfb309d03ab9d"
+  }
+}

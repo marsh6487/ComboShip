@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "source_checkpoint": "37b6be75d4f1682688ec325ae00dd3184c27be4e",
+  "source_tree": "f55b402803767ec7dbb6794cec912da8dbbc312f",
+  "published_parent": "628e891c683f5cd5b02a5570b1572ad62d42dd37",
+  "focused_checks": [
+    {
+      "name": "test-special-files",
+      "exit_code": 0
+    },
+    {
+      "name": "test-spawn",
+      "exit_code": 0
+    },
+    {
+      "name": "test-room",
+      "exit_code": 0
+    },
+    {
+      "name": "test-entrance",
+      "exit_code": 0
+    },
+    {
+      "name": "test-scene-paths",
+      "exit_code": 0
+    },
+    {
+      "name": "mm-vanilla-adapter-parity",
+      "exit_code": 0
+    },
+    {
+      "name": "mm-native-shop",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-unbound-controls",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-packaged-assets",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-native-materials",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-native-runtime",
+      "exit_code": 0
+    },
+    {
+      "name": "unbound-native-startup",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-production-format",
+      "exit_code": 0
+    },
+    {
+      "name": "mm-production-syntax",
+      "exit_code": 0
+    },
+    {
+      "name": "sages-original-preservation",
+      "exit_code": 0
+    }
+  ],
+  "source_restore": {
+    "baseline": "628e891c683f5cd5b02a5570b1572ad62d42dd37",
+    "candidate": "37b6be75d4f1682688ec325ae00dd3184c27be4e",
+    "restored_tree": "f55b402803767ec7dbb6794cec912da8dbbc312f",
+    "expected_tree": "f55b402803767ec7dbb6794cec912da8dbbc312f",
+    "changed_files": 32,
+    "independent_object_storage": true
+  },
+  "pot_candidate_sha256": "c87aedf634783306d791e1c6d427fd96ee1416224c786e818026ea2df4ca5169",
+  "pot_parent_sha256": "4d3059750f71cfb907a1311990b88764b88f925ab5444a7a91a5d5116b64e558",
+  "runtime": "unverified; no master promotion",
+  "files": [
+    {
+      "path": "recipe/repair_pots.py",
+      "bytes": 7526,
+      "sha256": "3097f9f78b326aa7e2d678ce0ed68068cad4929ac036ffac503999fce6fec9bb"
+    },
+    {
+      "path": "recipe/verify_pots.py",
+      "bytes": 9496,
+      "sha256": "a488a50bc2a3a2b57236acf83b13cf9121606daf6c421d1c4b43161820605aa4"
+    },
+    {
+      "path": "reference/native_reference.o2r",
+      "bytes": 10428,
+      "sha256": "e36f13e7b27812cb5229697a0dccf5449c544085fc27b12d34bd3cee24a4650d"
+    },
+    {
+      "path": "reference/authored_path_reference.o2r",
+      "bytes": 1102,
+      "sha256": "325a463ee351c570930cf2fe21571d9e86c39367353733bf4093404a22436d73"
+    },
+    {
+      "path": "reference/provenance.json",
+      "bytes": 2234,
+      "sha256": "edd59b650c730cbf6ced5e1ec7a2ce595dbc3729980af66650bee50c7109df3e"
+    },
+    {
+      "path": "reference/verify_kakariko_paths.py",
+      "bytes": 3659,
+      "sha256": "3f722b6e067f587eb4cd6fe3996e36b96677d4255e4e3e9b3378c1ebbeefb966"
+    },
+    {
+      "path": "evidence/engine_identity_snapshot.json",
+      "bytes": 410,
+      "sha256": "76c2188d8c8b599c2947e10980ae2e70564c6d018a5c7231a09e94f9ecd12587"
+    },
+    {
+      "path": "evidence/engine_identity_excerpt.txt",
+      "bytes": 2567,
+      "sha256": "c9d86e04b84fde64d02ef4face8a802efef38eb9f7f5790f3deda43aa5e7ddde",
+      "format_note": "Source excerpt line prefixes retain their numbers; trailing whitespace on blank lines normalized."
+    },
+    {
+      "path": "resources/scenes/spot01/rooms/0.json",
+      "bytes": 131340,
+      "sha256": "5c75bf71ef8d7e89504916b40acb47469cc8bb6a8429d1a1a4e01b9bad116c55"
+    }
+  ]
+}

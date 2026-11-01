@@ -5,6 +5,21 @@ OoT texture bindings, age/night setup headers, destination markers and travel
 support. It requires no external chamber archive. Both asset modes use the
 same geometry and native artwork.
 
+The committed pool also contains native Unbound scene/room/collision JSON and
+bulk collision data derived from the same binary controls. Native story
+settings remain in the base scene. All 4,096 existing resource payloads are
+unchanged; seven JSON/bulk resources are added. Preparation derives
+`custom/temple_sages/builtin_index.json` listing those exact 4,103 payloads.
+The canonical scene patch inherits the base's story/spawn setups in either
+asset mode. Room and collision controls have full canonical/Alt copies; a stale
+partial Alt scene is removed during preparation.
+
+ComboShip mounts a read-only view of its own `soh.o2r` after the clean ROM/Unbound
+base and before optional archives. Only indexed chamber resources gain this
+priority; unrelated base assets retain normal selection. This avoids mixing
+the original Temple's JSON collision/actor list with annex display lists. The
+legacy room headers remain available for return-pad lookup.
+
 The separate visual archive remains optional. It replaces the same material,
 texture and display-list identities to supply the custom textures, scrolling
 surfaces and visual effects. Installing it does not supply missing gameplay
@@ -53,6 +68,12 @@ with the preserved --addon, --base and --maps inputs, then run:
 
     python3 tests/temple_sages/test_packaged_chamber.py
     python3 tests/temple_sages/test_native_chamber_layers.py
+    python3 tests/temple_sages/test_unbound_chamber.py
+    python3 tests/temple_sages/run_builtin_layer_tests.py
+
+To refresh only JSON/bulk controls from the existing verified binary source
+pool, use `python3 -B tools/temple_sages_bundle/unbound_controls.py`. Normal builds
+decode the committed pool and require no original authoring/converter archive.
 
 Verified source checks are not gameplay acceptance. Native/Alt appearance,
 optional visual layering, footsteps/reverb, collision feel, cameras and travel
