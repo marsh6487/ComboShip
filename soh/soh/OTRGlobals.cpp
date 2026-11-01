@@ -38,6 +38,9 @@ extern "C" void Partners_Reset(void);
 #include <imgui.h>
 
 #include "ResourceManagerHelpers.h"
+#ifdef COMBO_BUILD
+#include "unbound/BuiltinTempleSages.h"
+#endif
 #include <fast/Fast3dWindow.h>
 #include <libultraship/bridge/audiobridge.h>
 #include <libultraship/bridge/crashhandlerbridge.h>
@@ -1158,6 +1161,9 @@ static void FinishUnboundArchiveSetup(bool standalone, const std::string& ootPat
     // mounting overrides, so a legacy room/collision mod cannot reuse a cached vanilla command list.
     resources->UnloadResources("scenes/*");
     resources->UnloadResources("text/*");
+#ifdef COMBO_BUILD
+    SOH::Unbound::MountBuiltinTempleSages(resources);
+#endif
     MountOotSupplementalArchives(resources);
 }
 

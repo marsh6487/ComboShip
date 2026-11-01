@@ -24,6 +24,14 @@ struct NativeInspection {
     bool settled = false;
 } sNativeInspection;
 bool sNativeWasSelecting = false;
+struct NativeReceiptTalk {
+    uint16_t ticket = 0;
+    PlayState* play = nullptr;
+    Player* player = nullptr;
+    Camera* camera = nullptr;
+    s16 cameraUid = -1;
+    bool globalTalk = false;
+} sNativeReceiptTalk;
 
 bool NativeCustomerGrounded(PlayState* play, const Player* player) {
     // The invisible wall is at Z130; the counter is behind it. Talking stays
@@ -90,12 +98,41 @@ bool NativeShopMessage(PlayState* play) {
     const auto id = play->msgCtx.currentTextId;
     return id >= kBrowseText && id <= kKeeperHelpText;
 }
+bool NativeReceiptTalkOwned(PlayState* play) {
+    auto* player = GET_PLAYER(play);
+    return sNativeReceiptTalk.ticket && sNativeReceiptTalk.play == play && player &&
+           player == sNativeReceiptTalk.player && sNativeShop && player->talkActor == &sNativeShop->actor &&
+           (player->actionFunc == Player_Action_Talk ||
+            (player->actionFunc == Player_Action_WaitForPutAway && player->afterPutAwayFunc == Player_SetupTalk));
+}
+void CancelNativeReceiptTalk(PlayState* play) {
+    if (sNativeReceiptTalk.ticket && play && play == gPlayState && play == sNativeShopPlay &&
+        sNativeReceiptTalk.play == play && sNativeShop && GET_PLAYER(play) == sNativeReceiptTalk.player)
+        sNativeShop->actor.flags &= ~ACTOR_FLAG_TALK;
+    if (play && play == gPlayState && NativeReceiptTalkOwned(play)) {
+        auto* player = sNativeReceiptTalk.player;
+        if (sNativeReceiptTalk.globalTalk && CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_TALK &&
+            Play_GetActiveCamId(play) == CAM_ID_MAIN && play->cameraPtrs[CAM_ID_MAIN] == sNativeReceiptTalk.camera &&
+            sNativeReceiptTalk.camera->uid == sNativeReceiptTalk.cameraUid)
+            CutsceneManager_Stop(CS_ID_GLOBAL_TALK);
+        player->afterPutAwayFunc = nullptr;
+        player->actor.flags &= ~ACTOR_FLAG_TALK;
+        player->talkActor = nullptr;
+        if (player->focusActor == &sNativeShop->actor)
+            player->focusActor = nullptr;
+        // Native conversation exit: retires the deferred callback and returns
+        // to the ordinary action without rewriting a foreign csAction/camera.
+        func_8085B384(player, play);
+    }
+    sNativeReceiptTalk = {};
+}
 void ForgetNativeShopCamera() {
     sBrowseCamera = sBrowseParent = CAM_ID_NONE;
     sBrowseCameraUid = -1;
     sBrowseCameraPtr = nullptr;
 }
 void EndBrowsing(PlayState* play, bool destroying = false) {
+    CancelNativeReceiptTalk(play);
     // Abnormal lifecycle/ownership exit only. Normal B, bank return and receipt
     // continuation execute EnOssan's own actions.
     if (!destroying && play && sNativeShop && sNativeShopPlay == play) {
@@ -123,6 +160,7 @@ void EndBrowsing(PlayState* play, bool destroying = false) {
     sNativeInspection = {};
     sNativeWasSelecting = false;
     sCustomerAnchor = {};
+    sNativeReceiptTalk = {};
     sTalking = false;
     if (destroying) {
         sNativeShop = nullptr;
@@ -193,6 +231,15 @@ void MonitorBrowsing() {
     auto* play = gPlayState;
     if (!play || play != sNativeShopPlay || gGameState != &play->state) {
         EndBrowsing(nullptr, true);
+        return;
+    }
+    if (sNativeReceiptTalk.ticket &&
+        (!sReceipt.pending || sNativeReceiptTalk.ticket != sReceipt.ticket || !NativeReceiptTalkOwned(play) ||
+         !(sNativeShop->actor.flags & ACTOR_FLAG_TALK) ||
+         play->cameraPtrs[CAM_ID_MAIN] != sNativeReceiptTalk.camera ||
+         sNativeReceiptTalk.camera->uid != sNativeReceiptTalk.cameraUid)) {
+        EndBrowsing(play);
+        CancelReceipt();
         return;
     }
     if (sReceipt.pending && sCustomerAnchor.play == play) {
@@ -388,23 +435,56 @@ s32 NativeOfferReceipt(EnOssan* shop, PlayState*) {
     sSelected = shop->cursorIndex;
     if (!Purchase())
         return false;
+    sNativeReceiptTalk = {};
     sCustomerAnchor.receipt = sReceipt.ticket;
     return true;
 }
 s32 NativeReceiptAccepted(EnOssan*, PlayState*) {
     return !sReceipt.pending || !ReceiptContext() ? -1 : sReceipt.delivered ? 1 : 0;
 }
-s32 NativeReceiptComplete(EnOssan*, PlayState* play) {
+s32 NativeReceiptComplete(EnOssan* shop, PlayState* play) {
     auto* player = GET_PLAYER(play);
+    const auto cs = CutsceneManager_GetCurrentCsId();
+    const bool continuing = sNativeReceiptTalk.ticket != 0 && sNativeReceiptTalk.ticket == sReceipt.ticket;
+    // Global TALK does not record a target actor/subcamera in the native
+    // manager. Accept only the one this handoff started on the same main view.
+    const bool ownTalk = continuing && sNativeReceiptTalk.globalTalk && cs == CS_ID_GLOBAL_TALK;
     if (!sReceipt.pending || !sReceipt.delivered || !ReceiptContext() || !player || play->msgCtx.msgMode != 0 ||
-        (player->stateFlags1 & PLAYER_STATE1_400) || Player_InBlockingCsMode(play, player) || !Safe(play) ||
-        Play_GetActiveCamId(play) != CAM_ID_MAIN || CutsceneManager_GetCurrentCsId() != CS_ID_NONE ||
+        (player->stateFlags1 & PLAYER_STATE1_400) || !Safe(play) ||
+        Play_GetActiveCamId(play) != CAM_ID_MAIN || (cs != CS_ID_NONE && !ownTalk) ||
         !ReceiptPlacementIdle())
         return false;
+    if (continuing) {
+        // Native StartTalking sets 20000000 itself. Keep all other blocking
+        // conditions, and wait for its put-away callback before exposing input.
+        if (play->cameraPtrs[CAM_ID_MAIN] != sNativeReceiptTalk.camera ||
+            sNativeReceiptTalk.camera->uid != sNativeReceiptTalk.cameraUid ||
+            player->actionFunc != Player_Action_Talk || player->talkActor != &shop->actor ||
+            !(shop->actor.flags & ACTOR_FLAG_TALK) || player->csAction != PLAYER_CSACTION_NONE ||
+            (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200 | PLAYER_STATE1_1)) ||
+            (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT) || play->actorCtx.isOverrideInputOn)
+            return false;
+        sNativeReceiptTalk = {};
+        sCustomerAnchor.receipt = 0;
+        CancelReceipt();
+        return true;
+    }
+    if (Player_InBlockingCsMode(play, player))
+        return false;
     RestoreNativeCustomer(play, player);
-    sCustomerAnchor.receipt = 0;
-    CancelReceipt();
-    return true;
+    // The custom receipt has already left Player's get-item action, so it
+    // misses the native receipt tail's automatic conversation continuation.
+    // Establish that handoff before EnOssan can start its return camera and
+    // leave ItemPurchased (the only action that consumes talk acceptance).
+    if (!Actor_OfferTalkExchangeEquiCylinder(&shop->actor, play, 400.f, PLAYER_IA_MINUS1))
+        return false;
+    // EnOssan opens the continuation text; deferred Player_SetupTalk must not.
+    shop->actor.textId = 0;
+    Player_StartTalking(play, &shop->actor);
+    auto* main = play->cameraPtrs[CAM_ID_MAIN];
+    sNativeReceiptTalk = { sReceipt.ticket, play, player, main, main->uid,
+                           CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_TALK };
+    return false;
 }
 s32 NativeKeeperDialogue(EnOssan*, PlayState* play) {
     // EnOssan retains action/cutscene ownership. Only the native Talk action

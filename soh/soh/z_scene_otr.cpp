@@ -123,9 +123,12 @@ bool Scene_CommandSpecialFiles(PlayState* play, SOH::ISceneCommand* cmd) {
     }
 
     if (specialCmd->specialObjects.elfMessage != 0) {
-        auto res =
-            (Ship::Blob*)OTRPlay_LoadFile(play, sNaviMsgFiles[specialCmd->specialObjects.elfMessage - 1].fileName);
-        play->cUpElfMsgs = (ElfMessage*)res->Data.data();
+        const char* path = sNaviMsgFiles[specialCmd->specialObjects.elfMessage - 1].fileName;
+        auto res = dynamic_cast<Ship::Blob*>(OTRPlay_LoadFile(play, path));
+        play->cUpElfMsgs = res != nullptr ? (ElfMessage*)res->Data.data() : nullptr;
+        if (res == nullptr) {
+            LUSLOG_ERROR("[SceneSpawn] ELF message unavailable path='%s'; disabling scene hints", path);
+        }
     }
 
     return false;

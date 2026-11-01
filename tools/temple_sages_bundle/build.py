@@ -21,6 +21,7 @@ import build as chamber
 import native_materials
 import temple_sages_pool
 import collision_audio
+import unbound_controls
 
 TEMPLE = 'scenes/shared/tokinoma_scene/'
 PRIVATE = 'custom/temple_sages/'
@@ -88,10 +89,11 @@ def build(addon, base, maps, output):
     # archive keeps the original material/texture identities and overrides them.
     previous_paths = set(result)
     result, native_bindings = native_materials.apply(result, native)
-    retired = sorted(previous_paths - set(result))
+    retired = sorted((previous_paths - set(result)) | {unbound_controls.RETIRED_ALT_SCENE})
     collision_path = TEMPLE + 'tokinoma_sceneCollisionHeader_0032F8'
     for prefix in ('', 'alt/'):
         result[prefix + collision_path] = collision_audio.apply(result[prefix + collision_path])
+    result = unbound_controls.apply(result)
     missing = dependencies.missing_dependencies(result, native_needed)
     if missing:
         raise ValueError('Unresolved native-base chamber dependencies: ' + repr(missing[:8]))
@@ -101,6 +103,7 @@ def build(addon, base, maps, output):
                 'native_dependencies': sorted(native_needed),
                 'native_apertures': count, 'external_mod_dependencies': [],
                 'texture_policy': 'native-oot-base-optional-visual-addon',
+                'unbound_controls': 'exact-native-room-collision-v1',
                 'native_texture_bindings': native_bindings,
                 'retired_resources': retired,
                 'collision_audio': collision_audio.inspect(result[collision_path]),

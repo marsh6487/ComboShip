@@ -39,6 +39,7 @@ jobs:
       - name: Verify spawn recovery and entrance routing
         run: |
           python3 -B tests/spawn_recovery/test_spawn.py
+          python3 -B tests/spawn_recovery/test_special_files.py
           python3 -B tests/spawn_recovery/test_room.py
           python3 -B tests/spawn_recovery/test_entrance.py
           python3 -B tests/spawn_recovery/test_scene_paths.py

@@ -131,6 +131,34 @@ def compile_native_shop(temporary, source_path=None):
     return native_object, includes
 
 
+def native_receipt_talk_source():
+    """Use native talk flags/setup, rather than assuming receipt acceptance.
+
+    Player animation/put-away completion remains a controlled service boundary;
+    the offer, acceptance, player talk entry and message setup are actual source.
+    """
+    actor = (ROOT / "mm/src/code/z_actor.c").read_text()
+    player = (ROOT / "mm/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
+    player_lib = (ROOT / "mm/src/code/z_player_lib.c").read_text()
+    bodies = [function(actor, signature) for signature in (
+        "s32 Actor_TalkOfferAccepted(", "s32 Actor_OfferTalkExchange(",
+        "s32 Actor_OfferTalkExchangeEquiCylinder(")]
+    bodies[0] = bodies[0].replace("Actor_TalkOfferAccepted", "NativeTalkAccepted")
+    bodies += [function(player_lib, signature) for signature in (
+        "bool Player_InBlockingCsMode(", "bool Player_InCsMode(",
+        "bool Player_CheckHostileLockOn(", "bool func_801242B4(")]
+    bodies += [function(player, signature) for signature in (
+        "void Player_StopHorizontalMovement(", "void func_8082DAD4(",
+        "bool func_808323C0(", "void Player_SetupTalk(", "void Player_StartTalking(")]
+    declarations = "\n".join(function(player, signature).split("{", 1)[0] + ";" for signature in (
+        "void Player_Action_Talk(", "void Player_SetAction_PreserveMoveFlags(", "s32 Player_PutAwayHeldItem(",
+        "s32 Player_SetupWaitForPutAway(", "PlayerAnimationHeader* Player_GetIdleAnim(",
+        "void Player_Anim_PlayLoop(", "void Player_Anim_PlayLoopSlowMorph(",
+        "void Player_Anim_PlayOnceAdjusted(", "void Player_AnimReplace_Setup("))
+    return ('#include "native_mm_shop_boundary.h"\n'
+            '#include "objects/gameplay_keep/gameplay_keep.h"\n' + declarations + "\n" + "\n".join(bodies))
+
+
 def build_source():
     source = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
     native_adapter = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarketMmNativeShop.h").read_text()
@@ -161,6 +189,15 @@ def build_source():
         "\nvoid RegisterPlayerDrawHook() {\n" + hooks + "\n}\n" +
         "void DrawPlayerBoundary(Actor* actor) { auto* play = gPlayState;\n" + dispatch + "\n}\n")
     support = (ROOT / "tests/black_market/native_mm_shop_support.h").read_text()
+    support = support.replace(function(support, 'extern "C" s32 FixtureTalk('), r'''
+extern "C" s32 NativeTalkAccepted(Actor*, GameState*);
+extern "C" s32 FixtureTalk(Actor* actor, GameState* state) {
+  const bool input = talkAccepted;
+  talkAccepted = false;
+  const bool native = NativeTalkAccepted(actor, state);
+  return input || native;
+}''')
+    support = support.replace(function(support, 'extern "C" s32 Actor_OfferTalkExchangeEquiCylinder('), "")
     shrink = (ROOT / "mm/src/code/z_shrink_window.c").read_text()
     native_shrink = '#include "z64shrink_window.h"\n'
     native_shrink += shrink[shrink.index("typedef struct {"):shrink.index("void ShrinkWindow_Letterbox_SetSizeTarget")]
@@ -266,10 +303,17 @@ def main():
         cpp.write_text(build_source())
         binary = Path(temporary) / "mm-camera"
         native_object, includes = compile_native_shop(temporary)
+        talk = Path(temporary) / "receipt_talk.c"
+        talk.write_text(native_receipt_talk_source())
+        talk_object = Path(temporary) / "receipt_talk.o"
+        subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-w", "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
+                        "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-pie",
+                        "-ffunction-sections", "-fdata-sections", *includes,
+                        "-c", str(talk), "-o", str(talk_object)], check=True)
         command = [os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
                    "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
                    "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
-                   *includes, str(cpp), str(native_object), "-o", str(binary)]
+                   *includes, str(cpp), str(native_object), str(talk_object), "-o", str(binary)]
         subprocess.run(command, check=True)
         subprocess.run([str(binary), *sys.argv[1:]], check=True,
                        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})

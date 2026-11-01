@@ -57,7 +57,35 @@ bool Purchase() {
   ++purchases;
   return purchaseAccepted && sReceipt.Begin(sSelected, 0, 0, 0);
 }
-extern "C" bool Player_InBlockingCsMode(PlayState *, Player *) { return false; }
+static AfterPutAwayFunc pendingTalk;
+static int putAwayDelay, putAwayCalls;
+extern "C" {
+void Player_StartTalking(PlayState*, Actor*);
+void Player_SetupTalk(PlayState*, Player*);
+void Player_Action_Talk(Player*, PlayState*) {}
+void Player_Action_WaitForPutAway(Player*, PlayState*) {}
+void Player_Action_Idle(Player*, PlayState*) {}
+void func_8085B384(Player* self, PlayState*) {
+  self->actionFunc = Player_Action_Idle;
+  self->stateFlags1 &= ~(PLAYER_STATE1_TALKING | PLAYER_STATE1_20000000);
+}
+void Player_SetAction_PreserveMoveFlags(PlayState*, Player* self, PlayerActionFunc action, s32) {
+  self->actionFunc = action;
+}
+s32 Player_PutAwayHeldItem(PlayState*, Player*) { return false; }
+s32 Player_SetupWaitForPutAway(PlayState*, Player* self, AfterPutAwayFunc callback) {
+  ++putAwayCalls;
+  self->actionFunc = Player_Action_WaitForPutAway;
+  self->afterPutAwayFunc = callback;
+  pendingTalk = callback;
+  return false;
+}
+PlayerAnimationHeader* Player_GetIdleAnim(Player*) { return nullptr; }
+void Player_Anim_PlayLoop(PlayState*, Player*, PlayerAnimationHeader*) {}
+void Player_Anim_PlayLoopSlowMorph(PlayState*, Player*, PlayerAnimationHeader*) {}
+void Player_Anim_PlayOnceAdjusted(PlayState*, Player*, PlayerAnimationHeader*) {}
+void Player_AnimReplace_Setup(PlayState*, Player*, s32) {}
+}
 // The resource loader/RTTI boundary is checked separately. Supply decoded
 // authored scene commands before the actual native actor Init/GetCutscenes.
 bool NativeShopSceneReady(PlayState *) { return sceneReady; }
@@ -162,6 +190,8 @@ static void Reset() {
   customerFloor = {};
   customerFloor.normal.y = 32767;
   talkAccepted = advance = purchaseAccepted = mirror = false;
+  pendingTalk = nullptr;
+  putAwayDelay = putAwayCalls = 0;
   invert = 1;
   sReceipt = {};
   status.fill(PurchaseResult::Ready);
@@ -216,6 +246,7 @@ static void Reset() {
   CutsceneManager_Init(&play, cutscenes.data(), cutscenes.size());
   sCutsceneMgr.retCamId = CAM_ID_MAIN;
   shop.actor.id = ACTOR_EN_OSSAN;
+  shop.actor.category = ACTORCAT_NPC;
   shop.actor.params = BlackMarketMmShopScene::kKeeperParams;
   shop.actor.objectSlot = 0;
   shop.actor.xzDistToPlayer = 40;
@@ -235,6 +266,16 @@ static void Reset() {
            stock[i].actor.update == EnGirlA_Update);
 }
 static void NativeFrame() {
+  // Player updates before NPCs. Keep put-away timing controllable, but let
+  // the actual Player_SetupTalk open its message when that animation finishes.
+  if (pendingTalk && (player.actionFunc != Player_Action_WaitForPutAway || player.afterPutAwayFunc != pendingTalk))
+    pendingTalk = nullptr;
+  if (pendingTalk && putAwayDelay-- <= 0) {
+    const auto callback = pendingTalk;
+    pendingTalk = nullptr;
+    callback(&play, &player);
+  }
+  player.talkActorDistance = FLT_MAX;
   nativeCalls.clear();
   ResetArena();
   KeeperUpdate(&shop.actor, &play);
@@ -509,6 +550,11 @@ static void SelectItem() {
     NativeFrame();
   assert(shop.shopItemSelectedTween == 1);
 }
+static void FinishReceiptReturn() {
+  for (int frames = 0; sReceipt.pending && frames < 64; ++frames)
+    NativeFrame();
+  assert(!sReceipt.pending && !pendingTalk);
+}
 static void CheckCustomerAccessAndReturn() {
   for (int form = 0; form < 5; ++form) {
     Reset(); player.transformation = form;
@@ -559,7 +605,7 @@ static void CheckCustomerAccessAndReturn() {
       if (interruption == 1) {
         assert(sReceipt.pending);
         placementIdle = true;
-        NativeFrame();
+        FinishReceiptReturn();
         assert(!sReceipt.pending && player.actor.world.pos.x == 75 &&
                player.actor.world.pos.y == 105 && player.actor.world.pos.z == 76 &&
                "foreign release must not revive the retired customer anchor");
@@ -605,7 +651,7 @@ static void CheckCustomerAccessAndReturn() {
       if (foreignCamera != CAM_ID_NONE) Play_ClearCamera(&play, foreignCamera);
       Play_ChangeCameraStatus(&play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
     }
-    NativeFrame();
+    FinishReceiptReturn();
     assert(!sReceipt.pending);
     if (owner == 3)
       assert(player.actor.world.pos.x == 0 && player.actor.world.pos.y == 0 && player.actor.world.pos.z == 160);
@@ -615,8 +661,9 @@ static void CheckCustomerAccessAndReturn() {
   }
   std::puts("MM customer safety: all5 forms can talk from customer floor; counter/shelf/climb starts rejected; receipt returns to validated floor only under unchanged ownership, including native talk/door/item release");
 }
-static void CheckProductionReceipt() {
+static void CheckProductionReceiptCase(int form, int delay, int choice, bool queuedTalk) {
   Reset();
+  player.transformation = form;
   Talk();
   ReachSlot(-1);
   Stick(80, 0);
@@ -660,22 +707,53 @@ static void CheckProductionReceipt() {
   NativeFrame();
   assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased);
   safe = true;
+  // A failed native talk offer must keep the receipt pending for a retry.
+  player.actor.flags |= ACTOR_FLAG_TALK;
   NativeFrame();
-  assert(!sReceipt.pending && shop.actionFunc == EnOssan_ItemPurchased);
-  talkAccepted = true;
+  assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased && !putAwayCalls);
+  player.actor.flags &= ~ACTOR_FLAG_TALK;
+  putAwayDelay = delay;
+  messageState = TEXT_STATE_NONE;
+  if (queuedTalk) {
+    CutsceneManager_Queue(CS_ID_GLOBAL_TALK);
+    CutsceneManager_Update();
+    CutsceneManager_ClearWaiting();
+    assert(CutsceneManager_IsNext(CS_ID_GLOBAL_TALK));
+  }
   NativeFrame();
+  assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased);
+  assert(player.talkActor == &shop.actor && player.focusActor == &shop.actor &&
+         (player.stateFlags1 & PLAYER_STATE1_TALKING) &&
+         (shop.actor.flags & ACTOR_FLAG_TALK) && putAwayCalls == 1);
+  assert((CutsceneManager_GetCurrentCsId() == CS_ID_GLOBAL_TALK) == queuedTalk);
+  for (int frames = 0; frames < delay; ++frames) {
+    // Even pressing A before native put-away finishes must not expose a prompt
+    // or start the return camera. No acceptance is injected by the fixture.
+    Press(BTN_A, true);
+    assert(sReceipt.pending && shop.actionFunc == EnOssan_SetupItemPurchased &&
+           messageState == TEXT_STATE_NONE && putAwayCalls == 1);
+  }
+  FinishReceiptReturn();
+  assert(shop.actionFunc == EnOssan_ItemPurchased && player.actionFunc == Player_Action_Talk);
+  // The custom receipt has already left Player's get-item action. Do not
+  // inject a talk acceptance here: the production handoff must restore it.
+  for (int frames = 0; shop.actionFunc != EnOssan_ContinueShopping && frames < 8; ++frames)
+    NativeFrame();
   assert(shop.actionFunc == EnOssan_ContinueShopping &&
          shop.csId == shop.lookToShopkeeperCsId);
   assert(play.msgCtx.currentTextId == kContinueText &&
          messageState == TEXT_STATE_CHOICE);
+  assert(!pendingTalk && putAwayCalls == 1 && purchases == 2);
   status[0] = PurchaseResult::SoldOut;
-  play.msgCtx.choiceIndex = 0;
+  play.msgCtx.choiceIndex = choice;
   Press(BTN_A, true);
-  assert(shop.actionFunc == EnOssan_FaceShopkeeper &&
-         play.msgCtx.currentTextId == kKeeperMenuText);
+  if (choice == 0) {
+    assert(shop.actionFunc == EnOssan_FaceShopkeeper &&
+           play.msgCtx.currentTextId == kKeeperMenuText);
+    Press(BTN_B);
+  }
   assert(stock[0].isOutOfStock && stock[0].actor.world.pos.x == kShelves[0].x &&
          stock[0].actor.world.pos.z == kShelves[0].z && callbacks.empty());
-  Press(BTN_B);
   assert(!sTalking && shop.actionFunc == EnOssan_Idle);
   Reset();
   Talk();
@@ -689,9 +767,71 @@ static void CheckProductionReceipt() {
   receiptContext = false;
   NativeFrame();
   assert(shop.actionFunc == EnOssan_Idle && !sReceipt.pending);
+}
+static void CheckProductionReceipt() {
+  for (int form = 0; form < 5; ++form)
+    for (int delay : {0, 30})
+      for (int choice : {0, 1})
+        for (bool queuedTalk : {false, true})
+          CheckProductionReceiptCase(form, delay, choice, queuedTalk);
   std::puts("MM production native shop: rejected reservation, single receipt "
-            "authority, pending/tutorial gating, native keeper "
+            "authority, pending/tutorial/talk-offer gating, actual player "
+            "talk handoff, all5 forms/2 put-away timings/Yes+No/queued-talk, native keeper "
             "continue/restock and context cancellation passed");
+}
+static void CheckReceiptHandoffCancellation() {
+  for (bool queuedTalk : {false, true}) {
+    for (int interruption = 0; interruption < 7; ++interruption) {
+      Reset(); Talk(); ReachSlot(-1);
+      Stick(80, 0); ReachSlot(0); NativeFrame(); SelectItem();
+      purchaseAccepted = true; Press(BTN_A, true);
+      sReceipt.delivered = true; NativeFrame();
+      play.msgCtx.msgMode = 0;
+      messageState = TEXT_STATE_NONE;
+      putAwayDelay = 30;
+      if (queuedTalk) {
+        CutsceneManager_Queue(CS_ID_GLOBAL_TALK);
+        CutsceneManager_Update(); CutsceneManager_ClearWaiting();
+      }
+      NativeFrame();
+      assert(sReceipt.pending && pendingTalk && sNativeReceiptTalk.ticket &&
+             player.actionFunc == Player_Action_WaitForPutAway);
+      Actor foreign{};
+      const auto foreignAction = +[](Player*, PlayState*) {};
+      const auto foreignCallback = +[](PlayState*, Player*) {};
+      if (interruption == 0) receiptContext = false;
+      if (interruption == 1) active = false;
+      if (interruption == 2) play.transitionTrigger = TRANS_TRIGGER_START;
+      if (interruption == 3) ++mainCamera.uid;
+      if (interruption == 4) shop.actor.flags &= ~ACTOR_FLAG_TALK;
+      if (interruption == 5) {
+        player.actionFunc = foreignAction;
+        player.afterPutAwayFunc = foreignCallback;
+        player.talkActor = player.focusActor = &foreign;
+      }
+      if (interruption == 6) {
+        // Actor_Delete clears focus before invoking Destroy.
+        player.focusActor = nullptr;
+        NativeKeeperDestroyed(&shop.actor, &play);
+      } else {
+        NativeFrame();
+      }
+      assert(!sReceipt.pending && !sNativeReceiptTalk.ticket && !sTalking);
+      if (interruption == 5) {
+        assert(player.actionFunc == foreignAction && player.afterPutAwayFunc == foreignCallback &&
+               player.talkActor == &foreign && player.focusActor == &foreign);
+      } else {
+        assert(player.actionFunc == Player_Action_Idle && !player.afterPutAwayFunc &&
+               !player.talkActor && !player.focusActor &&
+               !(player.actor.flags & ACTOR_FLAG_TALK) &&
+               !(player.stateFlags1 & (PLAYER_STATE1_TALKING | PLAYER_STATE1_20000000)));
+      }
+      for (int frames = 0; frames < 40; ++frames)
+        NativeFrame();
+      assert(!pendingTalk && !sTalking && messageState != TEXT_STATE_CHOICE);
+    }
+  }
+  std::puts("MM receipt handoff: context/scene/transition/UID/acceptance loss and live keeper destruction retire owned put-away; foreign player action/callback/targets preserved");
 }
 static void CheckDestructionWithForeignOwnerAndReceipt() {
   for (bool sameCutscene : {false, true}) {
@@ -1733,6 +1873,7 @@ int main(int argc, char **argv) {
   std::setbuf(stdout, nullptr);
   if (argc == 2 && std::string(argv[1]) == "receipt") {
     CheckProductionReceipt();
+    CheckReceiptHandoffCancellation();
     return 0;
   }
   if (argc == 2 && std::string(argv[1]) == "framing") {
@@ -1795,6 +1936,7 @@ int main(int argc, char **argv) {
   CheckSameCutsceneDifferentActor();
   CheckLiveKeeperDestruction();
   CheckProductionReceipt();
+  CheckReceiptHandoffCancellation();
   CheckDestructionWithForeignOwnerAndReceipt();
   CheckAuthoredFraming();
   CheckInspectionLetterboxBoundary();
