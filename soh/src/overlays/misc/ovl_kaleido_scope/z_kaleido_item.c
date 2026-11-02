@@ -2351,7 +2351,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
         if (pauseCtx->cursorSpecialPos == 0) {
             pauseCtx->cursorColorSet = 4;
 
-            if (cursorItem == PAUSE_ITEM_NONE) {
+            if (cursorItem == PAUSE_ITEM_NONE && !pauseAnyCursor) {
                 pauseCtx->stickRelX = 40;
             }
 
@@ -2520,7 +2520,7 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
         }
 
         if (pauseCtx->cursorSpecialPos == 0) {
-            if (cursorItem != PAUSE_ITEM_NONE) {
+            if (cursorItem != PAUSE_ITEM_NONE || pauseAnyCursor) {
                 if ((ABS(pauseCtx->stickRelY) > 30) ||
                     (dpad && CHECK_BTN_ANY(input->press.button, BTN_DDOWN | BTN_DUP))) {
                     moveCursorResult = 0 || IsItemCycling() || sGustOverlayActive || sArrowWheelOverlayActive;
@@ -2591,10 +2591,19 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 pauseCtx->nameColorSet = 1;
             }
 
-            if (cursorItem != PAUSE_ITEM_NONE) {
+            // Empty cells remain valid cursor positions when Pause Any Cursor is
+            // enabled. Define every corner here; inactive pages share cursorVtx.
+            if (cursorItem != PAUSE_ITEM_NONE || pauseAnyCursor) {
                 index = cursorSlot * 4; // required to match?
                 KaleidoScope_SetCursorVtx(pauseCtx, index, pauseCtx->itemVtx);
+            } else {
+                for (i = 0; i < 16; i++) {
+                    pauseCtx->cursorVtx[i].v.ob[0] = 0;
+                    pauseCtx->cursorVtx[i].v.ob[1] = -200;
+                }
+            }
 
+            if (cursorItem != PAUSE_ITEM_NONE) {
                 if (!switchedInventoryPage && (pauseCtx->debugState == 0) && (pauseCtx->state == 6) &&
                     (pauseCtx->unk_1E4 == 0)) {
                     KaleidoScope_HandleItemCycles(play);
@@ -2623,12 +2632,6 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                         }
                     }
                 }
-            } else {
-                pauseCtx->cursorVtx[0].v.ob[0] = pauseCtx->cursorVtx[2].v.ob[0] = pauseCtx->cursorVtx[1].v.ob[0] =
-                    pauseCtx->cursorVtx[3].v.ob[0] = 0;
-
-                pauseCtx->cursorVtx[0].v.ob[1] = pauseCtx->cursorVtx[1].v.ob[1] = pauseCtx->cursorVtx[2].v.ob[1] =
-                    pauseCtx->cursorVtx[3].v.ob[1] = -200;
             }
         } else {
             pauseCtx->cursorItem[PAUSE_ITEM] = PAUSE_ITEM_NONE;

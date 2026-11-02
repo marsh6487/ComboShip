@@ -71,7 +71,7 @@ s8 gSfxDefaultReverb;
 CHECKS = r'''
 static PlayState play;
 static Vtx vertices[24*4];
-static Vtx cursorVertices[4];
+static Vtx cursorVertices[20];
 static void reset(void) {
     memset(&play,0,sizeof(play)); memset(&gSaveContext,0,sizeof(gSaveContext));
     memset(&nei,0,sizeof(nei)); memset(gSaveContext.inventory.items,ITEM_NONE,24);

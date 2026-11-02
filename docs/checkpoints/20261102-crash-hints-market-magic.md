@@ -26,6 +26,40 @@ Focused native fixtures use ASan/UBSan with LeakSanitizer disabled on this host.
 
 The source tint catalog was inspected against `Market_Suite_R19_Bombchu_Routes_And_Day_Alley.unbound.o2r`, SHA256 `e62cfb6309e159695611dcd861c83fffbe4cb2afe6883333b1a6dbb7039583b6`. That archive is unchanged and is not included as a replacement in this commit.
 
-The new commit is a direct child of the pinned complete-source base above. Check out the candidate branch to recover all four additions; check out the pinned base to recover the preceding shop/startup/Chamber source. The equivalent locally tested subset checkpoint was `87e13883b99ea17f727e2f619d0075953443906a`; that subset SHA is a preparation identifier, not an upstream GitHub commit.
+The first published checkpoint, `33359ffce2a79e80d7f490d64c1462bfcaad6b14`, is a direct child of the pinned complete-source base above. Subsequent candidate commits preserve that history. Check out the candidate branch for the cumulative additions, the first checkpoint for the initial four-part pass, or the pinned base for the preceding shop/startup/Chamber source. The first checkpoint's equivalent locally tested subset was `87e13883b99ea17f727e2f619d0075953443906a`; that subset SHA is a preparation identifier, not an upstream GitHub commit.
 
 For the magic investigation, the next decisive evidence is the `[MagicLoad]` begin and settled/still-active records from a load where the sound persists. A settled meter with matching current/target values directs attention to audio; a still-active meter exposes values for tracing the writer or target that prevents completion. A save-file upload is not a prerequisite for gathering this trace.
+
+## Cursor-chat integration and latest reports
+
+The subsequent checkpoint adds the reviewed OoT empty-cell pause-cursor repair
+and the Market night room-background camera guard from the November 1
+"Fix Cursor Snapping" work. The cursor repair stabilizes intentionally selected
+empty cells, permits vertical movement through them, and defines or hides all
+four cursor corners. The room guard preserves the background-load hook before
+restricting prerender metadata access to the fixed prerender camera, and handles
+a null background result. Both donor gates were appended to the existing CI
+manifest; none of the earlier registrations was removed.
+
+Fresh native ASan/UBSan checks passed for six cursor cases in both standalone
+and combined modes, existing pagination/selection guards in both modes, and
+ten room-background cases per mode. Source and fixture bytes match the reviewed
+donor manifests, apart from the deliberately merged CI manifest and updated
+publication notes. The complete executable and configured gameplay remain
+untested. Enabled-policy side-arrow reentry remains a runtime check.
+
+The separate Graveyard camera snap remains unresolved. Its investigation is
+retained in `docs/diagnostics/graveyard-camera-status-20261102.md`; this commit
+does not enable its diagnostic camera patch or claim a Graveyard repair.
+
+Latest user reports: a new save load played the magic-fill sound normally;
+the intermittent cause is still unconfirmed and the existing bounded trace is
+retained. The separate overworld POC's DMT vertex spill was absent in the night
+scene, while daytime had not been checked. That is an asset-POC observation,
+not runtime proof for this source checkpoint.
+
+Combo Vanilla was proposed during this integration. The current launcher has
+Combo/OoT/MM session modes, while combined save creation requires a consolidated
+randomizer seed. A native combined vanilla flow therefore needs paired native
+save creation and an explicit per-save identity; it cannot be implemented by
+adding only a menu label. No Combo Vanilla product behavior is added here.

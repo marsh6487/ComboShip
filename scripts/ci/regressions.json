@@ -1636,5 +1636,17 @@
     "origin": "gate",
     "name": "Fractional magic load branches and bounded OoT load tracing",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_magic_load_probe.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "OoT empty-cell cursor navigation and geometry",
+    "run": "python3 -B tests/oot_pause_inventory/run_cursor_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native OoT room background camera eligibility and hook preservation",
+    "run": "python3 -B tests/oot_room_background/run_tests.py --sanitize"
   }
 ]
