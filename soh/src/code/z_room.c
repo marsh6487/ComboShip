@@ -422,6 +422,12 @@ BgImage* func_80096A74(PolygonType1* polygon1, PlayState* play) {
     camera = GET_ACTIVE_CAM(play);
     camId = camera->camDataIdx;
     if (GameInteractor_Should(VB_SHOULD_LOAD_BG_IMAGE, true, &camId)) {
+        // Door and free cameras do not use prerender image metadata. Keep the
+        // hook above this check so entrance-shuffle camera restoration still runs.
+        if (camera->setting != CAM_SET_PREREND_FIXED) {
+            return NULL;
+        }
+
         // jfifid
         camId2 = BgCheck_GetBgCamFuncDataImpl(&play->colCtx, camId, BGCHECK_SCENE)[2].y;
         if (camId2 >= 0) {
@@ -466,7 +472,7 @@ void func_80096B6C(PlayState* play, Room* room, u32 flags) {
     polygon1 = &room->meshHeader->polygon1;
     polygonDlist = SEGMENTED_TO_VIRTUAL(polygon1->dlist);
     bgImage = func_80096A74(polygon1, play);
-    sp94 = (flags & 1) && sp98 && bgImage->source && !(SREG(25) & 1);
+    sp94 = (flags & 1) && sp98 && bgImage != NULL && bgImage->source && !(SREG(25) & 1);
     sp90 = (flags & 1) && polygonDlist->opa && !(SREG(25) & 2);
     sp8C = (flags & 2) && polygonDlist->xlu && !(SREG(25) & 4);
 

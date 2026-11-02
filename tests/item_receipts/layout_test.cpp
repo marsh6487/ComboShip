@@ -36,8 +36,9 @@ static std::string path;
 #include "combo/menu/ComboItemReceiptRender.h"
 
 namespace Oot {
+/* OOT_MESSAGE_BUFFER_SIZE */
 struct MessageContext {
-    struct { char msgBuf[1280]{}; unsigned msgLength = 0; } font;
+    struct { char msgBuf[MESSAGE_BUF_SIZE]{}; unsigned msgLength = 0; } font;
     int textId = 0, msgLength = 0, msgBufPos = 0, textPosX = 0, textPosY = 0, textColorAlpha = 192, textBoxType = 2;
 };
 struct PlayState { MessageContext msgCtx; } play;
@@ -50,10 +51,11 @@ int R_TEXT_INIT_YPOS = 28, R_TEXTBOX_Y = 12;
 /* OOT_DECODE_POSITION */
 }
 namespace Mm {
+/* MM_MESSAGE_BUFFER_SIZE */
 using u16 = uint16_t;
 using s16 = int16_t;
 struct MessageContext {
-    struct { struct { char schar[1280]{}; } msgBuf; } font;
+    struct { struct { char schar[MM_MESSAGE_BUF_SIZE]{}; } msgBuf; } font;
     int currentTextId = 0, msgLength = 0, msgBufPos = 0, unk11FFC = 12, unk11F18 = 0, unk11F1A[3]{};
     int unk11FF8 = 65, unk11FFA = 28, textColorAlpha = 192;
     int textPosX = 0, textPosY = 0, itemId = 0xFE;
@@ -195,7 +197,44 @@ static void CheckLongMmMapPages() {
 }
 
 
+static void CheckUnboundOotMapPages() {
+    CwItemReceiptPresentation p{};
+    p.singleBox = 1;
+    p.rewardLine = 2;
+    std::string original = "You found the Spirit Temple Map!\x01It's ordinary.\x01";
+    for (int i = 0; i < 40; ++i)
+        original += "The entrance leads through Beneath the Well's castle entrance. ";
+    original += '\x02';
+    assert(original.size() > 1280 && original.size() < MESSAGE_BUF_SIZE);
+    std::memcpy(Oot::play.msgCtx.font.msgBuf, original.data(), original.size());
+    Oot::play.msgCtx.msgLength = original.size();
+    Oot::play.msgCtx.msgBufPos = 0;
+    Oot::Message_SetItemReceiptPresentation(&p);
+    Oot::Message_ApplyItemReceiptLayout(&Oot::play);
+    const auto& layout = Oot::sItemReceiptLayout;
+    assert(layout.firstPageEnd > 0 && layout.bodySize <= MESSAGE_BUF_SIZE);
+    assert(std::memchr(Oot::play.msgCtx.font.msgBuf, '\x04', layout.bodySize));
+    assert(Oot::play.msgCtx.font.msgBuf[layout.bodySize - 1] == '\x02');
+    CheckReflow(original, Oot::play.msgCtx.font.msgBuf, layout.bodySize,
+                false, Oot::sFontWidths, 144, layout.textScale);
+
+    // A roomier destination must not disable wrapping of an ordinary hint.
+    const std::string hint = "You found the Ice Cavern Map!\x01It's ordinary.\x01"
+                             "It seems the entrance is at Beneath the Well's castle entrance.\x02";
+    for (const size_t capacity : {size_t(1280), size_t(MESSAGE_BUF_SIZE), size_t(MESSAGE_BUF_SIZE * 2)}) {
+        std::vector<char> buffer(capacity + 1, '\x7F');
+        std::memcpy(buffer.data(), hint.data(), hint.size());
+        const auto wrapped = ComboReceipt_Layout(&p, buffer.data(), hint.size(), capacity,
+                                                 false, Oot::sFontWidths, 144);
+        assert(wrapped.firstPageEnd > 0 && wrapped.bodySize <= capacity);
+        assert(buffer[capacity] == '\x7F');
+        CheckReflow(hint, buffer.data(), wrapped.bodySize,
+                    false, Oot::sFontWidths, 144, wrapped.textScale);
+    }
+}
+
 int main() {
+    CheckUnboundOotMapPages();
     CheckLongMmMapPages();
     (void)&Mm::Message_DrawItemReceiptIcon;
     CwItemReceiptPresentation p{};

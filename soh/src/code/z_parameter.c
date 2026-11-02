@@ -26,6 +26,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
+#include "soh/Enhancements/randomizer/randostatupgrade.h"
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/audio/MidnaAudio.h"
@@ -3633,6 +3634,7 @@ void Interface_UpdateMagicBar(PlayState* play) {
             }
             break;
     }
+    RandoStat_TraceMagicLoad();
 }
 
 void Interface_DrawLineupTick(PlayState* play) {

@@ -14415,11 +14415,14 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
 static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
     if (MmForm_UpdateNativeMaskCutscene(player, play, 0))
         return;
+    // Wolf owns an SSBB animator and never initializes formSkelAnime. Keep
+    // its entry on the flash path instead of ticking the unused MM skeleton.
     // Garo/Gerudo use local packs. A native form reaches this fallback only
     // when its sequence was unavailable or an instant transition was requested.
     u8 forceInstantForLocalForm =
         (gFormState.targetForm == MM_PLAYER_FORM_GARO || gFormState.targetForm == MM_PLAYER_FORM_GERUDO ||
-         MmForm_IsNativeMaskForm(gFormState.targetForm));
+         MmForm_IsNativeMaskForm(gFormState.targetForm) ||
+         (gFormState.targetForm == MM_PLAYER_FORM_PIKACHU && WolfLinkForm_IsSelected()));
     u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sNativeMaskInstantFallback ||
                           sForceInstantTransform || forceInstantForLocalForm;
 
@@ -14645,13 +14648,21 @@ static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
 }
 
 static void MmForm_UpdateDetransforming(Player* player, PlayState* play) {
+    // A scene reload may restore currentForm without restoring targetForm.
+    // Capture the outgoing owner before the flash changes currentForm to HUMAN.
+    if (gFormState.cutsceneTimer == 0)
+        gFormState.targetForm = gFormState.currentForm;
     if (MmForm_UpdateNativeMaskCutscene(player, play, 1))
         return;
-    u8 wasWolf = gFormState.currentForm == MM_PLAYER_FORM_PIKACHU && WolfLinkForm_IsSelected();
+    // targetForm retains the outgoing form after currentForm becomes HUMAN
+    // at the flash peak; the final two frames must stay on this same path.
+    u8 wasWolf = gFormState.targetForm == MM_PLAYER_FORM_PIKACHU && WolfLinkForm_IsSelected();
+    // Wolf's independent animator also owns the removal pose. The full
+    // sequence would tick the same unused MM skeleton before restoring Link.
     // Keep local-pack and unavailable-native sequences on the instant path.
     u8 forceInstantForLocalForm =
         (gFormState.currentForm == MM_PLAYER_FORM_GARO || gFormState.currentForm == MM_PLAYER_FORM_GERUDO ||
-         MmForm_IsNativeMaskForm(gFormState.currentForm));
+         MmForm_IsNativeMaskForm(gFormState.currentForm) || wasWolf);
     u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sNativeMaskInstantFallback ||
                           forceInstantForLocalForm;
 

@@ -3,6 +3,7 @@
 #include <soh/OTRGlobals.h>
 #include "soh/Enhancements/randomizer/randostatupgrade.h"
 #include <libultraship/bridge.h>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 #include "z64.h"
@@ -10,6 +11,50 @@ extern "C" {
 #include "functions.h"
 #include "variables.h"
 extern SaveContext gSaveContext;
+}
+
+// Observe one load only. This does not clamp magic, restart a fill, or stop SFX.
+static bool sMagicLoadTraceActive = false;
+static unsigned sMagicLoadTraceTicks = 0;
+
+static void RandoStat_LogMagicLoad(const char* phase) {
+    const auto& r = gSaveContext.ship.quest.data.randomizer;
+    const bool adjustable = (bool)RAND_GET_OPTION(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE);
+    const uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, RSK_MAGIC_STAT_UPGRADE_TOTAL,
+                                                 RSK_MAGIC_STAT_UPGRADE_REQUIRED);
+    const int expected = MagicStatCapacity(r.magicStatUpgrades, required, adjustable, r.comboNativeMagicLevel);
+    SPDLOG_INFO("[MagicLoad] phase={} ticks={} statItems={} required={} adjustable={} nativeTier={} owned={} "
+                "double={} level={} capacity={} expected={} magic={} fillTarget={} addTarget={} state={} previous={}",
+                phase, sMagicLoadTraceTicks, (int)r.magicStatUpgrades, (int)required, adjustable,
+                (int)r.comboNativeMagicLevel, (int)gSaveContext.isMagicAcquired,
+                (int)gSaveContext.isDoubleMagicAcquired, (int)gSaveContext.magicLevel, (int)gSaveContext.magicCapacity,
+                expected, (int)gSaveContext.magic, (int)gSaveContext.magicFillTarget, (int)gSaveContext.magicTarget,
+                (int)gSaveContext.magicState, (int)gSaveContext.prevMagicState);
+}
+
+extern "C" void RandoStat_BeginMagicLoadTrace(void) {
+    sMagicLoadTraceActive = IS_RANDO && (bool)RAND_GET_OPTION(RSK_MAGIC_STAT_UPGRADE);
+    sMagicLoadTraceTicks = 0;
+    if (sMagicLoadTraceActive)
+        RandoStat_LogMagicLoad("begin");
+}
+
+extern "C" void RandoStat_TraceMagicLoad(void) {
+    if (!sMagicLoadTraceActive)
+        return;
+    if (!IS_RANDO) {
+        sMagicLoadTraceActive = false;
+        return;
+    }
+    ++sMagicLoadTraceTicks;
+    if (gSaveContext.magicState != MAGIC_STATE_STEP_CAPACITY && gSaveContext.magicState != MAGIC_STATE_FILL &&
+        gSaveContext.magicState != MAGIC_STATE_ADD) {
+        RandoStat_LogMagicLoad("settled");
+        sMagicLoadTraceActive = false;
+    } else if (sMagicLoadTraceTicks >= 120) {
+        RandoStat_LogMagicLoad("still-active");
+        sMagicLoadTraceActive = false;
+    }
 }
 
 static void RegisterRandoStatUpgradeHooks() {

@@ -12,7 +12,7 @@ PlayState* gPlayState = nullptr;
 }
 static int season = -1;
 static size_t evicted = 0;
-extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState*) {
+extern "C" int32_t SeasonWeather_FoliageSeasonForPlay(const PlayState*) {
     return season;
 }
 extern "C" void gfx_texture_cache_clear() {

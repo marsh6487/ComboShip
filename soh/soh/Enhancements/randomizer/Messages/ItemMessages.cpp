@@ -29,6 +29,7 @@
 #include "ComboKeyReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboBossSoulReceiptText.h"
+#include "ComboLanternReceiptIcon.h"
 #include "ComboVanillaItemReceiptText.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
@@ -482,9 +483,15 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         msg = CustomMessage(ComboBossSoulReceiptText::Body(*soul),
                             ComboBossSoulReceiptText::Body(*soul, Language::German),
                             ComboBossSoulReceiptText::Body(*soul, Language::French), TEXTBOX_TYPE_BLUE);
-        if (soulItem.HasCustomIcon())
-            msg.AutoFormat(static_cast<ItemID>(static_cast<uint8_t>(soulItem.GetItemID())));
-        else
+        if (soulItem.HasCustomIcon()) {
+            // The GI actor/entry may clear before this dialogue finishes. Keep
+            // the image with the message, never truncate an RG into an ItemID.
+            msg.receiptPresentation.singleBox = 1;
+            std::snprintf(msg.receiptPresentation.iconPath, sizeof(msg.receiptPresentation.iconPath), "%s",
+                          soulItem.GetCustomIcon());
+            msg.receiptPresentation.iconWidth = msg.receiptPresentation.iconHeight = 32;
+            msg.AutoFormat(ITEM_CUSTOM);
+        } else
             msg.AutoFormat();
         return;
     }
@@ -1747,59 +1754,59 @@ void BuildLanternCatchMessage(uint16_t* textId, bool* loadFromMessageTable) {
     u8 fireType = gLanternCatchPending;
     CustomMessage msg;
 
-    // \x13\xB4 = item icon for ITEM_LANTERN (0xB4)
     // All fire types: swing lights torches, burns grass (updraft + spread)
     switch (fireType) {
         case 1: // REGULAR (orange)
             msg = CustomMessage(
-                "\x13\xB4"
+
                 "You caught %rRegular Fire%w!&Swing to %rlight torches%w,&%rburn grass%w and spawn flames.",
-                "\x13\xB4"
+
                 "Du hast %rnormales Feuer%w!&Schwinge um %rFackeln%w und&%rGras zu verbrennen%w.",
-                "\x13\xB4"
-                "Vous avez le %rFeu Normal%w!&Agitez pour %rallumer%w et&%rbruler l'herbe%w.",
-                TEXTBOX_TYPE_BLUE);
+
+                "Vous avez le %rFeu Normal%w!&Agitez pour %rallumer%w et&%rbruler l'herbe%w.", TEXTBOX_TYPE_BLUE);
             break;
         case 2: // BLUE
-            msg = CustomMessage("\x13\xB4"
+            msg = CustomMessage(""
                                 "You caught %bBlue Fire%w!&Swing to release %bblue fire%w&that %cmelts red ice%w.",
-                                "\x13\xB4"
+
                                 "Du hast %bblaues Feuer%w!&Schwinge um %crotes Eis%w&%bzu schmelzen%w.",
-                                "\x13\xB4"
-                                "Vous avez le %bFeu Bleu%w!&Agitez pour %cfondre la&glace rouge%w.",
-                                TEXTBOX_TYPE_BLUE);
+
+                                "Vous avez le %bFeu Bleu%w!&Agitez pour %cfondre la&glace rouge%w.", TEXTBOX_TYPE_BLUE);
             break;
         case 3: // POE (purple)
             msg =
-                CustomMessage("\x13\xB4"
+                CustomMessage(""
                               "You caught %pPoe Fire%w!&%pReveals the invisible%w and&%pdispels illusions%w. No magic.",
-                              "\x13\xB4"
+
                               "Du hast %pIrrlichterfeuer%w!&%pEnthullt Unsichtbares%w und&%plost Illusionen auf%w.",
-                              "\x13\xB4"
+
                               "Vous avez le %pFeu Spectral%w!&%pRevele l'invisible%w et&%pdissipe les illusions%w.",
                               TEXTBOX_TYPE_BLUE);
             break;
         case 4: // GREEN
-            msg = CustomMessage("\x13\xB4"
+            msg = CustomMessage(""
                                 "You caught %gGreen Fire%w!&Slowly %gregenerates health%w&while it stays lit.",
-                                "\x13\xB4"
+
                                 "Du hast %ggruenes Feuer%w!&%gRegeneriert langsam Leben%w,&solange es brennt.",
-                                "\x13\xB4"
+
                                 "Vous avez le %gFeu Vert%w!&%gRegenere lentement la vie%w&tant qu'il brule.",
                                 TEXTBOX_TYPE_BLUE);
             break;
         default:
-            msg = CustomMessage("\x13\xB4"
+            msg = CustomMessage(""
                                 "The lantern is empty.",
-                                "\x13\xB4"
+
                                 "Die Laterne ist leer.",
-                                "\x13\xB4"
-                                "La lanterne est vide.",
-                                TEXTBOX_TYPE_BLUE);
+
+                                "La lanterne est vide.", TEXTBOX_TYPE_BLUE);
             break;
     }
 
-    msg.AutoFormat();
+    msg.receiptPresentation.singleBox = 1;
+    std::snprintf(msg.receiptPresentation.iconPath, sizeof(msg.receiptPresentation.iconPath), "%s",
+                  ComboLanternReceiptIcon(fireType));
+    msg.receiptPresentation.iconWidth = msg.receiptPresentation.iconHeight = 32;
+    msg.AutoFormat(ITEM_LANTERN);
     msg.LoadIntoFont();
     *loadFromMessageTable = false;
 }
