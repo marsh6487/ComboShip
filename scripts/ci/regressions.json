@@ -1648,5 +1648,11 @@
     "origin": "gate",
     "name": "Native OoT room background camera eligibility and hook preservation",
     "run": "python3 -B tests/oot_room_background/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Captured lantern fire icons and boss-soul receipt lifetime",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_dialogue_icon_lifetime_tests.py --sanitize"
   }
 ]

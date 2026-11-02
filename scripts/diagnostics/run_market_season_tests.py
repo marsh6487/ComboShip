@@ -96,7 +96,10 @@ int main() {
 '''
     source = source.replace('/* ENUMS */', enums).replace('/* CONTROLLER */', controller)
     source = source.replace('/* MARKET_SCENES */', ', '.join(data['scenes'])).replace('/* SELECTED */', selected)
-    flags = ['-std=c++20', '-O1', '-g', '-Wall', '-Wextra', '-Werror']
+    # Match the existing foliage gate's compiled-library logging boundary.
+    # Pixel/cache fixtures do not log; avoid linking system spdlog/fmt bodies.
+    flags = ['-std=c++20', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
+             '-DSPDLOG_ACTIVE_LEVEL=6', '-DSPDLOG_COMPILED_LIB']
     if args.sanitize:
         flags += ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-pie', '-no-pie']
     with tempfile.TemporaryDirectory(prefix='market-season-') as folder:
