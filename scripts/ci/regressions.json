@@ -1654,5 +1654,11 @@
     "origin": "gate",
     "name": "Captured lantern fire icons and boss-soul receipt lifetime",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_dialogue_icon_lifetime_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "OoT native song ownership, quest draw and bounded layout trace",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/oot_pause_inventory/run_quest_song_tests.py --sanitize"
   }
 ]
