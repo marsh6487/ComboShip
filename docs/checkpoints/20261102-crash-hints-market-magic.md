@@ -63,3 +63,19 @@ Combo/OoT/MM session modes, while combined save creation requires a consolidated
 randomizer seed. A native combined vanilla flow therefore needs paired native
 save creation and an explicit per-save identity; it cannot be implemented by
 adding only a menu label. No Combo Vanilla product behavior is added here.
+
+## Formatting repair after the failed workflow
+
+The Fast source checks job `125174010587` for remote head
+`46d57fd52152454388dea6d36c86d26c734d1615` failed at the clang-format diff
+gate, before the game-build matrix. The repair applies the exact CI-produced
+formatter output to four files: SeasonFoliageTint.h, SeasonWeather.cpp,
+randostatupgrade.cpp and season_foliage_market_test.cpp. Each resulting blob
+matches the formatter's recorded new blob ID, and a lexical comparison confirms
+no C/C++ token changes. No checks were disabled.
+
+Fresh native ASan/UBSan runs passed the magic-load probe (1305 cases per game
+and bounded OoT trace checks) and Market probe (11 eligibility guards, 906
+native/Alt bindings and 56 actual archive textures). Full workflow/build results
+remain pending for the replacement checkpoint; these probes are not an engine
+build or runtime acceptance.

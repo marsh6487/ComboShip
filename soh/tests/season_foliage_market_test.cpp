@@ -7,10 +7,15 @@
 
 Ship::Context* Ship::Context::current = nullptr;
 GameInteractor* GameInteractor::Instance = nullptr;
-extern "C" { PlayState* gPlayState = nullptr; }
+extern "C" {
+PlayState* gPlayState = nullptr;
+}
 static int selectedSeason = 2;
-extern "C" int32_t SeasonWeather_FoliageSeasonForPlay(const PlayState*) { return selectedSeason; }
-extern "C" void gfx_texture_cache_clear() {}
+extern "C" int32_t SeasonWeather_FoliageSeasonForPlay(const PlayState*) {
+    return selectedSeason;
+}
+extern "C" void gfx_texture_cache_clear() {
+}
 
 static std::shared_ptr<Fast::Texture> Texture(const std::string& path) {
     auto init = std::make_shared<Ship::ResourceInitData>();
@@ -39,7 +44,11 @@ static uint32_t U32(const std::vector<char>& bytes, size_t offset) {
 
 static void CheckArchiveTexture(const char* path, const char* file) {
     const Material* material = nullptr;
-    for (const auto& entry : kMaterials) if (!std::strcmp(entry.path, path)) { material = &entry; break; }
+    for (const auto& entry : kMaterials)
+        if (!std::strcmp(entry.path, path)) {
+            material = &entry;
+            break;
+        }
     REQUIRE(material);
     std::ifstream input(file, std::ios::binary);
     REQUIRE(input.good());
@@ -50,7 +59,8 @@ static void CheckArchiveTexture(const char* path, const char* file) {
     const size_t offset = version ? 92 : 80;
     auto source = Texture(path);
     source->Type = static_cast<Fast::TextureType>(U32(bytes, 64));
-    source->Width = U32(bytes, 68); source->Height = U32(bytes, 72);
+    source->Width = U32(bytes, 68);
+    source->Height = U32(bytes, 72);
     source->Flags = version ? U32(bytes, 76) : 0;
     source->ImageDataSize = U32(bytes, offset - 4);
     REQUIRE(bytes.size() == offset + source->ImageDataSize);
@@ -61,17 +71,23 @@ static void CheckArchiveTexture(const char* path, const char* file) {
     const size_t stride = packed ? 2 : 4;
     bool tinted = false;
     for (int season : { 0, 1, 2, 3 }) {
-        const auto copy = BuildTexture(source, Palette(season, material->surface), material->region, material->pixelMask);
+        const auto copy =
+            BuildTexture(source, Palette(season, material->surface), material->region, material->pixelMask);
         REQUIRE(*source->mImageBuffer == original);
-        if (season == 1) { REQUIRE(!copy); continue; }
-        if (!copy) continue;
+        if (season == 1) {
+            REQUIRE(!copy);
+            continue;
+        }
+        if (!copy)
+            continue;
         tinted = true;
         for (size_t i = 0; i < source->ImageDataSize; i += stride) {
             const unsigned pixel = packed ? unsigned(source->ImageData[i]) << 8 | source->ImageData[i + 1] : 0;
             const unsigned r = packed ? pixel >> 11 : source->ImageData[i];
             const unsigned g = packed ? (pixel >> 6) & 31 : source->ImageData[i + 1];
             const unsigned b = packed ? (pixel >> 1) & 31 : source->ImageData[i + 2];
-            if (g <= r || g <= b) REQUIRE(!std::memcmp(source->ImageData + i, copy->ImageData + i, stride));
+            if (g <= r || g <= b)
+                REQUIRE(!std::memcmp(source->ImageData + i, copy->ImageData + i, stride));
             REQUIRE(packed ? (copy->ImageData[i + 1] & 1) == (source->ImageData[i + 1] & 1)
                            : copy->ImageData[i + 3] == source->ImageData[i + 3]);
         }
@@ -80,7 +96,13 @@ static void CheckArchiveTexture(const char* path, const char* file) {
 }
 
 int main(int argc, char** argv) {
-    struct Target { const char* path; int16_t scene; Surface surface; Region region; PixelMask mask; };
+    struct Target {
+        const char* path;
+        int16_t scene;
+        Surface surface;
+        Region region;
+        PixelMask mask;
+    };
     const Target targets[] = { /* MARKET_TARGETS */ };
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
@@ -89,15 +111,20 @@ int main(int argc, char** argv) {
     for (const auto& target : targets) {
         const Material* reviewed = nullptr;
         for (const auto& material : kMaterials)
-            if (material.scene == target.scene && !std::strcmp(material.path, target.path)) { reviewed = &material; break; }
+            if (material.scene == target.scene && !std::strcmp(material.path, target.path)) {
+                reviewed = &material;
+                break;
+            }
         REQUIRE(reviewed && reviewed->surface == target.surface && reviewed->pixelMask == target.mask);
         REQUIRE(reviewed->region.left == target.region.left && reviewed->region.top == target.region.top &&
                 reviewed->region.right == target.region.right && reviewed->region.bottom == target.region.bottom);
         for (bool alt : { false, true }) {
             for (const char* prefix : { "", "alt/" }) {
-                if (*prefix && !alt) continue;
+                if (*prefix && !alt)
+                    continue;
                 Retire();
-                context.rm->cache.clear(); context.rm->alt = alt;
+                context.rm->cache.clear();
+                context.rm->alt = alt;
                 std::string path = std::string(prefix) + target.path;
                 auto source = Texture(path);
                 const auto original = *source->mImageBuffer;
@@ -109,12 +136,15 @@ int main(int argc, char** argv) {
                     const auto copy = std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache[path]);
                     REQUIRE(copy && copy != source);
                     REQUIRE(*source->mImageBuffer == original);
-                    for (size_t i = 3; i < copy->ImageDataSize; i += 4) REQUIRE(copy->ImageData[i] == 83);
-                    selectedSeason = 1; Update(&play);
+                    for (size_t i = 3; i < copy->ImageDataSize; i += 4)
+                        REQUIRE(copy->ImageData[i] == 83);
+                    selectedSeason = 1;
+                    Update(&play);
                     REQUIRE(context.rm->cache[path] == source);
                 }
                 selectedSeason = 2;
-                play.sceneNum = SCENE_HYRULE_FIELD; Update(&play);
+                play.sceneNum = SCENE_HYRULE_FIELD;
+                Update(&play);
                 REQUIRE(context.rm->cache[path] == source && "suite materials must not leak to another scene");
                 ++cases;
             }
@@ -126,16 +156,22 @@ int main(int argc, char** argv) {
     const auto props = BuildTexture(source, Palette(2, Surface::Understory), {}, PixelMask::MarketPropsFoliage);
     const auto bands = BuildTexture(source, Palette(3, Surface::Ground), {}, PixelMask::MarketGrassBands);
     REQUIRE(props && bands);
-    for (size_t y = 0; y < 16; ++y) for (size_t x = 0; x < 16; ++x) {
-        const size_t i = (y * 16 + x) * 4;
-        const bool plant = (x < 8 && y < 6) || (x >= 2 && x < 14 && y >= 12);
-        const bool grass = y == 2 || y == 15;
-        REQUIRE((std::memcmp(source->ImageData + i, props->ImageData + i, 4) != 0) == plant);
-        REQUIRE((std::memcmp(source->ImageData + i, bands->ImageData + i, 4) != 0) == grass);
-    }
+    for (size_t y = 0; y < 16; ++y)
+        for (size_t x = 0; x < 16; ++x) {
+            const size_t i = (y * 16 + x) * 4;
+            const bool plant = (x < 8 && y < 6) || (x >= 2 && x < 14 && y >= 12);
+            const bool grass = y == 2 || y == 15;
+            REQUIRE((std::memcmp(source->ImageData + i, props->ImageData + i, 4) != 0) == plant);
+            REQUIRE((std::memcmp(source->ImageData + i, bands->ImageData + i, 4) != 0) == grass);
+        }
     Retire();
-    std::cout << "PASS " << cases << " Market native/Alt cache bindings, all tint seasons, Summer restore, scene scope and atlas protection\n";
+    std::cout
+        << "PASS " << cases
+        << " Market native/Alt cache bindings, all tint seasons, Summer restore, scene scope and atlas protection\n";
     REQUIRE(argc % 2 == 1);
-    for (int i = 1; i < argc; i += 2) CheckArchiveTexture(argv[i], argv[i + 1]);
-    if (argc > 1) std::cout << "PASS " << (argc - 1) / 2 << " actual Market archive textures: tint, source/alpha/petal preservation and Summer restoration\n";
+    for (int i = 1; i < argc; i += 2)
+        CheckArchiveTexture(argv[i], argv[i + 1]);
+    if (argc > 1)
+        std::cout << "PASS " << (argc - 1) / 2
+                  << " actual Market archive textures: tint, source/alpha/petal preservation and Summer restoration\n";
 }

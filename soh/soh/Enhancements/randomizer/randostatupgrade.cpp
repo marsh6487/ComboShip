@@ -20,16 +20,15 @@ static unsigned sMagicLoadTraceTicks = 0;
 static void RandoStat_LogMagicLoad(const char* phase) {
     const auto& r = gSaveContext.ship.quest.data.randomizer;
     const bool adjustable = (bool)RAND_GET_OPTION(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE);
-    const uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE,
-                                                 RSK_MAGIC_STAT_UPGRADE_TOTAL, RSK_MAGIC_STAT_UPGRADE_REQUIRED);
+    const uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, RSK_MAGIC_STAT_UPGRADE_TOTAL,
+                                                 RSK_MAGIC_STAT_UPGRADE_REQUIRED);
     const int expected = MagicStatCapacity(r.magicStatUpgrades, required, adjustable, r.comboNativeMagicLevel);
     SPDLOG_INFO("[MagicLoad] phase={} ticks={} statItems={} required={} adjustable={} nativeTier={} owned={} "
                 "double={} level={} capacity={} expected={} magic={} fillTarget={} addTarget={} state={} previous={}",
                 phase, sMagicLoadTraceTicks, (int)r.magicStatUpgrades, (int)required, adjustable,
                 (int)r.comboNativeMagicLevel, (int)gSaveContext.isMagicAcquired,
-                (int)gSaveContext.isDoubleMagicAcquired, (int)gSaveContext.magicLevel,
-                (int)gSaveContext.magicCapacity, expected, (int)gSaveContext.magic,
-                (int)gSaveContext.magicFillTarget, (int)gSaveContext.magicTarget,
+                (int)gSaveContext.isDoubleMagicAcquired, (int)gSaveContext.magicLevel, (int)gSaveContext.magicCapacity,
+                expected, (int)gSaveContext.magic, (int)gSaveContext.magicFillTarget, (int)gSaveContext.magicTarget,
                 (int)gSaveContext.magicState, (int)gSaveContext.prevMagicState);
 }
 

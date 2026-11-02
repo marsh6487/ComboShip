@@ -62,9 +62,9 @@ bool HasNativeSkyWeather(const PlayState* play) {
 
 int32_t ResolveSeasonForPlay(const PlayState* play, bool requiresSky, bool authoredExteriorFoliage = false) {
     if (play == nullptr || (play->envCtx.indoors && !authoredExteriorFoliage) ||
-        (requiresSky && play->envCtx.skyboxDisabled) ||
-        play->envCtx.customSkyboxFilter || play->csCtx.state != CS_STATE_IDLE ||
-        play->gameOverCtx.state != GAMEOVER_INACTIVE || gSaveContext.gameMode != GAMEMODE_NORMAL) {
+        (requiresSky && play->envCtx.skyboxDisabled) || play->envCtx.customSkyboxFilter ||
+        play->csCtx.state != CS_STATE_IDLE || play->gameOverCtx.state != GAMEOVER_INACTIVE ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL) {
         return -1;
     }
     const Camera* camera = GET_ACTIVE_CAM(play);
