@@ -57,6 +57,11 @@ int main(int argc, char **argv) {
   assert(FileMode(bad) == Mode::Invalid);
   bad["combo"]["vanilla"]["version"] = "1";
   assert(FileMode(bad) == Mode::Invalid);
+  bad["combo"]["vanilla"]["version"] = 1;
+  bad["combo"]["vanilla"]["sharingProfile"] = "native-progressives";
+  assert(FileMode(bad) == Mode::Invalid);
+  bad["combo"]["vanilla"]["sharingProfile"] = "nei-only-v1";
+  assert(FileMode(bad) == Mode::Vanilla);
 
   Creation malformed;
     assert(malformed.Begin(1,prior));
@@ -71,6 +76,7 @@ int main(int argc, char **argv) {
   assert(!creation.Begin(0, prior));
   assert(FileMode(creation.Document()) == Mode::Vanilla);
   assert(!creation.Document()["combo"].contains("rando"));
+  assert(creation.Document()["combo"]["vanilla"]["sharingProfile"] == "nei-only-v1");
   assert(!creation.Stage(2, Oot()));
   assert(!creation.Stage(0, json::array()));
   assert(creation.Stage(0, Oot()));

@@ -4,6 +4,7 @@
 // directory.
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaSave.h"
+#include "combo/vanilla/ComboVanillaRewards.h"
 #include <cassert>
 #include <cstring>
 #include <fstream>
@@ -20,6 +21,7 @@ static std::filesystem::path directory;
 static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
+static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
 static bool ComboIsValidSlot(int slot) { return slot >= 0 && slot < 3; }
 static auto ComboContainerPath(int slot) {
   return directory / (std::to_string(slot) + ".combosav");

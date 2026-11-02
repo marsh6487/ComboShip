@@ -19,6 +19,8 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gCombo.NewFileVanilla", Kind::New,
+      "Create a seedless paired file with native progression, fixed NEI discoveries and NEI-only sharing." },
     { "gEnhancements.CustomEnemies.NaturalEncounters", Kind::New,
       "Enable additive natural encounters across Hyrule and Termina." },
     { "gEnhancements.CustomEnemies.Randomizer", Kind::New, "Include native custom enemies in enemy randomization." },

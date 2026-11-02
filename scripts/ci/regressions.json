@@ -1672,5 +1672,11 @@
     "origin": "gate",
     "name": "Native Combo Vanilla creation choice, MM opening and first-cycle sharing quarantine",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_opening_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Combo Vanilla exact reward journal and atomic paired-native receipts",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_reward_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_host_reward_tests.py --sanitize"
   }
 ]

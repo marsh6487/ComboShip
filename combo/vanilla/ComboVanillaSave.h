@@ -25,6 +25,9 @@ inline Mode FileMode(const nlohmann::json& document) {
     const auto vanilla = combo->find("vanilla");
     if (vanilla == combo->end() || !vanilla->is_object())
         return Mode::Invalid;
+    const auto profile = vanilla->find("sharingProfile");
+    if (profile != vanilla->end() && (!profile->is_string() || *profile != "nei-only-v1"))
+        return Mode::Invalid;
     const auto version = vanilla->find("version");
     return version != vanilla->end() && version->is_number_integer() && *version == 1 ? Mode::Vanilla : Mode::Invalid;
 }
@@ -45,7 +48,10 @@ class Creation {
                     { { "mode", "vanilla-nei" },
                       { "lastGame", 0 },
                       { "notes", "" },
-                      { "vanilla", { { "version", 1 }, { "collected", nlohmann::json::object() } } } } } };
+                      { "vanilla",
+                        { { "version", 1 },
+                          { "sharingProfile", "nei-only-v1" },
+                          { "collected", nlohmann::json::object() } } } } } };
         if (previous.is_object() && previous.contains("comboRelease"))
             draft["comboRelease"] = previous["comboRelease"];
         active = true;

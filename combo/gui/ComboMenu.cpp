@@ -1737,8 +1737,12 @@ void ComboMenu::DrawComboPanel() {
     bool vanilla = CVarGetInteger("gCombo.NewFileVanilla", 0) != 0;
     const bool creationAvailable = ComboSeedFileSelectActive();
     ImGui::BeginDisabled(!creationAvailable);
-    if (ImGui::Checkbox("Vanilla + NEI for new files", &vanilla)) {
-        CVarSetInteger("gCombo.NewFileVanilla", vanilla ? 1 : 0);
+    {
+        WhatsNew::Scope highlight("gCombo.NewFileVanilla", "Vanilla + NEI for new files",
+                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, !creationAvailable);
+        if (ImGui::Checkbox("Vanilla + NEI for new files", &vanilla)) {
+            CVarSetInteger("gCombo.NewFileVanilla", vanilla ? 1 : 0);
+        }
     }
     ImGui::EndDisabled();
     if (vanilla) {

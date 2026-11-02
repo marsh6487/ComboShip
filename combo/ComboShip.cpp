@@ -1,5 +1,6 @@
 #include "vanilla/ComboVanillaSave.h"
 #include "vanilla/ComboVanillaFile.h"
+#include "vanilla/ComboVanillaRewards.h"
 // ComboShip - Unified Launcher for OOT (soh.dll) + MM (2ship.dll)
 //
 // Select Combo/OoT/MM before ROM setup. Solo sessions enter the selected
@@ -457,6 +458,7 @@ static bool Combo_BindCrossDungeonRuntime(const nlohmann::json& seed) {
 static std::mutex g_containerMutex;
 static std::map<int, nlohmann::json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
+static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
 // Slots whose container was backed up for a COMBO_RELEASE_VERSION mismatch; guarded by g_containerMutex.
 // OOT drains it on the main thread (Combo_TakeEvictionNotice) to surface a popup.
 static std::vector<int> g_evictedSlots;
@@ -576,6 +578,7 @@ static void EraseComboContainer(int slot) {
     {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         g_containerCache.erase(slot);
+        g_vanillaReceipts.erase(slot);
         // MM's dormant save is now stale: leave it marked resident and the next load skips re-reading it,
         // and any dormant MM write would put the erased save back into the slot.
         if (g_MmSaveInMemorySlot == slot)
@@ -599,6 +602,9 @@ static void Combo_CopyContainer(int from, int to) {
     {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         nlohmann::json copy = LoadOrCreateContainer(from); // deep copy of the source container
+        // A receipt's native grant has not reached disk until its atomic
+        // commit. Copy only that durable state, including recoverable pending.
+        g_vanillaReceipts.erase(to);
         copy["slot"] = to;
         g_containerCache[to] = std::move(copy);
         if (g_MmSaveInMemorySlot == to)
@@ -651,12 +657,68 @@ static void Combo_WriteGameSave(int game, int fileNum, const char* json) {
         } catch (...) {}
         return;
     }
+    const auto receipt = g_vanillaReceipts.find(fileNum);
+    if (receipt != g_vanillaReceipts.end() && receipt->second.Active() && receipt->second.GameId() == game) {
+        try {
+            receipt->second.Stage(game, nlohmann::json::parse(json));
+        } catch (...) {}
+        return; // Native state and its permanent check are one atomic write.
+    }
     auto& c = LoadOrCreateContainer(fileNum);
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
     try {
         c[key] = nlohmann::json::parse(json);
     } catch (...) { return; }
     FlushContainer(fileNum);
+}
+
+static int Combo_VanillaReward(int action, int game, int slot, const char* checkId, const char* nativeJson) {
+    if (!ComboIsValidSlot(slot) || !checkId || game < 0 || game > 1)
+        return -1;
+    const auto* reward = ComboVanilla::FindReward(checkId);
+    if (!reward || static_cast<int>(reward->game) != game)
+        return -1;
+    try {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        const auto creation = g_vanillaCreations.find(slot);
+        if (creation != g_vanillaCreations.end() && creation->second.Active())
+            return -1;
+        auto& document = LoadOrCreateContainer(slot);
+        auto& receipt = g_vanillaReceipts[slot];
+        const auto operation = static_cast<ComboVanilla::RewardAction>(action);
+        if (operation == ComboVanilla::RewardAction::Query) {
+            const int status = ComboVanilla::RewardStatus(document, *reward);
+            return status == 0 && receipt.Active() ? 2 : status;
+        }
+        if (operation == ComboVanilla::RewardAction::Begin || operation == ComboVanilla::RewardAction::BeginOwned) {
+            const bool owned = operation == ComboVanilla::RewardAction::BeginOwned;
+            return receipt.Begin(document, *reward, owned,
+                                 [&](const nlohmann::json& draft) { return WriteContainerDocument(slot, draft); })
+                       ? 1
+                       : 0;
+        }
+        if (!receipt.Matches(game, checkId))
+            return 0;
+        if (operation == ComboVanilla::RewardAction::Abort) {
+            receipt.Abort(); // Durable pending remains available after reload.
+            return 1;
+        }
+        if (operation == ComboVanilla::RewardAction::PrepareCapture) {
+            receipt.PrepareCapture();
+            return 1;
+        }
+        if (operation != ComboVanilla::RewardAction::Commit)
+            return -1;
+        if (nativeJson && !receipt.Stage(game, nlohmann::json::parse(nativeJson)))
+            return 0;
+        return receipt.Commit(document,
+                              [&](const nlohmann::json& draft) { return WriteContainerDocument(slot, draft); })
+                   ? 1
+                   : 0;
+    } catch (const std::exception& error) {
+        std::cerr << "[ComboVanilla] reward transaction failed: " << error.what() << '\n';
+        return 0;
+    }
 }
 
 // One authoritative, slot-scoped point. Native fw structs remain unchanged for save compatibility.
@@ -1642,6 +1704,11 @@ static void Combo_OnMmHintRevealed(int fileNum, int kind, int poolIndex, const c
 static int Combo_OnFinalBossDefeated(int game, int fileNum) {
     if ((game != 0 && game != 1) || !ComboIsValidSlot(fileNum))
         return 0;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        if (ComboVanilla::FileMode(LoadOrCreateContainer(fileNum)) == ComboVanilla::Mode::Vanilla)
+            return 1; // Each native ending is independent in Vanilla + NEI.
+    }
     if (fileNum != g_comboCompletionSlot)
         LoadComboCompletion(fileNum);
     // The OOT death cutscene re-enters this every frame during the fade; persist + log only on the
@@ -4083,6 +4150,13 @@ int main(int argc, char** argv) {
     if (setOotVanilla && setMmVanilla && MM_InitVanillaSaveFile && MM_DiscardVanillaSaveCreation) {
         setOotVanilla(Combo_QueryFileMode, Combo_VanillaCreation);
         setMmVanilla(Combo_QueryFileMode, nullptr);
+    }
+    using FnSetVanillaReward = void (*)(ComboVanilla::RewardHost);
+    auto setOotReward = (FnSetVanillaReward)GetSym(sohModule, "SOH_SetComboVanillaRewardCallback");
+    auto setMmReward = (FnSetVanillaReward)GetSym(mmModule, "MM_SetComboVanillaRewardCallback");
+    if (setOotReward && setMmReward) {
+        setOotReward(Combo_VanillaReward);
+        setMmReward(Combo_VanillaReward);
     }
     if (SOH_SetOnNewSaveCallback && MM_InitRandoSaveFile) {
         SOH_SetOnNewSaveCallback(Combo_OnOOTSaveInit);
