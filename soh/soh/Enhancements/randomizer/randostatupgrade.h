@@ -63,6 +63,9 @@ extern "C" {
 bool IsCrawlStatActive(void);
 bool IsClimbStatActive(void);
 bool IsPushStatActive(void);
+
+void RandoStat_BeginMagicLoadTrace(void);
+void RandoStat_TraceMagicLoad(void);
 float GetCrawlStatValue(void);
 float GetClimbStatValue(void);
 float GetPushStatValue(void);

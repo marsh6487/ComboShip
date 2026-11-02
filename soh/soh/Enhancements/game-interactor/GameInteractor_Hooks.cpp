@@ -1,5 +1,6 @@
 #include "GameInteractor_Hooks.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
+#include "soh/Enhancements/randomizer/randostatupgrade.h"
 
 #ifdef COMBO_BUILD
 extern "C" void Combo_SOH_BeforeNativeLoadGame(void);
@@ -24,6 +25,7 @@ void GameInteractor_ExecuteOnLoadGame(int32_t fileNum) {
 #ifdef COMBO_BUILD
     Combo_SOH_AfterNativeLoadGame();
 #endif
+    RandoStat_BeginMagicLoadTrace();
 }
 
 void GameInteractor_ExecuteOnExitGame(int32_t fileNum) {

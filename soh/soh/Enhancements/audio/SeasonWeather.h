@@ -13,6 +13,9 @@ struct PlayState;
 // 0..3 select Spring/Summer/Autumn/Winter presentation without changing gameplay.
 // Returns -1 for Native/Off/unowned, interiors, underwater and story presentation.
 int32_t SeasonWeather_SeasonForPlay(const struct PlayState* play);
+// Reviewed Market suite exteriors may tint foliage despite indoor/sky flags;
+// retains ownership, Native, camera, story and game-state presentation guards.
+int32_t SeasonWeather_FoliageSeasonForPlay(const struct PlayState* play);
 // Ground particles can coexist with authored rain beneath an outdoor canopy
 // whose scene disables the skybox. Retains every other presentation guard.
 // Sky-dependent effects must additionally check their own visible-sky flag.

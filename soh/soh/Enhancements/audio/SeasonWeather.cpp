@@ -60,8 +60,9 @@ bool HasNativeSkyWeather(const PlayState* play) {
     return false;
 }
 
-int32_t ResolveSeasonForPlay(const PlayState* play, bool requiresSky) {
-    if (play == nullptr || play->envCtx.indoors || (requiresSky && play->envCtx.skyboxDisabled) ||
+int32_t ResolveSeasonForPlay(const PlayState* play, bool requiresSky, bool authoredExteriorFoliage = false) {
+    if (play == nullptr || (play->envCtx.indoors && !authoredExteriorFoliage) ||
+        (requiresSky && play->envCtx.skyboxDisabled) ||
         play->envCtx.customSkyboxFilter || play->csCtx.state != CS_STATE_IDLE ||
         play->gameOverCtx.state != GAMEOVER_INACTIVE || gSaveContext.gameMode != GAMEMODE_NORMAL) {
         return -1;
@@ -87,6 +88,34 @@ int32_t ResolveSeasonForPlay(const PlayState* play, bool requiresSky) {
 
 extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState* play) {
     return ResolveSeasonForPlay(play, true);
+}
+
+static bool SeasonWeather_IsMarketSuiteExterior(const PlayState* play) {
+    if (!play)
+        return false;
+    switch (play->sceneNum) {
+        case SCENE_MARKET_ENTRANCE_DAY:
+        case SCENE_MARKET_ENTRANCE_NIGHT:
+        case SCENE_MARKET_ENTRANCE_RUINS:
+        case SCENE_BACK_ALLEY_DAY:
+        case SCENE_BACK_ALLEY_NIGHT:
+        case SCENE_MARKET_DAY:
+        case SCENE_MARKET_NIGHT:
+        case SCENE_MARKET_RUINS:
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY:
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT:
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS:
+            return true;
+        default:
+            return false;
+    }
+}
+
+extern "C" int32_t SeasonWeather_FoliageSeasonForPlay(const PlayState* play) {
+    // The authored Market suite retains indoor/fixed-background scene flags.
+    // Its reviewed foliage can change independently of sky/weather eligibility.
+    const bool marketSuite = SeasonWeather_IsMarketSuiteExterior(play);
+    return ResolveSeasonForPlay(play, !marketSuite, marketSuite);
 }
 
 extern "C" int32_t SeasonWeather_ParticleSeasonForPlay(const PlayState* play) {

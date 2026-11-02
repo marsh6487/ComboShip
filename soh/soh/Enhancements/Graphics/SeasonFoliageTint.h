@@ -20,7 +20,9 @@ enum class PixelMask {
     RanchMasonryGrass,
     RanchAtlasGrass,
     RiverGroundAtlasGrass,
-    RiverFrameGrass
+    RiverFrameGrass,
+    MarketGrassBands,
+    MarketPropsFoliage
 };
 struct Tint {
     uint32_t color = 0;
@@ -151,6 +153,13 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
         if (pixelMask == PixelMask::RanchAtlasGrass &&
             !(inside({ 0, 7, 2, 8 }) || inside({ 4, 7, 6, 8 }) || inside({ 0, 15, 2, 16 }) ||
               inside({ 8, 15, 11, 16 }) || inside({ 12, 0, 14, 16 }) || inside({ 14, 15, 16, 16 })))
+            continue;
+        // Market's planter/brick strips and its mixed leaf/poster prop atlas.
+        if (pixelMask == PixelMask::MarketGrassBands &&
+            !(inside({ 0, 2, 16, 3 }) || inside({ 0, 15, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::MarketPropsFoliage &&
+            !(inside({ 0, 0, 8, 6 }) || inside({ 2, 12, 14, 16 })))
             continue;
         const uint64_t* contour = pixelMask == PixelMask::RiverGroundAtlasGrass ? kRiverGroundAtlasGrass
                                   : pixelMask == PixelMask::RiverFrameGrass     ? kRiverFrameGrass

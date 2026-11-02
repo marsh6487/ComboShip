@@ -27,6 +27,10 @@ typedef struct {
 
 typedef int32_t (*Fn_GetDungeonItemReceiptPresentation)(const char*, CwItemReceiptPresentation*);
 
+/* Unbound's OoT Font holds 8192 raw message bytes; MM keeps its smaller
+ * native buffer. Destination capacity is a limit, not a required scratch size. */
+enum { COMBO_RECEIPT_BUFFER_SIZE = 8192 };
+
 static inline int ComboReceipt_HasIcon(const CwItemReceiptPresentation* p) {
     return p && p->singleBox == 1 && p->rewardLine >= 0 && p->rewardLine < 3 &&
            memchr(p->iconPath, '\0', sizeof(p->iconPath)) && !strncmp(p->iconPath, "__OTR__", 7) && p->iconWidth > 0 &&
@@ -120,12 +124,14 @@ static inline CwItemReceiptLayout ComboReceipt_LayoutAtScale(const CwItemReceipt
                                                              size_t count, int32_t scale, int* overflow) {
     CwItemReceiptLayout result = { scale, 0, 0, 0, 0, 0, 0, (uint32_t)size };
     const CwItemReceiptLayout unchanged = result;
-    char wrapped[1280];
+    char wrapped[COMBO_RECEIPT_BUFFER_SIZE];
     int generatedPage = 0;
     if (overflow)
         *overflow = 1; // Capacity/malformed failures must not qualify as a fitted body.
-    if (!body || size > capacity || capacity > sizeof(wrapped))
+    if (!body || size > capacity || size > sizeof(wrapped))
         return result;
+    if (capacity > sizeof(wrapped))
+        capacity = sizeof(wrapped);
     const uint8_t newline = mm ? 0x11 : 0x01;
     const uint8_t page = mm ? 0x10 : 0x04;
     const uint8_t end = mm ? 0xBF : 0x02;
@@ -273,8 +279,8 @@ static inline CwItemReceiptLayout ComboReceipt_LayoutAtScale(const CwItemReceipt
  * Genuine long bodies still page safely instead of truncating or overflowing. */
 static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresentation* p, char* body, size_t size,
                                                       size_t capacity, int mm, const float* widths, size_t count) {
-    char candidate[1280];
-    if (body && size <= capacity && capacity <= sizeof(candidate) && p && p->singleBox && p->rewardLine != 1 &&
+    char candidate[COMBO_RECEIPT_BUFFER_SIZE];
+    if (body && size <= capacity && size <= sizeof(candidate) && p && p->singleBox && p->rewardLine != 1 &&
         !ComboReceipt_HasIcon(p)) {
         for (int mergeTitle = 0; mergeTitle < 2; ++mergeTitle) {
             for (int32_t scale = 75; scale >= 55; --scale) {

@@ -1,0 +1,3959 @@
+{
+  "archive_name": "Market_Suite_R19_Bombchu_Routes_And_Day_Alley.unbound.o2r",
+  "archive_sha256": "e62cfb6309e159695611dcd861c83fffbe4cb2afe6883333b1a6dbb7039583b6",
+  "scenes": [
+    "SCENE_MARKET_ENTRANCE_DAY",
+    "SCENE_MARKET_ENTRANCE_NIGHT",
+    "SCENE_MARKET_ENTRANCE_RUINS",
+    "SCENE_BACK_ALLEY_DAY",
+    "SCENE_BACK_ALLEY_NIGHT",
+    "SCENE_MARKET_DAY",
+    "SCENE_MARKET_NIGHT",
+    "SCENE_MARKET_RUINS",
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS"
+  ],
+  "scene_target_counts": {
+    "SCENE_MARKET_ENTRANCE_DAY": 79,
+    "SCENE_MARKET_ENTRANCE_NIGHT": 12,
+    "SCENE_MARKET_ENTRANCE_RUINS": 68,
+    "SCENE_BACK_ALLEY_DAY": 27,
+    "SCENE_BACK_ALLEY_NIGHT": 25,
+    "SCENE_MARKET_DAY": 29,
+    "SCENE_MARKET_NIGHT": 19,
+    "SCENE_MARKET_RUINS": 0,
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY": 21,
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT": 20,
+    "SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS": 2
+  },
+  "targets": [
+    {
+      "path": "custom/prelude/market_alley_scene/recipe104_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe108_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe115_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe116_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe120_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe122_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe124_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe128_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe130_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe36_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 22
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe46_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe50_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe59_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe60_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe64_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe66_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe71_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 41
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe72_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe79_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe84_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe85_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe89_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe92_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe93_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_alley_scene/recipe95_tex0",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "scenes/shared/market_alley_scene/hairal_kadan_01_C300",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 75
+    },
+    {
+      "path": "scenes/shared/market_alley_scene/hairal_tree_01_2FD00",
+      "scene": "SCENE_BACK_ALLEY_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 79
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe100_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe102_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe104_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe108_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe10_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe110_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe122_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe124_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe13_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe19_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe22_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe23_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe32_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe57_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe59_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe67_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 22
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe74_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe76_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe7_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe84_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe88_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe95_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_alley_n_scene/recipe96_tex0",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "scenes/shared/market_alley_n_scene/hairal_kadan_01_C300",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 75
+    },
+    {
+      "path": "scenes/shared/market_alley_n_scene/hairal_tree_01_2FD00",
+      "scene": "SCENE_BACK_ALLEY_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 79
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe10_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe135_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe137_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe141_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe150_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe151_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe155_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe173_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe175_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe189_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe196_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe199_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe200_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe204_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe205_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe207_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe33_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe34_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe38_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe48_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe50_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_day_scene/recipe52_tex0",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "scenes/shared/market_day_scene/hairal_enkei_01_2880",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        8,
+        8,
+        12,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 85
+    },
+    {
+      "path": "scenes/shared/market_day_scene/hairal_nuki_03_38280",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 88
+    },
+    {
+      "path": "scenes/shared/market_day_scene/hairal_obj_01_55A80",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 90
+    },
+    {
+      "path": "scenes/shared/market_day_scene/hairal_tree_01_66280",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 93
+    },
+    {
+      "path": "scenes/shared/market_day_scene/hairal_yama_01_6C100",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 95
+    },
+    {
+      "path": "scenes/shared/market_day_scene/shr_en_kabe_7FE00",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 96
+    },
+    {
+      "path": "scenes/shared/market_day_scene/shr_yuka_01_24600",
+      "scene": "SCENE_MARKET_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 97
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe102_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe106_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe10_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe110_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe111_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe112_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe113_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe115_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe119_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe120_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe123_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe127_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe131_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe132_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe133_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe134_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe136_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe140_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe141_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe144_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe148_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe14_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe15_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe187_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 22
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe18_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe197_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe201_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe210_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe211_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe215_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe217_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe22_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe26_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe27_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe28_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe29_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe2_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe31_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe35_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe36_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe39_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe3_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe43_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe47_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe48_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe49_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe4_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe50_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe52_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe56_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe57_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe5_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe60_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe64_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe68_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe69_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe6_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe70_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe71_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe73_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe77_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe78_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe7_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe81_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe85_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe89_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe8_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe90_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe91_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe92_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe94_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe98_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/entra_scene/recipe99_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_kadan_01_7E80",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 58
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_nuki_01__E880",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 60
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_obj_02_e_17C80",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        4,
+        14,
+        12
+      ],
+      "mask": "Green",
+      "reviewed_image": 62
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_obj_02_e_17C80___Copie",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        4,
+        14,
+        12
+      ],
+      "mask": "Green",
+      "reviewed_image": 63
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_tree_01_28480",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 70
+    },
+    {
+      "path": "scenes/shared/entra_scene/hairal_yama_01_6C100",
+      "scene": "SCENE_MARKET_ENTRANCE_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 56
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe10_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe20_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe22_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe29_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 22
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe34_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe37_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/recipe7_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "custom/prelude/entra_n_scene/window_repair/hairal_kadan_01_7E80",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 29
+    },
+    {
+      "path": "scenes/shared/entra_n_scene/hairal_kadan_01_7E80",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 29
+    },
+    {
+      "path": "scenes/shared/entra_n_scene/hairal_nuki_01__E880",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 106
+    },
+    {
+      "path": "scenes/shared/entra_n_scene/hairal_obj_02_e_17C80",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        4,
+        14,
+        12
+      ],
+      "mask": "Green",
+      "reviewed_image": 121
+    },
+    {
+      "path": "scenes/shared/entra_n_scene/hairal_tree_01_28480",
+      "scene": "SCENE_MARKET_ENTRANCE_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 93
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe100_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe104_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe105_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe108_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe112_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe116_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe117_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe118_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe119_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe121_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe125_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe126_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe129_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe133_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe137_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe138_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe139_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe140_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe142_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe146_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe147_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe150_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe154_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe158_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe159_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe160_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe161_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe163_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe167_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe168_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe171_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe175_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe29_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe30_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe31_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe32_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe33_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe34_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe35_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe37_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe41_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe42_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe45_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe49_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe53_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe54_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe55_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe56_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe58_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe62_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe63_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe66_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe70_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe74_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe75_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe76_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe77_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe79_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 0
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe83_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        7,
+        16,
+        9
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 1
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe84_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 2
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe87_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 5
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe91_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        15,
+        16,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 8
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe95_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 10
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe96_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 11
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe97_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 12
+    },
+    {
+      "path": "custom/prelude/enrui_scene/recipe98_tex0",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 13
+    },
+    {
+      "path": "scenes/shared/enrui_scene/hairal_obj_01_r_7C80",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Understory",
+      "region": [
+        0,
+        7,
+        8,
+        16
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 53
+    },
+    {
+      "path": "scenes/shared/enrui_scene/hairal_yama_01_6C100",
+      "scene": "SCENE_MARKET_ENTRANCE_RUINS",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 56
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe10_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe37_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe40_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe44_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe4_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe55_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe5_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketPropsFoliage",
+      "reviewed_image": 43
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe62_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe65_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe66_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe79_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/market_night_scene/recipe81_tex0",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "scenes/shared/market_night_scene/hairal_enkei_01_2880",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        8,
+        8,
+        12,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 85
+    },
+    {
+      "path": "scenes/shared/market_night_scene/hairal_nuki_03_38280",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 88
+    },
+    {
+      "path": "scenes/shared/market_night_scene/hairal_obj_01_55A80",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 100
+    },
+    {
+      "path": "scenes/shared/market_night_scene/hairal_tree_01_66280",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 93
+    },
+    {
+      "path": "scenes/shared/market_night_scene/hairal_yama_01_6C100",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 95
+    },
+    {
+      "path": "scenes/shared/market_night_scene/shr_en_kabe_7FE00",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 96
+    },
+    {
+      "path": "scenes/shared/market_night_scene/shr_yuka_01_24600",
+      "scene": "SCENE_MARKET_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 101
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe36_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 22
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe45_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 31
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe51_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 45
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe62_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe71_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe73_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe91_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe93_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe94_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe95_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 33
+    },
+    {
+      "path": "custom/prelude/shrine_scene/recipe96_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_en_kabe_0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 96
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_en_yuka_2A00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 102
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_hana_01_5400",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 103
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_kad_01_F900",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 105
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_kusa_01_10E00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 106
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_tree_01_18980",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 108
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_tree_02_1DD80",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 109
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_tree_03_23180",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 110
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_yuka_01_24600",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 116
+    },
+    {
+      "path": "scenes/shared/shrine_scene/shr_yuka_02_2EE00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 113
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe10_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 17
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe13_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 36
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe19_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 38
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe22_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 32
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe23_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 35
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe32_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 39
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe57_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 18
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe59_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 19
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe67_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 49
+    },
+    {
+      "path": "custom/prelude/shrine_n_scene/recipe7_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        1,
+        4,
+        7
+      ],
+      "mask": "Green",
+      "reviewed_image": 27
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_en_kabe_0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "KakarikoCliffGrass",
+      "reviewed_image": 96
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_en_yuka_2A00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 102
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_hana_01_5400",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 103
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_kad_01_F900",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "MarketGrassBands",
+      "reviewed_image": 105
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_kusa_01_10E00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 106
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_tree_01_18980",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        3,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 108
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_tree_02_1DD80",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 109
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_tree_03_23180",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Canopy",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 110
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_yuka_01_24600",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 112
+    },
+    {
+      "path": "scenes/shared/shrine_n_scene/shr_yuka_02_2EE00",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT",
+      "surface": "Ground",
+      "region": [
+        0,
+        0,
+        7,
+        2
+      ],
+      "mask": "GrassTrim",
+      "reviewed_image": 113
+    },
+    {
+      "path": "custom/prelude/shrine_r_scene/recipe32_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 51
+    },
+    {
+      "path": "custom/prelude/shrine_r_scene/recipe37_tex0",
+      "scene": "SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS",
+      "surface": "Understory",
+      "region": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "mask": "Green",
+      "reviewed_image": 51
+    }
+  ],
+  "excluded": "Architecture, signs, icons, water and whole prerendered backgrounds are not broad tint targets; mixed atlases use bounded foliage masks. Market ruins has no reviewed green foliage material."
+}

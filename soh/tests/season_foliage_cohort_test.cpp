@@ -12,7 +12,7 @@ extern "C" {
 PlayState* gPlayState = nullptr;
 }
 static int selectedSeason = -1;
-extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState*) {
+extern "C" int32_t SeasonWeather_FoliageSeasonForPlay(const PlayState*) {
     return selectedSeason;
 }
 extern "C" void gfx_texture_cache_clear() {

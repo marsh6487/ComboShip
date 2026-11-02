@@ -66,7 +66,7 @@ void Retire() {
 }
 
 void Update(const PlayState* play) {
-    const int season = SeasonWeather_SeasonForPlay(play);
+    const int season = SeasonWeather_FoliageSeasonForPlay(play);
     auto* context = Ship::Context::GetRawInstance();
     auto rm = context ? context->GetResourceManager() : nullptr;
     if (!rm || (season != 0 && season != 2 && season != 3)) {
