@@ -1,3 +1,4 @@
+#include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/ComboGameMode.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include <ship/Context.h>
@@ -1460,6 +1461,19 @@ void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, 
     // can restore QUEST_OOTXMM (the rando fileType alone would reduce it back to QUEST_RANDOMIZER).
     saveBlock["fleetCombo"] = (quest == QUEST_OOTXMM);
     if (sectionID == SECTION_ID_BASE) {
+#ifdef COMBO_BUILD
+        // The member document can still belong to the last seeded file. Never
+        // serialize its incompatible sections into this file or trigger the
+        // legacy vanilla migration popup on every later container load.
+        // Query this slot without changing the active mode from a save worker.
+        if (Combo_IsCombinedGame() && Combo_PeekVanillaMode(fileNum) == 1) {
+            auto sections = saveBlock.find("sections");
+            if (sections != saveBlock.end() && sections->is_object()) {
+                sections->erase("randomizer");
+                sections->erase("speedrun");
+            }
+        }
+#endif
         for (auto& sectionHandlerPair : sectionSaveHandlers) {
             auto& saveFuncInfo = sectionHandlerPair.second;
             // Don't call SaveFuncs for sections that aren't tied to game save
@@ -1643,6 +1657,13 @@ void SaveManager::SaveGlobal() {
 
 void SaveManager::LoadFile(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT save-load");
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame() && Combo_QueryVanillaMode(fileNum) < 0) {
+        SPDLOG_ERROR("[ComboVanilla] refusing invalid/mixed file identity for slot {}", fileNum);
+        return;
+    }
+#endif
+
     std::lock_guard<std::mutex> guard(saveMtx);
     SPDLOG_INFO("Load File - fileNum: {}", fileNum);
 #ifdef COMBO_BUILD

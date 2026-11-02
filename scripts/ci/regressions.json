@@ -1654,5 +1654,11 @@
     "origin": "gate",
     "name": "Captured lantern fire icons and boss-soul receipt lifetime",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_dialogue_icon_lifetime_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "WIP native paired Vanilla save identity and creation rollback",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_save_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_host_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_native_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_serializer_tests.py --sanitize"
   }
 ]

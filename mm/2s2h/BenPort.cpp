@@ -179,7 +179,34 @@ static bool sComboTransitionActive = false;
 // Session-owned, hidden in this DLL: the launcher sets it before MM initialization.
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+int gComboVanillaCreationFailed = 0;
+int (*gComboVanillaCreateCallback)(int, int) = nullptr;
 }
+
+static int (*sComboVanillaModeQuery)(int) = nullptr;
+extern "C" COMBO_EXPORT void MM_SetComboVanillaCallbacks(int (*query)(int), int (*create)(int, int)) {
+    sComboVanillaModeQuery = query;
+    gComboVanillaCreateCallback = create;
+}
+extern "C" int Combo_PeekVanillaMode(int slot) {
+    return Combo_IsCombinedGame() && sComboVanillaModeQuery ? sComboVanillaModeQuery(slot) : 0;
+}
+extern "C" int Combo_QueryVanillaMode(int slot) {
+    const int mode = Combo_PeekVanillaMode(slot);
+    gComboVanillaMode = mode == 1;
+    return mode;
+}
+extern int SaveManager_InitVanillaForCombo(int slot, const unsigned char* name);
+extern void SaveManager_DiscardVanillaCreation();
+extern "C" COMBO_EXPORT void MM_DiscardVanillaSaveCreation() {
+    SaveManager_DiscardVanillaCreation();
+}
+
+extern "C" COMBO_EXPORT int MM_InitVanillaSaveFile(int slot, const unsigned char* name) {
+    return SaveManager_InitVanillaForCombo(slot, name);
+}
+
 extern "C" COMBO_EXPORT void MM_SetGameMode(int mode) {
     if (OTRGlobals::Instance != nullptr)
         return; // A running module owns one immutable session mode.

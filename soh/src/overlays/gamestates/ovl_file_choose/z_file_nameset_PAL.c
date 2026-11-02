@@ -1,3 +1,4 @@
+#include "../../../../../combo/vanilla/ComboVanillaMode.h"
 #include "file_choose.h"
 #include "textures/title_static/title_static.h"
 #include "assets/overlays/ovl_File_Choose/ovl_file_choose.h"
@@ -460,6 +461,16 @@ void FileChoose_DrawNameEntry(GameState* thisx) {
                             gSaveContext.fileNum = this->buttonIndex;
                             dayTime = ((void)0, gSaveContext.dayTime);
                             Sram_InitSave(this);
+#ifdef COMBO_BUILD
+                            if (Combo_IsCombinedGame() && gComboVanillaCreationFailed) {
+                                gSaveContext.dayTime = dayTime;
+                                Audio_PlaySfxGeneral(NA_SE_SY_FSEL_ERROR, &gSfxDefaultPos, 4,
+                                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                                     &gSfxDefaultReverb);
+                                return;
+                            }
+#endif
+
                             gSaveContext.dayTime = dayTime;
                             this->prevConfigMode = CM_MAIN_MENU;
                             this->configMode = CM_NAME_ENTRY_TO_MAIN;

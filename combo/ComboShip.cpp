@@ -1,3 +1,5 @@
+#include "vanilla/ComboVanillaSave.h"
+#include "vanilla/ComboVanillaFile.h"
 // ComboShip - Unified Launcher for OOT (soh.dll) + MM (2ship.dll)
 //
 // Select Combo/OoT/MM before ROM setup. Solo sessions enter the selected
@@ -454,6 +456,7 @@ static bool Combo_BindCrossDungeonRuntime(const nlohmann::json& seed) {
 // See docs/deviations/boot-shutdown.md.
 static std::mutex g_containerMutex;
 static std::map<int, nlohmann::json> g_containerCache;
+static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 // Slots whose container was backed up for a COMBO_RELEASE_VERSION mismatch; guarded by g_containerMutex.
 // OOT drains it on the main thread (Combo_TakeEvictionNotice) to surface a popup.
 static std::vector<int> g_evictedSlots;
@@ -539,27 +542,23 @@ static nlohmann::json& LoadOrCreateContainer(int fileNum) {
 }
 
 // Hold g_containerMutex. Serialize the cached container to a temp file, then atomic rename over it.
-static void FlushContainer(int fileNum) {
-    auto it = g_containerCache.find(fileNum);
-    if (it == g_containerCache.end())
-        return;
+static bool WriteContainerDocument(int fileNum, const nlohmann::json& document) {
     std::error_code ec;
-    auto path = ComboContainerPath(fileNum);
+    const auto path = ComboContainerPath(fileNum);
     std::filesystem::create_directories(path.parent_path(), ec);
-    auto tmp = path;
-    tmp += ".temp";
-    {
-        std::ofstream out(tmp, std::ios::trunc | std::ios::binary);
-        if (!out.is_open())
-            return;
-        it->second["comboRelease"] = COMBO_RELEASE_VERSION; // every write carries the current release
-        out << it->second.dump();
-    }
-    std::filesystem::rename(tmp, path, ec);
-    if (ec) { // some filesystems won't replace-on-rename — remove then retry
-        std::filesystem::remove(path, ec);
-        std::filesystem::rename(tmp, path, ec);
-    }
+    if (ec)
+        return false;
+    auto stored = document;
+    stored["comboRelease"] = COMBO_RELEASE_VERSION;
+    return ComboVanilla::WriteFile(path, stored.dump());
+}
+
+static bool FlushContainer(int fileNum) {
+    const auto pending = g_vanillaCreations.find(fileNum);
+    if (pending != g_vanillaCreations.end() && pending->second.Active())
+        return false;
+    auto it = g_containerCache.find(fileNum);
+    return it != g_containerCache.end() && WriteContainerDocument(fileNum, it->second);
 }
 
 // OOT (main thread) polls this each frame via SOH_SetOutdatedSaveNotice: pops the next slot whose
@@ -619,7 +618,9 @@ static const char* Combo_ReadGameSave(int game, int fileNum) {
         return "";
     thread_local std::string buf;
     std::lock_guard<std::mutex> lk(g_containerMutex);
-    auto& c = LoadOrCreateContainer(fileNum);
+    const auto pending = g_vanillaCreations.find(fileNum);
+    const auto& c = pending != g_vanillaCreations.end() && pending->second.Active() ? pending->second.Document()
+                                                                                    : LoadOrCreateContainer(fileNum);
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
     auto it = c.find(key);
     buf = (it == c.end() || it->is_null()) ? std::string() : it->dump();
@@ -643,6 +644,13 @@ static void Combo_WriteGameSave(int game, int fileNum, const char* json) {
         return;
     }
     std::lock_guard<std::mutex> lk(g_containerMutex);
+    const auto pending = g_vanillaCreations.find(fileNum);
+    if (pending != g_vanillaCreations.end() && pending->second.Active()) {
+        try {
+            pending->second.Stage(game, nlohmann::json::parse(json));
+        } catch (...) {}
+        return;
+    }
     auto& c = LoadOrCreateContainer(fileNum);
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
     try {
@@ -796,6 +804,9 @@ typedef void (*FnMMSetRebuildCb)(void (*)(int));
 static FnSetGenerateCb SOH_SetOnComboGenerateCallback = nullptr;
 static FnApplyPlacements SOH_ApplyRandoPlacements = nullptr;
 static FnMMInitRandoSave MM_InitRandoSaveFile = nullptr;
+using FnMMInitVanillaSave = int (*)(int, const unsigned char*);
+static FnMMInitVanillaSave MM_InitVanillaSaveFile = nullptr;
+static FnVoid MM_DiscardVanillaSaveCreation = nullptr;
 static FnMMSetRebuildCb MM_SetRebuildSaveCallback = nullptr;
 static FnSetComboRandoSeed SOH_SetComboRandoSeed = nullptr;
 static FnSetComboRandoSeed MM_SetComboRandoSeed = nullptr;
@@ -3057,6 +3068,83 @@ static void Combo_RebuildMMSaveForSlot(int fileNum) try {
     std::cerr << "[ComboShip] ERROR: MM save rebuild threw for slot " << fileNum << ": " << e.what() << std::endl;
 } catch (...) { std::cerr << "[ComboShip] ERROR: MM save rebuild threw for slot " << fileNum << std::endl; }
 
+static int Combo_QueryFileMode(int slot) {
+    if (!ComboIsValidSlot(slot))
+        return -1;
+    std::lock_guard<std::mutex> lock(g_containerMutex);
+    const auto pending = g_vanillaCreations.find(slot);
+    if (pending != g_vanillaCreations.end() && pending->second.Active())
+        return 1;
+    return static_cast<int>(ComboVanilla::FileMode(LoadOrCreateContainer(slot)));
+}
+
+// Called by OoT before any native creation write, then after its writer drains.
+// No game callback executes while holding the container mutex.
+static int Combo_VanillaCreation(int slot, int phase) try {
+    if (!ComboIsValidSlot(slot))
+        return 0;
+    if (phase == 0) {
+        if (!MM_InitVanillaSaveFile || !MM_DiscardVanillaSaveCreation || !SOH_GetCurrentPlayerName)
+            return 0;
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        return g_vanillaCreations[slot].Begin(slot, LoadOrCreateContainer(slot)) ? 1 : 0;
+    }
+    if (phase == 2) {
+        if (MM_DiscardVanillaSaveCreation)
+            MM_DiscardVanillaSaveCreation();
+        g_MmSaveInMemorySlot = -1;
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        g_vanillaCreations[slot].Abort();
+        return 1;
+    }
+    if (phase != 1)
+        return 0;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        if (!g_vanillaCreations[slot].Active())
+            return 0;
+    }
+    unsigned char name[8];
+    SOH_GetCurrentPlayerName(name);
+    const int nativeResult = MM_InitVanillaSaveFile(slot, name);
+    bool committed = false;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        auto& pending = g_vanillaCreations[slot];
+        if (nativeResult == 0) {
+            committed = pending.Commit([&](const nlohmann::json& document) {
+                if (!WriteContainerDocument(slot, document))
+                    return false;
+                g_containerCache[slot] = document;
+                return true;
+            });
+        }
+        // Abort below after the native context is no longer writable.
+    }
+    if (!committed) {
+        MM_DiscardVanillaSaveCreation();
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        g_vanillaCreations[slot].Abort();
+    }
+    if (!committed)
+        std::cerr << "[ComboVanilla] paired creation failed for slot " << slot << " (MM status " << nativeResult
+                  << "); previous container retained" << std::endl;
+    g_MmSaveInMemorySlot = committed ? slot : -1;
+    if (committed) {
+        LoadComboCompletion(slot);
+        Combo_PushHintTrackerData(slot);
+    }
+    return committed ? 1 : 0;
+} catch (const std::exception& error) {
+    std::cerr << "[ComboVanilla] creation failed: " << error.what() << std::endl;
+    g_MmSaveInMemorySlot = -1;
+    if (MM_DiscardVanillaSaveCreation)
+        MM_DiscardVanillaSaveCreation();
+    std::lock_guard<std::mutex> lock(g_containerMutex);
+    g_vanillaCreations[slot].Abort();
+    return 0;
+}
+
 static void Combo_OnOOTSaveInit(int fileNum) {
     if (!ComboIsValidSlot(fileNum))
         return;
@@ -3412,6 +3500,8 @@ int main(int argc, char** argv) {
     SOH_SetComboSpoilerPath = (FnTakeStr)GetSym(sohModule, "SOH_SetComboSpoilerPath");
     SOH_GetComboSpoilerPath = (FnDumpData)GetSym(sohModule, "SOH_GetComboSpoilerPath");
     MM_InitRandoSaveFile = (FnMMInitRandoSave)GetSym(mmModule, "MM_InitRandoSaveFile");
+    MM_InitVanillaSaveFile = (FnMMInitVanillaSave)GetSym(mmModule, "MM_InitVanillaSaveFile");
+    MM_DiscardVanillaSaveCreation = (FnVoid)GetSym(mmModule, "MM_DiscardVanillaSaveCreation");
     MM_SetRebuildSaveCallback = (FnMMSetRebuildCb)GetSym(mmModule, "MM_SetRebuildSaveCallback");
     SOH_SetOnComboGenerateCallback = (FnSetGenerateCb)GetSym(sohModule, "SOH_SetOnComboGenerateCallback");
     SOH_ApplyRandoPlacements = (FnApplyPlacements)GetSym(sohModule, "SOH_ApplyRandoPlacements");
@@ -3987,6 +4077,13 @@ int main(int argc, char** argv) {
         SOH_SetFwCallbacks(&fwCallbacks);
     if (MM_SetFwCallbacks)
         MM_SetFwCallbacks(&fwCallbacks);
+    using FnSetVanillaCallbacks = void (*)(int (*)(int), int (*)(int, int));
+    auto setOotVanilla = (FnSetVanillaCallbacks)GetSym(sohModule, "SOH_SetComboVanillaCallbacks");
+    auto setMmVanilla = (FnSetVanillaCallbacks)GetSym(mmModule, "MM_SetComboVanillaCallbacks");
+    if (setOotVanilla && setMmVanilla && MM_InitVanillaSaveFile && MM_DiscardVanillaSaveCreation) {
+        setOotVanilla(Combo_QueryFileMode, Combo_VanillaCreation);
+        setMmVanilla(Combo_QueryFileMode, nullptr);
+    }
     if (SOH_SetOnNewSaveCallback && MM_InitRandoSaveFile) {
         SOH_SetOnNewSaveCallback(Combo_OnOOTSaveInit);
         std::cout << "[ComboShip] OOT new-save callback registered." << std::endl;

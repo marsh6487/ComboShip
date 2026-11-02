@@ -2153,8 +2153,24 @@ extern "C" void InitOTR(int argc, char* argv[]) {
 #ifdef COMBO_BUILD
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+int gComboVanillaCreationFailed = 0;
+int (*gComboVanillaCreateCallback)(int, int) = nullptr;
 }
 static bool sComboGameModeLocked = false;
+static int (*sComboVanillaModeQuery)(int) = nullptr;
+extern "C" COMBO_EXPORT void SOH_SetComboVanillaCallbacks(int (*query)(int), int (*create)(int, int)) {
+    sComboVanillaModeQuery = query;
+    gComboVanillaCreateCallback = create;
+}
+extern "C" int Combo_PeekVanillaMode(int slot) {
+    return Combo_IsCombinedGame() && sComboVanillaModeQuery ? sComboVanillaModeQuery(slot) : 0;
+}
+extern "C" int Combo_QueryVanillaMode(int slot) {
+    const int mode = Combo_PeekVanillaMode(slot);
+    gComboVanillaMode = mode == 1;
+    return mode;
+}
 
 extern "C" COMBO_EXPORT void SOH_SetGameMode(int mode) {
     // The ROM-free chooser may change mode; game initialization locks it for the session.
