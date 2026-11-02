@@ -21,6 +21,7 @@
 
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0; // Existing weather controls exercise seeded combined saves.
 }
 
 SaveContext gSaveContext;

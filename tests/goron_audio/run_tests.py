@@ -30,6 +30,7 @@ def function(source, name):
 
 def main():
     source = (ROOT / "soh/mods/transformation_masks/mm_player_form.cpp").read_text()
+    forms = (ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text()
     assets = (ROOT / "soh/mods/transformation_masks/assets/mm_asset_loader.cpp").read_text()
     pieces = []
     for enum in ("MmFormStateId", "GoronActionId"):
@@ -46,6 +47,7 @@ def main():
     pieces.append(init[:init.index("    // === Cleanup from previous scene ===")] + "}\n")
     reset = function(source, "MmForm_Reset")
     pieces.append(reset[:reset.index("    MmForm_ClearZoraSwimTrails")] + "}\n")
+    pieces.append(function(forms, "RitoItem_FormEnabled"))
     pieces.extend(function(source, name) for name in ("MmForm_OnDeath", "MmForm_Update"))
     pieces.append(function((ROOT / "soh/src/code/z_actor.c").read_text(), "Actor_Destroy"))
 

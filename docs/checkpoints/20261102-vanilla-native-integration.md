@@ -42,6 +42,14 @@ Independent reviewers verified the host journal, native sharing and both native 
 
 The launcher and modified full game translation units pass local syntax checks. The preceding journal checkpoint's public CI passed its full Linux build and five regression groups; the entrance group exposed a missing extraction dependency, now repaired without deleting assertions. The final candidate's platform jobs must be read separately before claiming its actual game build passes.
 
+### CI dependency follow-up
+
+The complete `2e4edd9250929205d35d8adfa281040b6a702bc7` source checkpoint restored independently from the public fork: all 84 changed blobs match the reviewed hashes. Its Actions run `41543875980` passed source/format, world and entrance checks but exposed a missing production `ComboVanillaMode.h` include in `OTRGlobals.cpp`. The actual full translation unit reproduces the undeclared `Combo_IsVanilla` error before that include and passes syntax verification with it.
+
+The same run exposed legacy extraction fixtures missing the newly required mode state or native helper bodies. The bounded follow-up supplies production headers, explicit seeded mode state where combined saves are exercised, the real Rito predicate and the real queued peer-pull handler. It also repairs the corresponding editor, pause-wheel, equipment, wand and paired-cane extraction boundaries. Existing behavioral assertions remain intact; reward bindings, sharing policy and placement behavior are unchanged.
+
+The six affected registered CI entries pass locally through the actual combined-ABI regression driver, including complete native weather/winter and MM editor syntax checks. Focused wand, equipment-access and paired-cane checks also pass. A fresh platform Actions run is still required for the follow-up revision; local syntax and fixture results do not establish a complete game build or configured runtime behavior.
+
 ## Preserved Shadow Crystal and dialogue/font fixes
 
 The inherited fixes from `33359ffce2a79e80d7f490d64c1462bfcaad6b14` remain part of this same source candidate. Wolf/Shadow Crystal entry and removal retain the flash path and outgoing-form capture instead of updating an unused MM skeleton callback. New Rito availability edits are outside those crash-fix hunks; the eight focused Wolf transition controls pass again.

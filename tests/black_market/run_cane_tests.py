@@ -10,11 +10,18 @@ grant = block_from(items, items.index("bool Grant("))
 ids = ["RI_OOT_NEI_CANE_OF_SOMARIA", "RI_OOT_NEI_CANE_SOMARIA_BLOCK", "RI_OOT_NEI_CANE_SOMARIA_PLATFORM", "RI_OOT_NEI_CANE_PACCI_FLIP", "RI_OOT_NEI_CANE_PACCI_STONE", "RI_OOT_NEI_CANE_PACCI_ULTRAHAND", "RI_OOT_EXT_CANE_OF_BYRNA"]
 fixture = r'''
 #include "rando/BlackMarket.h"
+#define COMBO_BUILD
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 #include <cassert>
 #include <cstdio>
 using u8 = unsigned char;
 using uint8_t = unsigned char;
 using Item = ComboRando::BlackMarket::Item;
+// Legacy paired-cane controls exercise a seeded save. The reset counter is
+// the native first-cycle service boundary, not another ownership registry.
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
+struct { struct { struct { struct { unsigned threeDayResetCount = 0; } playerData; } saveInfo; } save; } gSaveContext;
 struct State { u8 caneSkills = 0; bool cell = false; std::array<u8,2> comboObtainedFc{}, comboAppliedFc{}; } states[2];
 State* nei = &states[0];
 u8 Cane_GiveSkill(u8 skill) { nei->caneSkills |= 1 << skill; nei->cell = true; return 1; }

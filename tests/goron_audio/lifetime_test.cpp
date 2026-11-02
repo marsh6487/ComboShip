@@ -4,6 +4,8 @@
 #include "macros.h"
 #include "din_fire_sword.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/nei_save.h"
+#include "../../combo/vanilla/ComboVanillaMode.h"
 #include "mods/sound_translator/mm_audio_sfx.h"
 #include "mods/sound_translator/mm_sfx_ids.h"
 #include <cassert>
@@ -32,6 +34,16 @@ static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 
 SaveContext gSaveContext;
+// Other-form ownership is a service boundary; use the real Rito predicate
+// with the same explicit seeded identity as these legacy audio controls.
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+NeiSaveData* Nei_Save() {
+    static NeiSaveData state{};
+    return &state;
+}
+}
 PlayState* gPlayState;
 u16 gEquipMasks[4];
 u8 gEquipShifts[4];

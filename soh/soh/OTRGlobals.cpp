@@ -6,6 +6,7 @@ extern "C" void Partners_Reset(void);
 
 #include "rando/MagicMirrorShuffle.h"
 #include "../../combo/ComboGameMode.h"
+#include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "OTRGlobals.h"

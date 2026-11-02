@@ -8,6 +8,7 @@ extern "C" {
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboIds.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "tests/test_require.h"
 #include <cstring>
 #include <iostream>
@@ -17,6 +18,12 @@ extern "C" {
 
 SaveContext gSaveContext{};
 PlayState *gPlayState = nullptr;
+// Retain the legacy editor grant rules under the actual combined DLL ABI.
+// Vanilla's exact reward/profile behavior has separate native fixtures.
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+}
 int gFcCombo_SuppressRecord = 0;
 u32 gRandoPickupSerial = 0;
 u8 gItemSlots[77]{};
@@ -78,6 +85,8 @@ static void reset() {
 }
 
 int main() {
+    REQUIRE(Combo_IsCombinedGame());
+    REQUIRE(!Combo_IsVanilla());
     reset();
     gSaveContext.save.saveInfo.equips.equipment = EQUIP_VALUE_SHIELD_MIRROR << 4;
     const auto nativeIkanaBefore = gSaveContext.save.saveInfo;

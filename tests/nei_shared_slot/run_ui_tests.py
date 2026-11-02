@@ -24,12 +24,15 @@ def main():
 #include "global.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
+#include "vanilla/ComboVanillaMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <cassert>
 #include <cstring>
 #include <cstdio>
 #include <initializer_list>
 SaveContext gSaveContext{};
+// Existing wheel controls exercise the seeded combined profile.
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 static NeiSaveData state{};
 static int icons[8]{};
 static int page = 1;
