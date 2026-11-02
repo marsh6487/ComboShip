@@ -28,6 +28,7 @@ def function(path, marker):
 
 source=r'''
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -36,7 +37,13 @@ source=r'''
 #include <queue>
 #include <nlohmann/json.hpp>
 #include "ComboGameMode.h"
+#include "vanilla/ComboVanillaMode.h"
 extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
+extern "C" {
+int gComboVanillaMode=0;
+int gComboVanillaCreationFailed=0;
+int (*gComboVanillaCreateCallback)(int,int)=nullptr;
+}
 using u8=uint8_t; using u16=uint16_t; using s16=int16_t;
 #define CVAR_ENHANCEMENT(x) "enh." x
 #define CVAR_GENERAL(x) "gen." x
@@ -54,12 +61,12 @@ bool ResourceMgr_GameHasOriginal(){ return original; }
 bool ResourceMgr_GameHasMasterQuest(){ return mq; }
 /* native enum inserted below */
 struct RespawnData { int entranceIndex,roomIndex,playerParams; struct {float x,y,z;} pos; };
-struct { int entranceIndex,linkAge,dayTime,cutsceneIndex,language,n64ddFlag,fileNum,respawnFlag;
+struct SaveContext { int entranceIndex,linkAge,dayTime,cutsceneIndex,language,n64ddFlag,fileNum,respawnFlag;
   RespawnData respawn[3];
   u8 playerName[8]; struct { int filenameLanguage; struct { int id; } quest; } ship;
   struct { int dungeonItems[32]; } inventory; } gSaveContext{};
 struct FileChooseContext { int buttonIndex=0,n64ddFlag=0,speedrunIndex=0; u8 questType[3]{}; };
-struct { u8 playerName[8]; } metadata{};
+struct SaveFileMetaInfo { u8 playerName[8]; } metadata{};
 auto Save_GetSaveMetaInfo(int) { return &metadata; }
 int randos=0,peers=0,saves=0,created=0;
 bool seed=true,spoiler=false;

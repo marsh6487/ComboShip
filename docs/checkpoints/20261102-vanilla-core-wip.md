@@ -63,3 +63,18 @@ Local source-import commits are recovery-only. The remote tree overlays real
 feature/test/document deltas on the complete parent; it must not contain this
 inspected subset's root history. Accepted scene archives and all earlier
 crash/cursor/hint/icon changes remain preserved.
+
+## Recovered publication and CI follow-up
+
+The foundation is published at `517d408f5b7850f6ab0c7f72e28ea6539335a778`
+in draft PR #79. Its first CI run exposed stale extracted fixtures rather than
+a new native save failure: the solo OoT creation fixture lacked the new mode
+callback declarations and named save/metadata types. The updated fixture uses
+the actual mode header and retains all 30 existing solo/combined checks. The
+cumulative soul receipt expectation correction and quest-song investigation
+will be integrated from PR #78 while retaining both CI manifest additions.
+
+The corrected creation fixture passes all 30 existing checks locally. Independent
+review found no weakened checks or consequential issues. The broader local solo
+runner is blocked by missing SDL_net headers; complete CI remains enabled. The
+source merge retains the paired-save gate and the new quest-song gate.

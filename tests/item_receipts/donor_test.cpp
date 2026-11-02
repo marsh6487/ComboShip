@@ -871,8 +871,12 @@ int main(int argc, char** argv) {
           native.GetFrench(MF_RAW)}) {
       std::string body;
       const auto item = Rando::StaticData::RetrieveItem(soul.id);
-      const auto icon = CustomMessage::ITEM_OBTAINED(static_cast<uint8_t>(item.GetItemID()));
-      assert(text.find(icon) != std::string::npos && "native soul lost its catalog icon");
+      const auto icon = CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM);
+      assert(text.find(icon) != std::string::npos && "native soul lost its safe custom-icon operand");
+      assert(ComboReceipt_HasIcon(&native.receiptPresentation));
+      assert(std::strcmp(native.receiptPresentation.iconPath, item.GetCustomIcon()) == 0);
+      assert(native.receiptPresentation.iconWidth == 32 && native.receiptPresentation.iconHeight == 32);
+      assert(!native.receiptPresentation.iconIA8 && native.receiptPresentation.singleBox);
       assert(ComboItemReceiptText::FromOotMessage(text, body));
       const auto color = body.find(static_cast<char>(soul.color));
       const auto reset = body.find('\0', color);

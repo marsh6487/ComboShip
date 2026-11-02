@@ -1660,5 +1660,11 @@
     "origin": "gate",
     "name": "WIP native paired Vanilla save identity and creation rollback",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_save_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_host_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_native_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_serializer_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "OoT native song ownership, quest draw and bounded layout trace",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/oot_pause_inventory/run_quest_song_tests.py --sanitize"
   }
 ]

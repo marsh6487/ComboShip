@@ -3,6 +3,7 @@
 #include "sword_element_kaleido.h"
 #include <stdlib.h>
 #include <string.h>
+#include <libultraship/log/luslog.h>
 
 #include "textures/item_name_static/item_name_static.h"
 #include "textures/icon_item_static/icon_item_static.h"
@@ -1115,7 +1116,40 @@ Gfx* KaleidoScope_DrawPageSections(Gfx* gfx, Vtx* vertices, void** textures) {
     return gfx;
 }
 
+// Capture the ownership and layout together when investigating invisible songs.
+// Read-only; report once per opening or when ownership/layout changes.
+static void KaleidoNei_TraceQuestSongs(PlayState* play) {
+    static s32 reported = false;
+    static u32 lastQuest;
+    static s32 lastFile, lastMmPage, lastRandoPage;
+    PauseContext* pauseCtx = &play->pauseCtx;
+    s32 mmPage = CVarGetInteger(CVAR_ENHANCEMENT("SkijerNEI.MmQuestPage"), 0);
+    u32 quest = gSaveContext.inventory.questItems;
+    if (pauseCtx->state != 6 || pauseCtx->pageIndex != PAUSE_QUEST) {
+        reported = false;
+        return;
+    }
+    if (reported && lastQuest == quest && lastFile == gSaveContext.fileNum && lastMmPage == mmPage &&
+        lastRandoPage == pauseCtx->randoQuestMode) {
+        return;
+    }
+    reported = true;
+    lastQuest = quest;
+    lastFile = gSaveContext.fileNum;
+    lastMmPage = mmPage;
+    lastRandoPage = pauseCtx->randoQuestMode;
+    lusprintf(__FILE__, __LINE__, 2,
+              "[QuestSongs] slot=%d quest=%08x minuet=%d nocturne=%d mmPage=%d randoPage=%d "
+              "pause=%d cursor=%d/%d song=%d pausePlay=%d pauseWarp=%d",
+              (int)gSaveContext.fileNum, (unsigned)quest, !!CHECK_QUEST_ITEM(QUEST_SONG_MINUET),
+              !!CHECK_QUEST_ITEM(QUEST_SONG_NOCTURNE), (int)mmPage, (int)pauseCtx->randoQuestMode, (int)pauseCtx->state,
+              (int)pauseCtx->cursorPoint[PAUSE_QUEST], (int)pauseCtx->cursorSlot[PAUSE_QUEST],
+              (int)pauseCtx->ocarinaSongIdx, CVarGetInteger(CVAR_ENHANCEMENT("SkijerNEI.PausePlay"), 0),
+              CVarGetInteger(CVAR_ENHANCEMENT("PauseWarp"), 0));
+}
+
 void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
+    KaleidoNei_TraceQuestSongs(play);
     static Color_RGB8 D_8082ACF4[12] = {
         { 0, 0, 0 }, { 0, 0, 0 },     { 0, 0, 0 },    { 0, 0, 0 }, { 255, 255, 0 }, { 0, 0, 0 },
         { 0, 0, 0 }, { 255, 255, 0 }, { 0, 50, 255 }, { 0, 0, 0 }, { 0, 0, 0 },     { 0, 50, 255 },
