@@ -158,7 +158,12 @@ def main():
             common = common.replace('#include "z64animation.h"', '#include "z64animation.h"\n'
                                     '#include "z64interface.h"\n#include "z64player.h"')
             cpp = host_build / "test.cpp"
-            cpp.write_text(common + '\n#include <unordered_map>\n#include "' + fleet_dir + '/FleetComboItems.h"\n' +
+            # Run the legacy shared-item controls in explicit seeded mode while
+            # retaining the real mode query and first-cycle policy in extracted code.
+            mode = ('#include "combo/vanilla/ComboVanillaMode.h"\n'
+                    '#include "combo/vanilla/ComboVanillaPolicy.h"\n'
+                    'extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }\n')
+            cpp.write_text(common + '\n' + mode + '#include <unordered_map>\n#include "' + fleet_dir + '/FleetComboItems.h"\n' +
                            ('#include "soh/Enhancements/randomizer/randomizerEnums.h"\n' if host == "soh" else "") +
                            '#include "moons_production.inc"\n' + source_at("tests/moons_tear/test.cpp"))
             (host_build / "nei_save_production.inc").write_text(production_for(host, None))

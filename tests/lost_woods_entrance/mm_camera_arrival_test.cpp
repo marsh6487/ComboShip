@@ -7,6 +7,8 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/RegionalPassages.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 #include <array>
 #include <cassert>
 #include <cmath>

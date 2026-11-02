@@ -12,6 +12,8 @@
 #include "ComboBossSoulReceiptIcon.h"
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 #include "key_receipt_fixtures.h"
 #include "boss_soul_fixtures.h"
 #include "rando/CrossForeign.h"
@@ -44,6 +46,8 @@ enum {
 extern "C" {
 PlayState *gPlayState = nullptr;
 int gComboGameMode = COMBO_GAME_BOTH;
+// Shared-item receipt controls represent seeded combined saves.
+int gComboVanillaMode = 0;
 
 const NeiItem *Nei_FindByItem(int32_t item) {
   for (const auto &nei : sReceiptNeiItems)
