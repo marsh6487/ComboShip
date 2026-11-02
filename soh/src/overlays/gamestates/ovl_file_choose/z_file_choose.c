@@ -1,4 +1,5 @@
 #include "../../../../../combo/ComboGameMode.h"
+#include "../../../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "file_choose.h"
 
 #include <string.h>
@@ -904,8 +905,8 @@ void FileChoose_UpdateRandomizerMenu(GameState* thisx) {
     Input* input = &this->state.input[0];
     bool dpad = CVarGetInteger(CVAR_SETTING("DpadInText"), 0);
     // COMBO (OoTxMM) reuses this menu with a 4th option (Load Combo Seed); rando keeps its 3.
-    bool isCombo = (this->questType[this->buttonIndex] == QUEST_OOTXMM);
-    uint8_t lastOpt = isCombo ? CBO_OPEN_SETTINGS : RSM_OPEN_RANDOMIZER_SETTINGS;
+    bool isCombo = Combo_IsCombinedGame() || (this->questType[this->buttonIndex] == QUEST_OOTXMM);
+    uint8_t lastOpt = isCombo ? CBO_OPEN_SETTINGS + 1 : RSM_OPEN_RANDOMIZER_SETTINGS;
 
     FileChoose_UpdateRandomizer();
 
@@ -941,10 +942,21 @@ void FileChoose_UpdateRandomizerMenu(GameState* thisx) {
         return;
     }
 
+    // A separate creation row keeps the selected slot's persisted mode untouched.
+    if (isCombo && this->randomizerIndex == CBO_OPEN_SETTINGS + 1 &&
+        (CHECK_BTN_ALL(input->press.button, BTN_A) || ABS(this->stickRelX) > 30 ||
+         (dpad && CHECK_BTN_ANY(input->press.button, BTN_DLEFT | BTN_DRIGHT)))) {
+        CVarSetInteger("gCombo.NewFileVanilla", !CVarGetInteger("gCombo.NewFileVanilla", 0));
+        return;
+    }
+
     if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
         if (this->randomizerIndex == RSM_START_RANDOMIZER) {
-            if (Randomizer_IsSeedGenerated() || Randomizer_IsSpoilerLoaded()) {
-                SohFileSelect_ShowPresetModal();
+            const bool vanilla = isCombo && CVarGetInteger("gCombo.NewFileVanilla", 0);
+            if (ComboVanilla_CanStart(isCombo, vanilla, Randomizer_IsSeedGenerated() || Randomizer_IsSpoilerLoaded())) {
+                if (!vanilla) {
+                    SohFileSelect_ShowPresetModal();
+                }
                 Audio_PlaySfxGeneral(NA_SE_SY_FSEL_DECIDE_L, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                      &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 
@@ -2136,10 +2148,10 @@ void FileChoose_DrawWindowContents(GameState* thisx) {
         uint8_t language = (gSaveContext.language == LANGUAGE_JPN) ? LANGUAGE_ENG : gSaveContext.language;
         uint8_t textAlpha = this->randomizerUIAlpha;
         // COMBO (OoTxMM) reuses this sub-screen -> combo-worded option labels.
-        bool isCombo = (this->questType[this->buttonIndex] == QUEST_OOTXMM);
+        bool isCombo = Combo_IsCombinedGame() || (this->questType[this->buttonIndex] == QUEST_OOTXMM);
 
         // COMBO adds a 4th selectable option (Load Combo Seed); status/hint text uses combo indices.
-        uint8_t lastOpt = isCombo ? CBO_OPEN_SETTINGS : RSM_OPEN_RANDOMIZER_SETTINGS;
+        uint8_t lastOpt = isCombo ? CBO_OPEN_SETTINGS + 1 : RSM_OPEN_RANDOMIZER_SETTINGS;
         uint8_t genTextIdx = isCombo ? CBO_GENERATING : RSM_GENERATING;
         uint8_t noSeedTextIdx = isCombo ? CBO_NO_SEED : RSM_NO_RANDOMIZER_GENERATED;
 
@@ -2155,15 +2167,25 @@ void FileChoose_DrawWindowContents(GameState* thisx) {
 
             // Gray out "Start" when no seed is ready, and everything while generating. (COMBO
             // generation runs on its own thread -> FleetComboFS_IsBusy joins `generating`.)
-            if ((index == RSM_START_RANDOMIZER && !Randomizer_IsSeedGenerated() && !Randomizer_IsSpoilerLoaded()) ||
+            if ((index == RSM_START_RANDOMIZER &&
+                 !ComboVanilla_CanStart(isCombo, CVarGetInteger("gCombo.NewFileVanilla", 0),
+                                        Randomizer_IsSeedGenerated() || Randomizer_IsSpoilerLoaded())) ||
                 generating || FleetComboFS_IsBusy()) {
                 textColorR = textColorG = textColorB = 100;
             }
 
-            Interface_DrawTextLine(
-                this->state.gfxCtx,
-                (isCombo ? SohFileSelect_GetComboSettingText : SohFileSelect_GetSettingText)(index, language), 70,
-                (80 + (index * 16)), textColorR, textColorG, textColorB, textAlpha, 0.8f, true);
+            const bool vanilla = isCombo && CVarGetInteger("gCombo.NewFileVanilla", 0);
+            const char* optionText;
+            if (isCombo && index == CBO_OPEN_SETTINGS + 1) {
+                optionText = vanilla ? "Mode: Vanilla + NEI  (< > / A)" : "Mode: Randomizer  (< > / A)";
+            } else if (isCombo && index == RSM_START_RANDOMIZER && vanilla) {
+                optionText = "Start Vanilla + NEI";
+            } else {
+                optionText =
+                    (isCombo ? SohFileSelect_GetComboSettingText : SohFileSelect_GetSettingText)(index, language);
+            }
+            Interface_DrawTextLine(this->state.gfxCtx, optionText, 70, (80 + (index * 16)), textColorR, textColorG,
+                                   textColorB, textAlpha, 0.8f, true);
         }
 
         // COMBO: while the "Load Combo Seed" row is selected, show the currently-picked .fleet file
@@ -2184,7 +2206,8 @@ void FileChoose_DrawWindowContents(GameState* thisx) {
             } else {
                 snprintf(sSeedLine, sizeof(sSeedLine), "(no .fleet in the fleet/ folder)");
             }
-            Interface_DrawTextLine(this->state.gfxCtx, sSeedLine, 70, (80 + 72), 255, 255, 160, textAlpha, 0.7f, true);
+            Interface_DrawTextLine(this->state.gfxCtx, sSeedLine, 70, (80 + (isCombo ? 88 : 72)), 255, 255, 160,
+                                   textAlpha, 0.7f, true);
         }
 
         // Show text to indicate randomizer is being generated.
@@ -2196,34 +2219,37 @@ void FileChoose_DrawWindowContents(GameState* thisx) {
                 comboLabel = (SOH_GetComboGenPhase() == 3) ? RSM_FINALIZING : RSM_GENERATING;
 #endif
             Interface_DrawTextLine(this->state.gfxCtx, SohFileSelect_GetSettingText(comboLabel, language), 70,
-                                   (80 + 64), 255, 255, 255, textAlpha, 0.8f, true);
+                                   (80 + (isCombo ? 88 : 64)), 255, 255, 255, textAlpha, 0.8f, true);
 #ifdef COMBO_BUILD
             // ComboShip: live combo-generation progress (worker thread keeps the main loop running).
             if (Combo_IsCombinedGame()) {
                 char comboPct[16];
                 snprintf(comboPct, sizeof(comboPct), "%d%%", SOH_GetComboGenPercent());
-                Interface_DrawTextLine(this->state.gfxCtx, comboPct, 70, (80 + 80), 255, 255, 255, textAlpha, 0.8f,
+                Interface_DrawTextLine(this->state.gfxCtx, comboPct, 70, (80 + 104), 255, 255, 255, textAlpha, 0.8f,
                                        true);
             }
 #endif
         }
 
         // If no seed is ready and "Start" is selected, explain why you can't start yet.
-        if (!Randomizer_IsSeedGenerated() && !Randomizer_IsSpoilerLoaded() &&
+        if (!ComboVanilla_CanStart(isCombo, CVarGetInteger("gCombo.NewFileVanilla", 0),
+                                   Randomizer_IsSeedGenerated() || Randomizer_IsSpoilerLoaded()) &&
             this->randomizerIndex == RSM_START_RANDOMIZER) {
             Interface_DrawTextLine(
                 this->state.gfxCtx,
                 (isCombo ? SohFileSelect_GetComboSettingText : SohFileSelect_GetSettingText)(noSeedTextIdx, language),
-                70, (80 + 72), 240, 80, 80, textAlpha, 0.8f, true);
+                70, (80 + (isCombo ? 88 : 72)), 240, 80, 80, textAlpha, 0.8f, true);
         }
 
         // COMBO: a small line describing the OoT x MM run (goal). Seed-hash icons draw via the normal
         // rando path (IS_RANDO is true for combo) once a seed is ready.
         if (isCombo) {
             int goal = CVarGetInteger("gFleetCombo.GoalMode", 0);
-            const char* comboLine =
-                (goal == 1) ? "OoT x MM combo  -  Goal: Triforce Hunt" : "OoT x MM combo  -  Goal: Beat Both Bosses";
-            Interface_DrawTextLine(this->state.gfxCtx, comboLine, 70, (80 + 90), 170, 200, 255, textAlpha, 0.7f, true);
+            const char* comboLine = CVarGetInteger("gCombo.NewFileVanilla", 0)
+                                        ? "Vanilla + NEI  -  Native progression in both games"
+                                    : (goal == 1) ? "OoT x MM combo  -  Goal: Triforce Hunt"
+                                                  : "OoT x MM combo  -  Goal: Beat Both Bosses";
+            Interface_DrawTextLine(this->state.gfxCtx, comboLine, 70, (80 + 108), 170, 200, 255, textAlpha, 0.7f, true);
         }
 
         FileChoose_DrawListCursorArrow(this, textAlpha, 62, 85 + 16 * this->randomizerIndex, false);

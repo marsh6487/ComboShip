@@ -16,6 +16,8 @@
 #define COMBO_BUILD
 #include "combo/ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+// Existing foreign-scale lifecycle uses an explicit seeded container.
+extern "C" int Combo_QueryVanillaMode(int) { return 0; }
 #define SPDLOG_INFO(...) ((void)0)
 #define SPDLOG_WARN(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)

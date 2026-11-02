@@ -44,10 +44,10 @@
 
 **Interfaces:** The creation-only CVar `gCombo.NewFileVanilla` selects Vanilla + NEI versus Randomizer; subsequent play consults the persisted slot identity. Native MM entry uses the saved opening/first-cycle state while the first reset count is zero.
 
-- [ ] Write/run failing tests showing Vanilla Start requires no seed, Randomizer Start still does, previewing another slot does not switch active mode, and pending creation failure stays in name entry.
-- [ ] Add explicit creation mode choice and correct native start label/disabled state; randomizer generation/settings stay available for Randomizer mode.
-- [ ] Preserve native MM opening entrance/cutscene/form on first visit; prevent portal-destination overrides and incoming NEI from bypassing first-cycle state. On later entries retain ordinary Combo travel/resume.
-- [ ] Run source/native tests for first entry, Deku first cycle, first reset, later portal/resume and old seeded files. Commit.
+- [x] Write/run failing tests showing Vanilla Start requires no seed, Randomizer Start still does, previewing another slot does not switch active mode, and pending creation failure stays in name entry.
+- [x] Add explicit creation mode choice and correct native start label/disabled state; randomizer generation/settings stay available for Randomizer mode.
+- [x] Preserve native MM opening entrance/cutscene/form on first visit; prevent portal-destination overrides and incoming NEI from bypassing first-cycle state. On later entries retain ordinary Combo travel/resume.
+- [x] Run source/native tests for first entry, Deku first cycle, first reset, later portal/resume and old seeded files. Commit.
 
 ### Task 3: NEI sharing policy and reward persistence
 
@@ -89,3 +89,9 @@ Task 1 source/native milestone: explicit mode and transaction helpers, actual la
 Task 1 review corrections: explicitly invalidate native MM (including fileNum=0xFF, save type, owl residency and per-file mode) on rejected identity and aborted/throwing creation; read-only mode peeks support the worker serializer. Remove stale seed/speedrun sections from combined Vanilla writes while preserving unknown mod sections. New native extraction tests reproduced the defects and pass after repair.
 
 Task 1 correction review: independent reviewer verified all three findings resolved, reran host creation and serializer ASan/UBSan suites with leak detection disabled for this host, and found no consequential new issue. This closes the source/native foundation milestone; feature remains WIP through Tasks 2–5.
+
+Task 2 continuation milestone: creation-only mode choice in both native file select and Combo menu; real cold/warm MM setup retains intro, Deku first cycle and owl saves. Incoming direct grants and snapshot pulls wait for the first native reset; the pull remains pending. Native-type validation follows persisted file mode. Opening-forest normalization no longer bypasses the curse/tutorial during Vanilla's first cycle. Legacy two-process FleetWarpArrival is unchanged because COMBO_BUILD excludes its hooks.
+
+Task 2 evidence: the actual native menu handler, actual combined Setup_InitImpl and MM load wrapper, native opening adapter, opening-forest normalization, direct grant/pending-pull handlers and both DLL Peek/Query shims run under ASan/UBSan. All four existing paired-save suites pass. Independent review identified two inherited blockers and one redundant legacy-path compile regression; reproducing tests cover the first two and the legacy experiment was removed. Native story progression after all game events, full platform builds of this continuation and configured runtime remain separate. Tasks 3–5 are not complete.
+
+Task 2 inherited CI follow-up: actual a00d35fa Windows/Linux engine builds passed, while render and entrance regression groups failed because the scale-lifecycle and portal-save extraction fixtures omitted Combo_QueryVanillaMode. Restore their explicit seeded callback boundaries, retaining every prior assertion. Opening-route extraction now includes the real adapter and mode policy. Full CI must re-run against the complete published tree.

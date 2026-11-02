@@ -8,6 +8,10 @@
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/RegionalPassages.h"
 #include "gameplay/CrossGameTitleCard.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
+extern "C" { int gComboVanillaMode = 0; }
+extern "C" int Combo_PeekVanillaMode(int) { return 0; }
 
 SaveContext gSaveContext;
 int gComboStartFileNum = 0;

@@ -12,6 +12,8 @@
 //   Play_UpdateMain even while the game is combo-frozen, so the queued write completes.
 
 #include "FleetSync.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #endif
@@ -479,6 +481,9 @@ void ApplyRegistryToNatives() {
 // record hook and never re-granted. Deficit + shadow means it's safe to run every frame. Rando::GiveItem
 // derefs gPlayState (Item_Give), so callers MUST gate on gPlayState != NULL.
 void ApplyFcRegistryToNatives() {
+    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return;
+    }
     NeiSaveData* nei = Nei_Save();
     for (int fcId = 0; fcId < FCI_MAX && fcId < FC_COMBO_OBTAINED_FC_SIZE; fcId++) {
         // Both games publish exact caneSkills. Replaying the old progressive counter
@@ -783,6 +788,9 @@ void ExtractShared(nlohmann::json& sh) {
 }
 
 void ApplyShared(const nlohmann::json& sh) {
+    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return;
+    }
     ItemGrantAudit::Scope itemGrantAuditScope("MM ApplyShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     HealLeakedOwnedItems();

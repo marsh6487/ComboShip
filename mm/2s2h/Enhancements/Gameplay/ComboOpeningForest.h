@@ -2,6 +2,8 @@
 
 #ifdef COMBO_BUILD
 #include "../../../../combo/ComboGameMode.h"
+#include "../../../../combo/vanilla/ComboVanillaMode.h"
+#include "../../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "global.h"
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
 #include <math.h>
@@ -49,8 +51,9 @@ static inline void ComboOpeningForest_PrepareSpawn(PlayState* play) {
 }
 
 static inline void ComboOpeningForest_NormalizeEntry(void) {
-    if (!Combo_IsCombinedGame() || gSaveContext.gameMode != GAMEMODE_NORMAL ||
-        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+    if (!Combo_IsCombinedGame() ||
+        ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount) ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
         (gSaveContext.save.entrance >> 9) != ENTR_SCENE_OPENING_DUNGEON)
         return;
     // The forward fall normally enters the curse/tutorial sequence. Continue

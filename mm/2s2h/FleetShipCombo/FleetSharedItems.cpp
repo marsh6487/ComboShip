@@ -1,5 +1,7 @@
 #include "FleetSharedItems.h"
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
+#include "../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "FleetComboItems.h"
 #include "FleetComboItemsGlue.h"
 #include "2s2h/Rando/Types.h"
@@ -145,6 +147,9 @@ static void PullFromPeerWhenReady() {
     if (!Combo_IsCombinedGame() || !sPullPending || gPlayState == NULL || gSaveContext.fileNum < 0 ||
         gSaveContext.fileNum > 2) {
         return;
+    }
+    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return; // Keep the request armed; the first native reset releases it.
     }
     sPullPending = false;
     static FnExtractSharedState sExtract = nullptr;

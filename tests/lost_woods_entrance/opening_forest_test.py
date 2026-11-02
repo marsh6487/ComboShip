@@ -31,7 +31,9 @@ def build(game, source, name):
     with tempfile.TemporaryDirectory(prefix='opening-forest-' + name + '-') as directory:
         cpp = Path(directory) / 'test.cpp'
         binary = Path(directory) / 'test'
-        cpp.write_text('#include "ComboGameMode.h"\nextern "C" { int gComboGameMode = COMBO_GAME_BOTH; }\n' + source)
+        vanilla_state = '' if 'int gComboVanillaMode =' in source else 'extern "C" { int gComboVanillaMode = 0; }\n'
+        cpp.write_text('#include "ComboGameMode.h"\n#include "vanilla/ComboVanillaMode.h"\n#include "vanilla/ComboVanillaPolicy.h"\n'
+                       'extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }\n' + vanilla_state + source)
         includes = [game, game + ('/2s2h' if game == 'mm' else '/soh'), game + '/include',
                     game + '/include/PR', game + '/src', game + '/assets', 'libultraship/include', 'combo']
         command = [os.environ.get('CXX', 'c++'), '-std=c++20', '-w', '-DF3DEX_GBI_2',
@@ -57,7 +59,8 @@ if args.case in (None, 'mm'):
         'extern "C" COMBO_EXPORT void MM_SetComboEntryIsResume(',
         'extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(')))
     body = function((ROOT / 'mm/src/code/title_setup.c').read_text(), 'void Setup_InitImpl(')
-    source = source.replace('/* BOOT_BODY */', re.sub(r'\bthis\b', 'self', body))
+    opening = function((ROOT / 'mm/src/code/title_setup.c').read_text(), 'static s32 ComboVanilla_PrepareMMOpening(')
+    source = source.replace('/* BOOT_BODY */', opening + re.sub(r'\bthis\b', 'self', body))
     source += r'''
 int main() {
     SetupState state{};

@@ -1734,8 +1734,21 @@ void ComboMenu::DrawGamePanel(const char* gameKey) {
 }
 void ComboMenu::DrawComboPanel() {
     ResolveComboGenSyms();
-    ImGui::TextWrapped("Generate a cross-world randomizer seed spanning OOT and MM. "
-                       "You must Generate before starting a new file.");
+    bool vanilla = CVarGetInteger("gCombo.NewFileVanilla", 0) != 0;
+    const bool creationAvailable = ComboSeedFileSelectActive();
+    ImGui::BeginDisabled(!creationAvailable);
+    if (ImGui::Checkbox("Vanilla + NEI for new files", &vanilla)) {
+        CVarSetInteger("gCombo.NewFileVanilla", vanilla ? 1 : 0);
+    }
+    ImGui::EndDisabled();
+    if (vanilla) {
+        ImGui::TextWrapped("Start a new paired file from OoT file select without generating a seed. "
+                           "Native story progression and MM's first cycle are preserved. "
+                           "This choice applies only to new files.");
+        return;
+    }
+    ImGui::TextWrapped(
+        "Generate or load a cross-world randomizer seed spanning OoT and MM before starting a new file.");
     ImGui::Separator();
 
     // Goal (#136): one combined win condition; each game's piece slider decides how many it contributes.
