@@ -311,6 +311,9 @@ struct Item {
     return {}; // Imported MM rows have no localized article in the OoT catalog.
   }
   bool HasCustomIcon() { return HasSoulIcon() || HasBottleIcon(); }
+  const char* GetCustomIcon() const {
+    return HasSoulIcon() ? "__OTR__textures/parameter_static/gBossSoul" : nullptr;
+  }
   bool HasSoulIcon() const {
     return (id >= RG_GOHMA_SOUL && id <= RG_GANON_SOUL) ||
            (id >= RG_MM_SOUL_GOHT && id <= RG_MM_SOUL_TWINMOLD);
