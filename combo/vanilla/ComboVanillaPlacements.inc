@@ -64,7 +64,7 @@ VANILLA_REWARD("spirit_breastplate", Oot, "desert_colossus_spirit", "spirit", Eq
 VANILLA_REWARD("champions_tunic", Mm, "zora_cape", "gyorg", Equipment, 0x201, 0, "Champion's Tunic")
 VANILLA_REWARD("pegasus_boots", Oot, "lon_lon_ranch", "ranch_prize", Equipment, 0x301, 0, "Pegasus Boots")
 VANILLA_REWARD("climb_boots", Mm, "snowhead_approach", "goron", Equipment, 0x302, 0, "Climb Boots")
-VANILLA_REWARD("rocs_boots", Oot, "gerudo_valley", "longshot", Equipment, 0x303, 0, "Roc's Boots")
+VANILLA_REWARD("rocs_boots", Oot, "gerudo_valley", "bridge_or_longshot", Equipment, 0x303, 0, "Roc's Boots")
 VANILLA_DEFERRED("water_dragon_scale", Mm, "Water Dragon Scale", "Legacy equipment identity grants Sage's Tunic; no independent scale ownership/behavior exists")
 VANILLA_REWARD("ultrashot", Oot, "lake_hylia", "water_longshot", Upgrade, Upgrade::Ultrashot, 0, "Ultrashot")
 VANILLA_REWARD("hammer_axe", Oot, "goron_city", "fire_hammer", Upgrade, Upgrade::HammerAxe, 0, "Hammer Axe")

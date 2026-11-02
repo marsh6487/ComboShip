@@ -1,4 +1,5 @@
 #include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../combo/vanilla/ComboVanillaMode.h"
 // Skijer's NEI — per-save state moved out of the (now 100% vanilla) SaveContext
 // into a dedicated "nei" SaveManager section. Old saves lose this state (accepted).
 #include <string.h>
@@ -371,6 +372,8 @@ void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) 
     SaveManager::Instance->SaveData("slateMode", gNeiSave.slateMode);
     SaveManager::Instance->SaveData("slateRunesOwned", gNeiSave.slateRunesOwned);
     SaveManager::Instance->SaveData("ritoMaskFlags", gNeiSave.ritoMaskFlags);
+    SaveManager::Instance->SaveData("separateRocsFlags", gNeiSave.separateRocsFlags);
+    SaveManager::Instance->SaveData("vanillaRewardEvents", gNeiSave.vanillaRewardEvents);
     SaveManager::Instance->SaveArray("swordElements", 8,
                                      [](size_t i) { SaveManager::Instance->SaveData("", gNeiSave.swordElements[i]); });
     SaveManager::Instance->SaveData("swordElementSet", gNeiSave.swordElementSet);
@@ -499,6 +502,10 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("slateMode", gNeiSave.slateMode, (uint8_t)0);
     SaveManager::Instance->LoadData("slateRunesOwned", gNeiSave.slateRunesOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("ritoMaskFlags", gNeiSave.ritoMaskFlags, (uint8_t)0);
+    SaveManager::Instance->LoadData("separateRocsFlags", gNeiSave.separateRocsFlags, (uint8_t)0);
+    gNeiSave.separateRocsFlags &= 3;
+    SaveManager::Instance->LoadData("vanillaRewardEvents", gNeiSave.vanillaRewardEvents, (uint8_t)0);
+    gNeiSave.vanillaRewardEvents &= 1;
     // Read as JSON before narrowing: malformed values and out-of-range enums must
     // not wrap into another valid element. Missing/short old arrays retain zeroes.
     nlohmann::json swordElements;
@@ -603,6 +610,10 @@ extern "C" uint8_t Nei_CaneTypeOwned(uint8_t type) {
     if (type >= NEI_CANE_TYPE_MAX) {
         return 0;
     }
+    if (Combo_IsVanilla()) {
+        static const uint8_t independentMasks[4] = { 0x03, 0x04, 0x18, 0x20 };
+        return (Nei_Save()->caneSkills & independentMasks[type]) != 0;
+    }
     return (Nei_Save()->caneSkills & (1 << Nei_CaneTypeGateBit(type))) ? 1 : 0;
 }
 
@@ -615,7 +626,7 @@ extern "C" uint8_t Nei_CaneTypeVisible(uint8_t type) {
     if (!Nei_CaneTypeOwned(type)) {
         return 0;
     }
-    int mode = CVarGetInteger("gItemEditor.CaneWheelMode", 0);
+    int mode = Combo_IsVanilla() ? 0 : CVarGetInteger("gItemEditor.CaneWheelMode", 0);
     if (type == 0 && (mode == 1 || mode == 3) && Nei_CaneTypeOwned(1)) {
         return 0; // Somaria hidden behind an owned Trirod
     }
@@ -714,6 +725,13 @@ static uint8_t Nei_SomariaSummonOwned(uint8_t slot) {
 extern "C" uint8_t Nei_CaneGetSkillSlot(uint8_t type) {
     NeiSaveData* nei = Nei_Save();
 
+    if (Combo_IsVanilla() && type == 2) {
+        const uint8_t selected = nei->caneSkillSel[1];
+        if (selected < 2 && Nei_CaneHasSkill(3 + selected))
+            return selected;
+        return Nei_CaneHasSkill(3) ? 0 : 1;
+    }
+
     if (type != 0) {
         return 0; // only the Cane of Somaria has anything to choose between
     }
@@ -732,6 +750,10 @@ extern "C" uint8_t Nei_CaneGetSkillSlot(uint8_t type) {
 }
 
 extern "C" void Nei_CaneSetSkillSlot(uint8_t type, uint8_t slot) {
+    if (Combo_IsVanilla() && type == 2 && slot < 2 && Nei_CaneHasSkill(3 + slot)) {
+        Nei_Save()->caneSkillSel[1] = slot;
+        return;
+    }
     if ((type == 0) && (slot < 3) && Nei_SomariaSummonOwned(slot)) {
         Nei_Save()->caneSkillSel[0] = slot;
     }
@@ -744,7 +766,7 @@ extern "C" uint8_t Nei_CaneActiveSkill(void) {
         case 1:
             return 7; // Trirod — CANE_SKILL_TRIROD, above CANE_SKILL_MAX (the swing's fire-nothing sentinel)
         case 2:
-            return 3; // Cane of Pacci -> Flip (hold adds Lift once that level is owned)
+            return Combo_IsVanilla() ? 3 + Nei_CaneGetSkillSlot(2) : 3;
         case 3:
             return 5; // Ultrahand
         case 0:

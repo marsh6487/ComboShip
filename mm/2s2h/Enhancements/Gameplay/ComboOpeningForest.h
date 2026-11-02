@@ -35,6 +35,7 @@
 // other spawns/layers and retain their native behavior. No story flag marks a visit.
 static inline int ComboOpeningForest_IsExploration(const PlayState* play) {
     return Combo_IsCombinedGame() && play && play->sceneId == SCENE_LOST_WOODS &&
+           !ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount) &&
            gSaveContext.gameMode == GAMEMODE_NORMAL && ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) &&
            gSaveContext.sceneLayer == 0 && gSaveContext.save.entrance == ENTRANCE(LOST_WOODS, 0) &&
            gSaveContext.save.cutsceneIndex == 0;

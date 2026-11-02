@@ -55,10 +55,10 @@
 
 **Interfaces:** The sharing filter consumes native-independent receiver capabilities and returns an allowlisted JSON payload. Stable check IDs and explicit reward payloads distinguish normal item, cane skill, rune, season and upgrade. Reward transactions retain pending receipts and commit native save plus permanent check together.
 
-- [ ] Write/run failing native tests for native inventory/story/capacity isolation, all NEI flag families, MM quarantine, imported masks/Ikana/Pendant aliases, and sword prerequisites.
-- [ ] Filter both normal and transient sharing paths; prevent FC generic deficits from reintroducing native progression or randomly selecting specific skill rewards.
-- [ ] Implement per-slot versioned checks and pending/acknowledged reward transactions; test interruption, re-entry, copy, day reset, idempotent recovery and shop debit exactly once.
-- [ ] Audit existing Mirror, Feather, songs, Grace and seasons before adding duplicates; record exact identities. Commit.
+- [x] Write/run failing native tests for native inventory/story/capacity isolation, all NEI flag families, MM quarantine, imported masks/Ikana/Pendant aliases, and sword prerequisites.
+- [x] Filter both normal and transient sharing paths; prevent FC generic deficits from reintroducing native progression or randomly selecting specific skill rewards.
+- [x] Implement per-slot versioned checks and pending/acknowledged reward transactions; test interruption, re-entry, copy, day reset, idempotent recovery and shop debit exactly once.
+- [x] Audit existing Mirror, Feather, songs, Grace and seasons before adding duplicates; record exact identities. Commit.
 
 ### Task 4: Fixed native rewards across both games
 
@@ -66,19 +66,19 @@
 
 **Interfaces:** Each manifest row names stable check ID, world/scene/room/setup, native prerequisite, explicit grant payload, reward kind and safe placement variant. Per-game adapters offer the reward through existing GI/receipt machinery and report ownership acknowledgment to Task 3.
 
-- [ ] Write/run failing tests for every manifest row's explicit payload, prerequisite and source uniqueness; name every protected reward and verify no substitution of it.
-- [ ] Bind early tools and retained Mirror/Feather first, then implement each region's approved rods, skills, runes, seasons, equipment and optional upgrades. Use native capabilities and safe return paths; avoid heavy new actors or archive edits.
-- [ ] Use actual minor-check IDs only after verifying their native reward; otherwise add a nearby optional pickup. Shop prices are the approved 40/60/80/90 values, bounded by native wallets.
-- [ ] Verify explicit grants survive reload and cross-game transfer, and that the item never gates its own source. Record supported stock/authored positions and untested geometry variants.
-- [ ] Run all affected native gates, register new gates without deleting existing ones, format with clang-format 14.0.6 and obtain independent whole-branch review. Commit and upload the complete source candidate/PR.
+- [x] Write/run failing tests for every manifest row's explicit payload, prerequisite and source uniqueness; name every protected reward and verify no substitution of it.
+- [x] Bind early tools and retained Mirror/Feather first, then implement each region's approved rods, skills, runes, seasons, equipment and optional upgrades. Use native capabilities and safe return paths; avoid heavy new actors or archive edits.
+- [x] Use actual minor-check IDs only after verifying their native reward; otherwise add a nearby optional pickup. Shop prices are the approved 40/60/80/90 values, bounded by native wallets.
+- [x] Verify explicit grants survive reload and cross-game transfer, and that the item never gates its own source. Record supported stock/authored positions and untested geometry variants.
+- [x] Run all affected native gates, register new gates without deleting existing ones, format with clang-format 14.0.6 and obtain independent whole-branch review. Commit and upload the complete source candidate/PR.
 
 ### Task 5: Handoff and configured runtime
 
 **Files:** Update `combo/gui/WhatsNew.h` and checkpoint documentation.
 
-- [ ] Add the mode and NEI discoveries to What's New with accurate scope.
+- [x] Add the mode and NEI discoveries to What's New with accurate scope.
 - [ ] Verify actual GitHub game-build results separately from native fixtures; correct concrete failures.
-- [ ] List the decisive runtime checks: paired file creation, first MM visit/reset, travel both ways, representative early/late rewards, NPC bonus/shop debit, save/reload and stock/authored visibility/collision. Do not label runtime untested behavior accepted or promote an asset master.
+- [x] List the decisive runtime checks: paired file creation, first MM visit/reset, travel both ways, representative early/late rewards, NPC bonus/shop debit, save/reload and stock/authored visibility/collision. Do not label runtime untested behavior accepted or promote an asset master.
 
 ## Execution ledger
 
@@ -95,3 +95,12 @@ Task 2 continuation milestone: creation-only mode choice in both native file sel
 Task 2 evidence: the actual native menu handler, actual combined Setup_InitImpl and MM load wrapper, native opening adapter, opening-forest normalization, direct grant/pending-pull handlers and both DLL Peek/Query shims run under ASan/UBSan. All four existing paired-save suites pass. Independent review identified two inherited blockers and one redundant legacy-path compile regression; reproducing tests cover the first two and the legacy experiment was removed. Native story progression after all game events, full platform builds of this continuation and configured runtime remain separate. Tasks 3–5 are not complete.
 
 Task 2 inherited CI follow-up: actual a00d35fa Windows/Linux engine builds passed, while render and entrance regression groups failed because the scale-lifecycle and portal-save extraction fixtures omitted Combo_QueryVanillaMode. Restore their explicit seeded callback boundaries, retaining every prior assertion. Opening-route extraction now includes the real adapter and mode policy. Full CI must re-run against the complete published tree.
+
+
+Task 3 reward-journal source/native checkpoint: public `817e3cbf86132077bdd0a77f6d05b0bc5978b624`, full tree `71f019906732b0d3b0145e8d6e9958a2e180ddce`. Manifest and real host callbacks pass interruption/restart/atomic IO/copy/zero-charge tests; launcher translation unit passes syntax checking. This source boundary does not yet mark native discovery adapters or sharing integration complete. The public source includes the inherited Shadow Crystal crash and dialogue/font changes; all five focused source/native regression suites pass.
+
+Task 4 ongoing native review: source adapters cover 39 OoT and 30 MM checks. One explicit initial-manifest deferral is Water Dragon Scale (legacy identity grants Sage's Tunic). Native review reproduced live MM talk-order and packed-yaw defects and a stale SW97 setting that blocked earned Bomb Arrows; fixes and real native callback tests are required before final integration. OoT text IDs must avoid native static-story IDs. Per-file source event history covers bowling without replacing its native prizes.
+
+Final native source integration: 39 OoT and 30 MM checks, explicit per-port deferrals, paired ownership-only sharing and host/native atomic receipt adapters are implemented. Independent host, sharing and native adapter reviews found no remaining Critical/Important source issue. All six new CI gates pass through the actual combined-ABI regression runner, and changed production files pass clang-format14. Exact reviewed adapter blobs: OoT `58a93fe2774aad650c9f6866ff4e3efd8272aece`, MM `c10df4ecf93d61fd35a63344f1c58204e9288804`, Mirror `0010948d09bd5a732ee29563c5397cd674db37e0`. The final checkpoint details the Leaf south-entry adjustment, unported MM Tri Rod/foreign-base effects, excluded Water Dragon Scale and configured runtime checklist.
+
+Task 5 remaining distinction: check the actual platform jobs against the published final source before claiming a game build. Native fixtures and syntax checks do not establish configured gameplay/visual acceptance. The source candidate stays draft; no accepted master/archive promotion.

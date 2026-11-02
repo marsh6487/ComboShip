@@ -11,6 +11,7 @@
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorArrival.h"
 #include "gameplay/MagicMirrorItem.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "gameplay/MagicMirrorPlayer.h"
 #include "actors/ForestGiParticles.h"
 #include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
@@ -32,6 +33,8 @@ u8 ResourceMgr_FileExists(const char* path);
 int Combo_MM_CrossDungeonTransitionPending(void);
 u8 Pacci_UltrahandModeActive(void);
 u8 Sm64Mario_IsReady(void);
+int MM_VanillaMirrorUsesAuthoredSource(void);
+int MM_VanillaClaimMirror(void);
 }
 #define COMBO_MAGIC_MIRROR_MM
 #include "gameplay/MagicMirrorDraw.inc.h"
@@ -39,13 +42,17 @@ u8 Sm64Mario_IsReady(void);
 
 namespace MirrorRuntime {
 bool FinishPickup(int token);
-}
+bool FinishVanillaPickup(int token);
+} // namespace MirrorRuntime
 #include "MagicMirrorRando.inc.h"
 namespace MirrorHost {
 bool Shuffled() {
     return MirrorShuffle::Enabled();
 }
 bool PickupAvailable() {
+    if (Combo_IsVanilla())
+        return gSaveContext.save.saveInfo.playerData.threeDayResetCount > 0 && MM_VanillaMirrorUsesAuthoredSource() &&
+               !MagicMirror_IsOwned();
     return Shuffled() ? MirrorShuffle::StumpAvailable() : !MagicMirror_IsOwned();
 }
 void CancelPickup() {
@@ -118,11 +125,14 @@ void OpenPrompt() {
     Message_StartTextbox(gPlayState, 0x3FEC, nullptr);
 }
 void GivePickup(Actor* actor, PlayState*) {
-    MirrorRuntime::FinishPickup(CUSTOM_ITEM_PARAM);
+    const bool claimed = Combo_IsVanilla() ? MirrorRuntime::FinishVanillaPickup(CUSTOM_ITEM_PARAM)
+                                           : MirrorRuntime::FinishPickup(CUSTOM_ITEM_PARAM);
     CustomMessage::Entry entry;
     entry.textboxType = TEXTBOX_TYPE_2;
     entry.msg = "You found the %gMagic Mirror%w!\nEquip it to a C Button to return\nto the Lost Woods from outdoors."
                 "\x10Its reflection bridges worlds.\nUse the item selector to switch\nbetween Mirror and Time Gate.";
+    if (!claimed)
+        entry.msg = "The reward could not be saved.\nPlease try again.";
     if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE)
         CustomMessage::SetActiveCustomMessage(entry.msg, entry);
     else
@@ -175,6 +185,16 @@ extern "C" void MagicMirror_DrawGI(PlayState* play) {
 }
 
 #include "gameplay/MagicMirrorRuntime.inc.h"
+
+namespace MirrorRuntime {
+bool FinishVanillaPickup(int token) {
+    if (!token || token != sPickupToken || !Matches(gPlayState) || !Mode() ||
+        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum))
+        return false;
+    sPickupToken = 0;
+    return MM_VanillaClaimMirror();
+}
+} // namespace MirrorRuntime
 
 namespace {
 void ResetMirror() {

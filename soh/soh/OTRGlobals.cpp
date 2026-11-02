@@ -4321,6 +4321,10 @@ extern "C" COMBO_EXPORT void SOH_GrantCrossItem(const char* itemName) {
 
 // The peer's half of a shared item (MM obtained it): grant only, never share back.
 extern "C" COMBO_EXPORT void SOH_GrantSharedItem(const char* itemName) {
+    if (Combo_IsVanilla()) {
+        FleetShared_RequestPullFromPeer();
+        return;
+    }
     GrantOotItemByName(itemName, nullptr);
 }
 

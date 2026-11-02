@@ -1,4 +1,5 @@
 #include "mods/equipment/nei_equipment_presentation.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
 /**
  * mm_player_form.cpp - MM Transformation Masks Form System
  *
@@ -16594,7 +16595,7 @@ void MmForm_Init(PlayState* play, Player* player) {
 }
 
 u8 MmForm_IsEnabled(void) {
-    return CVarGetInteger("gMods.TransformMasks.Enabled", 0) && MmAssets_IsAvailable();
+    return (Combo_IsVanilla() || CVarGetInteger("gMods.TransformMasks.Enabled", 0)) && MmAssets_IsAvailable();
 }
 
 u8 MmForm_IsFDSkinMode(void) {
@@ -17717,7 +17718,7 @@ TransformMaskId MmForm_GetMaskType(s32 item) {
         // Link-rigged rito body in soh.o2r. Everything else stays vanilla Link, the
         // same deal as the Gerudo Mask. Gated by gMods.RitoForm (default ON).
         case ITEM_RITO_MASK:
-            result = CVarGetInteger("gMods.RitoForm", 1) ? TRANSFORM_MASK_RITO : TRANSFORM_MASK_NONE;
+            result = RitoItem_FormEnabled() ? TRANSFORM_MASK_RITO : TRANSFORM_MASK_NONE;
             break;
         // Keaton Mask (OoT's or MM's copy): full transformation into the
         // Link-rigged fox body in soh.o2r. Gated by gMods.KeatonMaskTransform
@@ -17818,7 +17819,7 @@ void MmForm_HandleMaskUse(PlayState* play, Player* player, s32 item) {
         // requirement. The transformation cutscene itself needs no MM animation:
         // the pre-flash phase only freezes/turns the player and fires SFX, and the
         // rito rides Link's own idle/walk/run afterwards.
-        if (!CVarGetInteger("gMods.RitoForm", 1))
+        if (!RitoItem_FormEnabled())
             return;
         // Fall through to common transform logic below.
     } else {
@@ -18111,7 +18112,7 @@ void MmForm_Update(PlayState* play, Player* player) {
     // (its body is in soh.o2r), so gate it on its own switch or a scene change would
     // silently drop the form and hand back plain Link.
     if (sPendingSoftReload &&
-        (MmForm_IsEnabled() || (sPendingReactivateForm == MM_PLAYER_FORM_RITO && CVarGetInteger("gMods.RitoForm", 1)) ||
+        (MmForm_IsEnabled() || (sPendingReactivateForm == MM_PLAYER_FORM_RITO && RitoItem_FormEnabled()) ||
          (sPendingReactivateForm == MM_PLAYER_FORM_KEATON && CVarGetInteger("gMods.KeatonMaskTransform", 1)) ||
          (sPendingReactivateForm == MM_PLAYER_FORM_KAFEI && CVarGetInteger("gMods.KafeiMaskTransform", 0)))) {
         sPendingSoftReload = 0;

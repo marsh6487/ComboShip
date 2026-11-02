@@ -16,6 +16,7 @@
 #include <string>
 
 SaveContext gSaveContext{};
+extern "C" { int gComboVanillaMode = 0; }
 static RegEditor registers{};
 RegEditor* gRegEditor = &registers;
 s16 gItemPrices[256]{};

@@ -5139,7 +5139,7 @@ extern "C" COMBO_EXPORT void MM_GrantCrossItem(const char* itemName) {
 
 // The peer's half of a shared item (OoT obtained it): grant only, never share back.
 extern "C" COMBO_EXPORT void MM_GrantSharedItem(const char* itemName) {
-    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+    if (Combo_IsVanilla()) {
         FleetShared_RequestPullFromPeer();
         return;
     }

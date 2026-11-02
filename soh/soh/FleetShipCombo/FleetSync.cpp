@@ -16,6 +16,8 @@
 // preserved from the previous shared block instead of regenerated.
 
 #include "FleetSync.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaSharing.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #endif
@@ -100,6 +102,8 @@ void Seasons_GrantSeason(unsigned char season);
 void Seasons_GrantRod(void);
 unsigned char Seasons_HasRod(void);
 void Seasons_UpdateGates(void);
+void VanillaRocsFeather_Grant(void);
+void RitoItem_NoteCellItem(s32 item);
 }
 
 // Cross-game restart: the raw reset of THIS game (defined in debugconsole.cpp), called by the
@@ -387,6 +391,9 @@ void FoldNativesIntoRegistry() {
 }
 
 void ApplyRegistryToNatives() {
+    if (Combo_IsVanilla()) {
+        return;
+    }
     NeiSaveData* nei = Nei_Save();
     if (nei->comboObtained[FC_OOT_SWORD_MASTER])
         gSaveContext.inventory.equipment |= (1 << 1);
@@ -440,7 +447,77 @@ static void RepairFlagOwnedCells(NeiSaveData* nei) {
     }
 }
 
+static void ExtractVanillaShared(nlohmann::json& sh) {
+    const NeiSaveData* nei = Nei_Save();
+    sh = ComboVanilla::SharingSnapshot(*nei, gSaveContext.fileNum);
+    auto& body = sh["vanillaNei"];
+    body["separateRocsFeather"] = (nei->separateRocsFlags & 1u) != 0;
+    body["ritoMaskOwned"] = (nei->ritoMaskFlags & RITO_FLAG_MASK_OWNED) != 0;
+    body["ownedItems"] = nlohmann::json::array();
+    for (unsigned i = 0; i < 24; ++i) {
+        const uint16_t canonical = nei->ownedItems[i];
+        body["ownedItems"].push_back(ComboVanilla::SharingCell(i, canonical) ? canonical : 0xFF);
+    }
+    body["mmMasks"] = nlohmann::json::array();
+    for (unsigned i = 0; i < 24; ++i) {
+        const bool owned = nei->ownedItems[24 + i] == 0xB8 + i;
+        body["mmMasks"].push_back(owned ? 0xB8 + i : 0xFF);
+    }
+}
+
+static void ApplyVanillaShared(const nlohmann::json& sh) {
+    NeiSaveData* nei = Nei_Save();
+    ComboVanilla::Receiver receiver;
+    receiver.slot = gSaveContext.fileNum;
+    receiver.world = ComboVanilla::World::Oot;
+    receiver.kokiriSword = (gSaveContext.inventory.equipment & (1u << 0)) != 0;
+    receiver.masterSword = (gSaveContext.inventory.equipment & (1u << 1)) != 0;
+    receiver.biggoronSword = (gSaveContext.inventory.equipment & (1u << 2)) != 0 && gSaveContext.bgsFlag;
+    receiver.hammer = gSaveContext.inventory.items[SLOT_HAMMER] == ITEM_HAMMER;
+    const auto filtered = ComboVanilla::FilterSharing(sh, receiver);
+    if (filtered.empty())
+        return;
+    ComboVanilla::ApplySharingOwnership(*nei, filtered, [](ComboVanilla::SharedGrant kind, unsigned index) {
+        switch (kind) {
+            case ComboVanilla::SharedGrant::Cane:
+                Cane_GiveSkill(index);
+                break;
+            case ComboVanilla::SharedGrant::Wand:
+                Wand_GrantMode(index);
+                break;
+            case ComboVanilla::SharedGrant::Slate:
+                Slate_GrantRune(index);
+                break;
+            case ComboVanilla::SharedGrant::Season:
+                Seasons_GrantSeason(index);
+                break;
+            case ComboVanilla::SharedGrant::SeasonRod:
+                Seasons_GrantRod();
+                break;
+        }
+    });
+    if (filtered.value("separateRocsFeather", 0) && !(nei->separateRocsFlags & 1u))
+        VanillaRocsFeather_Grant();
+    if (filtered.value("ritoMaskOwned", 0)) {
+        // Record only this world's real spell before sharing the empty cell.
+        // The peer's remembered Farore ownership is never part of the protocol.
+        auto& cell = gSaveContext.inventory.items[SLOT_FARORES_WIND];
+        RitoItem_NoteCellItem(cell);
+        nei->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
+        if (cell == ITEM_NONE)
+            cell = ITEM_RITO_MASK;
+    }
+    ComboVanilla::ApplySharingCells(
+        *nei, filtered, [](uint16_t item) { return item; }, [](uint16_t item) { return item; });
+    RepairFlagOwnedCells(nei);
+    ExtEquip_ResyncFromSave();
+}
+
 void ExtractShared(nlohmann::json& sh) {
+    if (Combo_IsVanilla()) {
+        ExtractVanillaShared(sh);
+        return;
+    }
     ItemGrantAudit::Scope itemGrantAuditScope("OOT ExtractShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     FoldNativesIntoRegistry();
@@ -619,6 +696,10 @@ void ExtractShared(nlohmann::json& sh) {
 // Shared-state APPLY (canonical json -> live OoT state)
 // ---------------------------------------------------------------------------------------------
 void ApplyShared(const nlohmann::json& sh) {
+    if (Combo_IsVanilla()) {
+        ApplyVanillaShared(sh);
+        return;
+    }
     ItemGrantAudit::Scope itemGrantAuditScope("OOT ApplyShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
 
@@ -986,6 +1067,9 @@ void ApplyShared(const nlohmann::json& sh) {
 //   3. Never equip an item this save does not own, and always write cButtonSlots next to buttonItems.
 //      An id without its slot is a phantom button the rest of the game cannot resolve.
 void ExtractEquips(nlohmann::json& sh) {
+    if (Combo_IsVanilla()) {
+        return;
+    }
     // Publish 0xFF for anything MM has no relative for, so the peer's rule 1 keeps its own button.
     auto pub = [](int btn) -> uint16_t {
         const uint16_t id = ExtButton_GetItem(btn);
@@ -1061,6 +1145,9 @@ void ApplyOneButton(int btn, uint16_t canon) {
 }
 
 void ApplyEquips(const nlohmann::json& sh) {
+    if (Combo_IsVanilla()) {
+        return;
+    }
     if (sh.contains("cEquips") && sh["cEquips"].is_array()) {
         for (int i = 0; i < 3 && i < (int)sh["cEquips"].size(); i++) {
             const auto& item = sh["cEquips"][i];
@@ -1123,6 +1210,9 @@ void FleetSync_ProcessPendingAge(void) {
 bool sApplyingFc = false;
 
 void ApplyFcRegistryToNatives() {
+    if (Combo_IsVanilla()) {
+        return;
+    }
     NeiSaveData* nei = Nei_Save();
     sApplyingFc = true; // suppress the record hook's re-entry for the duration of this pass
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
@@ -1283,6 +1373,12 @@ uint64_t NetHash(const nlohmann::json& flat) {
 }
 
 void NetSend(const nlohmann::json& j) {
+    if (Combo_IsVanilla()) {
+        auto packet = j;
+        ComboVanilla::StampSharingDelta(packet, gSaveContext.fileNum);
+        FleetShipCombo_PushPacket(packet.dump().c_str());
+        return;
+    }
     FleetShipCombo_PushPacket(j.dump().c_str());
 }
 
@@ -1480,6 +1576,8 @@ void NetHandleDelta(const nlohmann::json& p) {
         partial[nlohmann::json::json_pointer(it.key())] = it.value();
     }
     try {
+        if (Combo_IsVanilla() && !ComboVanilla::PrepareSharingDelta(partial, p, gSaveContext.fileNum))
+            return;
         ApplyShared(partial);
     } catch (const std::exception& e) {
         SPDLOG_ERROR("[FleetNet] ApplyShared threw on delta: {}", e.what());
@@ -1532,6 +1630,12 @@ void NetHandlePacket(const nlohmann::json& p) {
     if (op == "delta") {
         NetHandleDelta(p);
     } else if (op == "hash") {
+        // Vanilla's per-game native prerequisites and foreign-only aliases
+        // deliberately produce different views. Exact allowlisted pulls/deltas
+        // are authoritative; whole-snapshot equality is a seeded-mode policy.
+        if (Combo_IsVanilla()) {
+            return;
+        }
         // The peer told us what it thinks the state is. Agreeing is the common case and costs
         // nothing; disagreeing once is usually just a delta still in flight, so we only act on a
         // SECOND consecutive mismatch.

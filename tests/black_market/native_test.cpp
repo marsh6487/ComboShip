@@ -26,6 +26,7 @@
 #include "entry_diagnostics_fixture.h"
 extern "C" u8 ResourceMgr_FileExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 // Native title policy is exercised by lost_woods_entrance/run_mm_title_card_tests.py.
 extern "C" void Combo_MM_RequestCrossGameTitleCard(void) {}

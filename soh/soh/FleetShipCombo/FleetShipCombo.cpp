@@ -1,4 +1,5 @@
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
 #include "FleetShipCombo.h"
 #include "FleetComboRando.h"               // FleetCombo_IsRunning: a generating guest is busy, not hung
 #include "soh/Notification/Notification.h" // tell the player WHY the combo is closing
@@ -698,7 +699,7 @@ void FleetShipCombo_SharedInit(unsigned long instanceKey) {
 
 int FleetCombo_BeatBothBosses(void) {
 #ifdef COMBO_BUILD
-    if (!Combo_IsCombinedGame())
+    if (!Combo_IsCombinedGame() || Combo_IsVanilla())
         return 0;
 #endif
     return CVarGetInteger("isFleetShipCombo.Enabled", 0) != 0 && CVarGetInteger("gFleetCombo.GoalMode", 0) == 0;

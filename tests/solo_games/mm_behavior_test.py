@@ -149,6 +149,8 @@ int main() {
 
 goal = (ROOT/'mm/2s2h/FleetShipCombo/FleetComboGoal.cpp').read_text()
 goal_program = COMMON + r'''
+#include "combo/vanilla/ComboVanillaMode.h"
+extern "C" { int gComboVanillaMode = 0; }
 int CVarGetInteger(const char*,int) {return 0;}
 #define CVAR_COMBO 1
 ''' + block(goal, 'static bool BeatBothBosses()') + r'''

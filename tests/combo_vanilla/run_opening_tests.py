@@ -249,6 +249,12 @@ int main() {
     gSaveContext.save.saveInfo.playerData.threeDayResetCount=1;
     PullFromPeerWhenReady();PullFromPeerWhenReady();
     assert(!sPullPending&&delivered==1);
+    MM_GrantSharedItem("Lantern");assert(granted==0&&sPullPending);
+    PullFromPeerWhenReady();PullFromPeerWhenReady();
+    assert(!sPullPending&&delivered==2&&granted==0);
+    // Seeded files retain the existing native name-grant boundary, including
+    // before their cycle counter changes. Vanilla always uses the NEI profile.
+    vanilla=false;gSaveContext.save.saveInfo.playerData.threeDayResetCount=0;
     MM_GrantSharedItem("Lantern");assert(granted==1);
     for (bool mode : {false,true}) for (int resets : {0,1}) {
         vanilla=mode;gSaveContext=SaveContext{};

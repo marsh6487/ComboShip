@@ -59,6 +59,7 @@ source = r'''
 #include "2s2h/Enhancements/Graphics/WoodsMysteryMakeover.h"
 #include "ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int draws;

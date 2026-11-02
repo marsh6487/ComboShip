@@ -133,6 +133,7 @@ const NeiItem* Nei_FindByRg(int16_t rg); // Skijer's NEI
 // bow-only" rule live. `isSling` is 0 for the bow, 1 for the slingshot; the two carry independent
 // elements on purpose (spirit arrows and wind bullets may be primed at the same time).
 uint8_t Sw97_ElementOwned(uint8_t elem);
+uint8_t Sw97_ElementWheelEnabled(void); // earned Vanilla Bomb Arrows do not require the optional medallion module
 uint8_t Sw97_ElementCount(uint8_t isSling);
 uint8_t Sw97_ElementAt(uint8_t isSling, uint8_t index);
 uint8_t Sw97_GetElement(uint8_t isSling);

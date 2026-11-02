@@ -1,4 +1,5 @@
 #include "../../../../../combo/ComboGameMode.h"
+#include "../../../../../combo/vanilla/ComboVanillaMode.h"
 #include "z_boss_ganon2.h"
 #include "overlays/actors/ovl_Demo_Gj/z_demo_gj.h"
 #include "overlays/actors/ovl_En_Zl3/z_en_zl3.h"
@@ -1889,7 +1890,7 @@ void func_8090120C(BossGanon2* this, PlayState* play) {
             // ComboShip: gate the ending on both bosses. If Majora isn't dead yet, skip OOT's credits
             // and warp Adult to the Temple of Time adult spawn — the pedestal is the route to Child
             // and the Mask Shop portal to go finish MM.
-            if (Combo_IsCombinedGame() &&
+            if (Combo_IsCombinedGame() && !Combo_IsVanilla() &&
                 (gComboFinalBossDefeated == NULL || !gComboFinalBossDefeated(0, gSaveContext.fileNum))) {
                 play->nextEntranceIndex = ENTR_TEMPLE_OF_TIME_WARP_PAD;
                 gSaveContext.nextCutsceneIndex = 0xFFEF;

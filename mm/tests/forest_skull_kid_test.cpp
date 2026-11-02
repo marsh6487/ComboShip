@@ -28,6 +28,7 @@ SaveContext gSaveContext{};
 PlayState* gPlayState;
 GameState* gGameState;
 int gComboGameMode;
+int gComboVanillaMode = 0;
 void Actor_Kill(Actor*) {
     ++killed;
 }

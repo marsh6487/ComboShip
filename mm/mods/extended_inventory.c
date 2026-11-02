@@ -10,6 +10,7 @@
 
 #include "extended_inventory.h"
 #include "extended_equipment.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "z64.h"
 #include "functions.h" // Item_Give, Player_UnsetMask (ExtInv_KeepMmMaskOrSell)
 #include <string.h>
@@ -141,15 +142,21 @@ int ExtInv_GetMaxPages(void) {
     return count;
 }
 bool ExtInv_IsCustomItemsEnabled(void) {
+    if (Combo_IsVanilla())
+        return true;
     // Owning the standalone Mirror makes its existing page reachable without
     // enabling the other NEI systems or granting any unrelated inventory.
     return CVarGetInteger("gMods.CustomItems.Enabled", 1) != 0 || MagicMirror_IsOwned();
 }
 bool ExtInv_IsMmMasksEnabled(void) {
+    if (Combo_IsVanilla())
+        return true;
     // Default ON — NEI features are enabled by default.
     return CVarGetInteger("gMods.MmMasks.InventoryEnabled", 1) != 0;
 }
 bool ExtInv_IsOnlyTransformation(void) {
+    if (Combo_IsVanilla())
+        return false;
     return CVarGetInteger("gMods.MmMasks.OnlyTransformation", 0) != 0;
 }
 // OoT item-pause layout for page 0 (1:1 with the Shipwright build) — visual cell -> backing slot.
@@ -1303,6 +1310,8 @@ uint16_t Sw97_ElementIcon(uint8_t elem) {
 }
 
 uint8_t BombArrows_RandoMode(void) {
+    if (Combo_IsVanilla())
+        return BOMB_ARROWS_RANDO_OFF;
     return (uint8_t)CVarGetInteger("gMods.BombArrows.Mode", BOMB_ARROWS_RANDO_OFF);
 }
 
@@ -1312,6 +1321,10 @@ uint8_t Sw97_BombArrowsOwned(void) {
         return 1;
     }
     return (BombArrows_RandoMode() == BOMB_ARROWS_RANDO_BOMB_BAG) && (CUR_UPG_VALUE(UPG_BOMB_BAG) > 0);
+}
+
+uint8_t Sw97_ElementWheelEnabled(void) {
+    return SW97_ENABLED() || (Combo_IsVanilla() && Sw97_BombArrowsOwned());
 }
 
 uint8_t Sw97_ElementOwned(uint8_t elem) {
@@ -1338,6 +1351,10 @@ uint8_t Sw97_ElementOwned(uint8_t elem) {
 // bow and a wind-primed slingshot coexist like any other pair. Skijer's NEI
 static uint8_t Sw97_ElementAllowed(uint8_t isSling, uint8_t elem) {
     (void)isSling;
+    // Earned Bomb Arrows unlock their selector without enabling the optional
+    // medallion modes or writing the user's global preference.
+    if (Combo_IsVanilla() && !SW97_ENABLED() && elem != SW97_ELEM_NONE && elem != SW97_ELEM_BOMB)
+        return 0;
     return Sw97_ElementOwned(elem);
 }
 
@@ -1407,7 +1424,7 @@ uint8_t Sw97_ElementNeighbor(uint8_t isSling, uint8_t elem, int32_t dir) {
 // the pause grid — goes through this and nothing else, so the "CVar off" path stays byte-identical
 // to the pre-refactor behavior and the bow-only rule for bombs lives in exactly one place.
 uint8_t Sw97_EffectiveElement(uint8_t isSling) {
-    if (!SW97_ENABLED()) {
+    if (!Sw97_ElementWheelEnabled()) {
         return SW97_ELEM_NONE;
     }
     return Sw97_GetElement(isSling);
@@ -1565,6 +1582,8 @@ void* Wand_ModeNameTex(uint8_t mode) {
 }
 
 uint8_t Wand_RandoMode(void) {
+    if (Combo_IsVanilla())
+        return WAND_RANDO_ELEMENTAL;
     return (uint8_t)CVarGetInteger("gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE", WAND_RANDO_MEDALLIONS);
 }
 

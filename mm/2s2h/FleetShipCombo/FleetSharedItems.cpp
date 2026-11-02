@@ -112,6 +112,15 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
     if (!Combo_IsCombinedGame() || sReceiveDepth > 0) {
         return;
     }
+    if (Combo_IsVanilla()) {
+        // Also retry this side: earning a native base sword can make a previously
+        // quarantined foreign sword upgrade eligible without another game swap.
+        FleetShared_RequestPullFromPeer();
+        const auto peer = ResolvePeerGrant();
+        if (peer != nullptr)
+            peer(nullptr);
+        return;
+    }
     // Share the concrete native tier even in RPG mode. Returning without a
     // floor update left a foreign magic pickup dormant until the next switch.
     if (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC) {

@@ -10,6 +10,7 @@
  */
 
 #include "extended_equipment.h"
+#include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/menu/ComboItemIconOwnership.h"
 #include "equipment/nei_equipment_presentation.h"
 #include "../soh/FleetShipCombo/FleetComboIds.h"
@@ -332,7 +333,7 @@ u8 ExtEquip_CanSwitch(void) {
 }
 
 u8 ExtEquip_IsEnabled(void) {
-    return CVarGetInteger(CVAR_EXT_EQUIP_ENABLED, 0) != 0;
+    return Combo_IsVanilla() || CVarGetInteger(CVAR_EXT_EQUIP_ENABLED, 0) != 0;
 }
 
 // ---------------------------------------------------------------------------

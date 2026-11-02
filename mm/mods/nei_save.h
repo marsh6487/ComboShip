@@ -337,6 +337,12 @@ typedef struct NeiSaveData {
     uint8_t magicMirrorOwned;
     uint8_t cojiroPartnerOwned;     // additive companion ownership; never consumes the trade item
     uint8_t cojiroPartnerDismissed; // pause equipment summon toggle; defaults to called when unlocked
+    // Vanilla NEI entitlements whose foreign OoT bases/behaviors are deferred
+    // in MM. Ownership survives a round trip without manufacturing those bases,
+    // a native mask or a transformation. Append-only for existing save layouts.
+    uint8_t ultrashotOwned;
+    uint8_t ritoMaskOwned;
+    uint8_t ootWeaponUpgradesOwned; // only Hammer Axe (bit 0), True Master Sword (bit 3)
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

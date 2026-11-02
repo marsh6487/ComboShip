@@ -13,6 +13,7 @@ SaveContext gSaveContext{};
 #ifdef COMBO_BUILD
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
 }
 #endif
 namespace SOH {

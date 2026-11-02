@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #define COMBO_EXPORT
+extern "C" { int gComboVanillaMode = 0; }
 
 struct GameInteractor {
     struct OnSceneInit { using Function = std::function<void(s8, s8)>; };

@@ -1237,7 +1237,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
     // C-button, which is exactly the behavior this refactor removes. Skijer's NEI
     // [12] Boomerang <-> Gale Boomerang (ported from SoH).
     Gale_KaleidoHandle(play);
-    if (CVarGetInteger("gEnhancements.SkijerNEI.SW97Medallions", 0)) {
+    if (Sw97_ElementWheelEnabled()) {
         Sw97Wheel_Handle(play, SW97_BOW_CELL, 0);
         Sw97Wheel_Handle(play, SW97_SLING_CELL, 1);
     }
@@ -1386,7 +1386,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
     }
     // [12] Boomerang <-> Gale Boomerang (ported from SoH).
     Gale_KaleidoDraw(play);
-    if (CVarGetInteger("gEnhancements.SkijerNEI.SW97Medallions", 0)) { // Skijer's NEI element wheels
+    if (Sw97_ElementWheelEnabled()) { // Skijer's NEI element wheels
         Sw97Wheel_Draw(play, SW97_BOW_CELL, 0);
         Sw97Wheel_Draw(play, SW97_SLING_CELL, 1);
     }

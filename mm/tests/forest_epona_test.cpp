@@ -21,6 +21,7 @@ void FrameInterpolation_RecordCloseChild() {
 extern "C" {
 SaveContext gSaveContext{};
 int gComboGameMode;
+int gComboVanillaMode = 0;
 bool gHorsePlayedEponasSong = true;
 void gSPSegment(void* command, int segment, uintptr_t target) {
     __gSPSegment(static_cast<Gfx*>(command), segment, target);

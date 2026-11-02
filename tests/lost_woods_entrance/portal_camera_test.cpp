@@ -26,6 +26,7 @@ PlayState *gPlayState;
 GameState *gGameState;
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
 s32 sCameraInterfaceFlags;
 f32 qNaN0x10000 = 0x7F810000;
 }
