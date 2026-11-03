@@ -52,6 +52,8 @@ The six affected registered CI entries pass locally through the actual combined-
 
 The follow-up run `41547590152` passed source/format and entrance checks, and built the complete OoT engine on Linux before continuing to MM. Its later fixture failures reproduced missing dependencies in mask routing, native seasonal weather and both pause-page prefixes. Those fixtures now supply the real Rito predicate, production mode header and explicit seeded mode globals as appropriate; both C and C++ consumers retain their original assertions. All 58 equipment entries pass across the full local run and its repaired continuations. Platform builds and the other regression groups remain separately tracked in PR #79.
 
+The final item continuation exposed the same missing mode dependency in the legacy native Magic Mirror grant fixture. Both ports now use the production mode header and explicit seeded combined state. All 51 item entries and all 58 equipment entries passed locally; the 42 system entries cleared through the public CI prefix and local continuations. Rendering continuation and actual platform results remain separately tracked in PR #79. These fixture-only changes preserve the game sources from `2dfac243a8cef8847f560006f4d467df845939f6`.
+
 ## Preserved Shadow Crystal and dialogue/font fixes
 
 The inherited fixes from `33359ffce2a79e80d7f490d64c1462bfcaad6b14` remain part of this same source candidate. Wolf/Shadow Crystal entry and removal retain the flash path and outgoing-form capture instead of updating an unused MM skeleton callback. New Rito availability edits are outside those crash-fix hunks; the eight focused Wolf transition controls pass again.
