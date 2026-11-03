@@ -737,7 +737,8 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
                 play->transitionType = TRANS_TYPE_FADE_WHITE;
                 break;
             case 24:
-                if (IS_RANDO && Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
+                // Match regular scene exits: Combo cross routing can be active with native shuffle off.
+                if (IS_RANDO) {
                     play->nextEntranceIndex = Entrance_OverrideNextIndex(ENTR_JABU_JABU_ENTRANCE);
                 } else {
                     play->nextEntranceIndex = ENTR_JABU_JABU_ENTRANCE;

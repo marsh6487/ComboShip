@@ -5,6 +5,9 @@ typedef struct PlayState {
     struct {
         int state;
     } csCtx;
+    struct {
+        unsigned char natureAmbienceId = 2;
+    } sequenceCtx;
 } PlayState;
 typedef struct {
     int nightFlag;

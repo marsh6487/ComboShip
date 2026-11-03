@@ -241,6 +241,11 @@ static void ClickTab(const char *name) {
 
 static void ProbeWeather() {
   RegisterWeatherWidgets();
+  Check(enableNightMusic.key == CVAR_AUDIO("EnableNightMusic") &&
+            enableNightMusic.name == "Enable Night Music" && enableNightMusic.defaultValue == 0,
+        "optional night music must keep its shared key and default off in both menus");
+  Check(WhatsNew::Find(enableNightMusic.key.c_str()),
+        "optional night checkbox must use existing release highlighting");
   Check(writes == 0, "registering weather widgets must not change preferences");
   const char *seasonKey =
       TEST_MM ? MM_WEATHER_CVAR("Season") : SOH_SEASON_WEATHER_CVAR("Season");

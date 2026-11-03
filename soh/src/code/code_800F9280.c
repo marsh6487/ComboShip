@@ -24,6 +24,17 @@ static struct {
 ActiveSequence gActiveSeqs[4];
 static u16 sRegisteredNightBgm = NA_BGM_DISABLED;
 static u16 sResolvedMainBgm = NA_BGM_DISABLED;
+static u16 sRegisteredSceneNightBgm = NA_BGM_DISABLED;
+static u16 sResolvedSubBgm = NA_BGM_DISABLED;
+
+void Audio_RegisterSceneNightBgm(uint16_t sequence) {
+    sRegisteredSceneNightBgm = sequence;
+}
+
+uint8_t Audio_IsSceneNightBgmActive(void) {
+    return sRegisteredSceneNightBgm != NA_BGM_DISABLED && gActiveSeqs[SEQ_PLAYER_BGM_SUB].seqId != NA_BGM_DISABLED &&
+           sResolvedSubBgm == sRegisteredSceneNightBgm;
+}
 
 void Audio_RegisterNightBgm(uint16_t sequence) {
     sRegisteredNightBgm = sequence;
@@ -93,6 +104,8 @@ static void Audio_StartSequenceInternal(u8 playerIdx, u8 seqId, u8 arg2, u16 fad
         arg2 &= 0x7F;
         if (playerIdx == SEQ_PLAYER_BGM_MAIN) {
             sResolvedMainBgm = resolvedSeqId;
+        } else if (playerIdx == SEQ_PLAYER_BGM_SUB) {
+            sResolvedSubBgm = resolvedSeqId;
         }
         if (arg2 == 0x7F) {
             dur = (fadeTimer >> 3) * 60 * gAudioContext.audioBufferParameters.updatesPerFrame;
@@ -456,6 +469,33 @@ void Audio_QueueSeqCmd(u32 cmd) {
     sAudioSeqCmds[sSeqCmdWrPos++] = cmd;
 }
 
+uint8_t Audio_HasPendingSubBgmCommand(void) {
+    for (u8 slot = sSeqCmdRdPos; slot != sSeqCmdWrPos; ++slot) {
+        const u32 cmd = sAudioSeqCmds[slot];
+        if (GET_PLAYER_IDX(cmd) == SEQ_PLAYER_BGM_SUB && (cmd >> 28) <= 3)
+            return true;
+    }
+    return false;
+}
+
+void Audio_StopSceneNightBgm(void) {
+    if (sRegisteredSceneNightBgm == NA_BGM_DISABLED)
+        return;
+    bool cancelled = false;
+    // Cancel our queued exact start in place, preserving later native commands.
+    for (u8 slot = sSeqCmdRdPos; slot != sSeqCmdWrPos; ++slot) {
+        if (GET_PLAYER_IDX(sAudioSeqCmds[slot]) == SEQ_PLAYER_BGM_SUB && sResolvedSeqCmds[slot].isResolved &&
+            sResolvedSeqCmds[slot].seqId == sRegisteredSceneNightBgm) {
+            sAudioSeqCmds[slot] = 0x100000FF | (SEQ_PLAYER_BGM_SUB << 24);
+            sResolvedSeqCmds[slot].isResolved = false;
+            cancelled = true;
+        }
+    }
+    if (!cancelled && Audio_IsSceneNightBgmActive() && !Audio_HasPendingSubBgmCommand())
+        Audio_QueueSeqCmd(0x100A00FF | (SEQ_PLAYER_BGM_SUB << 24));
+    Audio_RegisterSceneNightBgm(NA_BGM_DISABLED);
+}
+
 void Audio_QueueResolvedSeqCmd(u8 playerIdx, u16 seqId, u8 fadeTimer) {
     if (playerIdx >= 4) {
         return;
@@ -796,6 +836,8 @@ u8 func_800FAD34(void) {
 void Audio_ResetActiveSequences(void) {
     Audio_RegisterNightBgm(NA_BGM_DISABLED);
     sResolvedMainBgm = NA_BGM_DISABLED;
+    Audio_RegisterSceneNightBgm(NA_BGM_DISABLED);
+    sResolvedSubBgm = NA_BGM_DISABLED;
     u8 seqPlayerIndex;
     u8 scaleIndex;
 

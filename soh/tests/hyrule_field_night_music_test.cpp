@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "audio_sequence_stubs/global.h"
+#include "night_bgm_bridge.h"
 #include "soh/Enhancements/audio/HyruleFieldNightMusicInternal.h"
 
 static uint16_t sReplacementSequence = 0x35;
@@ -402,5 +403,26 @@ int main() {
     Audio_QueueSeqCmd(0x031E0040);
     Audio_ProcessSeqCmds();
     REQUIRE((sPlayedSequences == std::vector<uint16_t>{ 0x8135, 0x40 }));
+    // Pending optional starts must be cancelled without deleting a later native owner.
+    ResetPlaybackBoundary();
+    Audio_RegisterSceneNightBgm(0x15d);
+    Audio_QueueResolvedSeqCmd(3, 0x15d, 30);
+    REQUIRE(Audio_HasPendingSubBgmCommand());
+    Audio_StopSceneNightBgm();
+    Audio_ProcessSeqCmds();
+    REQUIRE(sPlayedSequences.empty() && !Audio_IsSceneNightBgmActive());
+    Audio_RegisterSceneNightBgm(0x15d);
+    Audio_QueueResolvedSeqCmd(3, 0x15d, 30);
+    Audio_QueueSeqCmd(0x03000040);
+    Audio_StopSceneNightBgm();
+    Audio_ProcessSeqCmds();
+    REQUIRE((sPlayedSequences == std::vector<uint16_t>{ 0x40 }));
+    Audio_RegisterSceneNightBgm(0x15d);
+    Audio_QueueResolvedSeqCmd(3, 0x15d, 30);
+    Audio_ProcessSeqCmds();
+    REQUIRE(Audio_IsSceneNightBgmActive());
+    Audio_QueueResolvedSeqCmd(3, 0x25d, 0);
+    Audio_ProcessSeqCmds();
+    REQUIRE(!Audio_IsSceneNightBgmActive()); // Full-width identity, not bookkeeping low byte.
     return 0;
 }

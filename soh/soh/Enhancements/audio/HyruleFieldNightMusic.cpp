@@ -216,10 +216,20 @@ void HyruleFieldNightMusic_Update(PlayState* play) {
             break;
         case HyruleFieldNightMusicDecision::StopNightRestoreDay: {
             if (HyruleFieldNightMusic_ShouldRestoreDaySequence(state)) {
-                const uint16_t replacement = AudioCollection::Instance->GetReplacementSequence(NA_BGM_FIELD_LOGIC);
-                const uint16_t daySequence = HyruleFieldNightMusic_ValidateSequence(
-                    replacement, AudioCollection::Instance->HasSequenceNum(replacement), NA_BGM_FIELD_LOGIC);
-                Audio_QueueResolvedSeqCmd(SEQ_PLAYER_BGM_MAIN, daySequence, 0x1E);
+                if (state.isNight && CVarGetInteger("gAudioEditor.EnableNightMusic", 0) != 0 &&
+                    play->sequenceCtx.natureAmbienceId < NATURE_ID_NONE) {
+                    // Hand MAIN back to nature before the optional scene music takes SUB.
+                    // Nature checks the active sequence immediately (Windmill and
+                    // protected tracks refuse ambience). A queued stop is too late.
+                    if (Audio_IsNightBgmActive())
+                        Audio_ProcessSeqCmd(0x100000FF | (SEQ_PLAYER_BGM_MAIN << 24));
+                    Audio_PlayNatureAmbienceSequence(play->sequenceCtx.natureAmbienceId);
+                } else {
+                    const uint16_t replacement = AudioCollection::Instance->GetReplacementSequence(NA_BGM_FIELD_LOGIC);
+                    const uint16_t daySequence = HyruleFieldNightMusic_ValidateSequence(
+                        replacement, AudioCollection::Instance->HasSequenceNum(replacement), NA_BGM_FIELD_LOGIC);
+                    Audio_QueueResolvedSeqCmd(SEQ_PLAYER_BGM_MAIN, daySequence, 0x1E);
+                }
             }
             sOwnsNightBgm = false;
             sRefreshNightBgm = false;

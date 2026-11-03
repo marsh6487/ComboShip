@@ -1,4 +1,5 @@
 #pragma once
+void Audio_PlayNatureAmbienceSequence(unsigned char natureAmbienceId);
 #include "z64.h"
 int Player_InCsMode(PlayState* play);
 int CVarGetInteger(const char* name, int fallback);

@@ -1,6 +1,9 @@
 // Execute the production routing with each host's real PlayState/SaveContext.
 // Only the CVar store, preview stop and native command queue are test boundaries.
 #include <cassert>
+#include <cstdint>
+uint16_t SceneNightMusic_CurrentEntry() { return 0; }
+bool SceneNightMusic_RequestRefresh() { return false; }
 #include <cstdio>
 #include <filesystem>
 #include <locale>
@@ -68,6 +71,7 @@ void Audio_PlaySceneSequence(u16 sequence) { queued.push_back(sequence); }
 void Audio_PlayNatureAmbienceSequence(u8 ambience) { ambienceRequests.push_back(ambience); }
 u16 sPrevMainBgmSeqId;
 static u16 sPreviewNightBgmSeqId=NA_BGM_DISABLED;
+static u16 sResolvedSubBgm=NA_BGM_DISABLED;
 extern "C" uint16_t Audio_GetActiveNightBgm(void) { return NA_BGM_DISABLED; }
 extern "C" uint8_t Audio_RestoreNightBgm(uint16_t) { return false; }
 static u16 activeMain=NA_BGM_DISABLED;

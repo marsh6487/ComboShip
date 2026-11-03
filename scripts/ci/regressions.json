@@ -126,7 +126,7 @@
     "suite": "systems",
     "origin": "gate",
     "name": "Fast audio-worker compile and mixer regressions",
-    "run": "python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
+    "run": "python3 -B tests/night_music/run_tests.py\npython3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
   },
   {
     "suite": "systems",
@@ -138,7 +138,7 @@
     "suite": "entrances",
     "origin": "gate",
     "name": "Fast entrance compile and linkage preflight",
-    "run": "python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py\npython3 -B tests/cross_dungeon/oot_entrance_metadata_test.py\npython3 -B tests/cross_dungeon/generation_reset_behavior_test.py\npython3 -B tests/lost_woods_entrance/renderer_linkage_test.py"
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/jabu_fish_cutscene_test.py --sanitize\npython3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py\npython3 -B tests/cross_dungeon/oot_entrance_metadata_test.py\npython3 -B tests/cross_dungeon/generation_reset_behavior_test.py\npython3 -B tests/lost_woods_entrance/renderer_linkage_test.py"
   },
   {
     "suite": "equipment",

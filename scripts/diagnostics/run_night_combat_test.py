@@ -18,6 +18,13 @@ def main(build, cc='cc', cxx='c++'):
     if body is None:
         raise RuntimeError('Missing production Audio_SetSequenceMode')
     (build / 'night_sequence_mode.inc').write_text(body[0])
+    ambience=[]
+    for name in ['Audio_StartNatureAmbienceSequence','Audio_PlayNatureAmbienceSequence']:
+        match=re.search(r'^void '+name+r'\([^;]*?\)\s*\{.*?^}',source,re.M|re.S)
+        if match is None:
+            raise RuntimeError('Missing production '+name)
+        ambience.append(match[0])
+    (build/'night_native_ambience.inc').write_text('\n'.join(ambience))
     editor = (ROOT / 'soh/soh/Enhancements/audio/AudioEditor.cpp').read_text()
     replay = re.search(r'^void ReplayCurrentBGM\([^;]*?\)\s*\{.*?^}', editor, re.M | re.S)
     if replay is None:

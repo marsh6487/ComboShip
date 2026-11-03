@@ -13,6 +13,7 @@
 #include "soh/SohGui/SohMenu.h"
 #include "soh/SohGui/SohGui.hpp"
 #include "AudioCollection.h"
+#include "../../../../combo/audio/NightMusic.h"
 #include "HyruleFieldNightMusic.h"
 #include "OotrsArchive.h"
 #include "soh/Enhancements/enhancementTypes.h"
@@ -41,6 +42,7 @@ using namespace UIWidgets;
 #endif
 
 static WidgetInfo lowHpAlarm;
+static WidgetInfo enableNightMusic;
 static WidgetInfo naviCall;
 static WidgetInfo enemyProx;
 static WidgetInfo leeverProx;
@@ -186,6 +188,8 @@ static bool IsBgmEntry(uint16_t sequenceId) {
 }
 
 static uint16_t CurrentBGMEntry(uint16_t sequenceId) {
+    if (const auto nightRow = SceneNightMusic_CurrentEntry())
+        return nightRow;
     if (HyruleFieldNightMusic_IsPlaying(sequenceId))
         return HYRULE_FIELD_NIGHT_MUSIC_ENTRY;
 #ifdef COMBO_BUILD
@@ -203,6 +207,8 @@ static uint16_t CurrentBGMReplacement(uint16_t sequenceId) {
 // Grabs the current BGM sequence ID and replays it
 // which will lookup the proper override, or reset back to vanilla
 void ReplayCurrentBGM() {
+    if (SceneNightMusic_RequestRefresh())
+        return;
     if (HyruleFieldNightMusic_RequestRefresh())
         return;
     u16 curSeqId = func_800FA0B4(SEQ_PLAYER_BGM_MAIN);
@@ -217,6 +223,8 @@ void UpdateCurrentBGM(u16 seqKey, SeqType seqType) {
     if (seqType != SEQ_BGM_WORLD) {
         return;
     }
+    if (SceneNightMusic_CurrentEntry() == seqKey && SceneNightMusic_RequestRefresh())
+        return;
     // The night lifecycle may be temporarily yielding MAIN to a cutscene,
     // fanfare or preview. Retain the edit until that owner releases it.
     if (seqKey == HYRULE_FIELD_NIGHT_MUSIC_ENTRY && HyruleFieldNightMusic_RequestRefresh())
@@ -446,7 +454,9 @@ void Draw_SfxTab(const std::string& tabId, SeqType type, const std::string& tabN
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, columnSize.x + 30);
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, columnSize.x + 30);
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 160.0f);
-    for (const auto& [defaultValue, seqData] : map) {
+    for (const auto defaultValue :
+         ComboNightMusic::OrderedRows(map, NA_BGM_FIELD_LOGIC, HYRULE_FIELD_NIGHT_MUSIC_ENTRY)) {
+        const auto& seqData = map.at(defaultValue);
         if (~(seqData.category) & type) {
             continue;
         }
@@ -461,6 +471,8 @@ void Draw_SfxTab(const std::string& tabId, SeqType type, const std::string& tabN
         const std::string initialSfxKey = seqData.sfxKey;
         const std::string cvarKey = AudioCollection::Instance->GetCvarKey(seqData.sfxKey);
         const std::string cvarLockKey = AudioCollection::Instance->GetCvarLockKey(seqData.sfxKey);
+        WhatsNew::Scope rowAccent(cvarKey.c_str(), seqData.label.c_str(),
+                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
         const std::string hiddenKey = "##" + cvarKey;
         const std::string resetButton = ICON_FA_UNDO + hiddenKey;
         const std::string randomizeButton = ICON_FA_RANDOM + hiddenKey;
@@ -797,6 +809,7 @@ void AudioEditor::DrawElement() {
                     CVarSetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, 1.0f);
                 }
                 ImGui::SeparatorText("Night Music");
+                SohGui::mSohMenu->MenuDrawItem(enableNightMusic, THEME_COLOR);
                 SohGui::mSohMenu->MenuDrawItem(hyruleFieldNightMusic, THEME_COLOR);
                 DrawHyruleFieldNightTrack();
                 ImGui::SeparatorText("Audio Randomization");
@@ -1144,6 +1157,17 @@ void RegisterAudioWidgets() {
                      .Tooltip("Plays the selected night track only in Hyrule Field while preserving crickets, "
                               "ordinary SFX, and proximity weather."));
     SohGui::mSohMenu->AddSearchWidget({ hyruleFieldNightMusic, "Enhancements", "Audio Editor", "Audio Options" });
+
+    enableNightMusic = { .name = "Enable Night Music", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    enableNightMusic.CVar(CVAR_AUDIO("EnableNightMusic"))
+        .Options(
+            CheckboxOptions()
+                .Color(THEME_COLOR)
+                .DefaultValue(false)
+                .Tooltip(
+                    "Plays each scene's daytime music selection at night while keeping night ambience and "
+                    "sound effects. Yields to native audio; the dedicated Hyrule Field night track takes priority."));
+    SohGui::mSohMenu->AddSearchWidget({ enableNightMusic, "Enhancements", "Audio Editor", "Audio Options" });
 
     seasonWeatherWidgets[0] = { .name = "Seasonal Weather", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
     seasonWeatherWidgets[0]
