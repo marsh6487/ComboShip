@@ -32,10 +32,10 @@
 
 extern "C" {
 u8 Cane_GiveSkill(u8 skill);
-void CustomItem00_Update(Actor* actor, PlayState* play);
-void CustomItem00_Destroy(Actor* actor, PlayState* play);
 u8 ResourceMgr_FileExists(const char* path);
 }
+void CustomItem00_Update(Actor* actor, PlayState* play);
+void CustomItem00_Destroy(Actor* actor, PlayState* play);
 
 namespace {
 using namespace ComboVanilla;

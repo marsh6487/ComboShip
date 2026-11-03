@@ -5,6 +5,7 @@
 #include "soh/ActorDB.h"
 #include "soh/SaveManager.h"
 #include "soh/ShipInit.hpp"
+#include "soh/frame_interpolation.h"
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -26,6 +27,9 @@ extern PlayState* gPlayState;
 }
 
 namespace {
+// Display-list macros redeclare these at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 using namespace ComboVanilla;
 
 // BEGIN TESTED NATIVE REWARD HELPERS
