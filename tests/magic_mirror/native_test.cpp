@@ -22,6 +22,7 @@
 
 extern "C" {
 int gComboGameMode;
+int gComboVanillaMode = 0;
 }
 SaveContext gSaveContext{};
 PlayState *gPlayState;

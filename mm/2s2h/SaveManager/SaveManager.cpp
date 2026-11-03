@@ -1,3 +1,4 @@
+#include "../../../combo/vanilla/ComboVanillaMode.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
@@ -261,6 +262,30 @@ void SaveManager_BuildComboBaseline(const unsigned char* ootName8) {
 }
 #endif
 
+#ifdef COMBO_BUILD
+int SaveManager_InitVanillaForCombo(int slot, const unsigned char* name) {
+    if (!Combo_IsCombinedGame() || slot < 0 || slot > 2 || !gComboWriteGameSave)
+        return -1;
+    gComboVanillaMode = 1;
+    Combo_MM_LoadCrossDungeonCheckpoint(-1);
+    Sram_InitNewSave();
+    gSaveContext.fileNum = slot;
+    if (name) {
+        for (int i = 0; i < 8; ++i)
+            gSaveContext.save.saveInfo.playerData.playerName[i] = name[i] <= 0x3F ? name[i] : 0x3E;
+    }
+    // Keep native first-cycle, form, inventory, magic and quest state intact.
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+    nlohmann::json document;
+    document["newCycleSave"]["save"] = gSaveContext.save;
+    document["version"] = CURRENT_SAVE_VERSION;
+    document["type"] = "2S2H_SAVE";
+    gComboOwlBlobSlot = -1;
+    SaveManager_WriteSaveFile(SaveManager_GetFileName(slot + 1), document);
+    return 0;
+}
+#endif
+
 void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM save-init");
 #ifdef COMBO_BUILD
@@ -425,7 +450,17 @@ extern "C" COMBO_EXPORT void MM_InvalidateOwlBlobSlot(void) {
 void SaveManager_MarkNoSaveLoaded() {
     gSaveContext.fileNum = 0xFF;
     gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+#ifdef COMBO_BUILD
+    gComboVanillaMode = 0;
+    gComboOwlBlobSlot = -1;
+#endif
 }
+
+#ifdef COMBO_BUILD
+void SaveManager_DiscardVanillaCreation() {
+    SaveManager_MarkNoSaveLoaded();
+}
+#endif
 
 static int SaveManager_LoadFailedForCombo(int code) {
     SaveManager_MarkNoSaveLoaded();
@@ -438,6 +473,13 @@ static int SaveManager_LoadFailedForCombo(int code) {
 // -4 no usable save page (neither key, or owlSave unparseable with no newCycleSave), -5 parse.
 int SaveManager_LoadSaveFile(int mmFileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM save-load");
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame() && Combo_QueryVanillaMode(mmFileNum - 1) < 0) {
+        SPDLOG_ERROR("[ComboVanilla] refusing invalid/mixed file identity for MM slot {}", mmFileNum);
+        return SaveManager_LoadFailedForCombo(-6);
+    }
+#endif
+
     std::string fileName = SaveManager_GetFileName(mmFileNum);
     nlohmann::json j;
     int result = SaveManager_ReadSaveFile(fileName, j);

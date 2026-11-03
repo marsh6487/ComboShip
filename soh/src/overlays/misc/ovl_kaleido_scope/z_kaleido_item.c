@@ -1776,9 +1776,9 @@ static void Slate_DrawKaleidoSelector(PlayState* play) {
 }
 
 static void ArrowWheel_HandlePressA(PlayState* play) {
-    // Hard disable: SW97 medallions off → never cycle (kept inline; doesn't
-    // fit the wheel's onThisItem close path).
-    if (!SW97_MEDALLIONS_ENABLED()) {
+    // Close when neither optional medallions nor this file's earned Bomb
+    // Arrows can supply a selector (outside the onThisItem close path).
+    if (!Sw97_ElementWheelEnabled()) {
         sArrowWheelPressAActive = 0;
         return;
     }
@@ -1815,7 +1815,7 @@ static void ArrowWheel_HandlePressA(PlayState* play) {
 }
 
 static void ArrowWheel_DrawPressA(PlayState* play) {
-    if (!SW97_MEDALLIONS_ENABLED())
+    if (!Sw97_ElementWheelEnabled())
         return;
     PauseContext* pauseCtx = &play->pauseCtx;
     s32 cursorItem = pauseCtx->cursorItem[PAUSE_ITEM];
@@ -1866,7 +1866,7 @@ static void ArrowWheel_Build(void) {
 }
 
 static void ArrowWheel_Handle(PlayState* play) {
-    if (!SW97_MEDALLIONS_ENABLED()) {
+    if (!Sw97_ElementWheelEnabled()) {
         sArrowWheelOverlayActive = 0;
         sArrowWheelHoldTimer = 0;
         return;
@@ -1941,7 +1941,7 @@ static void ArrowWheel_Handle(PlayState* play) {
 }
 
 static void ArrowWheel_Draw(PlayState* play) {
-    if (!SW97_MEDALLIONS_ENABLED())
+    if (!Sw97_ElementWheelEnabled())
         return;
 
     PauseContext* pauseCtx = &play->pauseCtx;

@@ -113,6 +113,10 @@ inline void to_json(json& j, const NeiSaveData& n) {
         // Hookshot family (Skijer's NEI hookshot overhaul): Clawshot ownership (Ultrashot rides
         // ootHookshotLevel == 3; Switchhook rides its ExtInv ownedItems slot).
         { "clawshotOwned", n.clawshotOwned },
+        // Latent NEI ownership is separate from effect-driving native bases.
+        { "ultrashotOwned", n.ultrashotOwned },
+        { "ritoMaskOwned", n.ritoMaskOwned },
+        { "ootWeaponUpgradesOwned", n.ootWeaponUpgradesOwned & 0x09 },
         // Fleet Ship Combo cross-game fields (layouts in 2s2h/FleetShipCombo/FleetComboIds.h)
         { "shieldOwned", n.shieldOwned },
         { "comboObtained", n.comboObtained },
@@ -222,6 +226,18 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.ootHookshotLevel = j.value("ootHookshotLevel", (uint8_t)0);
     n.ootHookMode = j.value("ootHookMode", (uint8_t)0);
     n.clawshotOwned = j.value("clawshotOwned", (uint8_t)0);
+    // Absent old-save keys stay zero after the defaults above. Validate before
+    // byte conversion so malformed negative/wide values cannot invent ownership.
+    const auto ultrashot = j.find("ultrashotOwned");
+    if (ultrashot != j.end() && ultrashot->is_number_integer() && *ultrashot == 1)
+        n.ultrashotOwned = 1;
+    const auto ritoMask = j.find("ritoMaskOwned");
+    if (ritoMask != j.end() && ritoMask->is_number_integer() && *ritoMask == 1)
+        n.ritoMaskOwned = 1;
+    const auto weaponOwnership = j.find("ootWeaponUpgradesOwned");
+    if (weaponOwnership != j.end() && weaponOwnership->is_number_integer() && *weaponOwnership >= 0 &&
+        *weaponOwnership <= 0xFF)
+        n.ootWeaponUpgradesOwned = weaponOwnership->get<uint8_t>() & 0x09;
     n.nayruRocsMode = j.value("nayruRocsMode", (uint8_t)0);
     n.ootUpgrades = j.value("ootUpgrades", (uint16_t)0);
     n.ootMasksOwned = j.value("ootMasksOwned", (uint16_t)0);

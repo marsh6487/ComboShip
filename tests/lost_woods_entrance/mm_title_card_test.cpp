@@ -6,6 +6,8 @@
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Graphics/OotLocationTitleCard.h"
 #include "ComboGameMode.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/RegionalPassages.h"
 #include "entrances/MmRegionalBridgePlacements.h"
@@ -68,6 +70,9 @@ extern "C" s32 Entrance_GetTransitionFlags(u16 entrance) {
 /* NATIVE_MESSAGE_TITLE */
 
 #ifdef COMBO_BUILD
+// Existing portal/title controls exercise seeded combined saves.
+extern "C" { int gComboVanillaMode = 0; }
+extern "C" int Combo_PeekVanillaMode(int) { return 0; }
 /* REGIONAL_ARRIVAL */
 int gComboStartFileNum = -1, gComboEntryIsResume, gComboOwlBlobSlot = -1;
 static int sComboPortalRoute;

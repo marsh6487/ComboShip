@@ -15,6 +15,7 @@
 #include "ComboGameMode.h"
 #include "entrances/SoloForest.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; } // Preserve the existing seeded season controls.
 
 void MMAutumnSceneFoliage_Update(const PlayState *) {}
 void MMAutumnSceneFoliage_Reset() {}

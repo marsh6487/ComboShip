@@ -2,6 +2,7 @@
  * custom_forms.cpp — registry of custom player forms. See custom_forms.h.
  */
 #include "custom_forms.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
 #include "z64.h"
 #include "z64item.h"
 #include "functions.h"
@@ -118,7 +119,17 @@ extern "C" const CustomFormDef* CustomForms_ByItem(s32 itemId) {
     return nullptr;
 }
 
+extern "C" u8 RitoItem_FormEnabled(void) {
+    if (Combo_IsVanilla())
+        return (Nei_Save()->ritoMaskFlags & RITO_FLAG_MASK_OWNED) != 0;
+    return CVarGetInteger("gMods.RitoForm", 1) != 0;
+}
+
 static bool GateOn(const CustomFormDef* def) {
+    // Rito is earned by this paired file. Keep the user's global form option
+    // for their other files, including its legacy automatic mask behavior.
+    if (def->modelName != nullptr && std::strcmp(def->modelName, "rito") == 0)
+        return RitoItem_FormEnabled();
     if (def->cvar == nullptr || def->cvar[0] == '\0')
         return true;
     return CVarGetInteger(def->cvar, def->cvarDefault) != 0;
@@ -390,6 +401,8 @@ extern "C" void RitoItem_SyncCell(void) {
     u8* cell = &gSaveContext.inventory.items[SLOT_FARORES_WIND];
 
     RitoItem_NoteCellItem(*cell);
+    if (Combo_IsVanilla())
+        return;
     // Enabling the form grants the mask, but it must NEVER put it in the cell: seeding an empty one
     // fabricated the mask into a slot the randomizer owns (every seed opened the pause menu already
     // holding it) and handed it out without the spell, against this file's own contract. Writing is

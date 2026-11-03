@@ -17,6 +17,7 @@
 #include "2s2h/ShipInit.hpp"
 #include "FleetShipCombo.h"
 #include "FleetComboIds.h"
+#include "vanilla/ComboVanillaMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 extern "C" {
@@ -33,7 +34,7 @@ extern SaveContext gSaveContext;
 // Beat Both Bosses is goal mode 0; Triforce Hunt (1) keeps its own counter and is not gated here.
 static bool BeatBothBosses() {
 #ifdef COMBO_BUILD
-    if (!Combo_IsCombinedGame())
+    if (!Combo_IsCombinedGame() || Combo_IsVanilla())
         return false;
 #endif
     return CVAR_COMBO != 0 && CVarGetInteger("gFleetCombo.GoalMode", 0) == 0;

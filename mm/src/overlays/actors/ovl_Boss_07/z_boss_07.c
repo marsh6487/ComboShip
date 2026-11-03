@@ -34,6 +34,7 @@
 
 #ifdef COMBO_BUILD
 #include "ComboGameMode.h"
+#include "vanilla/ComboVanillaMode.h"
 // ComboShip: end-gating. Returns 1 iff both games' final bosses are dead (see BenPort.cpp).
 extern int (*gComboFinalBossDefeated)(int game, int fileNum);
 #endif
@@ -1968,7 +1969,7 @@ void Boss07_Wrath_DeathCutscene(Boss07* this, PlayState* play) {
 #ifdef COMBO_BUILD
                         // ComboShip: gate the ending on both bosses. If Ganon isn't dead yet, skip MM's
                         // credits and warp to South Clock Town to go finish OOT via the Clock Tower portal.
-                        if (Combo_IsCombinedGame() &&
+                        if (Combo_IsCombinedGame() && !Combo_IsVanilla() &&
                             (gComboFinalBossDefeated == NULL || !gComboFinalBossDefeated(1, gSaveContext.fileNum))) {
                             play->nextEntrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0);
                             gSaveContext.nextCutsceneIndex = 0xFFEF;

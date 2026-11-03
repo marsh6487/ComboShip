@@ -22,6 +22,7 @@
 
 #include "z64.h"
 #include "item_cane_of_somaria.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "../custom_items.h"
 #include "../helpers/equip_helper.h"
 #include "../helpers/fx_helper.h"
@@ -90,8 +91,14 @@ u8 Cane_GiveSkill(u8 skill) {
     // hands — the six pickups can arrive in any order, so "first one wins".
     if (!hadCane) {
         Nei_SetOwnedItem(SLOT_CANE_OF_SOMARIA, ITEM_CANE_OF_SOMARIA);
-        Nei_CaneSetType(CANE_SKILL_TYPE(skill));
-        Nei_CaneSetSkillSlot(CANE_SKILL_TYPE(skill), CANE_SKILL_SLOT(skill));
+        if (Combo_IsVanilla()) {
+            static const u8 family[CANE_SKILL_MAX] = { 0, 0, 1, 2, 2, 3 };
+            Nei_CaneSetType(family[skill]);
+            Nei_CaneSetSkillSlot(family[skill], skill == CANE_SKILL_PACCI_STONE ? 1 : CANE_SKILL_SLOT(skill));
+        } else {
+            Nei_CaneSetType(CANE_SKILL_TYPE(skill));
+            Nei_CaneSetSkillSlot(CANE_SKILL_TYPE(skill), CANE_SKILL_SLOT(skill));
+        }
     }
     return 1;
 }
@@ -388,10 +395,22 @@ static u8 Cane_SummonSlotOwned(u8 slot) {
 }
 
 // Step to the next owned summon in `dir`, wrapping and skipping locked ones.
-// Somaria only: Pacci has nothing to cycle, so L/R are inert there.
+// Vanilla's independently earned Pacci skills share their own two-way choice.
+// The original progressive treatment keeps its Somaria-only cycling.
 static void Cane_CycleSummon(Player* p, PlayState* play, s8 dir) {
     u8 cur;
     u8 owned = 0;
+
+    if (Combo_IsVanilla() && Cane_GetType() == CANE_TYPE_PACCI) {
+        cur = Nei_CaneGetSkillSlot(CANE_TYPE_PACCI);
+        const u8 next = cur ^ 1;
+        if (Nei_CaneHasSkill(CANE_SKILL_PACCI_FLIP + next)) {
+            Nei_CaneSetSkillSlot(CANE_TYPE_PACCI, next);
+            Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        }
+        return;
+    }
 
     if (Cane_GetType() != CANE_TYPE_SOMARIA) {
         return;

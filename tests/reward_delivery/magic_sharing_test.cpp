@@ -10,8 +10,12 @@
 #define COMBO_EXPORT
 #define COMBO_BUILD
 #include "combo/ComboGameMode.h"
+#include "combo/vanilla/ComboVanillaMode.h"
 
-extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
+// This fixture exercises seeded native magic. Vanilla's exact-profile pulls
+// have their own adapter tests and must not enter the legacy relay boundary.
+void FleetShared_RequestPullFromPeer() { assert(false && "unexpected Vanilla pull in seeded magic fixture"); }
 
 #define SPDLOG_INFO(...) ((void)0)
 #define SPDLOG_WARN(...) ((void)0)

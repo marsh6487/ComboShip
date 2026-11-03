@@ -15,6 +15,7 @@
 #include <vector>
 #ifdef MM_PASSAGE_TEST
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+extern "C" { int gComboVanillaMode = 0; }
 #include "2s2h/Enhancements/Graphics/WoodsMysteryMakeover.h"
 #endif
 

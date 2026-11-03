@@ -2,6 +2,8 @@
 
 #ifdef COMBO_BUILD
 #include "../../../../combo/ComboGameMode.h"
+#include "../../../../combo/vanilla/ComboVanillaMode.h"
+#include "../../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "global.h"
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
 #include <math.h>
@@ -33,6 +35,7 @@
 // other spawns/layers and retain their native behavior. No story flag marks a visit.
 static inline int ComboOpeningForest_IsExploration(const PlayState* play) {
     return Combo_IsCombinedGame() && play && play->sceneId == SCENE_LOST_WOODS &&
+           !ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount) &&
            gSaveContext.gameMode == GAMEMODE_NORMAL && ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) &&
            gSaveContext.sceneLayer == 0 && gSaveContext.save.entrance == ENTRANCE(LOST_WOODS, 0) &&
            gSaveContext.save.cutsceneIndex == 0;
@@ -49,8 +52,9 @@ static inline void ComboOpeningForest_PrepareSpawn(PlayState* play) {
 }
 
 static inline void ComboOpeningForest_NormalizeEntry(void) {
-    if (!Combo_IsCombinedGame() || gSaveContext.gameMode != GAMEMODE_NORMAL ||
-        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+    if (!Combo_IsCombinedGame() ||
+        ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount) ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
         (gSaveContext.save.entrance >> 9) != ENTR_SCENE_OPENING_DUNGEON)
         return;
     // The forward fall normally enters the curse/tutorial sequence. Continue

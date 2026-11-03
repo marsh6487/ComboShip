@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory(prefix='forest-portal-finish-') as temporary:
 #include <cstring>
 #include <initializer_list>
 extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int finishes, arches;

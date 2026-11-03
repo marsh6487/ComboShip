@@ -1,3 +1,5 @@
+#include "../../../combo/vanilla/ComboVanillaMode.h"
+#include <stdlib.h>
 #include "../../../combo/ComboGameMode.h"
 #include "global.h"
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
@@ -244,6 +246,27 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
         return;
     }
 #endif
+#ifdef COMBO_BUILD
+    gComboVanillaCreationFailed = 0;
+    const int vanillaNewFile = Combo_IsCombinedGame() && CVarGetInteger("gCombo.NewFileVanilla", 0);
+    SaveContext* previousSave = NULL;
+    SaveFileMetaInfo previousMeta;
+    const int previousVanillaMode = gComboVanillaMode;
+    if (vanillaNewFile) {
+        previousSave = (SaveContext*)malloc(sizeof(SaveContext));
+        if (!previousSave || !gComboVanillaCreateCallback ||
+            !gComboVanillaCreateCallback(fileChooseCtx->buttonIndex, 0)) {
+            free(previousSave);
+            gComboVanillaCreationFailed = 1;
+            return;
+        }
+        *previousSave = gSaveContext;
+        previousMeta = *Save_GetSaveMetaInfo(fileChooseCtx->buttonIndex);
+        gComboVanillaMode = 1;
+    } else if (Combo_IsCombinedGame()) {
+        gComboVanillaMode = 0;
+    }
+#endif
     u16 offset;
     u16 j;
     u16* ptr;
@@ -282,7 +305,7 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
     // ComboShip: generation is window-driven now; only force the rando quest type here.
     // The combined fill runs on a worker thread before save creation (triggered from the UI).
     if (Combo_IsCombinedGame()) {
-        fileChooseCtx->questType[fileChooseCtx->buttonIndex] = QUEST_RANDOMIZER;
+        fileChooseCtx->questType[fileChooseCtx->buttonIndex] = vanillaNewFile ? QUEST_NORMAL : QUEST_RANDOMIZER;
     }
     (void)gComboGenerateCallback; // retained symbol; no longer invoked
 #endif
@@ -313,6 +336,17 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
     SaveManager_ThreadPoolWait();
 
 #ifdef COMBO_BUILD
+    if (vanillaNewFile) {
+        if (!gComboVanillaCreateCallback(fileChooseCtx->buttonIndex, 1)) {
+            gComboVanillaCreateCallback(fileChooseCtx->buttonIndex, 2);
+            gSaveContext = *previousSave;
+            *Save_GetSaveMetaInfo(fileChooseCtx->buttonIndex) = previousMeta;
+            gComboVanillaMode = previousVanillaMode;
+            gComboVanillaCreationFailed = 1;
+        }
+        free(previousSave);
+        return;
+    }
     if (Combo_IsCombinedGame() && gComboSaveInitCallback != NULL) {
         gComboSaveInitCallback((int)gSaveContext.fileNum);
     }

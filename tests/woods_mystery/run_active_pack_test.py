@@ -23,6 +23,7 @@ static int draws=0,arches=0;
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 extern "C" int ComboSoloForestMm_PassageAvailable(void) { return soloAvailable; }
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return altEnabled; }
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return visualAvailable; }

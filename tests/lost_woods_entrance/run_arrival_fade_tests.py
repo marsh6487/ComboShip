@@ -139,6 +139,8 @@ with tempfile.TemporaryDirectory(prefix="forest-native-arrival-") as temporary:
         source = source.replace("/* ARRIVAL_BODY */", function(host, 'extern "C" void ' + arrival + '('))
         title = (ROOT / game / "src/code/title_setup.c").read_text()
         boot = function(title, "void Setup_InitImpl(" if mm else "void TitleSetup_InitImpl(")
+        if mm:
+            boot = function(title, "static s32 ComboVanilla_PrepareMMOpening(") + "\n" + boot
         source = source.replace("/* BOOT_BODY */", re.sub(r"\bthis\b", "self", boot))
         title_owner = "MM" if mm else "SOH"
         for operation, result in (("Request", "void"), ("Consume", "int")):

@@ -29,6 +29,7 @@ def function(source, name):
 PREFIX = r'''
 #include "z_kaleido_scope.h"
 #include "soh/Enhancements/enhancementTypes.h"
+#include "vanilla/ComboVanillaMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <assert.h>
 #include <stdio.h>
@@ -38,6 +39,10 @@ PREFIX = r'''
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
 SaveContext gSaveContext;
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0; // Keep the existing seeded page-toggle controls.
+#endif
 static NeiSaveData nei;
 static ExtendedInventoryState sExtInvState;
 static int customEnabled=1, masksEnabled=1, ngc, cycleActive;

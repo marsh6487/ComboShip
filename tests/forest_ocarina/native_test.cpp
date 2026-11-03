@@ -23,6 +23,7 @@ PlayState *gPlayState;
 GameState *gGameState;
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
 }
 static PlayState play;
 static Player player;

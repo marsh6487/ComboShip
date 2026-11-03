@@ -15,7 +15,11 @@
 #include "combo/rando/CrossDungeonRuntime.h"
 #define COMBO_BUILD
 #include "combo/ComboGameMode.h"
+#include "combo/vanilla/ComboVanillaMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
+// Existing foreign-scale lifecycle uses an explicit seeded container.
+extern "C" int Combo_QueryVanillaMode(int) { return 0; }
 #define SPDLOG_INFO(...) ((void)0)
 #define SPDLOG_WARN(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)
@@ -145,6 +149,7 @@ constexpr int RI_ABILITY_SWIM = 2, RI_SINGLE_MAGIC = 3, RI_DOUBLE_MAGIC = 4,
               RI_PROGRESSIVE_MAGIC = 5, FCI_SCALE = 9, FCI_NO_ITEM = 0,
               FC_COMBO_ITEM_COUNT = 10, COMBO_RPG_MAGIC = 0;
 int sReceiveDepth = 0;
+static bool sPullPending = false;
 bool ComboRpg_IsEnabled(int) { return false; }
 int ChainAliasFor(int) { return 0; }
 int FcCombo_ItemForNative(int native) {

@@ -8,6 +8,7 @@
  */
 
 #include "extended_inventory.h"
+#include "../../combo/vanilla/ComboVanillaMode.h"
 #include "din_fire_shield.h"
 #include "extended_equipment.h"
 #include "z64.h"
@@ -146,14 +147,14 @@ int ExtInv_GetMaxPages(void) {
 bool ExtInv_IsCustomItemsEnabled(void) {
     // Owning the standalone Mirror makes its existing page reachable without
     // enabling the other NEI systems or granting any unrelated inventory.
-    return CVarGetInteger("gMods.CustomItems.Enabled", 1) != 0 || MagicMirror_IsOwned();
+    return Combo_IsVanilla() || CVarGetInteger("gMods.CustomItems.Enabled", 1) != 0 || MagicMirror_IsOwned();
 }
 bool ExtInv_IsMmMasksEnabled(void) {
     // Default ON — NEI features are enabled by default.
-    return CVarGetInteger("gMods.MmMasks.InventoryEnabled", 1) != 0;
+    return Combo_IsVanilla() || CVarGetInteger("gMods.MmMasks.InventoryEnabled", 1) != 0;
 }
 bool ExtInv_IsOnlyTransformation(void) {
-    return CVarGetInteger("gMods.MmMasks.OnlyTransformation", 0) != 0;
+    return !Combo_IsVanilla() && CVarGetInteger("gMods.MmMasks.OnlyTransformation", 0) != 0;
 }
 int ExtInv_GetInventorySlot(int visualSlot) {
     return visualSlot + (sExtInvState.currentPage * 24);
@@ -917,6 +918,8 @@ uint16_t Sw97_ElementIcon(uint8_t elem) {
 
 // Which of the three randomizer treatments the seed picked for Bomb Arrows.
 uint8_t BombArrows_RandoMode(void) {
+    if (Combo_IsVanilla())
+        return BOMB_ARROWS_RANDO_OFF;
     return (uint8_t)CVarGetInteger("gMods.BombArrows.Mode", BOMB_ARROWS_RANDO_OFF);
 }
 
@@ -928,6 +931,10 @@ uint8_t Sw97_BombArrowsOwned(void) {
     // "Bomb Bag" mode: owning any bomb bag is the unlock. Evaluated live rather than latched so
     // toggling the option mid-file behaves.
     return (BombArrows_RandoMode() == BOMB_ARROWS_RANDO_BOMB_BAG) && (CUR_UPG_VALUE(UPG_BOMB_BAG) > 0);
+}
+
+uint8_t Sw97_ElementWheelEnabled(void) {
+    return SW97_MEDALLIONS_ENABLED() || (Combo_IsVanilla() && Sw97_BombArrowsOwned());
 }
 
 uint8_t Sw97_ElementOwned(uint8_t elem) {
@@ -950,6 +957,10 @@ uint8_t Sw97_ElementOwned(uint8_t elem) {
 
 // Is `elem` a legal value for this weapon at all? Bombs never ride the slingshot.
 static uint8_t Sw97_ElementAllowed(uint8_t isSling, uint8_t elem) {
+    // Earning Bomb Arrows enables their selector only. The user's disabled
+    // medallion module must not also unlock its six unrelated elements.
+    if (Combo_IsVanilla() && !SW97_MEDALLIONS_ENABLED() && elem != SW97_ELEM_NONE && elem != SW97_ELEM_BOMB)
+        return 0;
     if (isSling && (elem == SW97_ELEM_BOMB)) {
         return 0;
     }
@@ -1022,7 +1033,7 @@ uint8_t Sw97_ElementNeighbor(uint8_t isSling, uint8_t elem, int32_t dir) {
 // the pause grid — goes through this and nothing else, so the "CVar off" path stays byte-identical
 // to the pre-refactor behavior and the bow-only rule for bombs lives in exactly one place.
 uint8_t Sw97_EffectiveElement(uint8_t isSling) {
-    if (!SW97_MEDALLIONS_ENABLED()) {
+    if (!Sw97_ElementWheelEnabled()) {
         return SW97_ELEM_NONE;
     }
     return Sw97_GetElement(isSling);
@@ -1137,6 +1148,10 @@ void* Wand_ModeNameTex(uint8_t mode) {
 }
 
 uint8_t Wand_RandoMode(void) {
+    // Fixed rods are independent per-file rewards. A previous seed's global
+    // medallion/single-item treatment cannot grant or disable these modes.
+    if (Combo_IsVanilla())
+        return WAND_RANDO_ELEMENTAL;
     return (uint8_t)CVarGetInteger("gRandoSettings.ElementalWandShuffle", WAND_RANDO_MEDALLIONS);
 }
 

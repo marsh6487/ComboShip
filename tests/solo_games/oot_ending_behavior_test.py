@@ -12,7 +12,9 @@ cpp=r'''
 #include <cassert>
 #include <cstddef>
 #include "ComboGameMode.h"
+#include "vanilla/ComboVanillaMode.h"
 extern "C"{int gComboGameMode=COMBO_GAME_OOT;}
+extern "C"{int gComboVanillaMode=0;}
 constexpr int ENTR_TEMPLE_OF_TIME_WARP_PAD=1,ENTR_CHAMBER_OF_THE_SAGES_0=2,TRANS_TRIGGER_START=1,TRANS_TYPE_FADE_WHITE=2,LINK_AGE_ADULT=0;
 struct {int nextCutsceneIndex=0,fileNum=0;}gSaveContext;
 struct PlayState {int nextEntranceIndex=0,transitionTrigger=0,transitionType=0,linkAgeOnLoad=0;};

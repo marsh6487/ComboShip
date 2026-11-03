@@ -149,7 +149,9 @@ source=source.replace('/* ARRIVAL_BODY */',function(mm_port,'extern "C" void MM_
 source=source.replace('/* ROUTE_BODY */','\n'.join(function(mm_port,sig) for sig in (
     'static void Combo_CancelLostWoodsPassage(','static void Combo_ClearReturnRequests(',
     'extern "C" COMBO_EXPORT void MM_SetComboEntryIsResume(','extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(')))
-source=source.replace('/* BOOT_BODY */',re.sub(r'\bthis\b','self',function((ROOT/'mm/src/code/title_setup.c').read_text(),'void Setup_InitImpl(')))
+title=(ROOT/'mm/src/code/title_setup.c').read_text()
+source=source.replace('/* BOOT_BODY */',function(title,'static s32 ComboVanilla_PrepareMMOpening(')+'\n'+
+    re.sub(r'\bthis\b','self',function(title,'void Setup_InitImpl(')))
 source+=r'''
 int main() {
     SetupState state{};

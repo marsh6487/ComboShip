@@ -52,7 +52,7 @@ run("MM grottos cannot capture a stale parent-scene point", policy + "int main()
 
 run("shared point JSON", (ROOT / "tests/farores_wind/json_test.cpp").read_text())
 container_names = ["ComboContainerPath", "ComboIsValidSlot", "ComboReleaseMajorMinor", "LoadOrCreateContainer",
-                   "FlushContainer", "Combo_CopyContainer", "Combo_ReadGameSave", "Combo_WriteGameSave",
+                   "WriteContainerDocument", "FlushContainer", "Combo_CopyContainer", "Combo_ReadGameSave", "Combo_WriteGameSave",
                    "Combo_ReadFwPoint", "Combo_WriteFwPoint", "Combo_RequestFwReturn"]
 container = (ROOT / "tests/farores_wind/container_test.cpp").read_text().replace(
     "// PRODUCTION_CONTAINER_FUNCTIONS", "\n".join(body("combo/ComboShip.cpp", name) for name in container_names))

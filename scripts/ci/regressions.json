@@ -1656,9 +1656,57 @@
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_dialogue_icon_lifetime_tests.py --sanitize"
   },
   {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "WIP native paired Vanilla save identity and creation rollback",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_save_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_host_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_native_creation_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_serializer_tests.py --sanitize"
+  },
+  {
     "suite": "equipment",
     "origin": "gate",
     "name": "OoT native song ownership, quest draw and bounded layout trace",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/oot_pause_inventory/run_quest_song_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Native Combo Vanilla creation choice, MM opening and first-cycle sharing quarantine",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_opening_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Combo Vanilla exact reward journal and atomic paired-native receipts",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_reward_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_host_reward_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Combo Vanilla NEI-only native sharing, latent ownership and exact source identity",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_sharing_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Combo Vanilla native first-cycle resources and independent game endings",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_first_cycle_resource_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_goal_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Combo Vanilla OoT fixed native rewards, earned availability and atomic receipts",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_mode_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Combo Vanilla MM exact fixed rewards, native prerequisites and earned controls",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_rewards_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_cane_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_reward_bindings_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_bomb_arrow_tests.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Combo Vanilla MM native placement resources, receipt lifecycle and retained Mirror owner",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_reward_geometry_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_reward_receipt_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_mirror_owner_tests.py --sanitize"
   }
 ]

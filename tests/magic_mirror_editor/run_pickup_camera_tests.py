@@ -23,6 +23,7 @@ fixture = r'''
 #include <initializer_list>
 SaveContext gSaveContext{};
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; s16 sSceneCutsceneCount; }
+extern "C" { int gComboVanillaMode = 0; }
 static ActorCutscene* list;
 extern "C" void CutsceneManager_Init(PlayState*, ActorCutscene* entries, s16 count) {
  list = entries; sSceneCutsceneCount = count;

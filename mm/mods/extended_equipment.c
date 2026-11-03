@@ -10,6 +10,7 @@
  */
 
 #include "extended_equipment.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "../../combo/menu/ComboItemIconOwnership.h"
 #include "equipment/nei_equipment_presentation.h"
 #include "nei_save.h" // Skijer's NEI
@@ -284,6 +285,8 @@ u8 ExtEquip_CanSwitch(void) {
 }
 
 u8 ExtEquip_IsEnabled(void) {
+    if (Combo_IsVanilla())
+        return 1;
     return CVarGetInteger(CVAR_EXT_EQUIP_ENABLED, 0) != 0;
 }
 

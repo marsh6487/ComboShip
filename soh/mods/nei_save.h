@@ -262,6 +262,13 @@ typedef struct NeiSaveData {
     uint8_t magicMirrorOwned;
     uint8_t cojiroPartnerOwned;     // additive companion ownership; never consumes the trade item
     uint8_t cojiroPartnerDismissed; // pause equipment summon toggle; defaults to called when unlocked
+    // Vanilla's separate SoH feather shares Nayru's cell. Bit 0 owns the
+    // feather; bit 1 remembers a locally earned spell before cycling away.
+    // Neither bit grants the other item. Append for existing section layouts.
+    uint8_t separateRocsFlags;
+    // Local optional-reward milestones; bit 0 records a completed native
+    // bowling prize, including its consumable prizes. Never shared as story.
+    uint8_t vanillaRewardEvents;
 } NeiSaveData;
 
 #define RITO_FLAG_MASK_OWNED (1 << 0)

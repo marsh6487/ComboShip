@@ -1,5 +1,6 @@
 #include "../../../combo/ComboGameMode.h"
 #include "FleetSharedItems.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
 #include "FleetComboItems.h"
 #include "FleetComboItemsGlue.h"
 #include "FleetComboRando.h"
@@ -65,7 +66,16 @@ static FnGrantSharedItem ResolvePeerGrant() {
 }
 
 extern "C" void FleetShared_OnNativeObtained(int nativeId) {
-    if (sReceiveDepth > 0) {
+    if (!Combo_IsCombinedGame() || sReceiveDepth > 0) {
+        return;
+    }
+    if (Combo_IsVanilla()) {
+        // Also retry this side: earning a native base sword can make a previously
+        // quarantined foreign sword upgrade eligible without another game swap.
+        FleetShared_RequestPullFromPeer();
+        const auto peer = ResolvePeerGrant();
+        if (peer != nullptr)
+            peer(nullptr);
         return;
     }
     // Native magic is an absolute capacity floor. A progressive peer grant can
@@ -98,6 +108,22 @@ typedef const char* (*FnExtractSharedState)(void);
 // Deferred to a tick with a loaded file: ApplyShared writes the live save, and the switch that
 // requested the pull happens before this game's PlayState exists again.
 static void PullFromPeerWhenReady() {
+    // Native checks bypass Randomizer_Item_Give, so a newly earned base sword
+    // would otherwise leave an already-owned MM upgrade dormant until a swap.
+    // Retry only when this file's native eligibility changes, never every frame.
+    static int vanillaSlot = -1;
+    static unsigned nativeBases = 0;
+    if (!Combo_IsVanilla()) {
+        vanillaSlot = -1;
+    } else if (gPlayState != NULL && gSaveContext.fileNum >= 0 && gSaveContext.fileNum <= 2) {
+        const unsigned current = (gSaveContext.inventory.equipment & 7u) | (gSaveContext.bgsFlag ? 8u : 0u) |
+                                 (gSaveContext.inventory.items[SLOT_HAMMER] == ITEM_HAMMER ? 16u : 0u);
+        if (vanillaSlot != gSaveContext.fileNum || nativeBases != current) {
+            vanillaSlot = gSaveContext.fileNum;
+            nativeBases = current;
+            sPullPending = true;
+        }
+    }
     if (!Combo_IsCombinedGame() || !sPullPending || gPlayState == NULL || gSaveContext.fileNum > 2) {
         return;
     }

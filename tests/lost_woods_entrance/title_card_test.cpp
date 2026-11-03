@@ -17,6 +17,7 @@
 
 #include "ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 
 SaveContext gSaveContext{};
 PlayState* gPlayState;

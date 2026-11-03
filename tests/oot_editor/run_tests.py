@@ -24,6 +24,7 @@ prefix = r'''
 #include "z64.h"
 #include "macros.h"
 #include "mods/extended_inventory.h"
+#include "vanilla/ComboVanillaMode.h"
 extern "C" {
 #include "mods/items/logic/item_cane_of_somaria.h"
 }
@@ -32,6 +33,8 @@ extern "C" {
 #include <cstring>
 #include <initializer_list>
 SaveContext gSaveContext{};
+// These editor controls retain the existing seeded combined rules.
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 static NeiSaveData gNeiSave{};
 int wandRule = WAND_RANDO_MEDALLIONS;
 uint8_t seasonsRule = NEI_SEASONS_ROD;

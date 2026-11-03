@@ -14,6 +14,7 @@ from run_mm_scene_randomization_tests import function
 PREFIX = r'''
 #include "global.h"
 #include "mods/extended_inventory.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/CustomMessage/PauseItemDescriptions.h"
@@ -22,6 +23,10 @@ PREFIX = r'''
 #include <stdio.h>
 #include <string.h>
 SaveContext gSaveContext;
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+#endif
 static NeiSaveData nei;
 static ExtendedInventoryState sExtInvState;
 static int customEnabled = 1, masksEnabled = 1, cycleActive;

@@ -7,6 +7,8 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "gameplay/CrossGameTitleCard.h"
+#include "vanilla/ComboVanillaMode.h"
+#include "vanilla/ComboVanillaPolicy.h"
 extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
 extern int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void);
@@ -72,6 +74,28 @@ void Setup_InitRegs(void) {
     R_PICTO_FOCUS_TEXT_Y = 177;
 }
 
+#ifdef COMBO_BUILD
+/* Same opening decisions as Sram_OpenSave. First-cycle owl saves retain their
+ * native entrance/form/time; a fresh pair starts in the real introduction. */
+static s32 ComboVanilla_PrepareMMOpening(s32 loadedOwlSave) {
+    if (!ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return false;
+    }
+    if (loadedOwlSave) {
+        Combo_ApplyOwlSaveOpen(true);
+    } else if (gSaveContext.save.isFirstCycle) {
+        gSaveContext.save.entrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0);
+        gSaveContext.save.day = 0;
+        gSaveContext.save.time = CLOCK_TIME(6, 0) - 1;
+    } else {
+        gSaveContext.save.entrance = ENTRANCE(CUTSCENE, 0);
+        gSaveContext.nextCutsceneIndex = 0;
+        gSaveContext.save.playerForm = PLAYER_FORM_HUMAN;
+    }
+    return true;
+}
+#endif
+
 void Setup_InitImpl(SetupState* this) {
     SysFlashrom_InitFlash();
     SaveContext_Init();
@@ -91,28 +115,39 @@ void Setup_InitImpl(SetupState* this) {
         // entry, but it never enters on SaveContext_Init's zeros either — those read as Fierce Deity
         // with an inventory of Ocarinas of Time (both are id 0), so a failed load is repaired first.
         if (Combo_LoadMMSaveFile(gComboStartFileNum + 1) != 0) {
-            Combo_RepairMMSaveForSlot(gComboStartFileNum);
+            if (Combo_PeekVanillaMode(gComboStartFileNum) != 1) {
+                Combo_RepairMMSaveForSlot(gComboStartFileNum);
+            }
+            if (Combo_LoadMMSaveFile(gComboStartFileNum + 1) != 0) {
+                gComboStartFileNum = -1;
+                STOP_GAMESTATE(&this->state);
+                SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, sizeof(ConsoleLogoState));
+                return;
+            }
         }
         // ComboShip (#182): an owl save is the newest state whenever it exists, so it wins on both
         // entry kinds — but only a resume follows it to where it was saved.
         loadedOwlSave = (gComboOwlBlobSlot == gComboStartFileNum + 1);
-        if (loadedOwlSave) {
-            Combo_ApplyOwlSaveOpen(gComboEntryIsResume);
-            if (!gComboEntryIsResume) {
-                // Arriving in South Clock Town runs neither owl-arrival path, so clear isOwlSave here
-                // or it sticks — and then owl-save write timing stays armed for the whole session.
-                gSaveContext.save.isOwlSave = false;
+        const s32 preserveNativeOpening = ComboVanilla_PrepareMMOpening(loadedOwlSave);
+        if (!preserveNativeOpening) {
+            if (loadedOwlSave) {
+                Combo_ApplyOwlSaveOpen(gComboEntryIsResume);
+                if (!gComboEntryIsResume) {
+                    // Arriving in South Clock Town runs neither owl-arrival path, so clear isOwlSave here
+                    // or it sticks — and then owl-save write timing stays armed for the whole session.
+                    gSaveContext.save.isOwlSave = false;
+                    gSaveContext.save.entrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0);
+                }
+            } else if (gComboEntryIsResume && CVarGetInteger("gEnhancements.Saving.RememberSaveLocation", 0) &&
+                       gSaveContext.save.shipSaveInfo.pauseSaveEntrance != -1) {
+                // South Clock Town is the default arrival for both portal entry and a resume. Only a resume
+                // with Remember Save Location on returns to the stored spot (set by SavingEnhancements).
+                gSaveContext.save.entrance = gSaveContext.save.shipSaveInfo.pauseSaveEntrance;
+            } else {
                 gSaveContext.save.entrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0);
             }
-        } else if (gComboEntryIsResume && CVarGetInteger("gEnhancements.Saving.RememberSaveLocation", 0) &&
-                   gSaveContext.save.shipSaveInfo.pauseSaveEntrance != -1) {
-            // South Clock Town is the default arrival for both portal entry and a resume. Only a resume
-            // with Remember Save Location on returns to the stored spot (set by SavingEnhancements).
-            gSaveContext.save.entrance = gSaveContext.save.shipSaveInfo.pauseSaveEntrance;
-        } else {
-            gSaveContext.save.entrance = ENTRANCE(SOUTH_CLOCK_TOWN, 0);
+            gSaveContext.save.cutsceneIndex = 0;
         }
-        gSaveContext.save.cutsceneIndex = 0;
         // Reset magicLevel like Sram_OpenSave does — re-arms the magic meter grow animation
         // (Interface_Update only steps magicCapacity when magicLevel == 0).
         gSaveContext.save.saveInfo.playerData.magicLevel = 0;
@@ -130,34 +165,42 @@ void Setup_InitImpl(SetupState* this) {
         // and re-runs ShipInit::Init("IS_RANDO"). COND_* macros are unregister-then-register, so it's
         // idempotent. Without it the combo force-spawn loads a rando save whose behaviors never activate.
         GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
-        MM_ApplyComboPortalArrival();
-        ComboBlackMarket_ApplyResume(gComboEntryIsResume);
-        // These entrances are already composed. Apply after native save/load hooks and never send
-        // them through transition permutation a second time. Preserve the loaded MM day/time.
-        s32 crossDungeonArrival = Combo_MM_ConsumeCrossDungeonArrival();
-        s32 crossBossRecovery = Combo_MM_ConsumeCrossBossRecoveryResume();
-        s32 crossDungeonRecovery = crossDungeonArrival < 0 && crossBossRecovery < 0 && gComboEntryIsResume
-                                       ? Combo_MM_ConsumeCrossDungeonRecovery()
-                                       : -1;
-        if (crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossDungeonRecovery >= 0) {
-            gSaveContext.save.entrance = crossDungeonArrival >= 0 ? crossDungeonArrival
-                                         : crossBossRecovery >= 0 ? crossBossRecovery
-                                                                  : crossDungeonRecovery;
-            // The consumed arrival owns respawn mode, including a positioned grotto-hole return.
-            // A departure checkpoint may carry a pause-save marker. Player_Init would
-            // turn its grotto jump into a stationary spawn over the hole if retained.
-            gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
-            gSaveContext.save.isOwlSave = false;
-            gSaveContext.save.cutsceneIndex = 0;
+        MM_ApplyComboPortalArrival(); // Also consumes a route held during the opening.
+        if (!preserveNativeOpening) {
+            ComboBlackMarket_ApplyResume(gComboEntryIsResume);
+            // These entrances are already composed. Apply after native save/load hooks and never send
+            // them through transition permutation a second time. Preserve the loaded MM day/time.
+            s32 crossDungeonArrival = Combo_MM_ConsumeCrossDungeonArrival();
+            s32 crossBossRecovery = Combo_MM_ConsumeCrossBossRecoveryResume();
+            s32 crossDungeonRecovery = crossDungeonArrival < 0 && crossBossRecovery < 0 && gComboEntryIsResume
+                                           ? Combo_MM_ConsumeCrossDungeonRecovery()
+                                           : -1;
+            if (crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossDungeonRecovery >= 0) {
+                gSaveContext.save.entrance = crossDungeonArrival >= 0 ? crossDungeonArrival
+                                             : crossBossRecovery >= 0 ? crossBossRecovery
+                                                                      : crossDungeonRecovery;
+                // The consumed arrival owns respawn mode, including a positioned grotto-hole return.
+                // A departure checkpoint may carry a pause-save marker. Player_Init would
+                // turn its grotto jump into a stationary spawn over the hole if retained.
+                gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+                gSaveContext.save.isOwlSave = false;
+                gSaveContext.save.cutsceneIndex = 0;
+            }
+            s32 crossFwArrival = ComboFw_ApplyArrival(); // Explicit recall wins over ordinary save recovery.
+            // File select normally initializes showTitleCard. A crossing bypasses
+            // it, and may land at a positioned/shuffled entrance without a card bit.
+            // Ordinary save resumes keep the native rules, including saved recovery.
+            sComboCrossGameTitleCardPending =
+                !gComboEntryIsResume || crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossFwArrival;
+            if (sComboCrossGameTitleCardPending)
+                gSaveContext.showTitleCard = true;
+
+        } else {
+            // Discard destinations sent before the opening; they cannot replay later.
+            Combo_MM_ConsumeCrossDungeonArrival();
+            Combo_MM_ConsumeCrossBossRecoveryResume();
+            Combo_MM_ConsumeCrossDungeonRecovery();
         }
-        s32 crossFwArrival = ComboFw_ApplyArrival(); // Explicit recall wins over ordinary save recovery.
-        // File select normally initializes showTitleCard. A crossing bypasses
-        // it, and may land at a positioned/shuffled entrance without a card bit.
-        // Ordinary save resumes keep the native rules, including saved recovery.
-        sComboCrossGameTitleCardPending =
-            !gComboEntryIsResume || crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossFwArrival;
-        if (sComboCrossGameTitleCardPending)
-            gSaveContext.showTitleCard = true;
 
         // ComboShip (#182): consume the owl save like Sram_OpenSave does, so it can't shadow the newer
         // state we just continued into. Vetoed for Persistent Owl Saves and for pause/auto saves.

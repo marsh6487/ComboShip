@@ -21,6 +21,7 @@
  */
 
 #include "z64.h"
+#include "../../../../combo/vanilla/ComboVanillaMode.h"
 #include "item_cane_of_somaria.h"
 #include "../custom_items.h"
 #include "../helpers/equip_helper.h"
@@ -109,8 +110,15 @@ u8 Cane_GiveSkill(u8 skill) {
     // hands — the six pickups can arrive in any order, so "first one wins".
     if (!hadCane) {
         Nei_SetOwnedItem(SLOT_CANE_OF_SOMARIA, ITEM_CANE_OF_SOMARIA);
-        Nei_CaneSetType(CANE_SKILL_TYPE(skill));
-        Nei_CaneSetSkillSlot(CANE_SKILL_TYPE(skill), CANE_SKILL_SLOT(skill));
+        if (Combo_IsVanilla()) {
+            static const u8 types[6] = { 0, 0, 1, 2, 2, 3 };
+            const u8 type = types[skill];
+            Nei_CaneSetType(type);
+            Nei_CaneSetSkillSlot(type, type == 2 ? skill - 3 : skill);
+        } else {
+            Nei_CaneSetType(CANE_SKILL_TYPE(skill));
+            Nei_CaneSetSkillSlot(CANE_SKILL_TYPE(skill), CANE_SKILL_SLOT(skill));
+        }
     }
     return 1;
 }
@@ -413,6 +421,18 @@ static u8 Cane_SummonSlotOwned(u8 slot) {
 static void Cane_CycleSummon(Player* p, PlayState* play, s8 dir) {
     u8 cur;
     u8 owned = 0;
+
+    // Fixed Flip and Stone rewards remain separately selectable after either
+    // collection order. Flip keeps its existing tap/hold behavior.
+    if (Combo_IsVanilla() && Cane_GetType() == CANE_TYPE_PACCI) {
+        const u8 next = Nei_CaneGetSkillSlot(CANE_TYPE_PACCI) ^ 1;
+        if (Cane_HasSkill(3 + next)) {
+            Nei_CaneSetSkillSlot(CANE_TYPE_PACCI, next);
+            Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        }
+        return;
+    }
 
     // The Trirod cycles its LEARNED ECHOES here instead of Somaria's summons.
     if (Cane_GetType() == CANE_TYPE_TRIROD) {

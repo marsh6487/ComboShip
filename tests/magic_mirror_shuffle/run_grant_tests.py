@@ -21,11 +21,13 @@ for host in ['soh', 'mm']:
     fixture = r'''
 #include "global.h"
 #include "mods/extended_inventory.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "tests/test_require.h"
 #include <cstring>
 #include <initializer_list>
 /* ENUMS */
 SaveContext gSaveContext{};
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 static NeiSaveData saved{};
 static bool broad = false;
 extern "C" NeiSaveData* Nei_Save() { return &saved; }

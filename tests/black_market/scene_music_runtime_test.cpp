@@ -38,6 +38,7 @@ void Audio_SetEnvReverb(s8) {}
 #define osSyncPrintf(...) ((void)0)
 #ifdef SCENE_MUSIC_MM
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+extern "C" { int gComboVanillaMode = 0; }
 #define COMBO_SCENE_MUSIC_MM
 static uint16_t sComboSceneMusicPreviewRow;
 u8 gSceneSeqState;

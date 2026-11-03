@@ -1,5 +1,7 @@
 #include "FleetSharedItems.h"
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/vanilla/ComboVanillaMode.h"
+#include "../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "FleetComboItems.h"
 #include "FleetComboItemsGlue.h"
 #include "2s2h/Rando/Types.h"
@@ -110,6 +112,15 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
     if (!Combo_IsCombinedGame() || sReceiveDepth > 0) {
         return;
     }
+    if (Combo_IsVanilla()) {
+        // Also retry this side: earning a native base sword can make a previously
+        // quarantined foreign sword upgrade eligible without another game swap.
+        FleetShared_RequestPullFromPeer();
+        const auto peer = ResolvePeerGrant();
+        if (peer != nullptr)
+            peer(nullptr);
+        return;
+    }
     // Share the concrete native tier even in RPG mode. Returning without a
     // floor update left a foreign magic pickup dormant until the next switch.
     if (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC) {
@@ -145,6 +156,9 @@ static void PullFromPeerWhenReady() {
     if (!Combo_IsCombinedGame() || !sPullPending || gPlayState == NULL || gSaveContext.fileNum < 0 ||
         gSaveContext.fileNum > 2) {
         return;
+    }
+    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return; // Keep the request armed; the first native reset releases it.
     }
     sPullPending = false;
     static FnExtractSharedState sExtract = nullptr;

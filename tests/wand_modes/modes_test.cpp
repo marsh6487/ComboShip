@@ -9,6 +9,7 @@
 #include "mods/extended_player.h"
 #include "mods/extended_equipment.h"
 #include "mods/extended_inventory.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/oot_asset_loader/oot_asset_loader.h"
 #include "GameInteractor/GameInteractor.h"

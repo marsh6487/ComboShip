@@ -35,6 +35,7 @@
 #include "dungeon.h"
 #ifdef COMBO_BUILD
 extern "C" bool ComboBlackMarketOot_TryFixedReceiptGrant(PlayState*, GetItemEntry);
+extern "C" bool ComboVanillaOot_TryReceiptGrant(PlayState*, GetItemEntry);
 #include "hook_handlers.h" // ComboShip: OOT_DeliverForeign for RG_COMBO_FOREIGN grant divert
 extern "C" void (*gComboTriforceProgress)(int game, int fileNum);
 #endif
@@ -1826,6 +1827,8 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
     RandomizerGet item = (RandomizerGet)giEntry.getItemId;
 
 #ifdef COMBO_BUILD
+    if (ComboVanillaOot_TryReceiptGrant(play, giEntry))
+        return Return_Item_Entry(giEntry, RG_NONE);
     // A live fixed Black Market receipt may own an exact cane/bundle grant.
     // Keep the native receive hook, text, fanfare and item camera intact.
     if (ComboBlackMarketOot_TryFixedReceiptGrant(play, giEntry))

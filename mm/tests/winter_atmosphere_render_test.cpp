@@ -18,6 +18,7 @@
 
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0; // Existing native weather/render controls use seeded saves.
 }
 
 SaveContext gSaveContext{};

@@ -43,7 +43,9 @@ def main():
     arrival_end = regional.index("} sArrival;", arrival_start) + len("} sArrival;")
     arrival_state = "namespace {\nusing ComboMmRegional::Placement;\n" + regional[arrival_start:arrival_end] + "\n}\n"
     fixture = fixture.replace("/* REGIONAL_ARRIVAL */", arrival_state + function(regional, 'extern "C" int ComboRegionalPassagesMm_ApplyArrival('))
-    fixture = fixture.replace("/* BOOT_BODY */", re.sub(r"\bthis\b", "self", function(boot, "void Setup_InitImpl(")))
+    opening = function(boot, "static s32 ComboVanilla_PrepareMMOpening(")
+    fixture = fixture.replace("/* BOOT_BODY */", opening + "\n" +
+                              re.sub(r"\bthis\b", "self", function(boot, "void Setup_InitImpl(")))
     fixture = fixture.replace("/* ARRIVAL_BODY */", function(port, 'extern "C" void MM_ApplyComboPortalArrival('))
     fixture = fixture.replace("/* CUSTOM_TRANSITIONS */", "\n".join(function((ROOT / path).read_text(), signature)
         for path, signature in (("mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp", "void Transition("),

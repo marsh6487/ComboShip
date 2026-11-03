@@ -20,6 +20,7 @@ title = (ROOT / "mm/src/code/title_setup.c").read_text()
 port = (ROOT / "mm/2s2h/BenPort.cpp").read_text()
 body = block_from(title, title.index("void Setup_InitImpl("))
 body = re.sub(r"\bthis\b", "self", body)
+body = block_from(title, title.index("static s32 ComboVanilla_PrepareMMOpening(")) + "\n" + body
 signature = 'extern "C" void MM_ApplyComboPortalArrival('
 arrival = block_from(port, port.index(signature))
 routes = "\n".join(block_from(port, port.index(signature)) for signature in (

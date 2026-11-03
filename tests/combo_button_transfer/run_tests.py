@@ -17,6 +17,7 @@ PREFIX = r'''
 #include "global.h"
 #include "mods/nei_save.h"
 #include "gameplay/MagicMirrorItem.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "FleetComboIds.h"
 #include <nlohmann/json.hpp>
@@ -24,6 +25,8 @@ PREFIX = r'''
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+// The legacy native-button transfer controls run with a seeded paired file.
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 static nlohmann::json sNetShared, sNetFlat;
 static bool sNetPrimed;

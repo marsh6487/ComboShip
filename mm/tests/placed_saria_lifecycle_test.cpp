@@ -189,6 +189,7 @@ SaveContext gSaveContext{};
 PlayState* gPlayState;
 GameState* gGameState;
 int gComboGameMode;
+int gComboVanillaMode = 0;
 bool Player_InCsMode(PlayState*) {
     return false;
 }

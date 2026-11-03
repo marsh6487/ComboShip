@@ -1,4 +1,7 @@
 #include "gameplay/ComboFaroresWindJson.h"
+#include "vanilla/ComboVanillaFile.h"
+#include "vanilla/ComboVanillaSave.h"
+#include "vanilla/ComboVanillaRewards.h"
 #include <cassert>
 #include <ctime>
 #include <filesystem>
@@ -11,6 +14,9 @@
 namespace ComboRando { enum { GAME_OOT, GAME_MM }; }
 static std::mutex g_containerMutex;
 static std::map<int, nlohmann::json> g_containerCache;
+// Existing Farore controls run with no in-flight native creation or reward.
+static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
+static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
 static std::vector<int> g_evictedSlots;
 static int g_MmSaveInMemorySlot = -1;
 static void (*MM_InvalidateOwlBlobSlot)() = nullptr;

@@ -18,6 +18,7 @@ source = r'''
 #include <cstring>
 #include <initializer_list>
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+extern "C" { int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 static void require(bool condition, const char* reason) {
     if (!condition) { std::fprintf(stderr,"FAIL: %s\n",reason); std::exit(1); }

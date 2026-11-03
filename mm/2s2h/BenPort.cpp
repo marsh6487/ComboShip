@@ -29,6 +29,8 @@ extern "C" void Partners_Reset(void);
 #include <thread>
 #include <unordered_map> // ComboShip: oracle name->id lookup maps
 #include "2s2h/FleetShipCombo/FleetSharedItems.h"
+#include "vanilla/ComboVanillaPolicy.h"
+#include "vanilla/ComboVanillaMode.h"
 #include "mods/combo_rpg.h"
 
 #include <ship/resource/CrossRMRegistry.h>
@@ -179,7 +181,34 @@ static bool sComboTransitionActive = false;
 // Session-owned, hidden in this DLL: the launcher sets it before MM initialization.
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
+int gComboVanillaMode = 0;
+int gComboVanillaCreationFailed = 0;
+int (*gComboVanillaCreateCallback)(int, int) = nullptr;
 }
+
+static int (*sComboVanillaModeQuery)(int) = nullptr;
+extern "C" COMBO_EXPORT void MM_SetComboVanillaCallbacks(int (*query)(int), int (*create)(int, int)) {
+    sComboVanillaModeQuery = query;
+    gComboVanillaCreateCallback = create;
+}
+extern "C" int Combo_PeekVanillaMode(int slot) {
+    return Combo_IsCombinedGame() && sComboVanillaModeQuery ? sComboVanillaModeQuery(slot) : 0;
+}
+extern "C" int Combo_QueryVanillaMode(int slot) {
+    const int mode = Combo_PeekVanillaMode(slot);
+    gComboVanillaMode = mode == 1;
+    return mode;
+}
+extern int SaveManager_InitVanillaForCombo(int slot, const unsigned char* name);
+extern void SaveManager_DiscardVanillaCreation();
+extern "C" COMBO_EXPORT void MM_DiscardVanillaSaveCreation() {
+    SaveManager_DiscardVanillaCreation();
+}
+
+extern "C" COMBO_EXPORT int MM_InitVanillaSaveFile(int slot, const unsigned char* name) {
+    return SaveManager_InitVanillaForCombo(slot, name);
+}
+
 extern "C" COMBO_EXPORT void MM_SetGameMode(int mode) {
     if (OTRGlobals::Instance != nullptr)
         return; // A running module owns one immutable session mode.
@@ -224,6 +253,9 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     if (!sComboPortalArrivalPending || !ComboPassages_IsRoute(sComboPortalRoute))
         return;
     sComboPortalArrivalPending = false;
+    if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
+        return; // Consume the route without replacing native opening/first-cycle state.
+    }
     // Native opening-forest entrances include instant prologue transitions.
     // Stage the exploration arrival after save loading; Play_Init consumes it
     // once and the existing title-card hook waits for the native fade to end.
@@ -3576,19 +3608,16 @@ extern "C" void Combo_AdoptOOTGlobalOptions(void) {
     gSaveContext.options.audioSetting = (u8)audio;
 }
 
-// C-callable wrapper used by title_setup.c (which is a C file) to load a MM save from disk.
-// 0 = loaded a usable rando save; negative = nothing usable (SaveManager codes, plus -6 = loaded but not
-// a rando save). A negative code sends the caller to Combo_RepairMMSaveForSlot — entry is never refused.
+// C-callable load wrapper. The container's explicit mode owns the expected
+// native save type; a mismatched half must never become playable or writable.
 extern "C" int Combo_LoadMMSaveFile(int mmFileNum) {
     int result = SaveManager_LoadSaveFile(mmFileNum);
     if (result != 0) {
         return result;
     }
-    // No vanilla mode in ComboShip: a non-rando save means the slot was created wrong, and every
-    // IS_RANDO hook stays unregistered (COND_HOOK tests the condition once, at OnSaveLoad).
-    if (gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO) {
-        SPDLOG_ERROR("[ComboShip] MM save file{} is not SAVETYPE_RANDO — rebuilding a baseline", mmFileNum);
-        // The load above already set fileNum to this slot; re-mark "no save" or it reads as resident.
+    const auto expected = Combo_IsVanilla() ? SAVETYPE_VANILLA : SAVETYPE_RANDO;
+    if (gSaveContext.save.shipSaveInfo.saveType != expected) {
+        SPDLOG_ERROR("[ComboShip] MM save file{} type does not match the selected container mode", mmFileNum);
         SaveManager_MarkNoSaveLoaded();
         return -6;
     }
@@ -5110,6 +5139,10 @@ extern "C" COMBO_EXPORT void MM_GrantCrossItem(const char* itemName) {
 
 // The peer's half of a shared item (OoT obtained it): grant only, never share back.
 extern "C" COMBO_EXPORT void MM_GrantSharedItem(const char* itemName) {
+    if (Combo_IsVanilla()) {
+        FleetShared_RequestPullFromPeer();
+        return;
+    }
     GrantMmItemByName(itemName, nullptr);
 }
 

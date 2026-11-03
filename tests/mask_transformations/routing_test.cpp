@@ -1,5 +1,7 @@
 // Production mask lookup and item-use dispatcher; runtime resource/config seams only.
 #include "z64item.h"
+#include "mods/nei_save.h"
+#include "vanilla/ComboVanillaMode.h"
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -21,6 +23,10 @@ static struct {
 } gFormState;
 
 static std::unordered_map<std::string, int> cvars;
+extern "C" NeiSaveData* Nei_Save() {
+    static NeiSaveData state{};
+    return &state;
+}
 static bool mmAssets = true;
 static int handledItem = ITEM_NONE;
 static bool progressionUnlocked = true;

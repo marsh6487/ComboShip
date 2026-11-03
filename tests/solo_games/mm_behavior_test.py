@@ -149,6 +149,8 @@ int main() {
 
 goal = (ROOT/'mm/2s2h/FleetShipCombo/FleetComboGoal.cpp').read_text()
 goal_program = COMMON + r'''
+#include "combo/vanilla/ComboVanillaMode.h"
+extern "C" { int gComboVanillaMode = 0; }
 int CVarGetInteger(const char*,int) {return 0;}
 #define CVAR_COMBO 1
 ''' + block(goal, 'static bool BeatBothBosses()') + r'''
@@ -207,11 +209,16 @@ int main(){
 '''
 opening=(ROOT/'mm/2s2h/Enhancements/Gameplay/ComboOpeningForest.h').read_text()
 opening_program=COMMON+r'''
+#include "combo/vanilla/ComboVanillaMode.h"
+#include "combo/vanilla/ComboVanillaPolicy.h"
+// The existing combined opening control is a seeded save.
+extern "C" { int gComboVanillaMode = 0; }
 constexpr int GAMEMODE_NORMAL=0,SCENE_LOST_WOODS=1,ENTR_SCENE_OPENING_DUNGEON=2;
 #define ENTRANCE(scene,spawn) (0x600+(spawn))
 struct PlayState {int sceneId=SCENE_LOST_WOODS;};
 struct {int gameMode=GAMEMODE_NORMAL,fileNum=0,sceneLayer=0,nextCutsceneIndex=17,cutsceneTrigger=1,respawnFlag=2;
-struct {int entrance=ENTRANCE(LOST_WOODS,0),cutsceneIndex=0;} save;} gSaveContext;
+struct {int entrance=ENTRANCE(LOST_WOODS,0),cutsceneIndex=0;
+struct {struct {unsigned int threeDayResetCount=0;} playerData;} saveInfo;} save;} gSaveContext;
 bool ComboLostWoods_IsPlayableSlot(int slot){return slot>=0&&slot<3;}
 '''+block(opening,'static inline int ComboOpeningForest_IsExploration(')+'\n'+block(opening,'static inline void ComboOpeningForest_NormalizeEntry(')+r'''
 int main(){

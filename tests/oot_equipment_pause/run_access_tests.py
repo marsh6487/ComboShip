@@ -42,6 +42,7 @@ struct PlayState;
 struct LinkAnimationHeader;
 #include "soh/mods/extended_equipment.h"
 #include "soh/mods/nei_save.h"
+#include "combo/vanilla/ComboVanillaMode.h"
 #define EXT_EQUIP_PAGE_SWITCH_COOLDOWN 15
 #define TRADE_ADULT_PENDANT 1
 #define MM_PLAYER_FORM_PIKACHU 9
