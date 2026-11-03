@@ -24,6 +24,7 @@ def function(source, name):
 def main():
     form = (ROOT / 'soh/mods/transformation_masks/mm_player_form.cpp').read_text()
     routing = (ROOT / 'soh/mods/transformation_masks/transformation_masks.c').read_text()
+    forms = (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
     header = (ROOT / 'soh/mods/transformation_masks/transformation_masks.h').read_text()
     enums = []
     for text, name in ((header, 'TransformMaskId'), (header, 'MmPlayerTransformation'), (form, 'MmFormStateId')):
@@ -36,7 +37,8 @@ def main():
     source = (ROOT / 'tests/mask_transformations/routing_test.cpp').read_text()
     source = source.replace('/* PRODUCTION_FORM_ENUM */', '\n'.join(enums))
     source = source.replace('/* PRODUCTION_SHADOW_CRYSTAL_ID */', crystal.group(0))
-    actual = [function(form, name) for name in ('MmForm_MaskIdToForm', 'MmForm_GetMaskType', 'MmForm_IsEnabled',
+    actual = [function(forms, 'RitoItem_FormEnabled')]
+    actual += [function(form, name) for name in ('MmForm_MaskIdToForm', 'MmForm_GetMaskType', 'MmForm_IsEnabled',
                                               'MmForm_FleetApplyForm')]
     actual += [function(routing, name) for name in ('TransformMasks_GetMaskType', 'TransformMasks_IsEnabled',
                                                    'MaskShipsOutsideMmAssets', 'TransformMasks_TryFormFromItem')]
@@ -45,7 +47,8 @@ def main():
         p = Path(folder)
         (p / 'routing.cpp').write_text(source)
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=gnu++20', '-Wall', '-Wextra', '-Werror',
-                        '-I' + str(ROOT / 'soh/include'), str(p / 'routing.cpp'), '-o', str(p / 'routing')], check=True)
+                        '-I' + str(ROOT / 'soh/include'), '-I' + str(ROOT / 'soh'),
+                        '-I' + str(ROOT / 'combo'), str(p / 'routing.cpp'), '-o', str(p / 'routing')], check=True)
         subprocess.run([str(p / 'routing')], check=True)
 
 
