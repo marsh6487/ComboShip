@@ -126,7 +126,7 @@
     "suite": "systems",
     "origin": "gate",
     "name": "Fast audio-worker compile and mixer regressions",
-    "run": "python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
+    "run": "python3 -B tests/night_music/run_tests.py\npython3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
   },
   {
     "suite": "systems",

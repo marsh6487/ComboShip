@@ -5298,6 +5298,10 @@ void Audio_PlaySequenceWithSeqPlayerIO(u8 playerIdx, u16 seqId, u8 fadeTimer, s8
     Audio_StartSeq(playerIdx, fadeTimer, seqId);
 }
 
+uint8_t Audio_IsSceneNightMusicInCombat(void) {
+    return sSeqModeInput == SEQ_MODE_ENEMY;
+}
+
 void Audio_SetSequenceMode(u8 seqMode) {
     s32 volumeFadeInTimer;
     u16 seqId;
@@ -5316,7 +5320,7 @@ void Audio_SetSequenceMode(u8 seqMode) {
         }
 
         if ((seqId == NA_BGM_DISABLED) || (Audio_GetSeqFlags((u8)(seqId & 0xFF)) & 1) || Audio_IsNightBgmActive() ||
-            ((sPrevSeqMode & 0x7F) == SEQ_MODE_ENEMY)) {
+            Audio_IsSceneNightBgmActive() || ((sPrevSeqMode & 0x7F) == SEQ_MODE_ENEMY)) {
             // FIELD_LOGIC's untagged enemy mode has no SUB overlay. When
             // night takes over mid-combat, enter the ordinary overlay once.
             if (seqMode != (sPrevSeqMode & 0x7F) ||

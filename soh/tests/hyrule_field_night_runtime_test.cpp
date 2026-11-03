@@ -19,8 +19,16 @@ s8 D_80133390[] = "SEQ H", D_80133398[] = "    L";
 }
 
 static bool enabled = true;
+static bool sceneNightEnabled = false;
 static uint16_t nightSelection = 0x15D;
 static int previewSequence = 0;
+// The independent optional scene lifecycle is covered by tests/night_music.
+uint16_t SceneNightMusic_CurrentEntry() {
+    return 0;
+}
+bool SceneNightMusic_RequestRefresh() {
+    return false;
+}
 static std::vector<u32> commands;
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
@@ -28,7 +36,8 @@ AudioCollection::AudioCollection() = default;
 static AudioCollection collection;
 AudioCollection* AudioCollection::Instance = &collection;
 bool AudioCollection::HasSequenceNum(uint16_t id) {
-    return id == 0xFF02 || id == 0x15D || id == 0x1C6 || id == NA_BGM_FIELD_LOGIC || id == NA_BGM_KAKARIKO_ADULT;
+    return id == 0xFF02 || id == 0x15D || id == 0x1C6 || id == NA_BGM_FIELD_LOGIC || id == NA_BGM_KAKARIKO_ADULT ||
+           id == NA_BGM_GORON_CITY || id == NA_BGM_WINDMILL;
 }
 uint16_t AudioCollection::GetReplacementSequence(uint16_t id) {
     return id == 0xFF02 ? nightSelection : id;
@@ -42,6 +51,8 @@ int CVarGetInteger(const char* name, int fallback) {
         return nightSelection;
     if (std::strcmp(name, "gAudioEditor.Playing") == 0)
         return previewSequence;
+    if (std::strcmp(name, "gAudioEditor.EnableNightMusic") == 0)
+        return sceneNightEnabled;
     return fallback;
 }
 void CVarSetInteger(const char* name, int value) {
@@ -55,6 +66,11 @@ void Audio_CancelPreviewRestore(void) {
 int Player_InCsMode(PlayState* play) {
     return play->csCtx.state != CS_STATE_IDLE;
 }
+#ifndef NIGHT_COMBAT_RUNTIME_TEST
+void Audio_PlayNatureAmbienceSequence(u8) {
+    Audio_QueueSeqCmd(NA_BGM_NATURE_AMBIENCE);
+}
+#endif
 u16 AudioEditor_GetReplacementSeq(u16 id) {
     return id;
 }
@@ -106,6 +122,7 @@ static void Reset(PlayState& play) {
     HyruleFieldNightMusic_Reset();
     commands.clear();
     enabled = true;
+    sceneNightEnabled = false;
     nightSelection = 0x15D;
     previewSequence = 0;
     gSaveContext.nightFlag = 1;
@@ -136,6 +153,12 @@ int main() {
     // Rebinding the CVar must not multiply frame callbacks/start commands.
     ShipInit::Init("gAudioEditor.HyruleFieldNightMusic");
     ShipInit::Init("gAudioEditor.HyruleFieldNightSequence");
+    StartNight(play);
+
+    sceneNightEnabled = true;
+    enabled = false;
+    Frame();
+    REQUIRE((commands == std::vector<u32>{ 0x83000000, 0x82000001 }));
     StartNight(play);
 
     // Dawn and disable replace MAIN once; no stop of the new sequence.

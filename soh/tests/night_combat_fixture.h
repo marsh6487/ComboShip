@@ -7,6 +7,8 @@ static int sNumFramesMoving, sNumFramesStill;
 static u8 sAudioEnemyVol = 100;
 static int splitVolume;
 static u8 Audio_GetSeqFlags(u8 id) {
+    if (id == NA_BGM_GORON_CITY)
+        return 0x80;
     return id == 0x18 ? 1 : 0;
 }
 static void Audio_SplitBgmChannels(int volume) {
@@ -16,6 +18,21 @@ extern "C" void Audio_SetVolScale(u8, u8, u8, u8);
 #define Audio_StartSeq(player, fade, id) Audio_QueueSeqCmd(((player) << 24) | ((fade) << 16) | (id))
 #define Audio_SeqCmd1(player, fade) Audio_QueueSeqCmd(0x100000FF | ((player) << 24) | ((fade) << 16))
 #define Audio_SeqCmd7(player, port, value) Audio_QueueSeqCmd(0x70000000 | ((player) << 24) | ((port) << 16) | (value))
+#define Audio_SeqCmd8(player, port, channel, value) \
+    Audio_QueueSeqCmd(0x80000000 | ((player) << 24) | ((port) << 16) | ((channel) << 8) | (value))
+#define Audio_SeqCmdE01(player, value) Audio_QueueSeqCmd(0xE0000100 | ((player) << 24) | (value))
+#ifndef ARRAY_COUNT
+#define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
+#endif
+static u8 sSoundOutputMode = 0;
+struct TestNatureIO {
+    u16 playerIO = 0, channelMask = 0;
+    u8 channelIO[1] = { 0xff };
+};
+static TestNatureIO sNatureAmbienceDataIO[20];
+static void func_800F3F3C(u8) {
+}
+#include "night_native_ambience.inc"
 #include "night_sequence_mode.inc"
 #ifdef NIGHT_EDITOR_REFRESH_TEST
 static u16 sPreviewNightBgmSeqId = NA_BGM_DISABLED;
@@ -63,6 +80,17 @@ static void TestNightPreviewRestore(PlayState& play) {
 #endif
 
 static void TestCombat(PlayState& play) {
+    for (u16 protectedTrack : { u16(NA_BGM_GORON_CITY), u16(NA_BGM_WINDMILL) }) {
+        Reset(play);
+        nightSelection = protectedTrack;
+        Frame();
+        SetPlayer(0, protectedTrack);
+        commands.clear();
+        enabled = false;
+        sceneNightEnabled = true;
+        Frame();
+        REQUIRE((commands == std::vector<u32>{ 0x83000000, 0x82000001 }));
+    }
 #ifdef NIGHT_EDITOR_REFRESH_TEST
     TestNightPreviewRestore(play);
 #endif

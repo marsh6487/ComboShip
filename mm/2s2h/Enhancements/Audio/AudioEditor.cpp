@@ -14,6 +14,7 @@
 #include "2s2h/BenGui/BenMenu.h"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "AudioCollection.h"
+#include "../../../../combo/audio/NightMusic.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "../../../../combo/gui/WhatsNew.h"
 #include <random>
@@ -33,6 +34,7 @@ using namespace UIWidgets;
 #define CVAR_AUDIO(var) CVAR_PREFIX_AUDIO "." var
 
 static WidgetInfo lowHpAlarm;
+static WidgetInfo enableNightMusic;
 static WidgetInfo muteCarpenterSfx;
 static WidgetInfo childGoronCry;
 static WidgetInfo tatlCall;
@@ -201,6 +203,8 @@ size_t AuthenticCountBySequenceType(SeqType type) {
 }
 
 static uint16_t CurrentBGMReplacement(uint16_t sequenceId) {
+    if (const auto nightRow = SceneNightMusic_CurrentEntry())
+        return AudioCollection::Instance->GetReplacementSequence(nightRow);
 #ifdef COMBO_BUILD
     const auto row = AudioEditor_GetSceneMusicRow(sequenceId);
     if (row)
@@ -212,6 +216,8 @@ static uint16_t CurrentBGMReplacement(uint16_t sequenceId) {
 // Grabs the current BGM sequence ID and replays it
 // which will lookup the proper override, or reset back to vanilla
 void ReplayCurrentBGM() {
+    if (SceneNightMusic_RequestRefresh())
+        return;
     u16 curSeqId = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
 #ifdef COMBO_BUILD
     // ComboShip: nothing to replay when no BGM is playing (e.g. MM dormant while combo generates) —
@@ -233,6 +239,8 @@ void UpdateCurrentBGM(u16 seqKey, SeqType seqType) {
         return;
     }
 
+    if (SceneNightMusic_CurrentEntry() == seqKey && SceneNightMusic_RequestRefresh())
+        return;
     u16 curSeqId = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
     if (curSeqId == seqKey
 #ifdef COMBO_BUILD
@@ -539,6 +547,8 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
         const std::string initialSfxKey = seqData.sfxKey;
         const std::string cvarKey = AudioCollection::Instance->GetCvarKey(seqData.sfxKey);
         const std::string cvarLockKey = AudioCollection::Instance->GetCvarLockKey(seqData.sfxKey);
+        WhatsNew::Scope rowAccent(cvarKey.c_str(), seqData.label.c_str(),
+                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
         const std::string hiddenKey = "##" + cvarKey;
         const std::string resetButton = ICON_FA_UNDO + hiddenKey;
         const std::string randomizeButton = ICON_FA_RANDOM + hiddenKey;
@@ -803,6 +813,7 @@ void AudioEditor::DrawElement() {
                 BenGui::mBenMenu->MenuDrawItem(childGoronCry, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(tatlCall, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(enemyProx, ImGui::GetContentRegionAvail().x, THEME_COLOR);
+                BenGui::mBenMenu->MenuDrawItem(enableNightMusic, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(randoMusicOnSceneChange, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(randomAudioOnSeedGen, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(displaySeqName, ImGui::GetContentRegionAvail().x, THEME_COLOR);
@@ -1265,6 +1276,15 @@ void RegisterAudioWidgets() {
     for (auto& widget : seasonWeatherWidgets) {
         AddAudioSearchWidget(widget, "Weather & Seasons");
     }
+
+    enableNightMusic = { .name = "Enable Night Music", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    enableNightMusic.CVar(CVAR_AUDIO("EnableNightMusic"))
+        .Options(CheckboxOptions()
+                     .Color(THEME_COLOR)
+                     .DefaultValue(false)
+                     .Tooltip("Plays each scene's daytime music selection at night while preserving ambience, weather, "
+                              "sound effects and native forced music, including Final Hours."));
+    AddAudioSearchWidget(enableNightMusic);
 
     lowHpAlarm = { .name = "Mute Low HP Alarm", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     lowHpAlarm.CVar(CVAR_AUDIO("LowHpAlarm"))
