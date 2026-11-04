@@ -432,6 +432,11 @@ bool ExtInv_IsOnlyTransformation(void);
  */
 int ExtInv_GetInventorySlot(int visualSlot);
 
+/** Native MM item assignment -> visible item-page cell, or -1 when hidden.
+ * Does not change equipment storage or enable outlines for virtual/custom slots.
+ */
+int ExtInv_GetItemOutlineVisualSlot(uint8_t equippedSlot);
+
 /**
  * @param slot - Inventory slot to check
  * @return true if slot belongs to current page

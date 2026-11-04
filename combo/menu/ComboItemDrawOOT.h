@@ -43,7 +43,7 @@
 #include <string>
 #include <atomic>
 #include <spdlog/spdlog.h>
-#include "objects/object_gi_fire/object_gi_fire.h"           // gGiBlueFireFlameDL (boss-soul flame)
+#include "objects/object_gi_fire/object_gi_fire.h"           // bottle effects; soul flame is in soh_assets.h
 #include "objects/object_gi_key/object_gi_key.h"             // gGiSmallKeyDL
 #include "objects/object_gi_bosskey/object_gi_bosskey.h"     // gGiBossKeyDL / gGiBossKeyGemDL
 #include "objects/object_gi_map/object_gi_map.h"             // gGiDungeonMapDL
@@ -282,7 +282,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         out->dlistCount = 2;
         out->drawKind = CW_DRAW_KIND_BOSS_SOUL;
         out->xluStartIndex = 0;              // both layers XLU
-        out->dlists[0] = gGiBlueFireFlameDL; // flame (grayscale-tinted)
+        out->dlists[0] = gBossSoulFlameDL; // flame (grayscale-tinted)
         out->dlists[1] = gBossSoulSkullDL;   // generic soul skull
         if (slot == 5 && !CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("SimplerBossSoulModels"), 0)) {
             out->drawKind = CW_DRAW_KIND_OOT_MORPHA_SOUL;
@@ -1302,7 +1302,7 @@ static const uint8_t kBossSoulFlameColors[9][3] = {
 
 // Randomizer_DrawBossSoul's blue-fire flame: grayscale-tinted, billboarded, on a segment-8 scroll.
 static void OOT_AnimBossSoulFlame(CwItemAnimDrawInfo* out, int slot) {
-    out->flameDlPath = gGiBlueFireFlameDL;
+    out->flameDlPath = gBossSoulFlameDL;
     out->flameGrayscale = 1;
     out->flameTranslate[1] = -70.0f;
     out->flameScale[0] = out->flameScale[1] = out->flameScale[2] = 5.0f;

@@ -151,6 +151,7 @@ void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     play->unk_11DFC = nullptr;
     play->setupEntranceList = nullptr;
     play->setupExitList = nullptr;
+    play->setupExitListCount = 0;
     play->cUpElfMsgs = nullptr;
     play->setupPathList = nullptr;
     play->numSetupActors = 0;

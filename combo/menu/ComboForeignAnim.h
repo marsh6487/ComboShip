@@ -685,7 +685,8 @@ inline void CfaDrawFlame(PlayState* play, const CwItemAnimDrawInfo* info, const 
     // OoT boss models retain their owning RM and replacement skeleton. Only their
     // blue-fire composite pass uses MM's native soul renderer in the MM host.
     if (info->flameDlPath != nullptr && strcmp(game, "oot") == 0 && info->flameGrayscale &&
-        strcmp(info->flameDlPath, "__OTR__objects/object_gi_fire/gGiBlueFireFlameDL") == 0) {
+        (strcmp(info->flameDlPath, "__OTR__objects/object_gi_fire/gGiBlueFireFlameDL") == 0 ||
+         strcmp(info->flameDlPath, "__OTR__objects/object_boss_soul/gBossSoulFlameDL") == 0)) {
         DrawOotSoulFlame(play, info->flameColor, info->flameTranslate, info->flameScale);
         return;
     }
@@ -772,6 +773,9 @@ inline bool CfaValidateSegBind(const CwAnimSegBind* b) {
 }
 
 inline bool CfaValidateOpaInfo(const CwItemAnimDrawInfo* info) {
+    if (info->postModelDlPath != nullptr && !CfaIsOtrPath(info->postModelDlPath)) {
+        return false;
+    }
     if (info->proceduralProfile < CW_ANIM_PROFILE_NONE || info->proceduralProfile > CW_ANIM_PROFILE_MM_TWINMOLD ||
         (info->freezeLastFrame != 0 && info->freezeLastFrame != 1)) {
         return false;
@@ -992,6 +996,11 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
         }
 
         OPEN_DISPS(play->state.gfxCtx);
+        // Majora's native GI emits its tentacle material after the mask skeleton.
+        // Keep the owner bracket and model segments live for this final OPA pass.
+        if (info->postModelDlPath != nullptr) {
+            gSPDisplayList(POLY_OPA_DISP++, CfaRouteLimbDList((Gfx*)info->postModelDlPath));
+        }
         gSPComboRMPop(POLY_OPA_DISP++);
         gSPComboRMPop(POLY_XLU_DISP++);
         CLOSE_DISPS(play->state.gfxCtx);

@@ -1781,7 +1781,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
     for (i = 0, j = ITEM_NUM_SLOTS * 4; i < 3; i++, j += 4) {
         if (GET_CUR_FORM_BTN_ITEM(i + 1) != ITEM_NONE) {
             ItemId item = GET_CUR_FORM_BTN_ITEM(i + 1);
-            if (GameInteractor_Should(VB_DRAW_ITEM_EQUIPPED_OUTLINE, (GET_CUR_FORM_BTN_SLOT(i + 1) < ITEM_NUM_SLOTS),
+            if (GameInteractor_Should(VB_DRAW_ITEM_EQUIPPED_OUTLINE,
+                                      ExtInv_GetItemOutlineVisualSlot(GET_CUR_FORM_BTN_SLOT(i + 1)) >= 0,
                                       &item, (s32)(i + 1), 0, PAUSE_ITEM)) {
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->itemVtx[j], 4, 0);
                 POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
@@ -1794,8 +1795,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
             if (DPAD_GET_CUR_FORM_BTN_ITEM(i) != ITEM_NONE) {
                 ItemId item = DPAD_GET_CUR_FORM_BTN_ITEM(i);
                 if (GameInteractor_Should(VB_DRAW_ITEM_EQUIPPED_OUTLINE,
-                                          (DPAD_GET_CUR_FORM_BTN_SLOT(i) < ITEM_NUM_SLOTS), &item, (s32)i, 1,
-                                          PAUSE_ITEM)) {
+                                          ExtInv_GetItemOutlineVisualSlot(DPAD_GET_CUR_FORM_BTN_SLOT(i)) >= 0,
+                                          &item, (s32)i, 1, PAUSE_ITEM)) {
                     gSPVertex(POLY_OPA_DISP++, &pauseCtx->itemVtx[j], 4, 0);
                     POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
                 }

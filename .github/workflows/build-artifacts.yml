@@ -137,6 +137,15 @@ jobs:
           ./run-clang-format.sh
           git diff --exit-code
 
+      - name: Attach repaired boss soul icon pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: BossSoul-HD-Tracker-POC5-Metadata-Fix
+          path: |
+            tools/boss_soul_icons/BossSoul_HD_Tracker_POC5_Metadata_Fix.o2r
+            tools/boss_soul_icons/README.md
+          if-no-files-found: error
+
   checks:
     name: ${{ matrix.label }}
     needs: preflight

@@ -1535,6 +1535,7 @@ typedef struct PlayState {
     /* 0x12430 */ char unk_12430[0xE8];
     // SOH [Custom Models] MTX tracker for flex based skeletons
     Mtx** flexLimbOverrideMTX;
+    s32 setupExitListCount; // Exact OTR/Unbound length; -1 for count-less raw N64 commands.
 } PlayState; // size = 0x12518
 
 typedef struct {

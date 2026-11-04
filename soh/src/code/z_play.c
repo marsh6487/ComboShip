@@ -2118,6 +2118,7 @@ void Play_InitScene(PlayState* play, s32 spawn) {
     play->unk_11DFC = NULL;
     play->setupEntranceList = NULL;
     play->setupExitList = NULL;
+    play->setupExitListCount = 0;
     play->cUpElfMsgs = NULL;
     play->setupPathList = NULL;
     // SOH [Unbound] mirrors OTRPlay_InitScene: the Unbound command-populated fields reset with the vanilla ones
