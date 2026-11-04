@@ -81,8 +81,8 @@ void ApplyGraveyardGeometryPatches() {
         // A different setup/resource is not ours to patch. Custom tables and polygon
         // numbering must retain all authored surfaces, including indices above 32.
         if (!owner || header == nullptr || header != gPlayState->colCtx.colHeader ||
-            (owner->surfaceTypesCount != 31 && owner->surfaceTypesCount != 32) ||
-            header->surfaceTypeList == nullptr || header->polyList == nullptr) {
+            (owner->surfaceTypesCount != 31 && owner->surfaceTypesCount != 32) || header->surfaceTypeList == nullptr ||
+            header->polyList == nullptr) {
             return;
         }
         for (const auto& patch : graveyardGeometryPatches) {
@@ -104,7 +104,8 @@ void ApplyGraveyardGeometryPatches() {
         for (const auto& patch : graveyardGeometryPatches) {
             for (size_t i = patch.first.first; i <= patch.first.second; ++i) {
                 sOriginalPolyTypes.emplace_back(i, header->polyList[i].type);
-                header->polyList[i].type = patch.second.second == CUSTOM_SURFACE_TYPE ? customSurface : patch.second.second;
+                header->polyList[i].type =
+                    patch.second.second == CUSTOM_SURFACE_TYPE ? customSurface : patch.second.second;
             }
         }
         header->surfaceTypeList = sSurfaceTypes.data();

@@ -281,9 +281,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         int slot = (int)rg - (int)RG_GOHMA_SOUL;
         out->dlistCount = 2;
         out->drawKind = CW_DRAW_KIND_BOSS_SOUL;
-        out->xluStartIndex = 0;              // both layers XLU
+        out->xluStartIndex = 0;            // both layers XLU
         out->dlists[0] = gBossSoulFlameDL; // flame (grayscale-tinted)
-        out->dlists[1] = gBossSoulSkullDL;   // generic soul skull
+        out->dlists[1] = gBossSoulSkullDL; // generic soul skull
         if (slot == 5 && !CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("SimplerBossSoulModels"), 0)) {
             out->drawKind = CW_DRAW_KIND_OOT_MORPHA_SOUL;
             out->dlistCount = 3;
