@@ -7,6 +7,7 @@
 #include "2s2h/ShipUtils.h"
 
 extern "C" {
+#include "mods/extended_inventory.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
 #include "assets/objects/object_gi_bomb_1/object_gi_bomb_1.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
@@ -948,13 +949,14 @@ static void OnDrawItemEquippedOutline(bool* should, va_list args) {
     s32 isDpad = va_arg(args, s32);
     s32 pageIndex = va_arg(args, s32);
 
-    if (pageIndex != PAUSE_ITEM) {
+    if (pageIndex != PAUSE_ITEM || !*should) {
         return;
     }
 
     s32 slot = isDpad ? DPAD_GET_CUR_FORM_BTN_SLOT(btn) : GET_CUR_FORM_BTN_SLOT(btn);
-    // Don't show the border if the item is a mask (on the item page)
-    if (slot >= ITEM_NUM_SLOTS) {
+    // Preserve the item-page visibility decision, including reordered/off-page slots.
+    if (ExtInv_GetItemOutlineVisualSlot(slot) < 0) {
+        *should = false;
         return;
     }
 
@@ -967,7 +969,12 @@ static void OnDrawItemEquippedOutline(bool* should, va_list args) {
             // Redirect highlight to SLOT_BOMB by copying slot vtx and applying the vanilla expansion.
             s32 bIndex = isDpad ? (27 + btn) : (24 + (btn - 1));
             Vtx* destVtx = &gPlayState->pauseCtx.itemVtx[bIndex * 4];
-            Vtx* srcVtx = &gPlayState->pauseCtx.itemVtx[SLOT_BOMB * 4];
+            const s32 bombVisualSlot = ExtInv_GetItemOutlineVisualSlot(SLOT_BOMB);
+            if (bombVisualSlot < 0) {
+                *should = false;
+                return;
+            }
+            Vtx* srcVtx = &gPlayState->pauseCtx.itemVtx[bombVisualSlot * 4];
 
             memcpy(destVtx, srcVtx, sizeof(Vtx) * 4);
 

@@ -5,6 +5,7 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "mods/extended_inventory.h"
 #include "sword_element_kaleido.h"
 #include "z64map.h"
 #include "z64skybox.h"
@@ -2518,8 +2519,9 @@ void KaleidoScope_SetVertices(PlayState* play, GraphicsContext* gfxCtx) {
         // QUAD_ITEM_GRID_SELECTED_C_LEFT, QUAD_ITEM_GRID_SELECTED_C_DOWN, QUAD_ITEM_GRID_SELECTED_C_RIGHT
 
         for (j = EQUIP_SLOT_C_LEFT; j <= EQUIP_SLOT_C_RIGHT; j++, i += 4) {
-            if (GET_CUR_FORM_BTN_SLOT(j) != ITEM_NONE) {
-                k = GET_CUR_FORM_BTN_SLOT(j) * 4;
+            const int visualSlot = ExtInv_GetItemOutlineVisualSlot(GET_CUR_FORM_BTN_SLOT(j));
+            if (visualSlot >= 0) {
+                k = visualSlot * 4;
 
                 pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] =
                     pauseCtx->itemVtx[k].v.ob[0] + ITEM_GRID_SELECTED_QUAD_MARGIN;
@@ -2570,8 +2572,9 @@ void KaleidoScope_SetVertices(PlayState* play, GraphicsContext* gfxCtx) {
         }
         // #region 2S2H [Dpad]
         for (j = EQUIP_SLOT_D_RIGHT; j <= EQUIP_SLOT_D_UP; j++, i += 4) {
-            if (DPAD_GET_CUR_FORM_BTN_SLOT(j) != ITEM_NONE) {
-                k = DPAD_GET_CUR_FORM_BTN_SLOT(j) * 4;
+            const int visualSlot = ExtInv_GetItemOutlineVisualSlot(DPAD_GET_CUR_FORM_BTN_SLOT(j));
+            if (visualSlot >= 0) {
+                k = visualSlot * 4;
 
                 pauseCtx->itemVtx[i + 0].v.ob[0] = pauseCtx->itemVtx[i + 2].v.ob[0] =
                     pauseCtx->itemVtx[k].v.ob[0] + ITEM_GRID_SELECTED_QUAD_MARGIN;

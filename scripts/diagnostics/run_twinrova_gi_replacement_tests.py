@@ -39,7 +39,7 @@ Gfx command;
 '''
 includes='\n'.join('#include "objects/'+name+'/'+name+'.h"' for name in (
  'object_bv','object_gi_fire','object_goma','object_kingdodongo','object_gnd','object_fd','object_sst','object_tw','object_ganon2'))
-fixture=fixture.replace('#include "combo/menu/ComboItemDrawABI.h"', '#include "combo/menu/ComboItemDrawABI.h"\n'+includes)
+fixture=fixture.replace('#include "combo/menu/ComboItemDrawABI.h"', '#include "combo/menu/ComboItemDrawABI.h"\n#include "soh_assets.h"\n'+includes)
 a=owner.index('static const uint8_t kBossSoulFlameColors');b=owner.index('\n};',a)+3
 fixture += owner[a:b]+'\n'
 fixture += '\n'.join(function(owner,n) for n in ('OOT_AnimBossSoulFlame','OOT_AnimSeg','OOT_AnimLimbEnv','OOT_FillBossSoulAnim'))+'\n'
@@ -51,6 +51,7 @@ int main() {
  for(bool selected:{false,true,false}) {
   custom=selected;sKotakeGiCustomSkeleton=selected;
   CwItemAnimDrawInfo info{};assert(OOT_FillBossSoulAnim(7,&info)==1);
+  assert(!strcmp(info.flameDlPath,gBossSoulFlameDL));
   assert(!strcmp(info.skelPath,gTwinrovaKotakeSkel));
   assert(!strcmp(info.animPath,gTwinrovaKotakeKoumeFlyAnim));
   assert(info.limbCount==27 && info.segCount==3);

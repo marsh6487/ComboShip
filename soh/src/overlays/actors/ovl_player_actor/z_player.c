@@ -1,3 +1,4 @@
+#include "scene_exit.h"
 #include "mods/partners/Partners.h"
 #include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
@@ -6221,6 +6222,10 @@ s32 Player_HandleExitsAndVoids(PlayState* play, Player* this, CollisionPoly* pol
             (((poly != NULL) &&
               (exitIndex = SurfaceType_GetSceneExitIndex(&play->colCtx, poly, bgId), exitIndex != 0)) ||
              (func_8083816C(sFloorType) && (this->floorProperty == FLOOR_PROPERTY_12)))) {
+
+            if (exitIndex != 0 && !SceneExit_IsValid(play->setupExitList, play->setupExitListCount, exitIndex)) {
+                return 0;
+            }
 
             sp34 = this->unk_A84 - (s32)this->actor.world.pos.y;
 

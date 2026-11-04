@@ -130,6 +130,10 @@ static const ALIGN_ASSET(2) char gStatCrawlSpeedDL[] = dgStatCrawlSpeedDL;
 #define dgStatPushSpeedDL "__OTR__objects/object_stat_upgrade/gStatPushSpeedDL"
 static const ALIGN_ASSET(2) char gStatPushSpeedDL[] = dgStatPushSpeedDL;
 
+// Soul flames own their native geometry/material; bottle Alt packs may hide the blue-fire root.
+#define dgBossSoulFlameDL "__OTR__objects/object_boss_soul/gBossSoulFlameDL"
+static const ALIGN_ASSET(2) char gBossSoulFlameDL[] = dgBossSoulFlameDL;
+
 #define dgBossSoulSkullDL "__OTR__objects/object_boss_soul/gGIBossSoulSkullDL"
 static const ALIGN_ASSET(2) char gBossSoulSkullDL[] = dgBossSoulSkullDL;
 

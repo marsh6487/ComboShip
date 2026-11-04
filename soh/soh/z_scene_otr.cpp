@@ -343,6 +343,7 @@ bool Scene_CommandWindSettings(PlayState* play, SOH::ISceneCommand* cmd) {
 
 bool Scene_CommandExitList(PlayState* play, SOH::ISceneCommand* cmd) {
     play->setupExitList = (s16*)cmd->GetRawPointer();
+    play->setupExitListCount = static_cast<s32>(cmd->GetPointerSize() / sizeof(s16));
 
     return false;
 }

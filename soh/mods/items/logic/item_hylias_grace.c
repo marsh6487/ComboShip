@@ -1,3 +1,5 @@
+#include "scene_exit.h"
+#include <math.h>
 /**
  * item_hylias_grace.c - Hylia's Grace (fairy transformation)
  *
@@ -658,7 +660,7 @@ static void HGrace_StateFairy(Player* p, PlayState* play) {
     // This triggers scene transitions (doors, exits, grottos) while in fairy mode.
     if (floorPoly != NULL && play->transitionTrigger == TRANS_TRIGGER_OFF) {
         s32 exitIndex = SurfaceType_GetSceneExitIndex(&play->colCtx, floorPoly, floorBgId);
-        if (exitIndex != 0) {
+        if (SceneExit_IsValid(play->setupExitList, play->setupExitListCount, exitIndex)) {
             // Deactivate fairy mode before transitioning
             HGrace_Stop(p, play);
 

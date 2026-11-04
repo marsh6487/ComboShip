@@ -1018,7 +1018,7 @@ extern "C" void Randomizer_DrawBossSoul(PlayState* play, GetItemEntry* getItemEn
         { 150, 150, 150 }, // Ganon/Dorf
     };
 
-    // Draw the blue fire DL but coloured to the boss soul.
+    // Use the soul-owned native flame; bottle Alt packs may intentionally hide their blue-fire root.
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPSegment(POLY_XLU_DISP++, 8,
@@ -1033,7 +1033,7 @@ extern "C" void Randomizer_DrawBossSoul(PlayState* play, GetItemEntry* getItemEn
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gDPSetGrayscaleColor(POLY_XLU_DISP++, flameColors[slot][0], flameColors[slot][1], flameColors[slot][2], 255);
     gSPGrayscale(POLY_XLU_DISP++, true);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiBlueFireFlameDL);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gBossSoulFlameDL);
     gSPGrayscale(POLY_XLU_DISP++, false);
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);

@@ -1714,5 +1714,29 @@
     "origin": "gate",
     "name": "Native OoT fixed-camera backups retire before alternate scene resources unload",
     "run": "python3 -B tests/fixed_camera_lifetime/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Graveyard authored surfaces, scene resource lifetime and bounded exits",
+    "run": "python3 -B tests/graveyard_collision/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Boss soul flame root remains independent of bottle Alt replacements",
+    "run": "python3 -B tests/boss_soul_flame/check_dedicated_root.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Majora native and cross-game GI identity and material routing",
+    "run": "python3 -B scripts/diagnostics/run_majora_soul_routing_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "MM assignment outlines follow reordered inventory cells without changing save slots",
+    "run": "python3 -B tests/mm_pause_inventory/run_assignment_outline_tests.py"
   }
 ]

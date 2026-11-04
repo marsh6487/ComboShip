@@ -41,6 +41,7 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
     native = (ROOT / 'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
     assets = ['object_goma', 'object_kingdodongo', 'object_bv', 'object_gnd', 'object_fd', 'object_sst', 'object_tw', 'object_ganon2', 'object_gi_fire']
     recipe = '\n'.join('#include "' + str(ROOT / 'soh/assets/objects' / n / (n + '.h')) + '"' for n in assets)
+    recipe += '\n#include "' + str(ROOT / 'soh/assets/soh_assets.h') + '"\n'
     recipe += '\n#define RANDO_ENUM_BEGIN(name) enum name {\n#define RANDO_ENUM_ITEM(name) name,\n#define RANDO_ENUM_END(name) };\n'
     recipe += '#include "' + str(ROOT / 'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h') + '"\n'
     recipe += '#define CVAR_RANDOMIZER_ENHANCEMENT(name) name\nstatic int CVarGetInteger(const char*, int) { return 0; }\n'
@@ -55,7 +56,8 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
     mmrecipe += '#include "' + str(ROOT / 'mm/assets/objects/object_boss01/object_boss01.h') + '"\n'
     mmrecipe += '#include "' + str(ROOT / 'mm/assets/objects/object_boss03/object_boss03.h') + '"\n'
     mmrecipe += '#include "' + str(ROOT / 'mm/assets/objects/object_boss_hakugin/object_boss_hakugin.h') + '"\n'
-    mmrecipe += 'enum RandoItemId { RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD };\n'
+    mmrecipe += '#include "' + str(ROOT / 'mm/assets/objects/object_boss07/object_boss07.h') + '"\n'
+    mmrecipe += 'enum RandoItemId { RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD, RI_SOUL_BOSS_MAJORA };\n'
     mmrecipe += '\n'.join(production_function(mm, n) for n in ['MM_AnimSeg', 'MM_AnimTexSeg', 'MM_AnimSoulFlame', 'MM_FillBossSoulAnim'])
     mmrecipe += '\nnamespace Rando::StaticData { const std::string& GetItemDisplayName(RandoItemId id) { static const std::string names[] = {"Soul of Goht", "Soul of Gyorg", "Soul of Odolwa", "Soul of Twinmold"}; assert(id >= RI_SOUL_BOSS_GOHT && id <= RI_SOUL_BOSS_TWINMOLD); return names[id]; } }\n'
     mmrecipe += 'static bool twinmoldRecipeAvailable = true;\nextern "C" int32_t MM_GetItemAnimDrawInfo(const char* name, CwItemAnimDrawInfo* out) { for (int id = RI_SOUL_BOSS_GOHT; id <= RI_SOUL_BOSS_TWINMOLD; ++id) { if (Rando::StaticData::GetItemDisplayName((RandoItemId)id) == name) return twinmoldRecipeAvailable ? MM_FillBossSoulAnim((RandoItemId)id, out) : 0; } assert(false); return 0; }\n'

@@ -83,6 +83,7 @@
 #include "objects/object_boss03/object_boss03.h"                  // Gyorg soul
 #include "objects/object_boss02/object_boss02.h"                  // Twinmold soul
 #include "objects/object_boss01/object_boss01.h"                  // Odolwa soul
+#include "objects/object_boss07/object_boss07.h"                  // Majora soul
 
 // Portable slice of one sDrawItemTable row (defined in mm/src/code/z_draw.c). outDrawKind is a
 // CwDrawKind: 0 = plain OPA/XLU submission, else a non-portable func the consumer replicates.
@@ -499,7 +500,7 @@ static int32_t MM_FillEnemySoulDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
 // GID aliasing: items with no table row of their own (GID_NONE) whose real draw func is a bespoke
 // SkelAnime routine, mapped to a stand-in table row so they get a recognizable model instead of the
 // sentinel. Animated boss souls and minifrogs are intercepted before this legacy fallback;
-// Majora still aliases Twinmold's remains because its distinct material route is not described.
+// all five boss souls use the native animated recipes below.
 static int32_t MM_FillGidAliasDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     s32 gid;
     switch (id) {
@@ -513,7 +514,6 @@ static int32_t MM_FillGidAliasDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
             gid = GID_REMAINS_ODOLWA;
             break;
         case RI_SOUL_BOSS_TWINMOLD:
-        case RI_SOUL_BOSS_MAJORA: // no Majora remains model; Twinmold's stands in
             gid = GID_REMAINS_TWINMOLD;
             break;
         case RI_FROG_BLUE:
@@ -727,12 +727,26 @@ static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
             flameSize = 3.0f;
             MM_AnimTexSeg(out, 8, gTwinmoldBlueSkinTex);
             break;
+        case RI_SOUL_BOSS_MAJORA:
+            out->skelPath = gMajorasMaskSkel;
+            out->animPath = gMajorasMaskFloatingAnim;
+            out->limbCount = MAJORAS_MASK_LIMB_MAX;
+            out->nonFlexSkeleton = 1;
+            out->billboard = 1;
+            out->scale = 0.05f;
+            out->postModelDlPath = gMajorasMaskTentacleMaterialDL;
+            flame[0] = 232;
+            flame[1] = 128;
+            flame[2] = 21;
+            flameSize = 3.0f;
+            MM_AnimTexSeg(out, 8, gMajorasMaskWithNormalEyesTex);
+            break;
         default:
             return 0;
     }
     out->opa = 1;
     out->hiddenLimb = -1;
-    out->translatePre[1] = id == RI_SOUL_BOSS_TWINMOLD ? 0.0f : -20.0f;
+    out->translatePre[1] = (id == RI_SOUL_BOSS_TWINMOLD || id == RI_SOUL_BOSS_MAJORA) ? 0.0f : -20.0f;
     MM_AnimSoulFlame(out, flame, flameSize, flameSize, flameSize);
     return 1;
 }

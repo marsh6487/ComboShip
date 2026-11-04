@@ -200,6 +200,20 @@ int ExtInv_GetInventorySlot(int visualSlot) {
     return visualSlot + (sExtInvState.currentPage * 24);
 }
 
+// Equipped native MM slots stay in the save's native numbering. Only the
+// item-page outline translates them into the reordered page-0 visual grid.
+int ExtInv_GetItemOutlineVisualSlot(uint8_t equippedSlot) {
+    if (sExtInvState.currentPage != 0 || equippedSlot >= 24) {
+        return -1;
+    }
+    for (int visual = 0; visual < 24; ++visual) {
+        if (ExtInv_GetInventorySlot(visual) == equippedSlot) {
+            return visual;
+        }
+    }
+    return -1;
+}
+
 // Ownership for the Nayru's Love <-> Roc's Feather cell. Exposed as functions because THREE places
 // need the same answer — the cell getter, and the kaleido's canCycle/preview computation in both the
 // handle and the draw pass. They used to each carry their own expression, and they had already

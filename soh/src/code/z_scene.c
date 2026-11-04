@@ -407,6 +407,7 @@ void Scene_CommandWindSettings(PlayState* play, SceneCmd* cmd) {
 
 void Scene_CommandExitList(PlayState* play, SceneCmd* cmd) {
     play->setupExitList = SEGMENTED_TO_VIRTUAL(cmd->exitList.segment);
+    play->setupExitListCount = -1;
 }
 
 void Scene_CommandUndefined9(PlayState* play, SceneCmd* cmd) {

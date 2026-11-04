@@ -27,12 +27,14 @@ extern "C" {
 #include "objects/object_boss03/object_boss03.h"
 #include "objects/object_boss01/object_boss01.h"
 #include "objects/object_boss02/object_boss02.h"
+#include "objects/object_boss07/object_boss07.h"
 }
 #include "ComboItemDrawABI.h"
 #include "Rando/Types.h"
 #include "../soh/assets/objects/object_mo/object_mo.h"
 // Only the owner's asset path constants are needed; no owner engine state crosses.
 static const char* gGiBlueFireFlameDL = "__OTR__objects/object_gi_fire/gGiBlueFireFlameDL";
+static const char* gBossSoulFlameDL = "__OTR__objects/object_boss_soul/gBossSoulFlameDL";
 static const char* gBossSoulSkullDL = "__OTR__objects/object_boss_soul/gGIBossSoulSkullDL";
 #define RANDO_ENUM_BEGIN(name) enum name {
 #define RANDO_ENUM_ITEM(name) name,
@@ -160,13 +162,14 @@ int main() {
     for (int slot = 0; slot < 9; ++slot) {
         assert(OOT_BossSoulUsesSkeleton((RandomizerGet)(RG_GOHMA_SOUL + slot)) == (slot != 5));
     }
-    for (auto id : {RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD}) {
+    for (auto id : {RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD, RI_SOUL_BOSS_MAJORA}) {
         CwItemAnimDrawInfo anim{};
         assert(MM_FillAnimDrawInfo(id, &anim) == 1);
         assert(MM_HasAnimDraw(id));
+        if (id != RI_SOUL_BOSS_MAJORA) assert(anim.postModelDlPath == nullptr);
         assert(anim.opa && anim.skelPath && anim.animPath && anim.flameAfter && anim.flameBillboardFirst);
         assert(!strcmp(anim.flameDlPath, gameplay_keep_DL_01ACF0));
-        assert(anim.translatePre[1] == (id == RI_SOUL_BOSS_TWINMOLD ? 0.0f : -20.0f) && anim.hiddenLimb == -1);
+        assert(anim.translatePre[1] == ((id == RI_SOUL_BOSS_TWINMOLD || id == RI_SOUL_BOSS_MAJORA) ? 0.0f : -20.0f) && anim.hiddenLimb == -1);
         if (id == RI_SOUL_BOSS_GOHT) {
             assert(!strcmp(anim.skelPath, gGohtSkel) && !strcmp(anim.animPath, gGohtRunAnim));
             assert(anim.limbCount == GOHT_LIMB_MAX && anim.scale == .005f);
@@ -184,6 +187,15 @@ int main() {
             assert(anim.limbCount == ODOLWA_LIMB_MAX && anim.scale == .005f && anim.segCount == 0);
             assert(anim.flameColor[0] == 145 && anim.flameColor[1] == 20 && anim.flameColor[2] == 133);
             assert(anim.flameScale[0] == 25);
+        } else if (id == RI_SOUL_BOSS_MAJORA) {
+            assert(!strcmp(anim.skelPath, gMajorasMaskSkel) && !strcmp(anim.animPath, gMajorasMaskFloatingAnim));
+            assert(anim.postModelDlPath && !strcmp(anim.postModelDlPath, gMajorasMaskTentacleMaterialDL));
+            assert(anim.limbCount == MAJORAS_MASK_LIMB_MAX && anim.scale == .05f);
+            assert(anim.nonFlexSkeleton && anim.billboard && anim.proceduralProfile == CW_ANIM_PROFILE_NONE);
+            assert(anim.segCount == 1 && anim.segs[0].segment == 8 && anim.segs[0].onOpa && !anim.segs[0].onXlu);
+            assert(!strcmp(anim.segs[0].path, gMajorasMaskWithNormalEyesTex));
+            assert(anim.flameColor[0] == 232 && anim.flameColor[1] == 128 && anim.flameColor[2] == 21);
+            assert(anim.flameScale[0] == 3);
         } else {
             assert(!strcmp(anim.skelPath, gTwinmoldHeadSkel) && !strcmp(anim.animPath, gTwinmoldHeadFlyAnim));
             assert(anim.limbCount == TWINMOLD_HEAD_LIMB_MAX && anim.scale == .06f);

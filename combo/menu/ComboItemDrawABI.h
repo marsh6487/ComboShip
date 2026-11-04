@@ -379,6 +379,8 @@ typedef struct {
     int32_t proceduralProfile;        /* CwAnimProceduralProfile */
     const char* proceduralDlPaths[2]; /* Barinade: limb-25 ring and limbs-10..19 electric XLU DLs */
     int32_t freezeLastFrame;          /* 1 = initialize the selected animation at its last frame, once mode */
+    /* Native final model material pass, submitted on OPA after the skeleton under the owner RM. */
+    const char* postModelDlPath;
 } CwItemAnimDrawInfo;
 typedef int32_t (*Fn_GetItemAnimDrawInfo)(const char* itemName, CwItemAnimDrawInfo* out);
 

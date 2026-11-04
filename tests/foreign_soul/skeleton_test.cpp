@@ -334,6 +334,70 @@ struct AnimationResource : Ship::IResource {
   AnimationHeader h;
   void *GetRawPointer() override { return &h; }
 };
+#ifndef SKIP_TWINMOLD_TESTS
+// Exercise the final model material pass through the complete production consumer,
+// including both loaded rig types and independent host/owner resource managers.
+static void checkPostModelMaterial(std::shared_ptr<Ship::ResourceManager> owner,
+                                   std::shared_ptr<Ship::ResourceManager> host) {
+  CwItemAnimDrawInfo info{};
+  assert(MM_FillBossSoulAnim(RI_SOUL_BOSS_MAJORA, &info));
+  struct MajoraSkeletonResource : Ship::IResource {
+    CfaLoadedFlexSkeletonHeader h{};
+    std::vector<StandardLimb> limbs;
+    std::vector<void*> pointers;
+    std::string mask = "__OTR__majora_mask", tentacle = "__OTR__majora_tentacle";
+    explicit MajoraSkeletonResource(bool flex) : limbs(MAJORAS_MASK_LIMB_MAX - 1), pointers(limbs.size()) {
+      for (size_t i = 0; i < limbs.size(); ++i) pointers[i] = &limbs[i];
+      h.sh = {pointers.data(), (u8)limbs.size(), (u8)flex}; h.dListCount = 2;
+      limbs[0].child = 1; limbs[0].dList = (Gfx*)mask.c_str();
+      limbs[1].dList = (Gfx*)tentacle.c_str();
+    }
+    void* GetRawPointer() override { return &h; }
+  };
+  owner->normal[info.skelPath] = std::make_shared<MajoraSkeletonResource>(false);
+  owner->replacement[info.skelPath] = std::make_shared<MajoraSkeletonResource>(true);
+  owner->normal[info.animPath] = owner->replacement[info.animPath] = std::make_shared<AnimationResource>();
+  Ship::Context::GetRawInstance()->rm = host;
+  CfaClearCaches();
+  for (bool alt : {false, true, false}) {
+    owner->alt = alt;
+    GraphicsContext c; PlayState p{{&c, 217}, 70, {}};
+    current = {};
+    assert(ComboForeignAnim_Draw(&info, "mm", &p));
+    int meshes = 0, materials = 0, eyes = 0, restoredEyes = 0;
+    std::vector<std::string> owners;
+    for (Gfx* cmd = c.opa; cmd < c.op; ++cmd) {
+      if (cmd->kind == 8) owners.emplace_back((const char*)cmd->target);
+      if (cmd->kind == 9) { assert(!owners.empty()); owners.pop_back(); }
+      if (cmd->kind == 1 && cmd->seg == 8) {
+        if (!std::strcmp((const char*)cmd->target, gMajorasMaskWithNormalEyesTex)) {
+          assert(meshes == 0 && materials == 0); ++eyes;
+        } else { assert(materials == 1); ++restoredEyes; }
+      }
+      if (cmd->kind != 3) continue;
+      assert(!owners.empty() && owners.back() == "mm");
+      std::string path = (const char*)cmd->target;
+      if (path == "__OTR__@mm:objects/object_boss07/gMajorasMaskTentacleMaterialDL") {
+        assert(meshes == 2); ++materials;
+      } else { assert(materials == 0); ++meshes; }
+    }
+    assert(meshes == 2 && materials == 1 && eyes == 1 && restoredEyes >= 1 && owners.empty());
+    int flames = 0;
+    for (Gfx* cmd = c.xlu; cmd < c.xp; ++cmd) {
+      if (cmd->kind == 3 && std::strstr((const char*)cmd->target, "gameplay_keep_DL_01ACF0")) ++flames;
+    }
+    assert(flames == 1);
+    assert(Ship::Context::GetRawInstance()->rm == host && matrices.empty());
+  }
+  info.postModelDlPath = "raw_unroutable_material";
+  GraphicsContext c; PlayState p{{&c, 218}, 70, {}};
+  assert(!ComboForeignAnim_Draw(&info, "mm", &p));
+  assert(c.op == c.opa && c.xp == c.xlu);
+  owner->alt = false;
+  CfaClearCaches();
+  std::cout << "Final model material: native/replacement ordering, MM owner routing, validation and host RM preservation passed\n";
+}
+#endif
 #if defined(HOST_MM) && !defined(SKIP_TWINMOLD_TESTS)
 struct MmBossSkeletonResource : Ship::IResource {
   CfaLoadedFlexSkeletonHeader h{};
@@ -721,7 +785,7 @@ static void checkBarinade(std::shared_ptr<Ship::ResourceManager> owner,
 #ifdef HOST_MM
         assert(!strcmp((const char*)cmd->target, gameplay_keep_DL_01ACF0));
 #else
-        assert(!strcmp((const char*)cmd->target, "__OTR__@oot:objects/object_gi_fire/gGiBlueFireFlameDL"));
+        assert(!strcmp((const char*)cmd->target, "__OTR__@oot:objects/object_boss_soul/gBossSoulFlameDL"));
 #endif
       }
       draws++;
@@ -823,6 +887,9 @@ int main() {
   auto oot = std::make_shared<Ship::ResourceManager>(),
        mm = std::make_shared<Ship::ResourceManager>();
   Ship::CrossRMRegistry::owners = {{"oot", oot}, {"mm", mm}};
+#ifndef SKIP_TWINMOLD_TESTS
+  checkPostModelMaterial(mm, oot);
+#endif
   Ship::Context::GetRawInstance()->rm = mm;
 #ifndef SKIP_BARINADE_TESTS
   checkBarinade(oot, mm);
