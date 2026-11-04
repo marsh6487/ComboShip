@@ -137,7 +137,8 @@ static void SkipJabuFeedingCutscene() {
     Flags_SetEventChkInf(EVENTCHKINF_OFFERED_FISH_TO_JABU_JABU);
     Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
 
-    if (IS_RANDO && RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    // Match the full cutscene and regular mouth: Combo routing may be active on its own.
+    if (IS_RANDO) {
         gPlayState->nextEntranceIndex = Entrance_OverrideNextIndex(ENTR_JABU_JABU_ENTRANCE);
     } else {
         gPlayState->nextEntranceIndex = ENTR_JABU_JABU_ENTRANCE;
