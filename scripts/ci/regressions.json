@@ -1708,5 +1708,11 @@
     "origin": "gate",
     "name": "Combo Vanilla MM native placement resources, receipt lifecycle and retained Mirror owner",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_reward_geometry_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_reward_receipt_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_mm_mirror_owner_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native OoT fixed-camera backups retire before alternate scene resources unload",
+    "run": "python3 -B tests/fixed_camera_lifetime/run_tests.py"
   }
 ]

@@ -10,6 +10,7 @@ extern "C" {
 #include "functions.h"
 #include "variables.h"
 #include "z64bgcheck.h"
+extern PlayState* gPlayState;
 }
 
 #define CVAR_DISABLE_FIXED_CAMERA_NAME CVAR_ENHANCEMENT("DisableFixedCamera")
@@ -93,6 +94,25 @@ static bool IsFixedCameraType(s16 type) {
 
 static void RegisterDisableFixedCamera() {
     const bool disableFixedCamEnabled = CVAR_DISABLE_FIXED_CAMERA_VALUE != 0;
+
+    // A saved option (or a toggle at file select) already applies to the next
+    // scene. There is no live camera to defer; waiting here skips its first load.
+    if (disableFixedCamEnabled && gPlayState == nullptr) {
+        sWasEnabled = true;
+        sWaitForSceneChange = false;
+    }
+
+    // Play_Destroy runs before GameState_Destroy unloads alt/* resources. Retire
+    // borrowed collision pointers here, before a later scene can reuse their
+    // addresses and have its camera table overwritten with a stale backup.
+    COND_HOOK(OnPlayDestroy, true, []() {
+        DisableFixedCamera_RestoreAllCameraData();
+        sSetNormalCam = -1;
+        sIsCamApplied = false;
+        sCheckItemCamState = -1;
+        sStoreLastCamType = -1;
+        // Preserve enable/wait state so the next scene still applies the option.
+    });
 
     COND_HOOK(OnCameraState, disableFixedCamEnabled,
               [](PlayState* play) { DisableFixedCamera_CheckCameraState(play); });
