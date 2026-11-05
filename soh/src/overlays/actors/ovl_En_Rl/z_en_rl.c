@@ -326,6 +326,19 @@ static EnRlActionFunc sActionFuncs[] = {
 void EnRl_Update(Actor* thisx, PlayState* play) {
     EnRl* this = (EnRl*)thisx;
 
+    // The optional Temple annex is an ordinary room, not Rauru's story scene.
+    // Its placed sage must not run the native first-update player-facing write
+    // or consume the Temple pedestal's cutscene cues on later updates.
+    if (play->sceneNum == SCENE_TEMPLE_OF_TIME && this->actor.params == 0 &&
+        this->actor.home.pos.z < -1200.0f) {
+        this->action = 1;
+        this->drawConfig = 1;
+        func_80AE744C(this, play);
+        EnRl_UpdateSkelAnime(this);
+        func_80AE72D0(this);
+        return;
+    }
+
     if ((this->action < 0) || (this->action > 7) || (sActionFuncs[this->action] == NULL)) {
         osSyncPrintf(VT_FGCOL(RED) "メインモードがおかしい!!!!!!!!!!!!!!!!!!!!!!!!!\n" VT_RST);
         return;
