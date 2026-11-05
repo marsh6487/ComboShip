@@ -2,11 +2,11 @@
 // foreign descriptor. No authored fallback may replace that selected mesh.
 for (auto item : {RI_SWORD_KOKIRI, RI_SWORD_RAZOR, RI_SWORD_GILDED,
                   RI_OOT_MASTER_SWORD, RI_OOT_TRUE_MASTER_SWORD,
-                  RI_OOT_BIGGORON_SWORD, RI_GREAT_FAIRY_SWORD}) {
+                  RI_OOT_BIGGORON_SWORD}) {
   Reset(); ownerAlt = true; alt = true;
   const char* selected = item == RI_OOT_MASTER_SWORD || item == RI_OOT_TRUE_MASTER_SWORD ?
     "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL" :
-    item == RI_OOT_BIGGORON_SWORD || item == RI_GREAT_FAIRY_SWORD ?
+    item == RI_OOT_BIGGORON_SWORD ?
     "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL" :
     "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL";
   files.insert(selected);
@@ -15,7 +15,27 @@ for (auto item : {RI_SWORD_KOKIRI, RI_SWORD_RAZOR, RI_SWORD_GILDED,
   assert(arena.size() == 2 && stack.empty() && matrix == 1 && matrixY == 0);
 }
 Reset(); ownerAlt = false;
-std::cout << "PASS native MM selected owner swords: seven awards retain mesh, intrinsic particles and shimmer\n";
+std::cout << "PASS native MM selected owner swords: six awards retain mesh, intrinsic particles and shimmer\n";
+
+// A Biggoron/Din replacement alone cannot supply Great Fairy's Sword. Its own
+// authored model remains selectable when that model is available.
+for (bool useDin : {false, true}) {
+  Reset(); ownerAlt = alt = true; dinSword = useDin;
+  files.insert("__OTR__alt/objects/object_custom_equip/gCustomLongswordDL");
+  files.insert("__OTR__objects/din_fire_sword/progressive/bgs/SwordDL");
+  assert(!MM_TryDrawNeiGi(RI_GREAT_FAIRY_SWORD));
+  assert(Drawn().empty() && arena.empty() && stack.empty());
+  GetItemEntry greatFairyEntry{};
+  greatFairyEntry.drawFunc = Randomizer_DrawGreatFairySword;
+  const auto* greatFairy = FindPresentation(&greatFairyEntry);
+  assert(greatFairy);
+  files.insert(greatFairy->opaque);
+  assert(MM_TryDrawNeiGi(RI_GREAT_FAIRY_SWORD));
+  assert(Drawn() == std::vector<std::string>{std::string("__OTR__@oot:") + (greatFairy->opaque + 7)});
+  assert(!arena.empty() && stack.empty() && matrix == 1 && matrixY == 0);
+}
+Reset(); ownerAlt = false;
+std::cout << "PASS native MM Great Fairy sword: own authored model, Biggoron/Din isolation and balanced rendering\n";
 
 for (bool nativeMm : {false, true}) for (bool missingFlame : {false, true}) {
   Reset(); ownerAlt = alt = true; dinSword = true;
