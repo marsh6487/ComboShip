@@ -434,7 +434,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             // RI_OOT_PROGRESSIVE_BGS resolver chooses between the base and upgrade tiers.
             NeiSaveData* nei = Nei_Save();
             nei->comboObtained[FC_OOT_SWORD_BIGGORON] = 1;
-            WeaponUpgrade_SetGreatFairy(1);                                    // weaponUpgrades |= (1 << 4)
+            WeaponUpgrade_SetGreatFairy(1);                                      // weaponUpgrades |= (1 << 4)
             Item_Give(gPlayState, Rando::StaticData::Items[randoItemId].itemId); // native GFS
             break;
         }

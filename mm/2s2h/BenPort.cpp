@@ -950,7 +950,7 @@ static std::weak_ptr<Ship::Archive> sMilkArchive;
 static std::weak_ptr<Ship::ResourceManager> sMilkBaseView;
 
 static void MM_BindMilkBaseOwner(const std::shared_ptr<Ship::ResourceManager>& owner,
-                                const std::shared_ptr<Ship::Archive>& archive) {
+                                 const std::shared_ptr<Ship::Archive>& archive) {
     const std::lock_guard<std::mutex> lock(sMilkMutex);
     if (Ship::CrossRMRegistry::Get("mm-gi-base"))
         Ship::CrossRMRegistry::Unregister("mm-gi-base");
@@ -997,16 +997,16 @@ extern "C" void MM_MilkBottleSelectPair(const char** opaque, const char** glass,
             lastState = 32;
             ++records;
             SPDLOG_WARN("[MilkGI] context={} host={} owner=mm draw=GID_MILK opaque={} glass={} mods=unknown/unknown "
-                        "orphan=unknown route=selected-mm (owner/archive unavailable)", drawContext, host, *opaque, *glass);
+                        "orphan=unknown route=selected-mm (owner/archive unavailable)",
+                        drawContext, host, *opaque, *glass);
         }
         return;
     }
     Ship::ResourceManagerScope scope(owner);
     const bool contentsMod = NeiAssetPriority::IsModAsset("mm", "mm", *opaque);
     const bool glassMod = NeiAssetPriority::IsModAsset("mm", "mm", *glass);
-    const auto contents = contentsMod && !glassMod
-                              ? std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(*opaque))
-                              : nullptr;
+    const auto contents =
+        contentsMod && !glassMod ? std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(*opaque)) : nullptr;
     const bool orphan = contents && !contents->Instructions.empty() &&
                         ComboBottleGi_Calls(contents->Instructions.data(),
                                             "objects/object_gi_milk/mat_gGiMilkBottleContentsDL_ItemInvis");
@@ -1020,12 +1020,14 @@ extern "C" void MM_MilkBottleSelectPair(const char** opaque, const char** glass,
         ready = baseContents && !baseContents->Instructions.empty() && baseGlass && !baseGlass->Instructions.empty();
     }
     // One record per useful state transition, with a hard process-lifetime cap.
-    const unsigned state = contentsMod | (glassMod << 1) | (orphan << 2) | (ready << 3) | ((drawContext[0] != 'n') << 4);
+    const unsigned state =
+        contentsMod | (glassMod << 1) | (orphan << 2) | (ready << 3) | ((drawContext[0] != 'n') << 4);
     if ((contentsMod || glassMod || orphan) && state != lastState && records < 32) {
         lastState = state;
         ++records;
-        SPDLOG_WARN("[MilkGI] context={} host={} owner=mm draw=GID_MILK opaque={} glass={} mods={}/{} orphan={} route={}", drawContext, host, *opaque,
-                    *glass, contentsMod, glassMod, orphan, ready ? "mm-gi-base" : "selected-mm");
+        SPDLOG_WARN(
+            "[MilkGI] context={} host={} owner=mm draw=GID_MILK opaque={} glass={} mods={}/{} orphan={} route={}",
+            drawContext, host, *opaque, *glass, contentsMod, glassMod, orphan, ready ? "mm-gi-base" : "selected-mm");
     }
     if (ready) {
         *opaque = "__OTR__@mm-gi-base:objects/object_gi_milk/gGiMilkBottleContentsDL";
