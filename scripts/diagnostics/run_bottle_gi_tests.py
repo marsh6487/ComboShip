@@ -33,6 +33,12 @@ def native(namespace, game, member, resource_type, revision=None):
     helpers=[function(src,'GetItem_FairyBottleShell')]
     if 'static ComboFairyBottleShell GetItem_EmptyBottleShell(' in src:
         helpers.insert(0,function(src,'GetItem_EmptyBottleShell'))
+    if game == 'mm' and 'static ComboFairyBottleShell GetItem_MilkBottleShell(' in src:
+        # No native MM view is mounted by these empty/potion rendering controls.
+        parts += ['constexpr int GID_MILK=1000;',
+                  'const char* gGiMilkBottleContentsDL="milk-contents"; const char* gGiMilkBottleGlassDL="milk-glass";',
+                  'void MM_MilkBottleSelectPair(const char**,const char**,const char*) {}']
+        helpers.append(function(src,'GetItem_MilkBottleShell'))
     parts += ['struct Entry {void(*drawFunc)(PlayState*,s16);'+resource_type+' '+member+'[8];};',
               'Entry sDrawItemTable[]={'+','.join(rows)+'};',
               *helpers,export,*[function(src,n) for n in draws],'}']

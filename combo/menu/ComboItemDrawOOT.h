@@ -187,10 +187,8 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
             break;
         case RG_BIGGORON_SWORD:
         case RG_GIANTS_KNIFE:
-        case RG_GREAT_FAIRY_SWORD:
-            shimmer = rg == RG_GREAT_FAIRY_SWORD ? NeiGi::Kind::GreatFairySword
-                      : rg == RG_GIANTS_KNIFE    ? NeiGi::Kind::GiantsKnife
-                                                 : NeiGi::Kind::BiggoronSword;
+            // GFS keeps its own authored/native MM descriptor below this early route.
+            shimmer = rg == RG_GIANTS_KNIFE ? NeiGi::Kind::GiantsKnife : NeiGi::Kind::BiggoronSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
             break;

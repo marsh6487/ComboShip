@@ -239,13 +239,32 @@ int main(){
     List("objects/object_gi_longsword/gGiBiggoronSwordDL",7,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bgsVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     List("objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",8,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/fairyVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     List("objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL",9,{{uintptr_t(G_ENDDL)<<24,0}});
-    form=PLAYER_FORM_HUMAN;pose={.21f,51.3f,0,0};effects.clear();
-    DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+8000*nativePose.scale<=55.606f&&"legacy Great Fairy receipt fitted the identity instead of the callback's selected Biggoron geometry");
-    save.comboObtained[0]=1;pose={.21f,51.3f,0,0};effects.clear();
-    DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+40*nativePose.scale<=55.606f&&nativePose.lift-20*nativePose.scale>=41.114f&&
-           "native material-only secondary pass must still allow the geometric root's receipt fit");
+    // A concrete GFS award always retains MM's blade/emblem callback and fit,
+    // including before BGS ownership. The second root is material-only.
+    const std::vector<std::string> fairyOwners={
+        "mm:objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL","mm:test/fairyVertices",
+        "mm:objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL"};
+    for(int playerForm:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON}){
+        form=playerForm;const float origin=form==PLAYER_FORM_GORON?96.3f:51.3f;
+        Pose firstFairyPose{};std::vector<Pose> firstFairyEffects;
+        for(int priorBgs:{0,1}){
+            save.comboObtained[0]=priorBgs;pose={.21f,origin,0,0};const Pose caller=pose;
+            effects.clear();loadedOwners.clear();nativeDraws=0;
+            CwItemDrawInfo info{};assert(!MM_DescribeNeiGi(RI_GREAT_FAIRY_SWORD,&info));
+            assert(info.neiShimmer==int(Kind::GreatFairySword)+1);
+            DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
+            const float bottom=form==PLAYER_FORM_GORON?36.f:-48.5f,top=form==PLAYER_FORM_GORON?90.f:20.5f;
+            assert(nativePose.lift+40*nativePose.scale<=origin+.21f*top+.001f&&
+                   nativePose.lift-20*nativePose.scale>=origin+.21f*bottom-.001f&&
+                   "native material-only secondary pass must still allow the geometric root's receipt fit");
+            assert(loadedOwners==fairyOwners&&currentOwner==ootOwner&&
+                   "concrete GFS receipt fitted Biggoron or a foreign owner's geometry");
+            assert(nativeDraws==1&&effects.size()==2&&pose==caller&&poses.empty());
+            if(!priorBgs){firstFairyPose=nativePose;firstFairyEffects=effects;}
+            else assert(nativePose==firstFairyPose&&effects==firstFairyEffects&&
+                        "BGS ownership changed the concrete GFS model or award-space effects");
+        }
+    }
     // The native callback chooses OoT's local replacement for an imported
     // root before MM's donor, independently for each pass.
     const char* razor="objects/object_gi_sword_2/gGiRazorSwordDL";
@@ -310,10 +329,18 @@ int main(){
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[1]+32000*correction[0]<=16.001f&&correction[1]-900*correction[0]>=-44.001f&&
            "companion fit omitted the winning Alt child or read its descendants from donor instead of MM");
-    save.comboObtained[0]=0;pose={.21f,51.3f,0,0};effects.clear();
+    // Preserve the companion selection check on the actual BGS fit lane.
+    form=PLAYER_FORM_HUMAN;pose={.21f,51.3f,0,0};
+    ComboSwordGi_ApplyPresentationSize(false,1);
+    ComboSwordGi_ApplyLegacyFit("mm",Kind::BiggoronSword,false,1);
+    assert(pose.lift+32000*pose.scale<=55.606f&&pose.lift-900*pose.scale>=41.114f&&
+           "legacy Biggoron fit queried the MM twin instead of its companion's selected Alt child");
+    save.comboObtained[0]=0;pose={.21f,51.3f,0,0};const Pose fairyCaller=pose;
+    effects.clear();loadedOwners.clear();nativeDraws=0;
     DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+32000*nativePose.scale<=55.606f&&
-           "native legacy Biggoron callback queried the MM twin instead of its companion's selected Alt child");
+    assert(nativePose.lift+40*nativePose.scale<=55.606f&&nativePose.lift-20*nativePose.scale>=41.114f&&
+           loadedOwners==fairyOwners&&nativeDraws==1&&effects.size()==2&&pose==fairyCaller&&poses.empty()&&
+           "concrete GFS receipt borrowed the unrelated Biggoron companion's selected Alt child");
     const float modChildFit=correction[0];mmOwner->alt=false;
     assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&frameHigh[1]==100);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&

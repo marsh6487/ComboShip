@@ -134,7 +134,7 @@ int main(){
         ootAlt=donor;mmAlt=host;legacyMod=mmLegacyMod=false;
         CwItemDrawInfo info{};assert(MM_DescribeNeiGi(award.id,&info));
         assert(info.itemShimmer&&info.neiShimmer==static_cast<int>(award.identity)+1&&info.stateDependent==2);
-        if(!host||!donor){
+        if(!host||!donor||award.id==RI_GREAT_FAIRY_SWORD){
             const std::string authored=std::string(!host?"__OTR__@oot-gi-base:":"__OTR__")+"objects/nei_gi_redesign/"+award.slug+"/gi_dl";
             assert(info.drawKind==CW_DRAW_KIND_NEI_GI&&!strcmp(info.dlists[0],authored.c_str())&&
                    "vanilla MM sword GI retained a custom OoT donor model");
@@ -182,8 +182,14 @@ int main(){
       const auto& award=swordAwards[tier];
       ComboRando::foreignItem.itemName=award.progressiveName;
       const auto* preview=ComboResolveForeignDrawInfoOOT(17);
-      assert(preview&&preview->drawKind==(grantAlt?CW_DRAW_KIND_CUSTOM_GI:CW_DRAW_KIND_NEI_GI));
-      if(grantAlt)assert(strstr(preview->dls[0],"din_fire_sword"));
+      const bool concreteGfs=award.identity==Kind::GreatFairySword;
+      assert(preview&&preview->drawKind==(grantAlt&&!concreteGfs?CW_DRAW_KIND_CUSTOM_GI:CW_DRAW_KIND_NEI_GI));
+      if(grantAlt&&!concreteGfs)assert(strstr(preview->dls[0],"din_fire_sword"));
+      if(concreteGfs){
+        const std::string expected=std::string(!grantAlt?"__OTR__@oot-gi-base:":"__OTR__@oot:")+
+                                   "objects/nei_gi_redesign/great_fairy_sword/gi_dl";
+        assert(preview->dls[0]==expected&&preview->neiShimmer==int(Kind::GreatFairySword)+1);
+      }
       ComboLatchForeignDrawOOT(17);
       assert(!strcmp(ComboForeignLatchedNameOOT(17),award.name));
       donorSwordTier=(tier+1)%7; // The cross-game grant advanced the donor save.
@@ -192,8 +198,9 @@ int main(){
         mmAlt=host;
         const auto* drawn=ComboResolveForeignDrawInfoOOT(17);
         assert(drawn&&drawn->neiShimmer==static_cast<int>(award.identity)+1);
-        if(!host){
-          const std::string expected=std::string("__OTR__@oot-gi-base:objects/nei_gi_redesign/")+award.slug+"/gi_dl";
+        if(!host||concreteGfs){
+          const std::string expected=std::string(!host?"__OTR__@oot-gi-base:":"__OTR__@oot:")+
+                                     "objects/nei_gi_redesign/"+award.slug+"/gi_dl";
           assert(drawn->drawKind==CW_DRAW_KIND_NEI_GI&&!strcmp(drawn->dls[0],expected.c_str())&&
                  "latched progressive sword kept Din's mesh after switching to vanilla");
         }else assert(drawn->drawKind==CW_DRAW_KIND_CUSTOM_GI&&strstr(drawn->dls[0],"din_fire_sword"));

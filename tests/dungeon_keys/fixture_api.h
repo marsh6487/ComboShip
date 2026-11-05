@@ -25,6 +25,7 @@ enum {
   GID_COMPASS,
   GID_BOTTLE,
   GID_FAIRY_CONTAINER,
+  GID_MILK, // Distinct out-of-fixture row for the shared native bottle selector.
   GID_CHATEAU = 0x73, // Native MM z64item.h value; used by the shared draw producer.
   MTXMODE_APPLY = 1,
   SETUPDL_5 = 5

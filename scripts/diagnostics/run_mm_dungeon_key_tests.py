@@ -64,7 +64,7 @@ parts['PRODUCER'] = ('#include "ComboCollectibleShimmer.h"\nenum {' +
                      ','.join(name + '=' + str(1000+i) for i, name in enumerate(collectible_ids)) +
                      '};\n#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n' + collectible +
                      '\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n' + parts['PRODUCER'])
-native_names = ['GetItem_EmptyBottleShell', 'GetItem_FairyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
+native_names = ['GetItem_EmptyBottleShell', 'GetItem_MilkBottleShell', 'GetItem_FairyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
                 'GetItem_GetDungeonKeyModel', 'GetItem_TryDrawDungeonKey', 'GetItem_DrawDungeonItem', 'GetItem_DrawOpa0',
                 'GetItem_DrawOpa0Xlu1', 'GetItem_DrawCompass']
 fixture = ROOT / 'tests/dungeon_keys'
@@ -76,7 +76,15 @@ with tempfile.TemporaryDirectory(prefix='mm-dungeon-keys-') as td:
     build = Path(td)
     (build / 'fixture_api.h').write_text((fixture / 'fixture_api.h').read_text())
     source = (fixture / 'native_test.c').read_text().replace(
-        '/* PRODUCTION_NATIVE */', '\n'.join(function(native, n) for n in native_names))
+        '/* PRODUCTION_NATIVE */', '''
+/* No MM archive view exists at this key/bottle fixture boundary. The actual
+ * milk selector still compiles; its external owner bridge preserves its inputs. */
+static const char gGiMilkBottleContentsDL[] = "__OTR__objects/object_gi_milk/gGiMilkBottleContentsDL";
+static const char gGiMilkBottleGlassDL[] = "__OTR__objects/object_gi_milk/gGiMilkBottleGlassDL";
+void MM_MilkBottleSelectPair(const char** opaque, const char** glass, const char* context) {
+    (void)opaque; (void)glass; (void)context;
+}
+''' + '\n'.join(function(native, n) for n in native_names))
     (build / 'native.c').write_text(source)
     cc, cxx = os.environ.get('CC', 'cc'), os.environ.get('CXX', 'c++')
     subprocess.run([cc, '-std=c11', *flags, str(build / 'native.c'), '-o', str(build / 'native')], check=True)

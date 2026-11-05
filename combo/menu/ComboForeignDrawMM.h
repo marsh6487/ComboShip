@@ -210,7 +210,10 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         // explicit owner routes; ordinary paths still belong to the producing game.
         const bool routedMm = strncmp(p, "__OTR__@mm:", 11) == 0;
         const bool routedOot = strncmp(p, "__OTR__@oot:", 12) == 0;
-        const bool routedBase = strncmp(p, "__OTR__@oot-gi-base:", 20) == 0;
+        static constexpr char kOotBase[] = "__OTR__@oot-gi-base:";
+        static constexpr char kMmBase[] = "__OTR__@mm-gi-base:";
+        const bool routedBase =
+            strncmp(p, kOotBase, sizeof(kOotBase) - 1) == 0 || strncmp(p, kMmBase, sizeof(kMmBase) - 1) == 0;
         if (p[7] == '@' && !routedMm && !routedOot && !routedBase)
             return ComboForeignResolveOOT::Unknown;
         info.dls[i] = ComboInternRoutedPathOOT(routedMm || routedOot || routedBase

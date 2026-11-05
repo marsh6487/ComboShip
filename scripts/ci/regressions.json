@@ -1738,5 +1738,33 @@
     "origin": "gate",
     "name": "MM assignment outlines follow reordered inventory cells without changing save slots",
     "run": "python3 -B tests/mm_pause_inventory/run_assignment_outline_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Concrete Great Fairy sword grants and owner model identity",
+    "run": "python3 -B tests/concrete_great_fairy_sword/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/concrete_great_fairy_sword/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native item hint names, encoded translations and RNG continuity",
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_item_hint_export_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_item_hint_export_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM milk pair ownership and foreign owner preservation",
+    "run": "python3 -B tests/milk_bottle/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/milk_bottle/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native gossip generation, stone routing and junk isolation",
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py --sanitize"
   }
 ]

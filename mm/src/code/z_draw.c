@@ -411,6 +411,15 @@ static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
                                              ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
 }
 
+// Shared by native draw and the foreign recipe exporter; never alter other bottles.
+extern void MM_MilkBottleSelectPair(const char** opaque, const char** glass, const char* drawContext);
+static ComboFairyBottleShell GetItem_MilkBottleShell(s16 drawId, ComboFairyBottleShell shell, const char* drawContext) {
+    if (drawId == GID_MILK && shell.opaque == gGiMilkBottleContentsDL && shell.glass == gGiMilkBottleGlassDL) {
+        MM_MilkBottleSelectPair(&shell.opaque, &shell.glass, drawContext);
+    }
+    return shell;
+}
+
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     // Content models such as Blue Fire can bake a flame into their shell.
     // Reuse the empty bottle's selected casing without inheriting any content.
@@ -905,7 +914,9 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     res = sDrawItemTable[drawId].drawResources;
     const s32 isEmptyBottle = drawFunc == GetItem_DrawOpa0Xlu1 && (const char*)res[0] == gGiEmptyBottleCorkDL &&
                               (const char*)res[1] == gGiEmptyBottleGlassDL;
-    if (isEmptyBottle && maxDlists < 2) {
+    const s32 isMilk = drawId == GID_MILK && drawFunc == GetItem_DrawOpa0Xlu1 &&
+                       (const char*)res[0] == gGiMilkBottleContentsDL && (const char*)res[1] == gGiMilkBottleGlassDL;
+    if ((isEmptyBottle || isMilk) && maxDlists < 2) {
         return 0;
     }
 
@@ -1063,8 +1074,8 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
         outDlists[0] = (void*)shell.opaque;
         outDlists[1] = (void*)shell.glass;
-    } else if (isEmptyBottle) {
-        const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
+    } else if (isEmptyBottle || isMilk) {
+        const ComboFairyBottleShell shell = GetItem_MilkBottleShell(drawId, GetItem_EmptyBottleShell(drawId), "export");
         outDlists[0] = (void*)shell.opaque;
         outDlists[1] = (void*)shell.glass;
     }
@@ -1386,7 +1397,7 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
  */
 void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
     s32 pad;
-    const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
+    const ComboFairyBottleShell shell = GetItem_MilkBottleShell(drawId, GetItem_EmptyBottleShell(drawId), "native");
 
     OPEN_DISPS(play->state.gfxCtx);
 

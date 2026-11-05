@@ -70,7 +70,11 @@ int main(){
         Check();
         Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,true);
         Check();
-        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD}){
+        // Great Fairy's Sword keeps its authored MM model; the Biggoron replacement pose must decline it.
+        CwItemDrawInfo greatFairy{};greatFairy.dlistCount=1;greatFairy.scale=123.f;
+        assert(!CwAltSwordGi(RG_GREAT_FAIRY_SWORD,&greatFairy));
+        assert(greatFairy.dlistCount==1 && greatFairy.scale==123.f && greatFairy.opCount==0);
+        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE}){
             CwItemDrawInfo info{};assert(CwAltSwordGi(id,&info));
             Reset();Matrix_RotateY(.84f,MTXMODE_APPLY);
             for(int i=0;i<info.opCount;++i){const auto& op=info.ops[i];const float angle=op.a*(6.28318530718f/65536.f);

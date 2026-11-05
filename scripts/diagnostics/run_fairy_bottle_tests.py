@@ -55,12 +55,19 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
     source = (ROOT / path).read_text()
     export = function(source, 'GetItem_GetDrawTableEntry')
     names = sorted(set(re.findall(r'GetItem_Draw\w+', export)))
+    milk_helpers = []
+    if namespace == 'mm' and 'static ComboFairyBottleShell GetItem_MilkBottleShell(' in source:
+        # This reduced nonmilk fixture has no mounted native MM view.
+        constants += '\nconstexpr int GID_MILK=1000;\n'
+        constants += 'const char* gGiMilkBottleContentsDL="milk-contents"; const char* gGiMilkBottleGlassDL="milk-glass";\n'
+        constants += 'void MM_MilkBottleSelectPair(const char**,const char**,const char*) {}\n'
+        milk_helpers.append(function(source, 'GetItem_MilkBottleShell'))
     parts = ['namespace ' + namespace + ' {', constants]
     for name in names:
         parts.append('void ' + name + '(PlayState*,s16)' + (';' if name in draws else ' {}'))
     parts += [f'struct Entry {{void (*drawFunc)(PlayState*,s16);{resource_type} {member}[8];}};',
               'Entry sDrawItemTable[]={' + ','.join(rows) + '};',
-              function(source, 'GetItem_EmptyBottleShell'), function(source, 'GetItem_FairyBottleShell'), export]
+              function(source, 'GetItem_EmptyBottleShell'), *milk_helpers, function(source, 'GetItem_FairyBottleShell'), export]
     parts += [function(source, name) for name in draws]
     if namespace == 'oot':
         shimmer = function(source, 'GetItem_GetShimmerColor')

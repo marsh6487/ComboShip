@@ -369,8 +369,7 @@ int main() {
   {RG_GILDED_SWORD,NeiGi::Kind::GildedSword,"KokiriSword","child"},
   {RG_MASTER_SWORD,NeiGi::Kind::MasterSword,"MasterSword","adult"},
   {RG_TRUE_MASTER_SWORD,NeiGi::Kind::SwordAura,"MasterSword","adult"},
-  {RG_BIGGORON_SWORD,NeiGi::Kind::BiggoronSword,"Longsword","bgs"},
-  {RG_GREAT_FAIRY_SWORD,NeiGi::Kind::GreatFairySword,"Longsword","bgs"}};
+  {RG_BIGGORON_SWORD,NeiGi::Kind::BiggoronSword,"Longsword","bgs"}};
  for(const auto& theme:swordThemes)for(bool fire:{false,true}) {
   ownerAlt=true;dinSelected=fire;concrete=theme.rg;selected=RG_PROGRESSIVE_MASTER_SWORD;
   resources.insert(std::string("__OTR__alt/objects/object_custom_equip/gCustom")+theme.equipment+"DL");
@@ -385,7 +384,19 @@ int main() {
   assert(info.opCount==1 && info.ops[0].op==CW_OP_ROTATE_Z && info.scale==.04f);
  }
  ownerAlt=false;dinSelected=false;concrete=RG_NONE;
- std::cout<<"PASS selected standalone/Din full producer+resolver: seven exact themes, independent shimmer and unchanged geometry/flame fields\n";
+ std::cout<<"PASS selected standalone/Din full producer+resolver: six exact themes, independent shimmer and unchanged geometry/flame fields\n";
+ for(bool fire:{false,true}) {
+  ownerAlt=true;dinSelected=fire;concrete=RG_GREAT_FAIRY_SWORD;selected=RG_PROGRESSIVE_BGS;
+  resources.insert("__OTR__alt/objects/object_custom_equip/gCustomLongswordDL");
+  resources.insert("__OTR__objects/din_fire_sword/progressive/bgs/SwordDL");
+  info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(info.drawKind==CW_DRAW_KIND_SIMPLE && info.itemShimmer && info.count==2 && info.xluStart==1);
+  assert(std::string(info.dls[0])=="__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL");
+  assert(std::string(info.dls[1])=="__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL");
+  assert(info.opCount==0 && info.scale==0.f && info.resolvedName=="concrete award");
+ }
+ ownerAlt=false;dinSelected=false;concrete=RG_NONE;
+ std::cout<<"PASS concrete Great Fairy sword producer+resolver: native MM pair and Biggoron/Din isolation\n";
  const std::pair<RandomizerGet,const char*> direct[] = {
   {RG_LANTERN,"__OTR__objects/object_poh/gPoeLanternDL"},
   {RG_POKEBALL,"__OTR__objects/object_nei_pokeball/ItmPokeBall_opaque_dl"},

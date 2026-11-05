@@ -38,6 +38,11 @@ def native(host, namespace):
     else:
         entry = "struct DrawItemTableEntry { void (*drawFunc)(PlayState*,s16); void* drawResources[8]; };"
         declarations += '\nchar gGiBlueFireChamberstickDL[]="__OTR__objects/object_gi_fire/gGiBlueFireChamberstickDL";'
+    milk_helpers = []
+    if host == "mm" and "static ComboFairyBottleShell GetItem_MilkBottleShell(" in source:
+        # Receipt catalog controls have no mounted native MM view.
+        declarations += '\nvoid MM_MilkBottleSelectPair(const char**,const char**,const char*) {}'
+        milk_helpers.append(function(source, "GetItem_MilkBottleShell"))
     # The two real engine headers share guards; MM also publishes OoT aliases.
     # Keep those preprocessing names from changing the subsequent OoT catalog.
     undefs = '\n'.join('#undef ' + name for name in re.findall(
@@ -45,7 +50,7 @@ def native(host, namespace):
     return '\n'.join([
         "namespace " + namespace + " {", '#include "' + host + '/include/z64item.h"',
         '#include "' + host + '/include/z64object.h"', declarations, entry, table,
-        function(source, "GetItem_EmptyBottleShell"), function(source, "GetItem_FairyBottleShell"), export, "}",
+        function(source, "GetItem_EmptyBottleShell"), *milk_helpers, function(source, "GetItem_FairyBottleShell"), export, "}",
         undefs, "#undef Z64OBJECT_H"])
 
 

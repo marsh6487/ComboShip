@@ -812,8 +812,7 @@ const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*a
     } else if (std::strstr(item.opaque, "/master_sword/") || std::strstr(item.opaque, "/true_master_sword/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
-    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/great_fairy_sword/") ||
-               std::strstr(item.opaque, "/giants_knife/")) {
+    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/giants_knife/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     }
