@@ -5980,6 +5980,16 @@ static nlohmann::json Combo_HintTextToJson(const HintText& ht) {
              { "obscure", std::move(obscure) } };
 }
 
+// RHT_NONE is a valid shared template sentinel, but items without authored hints must name
+// their actual award. Keep its empty variant shape so every clarity tier consumes the same RNG.
+static nlohmann::json Combo_ItemHintToJson(const Rando::Item& item) {
+    if (item.GetHintKey() != RHT_NONE)
+        return Combo_HintTextToJson(item.GetHint());
+    const auto& name = item.GetName();
+    // Text's constructor orders French before German; CustomMessage orders German before French.
+    return Combo_HintTextToJson(HintText(CustomMessage(name.GetEnglish(), name.GetGerman(), name.GetFrench())));
+}
+
 // ComboShip: hintTextTable keys the combo hint composer (CrossHints.h) can actually emit — every
 // other RHT_* key is a native-only template (native reads its own in-process table directly, so
 // trimming this JSON export never affects native hint behavior). Keeping the dump to this allowlist
@@ -6260,7 +6270,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoHintData(void) {
             const std::string& name = item.GetName().GetEnglish();
             if (name.empty())
                 continue;
-            items.push_back({ { "name", name }, { "hint", Combo_HintTextToJson(item.GetHint()) } });
+            items.push_back({ { "name", name }, { "hint", Combo_ItemHintToJson(item) } });
         }
         out["items"] = std::move(items);
 

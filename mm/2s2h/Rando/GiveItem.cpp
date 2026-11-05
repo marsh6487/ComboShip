@@ -429,17 +429,13 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             }
             break;
         case RI_GREAT_FAIRY_SWORD: {
-            // FC 2-level chain (FCI_BIGGORON_SWORD): L1 = Biggoron's Sword base ownership (the FC
-            // registry cell the ext-equipment kaleido + FleetSync swordFlags read), L2 = the actual
-            // Great Fairy's Sword — native MM inventory item + WEAPON_UPGRADE_BGS_GREAT_FAIRY
-            // (weaponUpgrades bit 4), exactly the state ApplyShared materializes when syncing from OoT.
+            // This is a concrete award, including fixed grants that bypass ConvertItem.
+            // Establish its BGS prerequisite and native GFS immediately; only the separate
+            // RI_OOT_PROGRESSIVE_BGS resolver chooses between the base and upgrade tiers.
             NeiSaveData* nei = Nei_Save();
-            if (nei->comboObtained[FC_OOT_SWORD_BIGGORON] == 0) {
-                nei->comboObtained[FC_OOT_SWORD_BIGGORON] = 1;
-            } else {
-                WeaponUpgrade_SetGreatFairy(1);                                      // weaponUpgrades |= (1 << 4)
-                Item_Give(gPlayState, Rando::StaticData::Items[randoItemId].itemId); // native GFS
-            }
+            nei->comboObtained[FC_OOT_SWORD_BIGGORON] = 1;
+            WeaponUpgrade_SetGreatFairy(1);                                    // weaponUpgrades |= (1 << 4)
+            Item_Give(gPlayState, Rando::StaticData::Items[randoItemId].itemId); // native GFS
             break;
         }
         case RI_TINGLE_MAP_CLOCK_TOWN:

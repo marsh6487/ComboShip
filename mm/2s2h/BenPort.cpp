@@ -19,6 +19,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
 #include <iostream>
+#include <mutex>
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
@@ -123,6 +124,7 @@ CrowdControl* CrowdControl::Instance;
 // Resource Types/Factories
 #include <ship/resource/type/Blob.h>
 #include <fast/resource/type/DisplayList.h>
+#include "../../combo/menu/ComboBottleGi.h"
 #include <fast/resource/type/Matrix.h>
 #include <fast/resource/type/Texture.h>
 #include <fast/resource/type/Vertex.h>
@@ -939,10 +941,106 @@ static void InitGfxDebugger() {
     }
 }
 
+// Keep the original mounted archive identity, not a later filename/mod lookup.
+// Binding may be refreshed while another host requests a descriptor. Keep the
+// parent/archive/view snapshot and bounded trace state under one lock.
+static std::mutex sMilkMutex;
+static std::weak_ptr<Ship::ResourceManager> sMilkOwner;
+static std::weak_ptr<Ship::Archive> sMilkArchive;
+static std::weak_ptr<Ship::ResourceManager> sMilkBaseView;
+
+static void MM_BindMilkBaseOwner(const std::shared_ptr<Ship::ResourceManager>& owner,
+                                const std::shared_ptr<Ship::Archive>& archive) {
+    const std::lock_guard<std::mutex> lock(sMilkMutex);
+    if (Ship::CrossRMRegistry::Get("mm-gi-base"))
+        Ship::CrossRMRegistry::Unregister("mm-gi-base");
+    sMilkOwner = owner;
+    sMilkArchive = archive;
+    sMilkBaseView.reset();
+    if (!owner || !archive || !owner->GetArchiveManager())
+        return;
+    const auto mounted = owner->GetArchiveManager()->GetArchives();
+    if (!mounted || std::find(mounted->begin(), mounted->end(), archive) == mounted->end())
+        return;
+    const auto view = owner->CreateResourceView(archive);
+    if (!view)
+        return;
+    sMilkBaseView = view;
+    Ship::CrossRMRegistry::Register("mm-gi-base", view);
+}
+
+extern "C" void MM_MilkBottleSelectPair(const char** opaque, const char** glass, const char* drawContext) {
+    if (!opaque || !glass || !*opaque || !*glass)
+        return;
+    const std::lock_guard<std::mutex> lock(sMilkMutex);
+    static unsigned lastState = ~0u;
+    static unsigned records = 0;
+    const auto owner = sMilkOwner.lock();
+    const auto archive = sMilkArchive.lock();
+    const auto baseView = sMilkBaseView.lock();
+#ifdef COMBO_BUILD
+    const bool ownerCurrent = owner && Ship::CrossRMRegistry::Get("mm") == owner;
+#else
+    // The recorded native parent remains valid while an owner scope is active.
+    const bool ownerCurrent = owner != nullptr;
+#endif
+    const auto mounted = owner && owner->GetArchiveManager() ? owner->GetArchiveManager()->GetArchives() : nullptr;
+    if (!drawContext)
+        drawContext = "unknown";
+    const char* host = strcmp(drawContext, "native") == 0 ? "mm" : "unknown";
+    if (!ownerCurrent || !archive || !mounted ||
+        std::find(mounted->begin(), mounted->end(), archive) == mounted->end()) {
+        // A new parent/remount must be rebound by Initialize, never reuse an old view.
+        if (Ship::CrossRMRegistry::Get("mm-gi-base"))
+            Ship::CrossRMRegistry::Unregister("mm-gi-base");
+        if (lastState != 32 && records < 32) {
+            lastState = 32;
+            ++records;
+            SPDLOG_WARN("[MilkGI] context={} host={} owner=mm draw=GID_MILK opaque={} glass={} mods=unknown/unknown "
+                        "orphan=unknown route=selected-mm (owner/archive unavailable)", drawContext, host, *opaque, *glass);
+        }
+        return;
+    }
+    Ship::ResourceManagerScope scope(owner);
+    const bool contentsMod = NeiAssetPriority::IsModAsset("mm", "mm", *opaque);
+    const bool glassMod = NeiAssetPriority::IsModAsset("mm", "mm", *glass);
+    const auto contents = contentsMod && !glassMod
+                              ? std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(*opaque))
+                              : nullptr;
+    const bool orphan = contents && !contents->Instructions.empty() &&
+                        ComboBottleGi_Calls(contents->Instructions.data(),
+                                            "objects/object_gi_milk/mat_gGiMilkBottleContentsDL_ItemInvis");
+    bool ready = false;
+    if (orphan && baseView && Ship::CrossRMRegistry::Get("mm-gi-base") == baseView) {
+        // Owner prefixes are interpreter routes. Validate raw paths on the scoped view itself.
+        const auto baseContents = std::dynamic_pointer_cast<Fast::DisplayList>(
+            baseView->LoadResource("objects/object_gi_milk/gGiMilkBottleContentsDL"));
+        const auto baseGlass = std::dynamic_pointer_cast<Fast::DisplayList>(
+            baseView->LoadResource("objects/object_gi_milk/gGiMilkBottleGlassDL"));
+        ready = baseContents && !baseContents->Instructions.empty() && baseGlass && !baseGlass->Instructions.empty();
+    }
+    // One record per useful state transition, with a hard process-lifetime cap.
+    const unsigned state = contentsMod | (glassMod << 1) | (orphan << 2) | (ready << 3) | ((drawContext[0] != 'n') << 4);
+    if ((contentsMod || glassMod || orphan) && state != lastState && records < 32) {
+        lastState = state;
+        ++records;
+        SPDLOG_WARN("[MilkGI] context={} host={} owner=mm draw=GID_MILK opaque={} glass={} mods={}/{} orphan={} route={}", drawContext, host, *opaque,
+                    *glass, contentsMod, glassMod, orphan, ready ? "mm-gi-base" : "selected-mm");
+    }
+    if (ready) {
+        *opaque = "__OTR__@mm-gi-base:objects/object_gi_milk/gGiMilkBottleContentsDL";
+        *glass = "__OTR__@mm-gi-base:objects/object_gi_milk/gGiMilkBottleGlassDL";
+    }
+}
+// End native MM milk owner.
+
 void OTRGlobals::Initialize() {
     std::string mmPath = Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName);
+    // Invalidate before adding archives/factories; bind only after the factories are ready.
+    MM_BindMilkBaseOwner(context->GetResourceManager(), nullptr);
+    std::shared_ptr<Ship::Archive> milkNativeArchive;
     if (std::filesystem::exists(mmPath)) {
-        context->GetResourceManager()->GetArchiveManager()->AddArchive(mmPath);
+        milkNativeArchive = context->GetResourceManager()->GetArchiveManager()->AddArchive(mmPath);
     }
 
     std::unordered_set<uint32_t> validHashes = { MM_NTSC_US_10, MM_NTSC_US_GC };
@@ -1052,6 +1150,8 @@ void OTRGlobals::Initialize() {
                                     "KeyFrameAnim", static_cast<uint32_t>(SOH::ResourceType::TSH_CKeyFrameAnim), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryKeyFrameSkel>(), RESOURCE_FORMAT_BINARY,
                                     "KeyFrameSkel", static_cast<uint32_t>(SOH::ResourceType::TSH_CKeyFrameSkel), 0);
+
+    MM_BindMilkBaseOwner(context->GetResourceManager(), milkNativeArchive);
 
     // gSaveStateMgr = std::make_shared<SaveStateMgr>();
     // gRandomizer = std::make_shared<Randomizer>();
@@ -1753,6 +1853,7 @@ extern "C" void DeinitOTR() {
     benFast3dWindow = nullptr;
 
     // The stock-only GI view owns workers too; release it before Context/DLL teardown.
+    MM_BindMilkBaseOwner(nullptr, nullptr);
     Ship::CrossRMRegistry::Unregister("mm-ikana-base");
 #ifdef COMBO_BUILD
     // ComboShip: drop the resident-RM refs now so MM's ResourceManager dies on the main thread

@@ -3194,13 +3194,8 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
 #ifdef COMBO_GI_RECEIPT_TRACE
     ComboGiReceiptTrace::Native(randoItemId, mmPickup);
 #endif
-    // Match the retained legacy callback's concrete geometry, independently
-    // of the Great Fairy award's particle/shimmer identity.
-    const auto legacyFitKind =
-        randoItemId == RI_GREAT_FAIRY_SWORD && Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] == 0
-            ? NeiGi::Kind::BiggoronSword
-            : NeiGi::Kind::Neutral;
-    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup, legacyFitKind);
+    // Legacy callbacks retain the concrete award's geometry and matching effect fit.
+    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup);
 #endif
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
@@ -3741,19 +3736,8 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             break;
         }
         case RI_GREAT_FAIRY_SWORD:
-            // FC 2-level chain (FCI_BIGGORON_SWORD): the floating model = the tier you'll RECEIVE.
-            // First copy = Biggoron's Sword — the REAL OoT mesh from oot.o2r (its blade DL calls
-            // segment 8 for the animated reflection, so it needs DrawOotBiggoronSwordReal which sets
-            // that segment up; drawing it with a plain draw crashed). Second copy = the actual Great
-            // Fairy's Sword (native GID). If oot.o2r is unavailable, fall back to MM's own native
-            // Biggoron's Sword draw (GID_SWORD_BGS = GetItem_DrawGoronSword, which also sets segment 8).
-            if (Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] == 0) {
-                if (!DrawOotBiggoronSwordReal()) {
-                    GetItem_Draw(gPlayState, GID_SWORD_BGS);
-                }
-            } else {
-                GetItem_Draw(gPlayState, GID_SWORD_GREAT_FAIRY);
-            }
+            // Concrete GFS, including native MM legacy replacements, never reselects a tier.
+            GetItem_Draw(gPlayState, GID_SWORD_GREAT_FAIRY);
             break;
         case RI_OOT_GREG: // SoH draws Greg as the vanilla green rupee — MM's green rupee here
             GetItem_Draw(gPlayState, GID_RUPEE_GREEN);
