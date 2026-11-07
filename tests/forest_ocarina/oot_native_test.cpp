@@ -1,6 +1,7 @@
 #include "ComboGameMode.h"
 #include "entrances/SoloForest.h"
 #include "global.h"
+#include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -28,6 +29,13 @@ static s32 sCameraInterfaceFlags, sUpdateCameraDirection;
 s32 gUseAtanContFrac;
 f32 qNaN0x10000 = NAN;
 static bool animationFinished;
+#ifdef COMBO_BUILD
+static bool itemGetCameraActive;
+extern "C" int ComboBlackMarketNative_UseItemGetCamera(PlayState *current) {
+  assert(current == &play);
+  return itemGetCameraActive;
+}
+#endif
 static LinkAnimationHeader gPlayerAnim_link_normal_okarina_start{},
     gPlayerAnim_link_normal_okarina_swing{},
     gPlayerAnim_link_normal_okarina_end{};
@@ -257,6 +265,14 @@ int main() {
   NativePullOutOcarina(&player, &play);
   Require(camera.setting == CAM_SET_NORMAL0,
           "native fixed-room camera rejection is preserved");
+#ifdef COMBO_BUILD
+  itemGetCameraActive = true;
+  Require(Play_CamIsNotFixed(&play),
+          "active market receipt permits the native item-get camera");
+  itemGetCameraActive = false;
+  Require(!Play_CamIsNotFixed(&play),
+          "receipt completion restores the native fixed-room restriction");
+#endif
   Reset(COMBO_GAME_BOTH, LINK_AGE_CHILD, SCENE_CASTLE_COURTYARD_GUARDS_DAY, 2,
         -1);
   NativePullOutOcarina(&player, &play);

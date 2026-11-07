@@ -24,6 +24,8 @@ extern "C" { int gComboGameMode=COMBO_GAME_OOT; }
 namespace SohUtils{const char* Sanitize(const char* p){return p;}}
 struct ParseTarget {void ParseJson(const nlohmann::json&){};};
 namespace Rando {struct Settings: ParseTarget {static Settings* GetInstance(){static Settings s;return &s;}};}
+int sariaHintInvalidations=0;
+void InvalidateSariaMagicHintLocation(){++sariaHintInvalidations;}
 struct Context {
  bool mSeedGenerated=true,mSpoilerLoaded=false;
  std::shared_ptr<ParseTarget> mEntranceShuffler=std::make_shared<ParseTarget>(),mDungeons=mEntranceShuffler,mTrials=mEntranceShuffler;
@@ -41,7 +43,10 @@ int main(){
  std::ofstream("combo.json")<<R"({"fileType":"ComboShipRandomizer","version":"x","finalSeed":123})";
  Context ctx;ctx.ParseSpoiler("combo.json");
  assert(!ctx.mSpoilerLoaded && ctx.parsed==0 && "a remembered Combo file must never enter native parsing");
+ assert(sariaHintInvalidations==1);
  ctx.ParseSpoiler("native.json");assert(ctx.mSpoilerLoaded && !ctx.mSeedGenerated && ctx.parsed==1);
+ assert(sariaHintInvalidations==2);
+ ctx.ParseSpoiler("missing.json");assert(sariaHintInvalidations==3);
  GeneratePressed();assert(nativeGenerations==1 && comboGenerations==0);
  gComboGameMode=COMBO_GAME_BOTH;GeneratePressed();assert(nativeGenerations==1 && comboGenerations==1);
 }
