@@ -32,7 +32,7 @@ static GraphicsContext graphics;
 static std::array<Gfx, 2048> overlay;
 static std::array<std::array<Vec3s, 3>, 4> cameraData;
 static std::array<ActorCsCamInfo, 4> cameraInfo;
-static std::array<ActorCutscene, 4> cutscenes;
+static std::array<ActorCutscene, 5> cutscenes;
 static bool market, talkAccepted, advance, canOffer, canBegin, canStart,
     reserveWorks, receiptDone, mirror, initWorks = true;
 static int messageState, objectLookups, objectLoads, spawns, kills,

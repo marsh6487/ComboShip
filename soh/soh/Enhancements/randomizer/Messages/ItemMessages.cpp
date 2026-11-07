@@ -733,13 +733,10 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                             msg =
                                 CustomMessage(english, german, french, msg.GetTextBoxType(), msg.GetTextBoxPosition());
                             msg.Replace(receiptName.c_str(), name);
-                            // Native content text can say "Fish" instead of "Bottle
-                            // with Fish". Keep the foreign display label on its own page.
-                            if (msg.GetEnglish(MF_RAW).find(name) == std::string::npos)
-                                msg = CustomMessage(name + '\x04' + msg.GetEnglish(MF_RAW),
-                                                    name + '\x04' + msg.GetGerman(MF_RAW),
-                                                    name + '\x04' + msg.GetFrench(MF_RAW), msg.GetTextBoxType(),
-                                                    msg.GetTextBoxPosition());
+                            // Native receipts already name the item (for example
+                            // "Red Potion" rather than "Bottle with Red Potion").
+                            // Keep that localized name and the complete native
+                            // lesson; a catalog/display label is not another page.
                             return;
                         }
                     }

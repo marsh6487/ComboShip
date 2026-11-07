@@ -132,6 +132,8 @@ static std::set<RandomizerCheck> Combo_ParseExcludedLocations() { return {}; }
 void Rando::Logic::Reset(bool) {}
 void Rando::Context::GenerateLocationPool() {}
 #endif
+// Hint target ranking is exercised by tests/saria_magic; this fixture owns settings storage.
+void InvalidateSariaMagicHintLocation() {}
 #include "seed_settings_production.inc"
 
 static void Check(bool condition, const char* message) {

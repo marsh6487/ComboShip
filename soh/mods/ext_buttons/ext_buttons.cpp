@@ -78,11 +78,12 @@ s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot) {
         item == PAUSE_ITEM_NONE || item == ITEM_SOLD_OUT) {
         return false;
     }
-    // NEI bindings are independent. In particular, assigning D-pad must never
-    // move a C binding, including a sibling using the same inventory cell.
-    if (item >= 0x80 || item == ITEM_MM_LETTER_KAFEI || item == ITEM_MM_SPECIAL_DELIVERY ||
-        (item == ITEM_LENS && Picto_IsOwned() && Picto_IsOnLensActive()) ||
-        (item == ITEM_BOMB && PowerKeg_IsOwned() && PowerKeg_IsOnBombActive())) {
+    const bool neiItem = item >= 0x80 || item == ITEM_MM_LETTER_KAFEI || item == ITEM_MM_SPECIAL_DELIVERY ||
+                         (item == ITEM_LENS && Picto_IsOwned() && Picto_IsOnLensActive()) ||
+                         (item == ITEM_BOMB && PowerKeg_IsOwned() && PowerKeg_IsOnBombActive());
+    // Adding a D-pad shortcut preserves C bindings. Moving back to C below
+    // consumes existing copies of this exact item across both button banks.
+    if (neiItem && btn >= 4) {
         ExtButton_WriteEquip(btn, item, slot);
         return true;
     }
@@ -96,11 +97,14 @@ s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot) {
         const u16 otherItem = ExtButton_GetItem(other);
         // Native equipment virtual slots overlap page-2/3 cell numbers. A
         // native equip may swap only another native binding using that slot.
-        const bool same = otherItem < 0x80 && slot != SLOT_NONE && gSaveContext.equips.cButtonSlots[other - 1] == slot;
+        const bool same = neiItem ? otherItem == item
+                                  : otherItem < 0x80 && slot != SLOT_NONE &&
+                                        gSaveContext.equips.cButtonSlots[other - 1] == slot;
         const bool bow = item == ITEM_BOW && otherItem >= ITEM_BOW_ARROW_FIRE && otherItem <= ITEM_BOW_ARROW_LIGHT &&
                          !CVarGetInteger("gEnhancements.SeparateArrows", 0);
         if (same || bow) {
-            // Preserve native swaps, including the full ID of a displaced NEI item.
+            // Move the displaced item once, clearing any additional legacy copies.
+            // Full-width NEI identities must survive a native or custom swap.
             ExtButton_WriteEquip(other, moved ? ITEM_NONE : displaced, displacedSlot);
             Interface_LoadItemIcon2(play, other);
             moved = true;

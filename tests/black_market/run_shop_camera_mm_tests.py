@@ -47,8 +47,13 @@ def native_engine_source(observe=False):
                           ("sSetCutscenesModeNormalData", "sCamSetFree0Modes")):
         prefix += array(data, "CameraModeValue " + values + "[")
         prefix += array(data, "CameraMode " + modes + "[")
+    for values in ("D_801B5338", "D_801B535C", "D_801B53A4", "D_801B5380", "D_801B53C8"):
+        prefix += array(data, "CameraModeValue " + values + "[")
+    prefix += "#define CAM_SETTING_MODE_NULL { CAM_FUNC_NONE, 0, nullptr }\n"
+    prefix += array(data, "CameraMode sCamSetItem0Modes[")
     prefix += "CameraSetting sCameraSettings[CAM_SET_MAX]{};\nvoid InitNativeCameraTable() {\n"
     for setting, modes in (("CAM_SET_FIXED1", "sCamSetFixed1Modes"), ("CAM_SET_FREE0", "sCamSetFree0Modes"),
+                           ("CAM_SET_ITEM0", "sCamSetItem0Modes"),
                            ("CAM_SET_BLACK_MARKET_OOT", "sCamSetBlackMarketOotModes")):
         entry = re.search(r"^\s*(\{[^\n]*" + modes + r"[^\n]*\}),", data, re.M).group(1)
         prefix += "sCameraSettings[" + setting + "] = " + entry + ";\n"

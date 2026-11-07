@@ -128,6 +128,7 @@ static SceneResources Reset() {
     play.roomCtx.curRoom.roomShape = reinterpret_cast<RoomShape*>(roomMesh->GetPointer());
     baseResource = resources.scene;
     Bind(resources);
+    Play_AssignPlayerCsIdsFromScene(&play, BlackMarketMmShopScene::kPlayerCutscene);
     return resources;
 }
 
@@ -209,6 +210,16 @@ static void RecordCountAndPointerCases() {
         GuardedNativeLookup(false, "old scene has fewer than four native cutscene records");
     }
     auto resources = Reset();
+    resources.cutscenes->entries.resize(4);
+    Bind(resources);
+    GuardedNativeLookup(false, "legacy four-shop-cutscene scene lacks native receipt camera");
+    resources = Reset();
+    play.playerCsIds[PLAYER_CS_ID_ITEM_GET] = CS_ID_NONE;
+    GuardedNativeLookup(false, "spawn chain did not assign the player item-get camera");
+    resources = Reset();
+    play.playerCsIds[PLAYER_CS_ID_ITEM_GET] = 2;
+    GuardedNativeLookup(false, "player item-get camera incorrectly points into shelf chain");
+    resources = Reset();
     play.actorCsCamList = nullptr;
     GuardedNativeLookup(false, "missing loaded actor camera pointer");
     resources = Reset();
@@ -253,7 +264,7 @@ static void CameraAndCutsceneCases() {
         [](auto& cs) { ++cs.endSfx; }, [](auto& cs) { --cs.customValue; }, [](auto& cs) { ++cs.hudVisibility; },
         [](auto& cs) { ++cs.endCam; }, [](auto& cs) { --cs.letterboxSize; },
     };
-    for (int index = 0; index < 4; ++index)
+    for (int index = 0; index < BlackMarketMmShopScene::kTotalCutsceneCount; ++index)
         for (auto change : changes) {
             auto resources = Reset();
             change(resources.cutscenes->entries[index]);

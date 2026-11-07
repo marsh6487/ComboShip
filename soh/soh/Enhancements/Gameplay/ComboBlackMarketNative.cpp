@@ -306,9 +306,7 @@ void Transition(PlayState* play, u16 entrance) {
     play->transitionTrigger = TRANS_TRIGGER_START;
 }
 const Item* Offer(int slot) {
-    return sSession.Active(gSaveContext.fileNum) && slot >= 0 && slot < 8
-               ? Find(sSession.market["stock"][slot]["key"].get<std::string>())
-               : nullptr;
+    return sSession.Active(gSaveContext.fileNum) ? sSession.Offer(slot) : nullptr;
 }
 PurchaseResult Status(int slot) {
     const Item* item = Offer(slot);
@@ -320,10 +318,11 @@ PurchaseResult Status(int slot) {
 }
 BlackMarketReceipt::State sReceipt;
 nlohmann::json sReceiptMarket;
+bool sStockRefreshPending = true;
 GetItemEntry sReceiptEntry{};
 bool ReceiptContext() {
     return Active() && gPlayState && gPlayState->state.running &&
-           sReceipt.Matches(gSaveContext.fileNum, Seed(), sReceipt.ticket) && sReceiptMarket == sSession.market &&
+           sReceipt.Matches(gSaveContext.fileNum, Seed(), sReceipt.ticket) && sReceiptMarket == sSession.OfferFingerprint() &&
            gPlayState->transitionTrigger == TRANS_TRIGGER_OFF && gPlayState->transitionMode == TRANS_MODE_OFF &&
            gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
 }
@@ -386,6 +385,7 @@ void ReceiveMarketItem(GetItemEntry entry) {
         return;
     gSaveContext.rupees -= sReceipt.price;
     CommitPurchase(sSession.state, sReceipt.slot);
+    sStockRefreshPending = true;
     SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_BASE, false);
 }
 bool Purchase() {
@@ -418,10 +418,24 @@ bool Purchase() {
         sStatus = "That offer cannot be delivered yet.";
         return false;
     }
-    sReceiptMarket = sSession.market;
+    sReceiptMarket = sSession.OfferFingerprint();
     sReceiptEntry = *entry; // exact GI row, never GetGIEntry()/GetFinalGIEntry()
     sReceiptEntry.comboMarketReceipt = sReceipt.ticket;
     return true;
+}
+
+// Scan once on entry or after a purchase, before another quote is opened.
+// Never change a receipt's effective item or persist on every draw/update.
+void RefreshOwnedStock() {
+    if (!sStockRefreshPending || !Active() || sTalking || sReceipt.pending || !Safe(gPlayState))
+        return;
+    // Native asynchronous save callbacks read this live session's strings.
+    // Join them before publishing any replacement keys.
+    SaveManager::Instance->ThreadPoolWait();
+    sStockRefreshPending = false;
+    if (sSession.RefreshOwned(ComboBlackMarketOotItems::Owned, ComboBlackMarketOotItems::Available)) {
+        SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_BASE, false);
+    }
 }
 
 #define BLACK_MARKET_BROWSING_OOT
@@ -451,6 +465,7 @@ void MonitorReceipt() {
         return;
     const int shelf = sReceipt.slot;
     CancelReceipt();
+    RefreshOwnedStock();
     if (BeginBrowsing(play)) {
         sSelected = sBrowser.slot = shelf;
         Message_StartTextbox(play, kBrowseText, nullptr);
@@ -473,6 +488,7 @@ bool LoadNativeKeeper() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    RefreshOwnedStock();
     sBrowseKeeper = actor;
     SkelAnime_Update(&sKeeper.skel);
     if (sKeeper.timer > 0)
@@ -730,6 +746,9 @@ void DrawShelves(PlayState* play) {
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     CLOSE_DISPS(play->state.gfxCtx);
 }
+void DrawSoldOut(PlayState* play) {
+    GetItem_Draw(play, GID_SOLDOUT);
+}
 void DrawMarket() {
     auto* play = gPlayState;
     if (!Interior() || !play->state.running)
@@ -743,8 +762,7 @@ void DrawMarket() {
         if (!item)
             continue;
         const auto status = Status(slot);
-        if (status == PurchaseResult::SoldOut && !item->renewable)
-            continue;
+        const bool soldOut = status == PurchaseResult::SoldOut && !item->renewable;
         const bool locked = status == PurchaseResult::Locked;
         BlackMarketVisual::Capture capture(locked);
         Matrix_Push();
@@ -753,7 +771,10 @@ void DrawMarket() {
         Matrix_RotateY(play->gameplayFrames * .018f, MTXMODE_APPLY);
         const float scale = sTalking && slot == sSelected ? .32f : .25f;
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-        DrawOffer(play, *item);
+        if (soldOut)
+            DrawSoldOut(play);
+        else
+            DrawOffer(play, *item);
         Matrix_Pop();
         if (locked && CVarGetInteger(BlackMarketVisual::kSealsCvar, 1))
             DrawSeal(play, capture.frame, sTalking && slot == sSelected);
@@ -943,6 +964,7 @@ void RegisterNativeMarket() {
     SaveManager::Instance->AddSaveFunction("blackMarket", 1, SaveMarket, true, SECTION_PARENT_NONE);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>(BindSolo);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
+        sStockRefreshPending = true;
         ClearRoomMagic();
         sShelfFixture.Reset();
         sDoorCollision.Reset();
@@ -1165,7 +1187,19 @@ extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door)
     return COMBO_BLACK_MARKET_OOT_DOOR_ENTERED;
 }
 
+extern "C" int ComboBlackMarketNative_UseItemGetCamera(PlayState* play) {
+    if (!play || play != gPlayState || !ReceiptContext() || !sReceipt.offered || !Safe(play) ||
+        Play_GetActiveCamId(play) != CAM_ID_MAIN)
+        return false;
+    const auto* player = GET_PLAYER(play);
+    return player && (player->getItemEntry.comboMarketReceipt == sReceipt.ticket || sReceipt.delivered);
+}
+
 extern "C" int ComboBlackMarketNative_PrepareViewpointCamera(PlayState* play) {
+    // The native player owns TURN_AROUND/CAM_ITEM_TYPE_9 during this receipt.
+    // A fixed room viewpoint must not replace that view on the next frame.
+    if (ComboBlackMarketNative_UseItemGetCamera(play))
+        return 0;
     if (!sTalking || play != gPlayState || OwnNativeBrowsingCamera(play))
         return 1;
     if (BrowsingMessage(play))

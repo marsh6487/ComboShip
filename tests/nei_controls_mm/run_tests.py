@@ -131,6 +131,69 @@ int main(int argc,char** argv) {
     for(u16 item:{u16(ITEM_LENS_OF_TRUTH),u16(ITEM_BOMB)}) {
       Reset();assert(!ExtButton_EquipItem(&play,PAUSE_EQUIP_D_UP,item,item==ITEM_BOMB?SLOT_BOMB:SLOT_LENS_OF_TRUTH));
     }
+  } else if (!strcmp(argv[1],"relocate")) {
+    for(u16 item:{u16(ITEM_DEKU_LEAF),u16(EXT_ITEM_PHANTOM_HOURGLASS)})
+    for(int c=PAUSE_EQUIP_C_LEFT;c<=PAUSE_EQUIP_C_RIGHT;++c)
+    for(int d=0;d<4;++d)for(bool filled:{false,true}) {
+      Reset();
+      const u8 slot=78;
+      ExtButton_WriteEquip(&play,PAUSE_EQUIP_D_RIGHT+d,item,slot);
+      if(filled)ExtButton_WriteEquip(&play,c,ITEM_WHIP,85);
+      const int unrelated=(c+1)%3;
+      ExtButton_WriteEquip(&play,unrelated,ITEM_LANTERN,95);
+      assert(ExtButton_EquipItem(&play,c,item,slot));
+      assert(ExtButton_GetEquipItem(c)==item);
+      assert(ExtButton_GetDpadItem(0,d)==(filled?ITEM_WHIP:ITEM_NONE));
+      assert(ExtButton_GetEquipItem(unrelated)==ITEM_LANTERN);
+      if(!filled)assert(DPAD_SLOT_EQUIP(0,d)==SLOT_NONE);
+      for(int form=1;form<4;++form)assert(BUTTON_ITEM_EQUIP(form,1)==ITEM_NONE);
+    }
+    for(u16 item:{u16(ITEM_DEKU_LEAF),u16(EXT_ITEM_PHANTOM_HOURGLASS)}) {
+      Reset();
+      ExtButton_WriteEquip(&play,PAUSE_EQUIP_D_UP,item,SLOT_NONE);
+      assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_C_LEFT,item,78));
+      assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==item && ExtButton_GetDpadItem(0,EQUIP_SLOT_D_UP)==ITEM_NONE);
+    }
+    // Legacy D-pad saves can contain the truncated byte and only an owned
+    // page-2 slot. Reading that source repairs its full identity before moving.
+    for(u8 raw:{u8(EXT_ITEM_PHANTOM_HOURGLASS),u8(ITEM_EXT_BUTTON)}) {
+      Reset();
+      DPAD_BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_D_UP)=raw;
+      DPAD_SLOT_EQUIP(0,EQUIP_SLOT_D_UP)=78;
+      gSaveContext.save.shipSaveInfo.nei.ownedItems[6]=EXT_ITEM_PHANTOM_HOURGLASS;
+      assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_C_LEFT,EXT_ITEM_PHANTOM_HOURGLASS,78));
+      assert(ExtButton_GetItem(0,EQUIP_SLOT_C_LEFT)==EXT_ITEM_PHANTOM_HOURGLASS);
+      assert(ExtButton_GetDpadItem(0,EQUIP_SLOT_D_UP)==ITEM_NONE);
+      assert(DPAD_SLOT_EQUIP(0,EQUIP_SLOT_D_UP)==SLOT_NONE);
+      assert(gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][EQUIP_SLOT_D_UP]==0);
+    }
+    Reset();
+    ExtButton_WriteEquip(&play,PAUSE_EQUIP_C_LEFT,EXT_ITEM_PHANTOM_HOURGLASS,SLOT_NONE);
+    assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_C_LEFT,ITEM_NONE,SLOT_NONE));
+    for(int b=PAUSE_EQUIP_C_LEFT;b<=PAUSE_EQUIP_D_UP;++b)
+      assert(ExtButton_GetEquipItem(b)==ITEM_NONE && "clearing a full-ID binding must not relocate it into an empty slot");
+    // Old independent shortcuts can have both a C source and multiple D sources.
+    for(u16 item:{u16(ITEM_DEKU_LEAF),u16(EXT_ITEM_PHANTOM_HOURGLASS)})
+    for(bool alreadyTarget:{false,true}) {
+      Reset();
+      ExtButton_WriteEquip(&play,PAUSE_EQUIP_C_LEFT,item,78);
+      ExtButton_WriteEquip(&play,PAUSE_EQUIP_C_DOWN,alreadyTarget?item:ITEM_WHIP,alreadyTarget?78:85);
+      for(int d=0;d<4;++d)ExtButton_WriteEquip(&play,PAUSE_EQUIP_D_RIGHT+d,item,78);
+      assert(ExtButton_EquipItem(&play,PAUSE_EQUIP_C_DOWN,item,78));
+      int itemCount=0,displacedCount=0;
+      for(int b=PAUSE_EQUIP_C_LEFT;b<=PAUSE_EQUIP_D_UP;++b){
+        itemCount+=ExtButton_GetEquipItem(b)==item;
+        displacedCount+=ExtButton_GetEquipItem(b)==ITEM_WHIP;
+      }
+      assert(itemCount==1 && "C relocation must clear every existing NEI duplicate");
+      assert(displacedCount==(alreadyTarget?0:1) && "move displaced item once, never clone it across duplicates");
+      assert(ExtButton_GetEquipItem(PAUSE_EQUIP_C_DOWN)==item);
+      for(int d=0;d<4;++d){
+        assert(ExtButton_GetDpadItem(0,d)==ITEM_NONE);
+        assert(DPAD_SLOT_EQUIP(0,d)==SLOT_NONE);
+        assert(gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][d]==0);
+      }
+    }
   } else if (!strcmp(argv[1],"equipment")) {
     const u16 buttons[]={BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
     for(int row=0;row<4;++row)for(int col=1;col<=3;++col)for(int b=0;b<7;++b) {
@@ -200,7 +263,7 @@ def main():
         path=Path(td);source=path/'test.cpp';binary=path/'test';source.write_text(code)
         sanitize=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie'] if args.sanitize else []
         subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*([] if args.solo else ['-DCOMBO_BUILD']),*sanitize,str(source),'-o',str(binary)],check=True)
-        results=[subprocess.run([str(binary),case],env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1')).returncode for case in ('independent','equipment','wheel_name','arrow_alias','families')]
+        results=[subprocess.run([str(binary),case],env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1')).returncode for case in ('independent','equipment','wheel_name','arrow_alias','families','relocate')]
         return int(any(results))
 
 if __name__=='__main__':raise SystemExit(main())

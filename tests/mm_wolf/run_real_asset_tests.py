@@ -28,12 +28,12 @@ def run(command):
         print(result.stdout, end='')
 
 
-def read_asset(path):
+def read_asset(path, key="gWolfLinkData"):
     asset = Path(path).resolve()
     supplied = asset.read_bytes()
     if zipfile.is_zipfile(asset):
         with zipfile.ZipFile(asset) as archive:
-            resource = archive.read('objects/forms/wolf_link/gWolfLinkData')
+            resource = archive.read('objects/forms/wolf_link/' + key)
         if len(resource) < 68 or resource[4:8] != b'BLBO' or struct.unpack_from('<I', resource, 8)[0] != 0:
             raise SystemExit('Invalid Blob resource envelope')
         length = struct.unpack_from('<I', resource, 64)[0]
@@ -58,7 +58,7 @@ def main():
     if len(sys.argv) not in (2, 3):
         raise SystemExit('Usage: run_real_asset_tests.py <standard Wolf asset> [HD Wolf asset]')
     payload, resource_envelope = read_asset(sys.argv[1])
-    hd_payload, hd_envelope = read_asset(sys.argv[2]) if len(sys.argv) == 3 else (None, None)
+    hd_payload, hd_envelope = read_asset(sys.argv[2], "gWolfLinkHDData") if len(sys.argv) == 3 else (None, None)
     with tempfile.TemporaryDirectory(prefix='real-wolf-') as td:
         build = Path(td)
         (build / 'real.bin').write_bytes(payload)
@@ -78,7 +78,7 @@ def main():
             for i, path in enumerate(['mm/expansions/ssbb/ssbb_character.c', 'mm/expansions/ssbb/ssbb_skin.c',
                                       'mm/src/code/z_skin_matrix.c', 'mm/src/code/z_lib.c']):
                 obj = str(build / f'{mode_name}-{i}.o')
-                run([os.environ.get('CC', 'cc'), '-std=gnu11', *flags(),
+                run([os.environ.get('CC', 'cc'), '-std=gnu11', '-Wno-error=int-conversion', '-Wno-error=incompatible-pointer-types', '-DGBI_S32_VTX=1', *flags(),
                      '-include', str(ROOT / 'mm/include/z64malloc.h'),
                      '-include', str(ROOT / 'mm/expansions/ssbb/ssbb_anim.h'),
                      '-include', str(ROOT / 'mm/include/functions.h'), '-include', str(ROOT / 'mm/include/variables.h'),
@@ -86,7 +86,7 @@ def main():
                      '-ffunction-sections', '-fdata-sections', *mode, '-c', str(ROOT / path), '-o', obj])
                 objects.append(obj)
             binary = str(build / mode_name)
-            run([os.environ.get('CXX', 'c++'), '-std=c++20', *flags(), '-I' + td,
+            run([os.environ.get('CXX', 'c++'), '-std=c++20', '-DGBI_S32_VTX=1', *flags(), '-I' + td,
                  '-DMM_WOLF_HOST', '-DMM_WOLF_NATIVE_HANDOFF', '-DFMT_HEADER_ONLY',
                  '-DWOLF_IMPLEMENTATION="' + str(ROOT / 'mm/mods/transformation_masks/wolf_link_form.cpp') + '"',
                  '-ffunction-sections', '-fdata-sections', *mode,
@@ -97,8 +97,8 @@ def main():
             from run_articulated_tests import flags as oot_flags
             oot_options = oot_flags()[1:]
             oot_object = str(build / f'{mode_name}-oot-character.o')
-            run([os.environ.get('CC', 'cc'), '-std=gnu11', *oot_options,
-                 '-include', str(ROOT / 'soh/include/global.h'),
+            run([os.environ.get('CC', 'cc'), '-std=gnu11', '-Wno-error=int-conversion', '-Wno-error=incompatible-pointer-types', '-DGBI_S32_VTX=1', *oot_options,
+                 '-include', 'string.h', '-include', str(ROOT / 'soh/include/global.h'),
                  '-include', str(ROOT / 'soh/expansions/ssbb/ssbb_anim.h'),
                  '-include', str(ROOT / 'soh/include/functions.h'),
                  '-include', str(ROOT / 'soh/include/variables.h'),
@@ -106,7 +106,7 @@ def main():
                  '-ffunction-sections', '-fdata-sections', *mode, '-c',
                  str(ROOT / 'soh/expansions/ssbb/ssbb_character.c'), '-o', oot_object])
             oot_binary = str(build / f'{mode_name}-oot')
-            run([os.environ.get('CXX', 'c++'), '-std=c++20', *oot_options, '-DFMT_HEADER_ONLY',
+            run([os.environ.get('CXX', 'c++'), '-std=c++20', '-DGBI_S32_VTX=1', *oot_options, '-DFMT_HEADER_ONLY',
                  '-DWOLF_IMPLEMENTATION="' + str(ROOT / 'soh/mods/transformation_masks/wolf_link_form.cpp') + '"',
                  '-ffunction-sections', '-fdata-sections', *mode,
                  str(ROOT / 'tests/mm_wolf/oot_real_asset_test.cpp'), oot_object, '-Wl,--gc-sections', '-o', oot_binary])

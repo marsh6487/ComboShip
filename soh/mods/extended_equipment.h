@@ -459,8 +459,8 @@ void ExtEquip_DrawSwordDL(void* play);
 // original one for everything else that draws there.
 void ExtEquip_ApplySwordDLMatrix(void);
 
-// Byrna swing trail, measured in the cane's frame. Begin pushes a matrix and
-// returns 1 when the cane is out; the caller pops it.
+// Byrna swing trail in limb/model units, with the mesh scale removed. Begin
+// pushes a matrix and returns 1 when the cane is out; the caller pops it.
 u8 ExtEquip_ByrnaTrailBegin(void);
 f32 ExtEquip_ByrnaTrailLength(void);
 

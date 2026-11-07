@@ -144,32 +144,25 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
         return true;
     }
     u8 displacedSlot = ExtButton_GetEquipSlot(button);
-#ifdef COMBO_BUILD
-    bool mirrorMoved = displaced == EXT_ITEM_MAGIC_MIRROR;
-#endif
+    bool moved = displaced == item;
     for (s32 other = PAUSE_EQUIP_C_LEFT; other <= PAUSE_EQUIP_D_UP; ++other) {
         if (other == button) {
             continue;
         }
         u16 otherItem = ExtButton_GetEquipItem(other);
-        // EXT items in older C-button saves have SLOT_NONE: match their full id, never that slot.
-        if ((item >= 0x0200 && otherItem == item) ||
+        // Match exact identities even when older C/D saves have different slot
+        // metadata. Shared progressive cells still use the family checks below.
+        if ((otherItem == item && item != ITEM_NONE && item != PAUSE_ITEM_NONE) ||
             (item < 0x0200 && slot != SLOT_NONE && ExtButton_GetEquipSlot(other) == slot &&
              // Page-0 OoT virtual slots and page-1 custom equip slots both use
              // 72..79 in existing saves. A matching byte is not a matching cell
              // across those families. Keep true shared/progressive-cell swaps.
              ExtButton_IsVirtualOotItem(item) == ExtButton_IsVirtualOotItem(otherItem))) {
-#ifdef COMBO_BUILD
-            if (item == EXT_ITEM_MAGIC_MIRROR) {
-                // Heal old duplicate mappings without duplicating the displaced item.
-                ExtButton_WriteEquip(play, other, mirrorMoved ? ITEM_NONE : displaced,
-                                     mirrorMoved ? SLOT_NONE : displacedSlot);
-                mirrorMoved = true;
-                continue;
-            }
-#endif
-            ExtButton_WriteEquip(play, other, displaced, displacedSlot);
-            break;
+            // C-button relocation consumes every old shortcut, including a C
+            // source preceding D-pad duplicates. Return the displaced item once.
+            ExtButton_WriteEquip(play, other, moved ? ITEM_NONE : displaced,
+                                 moved ? SLOT_NONE : displacedSlot);
+            moved = true;
         }
     }
     ExtButton_WriteEquip(play, button, item, slot);

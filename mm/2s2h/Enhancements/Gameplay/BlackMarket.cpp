@@ -22,6 +22,7 @@ void EnDoor_Idle(EnDoor*, PlayState*);
 #include "BlackMarketRoomMagicResources.h"
 #include "BlackMarketMmShopScene.h"
 #include "BlackMarketReceipt.h"
+#include "assets/objects/object_gi_soldout/object_gi_soldout.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "sword_element_message.h"
@@ -423,9 +424,7 @@ void Transition(PlayState* play, u16 entrance) {
     play->transitionTrigger = TRANS_TRIGGER_START;
 }
 const Item* Offer(int slot) {
-    return sSession.Active(gSaveContext.fileNum) && slot >= 0 && slot < 8
-               ? Find(sSession.market["stock"][slot]["key"].get<std::string>())
-               : nullptr;
+    return sSession.Active(gSaveContext.fileNum) ? sSession.Offer(slot) : nullptr;
 }
 PurchaseResult Status(int slot) {
     const Item* item = Offer(slot);
@@ -438,12 +437,13 @@ PurchaseResult Status(int slot) {
 }
 BlackMarketReceipt::State sReceipt;
 nlohmann::json sReceiptMarket;
+bool sStockRefreshPending = true;
 Actor* sReceiptActor = nullptr;
 int sReceiptActorTicket = 0;
 bool ReceiptContext() {
     return Active() && gPlayState && gGameState == &gPlayState->state && gPlayState->state.running &&
            sReceipt.Matches(gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, sReceipt.ticket) &&
-           sReceiptMarket == sSession.market && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
+           sReceiptMarket == sSession.OfferFingerprint() && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
            gPlayState->transitionMode == TRANS_MODE_OFF && gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
 }
 void AbortMarketReceipt(Actor* actor) {
@@ -486,6 +486,7 @@ void GiveMarketReceipt(Actor* actor, PlayState* play) {
     // Reward, balance and sold bit enter one synchronous native snapshot.
     gSaveContext.save.saveInfo.playerData.rupees -= sReceipt.price;
     CommitPurchase(sSession.state, sReceipt.slot);
+    sStockRefreshPending = true;
     SaveManager_SaveCurrentForCombo(true);
     if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
         CustomMessage::SetActiveCustomMessage(entry.msg, entry);
@@ -579,7 +580,7 @@ bool Purchase() {
                 sStatus = "That offer cannot be delivered yet.";
                 break;
             }
-            sReceiptMarket = sSession.market;
+            sReceiptMarket = sSession.OfferFingerprint();
             return true;
         }
         case PurchaseResult::SoldOut:
@@ -602,6 +603,17 @@ bool Purchase() {
             break;
     }
     return false;
+}
+
+// Scan once on entry or after a purchase, before another quote is opened.
+// Never change a receipt's effective item or persist on every draw/update.
+void RefreshOwnedStock() {
+    if (!sStockRefreshPending || !Active() || sTalking || sReceipt.pending || !Safe(gPlayState))
+        return;
+    sStockRefreshPending = false;
+    if (sSession.RefreshOwned(ComboBlackMarketItems::Owned, ComboBlackMarketItems::Available)) {
+        SaveManager_SaveCurrentForCombo(true);
+    }
 }
 
 #include "BlackMarketMmNativeShop.h"
@@ -638,6 +650,7 @@ bool CustomKeeperAvailable() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    RefreshOwnedStock();
     sCounterBarrier.Ensure(play);
     MonitorBrowsing();
     auto* shop = reinterpret_cast<EnOssan*>(actor);
@@ -731,7 +744,8 @@ bool NativeShopSceneReady(PlayState* play) {
         if (command->cmdId == SOH::SceneCommandID::SetActorCutsceneList)
             cutscenes = std::dynamic_pointer_cast<SOH::SetActorCutsceneList>(command);
     }
-    if (!cameras || !cutscenes || cameras->csCamera.size() != 4 || cutscenes->entries.size() != 4 ||
+    if (!cameras || !cutscenes || cameras->csCamera.size() != 4 ||
+        cutscenes->entries.size() != BlackMarketMmShopScene::kTotalCutsceneCount ||
         static_cast<void*>(play->actorCsCamList) != cameras->GetPointer() ||
         static_cast<void*>(CutsceneManager_GetCutsceneEntry(0)) != cutscenes->GetPointer())
         return false;
@@ -749,6 +763,14 @@ bool NativeShopSceneReady(PlayState* play) {
             cs.endCam != CS_END_CAM_0 || cs.letterboxSize != BlackMarketMmShopScene::kLetterboxSize)
             return false;
     }
+    const auto& itemGet = cutscenes->entries[BlackMarketMmShopScene::kPlayerCutscene];
+    if (itemGet.priority != BlackMarketMmShopScene::kPlayerPriority || itemGet.length != -1 ||
+        itemGet.csCamId != CS_CAM_ID_GLOBAL_ITEM_GET || itemGet.scriptIndex != CS_SCRIPT_ID_NONE ||
+        itemGet.additionalCsId != CS_ID_NONE || itemGet.endSfx != CS_END_SFX_NONE || itemGet.customValue != 255 ||
+        itemGet.hudVisibility != BlackMarketMmShopScene::kHudVisibility || itemGet.endCam != CS_END_CAM_0 ||
+        itemGet.letterboxSize != BlackMarketMmShopScene::kLetterboxSize ||
+        play->playerCsIds[PLAYER_CS_ID_ITEM_GET] != BlackMarketMmShopScene::kPlayerCutscene)
+        return false;
     // A legacy/Alt room can retain the same scene cameras while overriding
     // the mesh with the old basket positions. Validate the actual selected
     // room and loaded mesh pointer before native actions can begin.
@@ -962,6 +984,15 @@ void DrawShelves(PlayState* play) {
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     CLOSE_DISPS(play->state.gfxCtx);
 }
+void DrawSoldOut(PlayState* play) {
+    // MM's native Sold Out object has no get-item draw-table row. Submit its
+    // native translucent sign with the same setup as OoT's Sold Out GI.
+    OPEN_DISPS(play->state.gfxCtx);
+    POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, 5);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiSoldOutDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
 void DrawMarket() {
     PlayState* play = gPlayState;
     if (!Interior() || !play->state.running)
@@ -975,8 +1006,7 @@ void DrawMarket() {
         if (!item)
             continue;
         const auto status = Status(slot);
-        if (status == PurchaseResult::SoldOut && !item->renewable)
-            continue;
+        const bool soldOut = status == PurchaseResult::SoldOut && !item->renewable;
         const bool locked = status == PurchaseResult::Locked;
         BlackMarketVisual::Capture capture(locked);
         auto* stock = sNativeShop && sNativeShopPlay == play ? sNativeShop->items[slot] : nullptr;
@@ -987,7 +1017,10 @@ void DrawMarket() {
         Matrix_Translate(display.world.pos.x, display.world.pos.y, display.world.pos.z, MTXMODE_NEW);
         Matrix_RotateYS(stock->rotY + play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);
         Matrix_Scale(display.scale.x, display.scale.y, display.scale.z, MTXMODE_APPLY);
-        Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
+        if (soldOut)
+            DrawSoldOut(play);
+        else
+            Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
         Matrix_Pop();
         if (locked && CVarGetInteger(BlackMarketVisual::kSealsCvar, 1))
             DrawSeal(play, capture.frame, sTalking && slot == sSelected);
@@ -1038,6 +1071,7 @@ void PlayerUpdate(Actor* actor) {
     }
 }
 void SceneInit(s8 scene, s8 spawn) {
+    sStockRefreshPending = true;
     ClearRoomMagic();
     CancelReceipt(true);
     sShelfFixture.Reset();

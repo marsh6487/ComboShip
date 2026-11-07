@@ -42,6 +42,10 @@ def native_chain_source():
     source += '\n'.join(function(manager, signature) for signature in (
         'ActorCutscene* CutsceneManager_GetCutsceneEntryImpl(',
         'ActorCutscene* CutsceneManager_GetCutsceneEntry(', 's16 CutsceneManager_GetAdditionalCsId('))
+    play = (ROOT / 'mm/src/code/z_play.c').read_text()
+    start = play.index('s16 sPlayerCsIdToCsCamId[] = {')
+    source += '\n' + play[start:play.index('};', start) + 2] + '\n'
+    source += function(play, 'void Play_AssignPlayerCsIdsFromScene(')
     return source + '\n' + function(actor, 'void EnOssan_GetCutscenes(')
 
 

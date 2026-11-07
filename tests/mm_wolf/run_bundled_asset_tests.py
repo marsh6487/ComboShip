@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify bundled Wolf resources, preserved animation/audio and chain UV bounds."""
+"""Verify bundled standard Wolf and optional external HD animation/audio/UVs."""
 import argparse
 import hashlib
 import json
@@ -22,14 +22,33 @@ def read_resource(data):
     return blob, h
 
 
-def verify(soh_archive=None, mm_archive=None, tp_baseline=None):
+def verify(soh_archive=None, mm_archive=None, tp_baseline=None, hd_archive=None):
     resources = {}
-    for name in (STANDARD, HD):
+    for name in (STANDARD,):
         files = [ROOT / game / "assets/custom" / PREFIX / name for game in ("soh", "mm")]
         data = files[0].read_bytes()
         assert files[1].read_bytes() == data, "both native owners must supply identical resources"
         resources[name] = data
+    for game in ("soh", "mm"):
+        assert not (ROOT / game / "assets/custom" / PREFIX / HD).exists(), "HD must remain external"
     standard, sh = read_resource(resources[STANDARD])
+    assert hashlib.sha256(resources[STANDARD]).hexdigest() == "5047bd1f0a639db9ad50f87063cbd52303d8fe8c0056896d34ec1e6cfd5d99f2"
+    for game, path in (("soh", soh_archive), ("mm", mm_archive)):
+        if path:
+            with zipfile.ZipFile(path) as archive:
+                assert archive.testzip() is None
+                assert PREFIX + HD not in archive.namelist(), "port archive must not bundle HD"
+                assert archive.read(PREFIX + STANDARD) == resources[STANDARD]
+                for key in ("objects/object_nei_shadow_crystal/gNeiShadowCrystalDL",
+                            "textures/icon_item_custom/gItemIconShadowCrystalTex",
+                            "textures/item_name_custom/gShadowCrystalNameTex"):
+                    assert key in archive.namelist(), f"{game} requires a separate Shadow Crystal pack"
+    if not hd_archive:
+        print("PASS standard Wolf byte-preserved in both hosts; HD absent from bundled source/archive; optional HD not supplied")
+        return
+    with zipfile.ZipFile(hd_archive) as archive:
+        resources[HD] = archive.read(PREFIX + HD)
+    assert hashlib.sha256(resources[HD]).hexdigest() == "7705dc56447b571a0d13b019fb4461ac5147dcaaf441db16d24dfe9a990f451c"
     hd, h = read_resource(resources[HD])
     assert sh[:6] == (8112, 2704, 40, 144, 256, 256)
     assert h[:6] == (8640, 2880, 46, 144, 1024, 512)
@@ -80,16 +99,6 @@ def verify(soh_archive=None, mm_archive=None, tp_baseline=None):
                     emission += 1
                 protected_changes += word != old and not chain
         assert emission == protected_changes == 536
-    for game, path in (("soh", soh_archive), ("mm", mm_archive)):
-        if path:
-            with zipfile.ZipFile(path) as archive:
-                assert archive.testzip() is None
-                for name, data in resources.items():
-                    assert archive.read(PREFIX + name) == data, f"{game} archive dropped or changed the Wolf resource"
-                for key in ("objects/object_nei_shadow_crystal/gNeiShadowCrystalDL",
-                            "textures/icon_item_custom/gItemIconShadowCrystalTex",
-                            "textures/item_name_custom/gShadowCrystalNameTex"):
-                    assert key in archive.namelist(), f"{game} requires a separate Shadow Crystal pack"
     report = {"standard_vertices": sh[0], "hd_vertices": h[0], "original_wolf_bones": 40,
               "chain_bones": 6, "clips": 144, "original_animation_frames_byte_preserved": frames,
               "original_rig_pcm": "byte-preserved", "chain_uvs": "bounded in their authored atlas tile",
@@ -104,5 +113,6 @@ if __name__ == "__main__":
     parser.add_argument("--soh-archive")
     parser.add_argument("--mm-archive")
     parser.add_argument("--tp-baseline")
+    parser.add_argument("--hd-archive")
     args = parser.parse_args()
-    verify(args.soh_archive, args.mm_archive, args.tp_baseline)
+    verify(args.soh_archive, args.mm_archive, args.tp_baseline, args.hd_archive)

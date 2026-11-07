@@ -39,6 +39,8 @@ static void UpdateSceneNightMusic() {
     const bool nativePending = Audio_HasPendingSubBgmCommand() != 0;
     const bool combat = Audio_IsSceneNightMusicInCombat() != 0;
     const bool playing = IsPlaying() && !nativePending && !combat;
+    const bool ranchSelection =
+        play->sceneNum == SCENE_LON_LON_RANCH && CVarGetInteger("gAudioEditor.DisableRanchProximityMusic", 0) != 0;
     const bool dedicated =
         play->sceneNum == SCENE_HYRULE_FIELD && CVarGetInteger("gAudioEditor.HyruleFieldNightMusic", 0) != 0;
     const bool nativeMain = main == NA_BGM_NATURE_AMBIENCE || main == NA_BGM_DISABLED;
@@ -54,7 +56,7 @@ static void UpdateSceneNightMusic() {
     const auto action = sSceneNight.Update({
         .scene = play->sceneNum,
         .source = row,
-        .enabled = CVarGetInteger("gAudioEditor.EnableNightMusic", 0) != 0,
+        .enabled = CVarGetInteger("gAudioEditor.EnableNightMusic", 0) != 0 || ranchSelection,
         .night = gSaveContext.dayTime <= 0x4AAA || gSaveContext.dayTime >= 0xB71D,
         .eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum < 3 && source != NA_BGM_NO_MUSIC &&
                     play->sequenceCtx.natureAmbienceId < NATURE_ID_NONE && !dedicated,

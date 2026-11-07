@@ -396,6 +396,12 @@ s32 func_80AF5DFC(EnSa* this, PlayState* play) {
         !Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER)) {
         return 1;
     }
+    // A randomizer hint may be heard before meeting Zelda. Mode 2 only talks;
+    // the song/reward trigger remains behind the original Letter gate below.
+    if (play->sceneNum == SCENE_SACRED_FOREST_MEADOW && !LINK_IS_ADULT && IS_RANDO &&
+        Randomizer_GetSettingValue(RSK_SARIA_HINT) && !Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER)) {
+        return 2;
+    }
     if (play->sceneNum == SCENE_SACRED_FOREST_MEADOW && (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER))) {
         return GameInteractor_Should(VB_BE_ELIGIBLE_FOR_SARIAS_SONG, !CHECK_QUEST_ITEM(QUEST_SONG_SARIA)) ? 5 : 2;
     }

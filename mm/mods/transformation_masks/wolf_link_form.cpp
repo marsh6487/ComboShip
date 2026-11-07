@@ -424,7 +424,9 @@ static void BuildMeshDisplayList(u32 vertexCount) {
         // w1 through gSPSegment when (w1 & 1); without it the raw 0x080000xx is
         // dereferenced verbatim.  Static data does the same — see Pikachu's
         // `gsSPVertex(0x08000001, 32, 0)`.
-        __gSPVertex(gfx++, (uintptr_t)(0x08000001u + start * sizeof(Vtx)), count, 0);
+        // SegAddrVtx consumes exported 16-byte offsets and rescales to the
+        // native Vtx stride (24 bytes with GBI_S32_VTX).
+        __gSPVertex(gfx++, (uintptr_t)(0x08000001u + start * 16u), count, 0);
         u32 tri = 0;
         for (; tri + 1 < count / 3; tri += 2) {
             u32 a = tri * 3;

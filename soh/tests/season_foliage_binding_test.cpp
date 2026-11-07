@@ -84,6 +84,118 @@ static void CheckCliffBandRounding() {
     }
 }
 
+static void CheckUnchangedTextureMemo(Ship::Context& context) {
+    Retire();
+    context.rm->cache.clear();
+    const std::string path = "alt/scenes/shared/spot20_scene/s20_road_01_45100";
+    auto source = Make(path);
+    // Supported RGBA texture, but warm stone has no tintable green pixels.
+    source->ImageData[0] = 95;
+    source->ImageData[1] = 85;
+    source->ImageData[2] = 70;
+    const auto original = *source->mImageBuffer;
+    context.rm->cache[path] = source;
+    context.rm->alt = true;
+    PlayState play{};
+    play.sceneNum = SCENE_LON_LON_RANCH;
+    season = 2;
+    FoliageTraceFixture::active = true;
+    FoliageTraceFixture::counters.clear();
+    FoliageTraceFixture::spans = 0;
+    Update(&play);
+    REQUIRE(context.rm->cache.at(path) == source);
+    REQUIRE(sCopies.size() == 1 && "unchanged evaluated textures must be memoized");
+    REQUIRE(!sCopies.begin()->second.copy);
+    REQUIRE(sCopies.begin()->second.source == source);
+    for (int frame = 0; frame < 50; ++frame)
+        Update(&play);
+    REQUIRE(sCopies.size() == 1);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.build_attempts"] == 1);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.pixels_scanned"] == 1);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.unchanged_builds"] == 1);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.unchanged_cache_hits"] == 50);
+    REQUIRE(FoliageTraceFixture::spans == 51);
+    REQUIRE(*source->mImageBuffer == original);
+    season = 3;
+    Update(&play);
+    REQUIRE(sCopies.size() == 2 && "a different season must evaluate its own tint");
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.build_attempts"] == 2);
+    // An external reload changes identity and must be reconsidered immediately.
+    auto replacement = Make(path);
+    context.rm->cache[path] = replacement;
+    Update(&play);
+    REQUIRE(context.rm->cache.at(path) != replacement);
+    REQUIRE(sCopies.size() == 3);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.build_attempts"] == 3);
+    Retire();
+    REQUIRE(sCopies.empty() && "scene retirement releases positive and negative cohorts");
+    REQUIRE(context.rm->cache.at(path) == replacement);
+    // Retirement must also allow a no-change source to be evaluated again.
+    context.rm->cache[path] = source;
+    Update(&play);
+    REQUIRE(FoliageTraceFixture::counters["season_foliage.build_attempts"] == 4);
+    const auto counters = FoliageTraceFixture::counters;
+    FoliageTraceFixture::active = false;
+    Update(&play);
+    REQUIRE(FoliageTraceFixture::counters == counters && "diagnostics stay inactive outside capture");
+    Retire();
+    context.rm->cache.clear();
+    // Invalid input must remain retryable if its metadata is repaired in place.
+    auto unsupported = Make(path);
+    unsupported->Type = Fast::TextureType::Palette8bpp;
+    unsupported->Flags = 0;
+    context.rm->cache[path] = unsupported;
+    Update(&play);
+    REQUIRE(sCopies.empty());
+    unsupported->Type = Fast::TextureType::RGBA16bpp;
+    unsupported->Flags = TEX_FLAG_LOAD_AS_RAW;
+    Update(&play);
+    REQUIRE(context.rm->cache.at(path) != unsupported);
+    Retire();
+    context.rm->cache.clear();
+    // No-change entries retain identity during a visit, then release it on travel.
+    auto temporary = Make(path);
+    temporary->ImageData[0] = 95;
+    temporary->ImageData[1] = 85;
+    temporary->ImageData[2] = 70;
+    std::weak_ptr<Fast::Texture> lifetime = temporary;
+    context.rm->cache[path] = temporary;
+    Update(&play);
+    context.rm->cache.clear();
+    temporary.reset();
+    REQUIRE(!lifetime.expired());
+    const auto priorEvictions = evicted;
+    Retire();
+    REQUIRE(lifetime.expired() && "negative entries must not retain outgoing source textures");
+    REQUIRE(evicted == priorEvictions && "no-change memoization introduces no GPU cache eviction");
+
+    // One shared image can be selected by two materials with different masks.
+    // A negative masonry result must never suppress a whole-image green tint.
+    auto shared = Make("fixture/shared-masked-image");
+    shared->Width = shared->Height = 16;
+    shared->ImageDataSize = 16 * 16 * 4;
+    shared->mImageBuffer = std::make_shared<std::vector<char>>(shared->ImageDataSize);
+    shared->ImageData = reinterpret_cast<uint8_t*>(shared->mImageBuffer->data());
+    for (size_t i = 0; i < shared->ImageDataSize; i += 4) {
+        shared->ImageData[i] = 95;
+        shared->ImageData[i + 1] = 85;
+        shared->ImageData[i + 2] = 70;
+        shared->ImageData[i + 3] = 255;
+    }
+    shared->ImageData[(8 * 16 + 10) * 4] = 40;
+    shared->ImageData[(8 * 16 + 10) * 4 + 1] = 110;
+    shared->ImageData[(8 * 16 + 10) * 4 + 2] = 25;
+    const std::string masonry = "scenes/shared/spot20_scene/s20_kabe_03_1B100";
+    context.rm->cache[path] = shared;
+    context.rm->cache[masonry] = shared;
+    Update(&play);
+    REQUIRE(context.rm->cache.at(path) != shared);
+    REQUIRE(context.rm->cache.at(masonry) == shared);
+    REQUIRE(sCopies.size() == 2 && "no-change cache keys retain mask/region identity");
+    Retire();
+    context.rm->cache.clear();
+}
+
 static void CheckSceneTerrain(Ship::Context& context) {
     struct Case {
         const char* path;
@@ -697,6 +809,7 @@ int main() {
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
     Ship::Context::current = &context;
+    CheckUnchangedTextureMemo(context);
     CheckActualArchives(context);
     CheckCliffBandRounding();
     CheckSceneTerrain(context);

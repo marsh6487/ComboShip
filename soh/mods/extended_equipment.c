@@ -1239,13 +1239,11 @@ f32 ExtEquip_TridentTrailLength(void) {
 #define BYRNA_CANE_SCALE_Y 10.45f
 #define BYRNA_CANE_SCALE_Z 7.71f
 
-// MEASURED from v_somaria_cane_vtx_0/_1 (262 verts): the cane's long axis is Y,
-// spanning -416..+223. X spans 181 and Z only 47, so Y is unambiguous.
+// Legacy and authored cane meshes share the +Y shaft, spanning -416..+223.
+// The authored crown is asymmetric (X about -223..17); keep its lateral
+// envelope separate from shaft length and from the visual mesh scale.
 #define BYRNA_CANE_AXIS_MIN (-416.0f)
 #define BYRNA_CANE_AXIS_MAX 223.0f
-// The streak's own thickness. 1.0 leaves it at whatever the cane frame's scale
-// already gives it.
-#define BYRNA_TRAIL_WIDTH 1.0f
 
 // Assumes the limb matrix is already on the stack (called from PostLimbDraw).
 // Only the Byrna branch moved: the Iron Knuckle's Axe draws through this same
@@ -1264,9 +1262,9 @@ void ExtEquip_ApplySwordDLMatrix(void) {
     Matrix_Scale(5.0f, 5.0f, 5.0f, MTXMODE_APPLY);
 }
 
-// Swing trail + melee quads in the CANE's frame instead of the hidden sword's,
-// which is why the streak used to hang off in empty space. Mirrors
-// ExtEquip_TridentTrailBegin; the caller pops the matrix.
+// Swing trail + melee quads follow the cane, but use limb/model units rather
+// than mesh units: its 7.7..10.45 visual scale must not multiply hit padding.
+// The caller pops the matrix. Keep the drawn weapon's transform unchanged.
 u8 ExtEquip_ByrnaTrailBegin(void) {
     Player* player = (gPlayState != NULL) ? GET_PLAYER(gPlayState) : NULL;
 
@@ -1277,15 +1275,16 @@ u8 ExtEquip_ByrnaTrailBegin(void) {
 
     Matrix_Push();
     ExtEquip_ApplySwordDLMatrix();
-    // The trail machinery lays the streak along +X; the cane's length is +Y.
-    Matrix_RotateZ(-M_PI / 2.0f, MTXMODE_APPLY);
-    Matrix_Translate(BYRNA_CANE_AXIS_MIN, 0.0f, 0.0f, MTXMODE_APPLY);
-    Matrix_Scale(1.0f, BYRNA_TRAIL_WIDTH, BYRNA_TRAIL_WIDTH, MTXMODE_APPLY);
+    // +X -> +Y. Swap the X/Y inverse scales after this rotation to remove
+    // only the cane mesh scale, retaining Link's age/size and animated hand.
+    Matrix_RotateZ(M_PI / 2.0f, MTXMODE_APPLY);
+    Matrix_Scale(1.0f / BYRNA_CANE_SCALE_Y, 1.0f / BYRNA_CANE_SCALE_X, 1.0f / BYRNA_CANE_SCALE_Z, MTXMODE_APPLY);
+    Matrix_Translate(BYRNA_CANE_AXIS_MIN * BYRNA_CANE_SCALE_Y, 0.0f, 0.0f, MTXMODE_APPLY);
     return 1;
 }
 
 f32 ExtEquip_ByrnaTrailLength(void) {
-    return BYRNA_CANE_AXIS_MAX - BYRNA_CANE_AXIS_MIN;
+    return (BYRNA_CANE_AXIS_MAX - BYRNA_CANE_AXIS_MIN) * BYRNA_CANE_SCALE_Y;
 }
 
 // Two-handed like the Biggoron's Sword, which is what takes the shield away. Fed

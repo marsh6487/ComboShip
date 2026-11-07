@@ -2513,6 +2513,42 @@ void func_80090A28(Player* this, Vec3f* vecs) {
     Matrix_MultVec3f(&D_80126098, &vecs[2]);
 }
 
+// Byrna's visible shaft is ~6678 limb units, ~66.8 world units at Link's
+// ordinary 0.01 scale. Its cane frame has no mesh scale: 200 extra tip units
+// and -900..1900/400 transverse units cover the asymmetric authored crown
+// (~17.3 world units on the +Y side of this frame), legacy mesh and padding.
+// Vanilla sword padding/combo reach is excluded; Insect Glaive animations
+// still sweep the quads through the hand. Arbitrary mod meshes are not fitted.
+static void Player_ByrnaMeleeWeaponPostLimb(PlayState* play, Player* this) {
+    f32 length = ExtEquip_ByrnaTrailLength();
+    Vec3f localTip[3] = { { length, 0.0f, 0.0f },
+                          { length + 200.0f, -900.0f, 400.0f },
+                          { length + 200.0f, 1900.0f, -400.0f } };
+    Vec3f localBase[3] = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 1900.0f, -400.0f }, { 0.0f, -900.0f, 400.0f } };
+    Vec3f tip[3];
+    Vec3f base[3];
+
+    // Retain the native combo-counter side effect without growing the cane.
+    if (this->unk_845 >= 3) {
+        this->unk_845 += 1;
+    }
+    for (s32 i = 0; i < 3; ++i) {
+        Matrix_MultVec3f(&localTip[i], &tip[i]);
+        Matrix_MultVec3f(&localBase[i], &base[i]);
+    }
+    if (func_80090480(play, NULL, &this->meleeWeaponInfo[0], &tip[0], &base[0]) &&
+        !(this->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
+        !CVarGetInteger(CVAR_ENHANCEMENT("DisableLinkSwordTrail"), 0)) {
+        EffectBlure_AddVertex(Effect_GetByIndex(this->meleeWeaponEffectIndex), &this->meleeWeaponInfo[0].tip,
+                              &this->meleeWeaponInfo[0].base);
+    }
+    if ((this->meleeWeaponState > 0) &&
+        ((this->meleeWeaponAnimation < 0x18) || (this->stateFlags2 & PLAYER_STATE2_SPIN_ATTACKING))) {
+        func_80090480(play, &this->meleeWeaponQuads[0], &this->meleeWeaponInfo[1], &tip[1], &base[1]);
+        func_80090480(play, &this->meleeWeaponQuads[1], &this->meleeWeaponInfo[2], &tip[2], &base[2]);
+    }
+}
+
 // Wrapper for FD melee weapon collision quads. Called from MmForm_PostLimbDraw at PLAYER_LIMB_L_HAND.
 // FD skin mode uses MmForm_PostLimbDraw instead of Player_PostLimbDrawGameplay, so the melee weapon
 // quad code at line 1904-1922 never runs for FD. This function provides the same functionality.
@@ -2720,20 +2756,15 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 }
                 Matrix_Pop();
             } else if (ExtEquip_ByrnaTrailBegin()) {
-                // Same reason as the Trident above: the cane is drawn far from the
-                // hidden sword, so the streak and the quads have to be measured in
-                // the cane's frame or they trail empty air. Skijer's NEI
-                Vec3f spE4_byrnaCane[3];
-                D_80126080.x = ExtEquip_ByrnaTrailLength();
+                // The cane owns its bounded endpoints. Standard sword padding
+                // must not be enlarged by its visual mesh transform.
                 if (this->meleeWeaponState != 0) {
                     EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
                                                sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
-                    func_80090A28(this, spE4_byrnaCane);
-                    func_800906D4(play, this, spE4_byrnaCane);
+                    Player_ByrnaMeleeWeaponPostLimb(play, this);
                 } else {
-                    // func_80090A28 also bumps unk_845 (the combo counter), which is
-                    // only right mid-swing.
-                    Matrix_MultVec3f(&D_80126080, &this->meleeWeaponInfo[0].tip);
+                    Vec3f tip = { ExtEquip_ByrnaTrailLength(), 0.0f, 0.0f };
+                    Matrix_MultVec3f(&tip, &this->meleeWeaponInfo[0].tip);
                 }
                 Matrix_Pop();
             } else if (this->meleeWeaponState != 0) {

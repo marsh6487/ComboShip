@@ -5404,10 +5404,59 @@ void Audio_SetBgmEnemyVolume(f32 dist) {
     sAudioEnemyDist = dist;
 }
 
+extern PlayState* gPlayState;
+
+static bool Audio_UseRanchMusicSelection(void) {
+    return gPlayState != NULL && gPlayState->sceneNum == SCENE_LON_LON_RANCH &&
+           CVarGetInteger("gAudioEditor.DisableRanchProximityMusic", 0) != 0;
+}
+
+static bool Audio_BypassRanchProximityMusic(void) {
+    static bool restoredMain = false;
+    static bool bypassed = false;
+    if (!Audio_UseRanchMusicSelection()) {
+        if (bypassed && gPlayState != NULL && gPlayState->sceneNum == SCENE_LON_LON_RANCH) {
+            // Relinquish the old full-track bank before native Malon can start
+            // that same bank with its own channel mask. Bank identity alone
+            // cannot distinguish these two owners after the queued start.
+            Audio_StopSceneNightBgm();
+            sMalonSingingTimer = 0;
+        }
+        bypassed = false;
+        restoredMain = false;
+        return false;
+    }
+    bypassed = true;
+    if (gPlayState->csCtx.state != CS_STATE_IDLE || Player_InCsMode(gPlayState) ||
+        CVarGetInteger("gAudioEditor.Playing", 0) != 0 || func_800FA0B4(SEQ_PLAYER_FANFARE) != NA_BGM_DISABLED) {
+        return true;
+    }
+    // Native IDs remain intact even when the editor resolves a custom bank.
+    // Undo a fade that was already active when the checkbox was enabled.
+    if ((!restoredMain || sMalonSingingTimer != 0) && (func_800FA0B4(SEQ_PLAYER_BGM_MAIN) & 0xFF) == NA_BGM_LONLON) {
+        Audio_SeqCmd6(SEQ_PLAYER_BGM_MAIN, 3, 0, 0x7F);
+        Audio_SeqCmd6(SEQ_PLAYER_BGM_MAIN, 3, 1, 0x7F);
+        Audio_SeqCmd6(SEQ_PLAYER_BGM_MAIN, 3, 13, 0x7F);
+        restoredMain = true;
+    }
+    // Release only Malon's native night overlay. The scene-night lifecycle
+    // resolves the full editor selection once, retaining nature on MAIN.
+    if (func_800FA0B4(SEQ_PLAYER_BGM_SUB) == NA_BGM_LONLON && !Audio_IsSceneNightBgmActive() &&
+        !Audio_HasPendingSubBgmCommand() && !Audio_IsSceneNightMusicInCombat()) {
+        Audio_SeqCmd1(SEQ_PLAYER_BGM_SUB, 0);
+    }
+    sMalonSingingTimer = 0;
+    return true;
+}
+
 void Audio_UpdateMalonSinging(f32 dist, u16 arg1) {
     s8 pad;
     s8 phi_v1;
     s16 temp_a0;
+
+    if (Audio_BypassRanchProximityMusic()) {
+        return;
+    }
 
     sIsMalonSinging = true;
     sMalonSingingDist = dist;
@@ -5475,6 +5524,9 @@ void Audio_ToggleMalonSinging(u8 arg0) {
     u16 sp34;
 
     sMalonSingingDisabled = arg0;
+    if (Audio_BypassRanchProximityMusic()) {
+        return;
+    }
     if ((func_800FA0B4(SEQ_PLAYER_BGM_MAIN) & 0xFF) == NA_BGM_LONLON) {
         playerIdx = SEQ_PLAYER_BGM_MAIN;
         sp34 = 0;

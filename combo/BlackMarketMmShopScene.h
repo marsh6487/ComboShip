@@ -6,7 +6,13 @@ inline constexpr int16_t kKeeperActor = 42;
 inline constexpr int16_t kKeeperParams = 1;
 inline constexpr int16_t kItemParamBase = 28672;
 inline constexpr int16_t kCameraSetting = 91;
+// Four keeper/shelf cuts form their own chain. Player receipts start at a
+// separate global ITEM0 record so they cannot continue into a shop view.
 inline constexpr int16_t kCutsceneCount = 4;
+inline constexpr int16_t kTotalCutsceneCount = 5;
+inline constexpr int16_t kPlayerCutscene = 4;
+inline constexpr int16_t kPlayerItemGetCamera = -2;
+inline constexpr int16_t kPlayerPriority = 500;
 inline constexpr int16_t kFirstCutscene = 0;
 inline constexpr int16_t kFirstPriority = 10;
 inline constexpr int16_t kHudVisibility = 4;

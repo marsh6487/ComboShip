@@ -187,6 +187,41 @@ inline constexpr const char* kGanondorfHintKey = "__GANONDORF__";
 // fishing pond): "__STATIC__<RandomizerHint enum name>", mapped back in SOH_ApplyComboHints.
 inline constexpr const char* kStaticHintPrefix = "__STATIC__";
 
+// Select from all placed stat upgrades, using full oracle spheres rather than
+// requiredness (redundant early upgrades may be absent from a pared playthrough).
+// Missing reachability metadata falls back to a stable location, without claiming
+// that the fallback is the earliest reachable one.
+inline std::optional<size_t> SelectSariaMagicPlacement(const std::vector<CwPlacedItem>& placements,
+                                                       const nlohmann::json& spheres, bool requireReachable = false) {
+    std::unordered_map<std::string, int> ranks;
+    for (const auto& sphere : spheres) {
+        const int rank = sphere.value("sphere", -1);
+        if (rank < 0)
+            continue;
+        for (const auto& step : sphere.value("steps", nlohmann::json::array())) {
+            if (!step.is_object())
+                continue;
+            std::string key = step.value("game", "") + ":" + step.value("check", "");
+            auto [it, inserted] = ranks.emplace(key, rank);
+            if (!inserted)
+                it->second = std::min(it->second, rank);
+        }
+    }
+    std::optional<size_t> best;
+    auto order = [&](const CwPlacedItem& p) {
+        auto rank = ranks.find((p.checkGame == GAME_OOT ? "oot:" : "mm:") + p.check);
+        return std::make_tuple(rank == ranks.end() ? INT32_MAX : rank->second, p.checkGame == GAME_OOT ? 0 : 1,
+                               p.check);
+    };
+    for (size_t i = 0; i < placements.size(); ++i) {
+        const std::string key = (placements[i].checkGame == GAME_OOT ? "oot:" : "mm:") + placements[i].check;
+        if (placements[i].itemGame == GAME_OOT && placements[i].item == "Magic Stat Upgrade" &&
+            (!requireReachable || ranks.count(key)) && (!best || order(placements[i]) < order(placements[*best])))
+            best = i;
+    }
+    return best;
+}
+
 // masterSeed: same seed the fill used (all randomness here derives from it, seeded independently via
 // the XOR tag, so hint generation is deterministic without perturbing the fill's own RNG stream).
 // sohDumpJson/mmDumpJson: the STATIC dumps (pool/items/advancement — mmDumpJson also carries
@@ -196,7 +231,9 @@ inline constexpr const char* kStaticHintPrefix = "__STATIC__";
 // oot/mm placement maps + foreign[] — same shape RunPlaythrough/PareDownPlaythrough consume).
 inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJson, const std::string& sohHintDumpJson,
                                const std::string& mmDumpJson, const nlohmann::json& foreignArray,
-                               const std::string& spoilerJson, const RequirednessResult& pareDown) {
+                               const std::string& spoilerJson, const RequirednessResult& pareDown,
+                               const nlohmann::json& reachabilitySpheres = nlohmann::json::array(),
+                               bool sariaReachabilityVerified = false) {
     nlohmann::json out;
     out["version"] = 1;
     nlohmann::json ootHints = nlohmann::json::array();
@@ -423,6 +460,18 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
         return std::find_if(placements.begin(), placements.end(),
                             [&](const CwPlacedItem& p) { return p.itemGame == GAME_OOT && p.item == name; });
     };
+    auto placementAreaText = [&](const CwPlacedItem& placed, bool yourPocket) -> std::optional<Tri> {
+        if (placed.checkGame != GAME_OOT) {
+            auto mk = mmLocationHints.find(placed.check);
+            return areaText("mm:" + (mk != mmLocationHints.end() ? mk->second : placed.check));
+        }
+        if (yourPocket && placed.check == "Link's Pocket")
+            return PickTemplate(tmpl("RHT_YOUR_POCKET"), hintClarity, rng);
+        auto ck = ootChecks.find(placed.check);
+        if (ck == ootChecks.end())
+            return std::nullopt;
+        return areaText("oot:" + ck->second.area);
+    };
     auto itemAreaText = [&](const char* itemName, bool yourPocket = false) -> std::optional<Tri> {
         auto it = findOotItem(itemName);
         // A hint names the concrete item while the pool may only carry the chain that grants it
@@ -432,16 +481,7 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
             it = findOotItem("Progressive " + std::string(itemName));
         if (it == placements.end())
             return std::nullopt;
-        if (it->checkGame != GAME_OOT) {
-            auto mk = mmLocationHints.find(it->check);
-            return areaText("mm:" + (mk != mmLocationHints.end() ? mk->second : it->check));
-        }
-        if (yourPocket && it->check == "Link's Pocket")
-            return PickTemplate(tmpl("RHT_YOUR_POCKET"), hintClarity, rng);
-        auto ck = ootChecks.find(it->check);
-        if (ck == ootChecks.end())
-            return std::nullopt;
-        return areaText("oot:" + ck->second.area);
+        return placementAreaText(*it, yourPocket);
     };
 
     // Weighted pick of a not-yet-used index from `pool` (indices into `candidates` or an area vector),
@@ -546,9 +586,16 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
             if (options.value(sh.option, 0) == 0)
                 continue;
             auto it = findOotItem(sh.item);
+            const bool statMagic = std::string(sh.hint) == "RH_SARIA_HINT" && options.value("magicStatUpgrade", 0) != 0;
+            if (statMagic) {
+                const auto selected =
+                    SelectSariaMagicPlacement(placements, reachabilitySpheres, sariaReachabilityVerified);
+                it = selected ? placements.begin() + *selected : placements.end();
+            }
             if (it == placements.end())
                 continue;
-            const std::optional<Tri> area = itemAreaText(sh.item, sh.yourPocket);
+            const std::optional<Tri> area =
+                statMagic ? placementAreaText(*it, sh.yourPocket) : itemAreaText(sh.item, sh.yourPocket);
             if (!area)
                 continue;
             nlohmann::json msgs = nlohmann::json::array();

@@ -64,4 +64,12 @@ inline int CopyResource(const char* nativeGame, uint8_t* destination, size_t cap
     }
     return 0;
 }
+// The model selector may successfully return the bundled standard fallback.
+// Only the selected owner's actual HD key enables the optional checkbox.
+inline bool HDResourceAvailable(const char* nativeGame) {
+    size_t size = 0;
+    const char* key = nullptr;
+    return CopyResource(nativeGame, nullptr, 0, &size, nullptr, true, &key) == 1 && key &&
+           (std::strcmp(key, kHDResourcePath) == 0 || std::strcmp(key, kAltHDResourcePath) == 0);
+}
 } // namespace NeiWolfAsset

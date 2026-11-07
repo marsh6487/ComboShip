@@ -121,6 +121,15 @@ inline const Item* Find(std::string_view key) {
     return nullptr;
 }
 
+// Keep retired records loadable for frozen seeds and sold-out receipts, while
+// excluding them from all newly generated stock and replacement candidates.
+inline bool Selectable(const Item& item) {
+    const std::string_view key(item.key);
+    return key != "wildcard.command_melody" && key != "wildcard.great_fairy_mask" &&
+           key != "wildcard.mask_truth" && key != "wildcard.gibdo_mask" &&
+           key != "wildcard.garo_mask" && key != "wildcard.captains_hat";
+}
+
 inline bool Eligible(const Item& item, Games games) {
     if (games != Games::Oot || !item.wildcard)
         return true; // Every NEI offer has native implementations in both games.
@@ -258,7 +267,8 @@ inline nlohmann::json Generate(uint32_t seed, const Options& options = {}) {
     Rng priceRng(static_cast<uint64_t>(seed) ^ UINT64_C(0x534B494550524943));
     std::vector<const Item*> candidates;
     for (const auto& item : Catalog())
-        if (Eligible(item, options.games) && (options.eligible.empty() || options.eligible.contains(item.key)))
+        if (Selectable(item) && Eligible(item, options.games) &&
+            (options.eligible.empty() || options.eligible.contains(item.key)))
             candidates.push_back(&item);
     for (size_t i = candidates.size(); i > 1; --i)
         std::swap(candidates[i - 1], candidates[stockRng.Below(i)]);
@@ -300,6 +310,8 @@ inline nlohmann::json Generate(uint32_t seed, const Options& options = {}) {
                               { "stock", std::move(stock) } };
     if (options.games != Games::Both)
         result["games"] = options.games == Games::Oot ? "oot" : "mm";
+    if (!options.eligible.empty())
+        result["eligible"] = options.eligible;
     return result;
 }
 
@@ -321,6 +333,13 @@ inline bool Validate(const nlohmann::json& market) {
         const auto games = market.value("games", nlohmann::json("both"));
         if (games != "both" && games != "oot" && games != "mm")
             return false;
+        if (market.contains("eligible")) {
+            if (!market["eligible"].is_array() || market["eligible"].empty())
+                return false;
+            for (const auto& key : market["eligible"])
+                if (!key.is_string() || !Find(key.get<std::string>()))
+                    return false;
+        }
         std::set<std::string> keys;
         int wildcards = 0;
         std::array<int, 3> tiers{};
@@ -341,14 +360,59 @@ inline bool Validate(const nlohmann::json& market) {
 
 struct State {
     uint8_t purchased = 0;
+    // Empty entries use the original seed offer. Overrides never change its
+    // price, dungeon unlock, or purchase bit, and are saved with that seed.
+    std::array<std::string, 8> replacements{};
 };
 inline nlohmann::json StateToJson(const State& state) {
-    return { { "purchased", state.purchased } };
+    return { { "purchased", state.purchased }, { "replacements", state.replacements } };
 }
 inline State StateFromJson(const nlohmann::json& json) {
     if (!json.is_object() || !json.contains("purchased") || !UnsignedInRange(json["purchased"], UINT8_MAX))
         return {};
-    return { json["purchased"].get<uint8_t>() };
+    State state;
+    state.purchased = json["purchased"].get<uint8_t>();
+    if (json.contains("replacements") && json["replacements"].is_array() && json["replacements"].size() == 8 &&
+        std::all_of(json["replacements"].begin(), json["replacements"].end(),
+                    [](const auto& key) { return key.is_string(); }))
+        state.replacements = json["replacements"].get<std::array<std::string, 8>>();
+    return state;
+}
+
+inline const Item* EffectiveItem(const nlohmann::json& market, const State& state, int slot) {
+    if (slot < 0 || slot >= 8 || !market.is_object() || !market.contains("stock") ||
+        !market["stock"].is_array() || market["stock"].size() != 8)
+        return nullptr;
+    return Find(state.replacements[slot].empty() ? market["stock"][slot].value("key", std::string())
+                                               : state.replacements[slot]);
+}
+
+inline Games MarketGames(const nlohmann::json& market) {
+    const auto games = market.value("games", nlohmann::json("both"));
+    return games == "oot" ? Games::Oot : games == "mm" ? Games::Mm : Games::Both;
+}
+
+inline bool ReplacementEligible(const nlohmann::json& market, const Item& item) {
+    if (!Selectable(item) || !Eligible(item, MarketGames(market)) || item.renewable)
+        return false;
+    if (!market.contains("eligible"))
+        return true;
+    return std::find(market["eligible"].begin(), market["eligible"].end(), item.key) != market["eligible"].end();
+}
+
+inline bool ValidateReplacements(const nlohmann::json& market, const State& state) {
+    std::set<std::string> keys;
+    for (int slot = 0; slot < 8; ++slot) {
+        const auto* item = EffectiveItem(market, state, slot);
+        if (!item || !keys.insert(item->key).second)
+            return false;
+        if (!state.replacements[slot].empty()) {
+            const auto* base = Find(market["stock"][slot]["key"].get<std::string>());
+            if (!base || base->renewable || item->tier != base->tier || !ReplacementEligible(market, *item))
+                return false;
+        }
+    }
+    return true;
 }
 
 // Purchase bits belong to one slot AND its complete frozen offer list. A seed
@@ -373,14 +437,64 @@ class Session {
     bool Active(int file) const {
         return slot == file && slot >= 0 && !market.is_null();
     }
+    const Item* Offer(int shelf) const {
+        return EffectiveItem(market, state, shelf);
+    }
+    nlohmann::json OfferFingerprint() const {
+        // Purchase acknowledgement changes paid bits while the same receipt is
+        // still visible. Its frozen identity depends only on stock, not bits.
+        return { { "market", market }, { "replacements", state.replacements } };
+    }
+    // Call only before opening browsing, never while an item or price is quoted
+    // or a receipt is in flight. The host persists a true result immediately.
+    template <class Owned, class Usable> bool RefreshOwned(Owned owned, Usable usable) {
+        if (slot < 0 || !Validate(market) || !ValidateReplacements(market, state))
+            return false;
+        bool changed = false;
+        std::set<std::string> occupied;
+        for (int shelf = 0; shelf < 8; ++shelf)
+            occupied.insert(Offer(shelf)->key);
+        for (int shelf = 0; shelf < 8; ++shelf) {
+            const auto* current = Offer(shelf);
+            if (current->renewable || (state.purchased & (1u << shelf)) ||
+                (Selectable(*current) && !owned(*current)))
+                continue;
+            std::vector<const Item*> preferred, fallback;
+            for (const auto& item : Catalog()) {
+                if (item.tier != current->tier || !ReplacementEligible(market, item) ||
+                    occupied.contains(item.key) || owned(item) || !usable(item))
+                    continue;
+                (item.wildcard == current->wildcard ? preferred : fallback).push_back(&item);
+            }
+            const auto& candidates = preferred.empty() ? fallback : preferred;
+            if (candidates.empty())
+                continue; // Exhaustion keeps the existing blocked offer, never a free grant.
+            // Separate from stock, price and fill streams. Explicit byte hashing
+            // avoids implementation-defined std::hash and persists the result.
+            uint64_t keyHash = UINT64_C(14695981039346656037);
+            for (unsigned char byte : std::string_view(current->key))
+                keyHash = (keyHash ^ byte) * UINT64_C(1099511628211);
+            Rng rng(market["seed"].get<uint32_t>() ^ keyHash ^
+                    (UINT64_C(0x42534D52504C0000) + static_cast<uint64_t>(shelf)));
+            const auto* replacement = candidates[rng.Below(candidates.size())];
+            occupied.erase(current->key);
+            occupied.insert(replacement->key);
+            state.replacements[shelf] = replacement->key;
+            changed = true;
+        }
+        return changed;
+    }
     nlohmann::json Save(int file) const {
         return Active(file) ? nlohmann::json{ { "market", market }, { "state", StateToJson(state) } }
                             : nlohmann::json();
     }
     void Load(const nlohmann::json& saved, int file) {
         state = {};
-        if (Active(file) && saved.is_object() && saved.value("market", nlohmann::json()) == market)
+        if (Active(file) && saved.is_object() && saved.value("market", nlohmann::json()) == market) {
             state = StateFromJson(saved.value("state", nlohmann::json()));
+            if (!ValidateReplacements(market, state))
+                state.replacements = {}; // Preserve paid slots if an override is malformed.
+        }
     }
 
   private:
@@ -410,10 +524,10 @@ inline Options OptionsFromJson(const nlohmann::json& json) {
 enum class PurchaseResult { Ready, SoldOut, Locked, NeedRupees, Owned, Unavailable };
 inline PurchaseResult CanPurchase(const nlohmann::json& market, const State& state, int slot, int rupees, int clears,
                                   bool owned, bool usable) {
-    if (slot < 0 || slot >= 8 || !Validate(market))
+    if (slot < 0 || slot >= 8 || !Validate(market) || !ValidateReplacements(market, state))
         return PurchaseResult::Unavailable;
     const auto& offer = market["stock"][slot];
-    const Item* item = Find(offer["key"].get<std::string>());
+    const Item* item = EffectiveItem(market, state, slot);
     if (!item->renewable && (state.purchased & (1u << slot)))
         return PurchaseResult::SoldOut;
     if (owned && !item->renewable)

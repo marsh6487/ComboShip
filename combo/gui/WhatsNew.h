@@ -355,6 +355,8 @@ inline constexpr Entry kControls[]{
       "Use elemental impact sounds for fire, ice and light arrows." },
     { "gCosmetic.Arrows.ElementalImpactSounds", Kind::New,
       "Use elemental impact sounds for fire, ice and light arrows." },
+    { "gAudioEditor.DisableRanchProximityMusic", Kind::New,
+      "Play the Audio Editor selection throughout Lon Lon Ranch without distance-based singing, including at night." },
     { "gAudioEditor.EnableNightMusic", Kind::New,
       "Use each scene's daytime music at night while preserving native ambience and audio ownership." },
     { "gAudioEditor.ReplacedSequences.COMBO_OOT_LOST_WOODS.value", Kind::New,

@@ -667,4 +667,52 @@ inline nlohmann::json PlaythroughLines(const nlohmann::json& spheres) {
     return out;
 }
 
+// Dedicated target search ignores the seed's win condition. Short hunts and
+// optional magic can finish before any upgrade appears in the spoiler playthrough.
+// Stop on the first reachable magic sphere; do not change the normal playthrough,
+// requiredness, item placements or hint RNG. The caller retains oracle restoration.
+inline nlohmann::json FindSariaMagicSphere(const std::string& spoilerJson, const OracleFns& ootOracle,
+                                           const OracleFns& mmOracle, const std::string& sohDumpJson,
+                                           const std::string& mmDumpJson, bool portalGated, bool mmStart,
+                                           uint32_t sharedMask, const std::string& sharedPairsJson) {
+    const auto placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
+    const auto groups = BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
+                                              SharedMaskForSpoiler(spoilerJson, sharedMask));
+    std::vector<std::string> ownedOot, ownedMm, ootSeen, mmSeen;
+    std::unordered_set<std::string> collected;
+    bool portalOpen = !portalGated || mmStart;
+    for (int sphere = 0; sphere < 200; ++sphere) {
+        SharedOwnedViews(groups, ownedOot, ownedMm, ootSeen, mmSeen);
+        std::unordered_set<std::string> ootReach, mmReach;
+        if (ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess) {
+            auto joint =
+                CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen, !portalGated || mmStart, QueryReachable);
+            ootReach = std::move(joint.oot);
+            mmReach = std::move(joint.mm);
+        } else {
+            ootReach = QueryReachable(ootOracle, ootSeen);
+            portalOpen = portalOpen || OraclePortalOpen(ootOracle);
+            mmReach = portalOpen ? QueryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
+        }
+        MagicMirrorShuffle::AddOotRoute(ootReach, mmReach);
+        nlohmann::json magic = nlohmann::json::array();
+        bool added = false;
+        for (const auto& p : placements) {
+            const std::string key = (p.checkGame == GAME_OOT ? "oot:" : "mm:") + p.check;
+            if (collected.count(key) || !(p.checkGame == GAME_OOT ? ootReach : mmReach).count(p.check))
+                continue;
+            if (p.itemGame == GAME_OOT && p.item == "Magic Stat Upgrade")
+                magic.push_back({ { "game", p.checkGame == GAME_OOT ? "oot" : "mm" }, { "check", p.check } });
+            collected.insert(key);
+            (p.itemGame == GAME_OOT ? ownedOot : ownedMm).push_back(p.item);
+            added = true;
+        }
+        if (!magic.empty())
+            return nlohmann::json::array({ { { "sphere", sphere }, { "steps", std::move(magic) } } });
+        if (!added)
+            break;
+    }
+    return nlohmann::json::array();
+}
+
 } // namespace ComboRando

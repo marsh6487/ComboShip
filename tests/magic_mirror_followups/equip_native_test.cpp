@@ -128,13 +128,9 @@ int main() {
                 Put(target, displaced, displaced >= 0x0200 || displaced == ITEM_NONE ? SLOT_NONE : 11);
                 Equip(&play, target, EXT_ITEM_MAGIC_MIRROR, travelSlot);
                 Check(Item(target) == EXT_ITEM_MAGIC_MIRROR, "Mirror lands on requested button");
-#ifdef MIRROR_FIXTURE_MM
                 const bool independent = target >= 4;
-#else
-                const bool independent = true;
-#endif
                 Check(Item(source) == (independent ? EXT_ITEM_MAGIC_MIRROR : displaced),
-                      "NEI shortcut preserves other bindings; C moves retain MM swap behavior");
+                      "D-pad shortcut preserves other bindings; C moves use swap behavior");
                 Check(sIconLoads[target] > 0 && (independent ? sIconLoads[source] == 0 : sIconLoads[source] > 0),
                       "Only changed HUD icons refresh");
                 for (int other = 1; other <= 7; ++other)
@@ -158,25 +154,15 @@ int main() {
     Put(6, 0x0210, SLOT_NONE);
     Put(7, 21, 18);
     Equip(&play, 3, EXT_ITEM_MAGIC_MIRROR, travelSlot);
-#ifdef MIRROR_FIXTURE_MM
     Check(Item(1) == 0x0209 && Item(2) == ITEM_NONE && Item(5) == ITEM_NONE,
           "Legacy Mirror duplicates are removed without duplicating the displaced item");
-#else
-    Check(Item(1) == EXT_ITEM_MAGIC_MIRROR && Item(2) == EXT_ITEM_MAGIC_MIRROR && Item(5) == EXT_ITEM_MAGIC_MIRROR,
-          "Independent NEI assignment preserves the other shortcut bindings");
-#endif
     Check(Item(7) == 21 && Slot(7) == 18, "Unrelated NEI/native slot is preserved");
     Check(Item(6) == 0x0210 && Slot(6) == SLOT_NONE, "Another extended item with SLOT_NONE is preserved");
     // Re-equipping the already selected button must not swap another Mirror back.
     Put(4, EXT_ITEM_MAGIC_MIRROR, travelSlot);
     Equip(&play, 3, EXT_ITEM_MAGIC_MIRROR, travelSlot);
-#ifdef MIRROR_FIXTURE_MM
     Check(Item(3) == EXT_ITEM_MAGIC_MIRROR && Item(4) == ITEM_NONE,
           "Re-equipping the same button heals duplicate Mirror mappings");
-#else
-    Check(Item(3) == EXT_ITEM_MAGIC_MIRROR && Item(4) == EXT_ITEM_MAGIC_MIRROR,
-          "Reassigning an independent shortcut leaves the other bank intact");
-#endif
 #ifdef MIRROR_FIXTURE_MM
     Reset();
     Put(1, 9, 11);

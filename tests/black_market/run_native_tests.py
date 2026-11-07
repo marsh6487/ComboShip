@@ -23,7 +23,7 @@ source = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
 signatures = ["bool SoloExterior(", "bool Exterior(", "Vec3f Door(", "u16 ReturnEntrance(",
               "void StageSoloReturn(", "bool Interior(",
               "bool Safe(", "void Transition(", "void PlayerUpdate(",
-              "const Item* Offer(", "PurchaseResult Status(",
+              "const Item* Offer(", "PurchaseResult Status(", "void RefreshOwnedStock(",
               "bool ReceiptContext(", "void AbortMarketReceipt(", "void GiveMarketReceipt(",
               "void ReleaseReceiptEvent(", "void MarketReceiptDestroyed(", "void CancelReceipt(",
               "void OfferMarketReceipt(", "bool Purchase(", "void SceneInit(", "void MarketText(",

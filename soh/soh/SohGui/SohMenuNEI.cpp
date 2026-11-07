@@ -1,3 +1,4 @@
+#include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
 #include "../../../combo/NeiGracePolicy.h"
@@ -885,6 +886,11 @@ void RegisterNEIMenu() {
     mSohMenu->AddWidget(path, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.WolfLink.UseHDModel")
         .RaceDisable(false)
+        .PreFunc([](WidgetInfo& info) {
+            info.options->disabled = !NeiWolfAsset::HDResourceAvailable("oot");
+            info.options->disabledTooltip = "Install wolf-link-hd.o2r in mods/soh and mods/2ship, then restart. "
+                                            "The bundled standard Wolf remains available.";
+        })
         .Options(CheckboxOptions().DefaultValue(true).Tooltip(
             "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
             "Applies the next time you transform into Wolf Link."));

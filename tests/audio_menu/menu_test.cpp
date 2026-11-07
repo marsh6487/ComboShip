@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "gui/WhatsNew.h"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -246,6 +247,13 @@ static void ProbeWeather() {
         "optional night music must keep its shared key and default off in both menus");
   Check(WhatsNew::Find(enableNightMusic.key.c_str()),
         "optional night checkbox must use existing release highlighting");
+#if !TEST_MM
+  Check(disableRanchProximityMusic.key == CVAR_AUDIO("DisableRanchProximityMusic") &&
+            disableRanchProximityMusic.defaultValue == 0,
+        "Ranch proximity opt-in must keep its stable key and default off");
+  Check(WhatsNew::Find(disableRanchProximityMusic.key.c_str()),
+        "Ranch checkbox must use native release highlighting");
+#endif
   Check(writes == 0, "registering weather widgets must not change preferences");
   const char *seasonKey =
       TEST_MM ? MM_WEATHER_CVAR("Season") : SOH_SEASON_WEATHER_CVAR("Season");
