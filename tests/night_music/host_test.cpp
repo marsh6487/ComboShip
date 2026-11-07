@@ -16,9 +16,10 @@ struct PlayState {
     struct { uint16_t seqId=0x22; uint8_t natureAmbienceId=2; } sequenceCtx;
     struct { uint16_t seqId=0x22; uint8_t ambienceId=2; } sceneSequences;
     struct { int state=0; } csCtx;
+    int transitionTrigger=0;
 };
 static struct {
-    int gameMode=0,fileNum=0,forcedSeqId=0;
+    int gameMode=0,fileNum=0,forcedSeqId=0,magicState=0;
     uint16_t dayTime=0xd000;
     struct { int day=2; uint16_t time=0xd000; } save;
 } gSaveContext;
@@ -48,7 +49,28 @@ static int CVarGetInteger(const char* name,int fallback) {
 }
 static uint16_t func_800FA0B4(int p) { return active[p]; }
 static uint16_t AudioSeq_GetActiveSeqId(int p) { return active[p]; }
+#if TEST_MM
 static bool Player_InCsMode(PlayState*) { return cutscene; }
+#else
+using s32=int;
+constexpr int PLAYER_STATE1_LOADING=1,PLAYER_STATE1_TALKING=1<<6,PLAYER_STATE1_DEAD=1<<7;
+constexpr int PLAYER_STATE1_IN_CUTSCENE=1<<29,PLAYER_STATE3_FLYING_WITH_HOOKSHOT=1<<7;
+constexpr int TRANS_TRIGGER_START=1,MAGIC_STATE_IDLE=0;
+struct Actor { int textId=0; };
+struct Player {
+    uint32_t stateFlags1=0,stateFlags3=0;
+    int csAction=0,unk_6AD=0,itemAction=0;
+    Actor actor;
+    Actor *talkActor=nullptr,*focusActor=nullptr;
+};
+static Player playerState;
+#define GET_PLAYER(play) (&playerState)
+static int Player_ActionToMagicSpell(Player*,int) { return -1; }
+static void Player_Action_Talk() {}
+static void Player_SetupActionPreserveAnimMovement(PlayState*,Player*,void(*)(),int) {}
+static void Message_StartTextbox(PlayState*,int,Actor*) {}
+/* NATIVE_PLAYER */
+#endif
 static int CutsceneManager_GetCurrentCsId() { return cutscene?1:-1; }
 static bool Environment_IsFinalHours(PlayState*) { return finalHours; }
 static bool AudioSeq_IsSeqCmdNotQueued(uint32_t,uint32_t) { return !pending; }
@@ -91,11 +113,41 @@ int main() {
     frame();assert(history.size()==1); // Pending command must not be repeated/stopped.
     Flush();frame();assert(history.size()==1&&SceneNightMusic_CurrentEntry()==0x22);
     SceneNightMusic_RequestRefresh();frame();Flush();assert(lookups==2);
+#if !TEST_MM
+    // Real talk setup sets IN_CUTSCENE even for ordinary gossip-stone dialogue.
+    Player_SetupTalk(&play,&playerState);
+    assert(Player_InCsMode(&play));
+    const auto dialogue=history.size();
+    const auto dialogueLookups=lookups;
+    for(int page=0;page<3;++page) for(int tick=0;tick<60;++tick) { frame();Flush(); }
+    assert(history.size()==dialogue && "ordinary dialogue must not stop/restart night music");
+    assert(lookups==dialogueLookups&&resolvedSub==0x15d&&sSceneNight.Owns());
+    playerState.stateFlags1=0;
+    frame();Flush();assert(history.size()==dialogue); // Closing must retain playback position.
+    Player_SetupTalk(&play,&playerState);
+    SceneNightMusic_RequestRefresh();frame();Flush();
+    assert(history.size()==dialogue); // Defer requested edits while player is busy.
+    playerState.stateFlags1=0;frame();Flush();
+    assert(history.size()==dialogue+1&&!history.back().stop&&lookups==dialogueLookups+1);
+    // A scripted cutscene remains an audio override, including dialogue inside it.
+    Player_SetupTalk(&play,&playerState);
+    play.csCtx.state=1;frame();Flush();
+    assert(history.back().stop&&history.back().player==3&&!sSceneNight.Owns());
+    play.csCtx.state=0;playerState.stateFlags1=0;frame();Flush();
+    assert(!history.back().stop&&sSceneNight.Owns());
+#endif
     const auto before=history.size();
+#if !TEST_MM
+    Player_SetupTalk(&play,&playerState);
+#endif
     active[1]=0x20;frame();
     if(!TEST_MM) { assert(history.size()==before+1&&history.back().stop&&history.back().player==3);Flush(); }
     else assert(history.size()==before);
-    active[1]=0xffff;frame();Flush();
+    active[1]=0xffff;
+#if !TEST_MM
+    playerState.stateFlags1=0;
+#endif
+    frame();Flush();
     if(!TEST_MM) assert(active[0]==1&&resolvedSub==0x15d);
     cvars["gAudioEditor.Playing"]=0x50;active[0]=0x50;
     const auto preview=history.size();frame();Flush();
@@ -110,13 +162,25 @@ int main() {
         assert(history.size()==n2&&!Audio_IsSceneNightBgmActive()); // Same low byte is a different owner.
         active[3]=0xffff;frame();Flush();
     }
+#if !TEST_MM
+    Player_SetupTalk(&play,&playerState);
+#endif
     cvars["gAudioEditor.EnableNightMusic"]=0;frame();Flush();
     assert(history.back().stop&&history.back().player==player);
     const auto off=history.size();frame();assert(history.size()==off);
+#if !TEST_MM
+    playerState.stateFlags1=0;frame();assert(history.size()==off);
+#endif
     cvars["gAudioEditor.EnableNightMusic"]=1;frame();Flush();
     gSaveContext.dayTime=gSaveContext.save.time=0x7000;
+#if !TEST_MM
+    Player_SetupTalk(&play,&playerState);
+#endif
     const auto dawn=history.size();frame();Flush();
     assert(TEST_MM?history.size()==dawn:history.size()==dawn+1&&history.back().stop);
+#if !TEST_MM
+    playerState.stateFlags1=0;
+#endif
     // Re-entry to a new scene cannot stop its native music or inherit ownership.
     play.sceneNum=play.sceneId=90;active[0]=0x70;
     const auto transition=history.size();frame();assert(history.size()==transition&&!sSceneNight.Owns());

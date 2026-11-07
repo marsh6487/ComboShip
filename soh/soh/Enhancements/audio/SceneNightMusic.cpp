@@ -44,8 +44,7 @@ static void UpdateSceneNightMusic() {
     const bool dedicated =
         play->sceneNum == SCENE_HYRULE_FIELD && CVarGetInteger("gAudioEditor.HyruleFieldNightMusic", 0) != 0;
     const bool nativeMain = main == NA_BGM_NATURE_AMBIENCE || main == NA_BGM_DISABLED;
-    const bool blocked = play->csCtx.state != CS_STATE_IDLE || Player_InCsMode(play) ||
-                         gSaveContext.forcedSeqId != NA_BGM_GENERAL_SFX ||
+    const bool blocked = play->csCtx.state != CS_STATE_IDLE || gSaveContext.forcedSeqId != NA_BGM_GENERAL_SFX ||
                          CVarGetInteger("gAudioEditor.Playing", 0) != 0 ||
                          func_800FA0B4(SEQ_PLAYER_FANFARE) != NA_BGM_DISABLED || !nativeMain || nativePending || combat;
     uint16_t row = source;
@@ -61,7 +60,9 @@ static void UpdateSceneNightMusic() {
         .eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum < 3 && source != NA_BGM_NO_MUSIC &&
                     play->sequenceCtx.natureAmbienceId < NATURE_ID_NONE && !dedicated,
         .blocked = blocked,
-        .canStart = nativeMain && (sub == NA_BGM_DISABLED || playing),
+        // Talking also sets Player_InCsMode. Defer starts/edits while controls
+        // are locked; existing playback and dawn/disable cleanup still run.
+        .canStart = !Player_InCsMode(play) && nativeMain && (sub == NA_BGM_DISABLED || playing),
         .playing = playing,
         .suspendWhenBlocked = true,
         .stopOnDay = true,
