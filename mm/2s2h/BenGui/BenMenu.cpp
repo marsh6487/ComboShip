@@ -1,3 +1,4 @@
+#include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/gameplay/SwordElementOverride.h"
 #include "../../../combo/render/SpinAttackStyle.h"
 #include "../../../combo/gui/WhatsNew.h"
@@ -3461,6 +3462,11 @@ void BenMenu::AddNEI() {
         .Options(CheckboxOptions().Tooltip("Deku/Goron/Zora/FD transformation-mask systems.").DefaultValue(true));
     AddWidget(masksPath, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.WolfLink.UseHDModel")
+        .PreFunc([](WidgetInfo& info) {
+            info.options->disabled = !NeiWolfAsset::HDResourceAvailable("mm");
+            info.options->disabledTooltip = "Install wolf-link-hd.o2r in mods/soh and mods/2ship, then restart. "
+                                            "The bundled standard Wolf remains available.";
+        })
         .Options(CheckboxOptions().DefaultValue(true).Tooltip(
             "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
             "Applies the next time you transform into Wolf Link."));

@@ -318,6 +318,7 @@ std::vector<RandomizerCheck> Context::GetLocations(const std::vector<RandomizerC
 }
 
 void Context::ClearItemLocations() {
+    InvalidateSariaMagicHintLocation();
 #ifdef COMBO_BUILD
     ComboWarnIfLiveWipe("Context::ClearItemLocations");
 #endif
@@ -327,6 +328,7 @@ void Context::ClearItemLocations() {
 }
 
 void Context::ItemReset() {
+    InvalidateSariaMagicHintLocation();
 #ifdef COMBO_BUILD
     ComboWarnIfLiveWipe("Context::ItemReset");
 #endif
@@ -349,6 +351,7 @@ void Context::LocationReset() {
 }
 
 void Context::HintReset() {
+    InvalidateSariaMagicHintLocation();
     for (const RandomizerCheck il : StaticData::GetGossipStoneLocations()) {
         GetItemLocation(il)->ResetVariables();
     }
@@ -432,6 +435,7 @@ GetItemEntry Context::GetFinalGIEntry(const RandomizerCheck rc, const bool check
 }
 
 void Context::ParseSpoiler(const char* spoilerFileName) {
+    InvalidateSariaMagicHintLocation();
     std::ifstream spoilerFileStream(SohUtils::Sanitize(spoilerFileName));
     if (!spoilerFileStream) {
         return;
@@ -678,6 +682,7 @@ uint32_t Context::GetSeed() const {
 }
 
 void Context::SetSeed(const uint32_t seed) {
+    InvalidateSariaMagicHintLocation();
     mFinalSeed = seed;
 }
 } // namespace Rando

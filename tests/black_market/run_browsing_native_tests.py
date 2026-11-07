@@ -26,10 +26,12 @@ def native_camera_path(camera, play):
     prefix = data[:data.index("} CameraSetting;") + len("} CameraSetting;")]
     prefix += "\n#define CAM_SETTING_MODE_ENTRY(func, data) { func, ARRAY_COUNT(data), data }\n"
     for values, modes in (("sSetFree0ModeNormalData", "sCamSetFree0Modes"),
+                          ("sSetTurnAroundModeNormalData", "sCamSetTurnAroundModes"),
                           ("sSetPivotShopBrowsingModeNormalData", "sCamSetPivotShopBrowsingModes")):
         prefix += array("CameraModeValue " + values + "[") + array("CameraMode " + modes + "[")
     prefix += "CameraSetting sCameraSettings[CAM_SET_MAX]{};\nvoid InitNativeCameraTable() {\n"
     for setting, modes in (("CAM_SET_FREE0", "sCamSetFree0Modes"),
+                           ("CAM_SET_TURN_AROUND", "sCamSetTurnAroundModes"),
                            ("CAM_SET_PIVOT_SHOP_BROWSING", "sCamSetPivotShopBrowsingModes")):
         entry = re.search(r"^\s*(\{[^\n]*" + modes + r"[^\n]*\}),", data, re.M).group(1)
         prefix += "sCameraSettings[" + setting + "] = " + entry + ";\n"
@@ -100,7 +102,12 @@ def run_oot(temporary):
                   "void MonitorBrowsing(", "void BrowseInput(", "void DrawBrowseCursor(")
     bodies = [block_from(native, native.index(s)) for s in signatures]
     bodies.append(block_from(source, source.index("void KeeperUpdate(")))
+    bodies.append(function(source, 'extern "C" int ComboBlackMarketNative_UseItemGetCamera('))
     bodies.append(function(source, 'extern "C" int ComboBlackMarketNative_PrepareViewpointCamera('))
+    player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
+    bodies.extend(function(player_source, signature) for signature in
+                  ("void Player_RequestCameraSetting(", "void Player_SetTurnAroundCamera("))
+    bodies.append(function((ROOT / "soh/src/code/z_play.c").read_text(), "s32 Play_CamIsNotFixed("))
     actor = (ROOT / "soh/src/code/z_actor.c").read_text()
     skin = (ROOT / "soh/src/code/z_skin_matrix.c").read_text()
     bodies[:0] = [function(skin, "void SkinMatrix_Vec3fMtxFMultXYZW("),

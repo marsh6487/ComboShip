@@ -23,7 +23,6 @@ constexpr int kLogicHz = 20;
 constexpr int kRainDensity = 30;
 PlayState* sPlay = nullptr;
 int sScene = -1;
-int sRoom = -1;
 int sSeason = -1;
 int sRainMode = -2;
 uint32_t sLastFrame = UINT32_MAX;
@@ -177,7 +176,7 @@ extern "C" int32_t SeasonWeather_WinterEffectEnabled(int32_t effect) {
 
 extern "C" void SeasonWeather_Reset() {
     sPlay = nullptr;
-    sScene = sRoom = sSeason = -1;
+    sScene = sSeason = -1;
     sRainMode = -2;
     sLastFrame = UINT32_MAX;
     sRandom = 0x534F4857;
@@ -273,11 +272,13 @@ extern "C" void SeasonWeather_Update(PlayState* play) {
         SeasonWeather_Reset();
         return;
     }
-    if (sPlay != play || sScene != play->sceneNum || sRoom != play->roomCtx.curRoom.num) {
+    // Room doors replace placed weather actors, not the scene's seasonal
+    // shower. Keep its phase, private cadence and audible loop through those
+    // ownership handoffs; a new PlayState/scene still starts fresh.
+    if (sPlay != play || sScene != play->sceneNum) {
         SeasonWeather_Reset();
         sPlay = play;
         sScene = play->sceneNum;
-        sRoom = play->roomCtx.curRoom.num;
     }
     const int season = SeasonWeather_SeasonForPlay(play);
     const bool rainySeason = season == SEASON_SPRING || season == SEASON_AUTUMN;

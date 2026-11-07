@@ -44,6 +44,7 @@ PurchaseResult Status(int index) {
   return status[index];
 }
 bool ReceiptContext() { return receiptContext; }
+void RefreshOwnedStock() {} // Stock policy and safe guards run in native transaction fixtures.
 bool ReceiptPlacementIdle() { return placementIdle; }
 extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState*, CollisionContext*, CollisionPoly** floor,
                                              s32* bg, Actor*, Vec3f* probe) {
@@ -242,6 +243,11 @@ static void Reset() {
                     CS_END_CAM_0,
                     BlackMarketMmShopScene::kLetterboxSize};
   }
+  cutscenes[BlackMarketMmShopScene::kPlayerCutscene] = {
+      BlackMarketMmShopScene::kPlayerPriority, -1, CS_CAM_ID_GLOBAL_ITEM_GET, CS_SCRIPT_ID_NONE,
+      CS_ID_NONE, CS_END_SFX_NONE, 255, BlackMarketMmShopScene::kHudVisibility, CS_END_CAM_0,
+      BlackMarketMmShopScene::kLetterboxSize};
+  play.playerCsIds[PLAYER_CS_ID_ITEM_GET] = BlackMarketMmShopScene::kPlayerCutscene;
   play.actorCsCamList = cameraInfo.data();
   CutsceneManager_Init(&play, cutscenes.data(), cutscenes.size());
   sCutsceneMgr.retCamId = CAM_ID_MAIN;
@@ -692,6 +698,20 @@ static void CheckProductionReceiptCase(int form, int delay, int choice, bool que
     NativeFrame();
   assert(purchases == 2 && shop.actionFunc == EnOssan_BuyItemWithFanfare &&
          callbacks.empty());
+  // The generated scene's player entry owns a separate native ITEM0 camera;
+  // it must not be mistaken for another shop-bank cutscene during receipt.
+  const auto itemGetCs = play.playerCsIds[PLAYER_CS_ID_ITEM_GET];
+  assert(itemGetCs == BlackMarketMmShopScene::kPlayerCutscene);
+  assert(CutsceneManager_Start(itemGetCs, &player.actor) == itemGetCs);
+  assert(CutsceneManager_IsCurrentActor(&player.actor));
+  auto* itemCamera = Play_GetCamera(&play, Play_GetActiveCamId(&play));
+  assert(itemCamera->setting == CAM_SET_ITEM0 && Play_GetActiveCamId(&play) != CAM_ID_MAIN &&
+         "the purchase must resolve the scene's global player item-get camera");
+  MonitorBrowsing();
+  assert(sReceipt.pending && sCustomerAnchor.play == &play);
+  CutsceneManager_Stop(itemGetCs);
+  CutsceneManager_Update();
+  assert(Play_GetActiveCamId(&play) == CAM_ID_MAIN);
   // Neither native stock callbacks nor native Actor_OfferGetItem may perform
   // a second grant/payment alongside the market's acknowledged receipt.
   sReceipt.delivered = true;

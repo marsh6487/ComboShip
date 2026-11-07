@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify actual Wolf eye words, emission, and protected bundled HD bytes."""
+"""Verify actual Wolf eye words, emission, and protected optional HD bytes."""
 import argparse
 import hashlib
 import importlib.util
@@ -37,7 +37,7 @@ def check_eye(rgb, luminous, original):
     return white, pupil
 
 
-def run(tp_baseline=None):
+def run(tp_baseline=None, hd_archive=None):
     fixture = FIXTURE.read_bytes()
     assert len(fixture) == 16384
     assert hashlib.sha256(fixture).hexdigest() == "04775b0c702ecf6e750a291903612985a2ca18b0e2d92a1777caf288630b1812"
@@ -53,9 +53,16 @@ def run(tp_baseline=None):
     assert np.array_equal(packed[pupil & ~white], words[pupil & ~white])
     assert np.array_equal(packed[~luminous], words[~luminous])
 
-    resources = [ROOT / game / "assets/custom/objects/forms/wolf_link/gWolfLinkHDData" for game in ("soh", "mm")]
-    data = resources[0].read_bytes()
-    assert resources[1].read_bytes() == data
+    for game in ("soh", "mm"):
+        assert not (ROOT / game / "assets/custom/objects/forms/wolf_link/gWolfLinkHDData").exists(), "HD must remain external"
+        standard = (ROOT / game / "assets/custom/objects/forms/wolf_link/gWolfLinkData").read_bytes()
+        assert hashlib.sha256(standard).hexdigest() == "5047bd1f0a639db9ad50f87063cbd52303d8fe8c0056896d34ec1e6cfd5d99f2"
+    if not hd_archive:
+        print("PASS deterministic eye palette; bundled standard byte-preserved; optional HD archive not supplied")
+        return
+    with zipfile.ZipFile(hd_archive) as archive:
+        data = archive.read("objects/forms/wolf_link/gWolfLinkHDData")
+    assert hashlib.sha256(data).hexdigest() == "7705dc56447b571a0d13b019fb4461ac5147dcaaf441db16d24dfe9a990f451c"
     h = struct.unpack_from("<20I", data, 80)
     assert h[:6] == (8640, 2880, 46, 144, 1024, 512)
     atlas = np.frombuffer(data, "<u2", h[4] * h[5], 68 + h[16]).reshape(h[5], h[4])
@@ -67,7 +74,7 @@ def run(tp_baseline=None):
         packed = ((rgb[..., 0] >> 3) << 11) | ((rgb[..., 1] >> 3) << 6) | ((rgb[..., 2] >> 3) << 1) | 1
         packed[luminous] &= np.uint16(0xFFFE)
         actual = atlas[y:y + 64, x:x + 64]
-        assert np.array_equal(actual, packed), "bundled HD eyes must match the deterministic palette"
+        assert np.array_equal(actual, packed), "external HD eyes must match the deterministic palette"
         check_eye(builder.rgba5551(actual), (actual & 1) == 0, original)
         for row in range(64):
             offset = 68 + h[16] + 2 * ((y + row) * h[4] + x)
@@ -75,7 +82,7 @@ def run(tp_baseline=None):
             recovered[offset:offset + 128] = fixture[start:start + 128]
     assert hashlib.sha256(recovered).hexdigest() == builder.HD_SOURCE_SHA256, \
         "protected fur, geometry, chain, weights, rig, clips, audio or Blob envelope changed"
-    assert builder.patch_hd_resource(bytes(recovered)) == data, "patch must reproduce both bundled resources"
+    assert builder.patch_hd_resource(bytes(recovered)) == data, "patch must reproduce the external HD resource"
     assert builder.patch_hd_resource(data) == data, "patch must be idempotent"
     assert builder.verify_hd_resource(data)["white_catchlight_texels_per_eye"] == [int(white.sum())] * 2
     malformed = bytearray(recovered)
@@ -123,10 +130,12 @@ def run(tp_baseline=None):
                     archive.writestr(chain.RESOURCE, serialized)
                 assert chain.read_soft_wolf(pack) == serialized
             print("PASS original guarded TP baseline reproduces corrected HD eye tiles; exact old/new chain inputs accepted")
-    print("PASS deterministic white catchlights, blue full-bright irises, dark pupils and exact protected HD bytes in both hosts")
+    print("PASS deterministic white catchlights, blue full-bright irises, dark pupils and exact protected external HD bytes")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tp-baseline", type=Path)
-    run(parser.parse_args().tp_baseline)
+    parser.add_argument("--hd-archive", type=Path)
+    args = parser.parse_args()
+    run(args.tp_baseline, args.hd_archive)

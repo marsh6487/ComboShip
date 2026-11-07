@@ -18,7 +18,7 @@ if compile_env.get("COMBO_NEI_FIXTURE_CPATH"):
 source = (ROOT / "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp").read_text()
 signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               "void RememberTravel(", "bool MatchesTravel(", "void StageReturn(", "void Transition(",
-              "const Item* Offer(", "PurchaseResult Status(",
+              "const Item* Offer(", "PurchaseResult Status(", "void RefreshOwnedStock(",
               "bool ReceiptContext(", "void CancelReceipt(", "bool PendingReceiptEntry(",
               "bool FixedMarketGrant(", "void ReceiveMarketItem(", "bool Purchase(", "void MonitorReceipt(",
               "void PlayerUpdate(", "void BindSolo(", "void SaveMarket(", "void RegisterKeeperActor(", "void PresentTitle(", "void DrawOffer(",

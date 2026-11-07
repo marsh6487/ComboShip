@@ -6187,6 +6187,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoHintData(void) {
             { "dampesDiaryHint", static_cast<int>(ctx->GetOption(RSK_DAMPES_DIARY_HINT).Get()) },
             { "gregHint", static_cast<int>(ctx->GetOption(RSK_GREG_HINT).Get()) },
             { "sariaHint", static_cast<int>(ctx->GetOption(RSK_SARIA_HINT).Get()) },
+            { "magicStatUpgrade", static_cast<int>(ctx->GetOption(RSK_MAGIC_STAT_UPGRADE).Get()) },
             { "midoHint", static_cast<int>(ctx->GetOption(RSK_MIDO_HINT).Get()) },
             { "fishingPoleHint", static_cast<int>(ctx->GetOption(RSK_FISHING_POLE_HINT).Get()) },
             { "doorOfTimeTemplate", doorOfTimeKey },

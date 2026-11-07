@@ -89,8 +89,13 @@ inline constexpr uint64_t kRiverFrameGrass[64] = {
 
 // Tint copies are made from the original texture, never the preceding season.
 // Djipi's RGBA16 resources with LOAD_AS_RAW carry four RGBA bytes per pixel.
+// evaluated distinguishes a completed no-change scan from invalid/unsupported
+// input, which must remain retryable rather than becoming a negative cache hit.
 inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::Texture>& source, Tint tint,
-                                                   Region region = {}, PixelMask pixelMask = PixelMask::Green) {
+                                                   Region region = {}, PixelMask pixelMask = PixelMask::Green,
+                                                   bool* evaluated = nullptr) {
+    if (evaluated)
+        *evaluated = false;
     if (!source || !tint.color || !source->ImageData || !source->Width || !source->Height)
         return nullptr;
     if (region.left >= region.right || region.top >= region.bottom || region.right > 16 || region.bottom > 16)
@@ -212,6 +217,8 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
         }
         changed |= tr != r || tg != g || tb != b;
     }
+    if (evaluated)
+        *evaluated = true;
     return changed ? copy : nullptr;
 }
 } // namespace SeasonFoliage

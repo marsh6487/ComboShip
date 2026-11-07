@@ -20,7 +20,8 @@ def contract():
     source = (ROOT / 'combo/BlackMarketMmShopScene.h').read_text()
     result = {}
     for name in ('KeeperActor', 'KeeperParams', 'ItemParamBase', 'CameraSetting',
-                 'CutsceneCount', 'FirstCutscene', 'FirstPriority', 'HudVisibility', 'LetterboxSize'):
+                 'CutsceneCount', 'TotalCutsceneCount', 'PlayerCutscene', 'PlayerItemGetCamera',
+                 'PlayerPriority', 'FirstCutscene', 'FirstPriority', 'HudVisibility', 'LetterboxSize'):
         match = re.search(r'inline constexpr int16_t k' + name + r' = (-?\d+);', source)
         if not match:
             raise ValueError('inspect changed native MM shop scene contract: ' + name)
@@ -35,7 +36,9 @@ def contract():
     result['CutsceneCameras'] = tuple(map(int, re.findall(r'-?\d+', cameras[1])))
     result['SelectedTargets'] = [tuple(map(float, re.findall(r'-?\d+(?:\.\d+)?', row)))
                                  for row in re.findall(r'\{([^{}]*)\}', targets[1])]
-    if (result['CutsceneCount'] != 4 or result['FirstCutscene'] != 0 or
+    if (result['CutsceneCount'] != 4 or result['TotalCutsceneCount'] != 5 or
+            result['PlayerCutscene'] != 4 or result['PlayerItemGetCamera'] != -2 or
+            result['PlayerPriority'] != 500 or result['FirstCutscene'] != 0 or
             len(result['CameraRecords']) != 4 or any(len(row) != 9 for row in result['CameraRecords']) or
             sorted(result['CutsceneCameras']) != [0, 1, 2, 3] or
             len(result['SelectedTargets']) != 2 or any(len(row) != 3 for row in result['SelectedTargets'])):
@@ -129,16 +132,34 @@ def apply(resources):
     result, values = dict(resources), contract()
     cameras = struct.pack('<I', 4) + b''.join(
         struct.pack('<HH9h', values['CameraSetting'], 3, *row) for row in values['CameraRecords'])
-    cutscenes = struct.pack('<I', 4) + b''.join(
+    shop_cutscenes = struct.pack('<I', 4) + b''.join(
         struct.pack('<5h2Bh2B', values['FirstPriority'] + index, -1, camera, -1,
                     index + 1 if index < 3 else -1, 0, 255, values['HudVisibility'],
                     0, values['LetterboxSize']) for index, camera in enumerate(values['CutsceneCameras']))
+    cutscenes = struct.pack('<I', values['TotalCutsceneCount']) + shop_cutscenes[4:] + struct.pack(
+        '<5h2Bh2B', values['PlayerPriority'], -1, values['PlayerItemGetCamera'], -1,
+        -1, 0, 255, values['HudVisibility'], 0, values['LetterboxSize'])
     commands = native_commands(result[SCENE])
+    # MM stores an actor's cutscene index in rotation Y's low seven bits;
+    # the upper nine bits retain the exact authored player yaw.
+    if 0 not in commands:
+        raise ValueError('native MM shop requires player spawn entries')
+    spawns = bytearray(commands[0])
+    count, = struct.unpack_from('<I', spawns)
+    if not count:
+        raise ValueError('native MM shop requires a player spawn')
+    for index in range(count):
+        offset = 4 + index * 16
+        actor = struct.unpack_from('<H6hH', spawns, offset)
+        if actor[0] & 0x1FFF or actor[5] & 0x7F not in (0, values['PlayerCutscene']):
+            raise ValueError('unexpected native MM shop player spawn chain')
+        struct.pack_into('<h', spawns, offset + 10, (actor[5] & ~0x7F) | values['PlayerCutscene'])
+    commands[0] = bytes(spawns)
     if 20 not in commands or list(commands)[-1] != 20:
         raise ValueError('native MM shop scene must end with its native end command')
     if 2 in commands and commands[2] != cameras:
         raise ValueError('unexpected existing native MM shop camera records')
-    if commands.get(27, struct.pack('<I', 0)) not in (struct.pack('<I', 0), cutscenes):
+    if commands.get(27, struct.pack('<I', 0)) not in (struct.pack('<I', 0), shop_cutscenes, cutscenes):
         raise ValueError('unexpected existing native MM shop cutscene records')
     encoded = {}
     for identity, payload in commands.items():

@@ -43,6 +43,7 @@ using namespace UIWidgets;
 
 static WidgetInfo lowHpAlarm;
 static WidgetInfo enableNightMusic;
+static WidgetInfo disableRanchProximityMusic;
 static WidgetInfo naviCall;
 static WidgetInfo enemyProx;
 static WidgetInfo leeverProx;
@@ -808,6 +809,7 @@ void AudioEditor::DrawElement() {
                                       UIWidgets::ButtonOptions().Size(ImVec2(80, 36)).Padding(ImVec2(5.0f, 0.0f)))) {
                     CVarSetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, 1.0f);
                 }
+                SohGui::mSohMenu->MenuDrawItem(disableRanchProximityMusic, THEME_COLOR);
                 ImGui::SeparatorText("Night Music");
                 SohGui::mSohMenu->MenuDrawItem(enableNightMusic, THEME_COLOR);
                 SohGui::mSohMenu->MenuDrawItem(hyruleFieldNightMusic, THEME_COLOR);
@@ -1157,6 +1159,16 @@ void RegisterAudioWidgets() {
                      .Tooltip("Plays the selected night track only in Hyrule Field while preserving crickets, "
                               "ordinary SFX, and proximity weather."));
     SohGui::mSohMenu->AddSearchWidget({ hyruleFieldNightMusic, "Enhancements", "Audio Editor", "Audio Options" });
+
+    disableRanchProximityMusic = { .name = "Disable Ranch Proximity Music", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    disableRanchProximityMusic.CVar(CVAR_AUDIO("DisableRanchProximityMusic"))
+        .Options(CheckboxOptions()
+                     .Color(THEME_COLOR)
+                     .DefaultValue(false)
+                     .Tooltip("In Lon Lon Ranch, plays the Audio Editor's Lon Lon Ranch selection without Malon's "
+                              "distance-based singing mix. Also plays that selection at night while preserving "
+                              "ambience, sound effects, and native music priority."));
+    SohGui::mSohMenu->AddSearchWidget({ disableRanchProximityMusic, "Enhancements", "Audio Editor", "Audio Options" });
 
     enableNightMusic = { .name = "Enable Night Music", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     enableNightMusic.CVar(CVAR_AUDIO("EnableNightMusic"))

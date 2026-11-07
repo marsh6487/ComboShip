@@ -85,3 +85,7 @@ std::vector<RandomizerCheck> GetAlwaysHintCandidates();
 // an item the combo fill placed in Termina.
 void Combo_SetHintItemAreas(const std::string& json);
 #endif
+// Cache the full native spheres before optional upgrades are pared away.
+void CaptureSariaMagicHintLocation(const std::vector<std::vector<RandomizerCheck>>& spheres);
+
+void InvalidateSariaMagicHintLocation();

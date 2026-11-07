@@ -138,6 +138,9 @@ int main(int argc, char** argv) {
   fixtures[mm.get()].alt = false;
   assert(NeiWolfAsset::CopyResource("mm", nullptr, 0, &size, &owner) == 1 &&
          loads.back().second == base);
+  assert(!NeiWolfAsset::HDResourceAvailable("oot"));
+  assert(!NeiWolfAsset::HDResourceAvailable("mm") &&
+         "bundled standard fallback must not enable the HD checkbox");
   if (argc == 3) {
     std::ifstream hdInput(argv[2], std::ios::binary);
     auto hdEnvelope = std::make_shared<std::vector<char>>(
@@ -160,6 +163,8 @@ int main(int argc, char** argv) {
     files[fixtures[oot.get()].archives.get()].insert(hdPath);
     fixtures[mm.get()].resources[hdPath] = hd;
     fixtures[oot.get()].resources[hdPath] = hd;
+    assert(NeiWolfAsset::HDResourceAvailable("oot"));
+    assert(NeiWolfAsset::HDResourceAvailable("mm"));
     assert(NeiWolfAsset::CopyResource("mm", nullptr, 0, &size, &owner, true,
                                       &key) == 1);
     assert(std::string(key) == hdPath && std::string(owner) == "mm" &&
@@ -175,6 +180,7 @@ int main(int argc, char** argv) {
     fixtures[mm.get()].alt = true;
     files[fixtures[mm.get()].archives.get()].insert(hdAlt);
     fixtures[mm.get()].resources[hdAlt] = invalid;
+    assert(!NeiWolfAsset::HDResourceAvailable("mm"));
     before = loads.size();
     assert(NeiWolfAsset::CopyResource("mm", nullptr, 0, &size, &owner, true,
                                       &key) == -1);
@@ -200,7 +206,10 @@ int main(int argc, char** argv) {
     assert(NeiWolfAsset::CopyResource("mm", nullptr, 0, &size, &owner, true,
                                       &key) == 1 &&
            std::string(key) == base && std::string(owner) == "mm");
+    assert(!NeiWolfAsset::HDResourceAvailable("mm") &&
+           "other owner's HD must not override this owner's standard Wolf");
     files[fixtures[mm.get()].archives.get()].clear();
+    assert(NeiWolfAsset::HDResourceAvailable("mm"));
     assert(NeiWolfAsset::CopyResource("mm", nullptr, 0, &size, &owner, true,
                                       &key) == 1 &&
            std::string(key) == hdPath && std::string(owner) == "oot");

@@ -701,6 +701,8 @@ int main(int argc, char** argv) {
         std::string sohDump, mmDump, sohHintDump;
         nlohmann::json crossDungeonSeed;
         ComboRando::CombinedFillResult r{};
+        bool sariaReachabilityVerified = false;
+        nlohmann::json sariaHintSpheres = nlohmann::json::array();
         ComboRando::RequirednessResult pareDownResult; // cross-hint verification (headless mirror of RunComboFill)
         // Whole-fill retries with re-derived seeds, identical to RunComboFill (GAP-4) so a headless
         // seed reproduces the in-game one even when early attempts fail (shared budget, same header).
@@ -799,6 +801,15 @@ int main(int argc, char** argv) {
                         mmAreas.emplace(chk, region.get<std::string>());
                 } catch (...) {}
                 const bool noLogic = ootAccess == ComboRando::OotAccess::NO_LOGIC;
+                sariaHintSpheres = nlohmann::json::array();
+                const auto sariaOptions = nlohmann::json::parse(sohHintDump.empty() ? "{}" : sohHintDump)
+                                              .value("options", nlohmann::json::object());
+                if (sariaOptions.value("sariaHint", 0) && sariaOptions.value("magicStatUpgrade", 0)) {
+                    sariaHintSpheres =
+                        ComboRando::FindSariaMagicSphere(r.spoilerJson, oot, mmO, sohDump, mmDump, !noLogic, mmStart,
+                                                         sharedMask, SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "");
+                    sariaReachabilityVerified = true;
+                }
                 // A hunt under NO_LOGIC has no meaningful requiredness (see RunComboFill) — skip it.
                 if (goal.hunt && noLogic)
                     std::cout << "[comborando]   pare-down skipped (No Logic + Triforce Hunt)\n";
@@ -904,9 +915,9 @@ int main(int argc, char** argv) {
                         consolidated["entrances"] = { { "oot", std::move(ootEnt) } };
                     }
                     // Cross-hint generation (mirrors RunComboFill) — enables the headless determinism check.
-                    consolidated["hints"] =
-                        ComboRando::Generate(masterSeed, sohDump, sohHintDump, mmDump, consolidated["foreign"],
-                                             r.spoilerJson, pareDownResult);
+                    consolidated["hints"] = ComboRando::Generate(masterSeed, sohDump, sohHintDump, mmDump,
+                                                                 consolidated["foreign"], r.spoilerJson, pareDownResult,
+                                                                 sariaHintSpheres, sariaReachabilityVerified);
                     std::error_code ec;
                     std::filesystem::create_directories("saves/combo", ec);
                     std::ofstream f("saves/combo/comborando.spoiler.json", std::ios::trunc);

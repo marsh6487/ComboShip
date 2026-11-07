@@ -1,6 +1,7 @@
 #include "SeasonFoliageTint.h"
 #include "soh/Enhancements/audio/SeasonWeather.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include "soh/ShipInit.hpp"
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
@@ -60,12 +61,27 @@ void Retire() {
     Reset();
     // The incoming scene no longer submits the outgoing texture cohort.
     // LUS uses image pointers as GPU cache keys: evict before freeing them.
-    if (!sCopies.empty())
+    if (std::any_of(sCopies.begin(), sCopies.end(), [](const auto& entry) { return entry.second.copy != nullptr; }))
         gfx_texture_cache_clear();
     sCopies.clear();
 }
 
 void Update(const PlayState* play) {
+    const bool diagnostic = FrameTiming_IsActive();
+    struct Diagnostic {
+        bool active;
+        FrameTimingSpan span;
+        uint64_t attempts = 0, pixels = 0, unchanged = 0, unchangedHits = 0;
+        ~Diagnostic() {
+            if (!active)
+                return;
+            FrameTiming_EndNamedSpan("season_foliage", "update", span);
+            FrameTiming_Count("season_foliage.build_attempts", attempts);
+            FrameTiming_Count("season_foliage.pixels_scanned", pixels);
+            FrameTiming_Count("season_foliage.unchanged_builds", unchanged);
+            FrameTiming_Count("season_foliage.unchanged_cache_hits", unchangedHits);
+        }
+    } stats{ diagnostic, diagnostic ? FrameTiming_BeginSpan() : FrameTimingSpan{} };
     const int season = SeasonWeather_FoliageSeasonForPlay(play);
     auto* context = Ship::Context::GetRawInstance();
     auto rm = context ? context->GetResourceManager() : nullptr;
@@ -102,11 +118,26 @@ void Update(const PlayState* play) {
                             material.pixelMask };
             auto found = sCopies.find(key);
             if (found == sCopies.end()) {
-                auto copy = BuildTexture(source, tint, material.region, material.pixelMask);
-                if (!copy)
+                bool evaluated = false;
+                auto copy = BuildTexture(source, tint, material.region, material.pixelMask, &evaluated);
+                if (diagnostic) {
+                    ++stats.attempts;
+                    if (evaluated) {
+                        stats.pixels += uint64_t(source->Width) * source->Height;
+                        stats.unchanged += !copy;
+                    }
+                }
+                if (!evaluated)
                     continue;
                 found = sCopies.emplace(key, Binding{ rm, path, source, std::move(copy) }).first;
+            } else if (diagnostic && !found->second.copy) {
+                ++stats.unchangedHits;
             }
+            // Keep no-change evaluations too. A source with no selected green
+            // pixels otherwise allocates and scans its entire HD payload every
+            // frame. Retaining source prevents pointer reuse until Retire().
+            if (!found->second.copy)
+                continue;
             if (current == sBindings.end() || current->copy != found->second.copy)
                 rm->CacheExternalResource(path, found->second.copy);
             active.push_back({ rm, path, source, found->second.copy });

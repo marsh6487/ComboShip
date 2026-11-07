@@ -11,6 +11,7 @@
 #include "soh/FleetShipCombo/FleetComboRando.h"
 #include <nlohmann/json.hpp>
 #include <unordered_map>
+#include <algorithm>
 
 using namespace Rando;
 
@@ -854,6 +855,35 @@ void CreateAdultAltarHint() {
                     RC_ALTAR_HINT_ADULT);
 }
 
+// Captured before native playthrough pruning; equivalent optional upgrades must
+// not lose their early sphere just because another copy can satisfy the seed.
+static RandomizerCheck sEarlySariaMagicCheck = RC_UNKNOWN_CHECK;
+static uint32_t sEarlySariaMagicSeed = 0;
+static bool sSariaMagicReachabilityVerified = false;
+void InvalidateSariaMagicHintLocation() {
+    sEarlySariaMagicCheck = RC_UNKNOWN_CHECK;
+    sEarlySariaMagicSeed = 0;
+    sSariaMagicReachabilityVerified = false;
+}
+
+void CaptureSariaMagicHintLocation(const std::vector<std::vector<RandomizerCheck>>& spheres) {
+    sEarlySariaMagicCheck = RC_UNKNOWN_CHECK;
+    auto ctx = Rando::Context::GetInstance();
+    sEarlySariaMagicSeed = ctx->GetSeed();
+    sSariaMagicReachabilityVerified = true;
+    for (const auto& sphere : spheres) {
+        for (RandomizerCheck check : sphere) {
+            if (ctx->GetItemLocation(check)->GetPlacedRandomizerGet() != RG_MAGIC_STAT_UPGRADE)
+                continue;
+            if (sEarlySariaMagicCheck == RC_UNKNOWN_CHECK ||
+                StaticData::GetLocation(check)->GetName() < StaticData::GetLocation(sEarlySariaMagicCheck)->GetName())
+                sEarlySariaMagicCheck = check;
+        }
+        if (sEarlySariaMagicCheck != RC_UNKNOWN_CHECK)
+            break;
+    }
+}
+
 void CreateStaticHintFromData(RandomizerHint hint, StaticHintInfo staticData) {
     auto ctx = Rando::Context::GetInstance();
     if (!ctx->GetHint(hint)->IsEnabled()) {
@@ -863,7 +893,29 @@ void CreateStaticHintFromData(RandomizerHint hint, StaticHintInfo staticData) {
              option.Is(std::get<uint8_t>(staticData.condition)))) {
 
             std::vector<RandomizerCheck> locations = {};
-            if (staticData.targetItems.size() > 0) {
+            if (hint == RH_SARIA_HINT && ctx->GetOption(RSK_MAGIC_STAT_UPGRADE)) {
+                staticData.targetItems = { RG_MAGIC_STAT_UPGRADE };
+                if (sSariaMagicReachabilityVerified && sEarlySariaMagicSeed == ctx->GetSeed() &&
+                    sEarlySariaMagicCheck == RC_UNKNOWN_CHECK)
+                    return; // A complete native search proved no upgrade reachable.
+                if (sEarlySariaMagicCheck != RC_UNKNOWN_CHECK && sEarlySariaMagicSeed == ctx->GetSeed() &&
+                    ctx->GetItemLocation(sEarlySariaMagicCheck)->GetPlacedRandomizerGet() == RG_MAGIC_STAT_UPGRADE) {
+                    locations = { sEarlySariaMagicCheck };
+                } else {
+                    // Imported seeds may have no full sphere metadata. Keep the target
+                    // deterministic; this fallback makes no earliest-reachability claim.
+                    auto candidates = FilterFromPool(ctx->allLocations, [ctx](RandomizerCheck check) {
+                        return ctx->GetItemLocation(check)->GetPlacedRandomizerGet() == RG_MAGIC_STAT_UPGRADE;
+                    });
+                    std::sort(candidates.begin(), candidates.end(), [](RandomizerCheck a, RandomizerCheck b) {
+                        return StaticData::GetLocation(a)->GetName() < StaticData::GetLocation(b)->GetName();
+                    });
+                    if (!candidates.empty())
+                        locations = { candidates.front() };
+                }
+                if (locations.empty())
+                    locations = { RC_UNKNOWN_CHECK };
+            } else if (staticData.targetItems.size() > 0) {
                 locations = FindItemsForHint(staticData.targetItems, staticData.hintChecks);
             } else {
                 for (auto check : staticData.targetChecks) {

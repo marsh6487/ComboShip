@@ -51,6 +51,7 @@ bool sReturnStaged = false;
 EnOssan* sNativeShop = nullptr; // Native actor actions run in the dedicated shop fixture.
 PlayState* sNativeShopPlay = nullptr;
 std::string sStatus;
+std::set<std::string> ownedKeys;
 bool pack = true, owned = false, usable = true, grantWorks = true, inCs = false;
 int grants, writes;
 static int receiptTextCalls, activeReceiptMessages, ordinaryReceiptMessages;
@@ -89,7 +90,7 @@ extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState*, CollisionContext*, Coll
 extern "C" void Camera_InitFocalActorSettings(Camera*, Actor*) {}
 namespace ComboBlackMarketItems {
 RandoItemId Id(const Item&) { return RI_UNKNOWN; }
-bool Owned(const Item&) { return owned; }
+bool Owned(const Item& item) { return owned || ownedKeys.contains(item.key); }
 bool Available(const Item&) { return usable; }
 bool Grant(const Item&) {
     if (!grantWorks) return false;
@@ -181,6 +182,7 @@ s32 NativeCaller(Player* current, PlayState* play, KnobDoorActor* knobDoor) {
 }
 
 void Reset() {
+    ownedKeys.clear(); sStockRefreshPending = false; sTalking = false;
     CancelReceipt(true);
     sReceipt = {};
     receiptInteractor.events.clear(); receiptInteractor.currentEvent = GIEventNone{};
@@ -467,7 +469,45 @@ static void TestDeferredPurchases() {
 }
 
 #include "interior_exit_cases.inc"
+void TestOwnedStockRefresh() {
+    Reset();
+    const auto base = sSession.market;
+    const std::string original = Offer(0)->key;
+    ownedKeys.insert(original);
+    sStockRefreshPending = true;
+    sTalking = true;
+    RefreshOwnedStock();
+    assert(sStockRefreshPending && writes == 0 && Offer(0)->key == original);
+    sTalking = false;
+    assert(sReceipt.Begin(0, gSaveContext.fileNum, 77, 10));
+    RefreshOwnedStock();
+    assert(sStockRefreshPending && writes == 0 && Offer(0)->key == original);
+    sReceipt.Cancel();
+    RefreshOwnedStock();
+    assert(!sStockRefreshPending && writes == 1 && sSession.market == base && Offer(0)->key != original);
+    assert(Status(0) == PurchaseResult::Ready && grants == 0);
+    const auto saved = sSession.Save(gSaveContext.fileNum);
+    sSession.state = {};
+    sSession.Load(saved, gSaveContext.fileNum);
+    assert(Offer(0)->key != original);
+    RefreshOwnedStock();
+    assert(writes == 1); // Idle updates do not keep saving/scanning.
+    assert(Purchase() && ReceiptContext());
+    const auto quoted = sSession.OfferFingerprint();
+    ownedKeys.insert(Offer(0)->key);
+    sStockRefreshPending = true;
+    RefreshOwnedStock();
+    assert(sSession.OfferFingerprint() == quoted && writes == 1);
+    // A foreign effective-stock mutation must invalidate an outstanding receipt.
+    assert(sSession.RefreshOwned([](const Item& item) { return ownedKeys.contains(item.key); },
+                                 [](const Item&) { return true; }));
+    assert(!ReceiptContext() && grants == 0);
+    Reset();
+    std::puts("PASS effective owned-stock refresh, quote/receipt freeze, persisted replacement and idle-save guards");
+}
+
 int main(int argc, char** argv) {
+    TestOwnedStockRefresh();
     if (argc > 1 && std::string(argv[1]) == "door-exit") { TestInteriorExitDoor(); return 0; }
     TestPlacedDoor();
     Reset();

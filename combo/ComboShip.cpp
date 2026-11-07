@@ -1939,6 +1939,8 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
 
     std::string sohDump, mmDump, spoiler, lastFillError, sohHintDump;
     bool usedCombinedFill = false;
+    nlohmann::json sariaMagicSpheres = nlohmann::json::array();
+    bool sariaReachabilityVerified = false;
     nlohmann::json playthroughJson = nlohmann::json::array(); // structured sphere playthrough (combined-fill only)
     ComboRando::RequirednessResult pareDownResult;            // cross-hint Phase 3 WotH/foolish classification
     // ComboShip: checkName -> OOT area, computed once from sohHintDump right after the winning attempt's
@@ -2137,6 +2139,14 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             // ComboShip: write the sphere-by-sphere playthrough log. Replays reachability via the
             // oracles BEFORE SOH_ApplyRandoPlacements restores the live OOT context, so it can't
             // corrupt the generated seed. Restores MM itself.
+            const auto sariaOptions = nlohmann::json::parse(sohHintDump.empty() ? "{}" : sohHintDump)
+                                          .value("options", nlohmann::json::object());
+            if (sariaOptions.value("sariaHint", 0) && sariaOptions.value("magicStatUpgrade", 0)) {
+                sariaMagicSpheres = ComboRando::FindSariaMagicSphere(
+                    result.spoilerJson, ootOracle, mmOracle, sohDump, mmDump, !noLogic, mmStart, sharedMask,
+                    SOH_DumpSharedItemPairs ? SOH_DumpSharedItemPairs() : "");
+                sariaReachabilityVerified = true;
+            }
             WriteComboPlaythrough(result.spoilerJson, ootOracle, mmOracle, inputSeed, &playthroughJson, sohDump, mmDump,
                                   goal, mmStart, sharedMask);
             if (cancelled())
@@ -2351,9 +2361,10 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
         // ComboShip: cross-game hint generation (Phase 3) — real per-seed hint assignments, from the
         // pare-down computed above. usedCombinedFill guards the no-logic fallback path (no oracles/
         // pare-down data there): that path ships with an empty hints payload, same as before Phase 3.
-        consolidated["hints"] = usedCombinedFill ? ComboRando::Generate(masterSeed, sohDump, sohHintDump, mmDump,
-                                                                        foreignEnriched, spoiler, pareDownResult)
-                                                 : nlohmann::json{ { "version", 1 } };
+        consolidated["hints"] =
+            usedCombinedFill ? ComboRando::Generate(masterSeed, sohDump, sohHintDump, mmDump, foreignEnriched, spoiler,
+                                                    pareDownResult, sariaMagicSpheres, sariaReachabilityVerified)
+                             : nlohmann::json{ { "version", 1 } };
         if (cancelled())
             return;
         g_FinalizeOotApply = ootApply.dump();

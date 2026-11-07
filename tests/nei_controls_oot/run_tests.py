@@ -117,6 +117,47 @@ int main(int argc, char** argv) {
         }
         puts("PASS OoT shared cells: active Pictograph/Power Keg independent bindings; native Lens/Bomb swaps");return 0;
     }
+    if (argc>1 && !strcmp(argv[1],"relocation")) {
+        for(u16 item:{u16(ITEM_DEKU_LEAF),u16(ITEM_WHIP),u16(EXT_ITEM_ROD_OF_SEASONS),u16(EXT_ITEM_MAGIC_MIRROR)})
+        for(int d=4;d<8;++d)for(int c=1;c<4;++c)for(bool occupied:{false,true}) {
+            reset();
+            if(occupied) Assign(&play,c,EXT_ITEM_PHANTOM_HOURGLASS,47);
+            Assign(&play,d,item,31);
+            gSaveContext.equips.buttonItems[0]=ITEM_SWORD_MASTER;
+            Assign(&play,c,item,31);
+            assert(ExtButton_GetItem(c)==item);
+            assert(ExtButton_GetItem(d)==(occupied?u16(EXT_ITEM_PHANTOM_HOURGLASS):u16(ITEM_NONE)) &&
+                   "moving an NEI to C must remove its old Dpad binding and preserve the displaced item once");
+            assert(ExtButton_GetItem(0)==ITEM_SWORD_MASTER);
+            if(!occupied)assert(EXT_BUTTON_ITEM(d)==0 && gSaveContext.equips.cButtonSlots[d-1]==SLOT_NONE);
+            for(int other=1;other<8;++other)if(other!=c && other!=d)assert(ExtButton_GetItem(other)==ITEM_NONE);
+        }
+        for(u16 item:{u16(ITEM_DEKU_LEAF),u16(EXT_ITEM_SHEIKAH_SLATE)})for(int target=1;target<4;++target) {
+            reset();
+            for(int source=1;source<8;++source) {
+                if(source==target)continue;
+                if(item>=0x200) ExtButton_SetItem(source,item);
+                else gSaveContext.equips.buttonItems[source]=item;
+                gSaveContext.equips.cButtonSlots[source-1]=item>=0x200?SLOT_NONE:31;
+            }
+            Assign(&play,target,EXT_ITEM_PHANTOM_HOURGLASS,47);
+            Assign(&play,target,item,31);
+            int count=0,displaced=0;
+            for(int button=1;button<8;++button) {
+                count+=ExtButton_GetItem(button)==item;
+                displaced+=ExtButton_GetItem(button)==EXT_ITEM_PHANTOM_HOURGLASS;
+            }
+            assert(count==1 && displaced==1 && "legacy duplicates must not duplicate the displaced item");
+            Assign(&play,target,item,31);
+            assert(ExtButton_GetItem(target)==item);
+        }
+        // Two different items may share a custom cell number; only the moved identity follows.
+        reset();Assign(&play,1,ITEM_ROCS_FEATHER_SKIJER,31);Assign(&play,4,ITEM_DEKU_LEAF,31);
+        Assign(&play,2,ITEM_DEKU_LEAF,31);
+        assert(ExtButton_GetItem(1)==ITEM_ROCS_FEATHER_SKIJER && ExtButton_GetItem(4)==ITEM_NONE);
+        puts("PASS OoT NEI Dpad-to-C relocation: all directions, occupied targets, full IDs and duplicate cleanup");
+        return 0;
+    }
     for (u16 item: {/* REGISTRY_ITEMS */}) {
         for (int button=4;button<8;button++) {
             reset();
@@ -161,7 +202,7 @@ int main(int argc, char** argv) {
         for combo in (False,True):
             binary=Path(td)/("combo" if combo else "solo")
             subprocess.run([os.environ.get("CXX","c++"),*flags,*( ["-DCOMBO_BUILD"] if combo else []),*includes,str(source),"-o",str(binary)],check=True)
-            for mode in ("assignment","input","shared"):
+            for mode in ("assignment","input","shared","relocation"):
                 result=subprocess.run([str(binary),mode],env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0","UBSAN_OPTIONS":"halt_on_error=1"})
                 failed |= result.returncode != 0
         return int(failed)

@@ -1,4 +1,7 @@
 #include "global.h"
+#ifndef OOT_LOCK_TEST
+#include "objects/object_gi_soldout/object_gi_soldout.h"
+#endif
 #include "combo/BlackMarketLock.h"
 #include "combo/BlackMarketGraphicsArena.h"
 #include "rando/BlackMarket.h"
@@ -37,7 +40,20 @@ static int shelfDraws, interiorEffects;
 void DrawShelves(PlayState*) { ++shelfDraws; }
 static bool sTalking = true, sTitlePending, sGrannyActive, active = true, interior = true, allocate = true, report = true;
 static bool allOffers = false, refillOffer = false;
-static int soldOutSlot = -1;
+static int soldOutSlot = -1, soldOutDraws = 0;
+void NativeDrawSoldOut(PlayState*);
+void DrawSoldOut(PlayState* p) { ++soldOutDraws; NativeDrawSoldOut(p); }
+#ifdef OOT_LOCK_TEST
+extern "C" void GetItem_Draw(PlayState*, s16 id) { assert(id == GID_SOLDOUT); }
+#else
+extern "C" void gSPDisplayList(Gfx* packet, Gfx* display) {
+    assert(display == (Gfx*)gGiSoldOutDL);
+    __gSPDisplayList(packet, display);
+}
+extern "C" Gfx* Gfx_SetupDL(Gfx* packet, u32 setup) {
+    assert(setup == 5); return packet;
+}
+#endif
 namespace BlackMarketInteriorEffects { void Draw(PlayState*, bool enabled, bool) { if (enabled) ++interiorEffects; } }
 static std::vector<Vec3f> translations;
 static std::vector<float> scales;
@@ -143,6 +159,7 @@ void Reset() {
     play.gameplayFrames = 31;
     allocations = matrixAllocations = setups = draws = pushDepth = shelfDraws = interiorEffects = 0;
     vertexAllocations.clear();
+    soldOutDraws = 0;
     drawnKeys.clear(); allOffers = refillOffer = false; soldOutSlot = -1; sSelected = 3;
     translations.clear(); scales.clear(); active = interior = allocate = report = true;
     sTalking = true; sTitlePending = sGrannyActive = false;
@@ -266,13 +283,13 @@ int main() {
     CheckPackets(2);
     Reset(); allOffers = true; sSelected = soldOutSlot = 6; DrawMarket();
     auto unsoldStock = fullStock; unsoldStock.erase(unsoldStock.begin() + 6);
-    assert(drawnKeys == unsoldStock && draws == 7 && allocations == 2 &&
-           "a sold one-time offer must disappear while the other seven merchandise models and seals stay intact");
+    assert(drawnKeys == unsoldStock && draws == 7 && soldOutDraws == 1 && allocations == 2 &&
+           "a purchased one-time offer must show the Sold Out GI while the other merchandise and seals stay intact");
     assert(sSelected == 6 && Offer(sSelected) && Status(sSelected) == PurchaseResult::SoldOut &&
            "a sold shelf remains selectable for its saved sold-out dialogue");
     CheckPackets(2);
     Reset(); allOffers = refillOffer = true; soldOutSlot = 6; DrawMarket();
-    assert(draws == 8 && drawnKeys[6] == "wildcard.chateau" && allocations == 2 &&
+    assert(draws == 8 && soldOutDraws == 0 && drawnKeys[6] == "wildcard.chateau" && allocations == 2 &&
            "a renewable refill remains visible even when purchase state exists for its slot");
     CheckPackets(2);
     Reset(); DrawMarket();

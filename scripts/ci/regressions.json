@@ -1023,7 +1023,7 @@
     "suite": "equipment",
     "origin": "nei",
     "name": "tests/mm_wolf/run_bundled_asset_tests.py",
-    "run": "python3 -B tests/mm_wolf/run_bundled_asset_tests.py"
+    "run": "python3 -B tests/mm_wolf/run_bundled_asset_tests.py\npython3 -B tests/mm_wolf/run_standard_package_tests.py"
   },
   {
     "suite": "equipment",
@@ -1034,8 +1034,8 @@
   {
     "suite": "equipment",
     "origin": "nei",
-    "name": "tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData",
-    "run": "python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData"
+    "name": "Native Wolf standard asset loading and renderer lifecycle",
+    "run": "python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData"
   },
   {
     "suite": "equipment",
@@ -1766,5 +1766,41 @@
     "native_abi": "explicit",
     "name": "Native gossip generation, stone routing and junk isolation",
     "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Seasonal rain room continuity with native and authored owners",
+    "run": "python3 -B tests/rain_transition/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/rain_transition/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Wolf runtime segmented vertices use exported record offsets",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_wolf/run_vertex_stride_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Cane melee bounds follow visible geometry without mesh-scale padding",
+    "run": "python3 -B tests/byrna_collision/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/byrna_collision/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Saria magic stat hint reachability and hint-only progression",
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/saria_magic/run_tests.py"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Ranch selected music bypasses proximity mix",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/ranch_music/run_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "nei",
+    "name": "Black Market retired wildcards, saved owned-stock replacement and Sold Out rendering",
+    "run": "python3 -B tests/black_market/run_stock_tests.py\npython3 -B tests/black_market/run_lock_draw_tests.py"
   }
 ]

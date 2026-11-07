@@ -1655,8 +1655,6 @@ void Settings::CreateOptions() {
                 mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL].Unhide();
                 mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED].Unhide();
             }
-            CVarSetInteger(CVAR_RANDOMIZER_SETTING("SariaHint"), 0);
-            mOptions[RSK_SARIA_HINT].Disable("Saria's Hint is disabled because the Magic Stat Upgrade replaces the magic meter.");
             CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingMagicMeter"), 0);
             mOptions[RSK_STARTING_MAGIC_METER].Disable("Disabled because the Magic Stat Upgrade controls the magic meter.");
         } else {

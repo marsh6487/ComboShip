@@ -20,7 +20,10 @@ with tempfile.TemporaryDirectory(prefix="market-lock-draw-") as temporary:
                   "Enhancements/Gameplay" / ("BlackMarket.cpp" if host == "mm" else "ComboBlackMarketNative.cpp")).read_text()
         bodies = "\n".join(block_from(source, source.index(signature))
                            for signature in ("void DrawSeal(", "void DrawMarket("))
-        fixture = (ROOT / "tests/black_market/lock_draw_test.cpp").read_text().replace("/* PRODUCTION */", bodies)
+        sold_out = block_from(source, source.index("void DrawSoldOut(")).replace(
+            "void DrawSoldOut(", "void NativeDrawSoldOut(", 1)
+        fixture = (ROOT / "tests/black_market/lock_draw_test.cpp").read_text().replace(
+            "/* PRODUCTION */", sold_out + "\n" + bodies)
         native_c = None
         if host == "soh":
             arena = (ROOT / "soh/src/code/TwoHeadArena.c").read_text()

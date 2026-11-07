@@ -2218,17 +2218,17 @@ void FileChoose_DrawWindowContents(GameState* thisx) {
             if (Combo_IsCombinedGame())
                 comboLabel = (SOH_GetComboGenPhase() == 3) ? RSM_FINALIZING : RSM_GENERATING;
 #endif
-            Interface_DrawTextLine(this->state.gfxCtx, SohFileSelect_GetSettingText(comboLabel, language), 70,
-                                   (80 + (isCombo ? 88 : 64)), 255, 255, 255, textAlpha, 0.8f, true);
+            const char* generationText = SohFileSelect_GetSettingText(comboLabel, language);
 #ifdef COMBO_BUILD
-            // ComboShip: live combo-generation progress (worker thread keeps the main loop running).
+            // Keep progress on the status row; the next row belongs to the combo goal footer.
+            char comboProgress[128];
             if (Combo_IsCombinedGame()) {
-                char comboPct[16];
-                snprintf(comboPct, sizeof(comboPct), "%d%%", SOH_GetComboGenPercent());
-                Interface_DrawTextLine(this->state.gfxCtx, comboPct, 70, (80 + 104), 255, 255, 255, textAlpha, 0.8f,
-                                       true);
+                snprintf(comboProgress, sizeof(comboProgress), "%s %d%%", generationText, SOH_GetComboGenPercent());
+                generationText = comboProgress;
             }
 #endif
+            Interface_DrawTextLine(this->state.gfxCtx, generationText, 70, (80 + (isCombo ? 88 : 64)), 255, 255, 255,
+                                   textAlpha, 0.8f, true);
         }
 
         // If no seed is ready and "Start" is selected, explain why you can't start yet.

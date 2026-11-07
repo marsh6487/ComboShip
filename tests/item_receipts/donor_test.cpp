@@ -1018,6 +1018,86 @@ int main(int argc, char** argv) {
     assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(gSaveContext)));
     assert(!std::memcmp(&neiBefore, &receiptNeiSave, sizeof(receiptNeiSave)));
   }
+  // Native bottle receipts name their contents, not the randomizer's full
+  // "Bottle with ..." catalog key. Exercise the production foreign route with
+  // that boundary, including a shared item whose display label has no suffix.
+  const auto englishBankBeforeContents = sNesMessageEntryTablePtr;
+  const auto germanBankBeforeContents = sGerMessageEntryTablePtr;
+  const auto frenchBankBeforeContents = sFraMessageEntryTablePtr;
+  const auto contentsLatchesBefore = foreignLatches;
+  const struct {
+    RandomizerGet item;
+    const char *catalog, *english, *german, *french;
+    uint16_t text;
+  } contentsCases[] = {
+      {RG_BOTTLE_WITH_RED_POTION, "Bottle with Red Potion", "Red Potion", "Rotes Elixier", "Potion Rouge", 0x43},
+      {RG_BOTTLE_WITH_GREEN_POTION, "Bottle with Green Potion", "Green Potion", "Gruenes Elixier", "Potion Verte", 0x44},
+      {RG_BOTTLE_WITH_BLUE_POTION, "Bottle with Blue Potion", "Blue Potion", "Blaues Elixier", "Potion Bleue", 0x45},
+      {RG_BOTTLE_WITH_FAIRY, "Bottle with Fairy", "Fairy", "Fee", "Fee", 0x46},
+      {RG_BOTTLE_WITH_FISH, "Bottle with Fish", "Fish", "Fisch", "Poisson", 0x47},
+      {RG_BOTTLE_WITH_BUGS, "Bottle with Bugs", "Bugs", "Kaefer", "Insecte", 0x7A},
+      {RG_BOTTLE_WITH_POE, "Bottle with Poe", "Poe", "Irrlicht", "Esprit", 0x97},
+      {RG_BOTTLE_WITH_BIG_POE, "Bottle with Big Poe", "Big Poe", "Nachtschwaermer", "Ame", 0xF9},
+      {RG_BOTTLE_WITH_BLUE_FIRE, "Bottle with Blue Fire", "Blue Fire", "Blaues Feuer", "Flamme Bleue", 0x5D},
+      {RG_BOTTLE_WITH_MILK, "Bottle with Milk", "Lon Lon Milk", "Lon Lon-Milch", "Lait Lon Lon", 0x98},
+      {RG_EMPTY_BOTTLE, "Empty Bottle", "empty bottle", "leere Flasche", "bouteille vide", 0x42},
+      {RG_RUTOS_LETTER, "Bottle with Ruto's Letter", "Letter", "Brief", "Lettre", 0x99},
+  };
+  for (const auto &fixture : contentsCases) {
+    // These are native-byte message-bank fixtures, with native short content
+    // nouns, localized labels, control operands and a complete tutorial page.
+    // The exact native bytes must survive; only the sentinel's icon is removed.
+    const std::array<std::string, 3> bodies = {
+        std::string("\x08\x13\x15You got a \x05\x41") + fixture.english +
+            "\x05\x40!\x09\x04On the Select Item Subscreen,\x01you can set this to \xA1 and drink\x01it with \xA1.\x04This potion will recover your health.\x02",
+        std::string("\x08\x13\x15" "Du hast \x05\x41") + fixture.german +
+            "\x05\x40!\x09\x04Lege die Flasche auf \xA1.\x01" "Druecke die Taste zum Nutzen.\x02",
+        std::string("\x08\x13\x15Vous obtenez \x05\x41") + fixture.french +
+            "\x05\x40!\x09\x04" "Assignez la bouteille a \xA1.\x01" "Appuyez pour l'utiliser.\x02"};
+    std::array<std::array<MessageTableEntry, 2>, 3> banks;
+    for (size_t locale = 0; locale < banks.size(); ++locale)
+      banks[locale] = {{{fixture.text, 0x23, bodies[locale].data(),
+                          static_cast<uint32_t>(bodies[locale].size())},
+                         {0xFFFF, 0, nullptr, 0}}};
+    sNesMessageEntryTablePtr = banks[0].data();
+    sGerMessageEntryTablePtr = banks[1].data();
+    sFraMessageEntryTablePtr = banks[2].data();
+    receiptPlayer.getItemEntry.getItemId = fixture.item;
+    const auto saveBefore = gSaveContext;
+    const auto neiBefore = receiptNeiSave;
+    const auto playerBefore = receiptPlayer;
+    CustomMessage native;
+    BuildCustomItemMessage(&receiptPlayer, native);
+    assert(native.GetEnglish(MF_RAW) == bodies[0]);
+    assert(native.GetGerman(MF_RAW) == bodies[1]);
+    assert(native.GetFrench(MF_RAW) == bodies[2]);
+    for (bool shared : {true, false}) {
+      foreign.itemName = fixture.catalog;
+      foreign.displayName = std::string(fixture.catalog) + (shared ? "" : " (MM)");
+      // No progressive resolution: exactly the shared MM red-potion seed path.
+      resolvedForeign = nullptr;
+      CustomMessage imported;
+      BuildComboForeignMessage(&receiptPlayer, imported);
+      const std::array<std::string, 3> actual = {
+          imported.GetEnglish(MF_RAW), imported.GetGerman(MF_RAW), imported.GetFrench(MF_RAW)};
+      for (size_t locale = 0; locale < actual.size(); ++locale) {
+        std::string expected;
+        assert(ComboItemReceiptText::WithoutOotItemIcons(bodies[locale], expected));
+        if (actual[locale] != expected)
+          std::cerr << "Unexpected added name page for " << fixture.catalog << " locale " << locale << '\n';
+        assert(actual[locale] == expected && "native short content name must not add a naked catalog-name page");
+      }
+      assert(imported.GetTextBoxType() == 2 && imported.GetTextBoxPosition() == 3);
+      assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(gSaveContext)));
+      assert(!std::memcmp(&neiBefore, &receiptNeiSave, sizeof(receiptNeiSave)));
+      assert(!std::memcmp(&playerBefore, &receiptPlayer, sizeof(receiptPlayer)));
+    }
+  }
+  sNesMessageEntryTablePtr = englishBankBeforeContents;
+  sGerMessageEntryTablePtr = germanBankBeforeContents;
+  sFraMessageEntryTablePtr = frenchBankBeforeContents;
+  foreignLatches = contentsLatchesBefore;
+  std::cout << "PASS shared/foreign native short bottle-content names: no extra name page; all three locale bytes, tutorials, controls, type/position and save identity preserved\n";
   const auto master = read("Master Sword");
   assert(master.find("Equipment") != std::string::npos &&
          master.find('\xB1') != std::string::npos &&

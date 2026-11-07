@@ -598,10 +598,12 @@ std::vector<RandomizerCheck> ReachabilitySearch(const std::vector<RandomizerChec
 
 // Create the playthrough for the seed
 std::vector<RandomizerCheck> GeneratePlaythrough() {
+    InvalidateSariaMagicHintLocation();
     auto ctx = Rando::Context::GetInstance();
     ctx->playthroughBeatable = false;
     logic->Reset();
     GetAccessibleLocationsStruct gals(GetMaxGSCount());
+    std::vector<std::vector<RandomizerCheck>> sariaMagicSpheres;
     ResetLogic(ctx, gals, true);
     do {
         gals.InitLoop();
@@ -614,6 +616,14 @@ std::vector<RandomizerCheck> GeneratePlaythrough() {
                 goto resetSphere;
             }
         }
+        // Pending effects retain every reached check, including the winning
+        // sphere and optional items discarded from the normal playthrough.
+        std::vector<RandomizerCheck> magicSphere;
+        for (auto* location : gals.newItemLocations) {
+            if (location->GetPlacedRandomizerGet() == RG_MAGIC_STAT_UPGRADE)
+                magicSphere.push_back(location->GetRandomizerCheck());
+        }
+        sariaMagicSpheres.push_back(std::move(magicSphere));
         if (gals.itemSphere.size() > 0) {
             ctx->playthroughLocations.push_back(gals.itemSphere);
         }
@@ -621,6 +631,7 @@ std::vector<RandomizerCheck> GeneratePlaythrough() {
             ctx->GetEntranceShuffler()->playthroughEntrances.push_back(gals.entranceSphere);
         }
     } while (gals.logicUpdated);
+    CaptureSariaMagicHintLocation(sariaMagicSpheres);
     return gals.lateLocations;
 }
 
@@ -1411,6 +1422,7 @@ void VanillaFill() {
 }
 
 void ClearProgress() {
+    InvalidateSariaMagicHintLocation();
 }
 
 // Fleet Ship Combo (FleetComboRando.cpp): pre-colocación cross-game de la seed combinada.

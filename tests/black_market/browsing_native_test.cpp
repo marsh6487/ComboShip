@@ -65,6 +65,13 @@ static int currentCs = -1, currentSub = -1, returnCamera;
 struct KeeperState { SkelAnime skel; int timer = 90, eye; } sKeeper;
 bool Active() { return active; }
 bool Interior() { return active; }
+extern "C" void Interface_ChangeHudVisibilityMode(u16) {}
+void RefreshOwnedStock() {} // Stock refresh policy has its own transaction fixtures.
+bool ReceiptContext() { return active && sReceipt.pending; }
+bool Safe(PlayState* p) { return p && p->csCtx.state == CS_STATE_IDLE && p->transitionTrigger == TRANS_TRIGGER_OFF && p->gameOverCtx.state == GAMEOVER_INACTIVE; }
+extern "C" int ComboBlackMarketNative_UseItemGetCamera(PlayState*);
+extern "C" int ComboBlackMarketNative_PrepareViewpointCamera(PlayState*);
+
 // Observe the queued-GI boundary; native transaction fixtures own item/rupee delivery.
 bool Purchase() {
     ++purchases;
@@ -128,7 +135,9 @@ s32 BrowseCameraDataIdx(Camera* camera, s32 dataIdx) {
 }
 void BrowseCameraDirection(Camera* camera, s16 flags, void* data0, void* data1, s16 yaw, s16 pitch, UNK_TYPE extra) {
     ++cameraWrites;
-    assert(camera == &shopCamera && flags == 0xC && !data0 && !data1 && pitch == 0 && extra == 0);
+    assert(((camera == &shopCamera && flags == 0xC) ||
+            (camera == &mainCamera && flags == CAM_DATA_SET_2 && yaw == CAM_ITEM_TYPE_9)) &&
+           !data0 && !data1 && pitch == 0 && extra == 0);
     Camera_SetCameraData(camera, flags, data0, data1, yaw, pitch, extra);
 }
 #define Camera_ChangeDataIdx BrowseCameraDataIdx
@@ -483,6 +492,41 @@ void CheckReceiptHandoff(Actor* keeper) {
            "keeper browsing must be available again after the receipt is retired");
     EndBrowsing(&play);
     assert(player.stateFlags2 == 0x100);
+}
+
+void CheckReceiptCamera() {
+    // The accepted room is fixed by YREG(15), so the real native player
+    // previously refused its item camera even after the shop subcamera ended.
+    sReceipt.Cancel(); active = true; gPlayState = &play;
+    play.roomCtx.curRoom.meshHeader = nullptr;
+    MeshHeader mesh{}; mesh.base.type = 0;
+    play.roomCtx.curRoom.meshHeader = &mesh;
+    play.csCtx.state = CS_STATE_IDLE; play.transitionTrigger = TRANS_TRIGGER_OFF;
+    play.gameOverCtx.state = GAMEOVER_INACTIVE;
+    CameraStatus(&play, CAM_ID_MAIN, CAM_STAT_ACTIVE);
+    YREG(15) = 0x30;
+    assert(!Play_CamIsNotFixed(&play));
+    sReceipt.Begin(0, 0, 0, 0); sReceipt.offered = true;
+    player.getItemEntry.comboMarketReceipt = sReceipt.ticket;
+    mainCamera.setting = CAM_SET_FREE0;
+    Player_SetTurnAroundCamera(&play, CAM_ITEM_TYPE_9);
+    assert(mainCamera.setting == CAM_SET_TURN_AROUND && Play_CamIsNotFixed(&play) &&
+           "the actual native player request must select the traditional item-get camera in a fixed shop");
+    assert(ComboBlackMarketNative_PrepareViewpointCamera(&play) == 0 &&
+           "fixed room viewpoint dispatch must yield until the native receipt ends");
+    Camera foreign{}; foreign.setting = CAM_SET_FREE0; foreign.thisIdx = 2; play.cameraPtrs[2] = &foreign;
+    CameraStatus(&play, 2, CAM_STAT_ACTIVE);
+    assert(!ComboBlackMarketNative_UseItemGetCamera(&play));
+    CameraStatus(&play, 0, CAM_STAT_ACTIVE);
+    play.cameraPtrs[2] = nullptr;
+    play.csCtx.state = CS_STATE_SKIPPABLE_EXEC;
+    assert(!ComboBlackMarketNative_UseItemGetCamera(&play));
+    play.csCtx.state = CS_STATE_IDLE;
+    sReceipt.Cancel();
+    assert(!Play_CamIsNotFixed(&play) && ComboBlackMarketNative_PrepareViewpointCamera(&play) == 1 &&
+           "receipt retirement must restore the room's ordinary fixed-camera policy");
+    play.roomCtx.curRoom.meshHeader = nullptr;
+    YREG(15) = 7;
 }
 
 void CheckFixedCustomerEye() {
@@ -857,6 +901,7 @@ int main() {
            "empty stock offers a normal explanation without browsing or purchasing");
     CheckReleaseLifecycle(&keeper);
     CheckReceiptHandoff(&keeper);
+    CheckReceiptCamera();
     assert(nativeSettingRequests > 0 && nativeCameraFrames > 100 && manualCameraSetters == 0);
     BlackMarketBrowsing::Axis axis;
     assert(axis.Step(30)==0 && axis.Step(60)==1);

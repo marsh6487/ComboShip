@@ -2445,6 +2445,13 @@ void Play_TriggerRespawn(PlayState* play) {
 }
 
 s32 Play_CamIsNotFixed(PlayState* play) {
+#ifdef COMBO_BUILD
+    // A Black Market receipt temporarily uses the normal native item-get
+    // camera even when its room normally presents a fixed shop viewpoint.
+    if (ComboBlackMarketNative_UseItemGetCamera(play)) {
+        return true;
+    }
+#endif
     return (play->roomCtx.curRoom.meshHeader->base.type != 1) && (YREG(15) != 0x20) && (YREG(15) != 0x30) &&
            (YREG(15) != 0x40) && (play->sceneNum != SCENE_CASTLE_COURTYARD_GUARDS_DAY);
 }
