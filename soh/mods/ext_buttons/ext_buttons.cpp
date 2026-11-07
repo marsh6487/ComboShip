@@ -97,9 +97,9 @@ s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot) {
         const u16 otherItem = ExtButton_GetItem(other);
         // Native equipment virtual slots overlap page-2/3 cell numbers. A
         // native equip may swap only another native binding using that slot.
-        const bool same = neiItem ? otherItem == item
-                                  : otherItem < 0x80 && slot != SLOT_NONE &&
-                                        gSaveContext.equips.cButtonSlots[other - 1] == slot;
+        const bool same =
+            neiItem ? otherItem == item
+                    : otherItem < 0x80 && slot != SLOT_NONE && gSaveContext.equips.cButtonSlots[other - 1] == slot;
         const bool bow = item == ITEM_BOW && otherItem >= ITEM_BOW_ARROW_FIRE && otherItem <= ITEM_BOW_ARROW_LIGHT &&
                          !CVarGetInteger("gEnhancements.SeparateArrows", 0);
         if (same || bow) {

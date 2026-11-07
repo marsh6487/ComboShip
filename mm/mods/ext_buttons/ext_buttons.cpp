@@ -160,8 +160,7 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
              ExtButton_IsVirtualOotItem(item) == ExtButton_IsVirtualOotItem(otherItem))) {
             // C-button relocation consumes every old shortcut, including a C
             // source preceding D-pad duplicates. Return the displaced item once.
-            ExtButton_WriteEquip(play, other, moved ? ITEM_NONE : displaced,
-                                 moved ? SLOT_NONE : displacedSlot);
+            ExtButton_WriteEquip(play, other, moved ? ITEM_NONE : displaced, moved ? SLOT_NONE : displacedSlot);
             moved = true;
         }
     }

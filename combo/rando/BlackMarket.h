@@ -125,9 +125,8 @@ inline const Item* Find(std::string_view key) {
 // excluding them from all newly generated stock and replacement candidates.
 inline bool Selectable(const Item& item) {
     const std::string_view key(item.key);
-    return key != "wildcard.command_melody" && key != "wildcard.great_fairy_mask" &&
-           key != "wildcard.mask_truth" && key != "wildcard.gibdo_mask" &&
-           key != "wildcard.garo_mask" && key != "wildcard.captains_hat";
+    return key != "wildcard.command_melody" && key != "wildcard.great_fairy_mask" && key != "wildcard.mask_truth" &&
+           key != "wildcard.gibdo_mask" && key != "wildcard.garo_mask" && key != "wildcard.captains_hat";
 }
 
 inline bool Eligible(const Item& item, Games games) {
@@ -380,11 +379,11 @@ inline State StateFromJson(const nlohmann::json& json) {
 }
 
 inline const Item* EffectiveItem(const nlohmann::json& market, const State& state, int slot) {
-    if (slot < 0 || slot >= 8 || !market.is_object() || !market.contains("stock") ||
-        !market["stock"].is_array() || market["stock"].size() != 8)
+    if (slot < 0 || slot >= 8 || !market.is_object() || !market.contains("stock") || !market["stock"].is_array() ||
+        market["stock"].size() != 8)
         return nullptr;
     return Find(state.replacements[slot].empty() ? market["stock"][slot].value("key", std::string())
-                                               : state.replacements[slot]);
+                                                 : state.replacements[slot]);
 }
 
 inline Games MarketGames(const nlohmann::json& market) {
@@ -456,13 +455,12 @@ class Session {
             occupied.insert(Offer(shelf)->key);
         for (int shelf = 0; shelf < 8; ++shelf) {
             const auto* current = Offer(shelf);
-            if (current->renewable || (state.purchased & (1u << shelf)) ||
-                (Selectable(*current) && !owned(*current)))
+            if (current->renewable || (state.purchased & (1u << shelf)) || (Selectable(*current) && !owned(*current)))
                 continue;
             std::vector<const Item*> preferred, fallback;
             for (const auto& item : Catalog()) {
-                if (item.tier != current->tier || !ReplacementEligible(market, item) ||
-                    occupied.contains(item.key) || owned(item) || !usable(item))
+                if (item.tier != current->tier || !ReplacementEligible(market, item) || occupied.contains(item.key) ||
+                    owned(item) || !usable(item))
                     continue;
                 (item.wildcard == current->wildcard ? preferred : fallback).push_back(&item);
             }

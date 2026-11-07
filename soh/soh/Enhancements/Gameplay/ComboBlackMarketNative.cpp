@@ -322,9 +322,9 @@ bool sStockRefreshPending = true;
 GetItemEntry sReceiptEntry{};
 bool ReceiptContext() {
     return Active() && gPlayState && gPlayState->state.running &&
-           sReceipt.Matches(gSaveContext.fileNum, Seed(), sReceipt.ticket) && sReceiptMarket == sSession.OfferFingerprint() &&
-           gPlayState->transitionTrigger == TRANS_TRIGGER_OFF && gPlayState->transitionMode == TRANS_MODE_OFF &&
-           gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
+           sReceipt.Matches(gSaveContext.fileNum, Seed(), sReceipt.ticket) &&
+           sReceiptMarket == sSession.OfferFingerprint() && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
+           gPlayState->transitionMode == TRANS_MODE_OFF && gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
 }
 void CancelReceipt(bool destroying = false) {
     // Withdraw only the entry issued by this transaction. Native item actions
