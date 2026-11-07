@@ -1789,7 +1789,7 @@
     "suite": "items",
     "origin": "gate",
     "name": "Saria magic stat hint reachability and hint-only progression",
-    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/saria_magic/run_tests.py"
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/saria_magic/run_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/saria_magic/run_spawn_interaction_tests.py"
   },
   {
     "suite": "systems",

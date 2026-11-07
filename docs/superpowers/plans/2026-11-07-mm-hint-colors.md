@@ -34,7 +34,7 @@ question does not add a new native-MM feature.
 - [x] Add the bounded formatter and exercise the actual MM color encoder with literal expected control bytes, including old saves and already-marked text.
 - [x] Verify native/foreign/paid routing, trap disguises, all clarity tiers, generated data/RNG/weights and tracker reveal identity remain intact.
 - [x] Verify additional dynamic hint fixes and record intentional palettes/plain surfaces from the broad audit.
-- [ ] Review, checkpoint and independently restore the cumulative source; full build and in-game pixels remain separate.
+- [x] Review, checkpoint and independently restore the cumulative source; full build and in-game pixels remain separate.
 
 Decisive configured check: reload the reported seed, read the same stone,
 confirm Bomb Bag red, Gerudo Fortress yellow and white connecting prose, then

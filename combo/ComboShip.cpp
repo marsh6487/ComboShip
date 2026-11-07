@@ -2141,7 +2141,7 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             // corrupt the generated seed. Restores MM itself.
             const auto sariaOptions = nlohmann::json::parse(sohHintDump.empty() ? "{}" : sohHintDump)
                                           .value("options", nlohmann::json::object());
-            if (sariaOptions.value("sariaHint", 0) && sariaOptions.value("magicStatUpgrade", 0)) {
+            if (sariaOptions.value("magicStatUpgrade", 0)) {
                 sariaMagicSpheres = ComboRando::FindSariaMagicSphere(
                     result.spoilerJson, ootOracle, mmOracle, sohDump, mmDump, !noLogic, mmStart, sharedMask,
                     SOH_DumpSharedItemPairs ? SOH_DumpSharedItemPairs() : "");

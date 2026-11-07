@@ -56,7 +56,7 @@ def build(exporter_override=None):
     playthrough = source("combo/rando/ComboPlaythrough.h")
     foreign = source("combo/rando/CrossForeign.h")
     custom = source("soh/soh/Enhancements/custom-message/CustomMessageManager.cpp")
-    parts = [prefix, '#include "rando/HintPresentation.h"\n', "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
+    parts = [prefix, '#include "rando/HintPresentation.h"\n#include "rando/SariaHintPolicy.h"\n', "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
     parts += [block(custom, "CustomMessage::CustomMessage(std::string english_, TextBoxType type_, TextBoxPosition position_)"),
               block(custom, "void CustomMessage::Replace(std::string&& oldStr, std::string&& newStr)"),
               block(custom, "void CustomMessage::SetSingularPlural()")]

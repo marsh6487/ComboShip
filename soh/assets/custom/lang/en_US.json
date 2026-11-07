@@ -475,7 +475,7 @@
                     "Required to open the Kakariko gate and Happy Mask Shop. Starting with the letter starts with the gate ",
                     "opened.\n",
                     "\n",
-                    "Meeting Zelda still triggers Saria at Sacred Forest Meadow.\n",
+                    "Meeting Zelda still unlocks Saria's song reward in Sacred Forest Meadow. Her magic hint can be heard earlier when Saria's Hint or Magic Stat Upgrades is enabled.\n",
                     "\n",
                     "When disabled, \"Start with Zelda's Letter\" skips child Zelda: you also get the item Impa would give."
                 ]
@@ -1315,7 +1315,7 @@
             },
             "saria_hint": {
                 "name": "Saria's Hint",
-                "description": "Talking to Saria either in person or through Saria's Song will tell you the location of a progressive magic meter."
+                "description": "Talking to Saria in person or through Saria's Song hints the location of a progressive magic meter. Magic Stat Upgrades provides an upgrade hint even when this option is off. Her Meadow hint can be heard before meeting Zelda; the song reward still requires meeting Zelda."
             },
             "mido_hint": {
                 "name": "Mido's Hint",

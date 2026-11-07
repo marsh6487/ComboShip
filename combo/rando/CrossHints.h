@@ -20,6 +20,7 @@
 
 #include "ComboPlaythrough.h" // ParseSpoilerPlacements, RequirednessResult
 #include "CrossWorldRando.h"  // CwRng
+#include "SariaHintPolicy.h"
 
 namespace ComboRando {
 
@@ -583,10 +584,12 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
             { "RH_FISHING_POLE", "fishingPoleHint", { "RHT_FISHING_POLE_HINT" }, "Fishing Pole", true },
         };
         for (const StaticItemHint& sh : kStaticItemHints) {
-            if (options.value(sh.option, 0) == 0)
+            const bool saria = std::string(sh.hint) == "RH_SARIA_HINT";
+            const bool statMagic = saria && options.value("magicStatUpgrade", 0) != 0;
+            if (!(saria ? SariaHint_IsEnabled(options.value(sh.option, 0), statMagic)
+                        : options.value(sh.option, 0) != 0))
                 continue;
             auto it = findOotItem(sh.item);
-            const bool statMagic = std::string(sh.hint) == "RH_SARIA_HINT" && options.value("magicStatUpgrade", 0) != 0;
             if (statMagic) {
                 const auto selected =
                     SelectSariaMagicPlacement(placements, reachabilitySpheres, sariaReachabilityVerified);

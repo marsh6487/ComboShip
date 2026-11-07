@@ -43,6 +43,9 @@ int main(){
  assert(hint(gen(json::array()))["messages"][0]["en"]=="magic A late");
  hd["options"]["magicStatUpgrade"]=0;assert(hint(gen(spheres))["messages"][0]["en"]=="magic Meter");
  hd["options"]["sariaHint"]=0;assert(hint(gen(spheres)).is_null());
+ hd["options"]["magicStatUpgrade"]=1;
+ assert(hint(gen(spheres))["messages"][0]["en"]=="magic B early");
+ assert(hd["options"]["sariaHint"]==0); // stat guidance does not rewrite the classic preference
  hd["options"]["sariaHint"]=1;hd["options"]["magicStatUpgrade"]=1;seed["oot"]=json::object();seed["mm"]=json::object();seed["foreign"]=json::array();
  assert(hint(gen(spheres)).is_null()); // absent stat upgrades never invent a location
  std::cout<<"PASS: full composer talk/song parity, cross-game target, original meter, absent items and disabled hint\n";

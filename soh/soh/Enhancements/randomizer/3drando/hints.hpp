@@ -89,3 +89,5 @@ void Combo_SetHintItemAreas(const std::string& json);
 void CaptureSariaMagicHintLocation(const std::vector<std::vector<RandomizerCheck>>& spheres);
 
 void InvalidateSariaMagicHintLocation();
+// Repair only a missing legacy stat-upgrade message from saved placements.
+bool EnsureSariaMagicHint();

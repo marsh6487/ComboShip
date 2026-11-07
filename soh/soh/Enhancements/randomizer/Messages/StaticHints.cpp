@@ -14,6 +14,8 @@
 #include "soh/Enhancements/randomizer/hook_handlers.h" // ComboShip: OOT_LookupForeign
 #endif
 #include "soh/ShipInit.hpp"
+#include "soh/Enhancements/randomizer/3drando/hints.hpp"
+#include "rando/SariaHintPolicy.h"
 
 extern "C" {
 #include "z64scene.h"
@@ -296,13 +298,27 @@ void BuildFishingPoleHintMessage(uint16_t* textId, bool* loadFromMessageTable) {
 
 void BuildSariaMessage(uint16_t* textId, bool* loadFromMessageTable) {
     CustomMessage msg;
-    if (*textId == TEXT_SARIA_SFM) {
+    if (!EnsureSariaMagicHint()) {
+        msg = CustomMessage("I cannot sense where hidden magic lies.",
+                            "Ich kann nicht spüren, wo verborgene Magie liegt.",
+                            "Je ne peux pas sentir où se cache la magie.");
+        if (*textId != TEXT_SARIA_SFM) {
+            msg.SetTextBoxType(TEXTBOX_TYPE_BLUE);
+            msg += "\x0B";
+        }
+        msg.AutoFormat();
+    } else if (*textId == TEXT_SARIA_SFM) {
         msg = ReadHintMessage(RH_SARIA_HINT, MF_AUTO_FORMAT, 0);
     } else {
         msg = ReadHintMessage(RH_SARIA_HINT, MF_AUTO_FORMAT, 1);
     }
     msg.LoadIntoFont();
     *loadFromMessageTable = false;
+}
+
+static bool SariaHintEnabled() {
+    return IS_RANDO &&
+           SariaHint_IsEnabled(RAND_GET_OPTION(RSK_SARIA_HINT).Get(), RAND_GET_OPTION(RSK_MAGIC_STAT_UPGRADE).Get());
 }
 
 void BuildMidoMessage(uint16_t* textId, bool* loadFromMessageTable) {
@@ -454,21 +470,21 @@ void RegisterStaticHints() {
     COND_ID_HOOK(OnOpenText, TEXT_FISHING_POND_START_MET, RAND_GET_OPTION(RSK_SHUFFLE_FISHING_POLE),
                  BuildFishingPoleHintMessage);
     // Saria
-    COND_ID_HOOK(OnOpenText, TEXT_SARIA_SFM, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FACE_TO_FACE, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FOREST_SOUNDS, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_MR_DARUNIA, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_SPIRITUAL_WATER, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_SPIRITUAL_FIRE, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DREAD_CASTLE, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DIFFERENT_OCARINA, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_EYES_DARKNESS_STORM, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DESERT_GODDESS, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_TEMPLES, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FOREST_TEMPLE, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_GLAD_NOW, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_IMPRISON_GANONDORF, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_CHANNELING_POWER, RAND_GET_OPTION(RSK_SARIA_HINT), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIA_SFM, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FACE_TO_FACE, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FOREST_SOUNDS, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_MR_DARUNIA, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_SPIRITUAL_WATER, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_SPIRITUAL_FIRE, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DREAD_CASTLE, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DIFFERENT_OCARINA, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_EYES_DARKNESS_STORM, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_DESERT_GODDESS, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_TEMPLES, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_FOREST_TEMPLE, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_GLAD_NOW, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_IMPRISON_GANONDORF, SariaHintEnabled(), BuildSariaMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_SARIAS_SONG_CHANNELING_POWER, SariaHintEnabled(), BuildSariaMessage);
     // Mido
     COND_ID_HOOK(OnOpenText, TEXT_MIDO_SPEAK_TO_MIDO_FIRST_TIME, RAND_GET_OPTION(RSK_MIDO_HINT), BuildMidoMessage);
     COND_ID_HOOK(OnOpenText, TEXT_MIDO_SPEAK_TO_MIDO_AGAIN, RAND_GET_OPTION(RSK_MIDO_HINT), BuildMidoMessage);
