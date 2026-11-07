@@ -33,6 +33,7 @@ void EnDoor_Idle(EnDoor*, PlayState*);
 #include "2s2h/Enhancements/Graphics/ComboPlaceTitleCard.h"
 #include "gameplay/CrossGameTitleCard.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/Enhancements/Debug/FrameTiming.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/SaveManager/SaveManager.h"
@@ -650,6 +651,7 @@ bool CustomKeeperAvailable() {
 }
 
 void KeeperUpdate(Actor* actor, PlayState* play) {
+    MMFrameTiming::NamedScope timing("update", "black_market.keeper_update");
     RefreshOwnedStock();
     sCounterBarrier.Ensure(play);
     MonitorBrowsing();
@@ -684,6 +686,7 @@ s32 KeeperLimb(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, Actor* actor
     return false;
 }
 void KeeperDraw(Actor* actor, PlayState* play) {
+    MMFrameTiming::NamedScope timing("draw", "black_market.keeper_draw");
     auto* gal = reinterpret_cast<EnOssan*>(actor);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -997,10 +1000,18 @@ void DrawMarket() {
     PlayState* play = gPlayState;
     if (!Interior() || !play->state.running)
         return;
-    DrawShelves(play);
-    BlackMarketInteriorEffects::Draw(play, !sGrannyActive, false);
+    MMFrameTiming::NamedScope timing("draw", "black_market.draw_market");
+    {
+        MMFrameTiming::NamedScope shelves("draw", "black_market.shelves");
+        DrawShelves(play);
+    }
+    {
+        MMFrameTiming::NamedScope effects("draw", "black_market.effects");
+        BlackMarketInteriorEffects::Draw(play, !sGrannyActive, false);
+    }
     if (!Active())
         return;
+    const bool seals = CVarGetInteger(BlackMarketVisual::kSealsCvar, 1) != 0;
     for (int slot = 0; slot < 8; ++slot) {
         const Item* item = Offer(slot);
         if (!item)
@@ -1008,7 +1019,7 @@ void DrawMarket() {
         const auto status = Status(slot);
         const bool soldOut = status == PurchaseResult::SoldOut && !item->renewable;
         const bool locked = status == PurchaseResult::Locked;
-        BlackMarketVisual::Capture capture(locked);
+        BlackMarketVisual::Capture capture(locked && seals);
         auto* stock = sNativeShop && sNativeShopPlay == play ? sNativeShop->items[slot] : nullptr;
         if (!stock || !stock->actor.update)
             continue;
@@ -1017,13 +1028,18 @@ void DrawMarket() {
         Matrix_Translate(display.world.pos.x, display.world.pos.y, display.world.pos.z, MTXMODE_NEW);
         Matrix_RotateYS(stock->rotY + play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);
         Matrix_Scale(display.scale.x, display.scale.y, display.scale.z, MTXMODE_APPLY);
-        if (soldOut)
-            DrawSoldOut(play);
-        else
-            Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
+        {
+            MMFrameTiming::NamedScope itemDraw("draw", "black_market.items");
+            if (soldOut)
+                DrawSoldOut(play);
+            else
+                Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, &display);
+        }
         Matrix_Pop();
-        if (locked && CVarGetInteger(BlackMarketVisual::kSealsCvar, 1))
+        if (locked && seals) {
+            MMFrameTiming::NamedScope sealDraw("draw", "black_market.seals");
             DrawSeal(play, capture.frame, sTalking && slot == sSelected);
+        }
     }
 }
 
@@ -1194,8 +1210,14 @@ void RegisterMarket() {
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(
         ACTOR_EN_DOOR, [](Actor*) { SyncShopDoorCollision(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldStart>([] {
-        DrawGrannyRoom();
-        BeginRoomMagic();
+        {
+            MMFrameTiming::NamedScope granny("draw", "black_market.granny_room");
+            DrawGrannyRoom();
+        }
+        {
+            MMFrameTiming::NamedScope roomMagic("draw", "black_market.room_magic");
+            BeginRoomMagic();
+        }
     });
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldVanillaBehavior>(
         VB_DISABLE_LETTERBOX, [](GIVanillaBehavior, bool* should, va_list) {

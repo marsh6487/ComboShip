@@ -1340,8 +1340,8 @@
   {
     "suite": "systems",
     "origin": "gate",
-    "name": "OoT diagnostic frame timing accounting",
-    "run": "python3 scripts/diagnostics/run_build_metadata_test.py\npython3 scripts/diagnostics/run_frame_timing_probe_tests.py"
+    "name": "OoT/MM diagnostic frame timing accounting",
+    "run": "python3 scripts/diagnostics/run_build_metadata_test.py\npython3 scripts/diagnostics/run_frame_timing_probe_tests.py\npython3 tests/mm_frame_timing/run_tests.py"
   },
   {
     "suite": "systems",

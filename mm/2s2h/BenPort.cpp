@@ -82,6 +82,7 @@ extern "C" void Partners_Reset(void);
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/Enhancements/Debug/FrameTiming.h"
 
 #ifdef ENABLE_CROWD_CONTROL
 #include "Enhancements/crowd-control/CrowdControl.h"
@@ -1841,7 +1842,10 @@ extern "C" void SaveManager_ThreadPoolWait() {
     // SaveManager::Instance->ThreadPoolWait();
 }
 
+static void MMFrameTiming_Shutdown();
+
 extern "C" void DeinitOTR() {
+    MMFrameTiming_Shutdown();
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
 #ifdef ENABLE_CROWD_CONTROL
@@ -1963,7 +1967,77 @@ static void CrossoverHotkey_Tick() {
     sHeld = pressed;
 }
 
+namespace {
+MMFrameTiming::Session sMMFrameTimingSession;
+FrameTimingSpan sMMTickBuildSpan{};
+} // namespace
+
+static bool MMFrameTiming_Eligible() {
+#ifdef COMBO_BUILD
+    const bool requested = CVarGetInteger("gDeveloperTools.FrameTimingProbe", 0) != 0;
+    if (!requested)
+        return false;
+    const bool liveGameplay = gPlayState && gGameState == &gPlayState->state && gPlayState->state.running &&
+                              gSaveContext.gameMode == GAMEMODE_NORMAL;
+    return MMFrameTiming::ShouldCapture(requested, liveGameplay, FleetShipCombo_IsThisGameActive(),
+                                        liveGameplay && ComboBlackMarket_IsInterior());
+#else
+    return false; // The native BlackMarket belongs to the combined game.
+#endif
+}
+
+static FrameTimingContext MMFrameTiming_Context() {
+    const bool liveGameplay = gPlayState && gGameState == &gPlayState->state && gPlayState->state.running;
+    return {
+        liveGameplay ? gPlayState->sceneId : -1,
+        liveGameplay ? gPlayState->roomCtx.curRoom.num : -1,
+        gSaveContext.save.playerForm, // The shared age field represents MM player form.
+        CVarGetInteger("gEnhancements.Mods.AlternateAssets", 0),
+        liveGameplay ? gPlayState->pauseCtx.state != 0 : 0,
+        OTRGlobals::Instance ? static_cast<int>(OTRGlobals::Instance->GetInterpolationFPS()) : 0,
+    };
+}
+
+static void MMFrameTiming_EndFrame() {
+    if (sMMFrameTimingSession.Engaged())
+        sMMFrameTimingSession.End(MMFrameTiming_Context(), MMFrameTiming_Eligible());
+}
+
+static void MMFrameTiming_Shutdown() {
+    sMMFrameTimingSession.Shutdown();
+}
+
+static void MMFrameTiming_RecordConfiguration(Fast::Interpreter* interpreter, int renderDetail) {
+    if (!FrameTiming_IsActive() || (!FrameTiming_NeedsConfiguration() && FrameTiming_TickId() % 200 != 0))
+        return;
+    try {
+        nlohmann::json archives = nlohmann::json::array();
+        for (const auto& archive :
+             *Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->GetArchives())
+            archives.push_back(archive->GetPath());
+        FrameTiming_RecordConfiguration(
+            { { "build", std::string(gBuildVersion) },
+              { "commit", std::string(gGitCommitHash) },
+              { "archives_in_manager_order", std::move(archives) },
+              { "backend", interpreter->mRapi->GetName() },
+              { "actor_attribution", "unavailable; named BlackMarket CPU spans only" },
+              { "age_field", "MM player form" },
+              { "alt_assets_enabled", Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled() },
+              { "detail_mode", renderDetail },
+              { "render_cost_probe", CVarGetInteger("gDeveloperTools.RendererCostProbe", 1) },
+              { "alt_lookup", interpreter->mAltRenderLookup },
+              { "internal_resolution", CVarGetFloat(CVAR_INTERNAL_RESOLUTION, 1.0f) },
+              { "msaa", CVarGetInteger(CVAR_MSAA_VALUE, 1) },
+              { "vsync", CVarGetInteger(CVAR_VSYNC_ENABLED, 1) } });
+    } catch (...) { FrameTiming_Count("diagnostic.configuration_errors", 1); }
+}
+
 extern "C" void Graph_StartFrame() {
+    const bool eligible = MMFrameTiming_Eligible();
+    if (eligible || sMMFrameTimingSession.Engaged()) {
+        sMMFrameTimingSession.Begin(MMFrameTiming_Context(), eligible);
+        sMMTickBuildSpan = FrameTiming_BeginSpan();
+    }
 #ifndef __WIIU__
     using Ship::KbScancode;
 
@@ -2072,7 +2146,10 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     }
 
     // Process window events for resize, mouse, keyboard events
-    wnd->HandleEvents();
+    {
+        FrameTiming::Scope timing(FRAME_TIMING_WINDOW_EVENTS);
+        wnd->HandleEvents();
+    }
 
     // Render-gating (Fleet Ship Combo): when this game is the INACTIVE one in the combo and
     // the user isn't viewing its BenGui, skip the 3D scene render (the bulk of the combo's GPU
@@ -2104,7 +2181,20 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
         fleetRealGameFrame = false;
     }
 
-    auto intp = wnd->GetInterpreterWeak().lock().get();
+    auto interpreter = wnd->GetInterpreterWeak().lock();
+    auto intp = interpreter.get();
+    if (!intp)
+        return;
+    // Eligibility may change during the game tick, before renderer submission.
+    if (sMMFrameTimingSession.Engaged() && !MMFrameTiming_Eligible())
+        MMFrameTiming_EndFrame();
+    const bool collectRenderTimings = FrameTiming_IsActive() != 0;
+    const int renderDetail = collectRenderTimings ? CVarGetInteger("gDeveloperTools.RenderFlightDetail", 2) : 0;
+    MMFrameTiming::CollectionScope collection(wnd.get(), intp, collectRenderTimings,
+                                              collectRenderTimings && renderDetail != 0 &&
+                                                  CVarGetInteger("gDeveloperTools.RendererCostProbe", 1),
+                                              renderDetail >= 2);
+    MMFrameTiming_RecordConfiguration(intp, renderDetail);
     intp->mInterpolationIndex = 0;
     intp->mGameTick = gPlayState != nullptr ? gPlayState->gameplayFrames : 0;
 
@@ -2113,10 +2203,60 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
     for (int i = 0; i < count; i++) {
         time += step;
+        const auto interpolationTiming = FrameTiming_BeginSpan();
+        const uint64_t interpolationStart = collectRenderTimings ? Fast::RenderCostNow() : 0;
         std::unordered_map<Mtx*, MtxF> mtx_replacements =
             (time == denom) ? std::unordered_map<Mtx*, MtxF>() : FrameInterpolation_Interpolate((float)time / denom);
+        FrameTiming_EndSpan(FRAME_TIMING_INTERPOLATION, interpolationTiming);
+        const uint64_t interpolationNs = collectRenderTimings ? Fast::RenderCostNow() - interpolationStart : 0;
         intp->mInterpolationT = (float)time / denom;
-        wnd->DrawAndRunGraphicsCommands(Commands, mtx_replacements);
+        bool presented;
+        {
+            FrameTiming::Scope timing(FRAME_TIMING_DRAW_PRESENT);
+            presented = wnd->DrawAndRunGraphicsCommands(Commands, mtx_replacements);
+        }
+        if (collectRenderTimings) {
+            try {
+                const auto& timings = wnd->GetLastFrameTimings();
+                const auto& report = intp->GetRenderCostReport();
+                FrameTiming_RecordAttempt(
+                    { { "id", timings.attemptId },
+                      { "start_ns", timings.startNs },
+                      { "end_ns", timings.endNs },
+                      { "game_tick", intp->mGameTick },
+                      { "index", i },
+                      { "count", count },
+                      { "fraction", intp->mInterpolationT },
+                      { "original_pose", time == denom },
+                      { "matrix_count", mtx_replacements.size() },
+                      { "interpolation_ms", interpolationNs / 1000000.0 },
+                      { "presented", presented },
+                      { "detail_mode", renderDetail },
+                      { "ready_ms", timings.ready / 1000000.0 },
+                      { "setup_ms", timings.setup / 1000000.0 },
+                      { "commands_ms", timings.commands / 1000000.0 },
+                      { "gui_ms", timings.gui / 1000000.0 },
+                      { "present_ms", timings.present / 1000000.0 },
+                      { "pacing", timings.pacing },
+                      { "gpu", timings.gpu },
+                      { "renderer_sampled", presented && report.sampled },
+                      { "renderer",
+                        presented && report.sampled ? FrameTiming_RenderSummary(report) : nlohmann::json(nullptr) },
+                      { "alt_lookup", intp->mAltRenderLookup },
+                      { "triangles",
+                        presented && report.sampled ? nlohmann::json(report.triangles) : nlohmann::json(nullptr) },
+                      { "vertices",
+                        presented && report.sampled ? nlohmann::json(report.vertices) : nlohmann::json(nullptr) } });
+                FrameTiming_AddDuration(FRAME_TIMING_FRAME_READY, timings.ready);
+                if (presented) {
+                    FrameTiming_AddDuration(FRAME_TIMING_RENDER_SETUP, timings.setup);
+                    FrameTiming_AddDuration(FRAME_TIMING_GRAPHICS_COMMANDS, timings.commands);
+                    FrameTiming_AddDuration(FRAME_TIMING_GUI_FINISH, timings.gui);
+                    FrameTiming_AddDuration(FRAME_TIMING_PRESENT, timings.present);
+                    FrameTiming_LogRenderCost(report, MMFrameTiming_Context());
+                }
+            } catch (...) { FrameTiming_Count("diagnostic.render_record_errors", 1); }
+        }
         intp->mInterpolationIndex++;
     }
     ImGui::PopStyleColor();
@@ -2133,8 +2273,14 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
 
 // C->C++ Bridge
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
+    MMFrameTiming::FrameEndScope frameEnd(MMFrameTiming_EndFrame);
+    FrameTiming_EndSpan(FRAME_TIMING_TICK_BUILD, sMMTickBuildSpan);
+    if (sMMFrameTimingSession.Engaged() && !MMFrameTiming_Eligible())
+        MMFrameTiming_EndFrame();
     {
+        const auto audioWaitTiming = FrameTiming_BeginSpan();
         std::unique_lock<std::mutex> Lock(audio.mutex);
+        FrameTiming_EndSpan(FRAME_TIMING_AUDIO_WAIT, audioWaitTiming);
         audio.framesPerUpdate = std::clamp<int>(R_UPDATE_RATE, 1, 3);
         audio.processing = true;
         // Set the combo audio-mute flag BEFORE waking the worker so THIS frame's buffer is
@@ -2214,8 +2360,12 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         // vector, which RunCommands builds per sub-frame internally.
         RunCommands(commands, start_time, step, next_original_frame, count);
     } catch (const std::exception& e) {
+        FrameTiming_Count("render.exceptions", 1);
         SPDLOG_ERROR("[FrameGuard] render/frame threw: {} — frame skipped (would have terminated 2ship)", e.what());
-    } catch (...) { SPDLOG_ERROR("[FrameGuard] render/frame threw a non-std exception — frame skipped"); }
+    } catch (...) {
+        FrameTiming_Count("render.exceptions", 1);
+        SPDLOG_ERROR("[FrameGuard] render/frame threw a non-std exception — frame skipped");
+    }
     FleetSync_PostFlipTrace("7. render: RunCommands done");
 
 #ifndef COMBO_BUILD
@@ -2251,10 +2401,12 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     last_update_rate = R_UPDATE_RATE;
 
     {
+        const auto audioWaitTiming = FrameTiming_BeginSpan();
         std::unique_lock<std::mutex> Lock(audio.mutex);
         while (audio.processing) {
             audio.cv_from_thread.wait(Lock);
         }
+        FrameTiming_EndSpan(FRAME_TIMING_AUDIO_WAIT, audioWaitTiming);
     }
 
     bool curAltAssets = CVarGetInteger("gEnhancements.Mods.AlternateAssets", 0);
@@ -2266,6 +2418,8 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         SOH::SkeletonPatcher::UpdateSkeletons();
         // GameInteractor::Instance->ExecuteHooks<GameInteractor::OnAssetAltChange>();
     }
+
+    frameEnd.Finish(); // Includes the final audio wait and Alt Assets handoff.
 
     // OTRTODO: FIGURE OUT END FRAME POINT
     /* if (OTRGlobals::Instance->context->GetWindow()->lastScancode != -1)
@@ -3830,7 +3984,8 @@ extern "C" void OTRMessage_ResetForResume(void);
 // ComboShip: OOT->MM forward transition. Stop MM audio without destroying the shared
 // context/window/resource-manager (OOT reuses them). Mirrors SOH_PrepareForTransition.
 extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
-    Partners_Reset(); // Release partner camera/input before the owning game becomes dormant.
+    sMMFrameTimingSession.Suspend(); // Flush before MM yields the shared renderer and trace collector.
+    Partners_Reset();                // Release partner camera/input before the owning game becomes dormant.
     ComboEmotes_Reset();
     ItemGrantAudit::Scope itemGrantAuditScope("MM_PrepareForTransition");
     SaveManager_ThreadPoolWait();
@@ -5893,6 +6048,7 @@ extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* pa
 extern "C" int MmAssets_GetOotGiModelBounds(const char* const* paths, int count, float minimum[3], float maximum[3]);
 extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char* const* paths, int count,
                                                    float minimum[3], float maximum[3]) {
+    MMFrameTiming::NamedScope timing("draw", "black_market.model_bounds");
     if (game && std::strcmp(game, "oot-companion") == 0) {
         const int result = MmAssets_GetOotGiModelBounds(paths, count, minimum, maximum);
         if (result)

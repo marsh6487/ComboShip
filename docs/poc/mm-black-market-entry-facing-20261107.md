@@ -32,6 +32,9 @@ aborted with `prepared MM market spawn decoded yaw -18933, expected -32768`.
 Afterward Combo and standalone fixtures pass all five forms over three entries,
 preserving position, params, source cache, form and ITEM_GET cutscene 4. Legacy
 entry, ordinary scenes, authored native chains and forest controls also pass.
+Actor allocation is a controlled fixture boundary: the form loops preserve each
+form setting but do not execute form-specific `Player_Init` or prove visible
+in-game facing.
 
 Verification:
 

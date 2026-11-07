@@ -1,6 +1,11 @@
 /* RESOURCE_TYPES */
 #include <unordered_map>
 #include <stdexcept>
+#include "mm/2s2h/Enhancements/Debug/FrameTiming.h"
+// The extracted production bounds bridge carries optional MM tracing; this
+// receipt fixture leaves recording disabled and still executes its real body.
+extern "C" FrameTimingSpan FrameTiming_BeginSpan(void) { return {}; }
+extern "C" void FrameTiming_EndNamedSpan(const char*, const char*, FrameTimingSpan) {}
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/soh/Enhancements/randomizer/NeiElementalGiColors.h"
 namespace NeiGi {struct TextureMaterial;}

@@ -15,6 +15,6 @@
 - [x] Extend the native fixture using the actual OoT talk setup and cutscene predicates; demonstrate dialogue continuity failing on baseline.
 - [x] Split player-control deferral from audio-override suspension in the OoT adapter.
 - [x] Run existing night lifecycle/host/queue checks and dedicated field/combat regression; inspect formatting and diff.
-- [ ] Commit a bounded candidate, preserve recovery, and record full-build and audible runtime limits.
+- [x] Commit a bounded candidate, preserve recovery, and record full-build and audible runtime limits.
 
 **Decisive runtime check:** With the reported mod stack and Enable Night Music on, talk to a stone at night, advance pages, close and repeat. The track should maintain its position without silence/restart. Verify one item fanfare and real cutscene still take precedence. No audible runtime claim follows from the native fixtures.

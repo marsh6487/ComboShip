@@ -757,6 +757,7 @@ void DrawMarket() {
     BlackMarketInteriorEffects::Draw(play, !sGrannyActive, true);
     if (!Active())
         return;
+    const bool seals = CVarGetInteger(BlackMarketVisual::kSealsCvar, 1) != 0;
     for (int slot = 0; slot < 8; ++slot) {
         const auto* item = Offer(slot);
         if (!item)
@@ -764,7 +765,7 @@ void DrawMarket() {
         const auto status = Status(slot);
         const bool soldOut = status == PurchaseResult::SoldOut && !item->renewable;
         const bool locked = status == PurchaseResult::Locked;
-        BlackMarketVisual::Capture capture(locked);
+        BlackMarketVisual::Capture capture(locked && seals);
         Matrix_Push();
         const auto pos = kShelves[slot];
         Matrix_Translate(pos.x, pos.y + 2 * std::sin((play->gameplayFrames + slot * 9) * .035f), pos.z, MTXMODE_NEW);
@@ -776,7 +777,7 @@ void DrawMarket() {
         else
             DrawOffer(play, *item);
         Matrix_Pop();
-        if (locked && CVarGetInteger(BlackMarketVisual::kSealsCvar, 1))
+        if (locked && seals)
             DrawSeal(play, capture.frame, sTalking && slot == sSelected);
     }
 }

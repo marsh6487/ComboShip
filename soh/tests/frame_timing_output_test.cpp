@@ -16,6 +16,16 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
+#ifndef FRAME_TIMING_EXPECTED_HOST
+#define FRAME_TIMING_EXPECTED_HOST "OoT"
+#endif
+#ifndef FRAME_TIMING_EXPECTED_NAMED_SPAN
+#define FRAME_TIMING_EXPECTED_NAMED_SPAN "room"
+#endif
+#ifndef FRAME_TIMING_EXPECTED_SCOPE
+#define FRAME_TIMING_EXPECTED_SCOPE "all OoT gameplay scenes; no slow-frame threshold"
+#endif
+
 int main(int argc, char** argv) {
     assert(argc == 2);
     std::filesystem::create_directories(argv[1]);
@@ -32,7 +42,7 @@ int main(int argc, char** argv) {
     const auto captureDirectory = std::filesystem::path(logPath).parent_path();
     std::set<std::filesystem::path> previousCaptures;
     for (const auto& entry : std::filesystem::directory_iterator(captureDirectory))
-        if (entry.path().filename().string().starts_with("OoT-RenderFlight-"))
+        if (entry.path().filename().string().starts_with(FRAME_TIMING_EXPECTED_HOST "-RenderFlight-"))
             previousCaptures.insert(entry.path());
 
     // Exercise the production adapter and the same asynchronous rotating-file
@@ -53,7 +63,7 @@ int main(int argc, char** argv) {
             { { "id", 2 }, { "presented", true }, { "fraction", .667 }, { "gpu", { { "status", "pending" } } } });
         FrameTiming_Count("actors.drawn", 12);
         auto named = FrameTiming_BeginSpan();
-        FrameTiming_EndNamedSpan("draw", "room", named);
+        FrameTiming_EndNamedSpan("draw", FRAME_TIMING_EXPECTED_NAMED_SPAN, named);
         auto span = FrameTiming_BeginSpan();
         FrameTiming_EndSpan(FRAME_TIMING_PLAY_UPDATE, span);
         FrameTiming_AddDuration(FRAME_TIMING_DRAW_PRESENT, 1000000);
@@ -120,7 +130,7 @@ int main(int argc, char** argv) {
     // capture retains the complete session and is the supported analysis input.
     std::filesystem::path completeCapture;
     for (const auto& entry : std::filesystem::directory_iterator(captureDirectory)) {
-        if (entry.path().filename().string().starts_with("OoT-RenderFlight-") &&
+        if (entry.path().filename().string().starts_with(FRAME_TIMING_EXPECTED_HOST "-RenderFlight-") &&
             !previousCaptures.contains(entry.path())) {
             assert(completeCapture.empty());
             completeCapture = entry.path();
@@ -139,11 +149,18 @@ int main(int argc, char** argv) {
         if (const auto pos = line.find(flightMarker); pos != std::string::npos) {
             ++flightSamples;
             const auto capture = nlohmann::json::parse(line.substr(pos + flightMarker.size()));
+            assert(capture.at("host") == FRAME_TIMING_EXPECTED_HOST);
             assert(capture.at("attempts").size() == 2);
             assert(capture.at("attempts")[0].at("presented") == false);
             assert(capture.at("attempts")[1].at("gpu").at("status") == "pending");
             assert(capture.at("attempts")[0].at("tick_id") == capture.at("ticks")[0].at("id"));
             assert(capture.at("ticks")[0].at("trace").at("counts").at("actors.drawn") == 12);
+            const auto& aggregates = capture.at("ticks")[0].at("trace").at("aggregates");
+            assert(aggregates.size() == 1);
+            assert(aggregates[0].at("category") == "draw");
+            assert(aggregates[0].at("name") == FRAME_TIMING_EXPECTED_NAMED_SPAN);
+            assert(aggregates[0].at("count") == 1);
+            assert(aggregates[0].at("total_ns").get<uint64_t>() > 0);
             assert(capture.at("ticks")[0].at("phases_ms").contains("play_update"));
             assert(capture.at("ticks")[0].at("wall_ms").get<double>() >= 1000.0);
             assert(capture.at("ticks")[0].contains("thread_cpu_ms"));
@@ -154,6 +171,7 @@ int main(int argc, char** argv) {
         if (renderStart != std::string::npos) {
             ++renderSamples;
             const auto cost = nlohmann::json::parse(line.substr(renderStart + renderMarker.size()));
+            assert(cost.at("host") == FRAME_TIMING_EXPECTED_HOST);
             assert(cost.at("scene") == play.scene);
             assert(cost.at("sample_every") == 31);
             assert(cost.at("game_tick") == 42);
@@ -207,10 +225,12 @@ int main(int argc, char** argv) {
         }
         const auto record = nlohmann::json::parse(line.substr(marker + 19));
         assert(record.at("schema") == 1);
+        assert(record.at("host") == FRAME_TIMING_EXPECTED_HOST);
         const auto event = record.at("event").get<std::string>();
         if (event == "startup") {
             armed = record.at("enabled").get<bool>();
             assert(record.at("phase_count") == FRAME_TIMING_PHASE_COUNT);
+            assert(record.at("scope") == FRAME_TIMING_EXPECTED_SCOPE);
             assert(record.at("normal_log_level_independent").get<bool>());
         } else if (event == "state") {
             disabled = !record.at("enabled").get<bool>();
