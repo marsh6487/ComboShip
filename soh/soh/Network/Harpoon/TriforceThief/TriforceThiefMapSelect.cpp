@@ -78,6 +78,88 @@ class TriforceThiefMapSelectWindow final : public Ship::GuiWindow {
     void DrawElement() override {
     }
     void UpdateElement() override {
+        auto harpoon = Harpoon::Instance;
+        if (!harpoon || !harpoon->isConnected)
+            return;
+        if (harpoon->gameState != HARPOON_STATE_MAP_SELECT)
+            return;
+        if (harpoon->currentRoomGameMode != "triforce_thief")
+            return;
+
+        bool isHost = (harpoon->ownClientId == harpoon->hostClientId);
+
+        static HarpoonGameState sPrevState = HARPOON_STATE_LOBBY;
+        if (sPrevState != HARPOON_STATE_MAP_SELECT)
+            sTTHasVoted = false;
+        sPrevState = harpoon->gameState;
+
+        s32 localSel = harpoon->selectedMapIndex;
+        if (localSel < 0 || localSel >= kTTMapCount)
+            localSel = 0;
+
+        // Stick navigation + A to confirm/vote. Non-hosts in HOST_CHOOSES
+        // mode see the overlay (spectator view) but can't interact — only
+        // the host's cursor / A press counts.
+        bool canInteract = (harpoon->mapSelectMode != MAP_SELECT_HOST_CHOOSES) || isHost;
+        if (gPlayState != nullptr && !sTTHasVoted && canInteract) {
+            Input* input = &gPlayState->state.input[0];
+            s8 sx = input->cur.stick_x;
+            s8 sy = input->cur.stick_y;
+            if (sTTStickDebounce > 0)
+                sTTStickDebounce--;
+            if (sTTStickDebounce == 0 && (abs(sx) > 30 || abs(sy) > 30)) {
+                int col = localSel % kTTGridCols;
+                int row = localSel / kTTGridCols;
+                if (sx > 30)
+                    col = (col + 1) % kTTGridCols;
+                if (sx < -30)
+                    col = (col + kTTGridCols - 1) % kTTGridCols;
+                if (sy > 30)
+                    row = (row + kTTGridRows - 1) % kTTGridRows;
+                if (sy < -30)
+                    row = (row + 1) % kTTGridRows;
+                s32 newSel = row * kTTGridCols + col;
+                if (newSel >= kTTMapCount)
+                    newSel = kTTMapCount - 1;
+                if (newSel != harpoon->selectedMapIndex) {
+                    harpoon->selectedMapIndex = newSel;
+                    nlohmann::json env;
+                    env["type"] = "ROOM.BROADCAST_EVENT";
+                    env["event_name"] = "TRIFORCE_THIEF.MAP_HOVER";
+                    env["data"] = { { "mapIndex", newSel } };
+                    harpoon->SendJsonToRemote(env);
+                }
+                sTTStickDebounce = 9;
+            }
+            // Confirm / vote intent. Same rules as PropHunt overlay:
+            //   - Host (any mode): A press.
+            //   - Peer in EVERYONE_CHOOSES: A press alone (was A+START;
+            //     parity with PropHunt's simplified vote input).
+            //   - Peer in HOST_CHOOSES: ignored.
+            bool everyoneMode = (harpoon->mapSelectMode == MAP_SELECT_EVERYONE_CHOOSES);
+            bool aPress = CHECK_BTN_ALL(input->press.button, BTN_A);
+            bool trigger = isHost ? aPress : (everyoneMode ? aPress : false);
+            if (trigger) {
+                s32 idx = harpoon->selectedMapIndex;
+                if (everyoneMode) {
+                    sTTHasVoted = true;
+                    nlohmann::json env;
+                    env["type"] = "ROOM.BROADCAST_EVENT";
+                    env["event_name"] = "TRIFORCE_THIEF.MAP_VOTE";
+                    env["data"] = { { "mapIndex", idx } };
+                    harpoon->SendJsonToRemote(env);
+                    auto myIt = harpoon->clients.find(harpoon->ownClientId);
+                    if (myIt != harpoon->clients.end()) {
+                        myIt->second.hasVoted = true;
+                        myIt->second.mapSelectIndex = idx;
+                    }
+                } else if (isHost) {
+                    // Shared host-confirm path: applies the map locally and
+                    // broadcasts MAP_CONFIRMED + ROUND_CONFIG + TRIFORCE_SPAWN.
+                    HarpoonTriforceThief::HostConfirmMap(idx);
+                }
+            }
+        }
     }
 
     void Draw() override {
@@ -92,13 +174,7 @@ class TriforceThiefMapSelectWindow final : public Ship::GuiWindow {
         bool isHost = (harpoon->ownClientId == harpoon->hostClientId);
         // Everybody sees the overlay regardless of mode. Non-hosts in
         // HOST_CHOOSES mode can spectate the host's cursor (it broadcasts
-        // MAP_HOVER) but can't press A to confirm — the input handler at
-        // the bottom of Draw() gates the confirm on `isHost`.
-
-        static HarpoonGameState sPrevState = HARPOON_STATE_LOBBY;
-        if (sPrevState != HARPOON_STATE_MAP_SELECT)
-            sTTHasVoted = false;
-        sPrevState = harpoon->gameState;
+        // MAP_HOVER) but can't press A to confirm — UpdateElement gates the confirm on `isHost`.
 
         if (!sTTTexturesLoaded)
             LoadTTTextures();
@@ -285,70 +361,6 @@ class TriforceThiefMapSelectWindow final : public Ship::GuiWindow {
         }
 
         ImGui::End();
-
-        // Stick navigation + A to confirm/vote. Non-hosts in HOST_CHOOSES
-        // mode see the overlay (spectator view) but can't interact — only
-        // the host's cursor / A press counts.
-        bool canInteract = (harpoon->mapSelectMode != MAP_SELECT_HOST_CHOOSES) || isHost;
-        if (gPlayState != nullptr && !sTTHasVoted && canInteract) {
-            Input* input = &gPlayState->state.input[0];
-            s8 sx = input->cur.stick_x;
-            s8 sy = input->cur.stick_y;
-            if (sTTStickDebounce > 0)
-                sTTStickDebounce--;
-            if (sTTStickDebounce == 0 && (abs(sx) > 30 || abs(sy) > 30)) {
-                int col = localSel % kTTGridCols;
-                int row = localSel / kTTGridCols;
-                if (sx > 30)
-                    col = (col + 1) % kTTGridCols;
-                if (sx < -30)
-                    col = (col + kTTGridCols - 1) % kTTGridCols;
-                if (sy > 30)
-                    row = (row + kTTGridRows - 1) % kTTGridRows;
-                if (sy < -30)
-                    row = (row + 1) % kTTGridRows;
-                s32 newSel = row * kTTGridCols + col;
-                if (newSel >= kTTMapCount)
-                    newSel = kTTMapCount - 1;
-                if (newSel != harpoon->selectedMapIndex) {
-                    harpoon->selectedMapIndex = newSel;
-                    nlohmann::json env;
-                    env["type"] = "ROOM.BROADCAST_EVENT";
-                    env["event_name"] = "TRIFORCE_THIEF.MAP_HOVER";
-                    env["data"] = { { "mapIndex", newSel } };
-                    harpoon->SendJsonToRemote(env);
-                }
-                sTTStickDebounce = 9;
-            }
-            // Confirm / vote intent. Same rules as PropHunt overlay:
-            //   - Host (any mode): A press.
-            //   - Peer in EVERYONE_CHOOSES: A press alone (was A+START;
-            //     parity with PropHunt's simplified vote input).
-            //   - Peer in HOST_CHOOSES: ignored.
-            bool everyoneMode = (harpoon->mapSelectMode == MAP_SELECT_EVERYONE_CHOOSES);
-            bool aPress = CHECK_BTN_ALL(input->press.button, BTN_A);
-            bool trigger = isHost ? aPress : (everyoneMode ? aPress : false);
-            if (trigger) {
-                s32 idx = harpoon->selectedMapIndex;
-                if (everyoneMode) {
-                    sTTHasVoted = true;
-                    nlohmann::json env;
-                    env["type"] = "ROOM.BROADCAST_EVENT";
-                    env["event_name"] = "TRIFORCE_THIEF.MAP_VOTE";
-                    env["data"] = { { "mapIndex", idx } };
-                    harpoon->SendJsonToRemote(env);
-                    auto myIt = harpoon->clients.find(harpoon->ownClientId);
-                    if (myIt != harpoon->clients.end()) {
-                        myIt->second.hasVoted = true;
-                        myIt->second.mapSelectIndex = idx;
-                    }
-                } else if (isHost) {
-                    // Shared host-confirm path: applies the map locally and
-                    // broadcasts MAP_CONFIRMED + ROUND_CONFIG + TRIFORCE_SPAWN.
-                    HarpoonTriforceThief::HostConfirmMap(idx);
-                }
-            }
-        }
     }
 };
 

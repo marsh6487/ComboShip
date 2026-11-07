@@ -4,6 +4,7 @@
  * Description: Trading Post Shop
  */
 
+#include "gui/UiVisibility.h"
 #include "z_en_ossan.h"
 #include "black_market_shop_adapter.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -1769,6 +1770,10 @@ void EnOssan_Update(Actor* thisx, PlayState* play) {
 }
 
 void EnOssan_DrawCursor(PlayState* play, EnOssan* this, f32 x, f32 y, f32 z, u8 drawCursor) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 ulx;
     s32 uly;
     s32 lrx;
@@ -1800,6 +1805,10 @@ void EnOssan_DrawCursor(PlayState* play, EnOssan* this, f32 x, f32 y, f32 z, u8 
 
 void EnOssan_DrawTextRec(PlayState* play, s32 r, s32 g, s32 b, s32 a, f32 x, f32 y, f32 z, s32 s, s32 t, f32 dx,
                          f32 dy) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     f32 unk;
     s32 ulx;
     s32 uly;

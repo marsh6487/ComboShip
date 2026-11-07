@@ -29,11 +29,11 @@ remains available without clearing saved overlay visibility intent.
 
 - [x] Trace native and ImGui boundaries and draw-driven state in both hosts.
 - [x] Add shared runtime gate, toggle and passive GUI suppression with recovery.
-- [ ] Add OoT true-hidden rendering/input, preserving existing Minimal UI.
-- [ ] Port Minimal UI and true-hidden rendering/input to MM.
-- [ ] Verify state progression, one-toggle-per-press, restoration, precedence,
+- [x] Add OoT true-hidden rendering/input, preserving existing Minimal UI.
+- [x] Port Minimal UI and true-hidden rendering/input to MM.
+- [x] Verify state progression, one-toggle-per-press, restoration, precedence,
   settings access and both build guards with focused native tests and review.
-- [ ] Save an independently restored cumulative source candidate; update the
+- [x] Save an independently restored cumulative source candidate; update the
   requested combined publication authorization. No public upload or master merge.
 
 Ownership: root owns shared forwarding header, accent registry, plans/records,

@@ -1,4 +1,6 @@
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "audiomgr.h"
 #include "idle.h"
 #include "sys_cfb.h"
@@ -107,12 +109,14 @@ void GameState_Draw(GameState* gameState, GraphicsContext* gfxCtx) {
 
     CLOSE_DISPS(gfxCtx);
 
+    MmUiDrawState uiDraw = MmUiDraw_Begin(gfxCtx, UiVisibility_IsHidden());
     Debug_DrawText(gfxCtx);
 
     if (R_ENABLE_ARENA_DBG != 0) {
         SpeedMeter_DrawTimeEntries(&sGameSpeedMeter, gfxCtx);
         SpeedMeter_DrawAllocEntries(&sGameSpeedMeter, gfxCtx, gameState);
     }
+    MmUiDraw_End(gfxCtx, uiDraw);
 }
 
 void GameState_SetFrameBuffer(GraphicsContext* gfxCtx) {
@@ -152,6 +156,12 @@ void GameState_Update(GameState* gameState) {
     GraphicsContext* gfxCtx = gameState->gfxCtx;
 
     GameState_SetFrameBuffer(gameState->gfxCtx);
+
+    /* Input has already been sampled. Keep recovery available in every game
+     * state, including dialogue, pause and file select; do not consume L. */
+    if (CHECK_BTN_ALL(CONTROLLER1(gameState)->press.button, BTN_L)) {
+        UiVisibility_Toggle();
+    }
 
     GameInteractor_ExecuteOnGameStateMainStart();
 

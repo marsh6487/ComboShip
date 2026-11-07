@@ -2445,6 +2445,21 @@ void BenMenu::AddEnhancements() {
                      .Max(5)
                      .DefaultValue(5));
 
+    // UI visibility
+    path = { "Enhancements", "UI", SECTION_COLUMN_1 };
+    AddSidebarEntry("Enhancements", "UI", 1);
+    AddWidget(path, "Minimal UI", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.MinimalUI")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use L to switch between the full HUD and Minimal UI. Hearts appear when damaged and magic while in "
+            "use. Item icons, action labels and minigame feedback remain available. Pausing shows the full HUD."));
+    AddWidget(path, "True Hidden UI", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.TrueHiddenUI")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use L to hide or reveal all game UI and passive overlays, including messages and pause menus. "
+            "Takes priority over Minimal UI. Open application settings remain available; turn this off here to "
+            "return to your Minimal UI and minimap preferences."));
+
     // HUD Editor
     path = { "Enhancements", "HUD Editor", SECTION_COLUMN_1 };
     AddSidebarEntry("Enhancements", "HUD Editor", 1);

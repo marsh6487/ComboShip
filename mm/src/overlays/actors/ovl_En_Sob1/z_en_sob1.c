@@ -4,6 +4,7 @@
  * Description: Shops (Zora, Goron, and Bomb)
  */
 
+#include "gui/UiVisibility.h"
 #include "z_en_sob1.h"
 #include "objects/object_mastergolon/object_mastergolon.h"
 #include "objects/object_masterzoora/object_masterzoora.h"
@@ -1527,6 +1528,10 @@ void EnSob1_Update(Actor* thisx, PlayState* play) {
 }
 
 void EnSob1_DrawCursor(PlayState* play, EnSob1* this, f32 x, f32 y, f32 z, u8 drawCursor) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 ulx;
     s32 uly;
     s32 lrx;
@@ -1557,6 +1562,10 @@ void EnSob1_DrawCursor(PlayState* play, EnSob1* this, f32 x, f32 y, f32 z, u8 dr
 
 void EnSob1_DrawTextRec(PlayState* play, s32 r, s32 g, s32 b, s32 a, f32 x, f32 y, f32 z, s32 s, s32 t, f32 dx,
                         f32 dy) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     f32 unk;
     s32 ulx;
     s32 uly;

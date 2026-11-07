@@ -4,6 +4,7 @@
 #include "ComboTrackerBridge.h" // canonical window-type defaults
 #include "ComboForeground.h"
 #include "ComboWidgetStyle.h"
+#include "UiVisibility.h"
 #include <libultraship/libultraship.h>
 #include <ship/resource/CrossRMRegistry.h>
 #include <imgui_internal.h> // FindWindowByName / SetWindowPos / ImGuiWindow rects
@@ -201,7 +202,7 @@ int DisplayOrder(ImGuiWindow* w) {
     return -1;
 }
 
-// Logic-only window: no Begin/End, just the per-frame reconcile + peek gesture. Registered under
+// The update derives visibility even when passive drawing is suppressed. Registered under
 // a name that sorts before "Check Tracker" and "Item Tracker" (leading space) so the derived
 // visibility applies before either tracker draws the same frame.
 class SwapWindow final : public Ship::GuiWindow {
@@ -212,15 +213,14 @@ class SwapWindow final : public Ship::GuiWindow {
   protected:
     void InitElement() override {
     }
-    void UpdateElement() override {
-    }
+    void UpdateElement() override;
     void DrawElement() override {
     }
 };
 
 std::shared_ptr<SwapWindow> sSwapWindow;
 
-void SwapWindow::Draw() {
+void SwapWindow::UpdateElement() {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
         return;
@@ -229,8 +229,19 @@ void SwapWindow::Draw() {
     ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
 
     for (int k = 0; k < ComboTracker::kSwapCount; ++k) {
+        if (UiVisibility_IsHidden()) {
+            sPeeks[k] = {}; // A hidden tracker cannot retain a hold or begin a new gesture.
+        }
         Reconcile(k);
     }
+}
+
+void SwapWindow::Draw() {
+    auto ctx = Ship::Context::GetRawInstance();
+    if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+        return;
+    }
+    ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
 
     // Combined Triforce progress (#136) — neither game's own tracker can show it (each counts only
     // its own pieces). Draggable overlay; ImGui persists the position.

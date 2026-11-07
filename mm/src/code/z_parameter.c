@@ -1,5 +1,7 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "mods/combo_rpg.h"
 #include "PR/gs2dex.h"
 #include "sys_cfb.h"
@@ -4150,6 +4152,9 @@ void Interface_Dpad_LoadItemIconImpl(PlayState* play, u8 btn) {
 }
 
 void Interface_DrawAutosaveIcon(PlayState* play, uint16_t opacity) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
     s16 rectLeft = 290;
     s16 rectTop = 220;
     s16 rectWidth = 24;
@@ -6069,6 +6074,11 @@ void Interface_SetOrthoView(InterfaceContext* interfaceCtx) {
     View_ApplyOrthoToOverlay(&interfaceCtx->view);
 }
 
+static bool Interface_IsFullUi(PlayState* play) {
+    return UiVisibility_IsEnabled() || !CVarGetInteger("gEnhancements.MinimalUI", 0) || !R_MINIMAP_DISABLED ||
+           play->pauseCtx.state != PAUSE_STATE_OFF;
+}
+
 void Interface_DrawItemButtons(PlayState* play) {
     static TexturePtr sCUpLabelTextures[LANGUAGE_MAX] = {
         gTatlCUpENGTex, // LANGUAGE_JPN
@@ -6943,6 +6953,7 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
 void Interface_DrawBButtonIcons(PlayState* play) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     Player* player = GET_PLAYER(play);
+    bool fullUi = Interface_IsFullUi(play);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -6967,7 +6978,10 @@ void Interface_DrawBButtonIcons(PlayState* play) {
                 (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) != ITEM_DEKU_NUT))) {
         if ((player->transformation == PLAYER_FORM_FIERCE_DEITY) || (player->transformation == PLAYER_FORM_HUMAN)) {
             if (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) != ITEM_NONE) {
-                Interface_DrawItemIconTexture(play, interfaceCtx->iconItemSegment[EQUIP_SLOT_B], EQUIP_SLOT_B);
+                if (fullUi || PLAYER_ON_REAL_HORSE(player) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
+                    play->bButtonAmmoPlusOne >= 2) {
+                    Interface_DrawItemIconTexture(play, interfaceCtx->iconItemSegment[EQUIP_SLOT_B], EQUIP_SLOT_B);
+                }
                 if (PLAYER_ON_REAL_HORSE(player) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
                     (play->bButtonAmmoPlusOne >= 2)) {
                     gDPPipeSync(OVERLAY_DISP++);
@@ -7235,20 +7249,22 @@ void Interface_DrawAButton(PlayState* play) {
     Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
     Matrix_RotateXFApply(interfaceCtx->aButtonRoll / 10000.0f);
 
-    // Draw A button Shadow
-    MATRIX_FINALIZE_AND_LOAD(OVERLAY_DISP++, play->state.gfxCtx);
-    gDPPipeSync(OVERLAY_DISP++);
-    gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[4], 4, 0);
-    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, aAlpha);
+    if (Interface_IsFullUi(play)) {
+        // Draw A button Shadow
+        MATRIX_FINALIZE_AND_LOAD(OVERLAY_DISP++, play->state.gfxCtx);
+        gDPPipeSync(OVERLAY_DISP++);
+        gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[4], 4, 0);
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, aAlpha);
 
-    OVERLAY_DISP = Gfx_DrawTexQuadIA8(OVERLAY_DISP, gButtonBackgroundTex, 32, 32, 0);
+        OVERLAY_DISP = Gfx_DrawTexQuadIA8(OVERLAY_DISP, gButtonBackgroundTex, 32, 32, 0);
 
-    // Draw A Button Colored
-    gDPPipeSync(OVERLAY_DISP++);
-    Interface_SetPerspectiveView(play, 23 + R_A_BTN_Y_OFFSET, 68 + R_A_BTN_Y_OFFSET, 190, 235);
-    gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[0], 4, 0);
-    gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 100, 200, 255, interfaceCtx->aAlpha, COSMETIC_ID("Buttons.A"));
-    gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+        // Draw A Button Colored
+        gDPPipeSync(OVERLAY_DISP++);
+        Interface_SetPerspectiveView(play, 23 + R_A_BTN_Y_OFFSET, 68 + R_A_BTN_Y_OFFSET, 190, 235);
+        gSPVertex(OVERLAY_DISP++, &interfaceCtx->actionVtx[0], 4, 0);
+        gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 100, 200, 255, interfaceCtx->aAlpha, COSMETIC_ID("Buttons.A"));
+        gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+    }
 
     // Draw A Button Do-Action
     gDPPipeSync(OVERLAY_DISP++);
@@ -9562,6 +9578,8 @@ void Interface_Draw(PlayState* play) {
     f32 minigameCountdownScale;
     s16 counterDigits[RUPEE_COUNTER_MAX_DIGITS];
     s16 magicAlpha;
+    bool fullUi = Interface_IsFullUi(play);
+    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -9618,12 +9636,15 @@ void Interface_Draw(PlayState* play) {
                                  SCREEN_HEIGHT);
         }
 
-        LifeMeter_Draw(play);
+        if (fullUi ||
+            gSaveContext.save.saveInfo.playerData.health != gSaveContext.save.saveInfo.playerData.healthCapacity) {
+            LifeMeter_Draw(play);
+        }
 
         Gfx_SetupDL39_Overlay(play->state.gfxCtx);
 
         // Draw Rupee Icon
-        if (GameInteractor_Should(VB_DRAW_RUPEE_ICON, true)) {
+        if (fullUi && GameInteractor_Should(VB_DRAW_RUPEE_ICON, true)) {
             gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, sRupeeCounterIconPrimColors[CUR_UPG_VALUE(UPG_WALLET)].r,
                                     sRupeeCounterIconPrimColors[CUR_UPG_VALUE(UPG_WALLET)].g,
                                     sRupeeCounterIconPrimColors[CUR_UPG_VALUE(UPG_WALLET)].b, interfaceCtx->magicAlpha,
@@ -9636,7 +9657,7 @@ void Interface_Draw(PlayState* play) {
                 Gfx_DrawTexRectIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16, 1 << 10, 1 << 10);
         }
 
-        switch (play->sceneId) {
+        switch (fullUi ? play->sceneId : -1) {
             case SCENE_INISIE_N:
             case SCENE_INISIE_R:
             case SCENE_MITURIN:
@@ -9873,7 +9894,7 @@ void Interface_Draw(PlayState* play) {
         gDPSetCombineLERP(OVERLAY_DISP++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, TEXEL0, 0,
                           PRIMITIVE, 0);
 
-        if (GameInteractor_Should(VB_DRAW_RUPEE_COUNTER, true)) {
+        if (fullUi && GameInteractor_Should(VB_DRAW_RUPEE_COUNTER, true)) {
             sp2CC = 0;
             sp2C8 = RupeeCounter_BuildDigits(gSaveContext.save.saveInfo.playerData.rupees,
                                              CUR_UPG_VALUE(UPG_WALLET) == 0 ? 2 : 3, counterDigits);
@@ -9932,7 +9953,9 @@ void Interface_Draw(PlayState* play) {
             }
         }
 
-        Magic_DrawMeter(play);
+        if (fullUi || gSaveContext.magicState > MAGIC_STATE_IDLE) {
+            Magic_DrawMeter(play);
+        }
         Map_DrawMinimap(play);
 
         if ((R_PAUSE_BG_PRERENDER_STATE != 2) && (R_PAUSE_BG_PRERENDER_STATE != 3)) {
@@ -9949,7 +9972,9 @@ void Interface_Draw(PlayState* play) {
 
         Gfx_SetupDL39_Overlay(play->state.gfxCtx);
 
-        Interface_DrawItemButtons(play);
+        if (fullUi) {
+            Interface_DrawItemButtons(play);
+        }
 
         if (player->transformation == GET_PLAYER_FORM) {
             Interface_DrawBButtonIcons(play);
@@ -10118,6 +10143,11 @@ void Interface_Draw(PlayState* play) {
         }
     }
 
+    CLOSE_DISPS(play->state.gfxCtx);
+    MmUiDraw_End(play->state.gfxCtx, uiDraw);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    // Keep the native whole-screen gameover fade separate from UI visibility.
     // Draw over the entire screen (used in gameover)
     if (interfaceCtx->screenFillAlpha != 0) {
         gDPPipeSync(OVERLAY_DISP++);

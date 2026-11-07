@@ -17,6 +17,7 @@
  */
 
 #include <string.h>
+#include "../../../combo/gui/UiVisibility.h"
 #include <math.h>
 #include <cstdio>
 #include <vector>
@@ -3646,7 +3647,7 @@ extern "C" void PikachuForm_Draw(PlayState* play, Player* player) {
     }
 
     // ── Pokemon-style textbox (full-width dark bar, white text) ──
-    if (sPika.giantTextTimer > 0) {
+    if (sPika.giantTextTimer > 0 && !UiVisibility_IsHidden()) {
         OPEN_DISPS(play->state.gfxCtx);
 
         s32 alpha = 200;

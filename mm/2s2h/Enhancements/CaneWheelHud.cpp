@@ -19,6 +19,7 @@
 // through the Cane_* accessors. Skijer's NEI
 // =============================================================================
 
+#include "gui/UiVisibility.h"
 #include <imgui.h>
 #include <algorithm>
 #include <cmath>
@@ -188,6 +189,10 @@ class CaneWheelHudWindow final : public Ship::GuiWindow {
 };
 
 void CaneWheelHudWindow::Draw() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     const bool wheel = Cane_IsWheelOpen() != 0;
     const bool aiming = Cane_IsAiming() != 0;
     if (!wheel && !aiming) {

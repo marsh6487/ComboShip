@@ -1,4 +1,5 @@
 #include "rando/CrossEntranceBoss.h"
+#include "ui_visibility.h"
 #include "z_en_ossan.h"
 #include "vt.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -2338,6 +2339,10 @@ s32 EnOssan_OverrideLimbDrawDefaultShopkeeper(PlayState* play, s32 limbIndex, Gf
 }
 
 void EnOssan_DrawCursor(PlayState* play, EnOssan* this, f32 x, f32 y, f32 z, u8 drawCursor) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 ulx, uly, lrx, lry;
     f32 w;
     s32 dsdx;
@@ -2362,6 +2367,10 @@ void EnOssan_DrawCursor(PlayState* play, EnOssan* this, f32 x, f32 y, f32 z, u8 
 
 void EnOssan_DrawTextRec(PlayState* play, s32 r, s32 g, s32 b, s32 a, f32 x, f32 y, f32 z, s32 s, s32 t, f32 dx,
                          f32 dy) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     f32 unk;
     s32 ulx, uly, lrx, lry;
     f32 w, h;
@@ -2386,6 +2395,10 @@ void EnOssan_DrawTextRec(PlayState* play, s32 r, s32 g, s32 b, s32 a, f32 x, f32
 }
 
 void EnOssan_DrawStickDirectionPrompts(PlayState* play, EnOssan* this) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 drawStickLeftPrompt = this->stickLeftPrompt.isEnabled;
     s32 drawStickRightPrompt = this->stickRightPrompt.isEnabled;
 

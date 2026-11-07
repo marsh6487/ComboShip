@@ -1,3 +1,4 @@
+#include "gui/UiVisibility.h"
 /**
  * box_menu.c — generic hold-button "boxed icon row" selector (Skijer's NEI).
  *
@@ -309,7 +310,7 @@ void BoxMenu_Draw(PlayState* play) {
     u8 curB;
 
     BoxMenu_DrawSeasonFlash(play);
-    if (!sBoxMOpen || sBoxMCount <= 0) {
+    if (UiVisibility_IsHidden() || !sBoxMOpen || sBoxMCount <= 0) {
         return;
     }
 

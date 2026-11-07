@@ -242,7 +242,7 @@ ImU32 ChargeColor(int phase, float charge) {
 
 // GuiWindow whose Draw() runs during the Gui frame (before ImGui::Render), so
 // our foreground-drawlist draws actually render. All gating + drawing lives in
-// Draw(); the Element overrides are unused.
+// Draw(); UpdateElement keeps the HP notification clock alive when rendering is hidden.
 class Sm64CapsHudWindow final : public Ship::GuiWindow {
   public:
     using GuiWindow::GuiWindow;
@@ -250,10 +250,37 @@ class Sm64CapsHudWindow final : public Ship::GuiWindow {
     }
     void DrawElement() override {
     }
-    void UpdateElement() override {
-    }
+    void UpdateElement() override;
     void Draw() override;
+
+  private:
+    int previousWedges = -1;
+    float showTimeLeft = 0.0f;
+    bool healthInitialized = false;
 };
+
+void Sm64CapsHudWindow::UpdateElement() {
+    if (!CVarGetInteger("gSm64Mario", 0) || gPlayState == nullptr || gPlayState->pauseCtx.state != 0 ||
+        ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+    auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+    if (gui->GetMenuOrMenubarVisible()) {
+        return;
+    }
+    int wedges = Sm64Mario_GetHealthWedges();
+    if (!healthInitialized) {
+        previousWedges = wedges;
+        healthInitialized = true;
+    }
+    if (wedges != previousWedges) {
+        showTimeLeft = 3.0f;
+        previousWedges = wedges;
+    }
+    if (showTimeLeft > 0.0f) {
+        showTimeLeft -= ImGui::GetIO().DeltaTime;
+    }
+}
 
 void Sm64CapsHudWindow::Draw() {
     if (!CVarGetInteger("gSm64Mario", 0)) {
@@ -313,23 +340,8 @@ void Sm64CapsHudWindow::Draw() {
     // seconds. State persists across frames; timed off ImGui delta-time so it's
     // framerate-independent.
     {
-        static int sPrevWedges = -1;
-        static float sShowTimeLeft = 0.0f; // seconds remaining visible
-        static bool sInit = false;
-
-        int wedges = Sm64Mario_GetHealthWedges(); // Mario's own 0..8 segments
-        if (!sInit) {
-            sPrevWedges = wedges;
-            sInit = true;
-        }
-        if (wedges != sPrevWedges) {
-            sShowTimeLeft = 3.0f; // show for 3s after a change
-            sPrevWedges = wedges;
-        }
-
-        if (sShowTimeLeft > 0.0f) {
-            sShowTimeLeft -= ImGui::GetIO().DeltaTime;
-
+        int wedges = Sm64Mario_GetHealthWedges();
+        if (showTimeLeft > 0.0f) {
             // GET_PLAYER lives in macros.h (not included here) — inline it.
             Player* player =
                 (gPlayState != nullptr) ? (Player*)gPlayState->actorCtx.actorLists[ACTORCAT_PLAYER].head : nullptr;
@@ -354,7 +366,7 @@ void Sm64CapsHudWindow::Draw() {
                             float wpx = nat.x * k;
                             float hpx = nat.y * k;
                             // Fade out over the last 0.6s.
-                            float a = (sShowTimeLeft < 0.6f) ? (sShowTimeLeft / 0.6f) : 1.0f;
+                            float a = (showTimeLeft < 0.6f) ? (showTimeLeft / 0.6f) : 1.0f;
                             if (a < 0.0f) {
                                 a = 0.0f;
                             }

@@ -5,6 +5,8 @@
  */
 
 #include "z_file_select.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "overlays/gamestates/ovl_opening/z_opening.h"
 #include "z64rumble.h"
 #include "z64save.h"
@@ -2467,6 +2469,7 @@ void FileSelect_Main(GameState* thisx) {
 
     FrameInterpolation_StartRecord();
     FileSelect_UpdateAndDrawSkybox(this);
+    MmUiDrawState uiDraw = MmUiDraw_Begin(this->state.gfxCtx, UiVisibility_IsHidden());
     gFileSelectDrawFuncs[this->menuMode](&this->state);
     FrameInterpolation_StopRecord();
 
@@ -2494,6 +2497,7 @@ void FileSelect_Main(GameState* thisx) {
                         1 << 10, 1 << 10);
 
     gDPPipeSync(POLY_OPA_DISP++);
+    MmUiDraw_End(this->state.gfxCtx, uiDraw);
     gSPDisplayList(POLY_OPA_DISP++, sScreenFillSetupDL);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 0, 0, 0, this->screenFillAlpha);
     gSPDisplayList(POLY_OPA_DISP++, D_0E000000_TO_SEGMENTED(fillRect));

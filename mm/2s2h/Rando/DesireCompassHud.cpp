@@ -13,6 +13,7 @@
 // (same constraint as expansions/sm64/Sm64CapsHud.cpp).
 // =============================================================================
 
+#include "gui/UiVisibility.h"
 #include "2s2h/Rando/DesireCompass.h"
 
 #include <imgui.h>
@@ -152,6 +153,10 @@ class DesireCompassHudWindow final : public Ship::GuiWindow {
 };
 
 void DesireCompassHudWindow::Draw() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     if (gPlayState == nullptr) {
         return;
     }

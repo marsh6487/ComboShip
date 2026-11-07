@@ -5,6 +5,8 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "mods/extended_inventory.h"
 #include "sword_element_kaleido.h"
 #include "z64map.h"
@@ -3335,6 +3337,7 @@ void KaleidoScope_Draw(PlayState* play) {
     s32 pad;
     PauseContext* pauseCtx = &play->pauseCtx;
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -3404,6 +3407,7 @@ void KaleidoScope_Draw(PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    MmUiDraw_End(play->state.gfxCtx, uiDraw);
 }
 
 void KaleidoScope_GrayOutTextureRGBA32(u32* texture, u16 pixelCount) {

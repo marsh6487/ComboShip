@@ -1,4 +1,5 @@
 #include "../../../combo/emotes/EmoteBridge.h"
+#include "ui_visibility.h"
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "mods/items/helpers/timestop_helper.h"
@@ -1478,6 +1479,7 @@ skip:
 }
 
 void Play_DrawOverlayElements(PlayState* play) {
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     if ((play->pauseCtx.state != 0) || (play->pauseCtx.debugState != 0)) {
         if (!BoxMenu_IsOpen() && !gCustomItemState.minishCapWarpMode && !gCustomItemState.postmanHatWarpMode &&
             !MmMaskWear_IsGreatFairyWarpActive()) {
@@ -1485,18 +1487,25 @@ void Play_DrawOverlayElements(PlayState* play) {
         }
     }
 
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
+
     if (gSaveContext.gameMode == GAMEMODE_NORMAL) {
+        // Interface_Draw retains its native scene fade outside its own HUD scope.
         Interface_Draw(play);
     }
 
+    uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     Message_Draw(play);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 
     if (play->gameOverCtx.state != GAMEOVER_INACTIVE) {
         GameOver_FadeInLights(play);
     }
 
-    // Great Fairy Mask teleport menu overlay
+    // Fairy orbit and Giant's Mask flash are warp/world effects.
     MmMaskWear_DrawOverlay(play);
+
+    uiScope = OotUi_BeginDraw(play->state.gfxCtx);
 
     // Minish Cap warp overlay — drawn last on OVERLAY_DISP so it covers HUD
     if (gCustomItemState.minishCapWarpMode) {
@@ -1507,6 +1516,7 @@ void Play_DrawOverlayElements(PlayState* play) {
 
     // Generic box selector — drawn after everything else so it sits on top. Skijer's NEI
     BoxMenu_Draw(play);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }
 
 void Play_Draw(PlayState* play) {
@@ -1845,7 +1855,9 @@ void Play_Draw(PlayState* play) {
         drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(93) != 0)) {
+            OotUiDrawScope diagnostics = OotUi_BeginDraw(play->state.gfxCtx);
             DebugDisplay_DrawObjects(play);
+            OotUi_EndDraw(play->state.gfxCtx, diagnostics);
         }
 
         FrameTiming_EndNamedSpan("play_draw", "debug_objects", drawPhase);

@@ -1,3 +1,4 @@
+#include "gui/UiVisibility.h"
 /**
  * z_en_oe2.c - Kokiri / Goron NPC actor for SW97
  *
@@ -1089,7 +1090,7 @@ void EnOE2_Draw(Actor* thisx, PlayState* play) {
     func_80093C80(play);
     func_80093D84(play->state.gfxCtx);
 
-    if (this->drawFlags & OE2_DRAWFLAG_DEBUG) {
+    if ((this->drawFlags & OE2_DRAWFLAG_DEBUG) && !UiVisibility_IsHidden()) {
 
         newDList = Graph_GfxPlusOne(polyOpaP = POLY_OPA_DISP);
         gSPDisplayList(OVERLAY_DISP++, newDList);

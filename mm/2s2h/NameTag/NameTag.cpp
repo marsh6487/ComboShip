@@ -1,3 +1,4 @@
+#include "gui/UiVisibility.h"
 #include "NameTag.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <vector>
@@ -148,6 +149,10 @@ void DrawNameTag(PlayState* play, const NameTag* nameTag) {
 
 // Draw all the name tags by leveraging a system heap buffer for majority of the graphics commands
 void DrawNameTags() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     if (gPlayState == nullptr || nameTags.size() == 0) {
         return;
     }

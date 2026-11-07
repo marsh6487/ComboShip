@@ -5,6 +5,7 @@
  */
 
 #include "global.h"
+#include "ui_visibility.h"
 #include "alloca.h"
 #include "textures/nintendo_rogo_static/nintendo_rogo_static.h"
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
@@ -71,6 +72,7 @@ void Title_Draw(TitleContext* this) {
     s32 pad2[2];
 
     OPEN_DISPS(this->state.gfxCtx);
+    OotUiDrawScope uiScope = OotUi_BeginDraw(this->state.gfxCtx);
 
     v3.x = 69;
     v3.y = 69;
@@ -115,6 +117,7 @@ void Title_Draw(TitleContext* this) {
         gSPTextureRectangle(POLY_OPA_DISP++, 388, y << 2, 1156, (y + 2) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
     }
 
+    OotUi_EndDraw(this->state.gfxCtx, uiScope);
     Environment_FillScreen(this->state.gfxCtx, 0, 0, 0, (s16)this->coverAlpha, FILL_SCREEN_XLU);
 
     sTitleRotY += 300;

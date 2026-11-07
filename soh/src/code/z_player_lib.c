@@ -1,4 +1,5 @@
 #include "global.h"
+#include "ui_visibility.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
 #include "../../../combo/render/sword_element_aura_identity.h"
@@ -2563,6 +2564,10 @@ void Player_FDMeleeWeaponPostLimb(PlayState* play, Player* this) {
 }
 
 void Player_DrawHookshotReticle(PlayState* play, Player* this, f32 hookshotRange) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     static Vec3f D_801260C8 = { -500.0f, -100.0f, 0.0f };
     CollisionPoly* colPoly;
     s32 bgId;

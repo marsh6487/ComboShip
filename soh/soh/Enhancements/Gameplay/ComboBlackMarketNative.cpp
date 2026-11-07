@@ -1,5 +1,6 @@
 #ifdef COMBO_BUILD
 #include "gameplay/CrossGameTitleCard.h"
+#include "../../../../combo/gui/UiVisibility.h"
 #include "ComboBlackMarketNative.h"
 #include "ComboBlackMarketItems.h"
 #include "ComboGameMode.h"
@@ -1002,7 +1003,9 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>([] {
         RestoreRoomMagic();
         DrawMarket();
-        DrawBrowseCursor();
+        if (!UiVisibility_IsHidden()) {
+            DrawBrowseCursor();
+        }
         DrawExterior();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {

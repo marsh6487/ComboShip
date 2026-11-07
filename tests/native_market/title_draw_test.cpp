@@ -1,6 +1,8 @@
 // Real market presentation, native update/draw and GBI command expansion run.
 // Resource availability, GPU setup, frame recording and cosmetics are boundaries.
 #include "global.h"
+#include "gui/UiVisibility.h"
+extern "C" int UiVisibility_IsHidden(void) { return 0; }
 #include "gameplay/CrossGameTitleCard.h"
 #ifdef OOT_TITLE_DRAW_TEST
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"

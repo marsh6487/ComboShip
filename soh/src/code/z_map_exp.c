@@ -1,4 +1,5 @@
 #include "global.h"
+#include "ui_visibility.h"
 #include "vt.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "textures/parameter_static/parameter_static.h"
@@ -821,7 +822,8 @@ void Minimap_Draw(PlayState* play) {
             case SCENE_SHADOW_TEMPLE:
             case SCENE_BOTTOM_OF_THE_WELL:
             case SCENE_ICE_CAVERN:
-                if (!R_MINIMAP_DISABLED && CVarGetInteger(CVAR_COSMETIC("HUD.Minimap.PosType"), 0) != HIDDEN) {
+                if ((!R_MINIMAP_DISABLED || UiVisibility_IsEnabled()) &&
+                    CVarGetInteger(CVAR_COSMETIC("HUD.Minimap.PosType"), 0) != HIDDEN) {
                     Gfx_SetupDL_39Overlay(play->state.gfxCtx);
                     gDPSetCombineLERP(OVERLAY_DISP++, 1, 0, PRIMITIVE, 0, TEXEL0, 0, PRIMITIVE, 0, 1, 0, PRIMITIVE, 0,
                                       TEXEL0, 0, PRIMITIVE, 0);
@@ -879,7 +881,7 @@ void Minimap_Draw(PlayState* play) {
                 }
 
                 if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_L) && !Play_InCsMode(play) &&
-                    enableMapToggle) {
+                    enableMapToggle && !UiVisibility_IsEnabled()) {
                     osSyncPrintf("Game_play_demo_mode_check=%d\n", Play_InCsMode(play));
                     // clang-format off
                     if (!R_MINIMAP_DISABLED) { Audio_PlaySfxGeneral(NA_SE_SY_CAMERA_ZOOM_UP, &gSfxDefaultPos, 4,
@@ -911,7 +913,8 @@ void Minimap_Draw(PlayState* play) {
             case SCENE_GORON_CITY:
             case SCENE_LON_LON_RANCH:
             case SCENE_OUTSIDE_GANONS_CASTLE:
-                if (!R_MINIMAP_DISABLED && CVarGetInteger(CVAR_COSMETIC("HUD.Minimap.PosType"), 0) != 4) { // Not Hidden
+                if ((!R_MINIMAP_DISABLED || UiVisibility_IsEnabled()) &&
+                    CVarGetInteger(CVAR_COSMETIC("HUD.Minimap.PosType"), 0) != 4) { // Not Hidden
                     Gfx_SetupDL_39Overlay(play->state.gfxCtx);
 
                     gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
@@ -1072,7 +1075,7 @@ void Minimap_Draw(PlayState* play) {
                 }
 
                 if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_L) && !Play_InCsMode(play) &&
-                    enableMapToggle) {
+                    enableMapToggle && !UiVisibility_IsEnabled()) {
                     // clang-format off
                     if (!R_MINIMAP_DISABLED) { Audio_PlaySfxGeneral(NA_SE_SY_CAMERA_ZOOM_UP, &gSfxDefaultPos, 4,
                                                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb); }

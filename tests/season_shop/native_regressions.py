@@ -264,7 +264,7 @@ def market(root, host):
     functions += prefix(elf, 'void EnElf_Draw(Actor* thisx, PlayState* play) {',
                         '    if ((this->unk_2A8' if oot else '    if (player->currentMask', '++bodyDraws;') + '\n'
     draw_marker = 'void Attention_Draw(TargetContext* targetCtx, PlayState* play) {' if oot else 'void Attention_Draw(Attention* attention, PlayState* play) {'
-    functions += prefix(actor, draw_marker, '    OPEN_DISPS(' if oot else '    if (player->stateFlags1 &', '++attentionDraws;') + '\n'
+    functions += prefix(actor, draw_marker, '    OotUiDrawScope ' if oot else '    if (player->stateFlags1 &', '++attentionDraws;') + '\n'
     functions += block(actor, 'Actor* Attention_FindActor(' if oot else 'void Attention_FindActor(') + '\n'
     functions += '\n'.join(block(actor, m) for m in ('s32 Actor_OfferTalkExchange(', 's32 Actor_OfferTalkExchangeEquiCylinder(', 's32 Actor_OfferTalk('))
     defines = r'''

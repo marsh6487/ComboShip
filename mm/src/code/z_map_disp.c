@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gui/UiVisibility.h"
 #include "gfx.h"
 #include "assets/interface/icon_item_dungeon_static/icon_item_dungeon_static.h"
 #include "assets/interface/parameter_static/parameter_static.h"
@@ -1386,8 +1387,8 @@ void MapDisp_DrawMinimap(PlayState* play, s32 playerInitX, s32 playerInitZ, s32 
     }
     // #endregion
 
-    if ((sMapDisp.mapDataScene != NULL) && ((s32)pauseCtx->state <= PAUSE_STATE_OPENING_2) && !R_MINIMAP_DISABLED &&
-        (play->interfaceCtx.minimapAlpha != 0)) {
+    if ((sMapDisp.mapDataScene != NULL) && ((s32)pauseCtx->state <= PAUSE_STATE_OPENING_2) &&
+        (!R_MINIMAP_DISABLED || UiVisibility_IsEnabled()) && (play->interfaceCtx.minimapAlpha != 0)) {
         if (!MapDisp_IsLocationMinimapBlocked(play) && (sSceneNumRooms != 0)) {
             if (MapDisp_CanDisplayMinimap(play)) {
                 MapDisp_DrawMinimapRoom(play, sMapDisp.minimapCurTex, sMapDisp.minimapCurX, sMapDisp.minimapCurY,

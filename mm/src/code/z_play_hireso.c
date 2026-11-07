@@ -1,4 +1,6 @@
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "sys_cfb.h"
 #include "z64bombers_notebook.h"
 #include "z64malloc.h"
@@ -1070,6 +1072,7 @@ void BombersNotebook_DrawArrows(BombersNotebook* this, Gfx** gfxP) {
 void BombersNotebook_Draw(BombersNotebook* this, GraphicsContext* gfxCtx) {
     Gfx* gfx;
     s32 pad[2];
+    MmUiDrawState uiDraw = MmUiDraw_Begin(gfxCtx, UiVisibility_IsHidden());
 
     func_8012CF0C(gfxCtx, this->loadState != BOMBERS_NOTEBOOK_LOAD_STATE_DONE, false, 0, 0, 0);
 
@@ -1118,6 +1121,7 @@ void BombersNotebook_Draw(BombersNotebook* this, GraphicsContext* gfxCtx) {
     POLY_OPA_DISP = gfx;
 
     CLOSE_DISPS(gfxCtx);
+    MmUiDraw_End(gfxCtx, uiDraw);
 }
 
 void BombersNotebook_LoadFiles(BombersNotebook* this, s32 flag) {

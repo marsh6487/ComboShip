@@ -1,6 +1,8 @@
 #include "global.h"
+#include "ui_visibility.h"
 
 void FlagSet_Update(PlayState* play) {
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     static s32 entryIdx = 0;
     static u32 curBit = 0;
     static s32 timer = 0;
@@ -149,4 +151,5 @@ void FlagSet_Update(PlayState* play) {
     }
 
     CLOSE_DISPS(gfxCtx);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }

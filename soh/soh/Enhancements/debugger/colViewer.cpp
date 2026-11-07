@@ -1,4 +1,5 @@
 #include <ship/window/Window.h>
+#include "../../../../combo/gui/UiVisibility.h"
 
 #include "colViewer.h"
 #include "soh/SohGui/UIWidgets.hpp"
@@ -752,6 +753,10 @@ template <typename T> size_t ResetVector(T& vec) {
 }
 
 extern "C" void DrawColViewer() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     if (gPlayState == nullptr) {
         return;
     }

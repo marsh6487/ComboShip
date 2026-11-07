@@ -4,6 +4,7 @@
  * Description: Curiosity Shop Man
  */
 
+#include "gui/UiVisibility.h"
 #include "z_en_fsn.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -1552,6 +1553,10 @@ void EnFsn_Update(Actor* thisx, PlayState* play) {
 }
 
 void EnFsn_DrawCursor(EnFsn* this, PlayState* play, f32 x, f32 y, f32 z, u8 drawCursor) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 ulx;
     s32 uly;
     s32 lrx;
@@ -1581,6 +1586,10 @@ void EnFsn_DrawCursor(EnFsn* this, PlayState* play, f32 x, f32 y, f32 z, u8 draw
 }
 
 void EnFsn_DrawTextRec(PlayState* play, s32 r, s32 g, s32 b, s32 a, f32 x, f32 y, f32 z, s32 s, s32 t, f32 dx, f32 dy) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     f32 unk;
     s32 ulx;
     s32 uly;

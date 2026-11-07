@@ -1,5 +1,6 @@
 // Adapted from Skijer/Shipwright abf41181d690643f74ab72926840918b15fbba3e; native host, no external loader.
 #include <stdbool.h>
+#include "ui_visibility.h"
 #include <string.h>
 #include <math.h>
 #include "functions.h"
@@ -259,6 +260,10 @@ void Partners_Reset(void) {
 }
 
 void Partners_DrawHint(void) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     PlayState* play = gPlayState;
     if (sActive < 0 || !play || play->pauseCtx.state)
         return;

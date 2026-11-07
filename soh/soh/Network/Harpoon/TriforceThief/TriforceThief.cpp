@@ -1,4 +1,5 @@
 #include "TriforceThief.h"
+#include "../../../../../combo/gui/UiVisibility.h"
 #include "../Harpoon.h"
 
 #include <libultraship/libultraship.h>
@@ -1747,7 +1748,18 @@ nlohmann::json BuildCutsceneBeginPayload(f32 triforceX, f32 triforceY, f32 trifo
 // Caller gates by active gamemode.
 // ---------------------------------------------------------------------------
 
+void TickHud() {
+    // Advance the visual flash even when the host suppresses the HUD window.
+    if (sLocal.preRoundCountdownFrames <= 0 && sLocal.goFlashFrames > 0) {
+        --sLocal.goFlashFrames;
+    }
+}
+
 void DrawHud() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     // --- Centered team-timer overlay (Mario Kart Shine Thief style) ---
     // Two compact MM:SS displays at top-center: red on the left, blue on
     // the right, with a small Triforce shape between them. Rendered with
@@ -1991,9 +2003,9 @@ void DrawHud() {
         fg->AddText(font, font->FontSize * scale, ImVec2(px, py), IM_COL32(255, 215, 0, 255), label);
     } else if (sLocal.goFlashFrames > 0) {
         // One-shot "GO!" flash. Armed by TickFrame when the countdown hits
-        // 0; decremented here each frame until it reaches 0 and the flash
+        // 0; decremented by TickHud each frame until it reaches 0 and the flash
         // disappears for the rest of the round.
-        sLocal.goFlashFrames--;
+
         auto vp = ImGui::GetMainViewport();
         ImDrawList* fg = ImGui::GetForegroundDrawList(vp);
         ImFont* font = ImGui::GetFont();

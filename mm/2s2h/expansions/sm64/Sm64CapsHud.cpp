@@ -210,8 +210,32 @@ class Sm64CapsHudWindow final : public Ship::GuiWindow {
     void DrawElement() override {
     }
     void UpdateElement() override {
+        if (!CVarGetInteger("gSm64Mario", 0) || gPlayState == nullptr || gPlayState->pauseCtx.state != 0 ||
+            ImGui::GetCurrentContext() == nullptr) {
+            return;
+        }
+        auto context = Ship::Context::GetRawInstance();
+        if (context == nullptr || context->GetWindow() == nullptr) {
+            return;
+        }
+        auto gui = context->GetWindow()->GetGui();
+        if (gui == nullptr || gui->GetMenuOrMenubarVisible()) {
+            return;
+        }
+        const int wedges = Sm64Mario_GetHealthWedges();
+        if (mPreviousHealthWedges >= 0 && wedges != mPreviousHealthWedges) {
+            mHealthDisplayTime = 3.0f;
+        }
+        mPreviousHealthWedges = wedges;
+        if (mHealthDisplayTime > 0.0f) {
+            mHealthDisplayTime -= ImGui::GetIO().DeltaTime;
+        }
     }
     void Draw() override;
+
+  private:
+    int mPreviousHealthWedges = -1;
+    float mHealthDisplayTime = 0.0f;
 };
 
 void Sm64CapsHudWindow::Draw() {
@@ -273,22 +297,8 @@ void Sm64CapsHudWindow::Draw() {
     // seconds. State persists across frames; timed off ImGui delta-time so it's
     // framerate-independent.
     {
-        static int sPrevWedges = -1;
-        static float sShowTimeLeft = 0.0f; // seconds remaining visible
-        static bool sInit = false;
-
-        int wedges = Sm64Mario_GetHealthWedges(); // Mario's own 0..8 segments
-        if (!sInit) {
-            sPrevWedges = wedges;
-            sInit = true;
-        }
-        if (wedges != sPrevWedges) {
-            sShowTimeLeft = 3.0f; // show for 3s after a change
-            sPrevWedges = wedges;
-        }
-
-        if (sShowTimeLeft > 0.0f) {
-            sShowTimeLeft -= ImGui::GetIO().DeltaTime;
+        const int wedges = Sm64Mario_GetHealthWedges(); // Mario's own 0..8 segments
+        if (mHealthDisplayTime > 0.0f) {
 
             // GET_PLAYER lives in macros.h (not included here) — inline it.
             Player* player =
@@ -314,7 +324,7 @@ void Sm64CapsHudWindow::Draw() {
                             float wpx = nat.x * k;
                             float hpx = nat.y * k;
                             // Fade out over the last 0.6s.
-                            float a = (sShowTimeLeft < 0.6f) ? (sShowTimeLeft / 0.6f) : 1.0f;
+                            float a = (mHealthDisplayTime < 0.6f) ? (mHealthDisplayTime / 0.6f) : 1.0f;
                             if (a < 0.0f) {
                                 a = 0.0f;
                             }

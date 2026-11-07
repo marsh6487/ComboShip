@@ -9,6 +9,7 @@
 // gives the ID3D11Device that ImGui renders with. We only need it once, then cache it.
 
 #include "FleetShipCombo.h"
+#include "../../../combo/gui/UiVisibility.h"
 
 #include <libultraship/libultraship.h>
 #include <libultraship/bridge.h>
@@ -240,6 +241,10 @@ void CopyUiFrameLocked() {
 // looks STALE (2ship stopped publishing: mid-load, killed, or overlay disabled on its side) so
 // a frozen ghost UI never lingers on screen.
 void DrawUiOverlay(ImDrawList* fg, ImGuiViewport* vp) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     static unsigned int sLastUiFrame = 0;
     static int sUiStall = 0;
     unsigned long long handle = 0;

@@ -167,7 +167,7 @@ struct LocalState {
     u8 savedWalkSpeedToggle = 0;   // user's prior global toggle state
 
     // One-shot "GO!" flash counter. Set to 20 (1 sec at 20 fps) when the
-    // pre-round countdown reaches 0; decremented in DrawHud each frame.
+    // pre-round countdown reaches 0; decremented in TickHud each GUI update.
     // Once it hits 0, never re-arms during the same round.
     s32 goFlashFrames = 0;
 
@@ -355,6 +355,7 @@ void OnSceneLoaded();
 // info when in TT mode.
 // ---------------------------------------------------------------------------
 
+void TickHud();
 void DrawHud();
 
 // ---------------------------------------------------------------------------
