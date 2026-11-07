@@ -19,6 +19,10 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.TrueHiddenUI", Kind::New,
+      "Use L to hide every game UI element and passive overlay. Open application settings remain available." },
+    { "gEnhancements.MinimalUI", Kind::Updated,
+      "Minimal UI is available in both games. True Hidden UI takes priority when both are enabled." },
     { "gCombo.NewFileVanilla", Kind::New,
       "Create a seedless paired file with native progression, fixed NEI discoveries and NEI-only sharing." },
     { "gEnhancements.CustomEnemies.NaturalEncounters", Kind::New,

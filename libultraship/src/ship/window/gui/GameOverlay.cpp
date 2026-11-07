@@ -1,4 +1,5 @@
 #include "ship/window/gui/GameOverlay.h"
+#include "libultraship/bridge/uivisibilitybridge.h"
 
 #include "ship/config/ConsoleVariable.h"
 #include "ship/resource/File.h"
@@ -186,6 +187,21 @@ void GameOverlay::DrawSettings() {
 }
 
 void GameOverlay::Draw() {
+    if (UiVisibility_IsHidden()) {
+        // Keep notification lifetimes advancing without submitting text, looking
+        // up registered TEXT CVars, or opening an overlay window while hidden.
+        for (auto& [key, overlay] : mRegisteredOverlays) {
+            if (overlay.Type == OverlayType::NOTIFICATION) {
+                overlay.duration -= .05f;
+                if (overlay.duration <= 0.0f) {
+                    mNeedsCleanup = true;
+                }
+            }
+        }
+        CleanupNotifications();
+        return;
+    }
+
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
     ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);

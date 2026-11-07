@@ -5,8 +5,10 @@
 #include <cstring>
 #include <utility>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "libultraship/bridge/uivisibilitybridge.h"
 #include "ship/config/Config.h"
 #include "ship/Context.h"
 #include "ship/config/ConsoleVariable.h"
@@ -202,6 +204,22 @@ void Gui::UpdateGamepadNavigation() {
     }
 }
 
+static bool GuiWindowAllowedWhenUiHidden(const std::string& name, bool menuVisible) {
+    const std::string_view label = std::string_view(name).substr(0, name.find("##"));
+    if (label == "FileBrowser" || label == "Modal Window") {
+        return true; // Application recovery and queued modal/file-picker requests.
+    }
+    if (name == "2ship (MM)") {
+        // Legacy standalone FleetShip displays the guest GAME framebuffer here,
+        // including its transition fades. Its passive UI is filtered by the host.
+        return true;
+    }
+    // Only explicitly opened configuration panels accompany the application
+    // menu. Trackers, notifications, stats and other passive HUD remain hidden.
+    return menuVisible && (label.ends_with(" Settings") || label == "Time Splits Settings Window" ||
+                           label == "Configure Controller" || label == "2S2H Input Editor");
+}
+
 void Gui::DrawMenu() {
     // Per frame: popups (boot prompts, the file browser) have no open/close event to hook.
     UpdateGamepadNavigation();
@@ -280,9 +298,13 @@ void Gui::DrawMenu() {
         GetMenu()->Draw();
     }
 
+    const bool hidePassiveUi = UiVisibility_IsHidden();
+    const bool menuVisible = GetMenuOrMenubarVisible();
     for (auto& windowIter : mGuiWindows) {
         windowIter.second->Update();
-        windowIter.second->Draw();
+        if (!hidePassiveUi || GuiWindowAllowedWhenUiHidden(windowIter.first, menuVisible)) {
+            windowIter.second->Draw();
+        }
     }
 
     ImGui::End();
