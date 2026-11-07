@@ -9,8 +9,9 @@ extern "C" {
 // Needed by the OoT progressive chains below: they resolve to their concrete tier and degrade to
 // junk at the top, reading the SAME state their gives write. Skijer's NEI
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_MASTER / FC_OOT_SWORD_BIGGORON
-#include "mods/extended_inventory.h"           // SLOT_ROCS
-#include "mods/items/logic/weapon_upgrades.h"  // WeaponUpgrade_Has* (hammer / master / BGS tops)
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"
+#include "mods/extended_inventory.h"          // SLOT_ROCS
+#include "mods/items/logic/weapon_upgrades.h" // WeaponUpgrade_Has* (hammer / master / BGS tops)
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ShipInit.hpp"
 #include <cassert>
@@ -763,6 +764,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
 }
 
 static RandoItemId ResolveCanePresentation() {
+    // Converted identities are used for both the receipt and the grant, so match base-cane eligibility.
+    const bool hasOotGameplay = Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive();
     static constexpr u8 skills[] = {
         CANE_SKILL_SOMARIA_STATUE, CANE_SKILL_PACCI_FLIP,       CANE_SKILL_SOMARIA_BLOCK,
         CANE_SKILL_PACCI_STONE,    CANE_SKILL_SOMARIA_PLATFORM, CANE_SKILL_PACCI_ULTRAHAND
@@ -770,9 +773,12 @@ static RandoItemId ResolveCanePresentation() {
     static constexpr RandoItemId items[] = { RI_OOT_NEI_CANE_OF_SOMARIA,       RI_OOT_NEI_CANE_PACCI_FLIP,
                                              RI_OOT_NEI_CANE_SOMARIA_BLOCK,    RI_OOT_NEI_CANE_PACCI_STONE,
                                              RI_OOT_NEI_CANE_SOMARIA_PLATFORM, RI_OOT_NEI_CANE_PACCI_ULTRAHAND };
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 6; ++i) {
+        if (!hasOotGameplay && skills[i] == CANE_SKILL_SOMARIA_PLATFORM)
+            continue;
         if (!Cane_HasSkill(skills[i]))
             return items[i];
+    }
     // All-owned copies preserve the existing no-op grant.
     return RI_OOT_NEI_CANE_OF_SOMARIA;
 }

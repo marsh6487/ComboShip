@@ -8,7 +8,8 @@
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h" // FcCombo_ItemForNative (native RI -> fcId)
 #include "2s2h/FleetShipCombo/FleetComboItems.h"     // FCI_NO_ITEM, FCI_MAX
 #include "2s2h/FleetShipCombo/FleetComboIds.h"       // FC_OOT_* registry indices + FC_SHIELD_* bits
-#include "2s2h/BenGui/Notification.h"                // "You found X" corner toast (parity with SoH)
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"
+#include "2s2h/BenGui/Notification.h" // "You found X" corner toast (parity with SoH)
 
 // MM's native EquipmentType (z64item.h) only has SWORD=0/SHIELD=1/TUNIC=2; BOOTS is the NEI accessory
 // tag defined in mods/nei_oot_compat.h (=3, matches extended_equipment.c's sword/shield/tunic/boots
@@ -1173,13 +1174,17 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         // into SLOT_CANE_OF_SOMARIA — so any of the six can be the "first" pickup.
         // The BASE check is progressive: each copy lights the next unowned skill, in
         // the same order SoH uses (randomizer.cpp), so a seed can simply place six
-        // copies of one item. The five explicit skill ids below stay available for
-        // anything that wants to hand out one specific skill.
+        // copies of one item. MM-only progression skips Trirod until its echo mechanic exists here.
+        // The explicit skill ids below remain available for legacy saved placements and sync.
         case RI_OOT_NEI_CANE_OF_SOMARIA: {
+            const bool hasOotGameplay = Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive();
             static const u8 kCaneOrder[6] = { CANE_SKILL_SOMARIA_STATUE,   CANE_SKILL_PACCI_FLIP,
                                               CANE_SKILL_SOMARIA_BLOCK,    CANE_SKILL_PACCI_STONE,
                                               CANE_SKILL_SOMARIA_PLATFORM, CANE_SKILL_PACCI_ULTRAHAND };
             for (int i = 0; i < 6; i++) {
+                if (!hasOotGameplay && kCaneOrder[i] == CANE_SKILL_SOMARIA_PLATFORM) {
+                    continue;
+                }
                 if (Cane_GiveSkill(kCaneOrder[i])) {
                     break;
                 }

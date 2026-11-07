@@ -8,6 +8,7 @@ extern "C" {
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboIds.h"
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include "vanilla/ComboVanillaMode.h"
 #include "tests/test_require.h"
 #include <cstring>
@@ -23,6 +24,8 @@ PlayState *gPlayState = nullptr;
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 int gComboVanillaMode = 0;
+// Actual COMBO_BUILD transport boundary: the launcher supplies paired gameplay.
+int FleetCombo_UnifiedPoolActive(void) { return 0; }
 }
 int gFcCombo_SuppressRecord = 0;
 u32 gRandoPickupSerial = 0;

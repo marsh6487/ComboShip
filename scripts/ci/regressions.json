@@ -1814,5 +1814,11 @@
     "origin": "nei",
     "name": "Black Market retired wildcards, saved owned-stock replacement and Sold Out rendering",
     "run": "python3 -B tests/black_market/run_stock_tests.py\npython3 -B tests/black_market/run_lock_draw_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "Implemented item admission, MM progressive cane and legacy market stock",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_availability/run_tests.py --sanitize"
   }
 ]

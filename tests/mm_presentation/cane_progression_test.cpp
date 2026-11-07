@@ -1,6 +1,13 @@
 #include <cassert>
 #include <iostream>
 #include "mm/2s2h/Rando/Types.h"
+#define COMBO_BUILD
+#include "mm/2s2h/FleetShipCombo/FleetShipCombo.h"
+static int unifiedPool=0;
+extern "C" {
+int gComboGameMode=COMBO_GAME_BOTH;
+int FleetCombo_UnifiedPoolActive(void) { return unifiedPool; }
+}
 using u8=unsigned char;
 constexpr int CANE_SKILL_SOMARIA_STATUE=0, CANE_SKILL_SOMARIA_BLOCK=1, CANE_SKILL_SOMARIA_PLATFORM=2,
     CANE_SKILL_PACCI_FLIP=3, CANE_SKILL_PACCI_STONE=4, CANE_SKILL_PACCI_ULTRAHAND=5;
@@ -34,5 +41,20 @@ int main() {
  Rando::DrawItem(RI_OOT_NEI_ROCS_FEATHER,RC_UNKNOWN,nullptr);
  assert(drawn==RI_OOT_NEI_ROCS_FEATHER && before==conversions);
  Rando::DrawItem(RI_OOT_PROGRESSIVE_ROC,RC_UNKNOWN,nullptr);assert(drawn==RI_OOT_NEI_ROCS_CAPE);
- std::cout<<"PASS actual Cane selection for all 64 ownership masks, raw preview, frozen first award and concrete Roc identity\n";
+ // Pure MM skips the OoT-only platform without changing ownership or preview identity.
+ gComboGameMode=COMBO_GAME_MM;
+ for(owned=0;owned<64;++owned) {
+   auto expected=ids[0];
+   for(int i=0;i<6;i++) if(i!=4 && !(owned&(1u<<bits[i]))) {expected=ids[i];break;}
+   assert(ResolveCanePresentation()==expected);
+   Rando::DrawItem(RI_OOT_NEI_CANE_OF_SOMARIA,RC_UNKNOWN,nullptr);
+   assert(drawn==expected);
+ }
+ // A shared fill keeps the full six-skill order even outside the combined host.
+ unifiedPool=1;
+ owned=(1u<<bits[0])|(1u<<bits[1])|(1u<<bits[2])|(1u<<bits[3]);
+ assert(ResolveCanePresentation()==RI_OOT_NEI_CANE_SOMARIA_PLATFORM);
+ Rando::DrawItem(RI_OOT_NEI_CANE_OF_SOMARIA,RC_UNKNOWN,nullptr);
+ assert(drawn==RI_OOT_NEI_CANE_SOMARIA_PLATFORM);
+ std::cout<<"PASS actual Cane selection: all 64 paired/pure-MM ownership masks, unified override, raw preview, frozen first award and concrete Roc identity\n";
 }
