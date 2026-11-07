@@ -1,9 +1,10 @@
+#include "global.h"
+
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/BenGui/HudEditor.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/RupeeCounterDigits.h"
 #include "PR/gs2dex.h"
-#include "global.h"
 #include "interface/parameter_static/parameter_static.h"
 #include "ui_visibility.h"
 #include "z64snap.h"
