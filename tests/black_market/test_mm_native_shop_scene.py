@@ -143,7 +143,7 @@ class MmNativeShopScene(unittest.TestCase):
             (500, -1, -2, -1, -1, 0, 255, 4, 0, 32),
         ])
 
-    def test_only_mm_scene_player_cutscene_index_and_keeper_actor_bytes_change(self):
+    def test_only_mm_scene_player_yaw_encoding_cutscene_and_keeper_actor_bytes_change(self):
         module = shop_module(self)
         original = dict(self.original)
         result = module.apply(original)
@@ -156,8 +156,10 @@ class MmNativeShopScene(unittest.TestCase):
                          {key: value for key, value in after.items() if key not in (0, 2, 27)})
         old_spawn = struct.unpack_from('<H6hH', before[0], 4)
         new_spawn = struct.unpack_from('<H6hH', after[0], 4)
-        self.assertEqual(new_spawn, (*old_spawn[:5], (old_spawn[5] & ~0x7F) | 4, *old_spawn[6:]))
-        self.assertEqual(new_spawn[5] >> 7, old_spawn[5] >> 7, 'player yaw must be preserved')
+        self.assertEqual(old_spawn[5], -32768, 'retained input uses OoT binary yaw')
+        self.assertEqual(new_spawn, (*old_spawn[:5], (180 << 7) | 4, *old_spawn[6:]))
+        self.assertEqual((new_spawn[5] >> 7) & 0x1FF, 180,
+                         'native MM must decode the customer-facing half-turn')
         self.assertEqual(result[SCENE][:64], original[SCENE][:64])
         before, after = forest.native_commands(original[ROOM]), module.native_commands(result[ROOM])
         self.assertEqual({key: value for key, value in before.items() if key != 1},
@@ -168,6 +170,23 @@ class MmNativeShopScene(unittest.TestCase):
         self.assertEqual(new_actor, (0x2A, *old_actor[1:7], 1))
         self.assertEqual(new_actor[5] & 0x7F, 0, 'native actor must start at cutscene 0')
         self.assertEqual(result, module.apply(result), 'native MM preparation must be idempotent')
+
+    def test_existing_native_yaw_is_preserved_and_previous_raw_link_is_repaired(self):
+        module = shop_module(self)
+        prepared = module.apply(self.original)
+        for packed_yaw, expected in ((180 << 7, (180 << 7) | 4),
+                                     ((180 << 7) | 4, (180 << 7) | 4),
+                                     (90 << 7, (90 << 7) | 4),
+                                     (-32764, (180 << 7) | 4)):
+            with self.subTest(packed_yaw=packed_yaw):
+                commands = module.native_commands(prepared[SCENE])
+                spawn = bytearray(commands[0])
+                struct.pack_into('<h', spawn, 14, packed_yaw)
+                commands[0] = bytes(spawn)
+                resources = dict(prepared)
+                resources[SCENE] = module._scene(prepared[SCENE], commands)
+                actual = module.native_commands(module.apply(resources)[SCENE])[0]
+                self.assertEqual(struct.unpack_from('<h', actual, 14)[0], expected)
 
     def test_legacy_four_cutscene_scene_upgrades_without_relinking_shop(self):
         module = shop_module(self)
