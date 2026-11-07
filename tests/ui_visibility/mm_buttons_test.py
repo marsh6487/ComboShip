@@ -26,7 +26,7 @@ void Matrix_RotateXFApply(f32 x) {}
 Gfx* Gfx_DrawTexQuad4b(Gfx* p, TexturePtr tex, s32 fmt,s16 w,s16 h,u16 point) { ++actionLabels; return p+1; }
 '''
 # Count the actual shadow-texture draw boundary rather than mirroring its branch.
-fixture=fixture.replace('Gfx* Gfx_DrawTexQuadIA8(Gfx* p, TexturePtr tex, s16 w, s16 h, u16 point) { return p+1; }',
+fixture=fixture.replace(function(fixture,'Gfx_DrawTexQuadIA8').strip(),
                         'static int shadowCalls;\nGfx* Gfx_DrawTexQuadIA8(Gfx* p, TexturePtr tex, s16 w, s16 h, u16 point) { ++shadowCalls; return p+1; }')
 fixture+='\n'.join(function(source,name) for name in ['Interface_IsFullUi','Interface_DrawBButtonIcons','Interface_DrawAButton'])
 fixture+=r'''

@@ -21,6 +21,15 @@ cost, sanitized MM RenderFlight and five analyzer checks also pass. The remainin
 scene-readiness check is blocked by the previously recorded missing SDL2 SDK.
 No assertion is removed and no production logic is changed by this correction.
 
+The subsequent complete UI rerun reached one more formatting-sensitive fixture:
+`mm_buttons_test.py` instrumented an exact one-line helper definition, but
+clang-format had expanded that helper. The replacement silently failed and its
+test counter was undeclared. It now uses the existing brace-aware named-function
+extractor to replace the same helper, preserving every assertion and the actual
+production button draw bodies. The targeted sanitized button check passes; the
+complete shared/OoT/MM UI suite also passes, including 46 native MM syntax
+checks, MM SM64 clocks and both Harpoon vote lifecycle checks.
+
 During publication preparation, cor separately authorized removal of unfinished
 randomizer items, or an authored GI with shimmer if Fugue of Home has working
 gameplay. That pool/functionality audit is a following bounded change and is not
