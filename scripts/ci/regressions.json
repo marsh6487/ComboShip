@@ -1538,6 +1538,12 @@
   {
     "suite": "render",
     "origin": "gate",
+    "name": "Independent river frog and ghost Dampe catalogue presenters",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/river_frogs_dampe/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
     "name": "Exact cumulative assets from bounded compressed source parts",
     "run": "python3 -B -m unittest discover -s tests/cumulative_assets -v"
   },

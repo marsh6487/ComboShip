@@ -32,6 +32,8 @@
 #include "objects/object_nb/object_nb.h"
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "objects/object_os_anime/object_os_anime.h"
+#include "objects/object_fr/object_fr.h"
+#include "objects/object_tk/object_tk.h"
 #include "static_story_actor.h"
 #include "static_story_talk.h"
 #include "static_story_kokiri.h"
@@ -334,6 +336,10 @@ static AnimationHeader* EnViewerStatic_GetAnimation(uint16_t animation) {
             return &gZelda2Anime2Anim_009FBC;
         case STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED:
             return &gZelda2Anime2Anim_003FF8;
+        case STATIC_ANIM_RIVER_FROG_IDLE:
+            return &object_fr_Anim_001534;
+        case STATIC_ANIM_DAMPE_GHOST_FLOAT:
+            return &gDampeFloatAnim;
         case STATIC_ANIM_CHILD_ZELDA_IDLE:
             return &gChildZeldaAnim_000654;
         case STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED:
@@ -391,6 +397,12 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             break;
         case STATIC_SKELETON_GREAT_FAIRY:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gGreatFairySkel, NULL, NULL, NULL, 0);
+            break;
+        case STATIC_SKELETON_RIVER_FROG:
+            SkelAnime_InitFlex(play, &this->skin.skelAnime, &object_fr_Skel_00B498, NULL, NULL, NULL, 0);
+            break;
+        case STATIC_SKELETON_DAMPE_GHOST:
+            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gDampeSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_PHANTOM_GANON:
             SkelAnime_Init(play, &this->skin.skelAnime, &gPhantomGanonSkel, NULL, NULL, NULL, 0);
@@ -827,7 +839,11 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
     int8_t fixedEyeIndex =
         StaticStoryActor_GetFixedEyeIndex((StaticStoryActorType)this->staticState.type, this->staticState.pose);
     this->staticState.eyeIndex = fixedEyeIndex >= 0 ? fixedEyeIndex : 0;
-    this->actor.flags |= ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY;
+    if (StaticStoryActor_IsDecorative((StaticStoryActorType)this->staticState.type)) {
+        this->actor.flags &= ~(ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY);
+    } else {
+        this->actor.flags |= ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY;
+    }
     this->staticState.talking = false;
     this->staticState.tracking = false;
     this->staticState.interactInfo.talkState = NPC_TALK_STATE_IDLE;
@@ -854,7 +870,7 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
         return;
     }
     bool animationEnded = false;
-    bool canInteract = true;
+    bool canInteract = !StaticStoryActor_IsDecorative((StaticStoryActorType)this->staticState.type);
 
     if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY) {
         bool canCall = this->actor.room == play->roomCtx.curRoom.num && play->pauseCtx.state == 0 &&
@@ -925,7 +941,8 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
     int8_t fixedEyeIndex =
         StaticStoryActor_GetFixedEyeIndex((StaticStoryActorType)this->staticState.type, this->staticState.pose);
     /* Great Fairy holds the fully closed head for two 20 Hz updates. */
-    u8 blinkFrameCount = this->staticState.type == STATIC_STORY_ACTOR_GREAT_FAIRY               ? 5
+    u8 blinkFrameCount = definition->adapter == STATIC_ADAPTER_RIVER_FROG                       ? 2
+                         : this->staticState.type == STATIC_STORY_ACTOR_GREAT_FAIRY             ? 5
                          : this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL ? 4
                                                                                                 : 3;
     if (fixedEyeIndex >= 0) {
@@ -2500,6 +2517,76 @@ static void EnViewer_DrawStaticPhantomGanon(EnViewer* this, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+/* These presenters use only the native visual contract. No En_Fr or
+ * En_Po_Relay action, singleton, light, reward or camera state is entered. */
+static s32 EnViewer_StaticRiverFrogOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
+                                                    void* thisx) {
+    if (limbIndex == 7 || limbIndex == 8) {
+        *dList = NULL;
+    }
+    return 0;
+}
+
+static void EnViewer_StaticRiverFrogPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    if ((limbIndex == 7 || limbIndex == 8) && *dList != NULL) {
+        OPEN_DISPS(play->state.gfxCtx);
+        Matrix_Push();
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_OPA_DISP++, *dList);
+        Matrix_Pop();
+        CLOSE_DISPS(play->state.gfxCtx);
+    }
+}
+
+static void EnViewer_DrawStaticRiverFrog(EnViewer* this, PlayState* play) {
+    static const Color_RGB8 colors[] = {
+        { 200, 170, 0 }, { 0, 170, 200 }, { 210, 120, 100 }, { 120, 130, 230 }, { 190, 190, 190 },
+    };
+    static void* eyes[] = { object_fr_Tex_0059A0, object_fr_Tex_005BA0 };
+    const Color_RGB8* color = &colors[this->staticState.type - STATIC_STORY_ACTOR_RIVER_FROG_YELLOW];
+    u8 eye = this->staticState.eyeIndex < 2 ? this->staticState.eyeIndex : 0;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetEnvColor(POLY_OPA_DISP++, color->r, color->g, color->b, 255);
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(eyes[eye]));
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(eyes[eye]));
+    SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticRiverFrogOverrideLimbDraw,
+                              EnViewer_StaticRiverFrogPostLimbDraw, this);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void EnViewer_StaticDampeGhostPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot,
+                                                  void* thisx) {
+    OPEN_DISPS(play->state.gfxCtx);
+    if (limbIndex == 14) {
+        /* Native lantern material uses alpha 128 on the opaque command stream.
+         * A stable warm color avoids native draw-time RNG/light mutations. */
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetEnvColor(POLY_OPA_DISP++, 240, 205, 175, 128);
+        gSPDisplayList(POLY_OPA_DISP++, gDampeLanternDL);
+    } else if (limbIndex == 8) {
+        gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_OPA_DISP++, gDampeHaloDL);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void EnViewer_DrawStaticDampeGhost(EnViewer* this, PlayState* play) {
+    static void* eyes[] = { gDampeEyeOpenTex, gDampeEyeHalfTex, gDampeEyeClosedTex };
+    u8 eye = this->staticState.eyeIndex < 3 ? this->staticState.eyeIndex : 0;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(eyes[eye]));
+    SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, NULL, EnViewer_StaticDampeGhostPostLimbDraw, this);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
     switch ((StaticStoryActorType)this->staticState.type) {
         case STATIC_STORY_ACTOR_IMPA:
@@ -2563,6 +2650,16 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
             break;
         case STATIC_STORY_ACTOR_SKULL_KID:
             EnViewer_DrawStaticSkullKid(this, play);
+            break;
+        case STATIC_STORY_ACTOR_RIVER_FROG_YELLOW:
+        case STATIC_STORY_ACTOR_RIVER_FROG_BLUE:
+        case STATIC_STORY_ACTOR_RIVER_FROG_RED:
+        case STATIC_STORY_ACTOR_RIVER_FROG_PURPLE:
+        case STATIC_STORY_ACTOR_RIVER_FROG_WHITE:
+            EnViewer_DrawStaticRiverFrog(this, play);
+            break;
+        case STATIC_STORY_ACTOR_DAMPE_GHOST:
+            EnViewer_DrawStaticDampeGhost(this, play);
             break;
         case STATIC_STORY_ACTOR_PHANTOM_GANON:
             EnViewer_DrawStaticPhantomGanon(this, play);

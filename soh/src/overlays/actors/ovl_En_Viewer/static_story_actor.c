@@ -71,6 +71,19 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
     [STATIC_STORY_ACTOR_CHILD_ZELDA] = { 2, 1, OBJECT_ZL4, STATIC_ADAPTER_CHILD_ZELDA, 0.01f, 40.0f, 10, 44, 0, 30, 30,
                                          75.0f, STATIC_TRACKING_NONE, 0, 0.0f },
 
+    [STATIC_STORY_ACTOR_RIVER_FROG_YELLOW] = { 0, 1, OBJECT_FR, STATIC_ADAPTER_RIVER_FROG, 0.015f, 10.0f, 10, 20, 0, 20,
+                                               60, 0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_RIVER_FROG_BLUE] = { 0, 1, OBJECT_FR, STATIC_ADAPTER_RIVER_FROG, 0.015f, 10.0f, 10, 20, 0, 20,
+                                             60, 0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_RIVER_FROG_RED] = { 0, 1, OBJECT_FR, STATIC_ADAPTER_RIVER_FROG, 0.015f, 10.0f, 10, 20, 0, 20,
+                                            60, 0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_RIVER_FROG_PURPLE] = { 0, 1, OBJECT_FR, STATIC_ADAPTER_RIVER_FROG, 0.015f, 10.0f, 10, 20, 0, 20,
+                                               60, 0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_RIVER_FROG_WHITE] = { 0, 1, OBJECT_FR, STATIC_ADAPTER_RIVER_FROG, 0.015f, 10.0f, 10, 20, 0, 20,
+                                              60, 0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_DAMPE_GHOST] = { 0, 1, OBJECT_TK, STATIC_ADAPTER_DAMPE_GHOST, 0.01f, 50.0f, 42, 52, 0, 0, 0,
+                                         0.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+
 };
 
 static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STORY_ACTOR_POSE_COUNT] = {
@@ -240,13 +253,20 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
                     STATIC_SKELETON_CHILD_ZELDA),
     },
 
+    [STATIC_STORY_ACTOR_RIVER_FROG_YELLOW] = { STATIC_POSE(STATIC_ANIM_RIVER_FROG_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_RIVER_FROG) },
+    [STATIC_STORY_ACTOR_RIVER_FROG_BLUE] = { STATIC_POSE(STATIC_ANIM_RIVER_FROG_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_RIVER_FROG) },
+    [STATIC_STORY_ACTOR_RIVER_FROG_RED] = { STATIC_POSE(STATIC_ANIM_RIVER_FROG_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_RIVER_FROG) },
+    [STATIC_STORY_ACTOR_RIVER_FROG_PURPLE] = { STATIC_POSE(STATIC_ANIM_RIVER_FROG_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_RIVER_FROG) },
+    [STATIC_STORY_ACTOR_RIVER_FROG_WHITE] = { STATIC_POSE(STATIC_ANIM_RIVER_FROG_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_RIVER_FROG) },
+    [STATIC_STORY_ACTOR_DAMPE_GHOST] = { STATIC_POSE(STATIC_ANIM_DAMPE_GHOST_FLOAT, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_DAMPE_GHOST) },
+
 };
 
 _Static_assert(sizeof(sDefinitions) / sizeof(sDefinitions[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a definition");
 _Static_assert(sizeof(sPoses) / sizeof(sPoses[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a pose row");
-enum { STATIC_STORY_DEFINITION_COUNT = 28, STATIC_STORY_POSE_ROW_COUNT = 28 };
+enum { STATIC_STORY_DEFINITION_COUNT = 34, STATIC_STORY_POSE_ROW_COUNT = 34 };
 _Static_assert(STATIC_STORY_DEFINITION_COUNT == STATIC_STORY_ACTOR_MAX - 1,
                "Definition count must change with the actor registry");
 _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
@@ -268,6 +288,12 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
         return id == 1   ? STATIC_STORY_ACTOR_MIKAU
                : id == 2 ? STATIC_STORY_ACTOR_DARMANI
                : id == 3 ? STATIC_STORY_ACTOR_CHILD_ZELDA
+               : id == 4 ? STATIC_STORY_ACTOR_RIVER_FROG_YELLOW
+               : id == 5 ? STATIC_STORY_ACTOR_RIVER_FROG_BLUE
+               : id == 6 ? STATIC_STORY_ACTOR_RIVER_FROG_RED
+               : id == 7 ? STATIC_STORY_ACTOR_RIVER_FROG_PURPLE
+               : id == 8 ? STATIC_STORY_ACTOR_RIVER_FROG_WHITE
+               : id == 9 ? STATIC_STORY_ACTOR_DAMPE_GHOST
                          : STATIC_STORY_ACTOR_NONE;
     }
     if (prefix == STATIC_STORY_ACTOR_EXPANDED_PARAM_PREFIX) {
@@ -440,10 +466,16 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
     }
 }
 
+bool StaticStoryActor_IsDecorative(StaticStoryActorType type) {
+    const StaticStoryActorDefinition* definition = StaticStoryActor_GetDefinition(type);
+    return definition != NULL &&
+           (definition->adapter == STATIC_ADAPTER_RIVER_FROG || definition->adapter == STATIC_ADAPTER_DAMPE_GHOST);
+}
+
 bool StaticStoryActor_CanTalk(StaticStoryActorType type) {
-    return StaticStoryActor_GetDefinition(type) != NULL && type != STATIC_STORY_ACTOR_PHANTOM_GANON &&
-           type != STATIC_STORY_ACTOR_STALCHILD && type != STATIC_STORY_ACTOR_MIKAU &&
-           type != STATIC_STORY_ACTOR_DARMANI;
+    return StaticStoryActor_GetDefinition(type) != NULL && !StaticStoryActor_IsDecorative(type) &&
+           type != STATIC_STORY_ACTOR_PHANTOM_GANON && type != STATIC_STORY_ACTOR_STALCHILD &&
+           type != STATIC_STORY_ACTOR_MIKAU && type != STATIC_STORY_ACTOR_DARMANI;
 }
 
 void StaticStoryActor_NormalizePlacementRotation(int16_t* pitch, int16_t* yaw, int16_t* roll) {

@@ -24,7 +24,7 @@ int main(void) {
     REQUIRE(childGlow->animation == childClasp->animation && (childGlow->flags & (1u << 7)));
     REQUIRE(!(childClasp->flags & (1u << 7)) && !(childIdle->flags & (1u << 7)));
     REQUIRE(StaticStoryActor_SanitizePose(child, 3) == 0);
-    REQUIRE(StaticStoryActor_GetType(0x7D04) == STATIC_STORY_ACTOR_NONE);
+    REQUIRE(StaticStoryActor_GetType(0x7D0A) == STATIC_STORY_ACTOR_NONE);
     REQUIRE(StaticStoryActor_GetType(0x7D01) == STATIC_STORY_ACTOR_MIKAU);
     REQUIRE(StaticStoryActor_GetType(0x7D02) == STATIC_STORY_ACTOR_DARMANI);
 

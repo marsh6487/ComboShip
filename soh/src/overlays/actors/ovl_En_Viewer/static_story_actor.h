@@ -42,6 +42,12 @@ typedef enum {
     STATIC_STORY_ACTOR_MIKAU,
     STATIC_STORY_ACTOR_DARMANI,
     STATIC_STORY_ACTOR_CHILD_ZELDA,
+    STATIC_STORY_ACTOR_RIVER_FROG_YELLOW,
+    STATIC_STORY_ACTOR_RIVER_FROG_BLUE,
+    STATIC_STORY_ACTOR_RIVER_FROG_RED,
+    STATIC_STORY_ACTOR_RIVER_FROG_PURPLE,
+    STATIC_STORY_ACTOR_RIVER_FROG_WHITE,
+    STATIC_STORY_ACTOR_DAMPE_GHOST,
     STATIC_STORY_ACTOR_MAX,
 } StaticStoryActorType;
 
@@ -74,6 +80,8 @@ typedef enum {
     STATIC_ADAPTER_MM_MIKAU,
     STATIC_ADAPTER_MM_DARMANI,
     STATIC_ADAPTER_CHILD_ZELDA,
+    STATIC_ADAPTER_RIVER_FROG,
+    STATIC_ADAPTER_DAMPE_GHOST,
 } StaticStoryActorAdapter;
 
 typedef enum {
@@ -104,6 +112,8 @@ typedef enum {
     STATIC_SKELETON_MIKAU,
     STATIC_SKELETON_DARMANI,
     STATIC_SKELETON_CHILD_ZELDA,
+    STATIC_SKELETON_RIVER_FROG,
+    STATIC_SKELETON_DAMPE_GHOST,
 } StaticStorySkeletonFamily;
 
 typedef enum {
@@ -242,6 +252,8 @@ typedef enum {
     STATIC_ANIM_CHILD_ZELDA_IDLE,
     STATIC_ANIM_CHILD_ZELDA_HANDS_CLASPED,
     STATIC_ANIM_ADULT_ZELDA_HANDS_CLASPED,
+    STATIC_ANIM_RIVER_FROG_IDLE,
+    STATIC_ANIM_DAMPE_GHOST_FLOAT,
 } StaticStoryAnimation;
 
 enum {
@@ -311,6 +323,7 @@ StaticStoryObjectRequirements StaticStoryActor_GetObjectRequirements(StaticStory
 const StaticStoryPoseDescriptor* StaticStoryActor_ResolvePose(StaticStoryActorType type, uint8_t pose);
 uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticStoryProgression* progression);
 bool StaticStoryActor_CanTalk(StaticStoryActorType type);
+bool StaticStoryActor_IsDecorative(StaticStoryActorType type);
 bool StaticStoryActor_ShouldCloseEventMessage(bool isEventState, bool shouldAdvance);
 int StaticStoryActor_CanTrack(StaticStoryActorType type, uint8_t pose);
 StaticStoryTrackingMode StaticStoryActor_GetTrackingMode(StaticStoryActorType type, uint8_t pose);
@@ -319,7 +332,8 @@ StaticStoryGreatFairyTrackingLimb StaticStoryActor_GetGreatFairyTrackingLimb(int
 int16_t StaticStoryActor_ClampGreatFairyHeadRotation(int16_t rotation);
 float StaticStoryActor_GetGreatFairyHoverAmplitude(uint8_t pose);
 int8_t StaticStoryActor_GetFixedEyeIndex(StaticStoryActorType type, uint8_t pose);
-uint8_t StaticStoryActor_GetInteractionEyeIndex(StaticStoryActorType type, uint8_t pose, uint8_t eyeIndex, bool talking);
+uint8_t StaticStoryActor_GetInteractionEyeIndex(StaticStoryActorType type, uint8_t pose, uint8_t eyeIndex,
+                                                bool talking);
 StaticStoryFaceProfile StaticStoryActor_GetFaceProfile(StaticStoryActorType type);
 uint8_t StaticStoryActor_ResolveEyeIndex(StaticStoryActorType type, uint8_t requestedEyeIndex, bool hasAlternateHead);
 bool StaticStoryActor_ShouldOverrideImpaHead(bool hasAlternateSkeleton);

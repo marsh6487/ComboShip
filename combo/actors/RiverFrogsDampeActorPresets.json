@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "actors": [
+    {
+      "name": "Zora's River Frog (Yellow)",
+      "catalog_id": 29,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x00E6",
+      "model_resource": "objects/object_fr/object_fr_Skel_00B498",
+      "animation_resource": "objects/object_fr/object_fr_Anim_001534",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Idle", "params": "0x7D04" }]
+    },
+    {
+      "name": "Zora's River Frog (Blue)",
+      "catalog_id": 30,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x00E6",
+      "model_resource": "objects/object_fr/object_fr_Skel_00B498",
+      "animation_resource": "objects/object_fr/object_fr_Anim_001534",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Idle", "params": "0x7D05" }]
+    },
+    {
+      "name": "Zora's River Frog (Red)",
+      "catalog_id": 31,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x00E6",
+      "model_resource": "objects/object_fr/object_fr_Skel_00B498",
+      "animation_resource": "objects/object_fr/object_fr_Anim_001534",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Idle", "params": "0x7D06" }]
+    },
+    {
+      "name": "Zora's River Frog (Purple)",
+      "catalog_id": 32,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x00E6",
+      "model_resource": "objects/object_fr/object_fr_Skel_00B498",
+      "animation_resource": "objects/object_fr/object_fr_Anim_001534",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Idle", "params": "0x7D07" }]
+    },
+    {
+      "name": "Zora's River Frog (White)",
+      "catalog_id": 33,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x00E6",
+      "model_resource": "objects/object_fr/object_fr_Skel_00B498",
+      "animation_resource": "objects/object_fr/object_fr_Anim_001534",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Idle", "params": "0x7D08" }]
+    },
+    {
+      "name": "Dampe's Ghost",
+      "catalog_id": 34,
+      "oot_actor_id": "0x002A",
+      "object_id": "0x0089",
+      "model_resource": "objects/object_tk/gDampeSkel",
+      "animation_resource": "objects/object_tk/gDampeFloatAnim",
+      "talk": false,
+      "poses": [{ "pose_id": 0, "name": "Floating idle", "params": "0x7D09" }]
+    }
+  ]
+}

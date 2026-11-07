@@ -158,7 +158,8 @@ placement, collider, and sampled joints are unchanged. Dialogue is
 Existing catalog IDs and `0x7F`/`0x7E` placements are unchanged. New catalog
 IDs are Stalchild 25, Mikau 26 and Darmani 27. Stalchild uses the last `0x7E`
 identity nibble; Mikau and Darmani start the `0x7D` family. `0x7D00` remains invalid; `0x7D03` is allocated to child Zelda below.
-`0x7D04` remains invalid. Each row below is an ambient presentation, with no
+`0x7D04` through `0x7D09` are allocated to the river frogs and ghost Dampé below;
+`0x7D0A` remains invalid. Each row below is an ambient presentation, with no
 quest actions, hostile AI, native path requirements or talk prompt.
 
 | Actor | Params | Pose | Skeleton limbs / matrix reservation | Frames |
@@ -267,3 +268,40 @@ The full POC4 addon places blue child/adult Zelda at the center of the
 authored Chamber platform, facing its Light approach, using normal age/setup
 headers. The matching rebuilt source is required for both new params, aura
 and dialogue. See the placement evidence for the inherited night fallbacks.
+
+## Zora's River frogs and ghost Dampé — 2026-11-07
+
+Place these in OoT as **Cutscene Actors / En_Viewer (`0x002A`)**, with the full
+params below. These are six new decorative entries. They keep the authored
+position and yaw, play their native idle animation and blink, and do not
+offer dialogue, track or collide with Link, run the frog minigame or Dampé's
+race, change progression, or control the camera. No automatic placement is
+included; choose the scene/room/age/setup explicitly in Prelude.
+
+| Actor | Catalogue ID | Params | Presentation | Native object |
+|---|---|---|---|---|
+| Zora's River Frog (Yellow) | 29 | `0x7D04` | Small frog idle | `OBJECT_FR` (`0x00E6`) |
+| Zora's River Frog (Blue) | 30 | `0x7D05` | Small frog idle | `OBJECT_FR` (`0x00E6`) |
+| Zora's River Frog (Red) | 31 | `0x7D06` | Small frog idle | `OBJECT_FR` (`0x00E6`) |
+| Zora's River Frog (Purple) | 32 | `0x7D07` | Small frog idle | `OBJECT_FR` (`0x00E6`) |
+| Zora's River Frog (White) | 33 | `0x7D08` | Small frog idle | `OBJECT_FR` (`0x00E6`) |
+| Dampé's Ghost | 34 | `0x7D09` | Floating idle, lantern and halo | `OBJECT_TK` (`0x0089`) |
+
+Only pose 0 is allocated for each entry; other pose nibbles sanitize to idle.
+Existing catalogue identities and poses retain their values.
+Machine-readable placement presets are in
+`combo/actors/RiverFrogsDampeActorPresets.json`. These are parameter references;
+this repository does not install a new dropdown into an external Prelude build.
+
+The frogs use `object_fr_Skel_00B498`, `object_fr_Anim_001534`, scale `0.015`,
+their native five body colors, two eye states and billboarded eye limbs.
+Dampé uses `gDampeSkel`, `gDampeFloatAnim`, scale `0.01` and three eye states.
+His native opaque skeleton draw includes the halo at limb 8 and lantern at
+limb 14; the lantern keeps its native alpha of 128 and a fixed warm color.
+The independent presentation does not insert a scene light or consume the
+race actor's random lantern-color draws. Native resource paths remain eligible
+for compatible replacement/Alt assets through the public skeleton loader.
+
+The rebuilt OoT module is required. Live appearance with custom packs,
+Alt toggles and in-scene placement remain runtime checks; these rows do not
+add native-MM actor presenters.
