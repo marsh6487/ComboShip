@@ -178,6 +178,17 @@ int main(int argc,char**argv) {
     if(!save.empty())hints=save.at("combo").at("rando").at("hints");
     else hints=GenerateCase(true,2,0x12345678u,1,false,40);
     const auto rows=CheckOotRouting(hints,save.empty()?json::array():save.at("oot").at("sections").at("randomizer").at("data").at("hintLocations"));
+    if(save.empty()) {
+        auto savedPayload=hints;
+        savedPayload["mm"]["gossipPool"]=json::array({
+            {{"weight",1},{"text","a Bomb Bag can be found at Gerudo Fortress (OOT)"}},
+            {{"weight",3},{"text","%cDisguised Key%w can be found hoarded in Shadow Temple (OOT)"}},
+            {{"weight",1},{"text","An unrelated old-save rumor."}}
+        });
+        const auto original=savedPayload.dump();
+        MmGossip::Run(savedPayload);
+        require(savedPayload.dump()==original,"display audit rewrote arbitrary saved gossip payload");
+    }
     const auto mm=MmGossip::Run(hints);
     json report={{"masterSeed",save.empty()?0x12345678u:save["combo"]["rando"]["masterSeed"].get<uint32_t>()},
                  {"ootRoutes",rows},{"mmRouting",mm},{"stats",hints.value("stats",json::object())}};

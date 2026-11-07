@@ -3179,7 +3179,8 @@ const std::vector<std::pair<int32_t, std::string>>& SensorItemChoices() {
 
     if (choices.empty()) {
         for (auto& [randoItemId, item] : Rando::StaticData::Items) {
-            if (randoItemId <= RI_NONE || randoItemId >= RI_MAX || item.name == nullptr || item.name[0] == '\0') {
+            if (randoItemId <= RI_UNKNOWN || randoItemId == RI_NONE || randoItemId >= RI_MAX || item.name == nullptr ||
+                item.name[0] == '\0') {
                 continue;
             }
             choices.emplace_back((int32_t)randoItemId, item.name);
@@ -3190,6 +3191,9 @@ const std::vector<std::pair<int32_t, std::string>>& SensorItemChoices() {
 }
 
 std::string SensorDesireName(int32_t randoItemId) {
+    if (randoItemId <= RI_UNKNOWN || randoItemId == RI_NONE || randoItemId >= RI_MAX) {
+        return "(empty)";
+    }
     auto item = Rando::StaticData::Items.find((RandoItemId)randoItemId);
 
     if (item == Rando::StaticData::Items.end() || item->second.name == nullptr || item->second.name[0] == '\0') {
@@ -3214,7 +3218,7 @@ void DrawSensorDesirePicker() {
         if (ImGui::BeginCombo(label.c_str(), SensorDesireName(current).c_str())) {
             ImGui::InputTextWithHint("##sensorSearch", "Search", search[slot], sizeof(search[slot]));
 
-            if (ImGui::Selectable("(empty)", current <= RI_NONE)) {
+            if (ImGui::Selectable("(empty)", current <= RI_UNKNOWN || current == RI_NONE || current >= RI_MAX)) {
                 CVarSetInteger(cvar.c_str(), RI_NONE);
                 Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
             }

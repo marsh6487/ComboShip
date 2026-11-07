@@ -140,7 +140,8 @@ static RandoItemId SensorGetDesire(s32 slot) {
         return RI_NONE;
     }
     int32_t item = CVarGetInteger((std::string(CVAR_SENSOR_DESIRE_PREFIX) + std::to_string(slot)).c_str(), RI_NONE);
-    if (item <= RI_NONE || item >= RI_MAX) {
+    // RI_NONE is mid-enum; ordinary item wishes can precede it.
+    if (item <= RI_UNKNOWN || item == RI_NONE || item >= RI_MAX) {
         return RI_NONE;
     }
     return static_cast<RandoItemId>(item);
@@ -176,8 +177,8 @@ extern "C" u8 SensorRune_PrepareHint(void) {
             continue;
         }
 
-        sSensorHintText = "The slate senses " + Rando::StaticData::GetItemName(item) + " " +
-                          Rando::GetHintLocationText(item, rc) + "...";
+        sSensorHintText = "The slate senses %g" + Rando::StaticData::GetItemName(item) + "%w %y" +
+                          Rando::GetHintLocationText(item, rc) + "%w...";
         return 1;
     }
     return 0;

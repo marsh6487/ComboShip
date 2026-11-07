@@ -74,7 +74,7 @@ void OverrideSubJsText(u16* textId, bool* loadFromMessageTable) {
                             break;
                     }
                     if (questItem != QUEST_17 && !CHECK_QUEST_ITEM(questItem)) {
-                        entry.msg = "You need to find {{item}} before you can play...";
+                        entry.msg = "You need to find %g{{item}}%w before you can play...";
                         entry.nextMessageID = 0x2216;
                         CustomMessage::Replace(&entry.msg, "{{item}}", Rando::StaticData::GetItemName(itemId));
                     }
@@ -82,13 +82,13 @@ void OverrideSubJsText(u16* textId, bool* loadFromMessageTable) {
                 }
                 case RO_ACCESS_TRIALS_FORMS:
                     if (jsType == 1 && !HAS_ITEM(ITEM_MASK_DEKU)) {
-                        entry.msg = "You need to find the Deku Mask before you can play...";
+                        entry.msg = "You need to find %gthe Deku Mask%w before you can play...";
                         entry.nextMessageID = 0x2216;
                     } else if (jsType == 2 && !HAS_ITEM(ITEM_MASK_GORON)) {
-                        entry.msg = "You need to find the Goron Mask before you can play...";
+                        entry.msg = "You need to find %gthe Goron Mask%w before you can play...";
                         entry.nextMessageID = 0x2216;
                     } else if (jsType == 3 && !HAS_ITEM(ITEM_MASK_ZORA)) {
-                        entry.msg = "You need to find the Zora Mask before you can play...";
+                        entry.msg = "You need to find %gthe Zora Mask%w before you can play...";
                         entry.nextMessageID = 0x2216;
                     }
                     break;

@@ -1765,7 +1765,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native gossip generation, stone routing and junk isolation",
-    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py --sanitize"
+    "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/cross_hints/run_gossip_routing_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/hint_dynamic_colors/run_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B tests/hint_dynamic_colors/run_tests.py --standalone --sanitize"
   },
   {
     "suite": "world",
