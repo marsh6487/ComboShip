@@ -1,6 +1,7 @@
 // Run complete production item and native SFX engine; pose/resource, input, and
 // audio-device output are boundaries. Missing or incorrectly scoped stops fail.
 #include "global.h"
+#include "mods/voice_pack/link_voice.h"
 #include "soh/_nei_compat_core.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #define linearVelocity speedXZ
@@ -26,6 +27,12 @@ static SequenceChannel channels[16];
 static ItemInputState input;
 static int toggles, magicSpent, damaged, choiceReady, stopCommands;
 static Vec3f otherSource;
+
+// Optional player-voice playback is outside this native Time Gate SFX fixture.
+// Decline interception so every request still runs through the real SFX bank engine.
+uint8_t LinkVoice_TryPlay(uint16_t sfxId, const void* position) { return 0; }
+void LinkVoice_Stop(uint16_t sfxId, const void* position) {}
+void LinkVoice_EndFrame(void) {}
 
 void AudioThread_QueueCmdS8(u32 opArgs, s8 data) {
     if ((opArgs >> 24) == 6 && (opArgs & 0xFF) == 0 && data == 0) {

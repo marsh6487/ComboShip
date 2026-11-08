@@ -152,19 +152,38 @@ void GameState_GetInput(GameState* gameState) {
     PadMgr_GetInput(gameState->input, true);
 }
 
+static void GameState_UpdateUiVisibility(GameState* gameState) {
+    /* L is shared with inventory/navigation. Only a fresh gameplay press may
+     * change the shared latch; rejected presses remain available to their owner. */
+    if (!UiVisibility_IsEnabled() || !CHECK_BTN_ALL(gameState->input[0].press.button, BTN_L) ||
+        CHECK_BTN_ALL(gameState->input[0].press.button, BTN_START) || gPlayState == NULL ||
+        gameState != &gPlayState->state || gameState->main != Play_Main || !gameState->running ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL) {
+        return;
+    }
+
+    PlayState* play = gPlayState;
+    Player* player = GET_PLAYER(play);
+    if (player == NULL || player->actor.update == NULL || IS_PAUSED(&play->pauseCtx) || play->frameAdvCtx.enabled ||
+        play->msgCtx.msgMode != MSGMODE_NONE || play->gameOverCtx.state != GAMEOVER_INACTIVE ||
+        play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
+        play->actorCtx.freezeFlashTimer != 0 || player->actor.freezeTimer != 0 ||
+        gSaveContext.save.saveInfo.playerData.health <= 0 || (player->stateFlags1 & PLAYER_STATE1_20) ||
+        Play_InCsMode(play)) {
+        return;
+    }
+
+    UiVisibility_Toggle();
+}
+
 void GameState_Update(GameState* gameState) {
     GraphicsContext* gfxCtx = gameState->gfxCtx;
 
     GameState_SetFrameBuffer(gameState->gfxCtx);
 
-    /* Input has already been sampled. Keep recovery available in every game
-     * state, including dialogue, pause and file select; do not consume L. */
-    if (CHECK_BTN_ALL(CONTROLLER1(gameState)->press.button, BTN_L)) {
-        UiVisibility_Toggle();
-    }
-
     GameInteractor_ExecuteOnGameStateMainStart();
 
+    GameState_UpdateUiVisibility(gameState);
     gameState->main(gameState);
 
     GameInteractor_ExecuteOnGameStateMainFinish();

@@ -104,14 +104,52 @@ static void Audio_PlaySceneSequence(uint16_t id,u8 day) {
 
 int main() {
     constexpr int player=TEST_MM?0:3;
+    const char* hostLabel=TEST_MM?"MM":"OoT";
+    uint16_t expectedEntry=0x22;
+#if !TEST_MM && TEST_DEBUG_WARP
+    // Booting directly into Debug Warp uses a temporary save in normal gameplay.
+    gSaveContext.gameMode=GAMEMODE_NORMAL;
+    gSaveContext.fileNum=0xff;
+    gSaveContext.dayTime=0x0000;
+    play.sceneNum=0x55; // SCENE_KOKIRI_FOREST
+    play.sequenceCtx.seqId=0x3c; // NA_BGM_KOKIRI
+    play.sequenceCtx.natureAmbienceId=4; // NATURE_ID_KOKIRI_REGION
+    expectedEntry=0x3c;
+    hostLabel="OoT debug warp";
+#endif
     auto frame=[] { UpdateSceneNightMusic(); };
     frame();assert(history.empty());
     cvars["gAudioEditor.EnableNightMusic"]=1;
+#if !TEST_MM
+    // Allowing debug gameplay must not enable music in title/demo or invalid slots.
+    for(int mode:{1,2,3}) { // Title/demo, file select, end credits.
+        gSaveContext.gameMode=mode;frame();
+        assert(history.empty()&&!sSceneNight.Owns());
+    }
+    gSaveContext.gameMode=GAMEMODE_NORMAL;
+    const auto initialFileNum=gSaveContext.fileNum;
+    for(int file:{3,0xfe,0x100}) {
+        gSaveContext.fileNum=file;frame();
+        assert(history.empty()&&!sSceneNight.Owns());
+    }
+    gSaveContext.fileNum=initialFileNum;
+    play.sequenceCtx.seqId=NA_BGM_NO_MUSIC;frame();
+    assert(history.empty()&&!sSceneNight.Owns());
+    play.sequenceCtx.seqId=expectedEntry;
+    const auto initialAmbience=play.sequenceCtx.natureAmbienceId;
+    play.sequenceCtx.natureAmbienceId=NATURE_ID_NONE;frame();
+    assert(history.empty()&&!sSceneNight.Owns());
+    play.sequenceCtx.natureAmbienceId=initialAmbience;
+    gSaveContext.forcedSeqId=0x3c;frame();
+    assert(history.empty()&&!sSceneNight.Owns());
+    gSaveContext.forcedSeqId=NA_BGM_GENERAL_SFX;
+#endif
     if(TEST_MM) active[0]=0xffff;
-    frame();assert(history.size()==1&&history.back().player==player&&lookups==1);
+    frame();assert(history.size()==1&&history.back().player==player&&lookups==1&&
+                   "normal gameplay must start night music for a saved game or debug warp");
     if(!TEST_MM) assert(history.back().id==0x15d&&active[0]==1);
     frame();assert(history.size()==1); // Pending command must not be repeated/stopped.
-    Flush();frame();assert(history.size()==1&&SceneNightMusic_CurrentEntry()==0x22);
+    Flush();frame();assert(history.size()==1&&SceneNightMusic_CurrentEntry()==expectedEntry);
     SceneNightMusic_RequestRefresh();frame();Flush();assert(lookups==2);
 #if !TEST_MM
     // Real talk setup sets IN_CUTSCENE even for ordinary gossip-stone dialogue.
@@ -198,5 +236,5 @@ int main() {
     } else {
         finalHours=true;active[0]=0x60;const auto n=history.size();frame();assert(history.size()==n);
     }
-    std::cout<<"PASS "<<(TEST_MM?"MM":"OoT")<<" production night adapter: custom resolution, ambience player preservation, preview/combat/fanfare, dawn, toggle, scene boundary\n";
+    std::cout<<"PASS "<<hostLabel<<" production night adapter: custom resolution, ambience player preservation, preview/combat/fanfare, dawn, toggle, scene boundary\n";
 }

@@ -499,6 +499,9 @@ FRAME_ORDER
         end = mm_play.index('{', begin)
         draw_condition = re.sub(r'\bthis\b', 'self', mm_play[begin:end])
         text += r'''
+// UI input eligibility has its own production-body control-input suite.
+// This frame fixture observes transition ordering, with no UI input active.
+static void GameState_UpdateUiVisibility(GameState*) {}
 static bool expectCovered=false,nativeEffectDrawn=false;
 static int lastRenderedFillAlpha=0;
 static bool D_801D0D54=false;

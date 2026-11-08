@@ -4,9 +4,7 @@
  * Description: Nintendo 64 logo shown on startup
  */
 
-#include "gui/UiVisibility.h"
 #include "z_title.h"
-#include "ui_visibility.h"
 #include "z64shrink_window.h"
 #include "z64view.h"
 #include "CIC6105.h"
@@ -132,7 +130,6 @@ void ConsoleLogo_Draw(GameState* thisx) {
 
     char* logoDL = gNintendo64LogoNDL;
     char* logoText = gNintendo64LogoTextTex;
-    MmUiDrawState uiDraw;
 
     if (!CVarGetInteger("gEnhancements.Graphics.AuthenticLogo", 0)) {
         logoDL = gShipLogoDL;
@@ -141,7 +138,6 @@ void ConsoleLogo_Draw(GameState* thisx) {
 
     OPEN_DISPS(this->state.gfxCtx);
 
-    uiDraw = MmUiDraw_Begin(this->state.gfxCtx, UiVisibility_IsHidden());
     lightDir.x = 69.0f;
     lightDir.y = 69.0f;
     lightDir.z = 69.0f;
@@ -196,7 +192,6 @@ void ConsoleLogo_Draw(GameState* thisx) {
         ConsoleLogo_PrintBuildInfo(this);
     }
 
-    MmUiDraw_End(this->state.gfxCtx, uiDraw);
     Environment_FillScreen(this->state.gfxCtx, 0, 0, 0, this->coverAlpha, FILL_SCREEN_XLU);
 
     sTitleRotation += 300;

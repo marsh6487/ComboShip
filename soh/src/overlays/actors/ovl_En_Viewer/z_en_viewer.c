@@ -2392,11 +2392,30 @@ static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
                                                            this->staticState.eyeIndex, this->staticState.tracking);
         if (presentation->kind == STATIC_STORY_MM_SCOPED_PLAYER_LOD)
             face = StaticStoryMm_KafeiFace(this->staticState.mmAppearance);
-        if (presentation->eyeCount != 0)
-            gSPSegment(POLY_OPA_DISP++, presentation->eyeSegment, (uintptr_t)this->staticState.mmEyeTextures[face.eye]);
-        if (presentation->mouthCount != 0)
-            gSPSegment(POLY_OPA_DISP++, presentation->mouthSegment,
-                       (uintptr_t)this->staticState.mmMouthTextures[face.mouth]);
+        if (this->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+            /* Retain each selected face resource's format, dimensions and scaling.
+             * Static storage and an even row stride keep all path addresses aligned. */
+            static const ALIGN_ASSET(2) char eyePaths[3][80] = {
+                "__OTR__objects/object_zog/object_zog_Tex_024750",
+                "__OTR__objects/object_zog/object_zog_Tex_024F50",
+                "__OTR__objects/object_zog/object_zog_Tex_025750",
+            };
+            static const ALIGN_ASSET(2) char mouthPaths[2][80] = {
+                "__OTR__objects/object_zog/object_zog_Tex_025F50",
+                "__OTR__objects/object_zog/object_zog_Tex_026750",
+            };
+            uint8_t eye = face.eye < 3 ? face.eye : 0;
+            uint8_t mouth = face.mouth < 2 ? face.mouth : 0;
+            gSPSegment(POLY_OPA_DISP++, presentation->eyeSegment, (uintptr_t)eyePaths[eye]);
+            gSPSegment(POLY_OPA_DISP++, presentation->mouthSegment, (uintptr_t)mouthPaths[mouth]);
+        } else {
+            if (presentation->eyeCount != 0)
+                gSPSegment(POLY_OPA_DISP++, presentation->eyeSegment,
+                           (uintptr_t)this->staticState.mmEyeTextures[face.eye]);
+            if (presentation->mouthCount != 0)
+                gSPSegment(POLY_OPA_DISP++, presentation->mouthSegment,
+                           (uintptr_t)this->staticState.mmMouthTextures[face.mouth]);
+        }
         gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
     }
     if (modelYaw != 0) {

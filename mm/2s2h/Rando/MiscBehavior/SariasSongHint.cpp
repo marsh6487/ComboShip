@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "MiscBehavior.h"
+#include "Rando/MagicHints.h"
 #include "2s2h/ShipUtils.h"
 #include <algorithm>
 #include <set>
@@ -116,12 +117,6 @@ void Rando::SetSariaPriorityItemsInConfig(std::vector<RandoItemId>& priorityItem
 
 static bool IsExcludedFromSariaPriorityItemCandidates(RandoItemId randoItemId) {
     switch (randoItemId) {
-        case RI_PROGRESSIVE_SWORD:
-        case RI_PROGRESSIVE_BOW:
-        case RI_PROGRESSIVE_BOMB_BAG:
-        case RI_PROGRESSIVE_MAGIC:
-        case RI_PROGRESSIVE_WALLET:
-        case RI_PROGRESSIVE_LULLABY:
         case RI_TIME_PROGRESSIVE:
         case RI_TRIFORCE_PIECE_PREVIOUS:
             return true;
@@ -135,7 +130,8 @@ std::vector<RandoItemId> Rando::GetSariaPriorityItemCandidates() {
     static const std::vector<RandoItemId> candidates = [] {
         std::vector<RandoItemId> result;
         for (auto& [randoItemId, randoStaticItem] : Rando::StaticData::Items) {
-            if ((randoStaticItem.randoItemType == RITYPE_MAJOR || randoStaticItem.randoItemType == RITYPE_MASK) &&
+            if ((randoStaticItem.randoItemType == RITYPE_MAJOR || randoStaticItem.randoItemType == RITYPE_MASK ||
+                 Rando::IsHallmarkHintUpgrade(randoItemId)) &&
                 !IsExcludedFromSariaPriorityItemCandidates(randoItemId)) {
                 result.push_back(randoItemId);
             }
@@ -168,11 +164,24 @@ RandoCheckId GetProgressiveCheckInLogic() {
             if (accessLogicFunc.first() && RANDO_SAVE_CHECKS[randoCheckId].shuffled &&
                 !RANDO_SAVE_CHECKS[randoCheckId].obtained) {
                 RandoItemId itemId = Rando::ConvertItem(RANDO_SAVE_CHECKS[randoCheckId].randoItemId, randoCheckId);
+                RandoItemId rawItem = RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
+                RandoItemId hintItem = Rando::MagicHintIdentity(rawItem, randoCheckId);
                 auto type = Rando::StaticData::Items[itemId].randoItemType;
+                if (hintItem == RI_HINT_MAGIC_STAT_UPGRADE) {
+                    type = RITYPE_MAJOR; // Only the verified non-trap fractional target gains eligibility.
+                }
+                if (type != RITYPE_MAJOR && type != RITYPE_MASK && !Rando::IsHallmarkHintUpgrade(itemId)) {
+                    continue; // Converted duplicates/ammo must not win a progressive-family wish.
+                }
 
-                if (std::find(priorityItems.begin(), priorityItems.end(), itemId) != priorityItems.end()) {
-                    priorityItemChecks.try_emplace(itemId, randoCheckId);
-                } else if (type == RITYPE_MAJOR || type == RITYPE_MASK) {
+                bool prioritized = false;
+                for (RandoItemId wish : priorityItems) {
+                    if (Rando::MagicHintMatches(wish, hintItem) || wish == itemId) {
+                        priorityItemChecks.try_emplace(wish, randoCheckId);
+                        prioritized = true;
+                    }
+                }
+                if (!prioritized && (type == RITYPE_MAJOR || type == RITYPE_MASK)) {
                     otherChecks.push_back(randoCheckId);
                 }
             }

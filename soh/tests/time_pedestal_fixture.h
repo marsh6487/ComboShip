@@ -255,6 +255,7 @@ struct PlayState {
 #define TRANS_TYPE_INSTANT 11
 #define TRANS_TYPE_FADE_BLACK_FAST 6
 #define TRANS_TYPE_FADE_WHITE_FAST 7
+#define TRANS_TYPE_FADE_WHITE 3
 #define SCENE_LOST_WOODS 0x5B
 #define SCENE_HYRULE_CASTLE 0x5F
 #define SCENE_OUTSIDE_GANONS_CASTLE 0x64
@@ -277,6 +278,14 @@ struct PlayState {
 #define VB_EXECUTE_PLAYER_STARTMODE_FUNC 8
 #define BTN_B 0x4000
 #define BTN_A 0x8000
+#define BTN_CLEFT 0x0002
+#define BTN_CDOWN 0x0004
+#define BTN_CRIGHT 0x0001
+#define BTN_DUP 0x0800
+#define BTN_DDOWN 0x0400
+#define BTN_DLEFT 0x0200
+#define BTN_DRIGHT 0x0100
+#define PAUSE_ITEM_NONE 999
 #define PLAYER_ACTION_HANDLER_7 7
 #define PLAYER_STATE1_LOADING (1U << 0)
 #define PLAYER_STATE1_START_CHANGING_HELD_ITEM (1U << 1)
@@ -439,6 +448,12 @@ void Play_PerformSave(PlayState*);
 void Play_SaveSceneFlags(PlayState*);
 void Save_SaveFile(void);
 void Interface_LoadItemIcon1(PlayState*, u16);
+void Interface_LoadItemIcon2(PlayState*, u16);
+u8 ItemInput_ButtonIsClaimed(u16);
+u8 Picto_IsOwned(void);
+u8 Picto_IsOnLensActive(void);
+u8 PowerKeg_IsOwned(void);
+u8 PowerKeg_IsOnBombActive(void);
 void Interface_ChangeHudVisibilityMode(s16);
 void func_808519EC(PlayState*, Player*, CsCmdActorCue*);
 void func_80851A50(PlayState*, Player*, CsCmdActorCue*);

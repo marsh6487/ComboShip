@@ -44,7 +44,7 @@ def block_from(source, start):
 
 
 def struct_typedef(source, name):
-    return re.search(r"typedef struct\s*\{[^{}]*\}\s*" + name + r";", source, re.S)[0]
+    return re.search(r"typedef struct(?:\s+\w+)?\s*\{[^{}]*\}\s*" + name + r";", source, re.S)[0]
 
 
 def main():

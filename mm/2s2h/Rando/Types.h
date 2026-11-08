@@ -3228,6 +3228,8 @@ typedef enum {
     RI_MAX_TRAP, // Just used for ice trap ice cube model
     // Append-only: Magic Mirror standalone shuffle.
     RI_OOT_NEI_MAGIC_MIRROR,
+    // Hint selector identity only; fractional upgrades retain their OoT ownership.
+    RI_HINT_MAGIC_STAT_UPGRADE,
     RI_MAX,
 } RandoItemId;
 
@@ -3630,7 +3632,7 @@ typedef enum {
     // 2026-08-06 — symmetric cross-game pool categories (user requirement #1: each game can offer
     // the other's items WITHOUT the combo). One checkbox per category; combo mode keeps supplying
     // these through its own block/FC delegation, so the standalone blocks are combo-gated OFF.
-    RO_SHUFFLE_OOT_GEAR,      // MS/BGS chains, stick/nut capacity, Open Chests, Strength, Roc's Feather
+    RO_SHUFFLE_OOT_GEAR,      // MS/BGS chains, stick/nut capacity, Strength, Roc's Feather
     RO_SHUFFLE_OOT_EQUIPMENT, // the 12 ext-equipment grid pieces + the progressive Skijer Roc
     RO_SHUFFLE_OOT_QUEST,     // OoT songs + medallions + spiritual stones + Stone of Agony
     RO_SHUFFLE_OOT_MASKS,     // Skull / Spooky / Gerudo

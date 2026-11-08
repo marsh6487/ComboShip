@@ -57,6 +57,7 @@ class Texture {
     uint16_t Width = 64, Height = 32;
     uint8_t* ImageData = nullptr;
     uint32_t ImageDataSize = 0;
+    bool NeutralizeShading = false; // Match the production transient material default.
     std::shared_ptr<Ship::ResourceInitData> init = std::make_shared<Ship::ResourceInitData>();
     std::shared_ptr<Ship::ResourceInitData> GetInitData() { return init; }
 };

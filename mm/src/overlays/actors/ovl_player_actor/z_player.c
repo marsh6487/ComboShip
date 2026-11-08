@@ -8,6 +8,7 @@
  */
 
 #include "global.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
@@ -1863,6 +1864,22 @@ void Player_AnimSfx_PlayFloorByAge(Player* this, u16 sfxId) {
     Player_PlaySfx(this, Player_GetFloorSfxByAge(this, sfxId));
 }
 
+static u16 Player_GetStepSfxOffset(Player* this) {
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && !(this->actor.bgCheckFlags & BGCHECKFLAG_WATER) &&
+        !RocBoots_OnWater() && this->actor.floorBgId == BGCHECK_SCENE &&
+        MMWeather_SeasonForPlay(gPlayState) == SEASON_WINTER) {
+        switch (this->floorSfxOffset) {
+            case NA_SE_PL_WALK_GROUND - SFX_FLAG:
+            case NA_SE_PL_WALK_SAND - SFX_FLAG:
+            case NA_SE_PL_WALK_CONCRETE - SFX_FLAG:
+            case NA_SE_PL_WALK_DIRT - SFX_FLAG:
+            case NA_SE_PL_WALK_GRASS - SFX_FLAG:
+                return NA_SE_PL_WALK_SNOW - SFX_FLAG;
+        }
+    }
+    return this->floorSfxOffset;
+}
+
 // ANIMSFX_TYPE_6 and ANIMSFX_TYPE_8
 void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {
     s32 sfxId;
@@ -1877,7 +1894,7 @@ void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {
         // metallic footstep). Overrides the floor+age walk sfx.
         sfxId = NA_SE_PL_WALK_METAL1;
     } else {
-        sfxId = Player_GetFloorSfxByAge(this, NA_SE_PL_WALK_GROUND);
+        sfxId = NA_SE_PL_WALK_GROUND + Player_GetStepSfxOffset(this) + this->ageProperties->surfaceSfxIdOffset;
     }
 
     // Audio_PlaySfx_AtPosForMetalEffectsWithSyncedFreqAndVolume
@@ -12766,6 +12783,13 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
         updBgCheckInfoFlags &= ~(UPDBGCHECKINFO_FLAG_8 | UPDBGCHECKINFO_FLAG_10);
     }
 
+    // Query water normally, but a frozen surface must not emit water-entry
+    // ripples before the surface pin clears WATER later in this function.
+    if (Seasons_WalksOnWater() && this->transformation == PLAYER_FORM_HUMAN &&
+        !(this->stateFlags1 & PLAYER_STATE1_8000000) && this->actor.velocity.y <= 0.0f) {
+        updBgCheckInfoFlags |= UPDBGCHECKINFO_FLAG_40;
+    }
+
     Actor_UpdateBgCheckInfo(play, &this->actor, 268 * 0.1f, wallCheckRadius, ceilingCheckHeight, updBgCheckInfoFlags);
 
     this->unk_AC0 -= (this->actor.world.pos.y - this->actor.prevPos.y) / this->actor.scale.y;
@@ -13040,8 +13064,19 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
             }
             sPlayerFloorType = FLOOR_TYPE_0;
             sPlayerFloorEffect = FLOOR_EFFECT_0;
+            if (Seasons_WalksOnWater()) {
+                this->actor.bgCheckFlags &= ~(BGCHECKFLAG_WATER | BGCHECKFLAG_WATER_TOUCH);
+            }
             this->floorPitch = this->floorPitchAlt = sFloorPitchShape = 0;
         }
+    }
+
+    // The current surface pin owns this sound, even over a deep pool with no
+    // bottom polygon. Do not inherit the underwater floor or a previous step.
+    if (RocBoots_OnFrozenWater()) {
+        this->prevFloorSfxOffset = this->floorSfxOffset;
+        this->floorSfxOffset = NA_SE_PL_WALK_ICE - SFX_FLAG;
+        return;
     }
 
     if (floorPoly != NULL) {
@@ -14168,6 +14203,44 @@ s32 Player_UpdateNoclip(Player* this, PlayState* play) {
 // mods/equipment/behaviors/equip_kite_shield.c. Mirrors the SoH placement. Skijer's NEI
 #include "mods/equipment/kite_surf.c"
 
+static void Player_UpdateCouplesMask(Player* this, PlayState* play) {
+    static s16 timer = 0;
+
+    if ((this->currentMask != PLAYER_MASK_COUPLE) || (this->transformation != PLAYER_FORM_HUMAN) ||
+        (this->stateFlags1 & PLAYER_STATE1_DEAD) || (gSaveContext.save.saveInfo.playerData.health <= 0)) {
+        timer = 0;
+        return;
+    }
+    if (IS_PAUSED(&play->pauseCtx) || (play->gameOverCtx.state != GAMEOVER_INACTIVE) ||
+        (play->transitionTrigger != TRANS_TRIGGER_OFF) || (play->transitionMode != TRANS_MODE_OFF) ||
+        Play_InCsMode(play)) {
+        return;
+    }
+
+    if (timer > 0) {
+        timer--;
+    }
+    if (timer == 0) {
+        // Match OoT's NEI cadence: day = 1 health unit / 4 updates, night = 1 magic unit / 7 updates.
+        if (!gSaveContext.save.isNight) {
+            timer = 4;
+            if (gSaveContext.save.saveInfo.playerData.health < gSaveContext.save.saveInfo.playerData.healthCapacity) {
+                gSaveContext.save.saveInfo.playerData.health++;
+            }
+        } else {
+            timer = 7;
+            // Use the initialized native capacity, which already includes fractional RPG upgrades.
+            // Never grant ownership or write into the meter's capacity/fill initialization handshake.
+            if (gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
+                (gSaveContext.magicState != MAGIC_STATE_STEP_CAPACITY) &&
+                (gSaveContext.magicState != MAGIC_STATE_FILL) &&
+                (gSaveContext.save.saveInfo.playerData.magic < gSaveContext.magicCapacity)) {
+                gSaveContext.save.saveInfo.playerData.magic++;
+            }
+        }
+    }
+}
+
 static void Player_UpdateCustomItems(Player* this, PlayState* play) {
     u16 toggleButton = 0;
     ItemId item = ITEM_NONE;
@@ -14388,6 +14461,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
     CustomForms_FilterInput(this, &input);
 
     Player_UpdateCommon(this, play, &input);
+    Player_UpdateCouplesMask(this, play);
 
     // The Trident needs current input/stick state and stamps its PAUSE ownership
     // after Player_UpdateCommon's clears, matching SoH's hook order.

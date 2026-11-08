@@ -11,7 +11,9 @@
  * Included by ext_equip_behavior.c (unity build).
  */
 
-// No extra includes — unity-built from ext_equip_behavior.c
+#include "mods/items/helpers/item_voice.h"
+
+// Unity-built from ext_equip_behavior.c
 // which inherits all includes from extended_equipment.c
 
 // ---------------------------------------------------------------------------
@@ -371,8 +373,7 @@ static void Pegasus_StateRunning(Player* p, PlayState* play) {
             // Bonk sounds
             Audio_PlaySoundGeneral(NA_SE_PL_BODY_HIT, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
                                    &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-            Audio_PlaySoundGeneral(NA_SE_VO_LI_CLIMB_END, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Player_AnimSfx_PlayVoice(p, NA_SE_VO_LI_CLIMB_END);
 
             gExtEquipBehavior.pegasusState = PEGASUS_BONK;
             gExtEquipBehavior.pegasusTimer = 0; // Timer not used — wait for anim to finish

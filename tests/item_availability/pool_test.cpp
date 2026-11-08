@@ -124,11 +124,14 @@ int main() {
                     count(RI_OOT_NEI_CANE_SOMARIA_PLATFORM) ==
                         (paired && nei ? 1 : 0),
                     "Trirod only enters pools with OoT gameplay, not MM-only");
-                const int chestSupply = paired ? (unified ? 2 : int(gear)) : 0;
+                // Modern Combo receives actions from OoT's settings-scoped pool.
+                // The MM gear category must never manufacture an extra chest ability;
+                // only the legacy unified transport retains its existing two copies.
+                const int chestSupply = paired && unified ? 2 : 0;
                 expect(count(RI_OOT_ABILITY_CHESTS) ==
                            std::max(0, chestSupply - int(startWith)) * density,
-                       "Open Chests supply requires OoT and respects starting "
-                       "inventory/density");
+                       "Open Chests supply follows pool ownership and respects "
+                       "starting inventory/density; MM gear cannot add actions");
                 expect(count(RI_OOT_SONG_COMMAND_MELODY) == !startWith,
                        "Command Melody retains one source or its requested "
                        "starting copy");

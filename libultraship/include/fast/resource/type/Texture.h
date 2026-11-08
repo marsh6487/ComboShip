@@ -33,6 +33,9 @@ class Texture final : public Ship::Resource<uint8_t> {
     TextureType Type;
     uint16_t Width, Height;
     uint32_t Flags = 0;
+    // Runtime material copy only; never serialized. Neutralize warm vertex /
+    // primitive tint for this texture's world triangles while retaining light.
+    bool NeutralizeShading = false;
     float HByteScale = 1.0;
     float VPixelScale = 1.0;
     uint32_t ImageDataSize;

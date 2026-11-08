@@ -17,19 +17,28 @@ typedef int32_t s32;
 typedef int16_t s16;
 typedef struct {} GraphicsContext;
 typedef struct { struct { unsigned button; } press; } Input;
-typedef struct GameState { GraphicsContext *gfxCtx; Input input[4]; void (*main)(struct GameState*); } GameState;
+typedef struct GameState { GraphicsContext *gfxCtx; Input input[4]; int running; void (*main)(struct GameState*); } GameState;
 typedef struct { int mapRoomNum, minimapAlpha, minigameState; } InterfaceContext;
-typedef struct { int state; } PauseContext;
-typedef struct { struct { struct { float y; } pos; } world; } Actor;
-typedef struct { Actor actor; } Player;
-typedef struct { GameState state; InterfaceContext interfaceCtx; PauseContext pauseCtx; int sceneId; Player player; } PlayState;
+typedef struct { int state, debugEditor; } PauseContext;
+typedef struct { struct { struct { float y; } pos; } world; void (*update)(void); int freezeTimer; } Actor;
+typedef struct { Actor actor; unsigned stateFlags1; } Player;
+typedef struct { GameState state; InterfaceContext interfaceCtx; PauseContext pauseCtx; int sceneId; Player player;
+    struct { int enabled; } frameAdvCtx;
+    struct { int msgMode; } msgCtx;
+    struct { int state; } gameOverCtx;
+    struct { int freezeFlashTimer; } actorCtx;
+    int transitionTrigger, transitionMode;
+} PlayState;
+static PlayState *gPlayState;
+static void Play_Main(GameState *state);
+static void playerUpdate(void) {}
 static int minimal, enabled, hidden = 1, blocked, inCutscene, hookAllows = 1;
 static int minimapDisabled, mapUpdates, sLastRoomNum, playerFloor, toggles, sounds, mainCalls, events;
 static int R_PAUSE_BG_PRERENDER_STATE;
 static struct { void *mapDataScene, *minimapCurTex, *minimapPrevTex;
     int minimapCurX,minimapCurY,minimapPrevX,minimapPrevY,curRoom,prevRoom,swapAnimTimer; } sMapDisp;
 static int sSceneNumRooms=1, hudEditorActiveElement, roomDraws, mapAvailable=1;
-static struct { int mapIndex; } gSaveContext;
+static struct { int mapIndex, gameMode; struct { struct { struct { int health; } playerData; } saveInfo; } save; } gSaveContext;
 #define HUD_EDITOR_ELEMENT_MINIMAP 1
 #define HUD_EDITOR_ELEMENT_NONE 0
 #define DUNGEON_COMPASS 0
@@ -50,10 +59,17 @@ static void MapDisp_Minimap_DrawActors(void *play) {}
 #define PAUSE_BG_PRERENDER_PROCESS 2
 #define PAUSE_STATE_OPENING_2 2
 #define BTN_L 0x20
+#define BTN_START 0x1000
+#define GAMEMODE_NORMAL 0
+#define MSGMODE_NONE 0
+#define GAMEOVER_INACTIVE 0
+#define TRANS_TRIGGER_OFF 0
+#define TRANS_MODE_OFF 0
+#define PLAYER_STATE1_20 (1 << 5)
 #define CHECK_BTN_ALL(value, bits) (((value) & (bits)) == (bits))
 #define CONTROLLER1(state) (&(state)->input[0])
 #define GET_PLAYER(play) (&(play)->player)
-#define IS_PAUSED(ctx) ((ctx)->state != 0)
+#define IS_PAUSED(ctx) ((ctx)->state != 0 || (ctx)->debugEditor != 0)
 #define R_MINIMAP_DISABLED minimapDisabled
 #define R_PLAYER_FLOOR_REVERSE_INDEX playerFloor
 #define FLOOR_INDEX_MAX 8
@@ -87,11 +103,16 @@ static void GameInteractor_ExecuteOnGameStateUpdate(void) { ++events; }
 static void GameState_Draw(GameState *state, GraphicsContext *gfx) { ++events; }
 static void GameState_DrawEnd(GraphicsContext *gfx) { ++events; }
 /* PRODUCTION */
-static void playMain(GameState *state) { ++mainCalls; Map_Update((PlayState*)state); }
+static void Play_Main(GameState *state) { ++mainCalls; Map_Update((PlayState*)state); }
 static void otherMain(GameState *state) { ++mainCalls; }
 static void reset(PlayState *play) {
     *play = (PlayState){0};
-    play->state.main = playMain;
+    play->state.main = Play_Main;
+    play->state.running = 1;
+    play->player.actor.update = playerUpdate;
+    gPlayState = play;
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
+    gSaveContext.save.saveInfo.playerData.health = 0x30;
     play->state.input[0].press.button = BTN_L;
     minimal = enabled = blocked = inCutscene = minimapDisabled = sounds = toggles = events = mainCalls = 0;
     hidden = hookAllows = 1;
@@ -114,17 +135,18 @@ int main(void) {
     assert(toggles == 1 && !UiVisibility_IsHidden() && minimapDisabled == 0 && sounds == 0);
     GameState_Update(&play.state);
     assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0);
-    // Global L recovery remains available in pauses/dialogue/file select. Map
-    // input must not also flip, including when normal minimap input is blocked.
+    // Inventory/dialogue/file-select L must preserve visibility and input.
+    // Native minimap handling must not double-toggle.
     play.pauseCtx.state = 6; inCutscene = 1;
     GameState_Update(&play.state);
-    assert(toggles == 3 && !UiVisibility_IsHidden() && minimapDisabled == 0);
+    assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0);
+    assert(play.state.input[0].press.button == BTN_L);
     play.state.main = otherMain;
     GameState_Update(&play.state);
-    assert(toggles == 4 && UiVisibility_IsHidden());
+    assert(toggles == 2 && UiVisibility_IsHidden());
     play.state.input[0].press.button = 0;
     GameState_Update(&play.state);
-    assert(toggles == 4);
+    assert(toggles == 2);
     enabled = 0;
     assert(!UiVisibility_IsHidden());
     reset(&play); minimal = 1; inCutscene = 1;
@@ -148,11 +170,12 @@ int main(void) {
     MapDisp_DrawMinimap(&play,0,0,0); assert(roomDraws==1);
     play.interfaceCtx.minimapAlpha=255; sMapDisp.mapDataScene=NULL;
     MapDisp_DrawMinimap(&play,0,0,0); assert(roomDraws==1);
-    puts("PASS MM UI L: native, no-map Minimal, True Hidden priority/global recovery, gates and setup");
+    puts("PASS MM UI L: native, no-map Minimal, True Hidden priority/control-only input, gates and setup");
 }
 '''
 production = function((ROOT/'mm/src/code/z_map_exp.c').read_text(), 'Map_Update')
 production += function((ROOT/'mm/src/code/z_construct.c').read_text(), 'Regs_InitData')
+production += function((ROOT/'mm/src/code/game.c').read_text(), 'GameState_UpdateUiVisibility')
 production += function((ROOT/'mm/src/code/game.c').read_text(), 'GameState_Update')
 production += function((ROOT/'mm/src/code/z_map_disp.c').read_text(), 'MapDisp_DrawMinimap')
 with tempfile.TemporaryDirectory(prefix='mm-ui-input-') as directory:

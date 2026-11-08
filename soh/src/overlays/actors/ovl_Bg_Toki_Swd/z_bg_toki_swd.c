@@ -496,6 +496,7 @@ void BgTokiSwd_FinishTimePedestal(BgTokiSwd* this, PlayState* play) {
     play->csCtx.linkAction = NULL;
     gSaveContext.cutsceneIndex = 0;
     gSaveContext.cutsceneTrigger = 0;
+    gSaveContext.cutsceneTransitionControl = 1;
     Audio_SetCutsceneFlag(0);
     // Some Lost Woods entrances continue BGM. The sword fanfare replaced the
     // scene track, so force normal scene music to restart on the local reload.
@@ -506,8 +507,11 @@ void BgTokiSwd_FinishTimePedestal(BgTokiSwd* this, PlayState* play) {
     // synchronous load. Finish a visible fade first, then fade back into the
     // independent exit animation. Keep the safe respawn recorded above, but
     // do not visibly snap Link back to his approach position during fade-out.
-    play->transitionType = TRANS_TYPE_FADE_WHITE_FAST;
-    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE_FAST;
+    // The Temple uses its regular white transition for both completed and
+    // automatically skipped time travel. Only the optional local B skip has
+    // already covered the handoff with its separate short fade.
+    play->transitionType = this->skipFadeFrame != 0 ? TRANS_TYPE_FADE_WHITE_FAST : TRANS_TYPE_FADE_WHITE;
+    gSaveContext.nextTransitionType = play->transitionType;
     player->actor.world.pos = ceremonyPos;
     player->yaw = player->actor.shape.rot.y = ceremonyYaw;
     player->interactRangeActor = &this->actor;
@@ -559,13 +563,19 @@ void BgTokiSwd_TimePedestalCutscene(BgTokiSwd* this, PlayState* play) {
     }
     GET_PLAYER(play)->interactRangeActor = &this->actor;
 
-    // The copied script deliberately omits the native destination command, so
-    // its automatic story-skip hook never runs. Read the same setting directly:
-    // that hook would also award story flags/items inappropriate for this actor.
-    // B can skip either local ceremony after the native camera has started.
+    // Mirror the Temple terminator's automatic branch: after frame 20, enter
+    // its native white transition directly. An extra env-fill ramp here made
+    // every interaction flash when Story Skip was enabled. Do not invoke the
+    // story hook itself, which would award progression/items at this local prop.
     if (this->localCutsceneStarted && play->csCtx.frames > 20 && play->csCtx.frames < this->ageSwapFrame &&
-        (this->skipFadeFrame != 0 || CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Story"), IS_RANDO) ||
-         CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B))) {
+        CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Story"), IS_RANDO)) {
+        BgTokiSwd_FinishTimePedestal(this, play);
+        return;
+    }
+
+    // The separately requested local B shortcut retains its existing fade.
+    if (this->localCutsceneStarted && play->csCtx.frames > 20 && play->csCtx.frames < this->ageSwapFrame &&
+        (this->skipFadeFrame != 0 || CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B))) {
         if (this->skipFadeFrame < TIME_PEDESTAL_SKIP_FADE_FRAMES) {
             this->skipFadeFrame++;
             BgTokiSwd_SetSkipFill(play, 255 * this->skipFadeFrame / TIME_PEDESTAL_SKIP_FADE_FRAMES);

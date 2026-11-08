@@ -55,6 +55,10 @@ u8 RocBoots_OnWater(void) {
     return sRocOnWater;
 }
 
+u8 RocBoots_OnFrozenWater(void) {
+    return sRocOnWater && Seasons_WalksOnWater();
+}
+
 // Per-frame behavior while the Roc Boots are the equipped ext boots (the effects are z_player gates).
 static void RocBoots_Behavior(Player* player, PlayState* play) {
     (void)player;

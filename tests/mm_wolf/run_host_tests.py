@@ -40,6 +40,9 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
     input_end=player_source.index('\n    GameInteractor_ExecuteOnPassPlayerInputs(&input);',input_start)
     input_body=player_source[input_start:input_end]
     native_actions.write_text('#include "global.h"\n'
+                              '#include "2s2h/Enhancements/Audio/MMWeather.h"\n'
+                              '#include "mods/nei_save.h"\n'
+                              'u8 RocBoots_OnWater(void);\n'
                               '#include "mods/forms/wolf_link_host.h"\n'
                               '#include "mods/items/custom_items.h"\n'
                               '#include "mods/extended_equipment.h"\n'
@@ -60,6 +63,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               native_body('void Player_Action_82(Player* this, PlayState* play) {')+'\n'+
                               native_body('bool func_8082DA90(PlayState* play) {')+'\n'+
                               native_body('u16 Player_GetFloorSfxByAge(Player* this, u16 sfxId) {')+'\n'+
+                              native_body('static u16 Player_GetStepSfxOffset(Player* this) {')+'\n'+
                               native_body('void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {')+'\n'+
                               native_body('void Player_AnimSfx_PlayFloorJump(Player* this) {')+'\n'+
                               native_body('void Player_AnimSfx_PlayFloorLand(Player* this) {')+'\n'+

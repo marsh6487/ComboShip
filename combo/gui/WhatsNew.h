@@ -19,6 +19,8 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.HideNonTransformationMasks", Kind::New,
+      "Hide worn non-transformation masks in both games while keeping their effects active." },
     { "gEnhancements.TrueHiddenUI", Kind::New,
       "Use L to hide every game UI element and passive overlay. Open application settings remain available." },
     { "gEnhancements.MinimalUI", Kind::Updated,

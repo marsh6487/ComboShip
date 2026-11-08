@@ -1,6 +1,7 @@
 #include "global.h"
 #include <nlohmann/json_fwd.hpp>
 #include "2s2h/Rando/Rando.h"
+#include "2s2h/Rando/MagicHints.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "overlays/actors/ovl_En_Js/z_en_js.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -76,7 +77,19 @@ std::string GetItemName(RandoItemId item, bool, RandoCheckId
     }
 }
 }
+#ifdef COMBO_BUILD
+// These cases place local MM items; foreign-placement lookup is a controlled boundary.
+namespace Rando::MiscBehavior {
+const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId) { return nullptr; }
+}
+#endif
 namespace Rando {
+// These color cases place concrete tiers. Progressive conversion is covered by
+// tests/magic_hints; fail here if a case unexpectedly crosses that boundary.
+RandoItemId ConvertItem(RandoItemId, RandoCheckId) {
+    assert(false && "unexpected progressive conversion in concrete-item color fixture");
+    return RI_NONE;
+}
 std::string GetHintLocationText(RandoItemId item, RandoCheckId check, bool) {
     locationReads.emplace_back(item, check);
     return "at Gerudo Fortress (OOT)";

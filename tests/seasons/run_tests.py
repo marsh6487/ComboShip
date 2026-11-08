@@ -281,6 +281,8 @@ assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
 run('winter_water',r'''
 int activeSeason=SEASON_WINTER;u8 bootsWorn=0;static u8 sRocOnWater=0;
 int MMWeather_Season(){return activeSeason;}
+u8 Seasons_SeasonCount(){return activeSeason >= 0 ? 1 : 0;}
+u8 Seasons_GetSeason(){return activeSeason >= 0 ? activeSeason : SEASON_OFF;}
 u8 RocBoots_IsWorn(){return bootsWorn;}
 ''',[(body('mm/mods/items/logic/item_rod_of_seasons.c','Seasons_WalksOnWater') if 'Seasons_WalksOnWater' in rodsource else 'u8 Seasons_WalksOnWater(){return 0;}'), body('mm/mods/equipment/behaviors/equip_roc_boots.c','RocBoots_WalksOnWater')],r'''
 Player p{};p.transformation=PLAYER_FORM_HUMAN;p.actor.depthInWater=1;

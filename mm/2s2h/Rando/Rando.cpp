@@ -1,3 +1,4 @@
+#include "Rando/MagicHints.h"
 #include "Rando.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -77,7 +78,11 @@ std::string Rando::GetHintLocationText(RandoItemId randoItemId, RandoCheckId ran
 std::vector<RandoCheckId> Rando::FindMultiItemPlacement(RandoItemId randoItemId) {
     std::vector<RandoCheckId> itemPlacements;
     for (auto& [randocheckId, check] : Rando::StaticData::Checks) {
-        if (RANDO_SAVE_CHECKS[randocheckId].randoItemId == randoItemId) {
+        if (Rando::MagicHintMatches(
+                randoItemId, Rando::MagicHintIdentity(RANDO_SAVE_CHECKS[randocheckId].randoItemId, randocheckId)) ||
+            (HintProgressiveFamily(randoItemId) != randoItemId &&
+             RANDO_SAVE_CHECKS[randocheckId].randoItemId == HintProgressiveFamily(randoItemId) &&
+             randoItemId == ConvertItem(HintProgressiveFamily(randoItemId), randocheckId))) {
             itemPlacements.push_back(randocheckId);
         }
     }

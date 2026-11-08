@@ -71,7 +71,8 @@ def main():
         ('soh/src/code/z_actor.c', ['Attention_SetReticlePos', 'Attention_Draw', 'TitleCard_Draw']),
         ('soh/src/overlays/actors/ovl_End_Title/z_end_title.c', ['EndTitle_DrawFull','EndTitle_DrawNintendoLogo']),
         ('soh/src/overlays/actors/ovl_En_Mag/z_en_mag.c', ['EnMag_Draw']),
-        ('soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c', ['FileChoose_Main'])]
+        ('soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c', ['FileChoose_Main']),
+        ('soh/src/overlays/gamestates/ovl_select/z_select.c', ['Select_Draw'])]
     native_ui_fixture = native_ui_fixture.replace('/* PRODUCTION_NATIVE_UI */', '\n'.join(
         function((ROOT / path).read_text(), name) for path, names in ui_functions for name in names))
     graph = (ROOT / 'soh/src/code/graph.c').read_text()

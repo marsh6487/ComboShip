@@ -4987,7 +4987,10 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
              ((((player->transformation != PLAYER_FORM_HUMAN) && (player->currentMask >= PLAYER_MASK_FIERCE_DEITY)) &&
                ((player->transformation + PLAYER_MASK_FIERCE_DEITY) != player->currentMask)) &&
               (player->skelAnime.curFrame >= 10.0f)))) {
-            if (func_80127438(play, player, player->currentMask)) {
+            // Hide only worn models; the shared segment loader also supplies masks held during equip/unequip.
+            if ((!CVarGetInteger("gEnhancements.HideNonTransformationMasks", 0) ||
+                 (player->currentMask >= PLAYER_MASK_FIERCE_DEITY)) &&
+                func_80127438(play, player, player->currentMask)) {
                 s32 maskMinusOne = player->currentMask - 1;
 
                 OPEN_DISPS(play->state.gfxCtx);
