@@ -6,6 +6,13 @@
 #include <string.h>
 
 #ifdef TEST_MM
+#include "mods/voice_pack/link_voice.h"
+// Player-voice interception is outside this cap/SFX lifetime fixture. Decline
+// interception so the real request/bank engine continues to own every sound.
+uint8_t LinkVoice_TryPlay(uint16_t sfxId, const void* position) { return 0; }
+void LinkVoice_Stop(uint16_t sfxId, const void* position) {}
+void LinkVoice_EndFrame(void) {}
+
 #define TEST_GAME "MM"
 #define BANKS gSfxBanks
 #define BANK(sfx) SFX_BANK(sfx)
