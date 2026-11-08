@@ -2,6 +2,7 @@
 #include "ComboNotesWindow.h"
 #include "ComboExport.h"
 #include "ComboTrackerCommon.h" // ComboTracker::OotActiveSlot + SetTracker
+#include "UiVisibility.h"
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h>     // InputTextMultiline over a std::string (vendored with ImGui)
 #include <libultraship/libultraship.h> // CVar bridge
@@ -36,7 +37,7 @@ void ComboNotes::FlushPending() {
     sDirty = false;
 }
 
-void ComboNotesWindow::Draw() {
+void ComboNotesWindow::UpdateElement() {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
         return;
@@ -50,13 +51,27 @@ void ComboNotesWindow::Draw() {
         return;
     }
 
+    // Hiding the editor loses focus without submitting its input widget. Keep
+    // pending edits and debounce live while preserving the window's open intent.
+    if (sDirty && (UiVisibility_IsHidden() || ImGui::GetTime() - sLastEdit > 2.0)) {
+        ComboNotes::FlushPending();
+    }
+
     int slot = ComboTracker::OotActiveSlot();
     if (slot != sLoadedSlot) {
         ComboNotes::FlushPending();
         sLoadedSlot = slot;
         sBuf = (slot >= 0 && sGet) ? sGet(slot) : ""; // copy out of the launcher's thread_local now
     }
-    if (slot < 0) {
+}
+
+void ComboNotesWindow::Draw() {
+    auto ctx = Ship::Context::GetRawInstance();
+    if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+        return;
+    }
+    ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
+    if (!IsVisible() || ComboTracker::OotActiveSlot() < 0) {
         return; // no save loaded (title/file select)
     }
 
@@ -78,8 +93,8 @@ void ComboNotesWindow::DrawElement() {
         sDirtySlot = sLoadedSlot;
         sLastEdit = ImGui::GetTime();
     }
-    // Persist on focus loss, or 2s after the last keystroke (SoH's 40-idle-frame equivalent).
-    if (ImGui::IsItemDeactivatedAfterEdit() || (sDirty && ImGui::GetTime() - sLastEdit > 2.0)) {
+    // Debounce and hidden-editor focus loss run in UpdateElement too.
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
         ComboNotes::FlushPending();
     }
 }

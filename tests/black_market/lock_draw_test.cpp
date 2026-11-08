@@ -13,6 +13,10 @@
 #ifndef OOT_LOCK_TEST
 #include "combo/BlackMarketMmShopLayout.h"
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
+#include "mm/2s2h/Enhancements/Debug/FrameTiming.h"
+// The standalone draw fixture exercises the normal, disabled recorder path.
+extern "C" FrameTimingSpan FrameTiming_BeginSpan(void) { return {}; }
+extern "C" void FrameTiming_EndNamedSpan(const char*, const char*, FrameTimingSpan) {}
 #endif
 
 using namespace ComboRando::BlackMarket;
@@ -36,7 +40,7 @@ static constexpr Vec3f kShelves[8] = {
     {-72,64,48},{-72,104,48},{-120,64,48},{-120,104,48}
 };
 static int sSelected = 3, allocations, matrixAllocations, setups, draws, pushDepth;
-static int shelfDraws, interiorEffects;
+static int shelfDraws, interiorEffects, boundsQueries;
 void DrawShelves(PlayState*) { ++shelfDraws; }
 static bool sTalking = true, sTitlePending, sGrannyActive, active = true, interior = true, allocate = true, report = true;
 static bool allOffers = false, refillOffer = false;
@@ -79,7 +83,9 @@ PurchaseResult Status(int slot) {
 void SubmitOffer(const Item& item) {
     const int slot = int(&item - Catalog().data());
     const bool locked = Status(slot) == PurchaseResult::Locked;
-    assert(BlackMarketVisual::Active() == locked && "only locked offers should query geometry");
+    assert(BlackMarketVisual::Active() == (locked && seals) &&
+           "only locked offers with visible seals should query geometry");
+    if (BlackMarketVisual::Active()) ++boundsQueries;
     if (report) BlackMarketVisual::Report({10.f + slot,20,30}, {16.f + slot,40,34},
                                         [](BlackMarketVisual::Point point) { return point; });
     drawnKeys.emplace_back(item.key);
@@ -157,12 +163,12 @@ void Reset() {
     graphics.polyXlu.p = commands.data(); graphics.polyXlu.d = commands.data() + commands.size();
     graphics.overlay.p = overlayCommands.data(); graphics.overlay.d = overlayCommands.data() + overlayCommands.size();
     play.gameplayFrames = 31;
-    allocations = matrixAllocations = setups = draws = pushDepth = shelfDraws = interiorEffects = 0;
+    allocations = matrixAllocations = setups = draws = pushDepth = shelfDraws = interiorEffects = boundsQueries = 0;
     vertexAllocations.clear();
     soldOutDraws = 0;
     drawnKeys.clear(); allOffers = refillOffer = false; soldOutSlot = -1; sSelected = 3;
     translations.clear(); scales.clear(); active = interior = allocate = report = true;
-    sTalking = true; sTitlePending = sGrannyActive = false;
+    sTalking = seals = true; sTitlePending = sGrannyActive = false;
 #ifndef OOT_LOCK_TEST
     nativeShop = {}; nativeStock = {}; sNativeShopPlay = &play;
     for (int i = 0; i < 8; ++i) {
@@ -279,7 +285,7 @@ int main() {
     assert(allocations == 0 && graphics.polyXlu.p == commands.data() && translations.empty());
     Reset(); allOffers = true; sSelected = 6; DrawMarket();
     const auto fullStock = drawnKeys;
-    assert(fullStock.size() == 8 && draws == 8 && allocations == 2);
+    assert(fullStock.size() == 8 && draws == 8 && allocations == 2 && boundsQueries == 2);
     CheckPackets(2);
     Reset(); allOffers = true; sSelected = soldOutSlot = 6; DrawMarket();
     auto unsoldStock = fullStock; unsoldStock.erase(unsoldStock.begin() + 6);
@@ -300,10 +306,14 @@ int main() {
     CheckPackets(2);
     Reset(); report = false; DrawMarket();
     assert(draws == 7 && allocations == 0 && graphics.polyXlu.p == commands.data());
-    Reset(); seals = false; DrawMarket();
+    Reset(); allOffers = true; seals = false; DrawMarket();
     assert(shelfDraws == 1 && "hiding seals must not hide shelves");
-    assert(draws == 7 && allocations == 0 && !BlackMarketVisual::Active());
-    seals = true;
+    assert(drawnKeys == fullStock && draws == 8 && allocations == 0 && boundsQueries == 0 &&
+           !BlackMarketVisual::Active() && "hiding seals must skip bounds collection while preserving all stock");
+    seals = true; DrawMarket();
+    assert(draws == 16 && boundsQueries == 2 && allocations == 2 && !BlackMarketVisual::Active() &&
+           "re-enabling seals must resume fitted geometry collection on the next draw");
+    CheckPackets(2);
     Reset(); active = false; DrawMarket();
     assert(draws == 0 && allocations == 0 && shelfDraws == 1 && interiorEffects == 1 &&
            "an interior without active stock still presents its physical shelves");

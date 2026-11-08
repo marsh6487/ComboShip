@@ -3,6 +3,7 @@
  */
 
 #include "camera_helper.h"
+#include "../../../../combo/gui/UiVisibility.h"
 #include "functions.h"
 #include "macros.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -56,6 +57,10 @@ s16 FirstPerson_GetAimPitch(Player* player) {
 }
 
 void FirstPerson_DrawReticle(Player* player, PlayState* play, f32 range, u8 r, u8 g, u8 b) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     if (!(player->stateFlags1 & PLAYER_STATE1_ITEM_IN_HAND) || player->unk_834 == 0)
         return;
 

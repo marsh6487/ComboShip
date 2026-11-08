@@ -92,6 +92,89 @@ class PropHuntMapSelectWindow final : public Ship::GuiWindow {
     void DrawElement() override {
     }
     void UpdateElement() override {
+        auto harpoon = Harpoon::Instance;
+        if (!harpoon || !harpoon->isConnected)
+            return;
+        if (harpoon->gameState != HARPOON_STATE_MAP_SELECT)
+            return;
+        if (harpoon->currentRoomGameMode != "prop_hunt")
+            return;
+
+        bool isHost = (harpoon->ownClientId == harpoon->hostClientId);
+
+        // Reset vote state on first frame in MAP_SELECT.
+        static HarpoonGameState sPrevState = HARPOON_STATE_LOBBY;
+        if (sPrevState != HARPOON_STATE_MAP_SELECT)
+            sHasVoted = false;
+        sPrevState = harpoon->gameState;
+
+        s32 localSel = harpoon->selectedMapIndex;
+        if (localSel < 0 || localSel >= kMapCount)
+            localSel = 0;
+
+        // Stick navigation + A to confirm — only when this client has authority
+        // over the cursor (host in host_chooses, anyone in everyone_votes).
+        bool canInteract = (harpoon->mapSelectMode != MAP_SELECT_HOST_CHOOSES) || isHost;
+        if (gPlayState != nullptr && !sHasVoted && canInteract) {
+            Input* input = &gPlayState->state.input[0];
+            s8 sx = input->cur.stick_x;
+            s8 sy = input->cur.stick_y;
+            if (sStickDebounce > 0)
+                sStickDebounce--;
+            if (sStickDebounce == 0 && (abs(sx) > 30 || abs(sy) > 30)) {
+                int col = localSel % kGridCols;
+                int row = localSel / kGridCols;
+                if (sx > 30)
+                    col = (col + 1) % kGridCols;
+                if (sx < -30)
+                    col = (col + kGridCols - 1) % kGridCols;
+                if (sy > 30)
+                    row = (row + kGridRows - 1) % kGridRows;
+                if (sy < -30)
+                    row = (row + 1) % kGridRows;
+                s32 newSel = row * kGridCols + col;
+                if (newSel >= kMapCount)
+                    newSel = kMapCount - 1;
+                if (newSel != harpoon->selectedMapIndex) {
+                    harpoon->selectedMapIndex = newSel;
+                    // Broadcast cursor position so peers see our navi move.
+                    nlohmann::json env;
+                    env["type"] = "ROOM.BROADCAST_EVENT";
+                    env["event_name"] = "PROP_HUNT.MAP_CURSOR";
+                    env["data"] = { { "mapIndex", newSel } };
+                    harpoon->SendJsonToRemote(env);
+                }
+                sStickDebounce = 9;
+            }
+            // Confirm / vote intent. Trigger rules:
+            //   - Host (any mode): A press alone.
+            //   - Peer in EVERYONE_CHOOSES: A press alone (was A+START;
+            //     user requested simple A so the vote feels responsive
+            //     and doesn't require holding pause).
+            //   - Peer in HOST_CHOOSES: ignored — only host confirms.
+            bool everyoneMode = (harpoon->mapSelectMode == MAP_SELECT_EVERYONE_CHOOSES);
+            bool aPress = CHECK_BTN_ALL(input->press.button, BTN_A);
+            bool trigger = isHost ? aPress : (everyoneMode ? aPress : false);
+            if (trigger) {
+                s32 idx = harpoon->selectedMapIndex;
+                if (everyoneMode) {
+                    sHasVoted = true;
+                    nlohmann::json env;
+                    env["type"] = "ROOM.BROADCAST_EVENT";
+                    env["event_name"] = "PROP_HUNT.MAP_VOTE";
+                    env["data"] = { { "mapIndex", idx } };
+                    harpoon->SendJsonToRemote(env);
+                    auto myIt = harpoon->clients.find(harpoon->ownClientId);
+                    if (myIt != harpoon->clients.end()) {
+                        myIt->second.hasVoted = true;
+                        myIt->second.mapSelectIndex = idx;
+                    }
+                } else if (isHost) {
+                    // HOST_CHOOSES → full round start.
+                    HarpoonPropHunt::HostStartRound(idx);
+                }
+            }
+        }
     }
 
     void Draw() override {
@@ -104,16 +187,10 @@ class PropHuntMapSelectWindow final : public Ship::GuiWindow {
             return;
 
         // Every player sees the overlay so they can watch the host's
-        // cursor in HOST_CHOOSES mode. The input handler below gates
+        // cursor in HOST_CHOOSES mode. UpdateElement gates
         // confirmation / navigation on `isHost`, so non-hosts can only
         // spectate.
         bool isHost = (harpoon->ownClientId == harpoon->hostClientId);
-
-        // Reset vote state on first frame in MAP_SELECT.
-        static HarpoonGameState sPrevState = HARPOON_STATE_LOBBY;
-        if (sPrevState != HARPOON_STATE_MAP_SELECT)
-            sHasVoted = false;
-        sPrevState = harpoon->gameState;
 
         if (!sTexturesLoaded)
             LoadTextures();
@@ -333,70 +410,6 @@ class PropHuntMapSelectWindow final : public Ship::GuiWindow {
         }
 
         ImGui::End();
-
-        // Stick navigation + A to confirm — only when this client has authority
-        // over the cursor (host in host_chooses, anyone in everyone_votes).
-        bool canInteract = (harpoon->mapSelectMode != MAP_SELECT_HOST_CHOOSES) || isHost;
-        if (gPlayState != nullptr && !sHasVoted && canInteract) {
-            Input* input = &gPlayState->state.input[0];
-            s8 sx = input->cur.stick_x;
-            s8 sy = input->cur.stick_y;
-            if (sStickDebounce > 0)
-                sStickDebounce--;
-            if (sStickDebounce == 0 && (abs(sx) > 30 || abs(sy) > 30)) {
-                int col = localSel % kGridCols;
-                int row = localSel / kGridCols;
-                if (sx > 30)
-                    col = (col + 1) % kGridCols;
-                if (sx < -30)
-                    col = (col + kGridCols - 1) % kGridCols;
-                if (sy > 30)
-                    row = (row + kGridRows - 1) % kGridRows;
-                if (sy < -30)
-                    row = (row + 1) % kGridRows;
-                s32 newSel = row * kGridCols + col;
-                if (newSel >= kMapCount)
-                    newSel = kMapCount - 1;
-                if (newSel != harpoon->selectedMapIndex) {
-                    harpoon->selectedMapIndex = newSel;
-                    // Broadcast cursor position so peers see our navi move.
-                    nlohmann::json env;
-                    env["type"] = "ROOM.BROADCAST_EVENT";
-                    env["event_name"] = "PROP_HUNT.MAP_CURSOR";
-                    env["data"] = { { "mapIndex", newSel } };
-                    harpoon->SendJsonToRemote(env);
-                }
-                sStickDebounce = 9;
-            }
-            // Confirm / vote intent. Trigger rules:
-            //   - Host (any mode): A press alone.
-            //   - Peer in EVERYONE_CHOOSES: A press alone (was A+START;
-            //     user requested simple A so the vote feels responsive
-            //     and doesn't require holding pause).
-            //   - Peer in HOST_CHOOSES: ignored — only host confirms.
-            bool everyoneMode = (harpoon->mapSelectMode == MAP_SELECT_EVERYONE_CHOOSES);
-            bool aPress = CHECK_BTN_ALL(input->press.button, BTN_A);
-            bool trigger = isHost ? aPress : (everyoneMode ? aPress : false);
-            if (trigger) {
-                s32 idx = harpoon->selectedMapIndex;
-                if (everyoneMode) {
-                    sHasVoted = true;
-                    nlohmann::json env;
-                    env["type"] = "ROOM.BROADCAST_EVENT";
-                    env["event_name"] = "PROP_HUNT.MAP_VOTE";
-                    env["data"] = { { "mapIndex", idx } };
-                    harpoon->SendJsonToRemote(env);
-                    auto myIt = harpoon->clients.find(harpoon->ownClientId);
-                    if (myIt != harpoon->clients.end()) {
-                        myIt->second.hasVoted = true;
-                        myIt->second.mapSelectIndex = idx;
-                    }
-                } else if (isHost) {
-                    // HOST_CHOOSES → full round start.
-                    HarpoonPropHunt::HostStartRound(idx);
-                }
-            }
-        }
     }
 };
 

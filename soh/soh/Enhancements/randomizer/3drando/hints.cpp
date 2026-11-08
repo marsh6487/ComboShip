@@ -12,6 +12,11 @@
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <algorithm>
+#include "rando/SariaHintPolicy.h"
+#include "../randomizer_check_objects.h"
+#ifdef COMBO_BUILD
+#include "rando/CrossForeign.h"
+#endif
 
 using namespace Rando;
 
@@ -884,13 +889,85 @@ void CaptureSariaMagicHintLocation(const std::vector<std::vector<RandomizerCheck
     }
 }
 
+bool EnsureSariaMagicHint() {
+    auto ctx = Rando::Context::GetInstance();
+    if (ctx->GetHint(RH_SARIA_HINT)->IsEnabled())
+        return true;
+    if (!ctx->GetOption(RSK_MAGIC_STAT_UPGRADE))
+        return false;
+    if (sSariaMagicReachabilityVerified && sEarlySariaMagicSeed == ctx->GetSeed() &&
+        sEarlySariaMagicCheck == RC_UNKNOWN_CHECK)
+        return false;
+
+    // Old saves restore every placed item but not the generation-only location
+    // pool, areas or full spheres. Select a real saved upgrade deterministically;
+    // this fallback makes no earliest-reachability claim and consumes no RNG.
+    RandomizerCheck selected = RC_UNKNOWN_CHECK;
+    for (int index = 0; index < RC_MAX; ++index) {
+        auto check = static_cast<RandomizerCheck>(index);
+        if (check == RC_UNKNOWN_CHECK || ctx->GetItemLocation(check)->GetPlacedRandomizerGet() != RG_MAGIC_STAT_UPGRADE)
+            continue;
+        if (selected == RC_UNKNOWN_CHECK ||
+            StaticData::GetLocation(check)->GetName() < StaticData::GetLocation(selected)->GetName())
+            selected = check;
+    }
+    if (sEarlySariaMagicSeed == ctx->GetSeed() && sEarlySariaMagicCheck != RC_UNKNOWN_CHECK &&
+        ctx->GetItemLocation(sEarlySariaMagicCheck)->GetPlacedRandomizerGet() == RG_MAGIC_STAT_UPGRADE)
+        selected = sEarlySariaMagicCheck;
+
+    CustomMessage area;
+    if (selected != RC_UNKNOWN_CHECK) {
+        const auto* location = StaticData::GetLocation(selected);
+        const auto home = location->GetArea();
+        const std::string name =
+            home == RCAREA_INVALID ? location->GetName() : RandomizerCheckObjects::GetRCAreaName(home);
+        if (name.empty())
+            return false;
+        area = CustomMessage(name);
+    } else {
+        std::string foreign;
+#ifdef COMBO_BUILD
+        // A cold saved-slot bind restores the baked blob, not the warmed
+        // sComboItemAreas cache. Read only this slot's persisted item-area map.
+        try {
+            const auto blob = nlohmann::json::parse(ComboRando::g_comboForeignJson);
+            const auto& areas = blob.at("hints").at("ootItemAreas");
+            auto found = areas.find("Magic Stat Upgrade");
+            if (found != areas.end() && found->is_string())
+                foreign = found->get<std::string>();
+        } catch (const nlohmann::json::exception&) {}
+#else
+        foreign = ForeignAreaForItem(RG_MAGIC_STAT_UPGRADE);
+#endif
+        if (foreign.empty())
+            return false;
+        area = CustomMessage(foreign);
+    }
+
+    std::vector<CustomMessage> messages;
+    for (auto key : { RHT_SARIA_TALK_HINT, RHT_SARIA_SONG_HINT }) {
+        auto message = StaticData::hintTextTable[key].GetClear();
+        message.InsertNames({ area });
+        // MESSAGE saves keep raw text but not the template's separate palette.
+        // Persist native colors as percent escapes so a reload retains them.
+        messages.emplace_back(message.GetEnglish(MF_ENCODE), message.GetGerman(MF_ENCODE), message.GetFrench(MF_ENCODE),
+                              message.GetTextBoxType(), message.GetTextBoxPosition());
+    }
+    // The MESSAGE constructor neither selects random wording nor marks item
+    // locations as hinted. Preserve every enabled authored/composed hint above.
+    ctx->AddHint(RH_SARIA_HINT, Hint(RH_SARIA_HINT, std::move(messages)));
+    return true;
+}
+
 void CreateStaticHintFromData(RandomizerHint hint, StaticHintInfo staticData) {
     auto ctx = Rando::Context::GetInstance();
     if (!ctx->GetHint(hint)->IsEnabled()) {
         OptionValue& option = ctx->GetOption(staticData.setting);
         if ((std::holds_alternative<bool>(staticData.condition) && option.Is(std::get<bool>(staticData.condition))) ||
             (std::holds_alternative<uint8_t>(staticData.condition) &&
-             option.Is(std::get<uint8_t>(staticData.condition)))) {
+             option.Is(std::get<uint8_t>(staticData.condition))) ||
+            (hint == RH_SARIA_HINT &&
+             SariaHint_IsEnabled(option.Get(), ctx->GetOption(RSK_MAGIC_STAT_UPGRADE).Get()))) {
 
             std::vector<RandomizerCheck> locations = {};
             if (hint == RH_SARIA_HINT && ctx->GetOption(RSK_MAGIC_STAT_UPGRADE)) {

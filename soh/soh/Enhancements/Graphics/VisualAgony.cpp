@@ -1,4 +1,5 @@
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "../../../../combo/gui/UiVisibility.h"
 
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
@@ -28,6 +29,10 @@ void FrameInterpolation_RecordCloseChild(void);
      GameInteractor_NoUIActive())
 
 void DrawVisualAgony(Player* player, double temp) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     if (SHOULD_HIDE_VISUAL_AGONY || player->closestSecretDistSq > 80000.0f) {
         return;
     }

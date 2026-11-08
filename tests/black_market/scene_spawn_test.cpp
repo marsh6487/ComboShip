@@ -136,6 +136,41 @@ int main() {
   // An already authored MM spawn with a real chain is left intact, including
   // scene-local item, transformation, death, revive and travel cameras.
 #endif
+  // Replay the actual host-specific prepared scene. Linking the ITEM_GET
+  // chain must retain the customer-facing half-turn after native decoding.
+  ActorEntry preparedSpawn = /* PREPARED_SPAWN */;
+  const ActorEntry preparedOriginal = preparedSpawn;
+  ActorCutscene preparedCutscenes[] = {/* PREPARED_CUTSCENES */};
+  SOH::Scene preparedScene{&preparedSpawn, preparedCutscenes,
+                          s16(ARRAY_COUNT(preparedCutscenes))};
+  play.sceneSegment = &preparedScene;
+  play.sceneId = COMBO_BLACK_MARKET_SCENE;
+  for (int cycle = 0; cycle < 3; ++cycle) {
+    for (int form = 0; form < PLAYER_FORM_MAX; ++form) {
+      gSaveContext.save.playerForm = form;
+      OTRPlay_InitScene(&play, 0);
+      Actor_SpawnEntry(&play.actorCtx, play.linkActorEntry, &play);
+      Play_AssignPlayerCsIdsFromScene(&play, player.actor.csId);
+      if (player.actor.home.rot.y != -32768)
+        std::fprintf(stderr, "prepared MM market spawn decoded yaw %d, expected -32768\n",
+                     player.actor.home.rot.y);
+      assert(player.actor.home.rot.y == -32768 &&
+             "prepared MM market must face the counter on entry");
+      assert(player.actor.csId == 4 &&
+             play.playerCsIds[PLAYER_CS_ID_ITEM_GET] == 4);
+      for (int id = 0; id < PLAYER_CS_ID_MAX; ++id)
+        if (id != PLAYER_CS_ID_ITEM_GET)
+          assert(play.playerCsIds[id] == CS_ID_NONE);
+      assert(player.actor.home.pos.x == -11 && player.actor.home.pos.y == 0 &&
+             player.actor.home.pos.z == 381 &&
+             player.actor.params == preparedOriginal.params &&
+             gSaveContext.save.playerForm == form);
+      assert(play.linkActorEntry == &preparedSpawn &&
+             std::memcmp(&preparedSpawn, &preparedOriginal, sizeof(preparedSpawn)) == 0);
+    }
+  }
+  puts("PASS prepared MM market native yaw and ITEM_GET chain across five forms and re-entry");
+  play.sceneSegment = &scene;
   ActorCutscene chain[PLAYER_CS_ID_MAX]{};
   for (int i = 0; i < PLAYER_CS_ID_MAX; ++i) {
     chain[i].csCamId = sPlayerCsIdToCsCamId[i];

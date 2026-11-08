@@ -8,6 +8,7 @@ production bodies and engine types. No renderer or game session is claimed.
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ from run_time_pedestal_tests import block_from, functions
 import native_forest
 import native_market
 import prepare_native_forest
+import prepare_native_market
 
 
 def main():
@@ -26,6 +28,12 @@ def main():
     commands = native_forest.read_scene(resources[native_market.SCENES["mm"]])
     spawn = native_forest.read_actor_list(commands[0])[0]
     assert commands[0x1b] == b"\0\0\0\0", "fixture must replay the actual empty cutscene list"
+    prepared = prepare_native_market.prepared_resources(host='mm')
+    prepared_commands = native_forest.read_scene(prepared[native_market.SCENES['mm']])
+    prepared_spawn = native_forest.read_actor_list(prepared_commands[0])[0]
+    cutscene_count, = struct.unpack_from('<I', prepared_commands[0x1b])
+    prepared_cutscenes = [struct.unpack_from('<5h2Bh2B', prepared_commands[0x1b], 4 + index * 16)
+                         for index in range(cutscene_count)]
     startup = (ROOT / "mm/2s2h/z_play_2SH.cpp").read_text()
     eventmgr = (ROOT / "mm/src/code/z_eventmgr.c").read_text()
     play = (ROOT / "mm/src/code/z_play.c").read_text()
@@ -58,6 +66,11 @@ def main():
     fixture = fixture.replace("/* RESOURCE_SPAWN */", "{" + ",".join(map(str, spawn[:1])) + ",{" +
                               ",".join(map(str, spawn[1:4])) + "},{" + ",".join(map(str, spawn[4:7])) +
                               "}," + str(spawn[7]) + "}")
+    fixture = fixture.replace("/* PREPARED_SPAWN */", "{" + str(prepared_spawn[0]) + ",{" +
+                              ",".join(map(str, prepared_spawn[1:4])) + "},{" +
+                              ",".join(map(str, prepared_spawn[4:7])) + "}," + str(prepared_spawn[7]) + "}")
+    fixture = fixture.replace("/* PREPARED_CUTSCENES */", ",\n".join(
+        "{" + ",".join(map(str, cutscene)) + "}" for cutscene in prepared_cutscenes))
     fixture = fixture.replace("/* FOREST_SPAWN */", "{" + str(forest_spawn[0]) + ",{" +
                               ",".join(map(str, forest_spawn[1:4])) + "},{" +
                               ",".join(map(str, forest_spawn[4:7])) + "}," + str(forest_spawn[7]) + "}")

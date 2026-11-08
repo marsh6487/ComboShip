@@ -1,4 +1,5 @@
 #include "global.h"
+#include "ui_visibility.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -239,6 +240,7 @@ void func_80063C04(GfxPrint* printer) {
 }
 
 void func_80063D7C(GraphicsContext* gfxCtx) {
+    OotUiDrawScope uiScope = OotUi_BeginDraw(gfxCtx);
     Gfx* sp7C;
     Gfx* sp78;
     GfxPrint printer;
@@ -273,4 +275,5 @@ void func_80063D7C(GraphicsContext* gfxCtx) {
     CLOSE_DISPS(gfxCtx);
 
     GfxPrint_Destroy(&printer);
+    OotUi_EndDraw(gfxCtx, uiScope);
 }

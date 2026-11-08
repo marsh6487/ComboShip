@@ -131,11 +131,18 @@ inline bool Selectable(const Item& item) {
 
 inline bool Eligible(const Item& item, Games games) {
     if (games != Games::Oot || !item.wildcard)
-        return true; // Every NEI offer has native implementations in both games.
+        return true; // Historical catalog compatibility, including frozen offers.
     const std::string_view key(item.key);
     // OoT-only never requires MM's archive for masks, sword models or bottles.
     return key == "wildcard.command_melody" || key == "wildcard.mario_mask" || key == "wildcard.poke_ball" ||
            key == "wildcard.magic_upgrade" || key == "wildcard.double_defense";
+}
+
+inline bool NewStockEligible(const Item& item, Games games) {
+    // Trirod works in OoT; MM's selected action is still unimplemented. Keep
+    // its known identity valid for existing stock and saved replacements.
+    return Selectable(item) && Eligible(item, games) &&
+           (games != Games::Mm || std::string_view(item.key) != "nei.cane.trirod");
 }
 
 inline bool MatchesGames(const nlohmann::json& market, Games games) {
@@ -266,8 +273,7 @@ inline nlohmann::json Generate(uint32_t seed, const Options& options = {}) {
     Rng priceRng(static_cast<uint64_t>(seed) ^ UINT64_C(0x534B494550524943));
     std::vector<const Item*> candidates;
     for (const auto& item : Catalog())
-        if (Selectable(item) && Eligible(item, options.games) &&
-            (options.eligible.empty() || options.eligible.contains(item.key)))
+        if (NewStockEligible(item, options.games) && (options.eligible.empty() || options.eligible.contains(item.key)))
             candidates.push_back(&item);
     for (size_t i = candidates.size(); i > 1; --i)
         std::swap(candidates[i - 1], candidates[stockRng.Below(i)]);
@@ -459,8 +465,8 @@ class Session {
                 continue;
             std::vector<const Item*> preferred, fallback;
             for (const auto& item : Catalog()) {
-                if (item.tier != current->tier || !ReplacementEligible(market, item) || occupied.contains(item.key) ||
-                    owned(item) || !usable(item))
+                if (item.tier != current->tier || !NewStockEligible(item, MarketGames(market)) ||
+                    !ReplacementEligible(market, item) || occupied.contains(item.key) || owned(item) || !usable(item))
                     continue;
                 (item.wildcard == current->wildcard ? preferred : fallback).push_back(&item);
             }

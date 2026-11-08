@@ -6,6 +6,7 @@
 #include "scenes/overworld/spot05/spot05_scene.h"
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "rando/SariaHintPolicy.h"
 
 #define FLAGS                                                                                  \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
@@ -151,7 +152,8 @@ u16 EnSa_GetTextId(PlayState* play, Actor* thisx) {
     if (reaction != 0) {
         return reaction;
     }
-    if (IS_RANDO && Randomizer_GetSettingValue(RSK_SARIA_HINT)) {
+    if (IS_RANDO && SariaHint_IsEnabled(Randomizer_GetSettingValue(RSK_SARIA_HINT),
+                                        Randomizer_GetSettingValue(RSK_MAGIC_STAT_UPGRADE))) {
         return 0x10AD;
     }
     if (CHECK_QUEST_ITEM(QUEST_SONG_SARIA)) {
@@ -399,7 +401,9 @@ s32 func_80AF5DFC(EnSa* this, PlayState* play) {
     // A randomizer hint may be heard before meeting Zelda. Mode 2 only talks;
     // the song/reward trigger remains behind the original Letter gate below.
     if (play->sceneNum == SCENE_SACRED_FOREST_MEADOW && !LINK_IS_ADULT && IS_RANDO &&
-        Randomizer_GetSettingValue(RSK_SARIA_HINT) && !Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER)) {
+        SariaHint_IsEnabled(Randomizer_GetSettingValue(RSK_SARIA_HINT),
+                            Randomizer_GetSettingValue(RSK_MAGIC_STAT_UPGRADE)) &&
+        !Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER)) {
         return 2;
     }
     if (play->sceneNum == SCENE_SACRED_FOREST_MEADOW && (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER))) {

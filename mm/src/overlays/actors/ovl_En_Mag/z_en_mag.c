@@ -5,6 +5,8 @@
  */
 
 #include "z_en_mag.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "objects/object_mag/object_mag.h"
 #include "BenPort.h"
 
@@ -996,6 +998,7 @@ void EnMag_Draw(Actor* thisx, PlayState* play) {
     s32 pad;
     Gfx* gfx;
     Gfx* gfxRef;
+    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1010,4 +1013,5 @@ void EnMag_Draw(Actor* thisx, PlayState* play) {
     POLY_OPA_DISP = gfx;
 
     CLOSE_DISPS(play->state.gfxCtx);
+    MmUiDraw_End(play->state.gfxCtx, uiDraw);
 }

@@ -22,7 +22,7 @@ from run_time_pedestal_tests import block_from
 def draw_flow(source, function, begin, end, bridge):
     body = block_from(source, source.index('void ' + function + '('))
     body = re.sub(r'/\*.*?\*/|//[^\n]*|^\s*#[^\n]*', '', body, flags=re.S | re.M)
-    types = 'PlayState FrameTimingSpan GraphicsContext Lights Vec3f u32 u16 u8 s32 s16 f32 bool Gfx View Mtx'
+    types = 'PlayState FrameTimingSpan GraphicsContext Lights Vec3f u32 u16 u8 s32 s16 f32 bool Gfx View Mtx OotUiDrawScope'
     parsed = c_parser.CParser().parse('typedef int ' + ', '.join(types.split()) + ';\n' + body)
     draw = parsed.ext[-1]
     calls = {begin, end, bridge, "Camera_Update"}

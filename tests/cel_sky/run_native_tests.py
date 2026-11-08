@@ -16,6 +16,10 @@ parser.add_argument('--case',choices=('native_actor','native_sky','native_fairy'
 args=parser.parse_args()
 source=(ROOT/'soh/src/code/z_actor.c').read_text()
 actor=block_from(source,source.index('void Actor_DrawAll('))
+visibility=(ROOT/'soh/include/ui_visibility.h').read_text()
+# The fixture supplies modeled engine buffers and the visibility bridge. Keep
+# the complete production snapshot type and both inline helpers unchanged.
+ui_scope=visibility[visibility.index('typedef struct {'):visibility.rindex('#endif')]
 play=(ROOT/'soh/src/code/z_play.c').read_text()
 destroy=block_from(play,play.index('void Play_Destroy('))
 teardown=destroy[destroy.index('{')+1:destroy.index('    play->state.gfxCtx->callback = NULL;')]
@@ -34,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='cel-native-') as temporary:
  for name,marker,production in [('native_actor','NATIVE_ACTOR_DRAW_ALL',actor),('native_sky','NATIVE_SKY_PHASE',sky),('native_fairy','NATIVE_FAIRY_LIGHTS',fairy_lights),('native_light','NATIVE_LIGHT_SETTER',setter),('native_teardown','NATIVE_TEARDOWN_PHASE',teardown)]:
   if args.case and args.case!=name: continue
   cpp=build/(name+'.cpp')
-  cpp.write_text((ROOT/'tests/cel_sky'/(name+'_test.cpp')).read_text().replace('/* '+marker+' */',production).replace('/* NATIVE_FAIRY_UPDATE */',fairy_update))
+  cpp.write_text((ROOT/'tests/cel_sky'/(name+'_test.cpp')).read_text().replace('/* '+marker+' */',production).replace('/* NATIVE_FAIRY_UPDATE */',fairy_update).replace('/* PRODUCTION_UI_DRAW_SCOPE */',ui_scope))
   binary=build/name
-  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable',*flags,str(cpp),'-o',str(binary)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable',*flags,'-I'+str(ROOT/'libultraship/include'),str(cpp),'-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)

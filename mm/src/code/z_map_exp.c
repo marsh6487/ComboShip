@@ -1,4 +1,6 @@
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -254,8 +256,9 @@ void Map_Update(PlayState* play) {
     s16 floor;
     s32 pad2;
 
-    if ((play->pauseCtx.state <= PAUSE_STATE_OPENING_2) && (CHECK_BTN_ALL(controller->press.button, BTN_L)) &&
-        !Play_InCsMode(play) && !MapDisp_IsMinimapToggleBlocked(play)) {
+    if (!UiVisibility_IsEnabled() && (play->pauseCtx.state <= PAUSE_STATE_OPENING_2) &&
+        CHECK_BTN_ALL(controller->press.button, BTN_L) && !Play_InCsMode(play) &&
+        (CVarGetInteger("gEnhancements.MinimalUI", 0) || !MapDisp_IsMinimapToggleBlocked(play))) {
         if (GameInteractor_Should(VB_MINIMAP_TOGGLE, true)) {
             if (!R_MINIMAP_DISABLED) {
                 Audio_PlaySfx(NA_SE_SY_CAMERA_ZOOM_UP);

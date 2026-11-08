@@ -15,6 +15,8 @@
  */
 
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include <string.h>
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -2472,6 +2474,7 @@ void Player_DrawHookshotReticle(PlayState* play, Player* player, f32 hookshotDis
     Vec3f sp7C;
     Vec3f sp70;
     Vec3f pos;
+    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
 
     D_801C094C.z = 0.0f;
     Matrix_MultVec3f(&D_801C094C, &sp7C);
@@ -2504,6 +2507,7 @@ void Player_DrawHookshotReticle(PlayState* play, Player* player, f32 hookshotDis
             CLOSE_DISPS(play->state.gfxCtx);
         }
     }
+    MmUiDraw_End(play->state.gfxCtx, uiDraw);
 }
 
 s32 D_801C0958 = false;

@@ -17,8 +17,13 @@ extern "C" {
 #include <cstdio>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <libultraship/bridge/uivisibilitybridge.h>
 #include <string>
 #include <vector>
+
+// These baseline shop-flow checks use default UI visibility. Hidden cursor
+// drawing is exercised separately by tests/ui_visibility/mm_shops_test.py.
+extern "C" int UiVisibility_IsHidden(void) { return 0; }
 
 SaveContext gSaveContext{};
 PlayState *gPlayState;

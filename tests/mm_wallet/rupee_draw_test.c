@@ -22,6 +22,7 @@ static GraphicsContext gfx;
 static PlayState play;
 static char drawn[6];
 static int drawnCount;
+static bool nativeFullUi = true;
 
 void FrameInterpolation_RecordOpenChild(const void* source, int line) {}
 void FrameInterpolation_RecordCloseChild(void) {}
@@ -58,7 +59,7 @@ static void checkDraw(s16 balance, int wallet, int tycoon, const char* expected)
     if (tycoon) {
         DrawTycoonRupeeCounter();
     } else {
-        TestNativeDraw(&play);
+        TestNativeDraw(&play, nativeFullUi);
     }
     if (strcmp(drawn, expected) != 0) {
         fprintf(stderr, "balance=%d wallet=%d path=%s expected=%s drawn=%s\n", balance, wallet,
@@ -74,6 +75,10 @@ int main(int argc, char** argv) {
     play.state.gfxCtx = &gfx;
     gPlayState = &play;
     play.interfaceCtx.magicAlpha = 255;
+    // The same native draw block skips the counter when the HUD policy hides it.
+    nativeFullUi = false;
+    checkDraw(1667, 2, 0, "");
+    nativeFullUi = true;
     if (argc == 1) {
         checkDraw(1667, 2, 0, "1667");
         checkDraw(99, 0, 0, "99");

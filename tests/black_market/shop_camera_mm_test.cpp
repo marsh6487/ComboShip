@@ -10,7 +10,11 @@
 #include "combo/BlackMarketReceipt.h"
 #include "combo/rando/BlackMarket.h"
 #include "objects/object_bg/object_bg.h"
+#include "mm/2s2h/Enhancements/Debug/FrameTiming.h"
 #include <sanitizer/asan_interface.h>
+
+extern "C" FrameTimingSpan FrameTiming_BeginSpan(void) { return {}; }
+extern "C" void FrameTiming_EndNamedSpan(const char*, const char*, FrameTimingSpan) {}
 
 extern "C" s32 EnOssan_TakeItemOffShelf(EnOssan *);
 extern "C" s32 EnOssan_ReturnItemToShelf(EnOssan *);

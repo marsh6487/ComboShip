@@ -976,6 +976,12 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("MinimalUI"))
         .Options(CheckboxOptions().Tooltip("Hides most of the UI when not needed.\n"
                                            "NOTE: Doesn't activate until scene transition."));
+    AddWidget(path, "True Hidden UI", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("TrueHiddenUI"))
+        .Options(CheckboxOptions().Tooltip(
+            "Press L to hide or show all game UI, including native pause menus and dialogue.\n"
+            "Game updates and inputs continue. Application settings remain available.\n"
+            "Takes priority over Minimal UI while enabled."));
     AddWidget(path, "Disable Hot/Underwater Warning Text", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DisableTunicWarningText"))
         .Options(CheckboxOptions().Tooltip("Disables warning text when you don't have the Goron/Zora Tunic on "

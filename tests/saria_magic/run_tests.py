@@ -10,14 +10,15 @@ body=block_from(actor,actor.index('s32 func_80AF5DFC('))
 action=block_from(actor,actor.index('void func_80AF6448(EnSa* this, PlayState* play) {'))
 idle=block_from(actor,actor.index('void func_80AF67D0(EnSa* this, PlayState* play) {'))
 prefix=r'''
+#include "combo/rando/SariaHintPolicy.h"
 #include <cassert>
 using s32=int;
 struct PlayState{int sceneNum;};
 struct EnSa{struct{int talkState;}interactInfo;struct{int textId;}actor;struct{void* animation;float playSpeed,curFrame;}skelAnime;int unk_208,unk_20B,mouthIndex;void(*actionFunc)(EnSa*,PlayState*);};
 struct {int cutsceneIndex;} gSaveContext;
 enum{SCENE_KOKIRI_FOREST,SCENE_SACRED_FOREST_MEADOW,SCENE_SARIAS_HOUSE};
-enum{EVENTCHKINF_OBTAINED_ZELDAS_LETTER,QUEST_SONG_SARIA,QUEST_KOKIRI_EMERALD,INFTABLE_GREETED_BY_SARIA,VB_BE_ELIGIBLE_FOR_SARIAS_SONG,VB_NOT_BE_GREETED_BY_SARIA,ITEM_OCARINA_FAIRY,RSK_SARIA_HINT};
-bool adult,rando,letter,song,emerald,hint,learned;
+enum{EVENTCHKINF_OBTAINED_ZELDAS_LETTER,QUEST_SONG_SARIA,QUEST_KOKIRI_EMERALD,INFTABLE_GREETED_BY_SARIA,VB_BE_ELIGIBLE_FOR_SARIAS_SONG,VB_NOT_BE_GREETED_BY_SARIA,ITEM_OCARINA_FAIRY,RSK_SARIA_HINT,RSK_MAGIC_STAT_UPGRADE};
+bool adult,rando,letter,song,emerald,hint,learned,stat;
 enum{VB_SARIA_GESTURE=99,NPC_TALK_STATE_IDLE=0,INFTABLE_01=1,INFTABLE_03=3,ENSA_ANIM1_6=6,ANIMMODE_ONCE=0};
 int gSariaHandsBehindBackWaitAnim,gSariaStopPlayingOcarinaAnim;
 void func_80AF67D0(EnSa*,PlayState*);void func_80AF6448(EnSa*,PlayState*);
@@ -29,7 +30,7 @@ void Animation_Change(decltype(EnSa::skelAnime)*,void*,float,float,float,int,flo
 #define INV_CONTENT(x) 0
 bool Flags_GetEventChkInf(int){return letter;}
 bool Flags_GetInfTable(int){return true;}
-bool Randomizer_GetSettingValue(int){return hint;}
+bool Randomizer_GetSettingValue(int key){return key==RSK_SARIA_HINT?hint:stat;}
 bool GameInteractor_Should(int k,bool v,...){return rando&&k==VB_BE_ELIGIBLE_FOR_SARIAS_SONG?!learned:v;}
 '''
 main=r'''
@@ -50,7 +51,7 @@ gSaveContext.cutsceneIndex=0xFFF0;assert(func_80AF5DFC(&sa,&p)==5);
 '''
 with tempfile.TemporaryDirectory(prefix='saria-magic-') as tmp:
  p=Path(tmp);(p/'actor.cpp').write_text(prefix+(body+action+idle).replace('this', 'self')+main)
- subprocess.run(['g++','-std=c++20',str(p/'actor.cpp'),'-o',str(p/'actor')],check=True)
+ subprocess.run(['g++','-std=c++20','-I'+str(ROOT),str(p/'actor.cpp'),'-o',str(p/'actor')],check=True)
  subprocess.run([str(p/'actor')],check=True)
  print('PASS: native Saria hint-only eligibility and progression guards')
  cpp=ROOT/'tests/saria_magic/hints_test.cpp'

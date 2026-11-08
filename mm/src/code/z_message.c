@@ -1,6 +1,8 @@
 #include "mods/partners/Partners.h"
 #include "prevent_bss_reordering.h"
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "segment_symbols.h"
 #include "z64horse.h"
@@ -5800,6 +5802,7 @@ void Message_Draw(PlayState* play) {
     Gfx* nextDisplayList;
     Gfx* polyOpa;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
+    MmUiDrawState uiDraw = MmUiDraw_Begin(gfxCtx, UiVisibility_IsHidden());
 
     OPEN_DISPS(gfxCtx);
 
@@ -5816,6 +5819,7 @@ void Message_Draw(PlayState* play) {
     POLY_OPA_DISP = nextDisplayList;
 
     CLOSE_DISPS(gfxCtx);
+    MmUiDraw_End(gfxCtx, uiDraw);
 }
 
 s16 sTextboxXPositions[TEXTBOX_TYPE_MAX] = {

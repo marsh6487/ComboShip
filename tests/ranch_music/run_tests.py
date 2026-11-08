@@ -4,7 +4,7 @@ from pathlib import Path
 import re, subprocess, tempfile, os
 ROOT=Path(__file__).resolve().parents[2]
 def function(source,name):
-    m=re.search(r'^(?:static )?(?:void|bool|u8) '+name+r'\([^;]*?\)\s*\{',source,re.M)
+    m=re.search(r'^(?:static )?(?:void|bool|u8|s32) '+name+r'\([^;]*?\)\s*\{',source,re.M)
     assert m, name
     depth=1; end=m.end()
     while depth:
@@ -65,6 +65,12 @@ int main(){
     subprocess.run(['c++','-std=c++20','-fsanitize=address,undefined','-no-pie',str(cpp),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0"})
     host=(ROOT/'tests/night_music/host_test.cpp').read_text()
+    native_player=(ROOT/'soh/src/code/z_player_lib.c').read_text()
+    native_talk=(ROOT/'soh/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
+    player_bodies=[re.sub(r'\bthis\b','player',function(source,name)) for source,name in
+                   [(native_player,'Player_InBlockingCsMode'),(native_player,'Player_InCsMode'),
+                    (native_talk,'Player_SetupTalk')]]
+    host=host.replace('/* NATIVE_PLAYER */','\n'.join(player_bodies))
     production=(ROOT/'soh/soh/Enhancements/audio/SceneNightMusic.cpp').read_text()
     production=production[production.index('static ComboNightMusic::Lifecycle'):production.index('static void RegisterSceneNightMusic')]
     host=host.replace('sceneNum=82,sceneId=82','sceneNum=99,sceneId=99')

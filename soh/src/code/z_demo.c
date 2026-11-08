@@ -1,4 +1,5 @@
 #include "rando/CrossEntranceBoss.h"
+#include "ui_visibility.h"
 #include "global.h"
 #include "z64camera.h"
 #include "soh/Enhancements/audio/GlobalOutdoorRainBridge.h"
@@ -2062,7 +2063,7 @@ void func_80068C3C(PlayState* play, CutsceneContext* csCtx) {
 
     if (gSaveContext.cutsceneIndex >= 0xFFF0) {
 
-        if (BREG(0) != 0) {
+        if (BREG(0) != 0 && !UiVisibility_IsHidden()) {
             OPEN_DISPS(play->state.gfxCtx);
 
             prevDisplayList = POLY_OPA_DISP;

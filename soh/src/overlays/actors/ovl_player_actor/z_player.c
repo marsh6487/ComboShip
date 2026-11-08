@@ -1,4 +1,5 @@
 #include "scene_exit.h"
+#include "ui_visibility.h"
 #include "mods/partners/Partners.h"
 #include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
@@ -14868,8 +14869,11 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
     {
         Gfx* pictoOvl = OVERLAY_DISP;
         Picto_EmitCapture(play, &pictoOvl);
+        OVERLAY_DISP = pictoOvl;
+        OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
         Picto_DrawPhoto(play, &pictoOvl);
         OVERLAY_DISP = pictoOvl;
+        OotUi_EndDraw(play->state.gfxCtx, uiScope);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

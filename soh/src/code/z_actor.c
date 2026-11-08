@@ -1,4 +1,5 @@
 #include "../../../combo/encounters/NativeCustomEnemies.h"
+#include "ui_visibility.h"
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #ifdef COMBO_BUILD
@@ -495,6 +496,7 @@ void Attention_Draw(TargetContext* targetCtx, PlayState* play) {
     }
 #endif
 
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     OPEN_DISPS(play->state.gfxCtx);
 
     if (targetCtx->unk_48 != 0) {
@@ -609,6 +611,7 @@ void Attention_Draw(TargetContext* targetCtx, PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }
 
 void Attention_Update(TargetContext* targetCtx, Player* player, Actor* actorArg, PlayState* play) {
@@ -1205,6 +1208,10 @@ void TitleCard_Update(PlayState* play, TitleCardContext* titleCtx) {
 }
 
 void TitleCard_Draw(PlayState* play, TitleCardContext* titleCtx) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     s32 width;
     s32 height;
     s32 titleX;
@@ -3528,7 +3535,9 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
     phaseSpan = FrameTiming_BeginSpan();
 
     if ((HREG(64) != 1) || (HREG(76) != 0)) {
+        OotUiDrawScope diagnostics = OotUi_BeginDraw(play->state.gfxCtx);
         CollisionCheck_DrawCollision(play, &play->colChkCtx);
+        OotUi_EndDraw(play->state.gfxCtx, diagnostics);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

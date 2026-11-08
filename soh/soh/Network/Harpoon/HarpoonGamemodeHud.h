@@ -18,8 +18,7 @@ class Window final : public Ship::GuiWindow {
     using GuiWindow::GuiWindow;
     void InitElement() override {
     }
-    void UpdateElement() override {
-    }
+    void UpdateElement() override;
     void DrawElement() override;
 };
 

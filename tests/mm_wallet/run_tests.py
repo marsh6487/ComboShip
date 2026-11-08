@@ -16,7 +16,10 @@ from run_mm_scene_randomization_tests import function
 def main():
     native = (ROOT / "mm/src/code/z_parameter.c").read_text()
     tycoon = (ROOT / "mm/2s2h/Rando/MiscBehavior/TycoonWallet.cpp").read_text()
-    start = native.index("if (GameInteractor_Should(VB_DRAW_RUPEE_COUNTER, true))")
+    guard = re.search(r"\bif\s*\([^;{}]*\bVB_DRAW_RUPEE_COUNTER\b[^;{}]*\)\s*\{", native)
+    if guard is None:
+        raise ValueError("Missing native rupee counter draw guard")
+    start = guard.start()
     opening = native.index("{", start)
     depth = 1
     end = opening + 1
@@ -24,7 +27,7 @@ def main():
         depth += (native[end] == "{") - (native[end] == "}")
         end += 1
     declarations = "\n".join(re.findall(r"s16 sRupeeDigits(?:First|Count)\[\].*?;", native))
-    production = declarations + "\nvoid TestNativeDraw(PlayState* play) {\n"
+    production = declarations + "\nvoid TestNativeDraw(PlayState* play, bool fullUi) {\n"
     production += "InterfaceContext* interfaceCtx = &play->interfaceCtx;\n"
     production += "s16 counterDigits[5], sp2CC, sp2C8, sp2CE, sp2CA, magicAlpha;\n"
     production += "OPEN_DISPS(play->state.gfxCtx);\n" + native[start:end]

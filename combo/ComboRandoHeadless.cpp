@@ -804,7 +804,7 @@ int main(int argc, char** argv) {
                 sariaHintSpheres = nlohmann::json::array();
                 const auto sariaOptions = nlohmann::json::parse(sohHintDump.empty() ? "{}" : sohHintDump)
                                               .value("options", nlohmann::json::object());
-                if (sariaOptions.value("sariaHint", 0) && sariaOptions.value("magicStatUpgrade", 0)) {
+                if (sariaOptions.value("magicStatUpgrade", 0)) {
                     sariaHintSpheres =
                         ComboRando::FindSariaMagicSphere(r.spoilerJson, oot, mmO, sohDump, mmDump, !noLogic, mmStart,
                                                          sharedMask, SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "");

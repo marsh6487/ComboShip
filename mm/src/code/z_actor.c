@@ -5,6 +5,9 @@
  * Description:
  */
 
+#include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "z64actor.h"
 #ifdef COMBO_BUILD
 #include "BlackMarketFairy.h"
@@ -564,6 +567,7 @@ void Attention_Draw(Attention* attention, PlayState* play) {
 
     actor = attention->reticleActor;
 
+    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
     OPEN_DISPS(play->state.gfxCtx);
 
     if (attention->reticleFadeAlphaControl != 0) {
@@ -692,6 +696,7 @@ void Attention_Draw(Attention* attention, PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    MmUiDraw_End(play->state.gfxCtx, uiDraw);
 }
 
 void Attention_Update(Attention* attention, Player* player, Actor* playerFocusActor, PlayState* play) {
@@ -1073,6 +1078,9 @@ void TitleCard_Update(GameState* gameState, TitleCardContext* titleCtx) {
 }
 
 void TitleCard_Draw(GameState* gameState, TitleCardContext* titleCtx) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
     if (titleCtx->alpha != 0) {
         s32 width = titleCtx->width;
         s32 height = titleCtx->height;

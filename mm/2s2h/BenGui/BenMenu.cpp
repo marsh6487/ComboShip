@@ -2445,6 +2445,21 @@ void BenMenu::AddEnhancements() {
                      .Max(5)
                      .DefaultValue(5));
 
+    // UI visibility
+    path = { "Enhancements", "UI", SECTION_COLUMN_1 };
+    AddSidebarEntry("Enhancements", "UI", 1);
+    AddWidget(path, "Minimal UI", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.MinimalUI")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use L to switch between the full HUD and Minimal UI. Hearts appear when damaged and magic while in "
+            "use. Item icons, action labels and minigame feedback remain available. Pausing shows the full HUD."));
+    AddWidget(path, "True Hidden UI", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.TrueHiddenUI")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use L to hide or reveal all game UI and passive overlays, including messages and pause menus. "
+            "Takes priority over Minimal UI. Open application settings remain available; turn this off here to "
+            "return to your Minimal UI and minimap preferences."));
+
     // HUD Editor
     path = { "Enhancements", "HUD Editor", SECTION_COLUMN_1 };
     AddSidebarEntry("Enhancements", "HUD Editor", 1);
@@ -3179,7 +3194,8 @@ const std::vector<std::pair<int32_t, std::string>>& SensorItemChoices() {
 
     if (choices.empty()) {
         for (auto& [randoItemId, item] : Rando::StaticData::Items) {
-            if (randoItemId <= RI_NONE || randoItemId >= RI_MAX || item.name == nullptr || item.name[0] == '\0') {
+            if (randoItemId <= RI_UNKNOWN || randoItemId == RI_NONE || randoItemId >= RI_MAX || item.name == nullptr ||
+                item.name[0] == '\0') {
                 continue;
             }
             choices.emplace_back((int32_t)randoItemId, item.name);
@@ -3190,6 +3206,9 @@ const std::vector<std::pair<int32_t, std::string>>& SensorItemChoices() {
 }
 
 std::string SensorDesireName(int32_t randoItemId) {
+    if (randoItemId <= RI_UNKNOWN || randoItemId == RI_NONE || randoItemId >= RI_MAX) {
+        return "(empty)";
+    }
     auto item = Rando::StaticData::Items.find((RandoItemId)randoItemId);
 
     if (item == Rando::StaticData::Items.end() || item->second.name == nullptr || item->second.name[0] == '\0') {
@@ -3214,7 +3233,7 @@ void DrawSensorDesirePicker() {
         if (ImGui::BeginCombo(label.c_str(), SensorDesireName(current).c_str())) {
             ImGui::InputTextWithHint("##sensorSearch", "Search", search[slot], sizeof(search[slot]));
 
-            if (ImGui::Selectable("(empty)", current <= RI_NONE)) {
+            if (ImGui::Selectable("(empty)", current <= RI_UNKNOWN || current == RI_NONE || current >= RI_MAX)) {
                 CVarSetInteger(cvar.c_str(), RI_NONE);
                 Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
             }

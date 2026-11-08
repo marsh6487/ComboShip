@@ -1,4 +1,5 @@
 #include <string.h>
+#include "ui_visibility.h"
 #include "global.h"
 #include "vt.h"
 #include <libultraship/bridge/resourcebridge.h>
@@ -175,6 +176,7 @@ void GameState_Draw(GameState* gameState, GraphicsContext* gfxCtx) {
         GameState_SetFBFilter(&newDList);
     }
 
+    Gfx* passiveUiStart = newDList;
     sLastButtonPressed = gameState->input[0].press.button | gameState->input[0].cur.button;
     if (R_DISABLE_INPUT_DISPLAY == 0 && CVarGetInteger(CVAR_DEVELOPER_TOOLS("DebugEnabled"), 0)) {
         GameState_DrawInputDisplay(sLastButtonPressed, &newDList);
@@ -201,18 +203,23 @@ void GameState_Draw(GameState* gameState, GraphicsContext* gfxCtx) {
         R_ENABLE_ARENA_DBG = 0;
     }
 
+    if (UiVisibility_IsHidden()) {
+        newDList = passiveUiStart;
+    }
     gSPEndDisplayList(newDList++);
     Graph_BranchDlist(polyOpaP, newDList);
     POLY_OPA_DISP = newDList;
 
     CLOSE_DISPS(gfxCtx);
 
+    OotUiDrawScope uiScope = OotUi_BeginDraw(gfxCtx);
     func_80063D7C(gfxCtx);
 
     if (R_ENABLE_ARENA_DBG != 0) {
         SpeedMeter_DrawTimeEntries(&D_801664D0, gfxCtx);
         SpeedMeter_DrawAllocEntries(&D_801664D0, gfxCtx, gameState);
     }
+    OotUi_EndDraw(gfxCtx, uiScope);
 }
 
 void GameState_SetFrameBuffer(GraphicsContext* gfxCtx) {
@@ -256,6 +263,17 @@ void GameState_ReqPadData(GameState* gameState) {
 // Framebuffer for the Link preview on the pause menu equipment sub-screen
 int gPauseLinkFrameBuffer = -1;
 
+static void GameState_UpdateUiVisibility(GameState* gameState) {
+    /* Use the same L conflicts as the native minimap, independent of scene,
+     * pause/dialogue state and whether this game state has a minimap. */
+    bool allowToggle =
+        !(CVarGetInteger(CVAR_DEVELOPER_TOOLS("DebugEnabled"), 0) || CVarGetInteger(CVAR_CHEAT("MoonJumpOnL"), 0)) ||
+        CVarGetInteger(CVAR_DEVELOPER_TOOLS("EnableMapToggle"), 0);
+    if (UiVisibility_IsEnabled() && CHECK_BTN_ALL(gameState->input[0].press.button, BTN_L) && allowToggle) {
+        UiVisibility_Toggle();
+    }
+}
+
 void GameState_Update(GameState* gameState) {
     GraphicsContext* gfxCtx = gameState->gfxCtx;
 
@@ -268,6 +286,7 @@ void GameState_Update(GameState* gameState) {
 
     GameInteractor_ExecuteOnGameStateMainStart();
 
+    GameState_UpdateUiVisibility(gameState);
     gameState->main(gameState);
 
     func_800C4344(gameState);

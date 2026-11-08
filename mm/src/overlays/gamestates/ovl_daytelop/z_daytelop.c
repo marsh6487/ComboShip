@@ -5,6 +5,8 @@
  */
 
 #include "global.h"
+#include "gui/UiVisibility.h"
+#include "ui_visibility.h"
 #include "z_daytelop.h"
 #include "z64save.h"
 #include "z64shrink_window.h"
@@ -157,6 +159,7 @@ void DayTelop_Draw(DayTelopState* this) {
 
     Gfx_SetupDL39_Opa(this->state.gfxCtx);
 
+    MmUiDrawState uiDraw = MmUiDraw_Begin(gfxCtx, UiVisibility_IsHidden());
     gDPSetRenderMode(POLY_OPA_DISP++, G_RM_OPA_SURF, G_RM_OPA_SURF2);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
 
@@ -202,6 +205,7 @@ void DayTelop_Draw(DayTelopState* this) {
                             0x0400, 0x0400);
     }
 
+    MmUiDraw_End(gfxCtx, uiDraw);
     CLOSE_DISPS(gfxCtx);
 }
 

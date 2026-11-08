@@ -1,4 +1,5 @@
 #include "valueViewer.h"
+#include "../../../../combo/gui/UiVisibility.h"
 #include <ship/config/Config.h>
 #include <ship/Context.h>
 #include "soh/SohGui/UIWidgets.hpp"
@@ -144,6 +145,10 @@ extern "C" void ValueViewer_Draw(GfxPrint* printer) {
 }
 
 extern "C" void ValueViewer_SetupDraw() {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     OPEN_DISPS(gGameState->gfxCtx);
 
     Gfx* gfx;

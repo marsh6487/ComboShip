@@ -1,6 +1,7 @@
 // Execute the complete production enhancement and native MM title-card
 // init/update/draw bodies. Hooks, resource availability and GPU setup are boundaries.
 #include "global.h"
+#include "gui/UiVisibility.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/GameInteractor/GameInteractor_VanillaBehavior.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -22,6 +23,8 @@ extern "C" { int gComboVanillaMode = 0; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 GameState* gGameState;
+static bool trueHiddenUI;
+extern "C" int UiVisibility_IsHidden(void) { return trueHiddenUI; }
 static bool playerInCutscene, hideTitleCards;
 extern "C" bool Player_InCsMode(PlayState*) { return playerInCutscene; }
 extern "C" bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t value, ...) {
@@ -96,7 +99,7 @@ static void Reset() {
     gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
     gSaveContext.showTitleCard = true;
     std::memset(&gSaveContext.save.saveInfo, 0x5A, sizeof(gSaveContext.save.saveInfo));
-    playerInCutscene = hideTitleCards = false;
+    playerInCutscene = hideTitleCards = trueHiddenUI = false;
     auto owner = std::make_shared<Ship::ResourceManager>();
     owner->archive->files.insert(kTexture);
     Ship::CrossRMRegistry::managers = {{"mm", owner}};
@@ -165,6 +168,16 @@ int main() {
     for (auto* command = overlay; command != graphics.overlay.p; ++command)
         matchingTextures += command->words.w1 == (uintptr_t)card.texture;
     Require(matchingTextures == 1, "the production MM draw must submit the routed texture exactly once");
+    auto* beforeHiddenDraw = graphics.overlay.p;
+    const auto beforeHiddenDuration = card.durationTimer;
+    trueHiddenUI = true;
+    Tick();
+    TitleCard_Draw(&play.state, &card);
+    Require(graphics.overlay.p == beforeHiddenDraw && card.durationTimer < beforeHiddenDuration,
+            "True Hidden must suppress the routed OoT place card while native title duration continues");
+    trueHiddenUI = false;
+    TitleCard_Draw(&play.state, &card);
+    Require(graphics.overlay.p > beforeHiddenDraw, "revealing UI must restore the routed OoT place card");
     for (int i = 0; i < 240; ++i) Tick();
     Require(!CardActive(), "a visit must finish its title without restarting each frame");
     Require(!std::memcmp(&before, &gSaveContext, sizeof(before)),

@@ -1,5 +1,6 @@
 #include "z64debug_display.h"
 #include "global.h"
+#include "gui/UiVisibility.h"
 
 DebugDispObject* sDebugObjectListHead;
 
@@ -54,6 +55,9 @@ DebugDispObjectInfo sDebugObjectInfoTable[] = {
 };
 
 void DebugDisplay_DrawObjects(PlayState* play) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
     DebugDispObject* dispObj = sDebugObjectListHead;
     DebugDispObjectInfo* objInfo;
 
@@ -109,6 +113,9 @@ void DebugDisplay_DrawPolygon(DebugDispObject* dispObj, void* dList, PlayState* 
  */
 
 void DebugDisplay_DrawPath(PlayState* play, Path* path) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
     s32 pad;
 
     OPEN_DISPS(play->state.gfxCtx);

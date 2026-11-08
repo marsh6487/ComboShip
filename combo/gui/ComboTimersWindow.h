@@ -32,8 +32,7 @@ class ComboTimersWindow final : public Ship::GuiWindow {
   protected:
     void InitElement() override {
     }
-    void UpdateElement() override {
-    }
+    void UpdateElement() override;
     void DrawElement() override;
 };
 

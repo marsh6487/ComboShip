@@ -64,16 +64,28 @@ namespace CustomMessage {
     Entry font;
     Entry LoadVanillaMessageTableEntry(u16){return {};}
     void Replace(std::string* text,const std::string& before,const std::string& after){size_t i=0;while((i=text->find(before,i))!=std::string::npos){text->replace(i,before.size(),after);i+=after.size();}}
-    // Color encoding, wrapping and actual font writes belong to the engine service boundary.
-    void ReplaceColorChars(std::string*){}
+    void ReplaceColorChars(std::string*);
+    // Wrapping and actual font writes remain engine service boundaries.
     void AddLineBreaks(std::string*){}
     void EnsureMessageEnd(std::string*){}
-    void LoadCustomMessageIntoFont(const Entry& entry){font=entry;}
+    void LoadCustomMessageIntoFont(const Entry& entry){font=entry;if(font.autoFormat)ReplaceColorChars(&font.msg);}
 }
+/* NATIVE_COLOR_ENCODER */
 std::vector<std::string> flavorText={"flavor"};
 /* NATIVE_ALGORITHMS */
 
 void Check(bool value,const char* message){if(!value){std::cerr<<"FAIL: "<<message<<'\n';std::exit(1);}}
+std::string VisibleHintWords(const std::string& text) {
+    std::string visible;
+    for(size_t i=0;i<text.size();++i) {
+        if(text[i]=='%'&&i+1<text.size()&&std::string("wrgbcpyB").find(text[i+1])!=std::string::npos) {
+            ++i;
+        } else if(static_cast<unsigned char>(text[i])>6) {
+            visible+=text[i];
+        }
+    }
+    return visible;
+}
 void Reset(const json& hints) {
     options={{RO_HINTS_GOSSIP_STONE_STRENGTH,50},{RO_HINTS_GOSSIP_STONES,1},{RO_HINTS_PURCHASEABLE,0},{RO_HINTS_MOON_GOSSIP_STONES,0}};
     Rando::StaticData::Checks.clear();Rando::StaticData::Items.clear();saveChecks.clear();
@@ -106,6 +118,34 @@ json Run(const json& hints) {
               "literal MM weighted cross-pool boundaries changed");
     }
     Check(ComboRando::LoadHintsMM(0).itemLocations.at("Fixture Mask")=="in OOT Fixture Area (OOT)","MM imported-item location loader changed");
+    const std::string screenshotText="a Bomb Bag can be found at Gerudo Fortress (OOT)";
+    const json screenshot={{"mm",{{"gossipPool",json::array({{{"weight",1},{"text",screenshotText}}})}}}};
+    Reset(screenshot);forcedRoll=1700;
+    bool screenshotTable=true;u16 screenshotId=0x20d1;
+    FirstMessage(&screenshotId,&screenshotTable);
+    Check(!screenshotTable&&CustomMessage::font.msg==
+          "They say \x01" "a Bomb Bag\x00" " can be found at \x04" "Gerudo Fortress (OOT)\x00."s,
+          "saved foreign gossip must color its item red and location yellow");
+    Check(ComboRando::LoadHintsMM(0).gossipPool[0].text==screenshotText,
+          "hint presentation must not rewrite existing saved pool text");
+    for(const auto& [raw,expected]:std::vector<std::pair<std::string,std::string>>{
+        {"%ga Bomb Bag%w can be found at %cGerudo Fortress%B (OOT)",
+         "%ra Bomb Bag%w can be found at %yGerudo Fortress (OOT)%w"},
+        {"%rDisguised Relic%w can be found hoarded in %ySpirit Temple (OOT)%w",
+         "%rDisguised Relic%w can be found hoarded in %ySpirit Temple (OOT)%w"},
+        {"Épée can be found at Forêt (OOT)","%rÉpée%w can be found at %yForêt (OOT)%w"},
+        {"A rumor without a placement.","A rumor without a placement."},
+        {"%gA harmless joke%w.","%gA harmless joke%w."},
+        {"can be found at Gerudo Fortress (OOT)","can be found at Gerudo Fortress (OOT)"},
+        {"A relic can be found at  (OOT)","A relic can be found at  (OOT)"},
+        {"A relic can be found at Termina (MM)","A relic can be found at Termina (MM)"},
+        {"A 50%x relic can be found at Coast (OOT)","%rA 50%x relic%w can be found at %yCoast (OOT)%w"}
+    }) {
+        Check(ComboHintPresentation::MmForeignGossip(raw)==expected,
+              "foreign placement presentation corrupted colors, visible text or unrelated rumors");
+        Check(ComboHintPresentation::MmForeignGossip(expected)==expected,
+              "foreign placement presentation must be idempotent");
+    }
     Reset(hints);
     auto loaded=ComboRando::LoadHintsMM(0);
     Check(loaded.gossipPool.size()==hints.at("mm").at("gossipPool").size(),"MM loader dropped cross pool entries");
@@ -129,16 +169,25 @@ json Run(const json& hints) {
               "cross-pool weighted boundary routed wrong index or text");
         Check(drawCalls==previous+1,"cross pool must share exactly one draw with native checks");
         bool fromTable=true;u16 id=0x20d1;reveals.clear();FirstMessage(&id,&fromTable);
-        Check(!fromTable&&CustomMessage::font.msg=="They say "+text+".","MM first textbox displayed wrong cross text");
+        const std::map<std::string,std::string> display={
+            {"OOT Native Relic can be found at Oot Home Area (OOT)",
+             "They say \x01" "OOT Native Relic\x00" " can be found at \x04" "Oot Home Area (OOT)\x00."s},
+            {"MM Abroad Relic can be found hoarded in Oot Foreign Area (OOT)",
+             "They say \x01" "MM Abroad Relic\x00" " can be found hoarded in \x04" "Oot Foreign Area (OOT)\x00."s}
+        };
+        Check(!fromTable&&VisibleHintWords(CustomMessage::font.msg)=="They say "+VisibleHintWords(text)+".",
+              "MM first textbox changed the selected saved hint's visible words");
+        if(display.contains(text))
+            Check(CustomMessage::font.msg==display.at(text),"MM fixture hint has wrong literal color bytes");
         Check(reveals.size()==1&&reveals[0].kind==0&&reveals[0].index==int(i),"MM cross-pool tracker reveal used wrong index");
         bad+=text.find("No Hint")!=std::string::npos;
         cumulative+=100+(std::max<u32>(1,loaded.gossipPool[i].weight)-1)*50;
     }
     forcedRoll=0;u16 id=0x20d1;bool table=true;reveals.clear();FirstMessage(&id,&table);
-    Check(!table&&CustomMessage::font.msg=="They say %ga Native Mask%w is hidden %yin Fixture Native Area%w.","native MM item/message branch changed");
+    Check(!table&&CustomMessage::font.msg=="They say \x02" "a Native Mask\x00" " is hidden \x04" "in Fixture Native Area\x00."s,"native MM item/message branch changed");
     Check(reveals.size()==1&&reveals[0].kind==1&&reveals[0].key=="Fixture Native Check","native MM check tracker route changed");
     forcedRoll=1200;table=true;reveals.clear();FirstMessage(&id,&table);
-    Check(CustomMessage::font.msg=="They say %gImported Relic (OOT)%w is hidden %yin Fixture Native Area%w.","OOT item at MM check lost its real display name");
+    Check(CustomMessage::font.msg=="They say \x02" "Imported Relic (OOT)\x00" " is hidden \x04" "in Fixture Native Area\x00."s,"OOT item at MM check lost its real display name");
     auto& foreign=Rando::MiscBehavior::foreign.at(RC_ASTRAL_OBSERVATORY_PASSAGE_CHEST);
     foreign.category="junk";forcedRoll=1200;std::string junkText;int junkIndex=-1;
     Check(Rando::GetItemTypeForCheck(RI_COMBO_FOREIGN,RC_ASTRAL_OBSERVATORY_PASSAGE_CHEST)==RITYPE_JUNK&&
@@ -151,7 +200,7 @@ json Run(const json& hints) {
     Reset(hints);options[RO_HINTS_PURCHASEABLE]=1;play.msgCtx.choiceIndex=1;forcedRoll=0;table=true;id=0x20c0;
     const int cost=GetNormalizedCost();Check(cost==70,"normalized purchase cost changed in controlled four-check fixture");
     SecondMessage(&id,&table);Check(!table&&gSaveContext.rupeeAccumulator==-70,"paid message failed to charge its selected hint");
-    Check(CustomMessage::font.msg=="Wise choice... They say %ga Native Mask%w is hidden %yin Fixture Paid Area%w.","paid hint used OOT cross pool or wrong native location route");
+    Check(CustomMessage::font.msg=="Wise choice... They say \x02" "a Native Mask\x00" " is hidden \x04" "in Fixture Paid Area\x00."s,"paid hint used OOT cross pool or wrong native location route");
     gSaveContext.save.saveInfo.playerData.rupees=0;gSaveContext.rupeeAccumulator=0;SecondMessage(&id,&table);
     Check(gSaveContext.rupeeAccumulator==0&&CustomMessage::font.msg=="Foolish... You don't have enough rupees...","failed purchase charged or displayed a hint");
     play.msgCtx.choiceIndex=0;SecondMessage(&id,&table);
@@ -169,7 +218,7 @@ json Run(const json& hints) {
     std::string current;index=-1;Check(GetRandomCheck(false,&current,&index)==RC_UNKNOWN&&index==0&&current=="Another slot's rumor",
         "MM generation change retained previous slot's cached hint pool");
     std::cout<<"PASS native MM loader, weighted selection, all cross entries, native/foreign names, paid repeat, Moon priority and cache reload\n";
-    return {{"poolEntriesRouted",loaded.gossipPool.size()},{"storedNoHintEntries",bad},{"fontService","recorded before engine wrapping/color encoding"}};
+    return {{"poolEntriesRouted",loaded.gossipPool.size()},{"storedNoHintEntries",bad},{"fontService","native color bytes recorded before engine wrapping/font upload"}};
 }
 #undef GET_PLAYER
 #undef RANDO_SAVE_CHECKS

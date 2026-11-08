@@ -292,14 +292,22 @@ void ComboTimersWindow::DrawElement() {
     ImGui::EndTable();
 }
 
-void ComboTimersWindow::Draw() {
+void ComboTimersWindow::UpdateElement() {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
         return;
     }
     // comboui's per-module GImGui must point at the shared context (same pattern as ComboMenu).
     ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
-    SuppressNativeOverlays(); // before the visibility gate — it must run with the overlay off too
+    SuppressNativeOverlays(); // This must also run while True Hidden UI suppresses Draw().
+}
+
+void ComboTimersWindow::Draw() {
+    auto ctx = Ship::Context::GetRawInstance();
+    if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+        return;
+    }
+    ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
 
     if (!IsVisible()) {
         return;

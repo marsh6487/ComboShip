@@ -28,6 +28,7 @@ static void EnsureCommandMelodyInPool(std::vector<RandoItemId>& itemPool) {
 }
 
 void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool) {
+    const bool hasOotGameplay = Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive();
 #ifdef COMBO_BUILD
     // ComboShip (#136): the launcher owns the goal, so the hunt toggle follows it (the Majora soul-lock
     // applies even at 0 MM pieces). REQUIRED is combined and display-only here — the win is combo's.
@@ -301,19 +302,14 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         // a pool, so having one was never enough to make the Skijer Roc placeable.)
         itemPool.push_back(RI_OOT_ROCS_FEATHER);
 
-        // THE 3 DUPLICATE SONGS BECOME THE 3 NEI CUSTOMS. Epona's Song, the Song of Time and the Song
-        // of Storms exist in BOTH games, so in a combo two of each is a wasted item. NEI's answer is
-        // to give MM's side three songs of its own instead, and the MM quest page in OoT already draws
-        // them in exactly those three rows (sMmPageSongs, z_kaleido_collect.c).
+        // Replace the duplicate Song of Time with the working Command Melody. Fugue of Home and
+        // Ballad of the Hero have no gameplay effect yet, so retain native Epona/Storms supply.
         //
         // Done as a POOL SWAP, not by editing the checks table: a check's randoItemId is its VANILLA
         // item (where the copy comes from), not what it will hand out, and rewriting it would change
-        // solo-MM randos too. Swapping keeps the pool exactly as long as the check list. OoT keeps its
-        // own Epona/Time/Storms — they are only dropped from MM's side. Skijer's NEI
+        // solo-MM randos too. Swapping keeps the pool exactly as long as the check list.
         const std::pair<RandoItemId, RandoItemId> kComboSongSwaps[] = {
-            { RI_SONG_EPONA, RI_OOT_SONG_FUGUE_OF_HOME },
             { RI_SONG_TIME, RI_OOT_SONG_COMMAND_MELODY },
-            { RI_SONG_STORMS, RI_OOT_SONG_BALLAD_OF_THE_HERO },
         };
         for (auto& [dup, custom] : kComboSongSwaps) {
             auto it = std::find(itemPool.begin(), itemPool.end(), dup);
@@ -356,7 +352,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_PROGRESSIVE_STICK_CAPACITY);
             itemPool.push_back(RI_OOT_PROGRESSIVE_NUT_CAPACITY);
             itemPool.push_back(RI_OOT_PROGRESSIVE_NUT_CAPACITY);
-            itemPool.push_back(RI_OOT_ABILITY_CHESTS);
+            if (hasOotGameplay) {
+                itemPool.push_back(RI_OOT_ABILITY_CHESTS);
+            }
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L1 Goron Bracelet
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L2 Silver Gauntlets
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L3 Gold Gauntlets
@@ -403,9 +401,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_SONG_REQUIEM_OF_SPIRIT);
             itemPool.push_back(RI_OOT_SONG_NOCTURNE_OF_SHADOW);
             itemPool.push_back(RI_OOT_SONG_PRELUDE_OF_LIGHT);
-            itemPool.push_back(RI_OOT_SONG_FUGUE_OF_HOME);
             itemPool.push_back(RI_OOT_SONG_COMMAND_MELODY);
-            itemPool.push_back(RI_OOT_SONG_BALLAD_OF_THE_HERO);
         }
         if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_MASKS] == RO_GENERIC_YES) {
             itemPool.push_back(RI_OOT_MASK_SKULL);
@@ -697,11 +693,13 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_ROCS_FEATHER);
         }
 
-        // Dual Cane: SIX copies, because the cane is six separate skills sharing one slot and each
-        // pickup unlocks the next (see the RI_OOT_NEI_CANE_* arms in GiveItem.cpp).
+        // Cane skills share one slot. Trirod's echo mechanic is only implemented in OoT; keep its
+        // identity and direct legacy grant, but do not supply it to an MM-only seed.
         itemPool.push_back(RI_OOT_NEI_CANE_OF_SOMARIA);
         itemPool.push_back(RI_OOT_NEI_CANE_SOMARIA_BLOCK);
-        itemPool.push_back(RI_OOT_NEI_CANE_SOMARIA_PLATFORM);
+        if (hasOotGameplay) {
+            itemPool.push_back(RI_OOT_NEI_CANE_SOMARIA_PLATFORM);
+        }
         itemPool.push_back(RI_OOT_NEI_CANE_PACCI_FLIP);
         itemPool.push_back(RI_OOT_NEI_CANE_PACCI_STONE);
         itemPool.push_back(RI_OOT_NEI_CANE_PACCI_ULTRAHAND);

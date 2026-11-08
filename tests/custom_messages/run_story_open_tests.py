@@ -41,6 +41,7 @@ fixture = fixture.replace('/* NATIVE_UNBOUND_MESSAGES */', registry)
 # Japanese glyph and graphics services are unused boundaries for these texts.
 engine = r'''
 #include "global.h"
+#include "libultraship/bridge/consolevariablebridge.h"
 #include "message_data_static.h"
 #include "ComboItemReceiptPresentation.h"
 #include "soh/OTRGlobals.h"

@@ -5,6 +5,7 @@
  */
 
 #include "z_end_title.h"
+#include "ui_visibility.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -70,6 +71,7 @@ void EndTitle_DrawFull(Actor* thisx, PlayState* play) {
 
     CLOSE_DISPS(play->state.gfxCtx);
 
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     OPEN_DISPS(play->state.gfxCtx);
 
     // Draw title cards on the screen
@@ -108,10 +110,12 @@ void EndTitle_DrawFull(Actor* thisx, PlayState* play) {
     gSPTextureRectangle(OVERLAY_DISP++, 104 << 2, 177 << 2, 216 << 2, 192 << 2, G_TX_RENDERTILE, 0, 0, 1 << 10,
                         1 << 10);
     CLOSE_DISPS(play->state.gfxCtx);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }
 
 // Used in the Temple of Time
 void EndTitle_DrawNintendoLogo(Actor* thisx, PlayState* play) {
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     EndTitle* this = (EndTitle*)thisx;
     s32 pad;
     s32 frames = play->csCtx.frames;
@@ -127,4 +131,5 @@ void EndTitle_DrawNintendoLogo(Actor* thisx, PlayState* play) {
     gSPDisplayList(OVERLAY_DISP++, sPresentedByNintendoDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }

@@ -579,6 +579,8 @@ UNEXPECTED_DRAW(EnViewer_DrawStaticAdultMalon)
 UNEXPECTED_DRAW(EnViewer_DrawStaticDarunia)
 UNEXPECTED_DRAW(EnViewer_DrawStaticNabooru)
 UNEXPECTED_DRAW(EnViewer_DrawStaticPhantomGanon)
+UNEXPECTED_DRAW(EnViewer_DrawStaticRiverFrog)
+UNEXPECTED_DRAW(EnViewer_DrawStaticDampeGhost)
 #undef UNEXPECTED_DRAW
 /* PRODUCTION_OPAQUE_RENDER_MODE */
 /* PRODUCTION_VIEWER_FUNCTIONS */

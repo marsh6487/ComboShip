@@ -56,7 +56,7 @@ def build(exporter_override=None):
     playthrough = source("combo/rando/ComboPlaythrough.h")
     foreign = source("combo/rando/CrossForeign.h")
     custom = source("soh/soh/Enhancements/custom-message/CustomMessageManager.cpp")
-    parts = [prefix, "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
+    parts = [prefix, '#include "rando/HintPresentation.h"\n#include "rando/SariaHintPolicy.h"\n', "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
     parts += [block(custom, "CustomMessage::CustomMessage(std::string english_, TextBoxType type_, TextBoxPosition position_)"),
               block(custom, "void CustomMessage::Replace(std::string&& oldStr, std::string&& newStr)"),
               block(custom, "void CustomMessage::SetSingularPlural()")]
@@ -125,7 +125,9 @@ def mm_fixture():
         section = actor[actor.index("    COND_ID_HOOK(OnOpenText, " + native_id):]
         algorithms.append("auto " + name + " = " + block(section, "[](u16* textId, bool* loadFromMessageTable)") + ";\n")
     boundary = (ROOT / "tests/cross_hints/mm_gossip_boundary.inc").read_text()
-    return boundary.replace("/* NATIVE_ENUMS */", enums).replace("/* NATIVE_ALGORITHMS */", "\n".join(algorithms))
+    encoder = block(source("mm/2s2h/CustomMessage/CustomMessage.cpp"), "void CustomMessage::ReplaceColorChars(")
+    return boundary.replace("/* NATIVE_ENUMS */", enums).replace("/* NATIVE_COLOR_ENCODER */", encoder).replace(
+        "/* NATIVE_ALGORITHMS */", "\n".join(algorithms))
 
 
 def main():
@@ -142,7 +144,7 @@ def main():
         cpp.write_text(build(args.baseline_exporter))
         binary = root / "test"
         command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-DCOMBO_BUILD",
-                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include")]
+                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"), "-I" + str(ROOT / "combo")]
         if args.sanitize:
             command += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                         "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]

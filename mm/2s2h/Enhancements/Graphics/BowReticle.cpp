@@ -1,3 +1,4 @@
+#include "gui/UiVisibility.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -16,6 +17,10 @@ extern "C" {
 extern "C" unsigned char IKAxe_IsAiming(void);
 
 void DrawBowReticle(PlayState* play, Player* player, f32 bowDistance) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     static Vec3f D_801C094C = { -500.0f, -100.0f, 0.0f };
     CollisionPoly* poly;
     s32 bgId;

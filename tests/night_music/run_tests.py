@@ -18,6 +18,18 @@ with tempfile.TemporaryDirectory(prefix='night-music-') as tmp:
         production=(ROOT/path).read_text()
         production=production[production.index('static ComboNightMusic::Lifecycle'):production.index('static void RegisterSceneNightMusic')]
         fixture=(ROOT/'tests/night_music/host_test.cpp').read_text().replace('/* PRODUCTION */',production)
+        if host=='soh':
+            native_player=(ROOT/'soh/src/code/z_player_lib.c').read_text()
+            native_talk=(ROOT/'soh/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
+            bodies=[]
+            for source,name in [(native_player,'Player_InBlockingCsMode'),(native_player,'Player_InCsMode'),
+                                (native_talk,'Player_SetupTalk')]:
+                match=re.search(r'^(?:s32|void) '+name+r'\([^;]*?\)\s*\{.*?^}',source,re.M|re.S)
+                if match is None:
+                    raise RuntimeError('Missing native '+name)
+                # C's player parameter is named `this`; only rename that C++ keyword.
+                bodies.append(re.sub(r'\bthis\b','player',match[0]))
+            fixture=fixture.replace('/* NATIVE_PLAYER */','\n'.join(bodies))
         cpp=Path(tmp)/(host+'.cpp');cpp.write_text(fixture)
         subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-DCOMBO_BUILD','-DTEST_MM='+str(int(host=='mm')),
                         '-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-no-pie',

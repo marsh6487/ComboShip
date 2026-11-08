@@ -1,4 +1,5 @@
 #include "../../../../../combo/ComboGameMode.h"
+#include "ui_visibility.h"
 #include "../../../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "file_choose.h"
 
@@ -3276,6 +3277,7 @@ void FileChoose_Main(GameState* thisx) {
 
     FileChoose_PulsateCursor(&this->state);
     gFileSelectUpdateFuncs[this->menuMode](&this->state);
+    OotUiDrawScope uiScope = OotUi_BeginDraw(this->state.gfxCtx);
     FrameInterpolation_StartRecord();
     gFileSelectDrawFuncs[this->menuMode](&this->state);
     FrameInterpolation_StopRecord();
@@ -3297,6 +3299,7 @@ void FileChoose_Main(GameState* thisx) {
     // Draw rando save version warning over the controls text, but before the screen fill fade out
     FileChoose_DrawRandoSaveVersionWarning(&this->state);
 
+    OotUi_EndDraw(this->state.gfxCtx, uiScope);
     gDPPipeSync(POLY_OPA_DISP++);
     gSPDisplayList(POLY_OPA_DISP++, sScreenFillSetupDL);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 0, 0, 0, sScreenFillAlpha);

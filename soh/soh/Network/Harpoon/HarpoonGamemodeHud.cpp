@@ -9,6 +9,17 @@
 
 namespace HarpoonHud {
 
+void Window::UpdateElement() {
+    if (Harpoon::Instance == nullptr || !Harpoon::Instance->isConnected ||
+        Harpoon::Instance->activeGameMode == HARPOON_MODE_PROP_HUNT) {
+        return;
+    }
+    if (HarpoonTriforceThief::IsLoaded() &&
+        (HarpoonTriforceThief::IsInMapSelect() || HarpoonTriforceThief::IsInRound())) {
+        HarpoonTriforceThief::TickHud();
+    }
+}
+
 void Window::DrawElement() {
     if (Harpoon::Instance == nullptr || !Harpoon::Instance->isConnected)
         return;

@@ -140,8 +140,9 @@ def apply(resources):
         '<5h2Bh2B', values['PlayerPriority'], -1, values['PlayerItemGetCamera'], -1,
         -1, 0, 255, values['HudVisibility'], 0, values['LetterboxSize'])
     commands = native_commands(result[SCENE])
-    # MM stores an actor's cutscene index in rotation Y's low seven bits;
-    # the upper nine bits retain the exact authored player yaw.
+    # The retained scene stores OoT's raw binary half-turn. Convert it to
+    # MM's packed degrees before assigning the low-seven-bit cutscene index;
+    # changing those bits first bypasses the runtime's exact legacy-yaw repair.
     if 0 not in commands:
         raise ValueError('native MM shop requires player spawn entries')
     spawns = bytearray(commands[0])
@@ -153,7 +154,10 @@ def apply(resources):
         actor = struct.unpack_from('<H6hH', spawns, offset)
         if actor[0] & 0x1FFF or actor[5] & 0x7F not in (0, values['PlayerCutscene']):
             raise ValueError('unexpected native MM shop player spawn chain')
-        struct.pack_into('<h', spawns, offset + 10, (actor[5] & ~0x7F) | values['PlayerCutscene'])
+        yaw = actor[5] & ~0x7F
+        if yaw == -32768:
+            yaw = 180 << 7
+        struct.pack_into('<h', spawns, offset + 10, yaw | values['PlayerCutscene'])
     commands[0] = bytes(spawns)
     if 20 not in commands or list(commands)[-1] != 20:
         raise ValueError('native MM shop scene must end with its native end command')

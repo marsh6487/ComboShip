@@ -297,18 +297,23 @@ void Reconcile() {
     }
 }
 
-// Draw-only shell: the reconcile needs a per-frame tick, not a window.
+// Logic-only shell: keep settings synchronized when passive drawing is suppressed.
 class SyncWindow final : public Ship::GuiWindow {
   public:
     using GuiWindow::GuiWindow;
     void Draw() override {
-        Reconcile();
     }
 
   protected:
     void InitElement() override {
     }
     void UpdateElement() override {
+        auto ctx = Ship::Context::GetRawInstance();
+        if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+            return;
+        }
+        ImGui::SetCurrentContext(ctx->GetWindow()->GetGui()->GetImGuiContext());
+        Reconcile();
     }
     void DrawElement() override {
     }

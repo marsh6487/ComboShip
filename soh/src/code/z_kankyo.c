@@ -1,4 +1,5 @@
 #include "global.h"
+#include "ui_visibility.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include <libultraship/libultra.h>
 #include "vt.h"
@@ -1018,7 +1019,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
             gSaveContext.nightFlag = 0;
         }
 
-        if (SREG(0) != 0 || CREG(2) != 0) {
+        if ((SREG(0) != 0 || CREG(2) != 0) && !UiVisibility_IsHidden()) {
             Gfx* displayList;
             Gfx* prevDisplayList;
 

@@ -1,4 +1,5 @@
 #include "CollisionViewer.h"
+#include "gui/UiVisibility.h"
 #include "2s2h/BenGui/UIWidgets.hpp"
 
 #include <vector>
@@ -665,7 +666,7 @@ template <typename T> size_t ResetVector(T& vec) {
 }
 
 extern "C" void DrawCollisionViewer() {
-    if (gPlayState == nullptr || !CVarGetInteger("gCollisionViewer.Enabled", 0)) {
+    if (UiVisibility_IsHidden() || gPlayState == nullptr || !CVarGetInteger("gCollisionViewer.Enabled", 0)) {
         return;
     }
 

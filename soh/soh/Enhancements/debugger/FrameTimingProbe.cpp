@@ -18,6 +18,13 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 
+#ifndef FRAME_TIMING_HOST_LABEL
+#define FRAME_TIMING_HOST_LABEL "OoT"
+#endif
+#ifndef FRAME_TIMING_CAPTURE_SCOPE
+#define FRAME_TIMING_CAPTURE_SCOPE "all OoT gameplay scenes; no slow-frame threshold"
+#endif
+
 namespace {
 thread_local FrameTiming::Recorder recorder;
 std::shared_ptr<spdlog::logger> diagnosticLogger;
@@ -71,9 +78,10 @@ const std::shared_ptr<spdlog::logger>& DiagnosticLogger() {
     if (!diagnosticLogger) {
         // Windows statically links spdlog into each game/engine DLL. The game
         // DLL's default logger is not the engine Context's file logger.
-        diagnosticLogger = Ship::Context::GetRawInstance()->GetLogger()->clone("OoTFrameTimingProbe");
-        flightLogPath =
-            Ship::Context::GetPathRelativeToAppDirectory("logs/OoT-RenderFlight-" + std::to_string(Now()) + ".log");
+        diagnosticLogger =
+            Ship::Context::GetRawInstance()->GetLogger()->clone(FRAME_TIMING_HOST_LABEL "FrameTimingProbe");
+        flightLogPath = Ship::Context::GetPathRelativeToAppDirectory("logs/" FRAME_TIMING_HOST_LABEL "-RenderFlight-" +
+                                                                     std::to_string(Now()) + ".log");
         auto captureSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(flightLogPath, false);
         captureSink->set_pattern("%v");
         diagnosticLogger->sinks().push_back(captureSink);
@@ -118,6 +126,7 @@ void FlushFlight(const char* reason) {
         return;
     const uint64_t start = Now();
     auto record = flight.Take(reason);
+    record["host"] = FRAME_TIMING_HOST_LABEL;
     record["diagnostic_errors"] = flightErrors;
     const auto pool = Ship::Context::GetRawInstance()->GetLogThreadPool();
     record["logger_queue_depth_before_emit"] = pool ? nlohmann::json(pool->queue_size()) : nlohmann::json(nullptr);
@@ -134,13 +143,14 @@ void ReportOutputState(bool enabled) {
     }
     DiagnosticLogger(); // create the complete-session capture before announcing its path
     const nlohmann::json state = {
+        { "host", FRAME_TIMING_HOST_LABEL },
         { "event", previousEnabled == -1 ? "startup" : "state" },
         { "schema", 1 },
         { "enabled", enabled },
         { "phase_count", FRAME_TIMING_PHASE_COUNT },
         { "interval_ms", 1000 },
         { "normal_log_level_independent", true },
-        { "scope", "all OoT gameplay scenes; no slow-frame threshold" },
+        { "scope", FRAME_TIMING_CAPTURE_SCOPE },
         { "flight_schema", 1 },
         { "complete_capture_file", flightLogPath },
         { "flight_capture", "all ticks and render attempts; transition and shutdown flush" },
@@ -289,6 +299,7 @@ extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
             };
         }
         const nlohmann::json record = {
+            { "host", FRAME_TIMING_HOST_LABEL },
             { "event", "sample" },
             { "schema", 1 },
             { "scene", report->context.scene },
@@ -462,6 +473,7 @@ extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, 
         opcodes.push_back(std::move(entry));
     }
     nlohmann::json record = {
+        { "host", FRAME_TIMING_HOST_LABEL },
         { "event", "sample" },
         { "schema", 2 },
         { "scene", context.scene },
@@ -556,6 +568,7 @@ extern "C" void FrameTiming_RecordConfiguration(const nlohmann::json& value) {
         auto configuration = value;
         configurationLogged = true;
         configuration["tick_id"] = tickId;
+        configuration["host"] = FRAME_TIMING_HOST_LABEL;
         Emit("RenderFlightConfiguration", configuration);
 
     } catch (...) { ++flightErrors; }

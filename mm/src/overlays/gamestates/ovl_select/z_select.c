@@ -5,6 +5,7 @@
  */
 
 #include "z_select.h"
+#include "gui/UiVisibility.h"
 #include "z64shrink_window.h"
 #include "z64view.h"
 #include "libc/alloca.h"
@@ -1068,6 +1069,9 @@ void MapSelect_DrawLoadingScreen(MapSelectState* this) {
 }
 
 void MapSelect_Draw(MapSelectState* this) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
     GraphicsContext* gfxCtx = this->state.gfxCtx;
 
     func_8012CF0C(gfxCtx, true, true, 0, 0, 0);

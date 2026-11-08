@@ -1,4 +1,5 @@
 #include "../../../combo/ComboGameMode.h"
+#include "ui_visibility.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
 #include "gameplay/ComboFaroresWind.h"
@@ -5917,7 +5918,8 @@ void Interface_Draw(PlayState* play) {
     s16 svar4;
     s16 svar5;
     s16 timerId;
-    bool fullUi = !CVarGetInteger(CVAR_ENHANCEMENT("MinimalUI"), 0) || !R_MINIMAP_DISABLED || play->pauseCtx.state != 0;
+    bool fullUi = UiVisibility_IsEnabled() || !CVarGetInteger(CVAR_ENHANCEMENT("MinimalUI"), 0) ||
+                  !R_MINIMAP_DISABLED || play->pauseCtx.state != 0;
     // #region SOH [NTSC]
     s32 languageOffset = gSaveContext.language;
 
@@ -5930,6 +5932,7 @@ void Interface_Draw(PlayState* play) {
         return;
     }
 
+    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     OPEN_DISPS(play->state.gfxCtx);
 
     gSPSegment(OVERLAY_DISP++, 0x02, interfaceCtx->parameterSegment);
@@ -7224,6 +7227,10 @@ void Interface_Draw(PlayState* play) {
         FlagSet_Update(play);
     }
 
+    CLOSE_DISPS(play->state.gfxCtx);
+    OotUi_EndDraw(play->state.gfxCtx, uiScope);
+
+    OPEN_DISPS(play->state.gfxCtx);
     if (interfaceCtx->unk_244 != 0) {
         gDPPipeSync(OVERLAY_DISP++);
         gSPDisplayList(OVERLAY_DISP++, sSetupDL_80125A60);
@@ -7235,6 +7242,10 @@ void Interface_Draw(PlayState* play) {
 }
 
 void Interface_DrawTotalGameplayTimer(PlayState* play) {
+    if (UiVisibility_IsHidden()) {
+        return;
+    }
+
     // Draw timer based on the Gameplay Stats total time.
     if (GameInteractor_Should(VB_SHOW_GAMEPLAY_TIMER,
                               CVarGetInteger(CVAR_GAMEPLAY_STATS("ShowIngameTimer"), 0) && gSaveContext.fileNum >= 0 &&

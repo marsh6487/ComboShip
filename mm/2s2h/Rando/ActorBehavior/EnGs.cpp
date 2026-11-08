@@ -2,6 +2,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/ShipUtils.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "../../../../combo/rando/HintPresentation.h"
 #ifdef COMBO_BUILD
 #include "rando/CrossForeign.h"              // ComboShip: cross-game gossip-stone pool
 #include "Rando/MiscBehavior/MiscBehavior.h" // ComboShip: ComboRandoGen cache invalidation
@@ -290,7 +291,7 @@ void Rando::ActorBehavior::InitEnGsBehavior() {
             entry.autoFormat = false;
 
             if (!foreignText.empty()) {
-                entry.msg = "They say " + foreignText + ".";
+                entry.msg = "They say " + ComboHintPresentation::MmForeignGossip(foreignText) + ".";
                 ComboReportStoneHint(foreignIndex, RC_UNKNOWN, false);
             } else {
                 auto& saveCheck = RANDO_SAVE_CHECKS[randoCheckId];
