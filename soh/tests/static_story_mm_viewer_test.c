@@ -174,6 +174,8 @@ bool MmAssets_LoadNormalActor(int type, unsigned char pose, MmNormalActorResourc
         output->eyes[i] = eyes[i];
     for (unsigned i = 0; i < p->mouthCount; ++i)
         output->mouths[i] = mouths[i];
+    if (p->propDisplayListPath != NULL)
+        output->propDisplayList = umbrella;
     return true;
 }
 bool MmAssets_LoadKafei(unsigned char pose, MmNormalActorResources* output) {
@@ -315,8 +317,12 @@ void Actor_SetFocus(Actor* a, f32 y) {
     a->focus.pos = a->world.pos;
     a->focus.pos.y += y;
 }
+static s16 testRandomOffset, lastRandomBase, lastRandomRange;
 s16 Rand_S16Offset(s16 base, s16 range) {
-    return base;
+    REQUIRE(testRandomOffset == 0 || (testRandomOffset > 0 && testRandomOffset < range));
+    lastRandomBase = base;
+    lastRandomRange = range;
+    return base + testRandomOffset;
 }
 f32 Math_SinS(s16 angle) {
     return 0;
@@ -378,6 +384,30 @@ static void EnViewer_StaticSkullKidPostLimbDraw(PlayState* p, s32 i, Gfx** d, Ve
 }
 static void EnViewer_DrawStaticTatl(EnViewer* a, PlayState* p) {
 }
+static void requireMikauFaceCommands(unsigned expectedEye) {
+    static const char* const eyePaths[] = {
+        "__OTR__objects/object_zog/object_zog_Tex_024750",
+        "__OTR__objects/object_zog/object_zog_Tex_024F50",
+        "__OTR__objects/object_zog/object_zog_Tex_025750",
+    };
+    REQUIRE(expectedEye < 3);
+    REQUIRE((commands[1].words.w0 >> 24) == G_MOVEWORD);
+    REQUIRE((commands[1].words.w0 & 0xffff) == 8 * 4);
+    REQUIRE((commands[2].words.w0 >> 24) == G_MOVEWORD);
+    REQUIRE((commands[2].words.w0 & 0xffff) == 9 * 4);
+    const char* eyePath = (const char*)commands[1].words.w1;
+    const char* mouthPath = (const char*)commands[2].words.w1;
+    REQUIRE(eyePath != NULL && ((uintptr_t)eyePath & 1) == 0);
+    /* Check the signature before reading a full path: the old loader supplied
+     * small raw pixel buffers, losing the alternate texture's HD metadata. */
+    REQUIRE(memcmp(eyePath, "__OTR__", 7) == 0);
+    REQUIRE(strcmp(eyePath, eyePaths[expectedEye]) == 0);
+    REQUIRE(mouthPath != NULL && ((uintptr_t)mouthPath & 1) == 0);
+    REQUIRE(memcmp(mouthPath, "__OTR__", 7) == 0);
+    REQUIRE(strcmp(mouthPath, "__OTR__objects/object_zog/object_zog_Tex_025F50") == 0);
+    REQUIRE((commands[3].words.w0 >> 24) == G_SETENVCOLOR);
+    REQUIRE(commands[3].words.w1 == 0xffffffffU);
+}
 void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDrawOpa override, PostLimbDrawOpa post,
                                void* arg) {
     ++drawCalls;
@@ -391,10 +421,16 @@ void SkelAnime_DrawSkeletonOpa(PlayState* play, SkelAnime* skel, OverrideLimbDra
         REQUIRE(drawing->actor.focus.pos.x == posedFocus.x && drawing->actor.focus.pos.z == posedFocus.z);
         REQUIRE(drawing->actor.focus.pos.y == posedFocus.y + (drawing->staticState.type == 26 ? 10 : 0));
         if (drawing->staticState.type == STATIC_STORY_ACTOR_MIKAU) {
+            REQUIRE(play->state.gfxCtx->polyOpa.p == commands + 4);
             REQUIRE((commands[0].words.w0 & 0xffff) == 0x0C * 4);
             REQUIRE(commands[0].words.w1 == (uintptr_t)MmAssets_GetOpaqueRenderMode());
             /* Native Mikau limbs call G_DL_INDEX with segment C, index 2. */
             REQUIRE((MmAssets_GetOpaqueRenderMode()[2].words.w0 >> 24) == G_ENDDL);
+            StaticStoryMmFace face =
+                StaticStoryMm_ResolveFace(STATIC_STORY_ACTOR_MIKAU, drawing->staticState.pose, skel->curFrame,
+                                          drawing->staticState.eyeIndex, drawing->staticState.tracking);
+            REQUIRE(face.mouth == 0);
+            requireMikauFaceCommands(face.eye);
         }
         if (drawing->staticState.type == 26 && drawing->staticState.pose == 1) {
             REQUIRE(post);
@@ -795,6 +831,97 @@ static void testShopGalBlink(PlayState* play) {
     puts("PASS Treasure Chest Shop Gal: three poses, complete blink, per-instance timing, aligned OTR eye paths retain "
          "HD metadata");
 }
+static void checkMikauBlinkFrame(EnViewer* viewer, PlayState* play, unsigned expectedEye, s16 expectedTimer) {
+    REQUIRE(viewer->staticState.eyeIndex == expectedEye);
+    REQUIRE(viewer->staticState.blinkTimer == expectedTimer);
+    StaticStoryMmFace face =
+        StaticStoryMm_ResolveFace(STATIC_STORY_ACTOR_MIKAU, viewer->staticState.pose, viewer->skin.skelAnime.curFrame,
+                                  viewer->staticState.eyeIndex, viewer->staticState.tracking);
+    REQUIRE(face.eye == expectedEye && face.mouth == 0);
+    f32 frame = viewer->skin.skelAnime.curFrame;
+    uintptr_t eyePath = 0, mouthPath = 0;
+    for (unsigned render = 0; render < 2; ++render) {
+        draw(viewer, play); /* Public dispatcher and production MM draw emit the segments. */
+        requireMikauFaceCommands(expectedEye);
+        REQUIRE(viewer->staticState.eyeIndex == expectedEye);
+        REQUIRE(viewer->staticState.blinkTimer == expectedTimer);
+        REQUIRE(viewer->skin.skelAnime.curFrame == frame);
+        if (render != 0) {
+            REQUIRE(commands[1].words.w1 == eyePath);
+            REQUIRE(commands[2].words.w1 == mouthPath);
+        }
+        eyePath = commands[1].words.w1;
+        mouthPath = commands[2].words.w1;
+    }
+}
+static void testMikauBlink(PlayState* play) {
+    const StaticStoryActorDefinition* definition = StaticStoryActor_GetDefinition(STATIC_STORY_ACTOR_MIKAU);
+    const s16 randomOffsets[] = { 0, 15, 29 };
+    unsigned completedCycles = 0, updateCount = 0;
+    REQUIRE(definition != NULL && definition->blinkMin == 30 && definition->blinkRange == 30);
+    REQUIRE(!StaticStoryActor_CanTalk(STATIC_STORY_ACTOR_MIKAU));
+    for (unsigned useAlt = 0; useAlt < 2; ++useAlt)
+        for (unsigned pose = 0; pose < 2; ++pose)
+            for (unsigned delayCase = 0; delayCase < 3; ++delayCase) {
+                altAssets = useAlt;
+                testRandomOffset = randomOffsets[delayCase];
+                const s16 delay = 30 + testRandomOffset;
+                const StaticStoryMmPresentation* presentation =
+                    StaticStoryMm_GetPresentation(STATIC_STORY_ACTOR_MIKAU, pose);
+                REQUIRE(presentation != NULL && presentation->eyeCount == 3 && presentation->mouthCount == 2);
+                REQUIRE(presentation->eyeSegment == 8 && presentation->mouthSegment == 9);
+                REQUIRE(StaticStoryActor_GetFixedEyeIndex(STATIC_STORY_ACTOR_MIKAU, pose) == -1);
+                EnViewer first, second;
+                prepare(&first, STATIC_STORY_ACTOR_MIKAU, pose);
+                prepare(&second, STATIC_STORY_ACTOR_MIKAU, pose);
+                EnViewerStatic_WaitForObjects(&first, play);
+                EnViewerStatic_WaitForObjects(&second, play);
+                REQUIRE(first.staticState.initialized && second.staticState.initialized);
+                REQUIRE(first.actionFunc == EnViewerStatic_Update && second.actionFunc == EnViewerStatic_Update);
+                REQUIRE(lastRandomBase == 30 && lastRandomRange == 30);
+                checkMikauBlinkFrame(&first, play, 0, delay);
+                checkMikauBlinkFrame(&second, play, 0, delay);
+                unsigned observedEyes = 1;
+                for (unsigned cycle = 0; cycle < 2; ++cycle) {
+                    for (s16 remaining = delay; remaining > 0; --remaining) {
+                        EnViewer_Update(&first.actor, play);
+                        ++updateCount;
+                        checkMikauBlinkFrame(&first, play, 0, remaining - 1);
+                    }
+                    /* Exercise the real update timer; never inject an eye index.
+                     * Mikau's existing sequence is open -> half -> closed -> open. */
+                    for (unsigned step = 1; step <= 3; ++step) {
+                        EnViewer_Update(&first.actor, play);
+                        ++updateCount;
+                        unsigned expectedEye = step % 3;
+                        checkMikauBlinkFrame(&first, play, expectedEye, step == 3 ? delay : 0);
+                        observedEyes |= 1u << first.staticState.eyeIndex;
+                        if (step == 2) {
+                            uintptr_t closedPath = commands[1].words.w1;
+                            altAssets = !useAlt;
+                            checkMikauBlinkFrame(&first, play, 2, 0);
+                            REQUIRE(commands[1].words.w1 == closedPath);
+                            altAssets = useAlt;
+                            checkMikauBlinkFrame(&first, play, 2, 0);
+                        }
+                        /* Drawing a second actor must not consume its private timer. */
+                        checkMikauBlinkFrame(&second, play, 0, delay);
+                    }
+                    REQUIRE(first.staticState.eyeIndex == 0 && first.staticState.blinkTimer == delay);
+                    REQUIRE(lastRandomBase == 30 && lastRandomRange == 30);
+                    ++completedCycles;
+                }
+                REQUIRE(observedEyes == 7);
+                EnViewer_Destroy(&first.actor, play);
+                EnViewer_Destroy(&second.actor, play);
+            }
+    testRandomOffset = 0;
+    altAssets = false;
+    REQUIRE(completedCycles == 24 && updateCount == 1144);
+    puts("PASS Mikau blink: two poses, Alt Assets off/on and live toggle, 30/45/59-frame delays, "
+         "24 complete timer-driven cycles (1144 updates), all three aligned OTR eye paths, closed mouth, "
+         "per-instance timing and render independence");
+}
 static void testShopGalFootAnimations(PlayState* play) {
     for (unsigned pose = 0; pose < 3; ++pose)
         for (unsigned mode = 0; mode < 5; ++mode) {
@@ -1176,6 +1303,7 @@ int main(void) {
     loadSuccess = true;
     testLuluHdBlink(&play);
     testShopGalBlink(&play);
+    testMikauBlink(&play);
     testShopGalFootAnimations(&play);
     testGreatFairyBlink(&play);
     for (uint8_t pose = 0; pose < 2; ++pose) {
