@@ -162,8 +162,11 @@ int main() {
 '''
 pools = (ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
 pool_prefix = pools[pools.index('void GeneratePools('):pools.index('    std::vector<RandoItemId> startingItems')]
+fleet = (ROOT/'mm/2s2h/FleetShipCombo/FleetShipCombo.cpp').read_text()
 pool_program = COMMON + r'''
 #include <vector>
+#include "mm/2s2h/FleetShipCombo/FleetShipCombo.h"
+''' + block(fleet, 'int FleetCombo_UnifiedPoolActive(void)') + r'''
 using RandoCheckId=int;using RandoItemId=int;
 constexpr int RO_SHUFFLE_TRIFORCE_PIECES=0,RO_TRIFORCE_PIECES_REQUIRED=1,RO_TRIFORCE_PIECES_MAX=2;
 constexpr int RO_GENERIC_YES=1,RO_GENERIC_NO=0,RO_GENERIC_ON=1,RO_SHUFFLE_MAGIC_MIRROR=3;
@@ -176,6 +179,7 @@ int CVarGetInteger(const char* name,int fallback) {
 int gMMComboGoalHunt=0,gMMComboGoalRequired=99,gMMComboGoalPieces=100;
 ''' + pool_prefix + '}\n' + r'''
 int main() {
+    assert(!FleetCombo_UnifiedPoolActive()); // Actual modern launcher boundary, even with stale callbacks.
     RandoSaveInfo info;std::vector<int> checks,items;
     GeneratePools(info,checks,items);
     assert(info.randoSaveOptions[0]==1 && info.randoSaveOptions[1]==7 && info.randoSaveOptions[2]==9);

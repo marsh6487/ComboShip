@@ -8,10 +8,18 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "libultraship/bridge/uivisibilitybridge.h"
 using s32=int32_t; using u8=uint8_t;
 struct Vec3f { float x=0,y=0,z=0; };
 struct Gfx {};
-struct GraphicsContext { Gfx* opa; Gfx* xlu; };
+struct DisplayListBuffer { Gfx* p; Gfx* d; };
+struct GraphicsContext { DisplayListBuffer work,polyOpa,polyXlu,overlay; };
+// Only the shared visibility bridge is controlled. The draw-scope type and
+// snapshot/rewind helpers below are copied verbatim from the production header.
+bool hidden=false;
+int visibilitySamples=0,diagnosticDraws=0;
+int UiVisibility_IsHidden(void){++visibilitySamples;return hidden;}
+/* PRODUCTION_UI_DRAW_SCOPE */
 struct Actor { int id=0; int flags=0; int sfx=0; int room=0; bool isDrawn=false; bool visible=true; bool receiver=false; Actor* next=nullptr; void* init=nullptr; void* draw=(void*)1; struct {Vec3f pos;} world; Vec3f projectedPos; float projectedW=1; };
 struct ActorListEntry { Actor* head=nullptr; };
 struct ActorContext { ActorListEntry actorLists[3]; bool lensActive=false,lensFromLantern=false; int titleCtx=0; };
@@ -22,15 +30,16 @@ constexpr int ACTOR_FLAG_DRAW_CULLING_DISABLED=1, ACTOR_FLAG_INSIDE_CULLING_VOLU
 constexpr int LENS_MODE_HIDE_ACTORS=1,CS_STATE_IDLE=0;
 int hregs[100]{},iregs[100]{}; bool cel=false,shadows=false,transformed=true;
 std::vector<std::string> events; std::map<int,int> draws,audio; std::map<std::string,uint64_t> metrics;
-Gfx opa[256],xlu[256];
+Gfx work[256],opa[256],xlu[256],overlay[256];
+Gfx* diagnosticHeads[4]{};
 #define HREG(i) hregs[i]
 #define IREG(i) iregs[i]
 #define ARRAY_COUNT(a) int(sizeof(a)/sizeof((a)[0]))
 #define CVAR_ENHANCEMENT(s) s
 #define OPEN_DISPS(ctx) auto* testGfx=(ctx)
 #define CLOSE_DISPS(ctx) ((void)(ctx))
-#define POLY_OPA_DISP testGfx->opa
-#define POLY_XLU_DISP testGfx->xlu
+#define POLY_OPA_DISP testGfx->polyOpa.p
+#define POLY_XLU_DISP testGfx->polyXlu.p
 #define gDPNoOpString(pkt,name,i) ((void)(pkt),(void)(name),(void)(i))
 void Toon(Gfx* pkt,bool enabled) { if (pkt>=opa && pkt<opa+256) events.push_back(enabled?"T+":"T-"); }
 #define gSPToon(pkt,state) Toon(pkt,state)
@@ -59,14 +68,24 @@ void Actor_DrawLensActors(PlayState*,int count,Actor** actors){for(int i=0;i<cou
 bool Player_InCsMode(PlayState*){return false;} void Actor_DisableLens(PlayState*){}
 void DinFireSword_FinishDrawAll(PlayState*){} void Actor_DrawFaroresWindPointer(PlayState*){}
 void Lights_DrawGlow(PlayState*){} void TitleCard_Draw(PlayState*,int*){}
-void CollisionCheck_DrawCollision(PlayState*,int*){}
+void CollisionCheck_DrawCollision(PlayState* play,int*){
+ ++diagnosticDraws;events.push_back("C");
+ auto* gfx=play->state.gfxCtx;
+ diagnosticHeads[0]=gfx->work.p++;diagnosticHeads[1]=gfx->polyOpa.p++;
+ diagnosticHeads[2]=gfx->polyXlu.p++;diagnosticHeads[3]=gfx->overlay.p++;
+ --gfx->polyOpa.d; // Draw-side allocations and diagnostic updates stay live.
+}
 /* NATIVE_ACTOR_DRAW_ALL */
 static int Position(const char* event){for(size_t i=0;i<events.size();i++)if(events[i]==event)return int(i);return -1;}
 static void Require(bool value,const char* why){if(!value){std::fprintf(stderr,"FAIL: %s\n",why);for(auto& e:events)std::fprintf(stderr,"%s ",e.c_str());std::fputs("\n",stderr);std::exit(1);}}
 int main(){
+ for(bool visibility : {false,true,false}){
+ hidden=visibility;
  for(int mask=0;mask<4;mask++){
   cel=mask&1;shadows=mask&2;events.clear();draws.clear();audio.clear();metrics.clear();
-  GraphicsContext gfx{opa,xlu};PlayState play{};play.state.gfxCtx=&gfx;play.actorCtx.lensFromLantern=true;
+  visibilitySamples=diagnosticDraws=0;
+  GraphicsContext gfx{{work,work+256},{opa,opa+256},{xlu,xlu+256},{overlay,overlay+256}};
+  PlayState play{};play.state.gfxCtx=&gfx;play.actorCtx.lensFromLantern=true;
   Actor player{},floor{},lens{},culled{};
   player.id=10;player.sfx=0x1801;player.next=&lens;
   lens.id=30;lens.flags=ACTOR_FLAG_REACT_TO_LENS;lens.sfx=123;
@@ -83,6 +102,14 @@ int main(){
   Require(Position("B")<Position("L30")&&Position("L30")<Position("Z"),"NEI lantern-only lens pass has balanced cel brackets");
   if(cel)Require(Position("T+")>=0&&Position("T-")>Position("D10")&&Position("T-")<Position("E"),"toon actor bracket closes before effects");
   if(shadows&&!cel)Require(Position("X")>Position("D10")&&Position("X")<Position("E"),"shadow-only final capture disarms before effects");
+  Require(visibilitySamples==1&&diagnosticDraws==1,"one UI scope samples visibility around one diagnostic draw");
+  Require(Position("C")>Position("Z")&&Position("C")>Position("S"),"diagnostic wrapper preserves native effects/lens ordering");
+  int commands=hidden?0:1;
+  Require(gfx.work.p==diagnosticHeads[0]+commands&&gfx.polyOpa.p==diagnosticHeads[1]+commands&&
+          gfx.polyXlu.p==diagnosticHeads[2]+commands&&gfx.overlay.p==diagnosticHeads[3]+commands,
+          "production UI scope preserves visible/restored commands and discards hidden diagnostics only");
+  Require(gfx.polyOpa.d==opa+255,"UI wrapper retains draw-driven diagnostic allocations");
+ }
  }
  std::puts("cel native actor draw: PASS");
 }
