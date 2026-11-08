@@ -1,0 +1,44 @@
+{
+  "archive_sha256": "f10167e5682d74cc8da0137c524b1521f4e7ff47438b8888b63db6c7c6dc8d59",
+  "gameplay": "not run",
+  "forms": {
+    "FD": {
+      "texture": "objects/object_link_boy/gLinkFierceDeityEyesTex",
+      "texture_sha256": "7c33ed2b3480df0fd41024d32a839e3a756c5ef0228466a35910f9ed6d3d7f51",
+      "head": "objects/object_link_boy/gLinkFierceDeityHeadDL",
+      "head_sha256": "2d219d719a5ca6a1c6dc3091039687f11dfc9c800e66f1b75725dafe886308c1",
+      "exact_native_eye_hash_loads": 1,
+      "eye_hash_load_file_offset": 440,
+      "open_half_closed_counts": [
+        130,
+        70,
+        0
+      ],
+      "count_kind": "white eye pixels",
+      "frame_sha256": [
+        "c34188814080698e10c307b06100ca4af68665dd4f44fe18c05f244fabaf3e4b",
+        "402f7bea5f1f04cad8d8309a03b85a31adc14c7d5f2a612d1f0be87c869e44f8",
+        "34d608a2d0d0e626a036c88e8f06fb46c1de3c153281fd35702eae86a899ef1b"
+      ]
+    },
+    "Deku": {
+      "texture": "objects/object_link_nuts/object_link_nuts_Tex_0048B0",
+      "texture_sha256": "50b4dae0e3525487768b2d616c6e72edaadab29ab06bf5b2afd1d4380d70ebf4",
+      "head": "objects/object_link_nuts/gLinkDekuHeadDL",
+      "head_sha256": "1ed78191d779c1d9ef856d7a5b7114ffb7d73e9b2e188cdff09c55aa2a62c78b",
+      "exact_native_eye_hash_loads": 1,
+      "eye_hash_load_file_offset": 640,
+      "open_half_closed_counts": [
+        857,
+        444,
+        54
+      ],
+      "count_kind": "opaque pixels",
+      "frame_sha256": [
+        "34aa46a1a2ce96672ef9500c198d24c409590e1ff9f184df7bf6b01b82ced8af",
+        "dea2ce1d19c9f6eb2d46680ee2aaafe4640bd6bec6417e1f3dcb15009436155e",
+        "e06223154d16bfdecc8cbfa073ff51818458e7cea7995e6a35fb80d378879e9c"
+      ]
+    }
+  }
+}

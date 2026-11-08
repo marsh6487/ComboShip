@@ -1,4 +1,5 @@
 #include "SeasonFoliageTint.h"
+#include "SeasonWinterTerrain.h"
 #include "soh/Enhancements/audio/SeasonWeather.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
@@ -8,6 +9,8 @@
 #include <map>
 #include <string>
 #include <tuple>
+#include <span>
+#include <string_view>
 
 extern "C" {
 #include "z64.h"
@@ -30,6 +33,10 @@ struct Material {
 };
 constexpr Material kMaterials[] = {
 #include "SeasonFoliageMaterials.inc"
+};
+
+constexpr Material kWinterTerrainMaterials[] = {
+#include "SeasonWinterTerrainMaterials.inc"
 };
 
 struct Binding {
@@ -90,57 +97,74 @@ void Update(const PlayState* play) {
         return;
     }
     std::vector<Binding> active;
-    for (const auto& material : kMaterials) {
-        if (material.scene >= 0 && (!play || play->sceneNum != material.scene))
+    for (const auto cohort :
+         { std::span<const Material>(kMaterials), std::span<const Material>(kWinterTerrainMaterials) }) {
+        const bool terrain = cohort.data() == kWinterTerrainMaterials;
+        if (terrain && season != 3)
             continue;
-        const auto tint = Palette(season, material.surface, material.autumnColor);
-        if (!tint.color)
-            continue;
-        for (const char* prefix : { "", "alt/" }) {
-            // Selection follows the requested cache binding, including native
-            // fallback and .meta redirects; target metadata is preserved.
-            if ((material.assets == Assets::Native && *prefix) || (material.assets == Assets::Alt && !*prefix))
+        for (const auto& material : cohort) {
+            if (material.scene >= 0 && (!play || play->sceneNum != material.scene))
                 continue;
-            if (*prefix && !rm->IsAltAssetsEnabled())
+            if (!terrain && season == 3 && play &&
+                std::any_of(std::begin(kWinterTerrainMaterials), std::end(kWinterTerrainMaterials),
+                            [&](const auto& winter) {
+                                return winter.scene == play->sceneNum && std::string_view(winter.path) == material.path;
+                            }))
+                continue; // The Winter terrain copy owns this material without compounding the accepted grass tint.
+            const auto tint =
+                terrain ? Tint{ 0xFFFFFFFFu, 256, 168 } : Palette(season, material.surface, material.autumnColor);
+            if (!tint.color)
                 continue;
-            const std::string path = std::string(prefix) + material.path;
-            auto source = std::dynamic_pointer_cast<Fast::Texture>(rm->GetCachedResource(path, true));
-            if (!source)
-                continue; // Unloaded rooms remain on the normal renderer load path.
-            const auto current = std::find_if(sBindings.begin(), sBindings.end(), [&](const auto& binding) {
-                return binding.owner.lock() == rm && binding.path == path && binding.copy == source;
-            });
-            if (current != sBindings.end())
-                source = current->source;
-            const auto key =
-                std::tuple{ source.get(),         tint.color,          tint.lightScale,       tint.shadowLift,
-                            material.region.left, material.region.top, material.region.right, material.region.bottom,
-                            material.pixelMask };
-            auto found = sCopies.find(key);
-            if (found == sCopies.end()) {
-                bool evaluated = false;
-                auto copy = BuildTexture(source, tint, material.region, material.pixelMask, &evaluated);
-                if (diagnostic) {
-                    ++stats.attempts;
-                    if (evaluated) {
-                        stats.pixels += uint64_t(source->Width) * source->Height;
-                        stats.unchanged += !copy;
-                    }
-                }
-                if (!evaluated)
+            for (const char* prefix : { "", "alt/" }) {
+                // Selection follows the requested cache binding, including native
+                // fallback and .meta redirects; target metadata is preserved.
+                if ((material.assets == Assets::Native && *prefix) || (material.assets == Assets::Alt && !*prefix))
                     continue;
-                found = sCopies.emplace(key, Binding{ rm, path, source, std::move(copy) }).first;
-            } else if (diagnostic && !found->second.copy) {
-                ++stats.unchangedHits;
+                if (*prefix && !rm->IsAltAssetsEnabled())
+                    continue;
+                const std::string path = std::string(prefix) + material.path;
+                auto source = std::dynamic_pointer_cast<Fast::Texture>(rm->GetCachedResource(path, true));
+                if (!source)
+                    continue; // Unloaded rooms remain on the normal renderer load path.
+                const auto current = std::find_if(sBindings.begin(), sBindings.end(), [&](const auto& binding) {
+                    return binding.owner.lock() == rm && binding.path == path && binding.copy == source;
+                });
+                if (current != sBindings.end())
+                    source = current->source;
+                const auto key = std::tuple{ source.get(),          tint.color,
+                                             tint.lightScale,       tint.shadowLift,
+                                             material.region.left,  material.region.top,
+                                             material.region.right, material.region.bottom,
+                                             material.pixelMask };
+                auto found = sCopies.find(key);
+                if (found == sCopies.end()) {
+                    bool evaluated = false;
+                    auto copy = terrain ? BuildWinterTerrainTexture(source, material.region)
+                                        : BuildTexture(source, tint, material.region, material.pixelMask, &evaluated);
+                    if (terrain)
+                        evaluated = copy != nullptr;
+                    if (diagnostic) {
+                        ++stats.attempts;
+                        if (evaluated) {
+                            stats.pixels += uint64_t(source->Width) * source->Height;
+                            stats.unchanged += !copy;
+                        }
+                    }
+                    if (!evaluated)
+                        continue;
+                    found = sCopies.emplace(key, Binding{ rm, path, source, std::move(copy) }).first;
+                } else if (diagnostic && !found->second.copy) {
+                    ++stats.unchangedHits;
+                }
+                // Keep no-change evaluations too. A source with no selected green
+                // pixels otherwise allocates and scans its entire HD payload every
+                // frame. Retaining source prevents pointer reuse until Retire().
+                if (!found->second.copy)
+                    continue;
+                if (current == sBindings.end() || current->copy != found->second.copy)
+                    rm->CacheExternalResource(path, found->second.copy);
+                active.push_back({ rm, path, source, found->second.copy });
             }
-            // Keep no-change evaluations too. A source with no selected green
-            // pixels otherwise allocates and scans its entire HD payload every
-            // frame. Retaining source prevents pointer reuse until Retire().
-            if (!found->second.copy)
-                continue;
-            if (current == sBindings.end() || current->copy != found->second.copy)
-                rm->CacheExternalResource(path, found->second.copy);
-            active.push_back({ rm, path, source, found->second.copy });
         }
     }
     for (const auto& binding : sBindings) {

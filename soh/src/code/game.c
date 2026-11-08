@@ -264,12 +264,31 @@ void GameState_ReqPadData(GameState* gameState) {
 int gPauseLinkFrameBuffer = -1;
 
 static void GameState_UpdateUiVisibility(GameState* gameState) {
-    /* Use the same L conflicts as the native minimap, independent of scene,
-     * pause/dialogue state and whether this game state has a minimap. */
+    /* L is shared with inventory/navigation. Only a fresh gameplay press may
+     * change the shared latch; rejected presses remain available to their owner. */
+    if (!UiVisibility_IsEnabled() || !CHECK_BTN_ALL(gameState->input[0].press.button, BTN_L) ||
+        CHECK_BTN_ALL(gameState->input[0].press.button, BTN_START) || gPlayState == NULL ||
+        gameState != &gPlayState->state || gameState->main != Play_Main || !gameState->running ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL) {
+        return;
+    }
+
+    PlayState* play = gPlayState;
+    Player* player = GET_PLAYER(play);
+    if (player == NULL || player->actor.update == NULL || play->pauseCtx.state != 0 || play->pauseCtx.debugState != 0 ||
+        play->frameAdvCtx.enabled || play->msgCtx.msgMode != MSGMODE_NONE ||
+        play->gameOverCtx.state != GAMEOVER_INACTIVE || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+        play->transitionMode != TRANS_MODE_OFF || play->actorCtx.freezeFlashTimer != 0 ||
+        player->actor.freezeTimer != 0 || gSaveContext.health <= 0 ||
+        (player->stateFlags1 & PLAYER_STATE1_INPUT_DISABLED) || Play_InCsMode(play)) {
+        return;
+    }
+
+    /* Retain the native minimap's developer/cheat L conflicts. */
     bool allowToggle =
         !(CVarGetInteger(CVAR_DEVELOPER_TOOLS("DebugEnabled"), 0) || CVarGetInteger(CVAR_CHEAT("MoonJumpOnL"), 0)) ||
         CVarGetInteger(CVAR_DEVELOPER_TOOLS("EnableMapToggle"), 0);
-    if (UiVisibility_IsEnabled() && CHECK_BTN_ALL(gameState->input[0].press.button, BTN_L) && allowToggle) {
+    if (allowToggle) {
         UiVisibility_Toggle();
     }
 }

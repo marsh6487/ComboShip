@@ -1,0 +1,754 @@
+{
+  "fixtures": [
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_008198",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_008198",
+      "sha256": "3ad8c8e74112b2a45424e67445865e0cf3c097f34215388010550e6d61b3bae7"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_009198",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_009198",
+      "sha256": "6c67837094dba2e17346f6aabfe71fdfe3d2336579a1abf94a09d18df9ab1cc7"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_009998",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_009998",
+      "sha256": "11e8bce9879399eff15092f98155da27dee383686f04ffbe5a68e9ff3842c7f4"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_009D98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_009D98",
+      "sha256": "7712c826d724fd23078a15086e098ad820a56dadc43bc65e88913d4c2f8659a3"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_00AD98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_00AD98",
+      "sha256": "ddaa7ce0b6dfd4954779f5c27f11b6e05165c741a5325d3167bb99eaf8883d03"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_00BD98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_00BD98",
+      "sha256": "04bd50d11e4c7685d72a8b5aae77591461ce4ba0faa20ed03baab5c4ce5fbf8a"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_00D798",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_00D798",
+      "sha256": "b45b1f0f8416c9f4aba95616b4cc56134ab284de66cc5366d1626823ca2e4152"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTLUT_008170",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTLUT_008170",
+      "sha256": "df093764089787ec6ace181fa3bab0010760a85b7d33d72dd96001f07f4b8fb8"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_00DF98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_00DF98",
+      "sha256": "b4cefec85ae58cdee09c07357b389c012c52ca07cd5068bfd860bd20289dfa6c"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_011198",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_011198",
+      "sha256": "0a48df89fb4b6ba167112584a993af0493456fc033b5eab9e3a0633bb9c537b7"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_011598",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_011598",
+      "sha256": "9a450373562a31f5b12c1e417754612fbc27456c2b1c3ac2a615faf0ae495adf"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_011798",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_011798",
+      "sha256": "a7a8d6088ccd187d7f36448946360b56bbd84954822fa0168b0330e99b1d02c1"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_012798",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_012798",
+      "sha256": "9358bd98e16bbf724cf5779fd88e0c915f98224ba29e8b8b50b6f3a64e8bbb40"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_013798",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_013798",
+      "sha256": "e43d42c408000795a94f2ba6705bddee1880f78aec858991a449ba6d5eb02239"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_013D98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_013D98",
+      "sha256": "eaefa8b13075582dcff0e9e529cc09f3b4713549f5388a764dbd1d4eaf54b5e6"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_014D98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_014D98",
+      "sha256": "625239fc845c54fccdd908da3f0bde8a7bff8665d33fd42bfe872a05a08d3dc9"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_015598",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_015598",
+      "sha256": "9da7ababfe9206ddd7a74ea0113f335f870ab6b154e5d64a2f90349430db0430"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_017E98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_017E98",
+      "sha256": "7e5a9795bdce7ebb377e5ec9476106af6d646b789c34c8f15dbd21f82364e9b5"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_018698",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_018698",
+      "sha256": "857c9817ccea10cd5acc098d1cd78548b098d381dabe3ac7f4bcc34edced817f"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_01D698",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_01D698",
+      "sha256": "6c50969f96eb6fbeef75598912300f443456f19acf0119e167084e30c1b7a445"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/spot16_sceneTex_01DE98",
+      "source": "native/scenes/shared/spot16_scene/spot16_sceneTex_01DE98",
+      "sha256": "dcad211d9b15d88700b1a6ad7141aa8ce089cf8fd91b70ca8aa956668c399015"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_003460",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_003460",
+      "sha256": "cc82663c730687b4da5d3d451a9d4d3614d1dc8f50a46aefe6cb299ba2634de6"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_004460",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_004460",
+      "sha256": "9582fb6fd9b814d081efdcb0cbe84f9b06b9d63132136e6062fe090130a0abc3"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_006D60",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_006D60",
+      "sha256": "aac64ca3c1643491939bacd0c4bbbd60355335681d548fedeb66a688dc4947be"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_007160",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_007160",
+      "sha256": "ad1d87d872ba080fc109605b48afc5f1e32e3f74bd32ff5c4d042b995446aab8"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_008160",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_008160",
+      "sha256": "15a912e0043850fe2b67b37e93be50110677fe60ee0d70e5de63112e05381bda"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_009160",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_009160",
+      "sha256": "bc7f7925171b43eada87f5b02f7ce2f4ba7b6e1c911378d81e05b0200b12e5bc"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_00B960",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_00B960",
+      "sha256": "207ceaf6fb6ea63577c254fbef7ff76c6e6f03af61db26236b4b81e64f3f2f9d"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_00D160",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_00D160",
+      "sha256": "4996a1a3cd22f740d499174bfb3d1dc1c8cd6dad3758552bc13b5acb80ea7644"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/spot09_sceneTex_00F960",
+      "source": "native/scenes/shared/spot09_scene/spot09_sceneTex_00F960",
+      "sha256": "b9063fdf6291384c6e5d6b684b1de3d813387b3c7737326f6af4a683ec05f49e"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/gSpot12_009678Tex",
+      "source": "native/scenes/shared/spot12_scene/gSpot12_009678Tex",
+      "sha256": "99f5b0073e04995d4d6ab7b64b748182477505248ff7c7f7d1876769e2b49c25"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/gSpot12_00DE78Tex",
+      "source": "native/scenes/shared/spot12_scene/gSpot12_00DE78Tex",
+      "sha256": "6e3960f5e409b7d407fac73e166b5c309abe8b4c09138b771cbdb0a832167382"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_006678",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_006678",
+      "sha256": "5413bb185925be50101442fa75e6da0a96c9ac268b8538d0258f4886f663827f"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_007678",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_007678",
+      "sha256": "75fb157ff979fbeceee47bc04502489243e841c5032e94ab9eab0ec92572e614"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_008678",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_008678",
+      "sha256": "c71cd9da4a613f881d3afd7d1b24be529836640b1e3f7bfd4a34bb9e1b4cbaeb"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_00A678",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_00A678",
+      "sha256": "ae594be49d0beaed784f12f05f10fbe1a20e7274cebd151f25b2babcbf8998b9"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_00CE78",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_00CE78",
+      "sha256": "1b7eb7d55664a70e5652cda5e2ea9f7a81d7305b6498725b50e5cdb9eccb8b26"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_00D678",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_00D678",
+      "sha256": "5aed16344728bf10aaa61ba23fefeeeca88bed8fe5edceb9f9199e20c141058f"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_sceneTex_00EE78",
+      "source": "native/scenes/shared/spot12_scene/spot12_sceneTex_00EE78",
+      "sha256": "9582fb6fd9b814d081efdcb0cbe84f9b06b9d63132136e6062fe090130a0abc3"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_008AB0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_008AB0",
+      "sha256": "23757ae0889477e3616c3afdfea4c40d9c9d252b72c8a9db24458ad91eb0d797"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_0092B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_0092B0",
+      "sha256": "a504b739b6037a38dc73cd17873b3dc06aac98ab9b4d3ccd77ec4a12c07644cc"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_0096B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_0096B0",
+      "sha256": "1daf1d2503baa46b11ee743f9295bcbd26859087d4a8ba3d2c81e3a65f35cf13"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_009EB0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_009EB0",
+      "sha256": "3a72b3575bc7f5454a4e05005cb20e4ddfda29e17cf84795201b2b57c53cbe20"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_00A6B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_00A6B0",
+      "sha256": "99d6fc1b7454a1b0d54a8b06cd3008d35e540f378ff1df13054c17faae4766e3"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_00C6B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_00C6B0",
+      "sha256": "bf81f29ca6b5fef5692710a6285409eb8da0e5bdd54c2fe09f4164da134e8d17"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0TLUT_008A90",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0TLUT_008A90",
+      "sha256": "2b4c84589bd980ce659747ab2e7f40513738329d8214f062e276e3dbb238b616"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_00D2B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_00D2B0",
+      "sha256": "c78d5f2f11e6f1bea2e2391df249d5a00a226133ef230aaed24c0d114463f8ba"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_00E2B0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_00E2B0",
+      "sha256": "3e9c2359a42ef473685e031dcd260637e22d848559a12a1391e79436f0b9d5eb"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_0Tex_00EAB0",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_0Tex_00EAB0",
+      "sha256": "d58f5717f9e1c365f897dd62abc9fae30d90cfa670e4fdabe5818aae8d10a3e8"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/spot12_room_1Tex_006638",
+      "source": "native/scenes/shared/spot12_scene/spot12_room_1Tex_006638",
+      "sha256": "43114b027b92000649394583f07838ec913dbe94213cb5d757759880cc9afd55"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_gake_01_F00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_gake_01_F00",
+      "sha256": "87811d893621a249942dd13a29acc5d2d9b0c9a5447012fe49e1c6324b6de918"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_gake_01_F00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_gake_01_F00",
+      "sha256": "5c8a7c53362ecacb31adf7a1d1e9cc8b307ad4261b92ce80bdb9228eb8c463a2"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_gake_02_B700",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_gake_02_B700",
+      "sha256": "6846c42dfbde7d6098a422f584860290ef2a5e3b924d48a2205e14b2adc98805"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_gake_02_B700",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_gake_02_B700",
+      "sha256": "3db8797c5755c74be551e0f45ef50a836baa3c84efa3843268b4d06e559cad03"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_01_17400",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_kabe_01_17400",
+      "sha256": "3a174aefd265617a7aea57d888b4533d70745258f7e16204c93183377668dc8f"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_01_17400",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kabe_01_17400",
+      "sha256": "5636d044fe68f22e9b3b0ae7648248a1340323216df00b36c23b2ed3c19d5111"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_02_21C00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_kabe_02_21C00",
+      "sha256": "313cee5c8fb859c8230fec93499fb28b21c8c00fab0a405d26015215e9ac23b9"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_02_21C00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kabe_02_21C00",
+      "sha256": "572c6eebf5fab0086ada084cd14e7a9777df22fb0f3111c648ae067019db114c"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_02_21C00_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kabe_02_21C00_copy",
+      "sha256": "e56cd5c561bb89c0fa1957122f0db292df2b950d14cde0b8b9db2bbe6f80809c"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_03_2C400",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_kabe_03_2C400",
+      "sha256": "56850ac75b8a12550438ce3b260d850cbb7c17c41975ce21c5cef63d2974bb88"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_03_2C400",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kabe_03_2C400",
+      "sha256": "9fae9c3053b39f1308c5dd0a661604f686fe7935edc96a2bbaaccb52c5ac6d57"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_05_31800",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_kabe_05_31800",
+      "sha256": "c8889c999452d481177a0b0a5cb6dd2fb939e7ac93623d384edb4c552e0e88f5"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kabe_05_31800",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kabe_05_31800",
+      "sha256": "81ab154db0230142765ea573ff21226d22444404593e5897fd3743c96272f494"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kaidan_01_36C00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_kaidan_01_36C00",
+      "sha256": "1726ce18752f540bdec09afb071a52b47d06a2b410089fa97bbefdfd3d96e227"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kaidan_01_36C00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kaidan_01_36C00",
+      "sha256": "dcfddd109263cfdc4878b90becba1408d6a8c2714ed2bf927e816d87de1e6329"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_kaidan_01_36C00___Copie",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_kaidan_01_36C00___Copie",
+      "sha256": "1b2437eb243f4c2896e82642435011d4ebbd3d76eef34193a33e4a0788f21d55"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yama_03_42480",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_yama_03_42480",
+      "sha256": "8a04834805509a88f1dc0ea5156c4045eea3bca22eb5193f37195ff02eebd710"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yama_03_42480",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_yama_03_42480",
+      "sha256": "81ec1f0f0f67a0ee4455f5df19f55b68578aaeb4616b46a475d8bcedd415b817"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_01_44E80",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_yuka_01_44E80",
+      "sha256": "46f6d714f5986175f92e69b35574c6077ffd188549567245c36f0de4aa811a05"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_01_44E80",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_yuka_01_44E80",
+      "sha256": "50e8c81c8c93873d5cd611bad3e2bb86d98072ae592cf74cfe4550530330c5d4"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_01_44E80_copy",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_yuka_01_44E80_copy",
+      "sha256": "46f6d714f5986175f92e69b35574c6077ffd188549567245c36f0de4aa811a05"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_01_44E80_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_yuka_01_44E80_copy",
+      "sha256": "50e8c81c8c93873d5cd611bad3e2bb86d98072ae592cf74cfe4550530330c5d4"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_02_4F680",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_yuka_02_4F680",
+      "sha256": "f6932171fc9d27257b6550370d2e1cb90afd85a00af46653bd49ceb93f148450"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_02_4F680",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_yuka_02_4F680",
+      "sha256": "3c3c5e628b75694be3b878cc7c085b10a3f678d664ebf6192d6364bf05b94d20"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_03_59E80",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot16_scene/s16_yuka_03_59E80",
+      "sha256": "06e4138253d97a2da16b74ee141f4c45c4945fa182099fcca87f9b2de033b019"
+    },
+    {
+      "resource": "scenes/shared/spot16_scene/s16_yuka_03_59E80",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot16_scene/s16_yuka_03_59E80",
+      "sha256": "b007a302a2ef6e4b2dfb339d4e3428233831876d97af3bb426359458126d6655"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_g_yuka_01_0",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_g_yuka_01_0",
+      "sha256": "c3f62a400abffd7a3fe5f45bd65973e5aca843c4f28c012ee3b818347d3d2108"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_g_yuka_01_0",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_g_yuka_01_0",
+      "sha256": "5ae960373f5cd1d9fcc34c2b4a6361357dfddfcf6caf868f7104127c6e7c1d1e"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_01_3F00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_kabe_01_3F00",
+      "sha256": "a6c2226a46445107e99a2cb580c3f8e7cf2e871f64c3f1068f2c155df9fa908e"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_01_3F00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_01_3F00",
+      "sha256": "303e1cda6b3a7cc3b1891ad510157f7d305b59fae4db19ba0e55e84432b6cac2"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_01_3F00_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_01_3F00_copy",
+      "sha256": "303e1cda6b3a7cc3b1891ad510157f7d305b59fae4db19ba0e55e84432b6cac2"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_02_E700",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_kabe_02_E700",
+      "sha256": "b9135a2053ee5658a739dbd1d5e9d676801082762d9ff361e8f631692ff9ed3b"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_02_E700",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_02_E700",
+      "sha256": "aeea745ef2418376b6a9b7995bc611fb7d8e9679148f43ea31d72dedad4b94d6"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_02_E700_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_02_E700_copy",
+      "sha256": "aeea745ef2418376b6a9b7995bc611fb7d8e9679148f43ea31d72dedad4b94d6"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_04_18F00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_kabe_04_18F00",
+      "sha256": "166281e1a245d267848bf9d76ff5dc17812cb923a6d1692dec58d87ce98a2722"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_04_18F00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_04_18F00",
+      "sha256": "110145a48b749531213dcf2133ed8a5b4386f903fe4a851ab730b319525bc9f6"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_04_18F00_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_04_18F00_copy",
+      "sha256": "110145a48b749531213dcf2133ed8a5b4386f903fe4a851ab730b319525bc9f6"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_05_1B900",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_kabe_05_1B900",
+      "sha256": "596a6b3b278d1d067a4f47a4beff1a67826888d5f57d5760c1a6bddb77bb4172"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_05_1B900",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_05_1B900",
+      "sha256": "c6e53ca8a6a4939b1000a7f13e1775f4c6fa4d44b49f1e6b7954fde0d281e474"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_kabe_05_1B900_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_kabe_05_1B900_copy",
+      "sha256": "c6e53ca8a6a4939b1000a7f13e1775f4c6fa4d44b49f1e6b7954fde0d281e474"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_01_35C80",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_yuka_01_35C80",
+      "sha256": "892d9c8a786e54fec1bf22e7948ea7f24374987b586d57ccce99a10849eb3936"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_01_35C80",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_yuka_01_35C80",
+      "sha256": "62142600e482cff4b6dae42c11d67b894884b37d16046e659ec514d64d417aed"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_01_35C80_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_yuka_01_35C80_copy",
+      "sha256": "62142600e482cff4b6dae42c11d67b894884b37d16046e659ec514d64d417aed"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_04_40480",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_yuka_04_40480",
+      "sha256": "d733cba28c646d24afb2baea0f7e9bd17f38994ee986213baa9d9fc1153fae13"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_04_40480",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_yuka_04_40480",
+      "sha256": "dafa7ecf2f09e742e6ebad863c23012ace8f1744bf182c95598570ee21d553d9"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_04_40480_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_yuka_04_40480_copy",
+      "sha256": "dafa7ecf2f09e742e6ebad863c23012ace8f1744bf182c95598570ee21d553d9"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_05_45880",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot09_scene/s09_yuka_05_45880",
+      "sha256": "4831b86aff56815ced9c164c170c9ef4c09f97822cbab05846e3044911a2b32d"
+    },
+    {
+      "resource": "scenes/shared/spot09_scene/s09_yuka_05_45880",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot09_scene/s09_yuka_05_45880",
+      "sha256": "626430965dbb057899729dc4d486bd7c3619dbc47bbf76f7c900136a722fe0f8"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_01_7E00",
+      "sha256": "cc1dc65b25a9a2e4a1ef246392903f6dd218c1c992628cf73419cf5de01c6525"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_01_7E00",
+      "sha256": "0276b7e656c44b57b58b27359515ebbfc97593775c637e3ab43922f8cb7d2a14"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E0099",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_01_7E0099",
+      "sha256": "ea35175be8d6980d2e65280d49bf7f587e63f085962bc8530fdbb889cd2dd755"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E0099",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_01_7E0099",
+      "sha256": "6de8c777f3dbd4e978de7942db945b22ad541165b82df68471284e1dc7bae020"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E00_copy",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_01_7E00_copy",
+      "sha256": "cc1dc65b25a9a2e4a1ef246392903f6dd218c1c992628cf73419cf5de01c6525"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_01_7E00_copy",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_01_7E00_copy",
+      "sha256": "0276b7e656c44b57b58b27359515ebbfc97593775c637e3ab43922f8cb7d2a14"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_12600",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_02_12600",
+      "sha256": "4a5512f1b8fbfc4346020ab7eec62b968cd08b95d11905854ea5b3994653eb80"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_12600",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_02_12600",
+      "sha256": "d3484975e284bd11f9fcabdf26cbb64fa293cbf38b4b9e849ec643c906c74b2c"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_126000",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_02_126000",
+      "sha256": "5087eba04e2459c638128f23ed764c328506dca410a681d6bcbca20c07c1a9f7"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_126000",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_02_126000",
+      "sha256": "89a2699b453d3edd2b000f8cf43cdb1687d331b5a0bb9ac0a462b4f558648c89"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_126001",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_02_126001",
+      "sha256": "36df89858b43edde446fa09920906f9d58f95bbc228af48913366a77acd43813"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_02_126001",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_02_126001",
+      "sha256": "2c71530bb98faf7d9eae7fc6f6e787e7f955e34c38ed98ce1a784a77733e2b03"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_03_1CE00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_fortress_03_1CE00",
+      "sha256": "5de11463153f0943dc74e4e8b93683975ac47a7359f865447c5ca35cd4385f2b"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_fortress_03_1CE00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_fortress_03_1CE00",
+      "sha256": "9eccd6577fa10d14cdb80938e2eead490b0e08105c75a1452766cc4eb42879b1"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_01_7E00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_01_7E00",
+      "sha256": "d1508e4c3c18a437698324db1453bd974375435fc4c9d4b25c193974f7969819"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_01_7E00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_01_7E00",
+      "sha256": "1c692d2e231fd71be8bdc8fac58a9fc69457ad82df610e37bee3a76704b8b543"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_02_2_2A000",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_02_2_2A000",
+      "sha256": "f346f852fe43e4e6d1a4a414e6ad0af64ab52cc78f99e60238b93de2e387d165"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_02_2_2A000",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_02_2_2A000",
+      "sha256": "39a5638b0e882b38d01a9d9f48ab41422f053bd417bdaa1b33bbf414c1279506"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_02_ue_2CA00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_02_ue_2CA00",
+      "sha256": "fb59483fae7128e8f198a2270c7a6ce50bef68aeaba39531388de6050cc29b52"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_02_ue_2CA00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_02_ue_2CA00",
+      "sha256": "5e6c60670abe4855f55a81091c02fedc8a2e71588ce1bb30f5cdecf90ea4fef5"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_05_12600",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_05_12600",
+      "sha256": "493dbada9dc46c930e553f6316e3056982962ffb642d608a40cf72c3dc26fc5d"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_05_12600",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_05_12600",
+      "sha256": "6b942dff9c05a891c149e053dbc94693a6cf7033dcea9a54a062c360e937eb78"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_07_37C00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_07_37C00",
+      "sha256": "cdf02cf611712d54ceead641276f90c8ad3feb4cd19b58a6b4c6bca132a8c8d5"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_07_37C00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_07_37C00",
+      "sha256": "1e8f0b29416d831196cd1837e03b1161b1d1e6fa475fe61a3c4234373950513d"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kaidan_01_3D000",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kaidan_01_3D000",
+      "sha256": "bd1729a216c51df5d4173b11c511a90270bf4477f208bf9af8ca3967e2e5deab"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kaidan_01_3D000",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kaidan_01_3D000",
+      "sha256": "39bd11079ecd5c423992eaccd24baa34f1d27b102fcfb3fe4cc888e29026fca7"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_01_1D880",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yomikomi_01_1D880",
+      "sha256": "44c2193c3beb6ec1736eef34f492dc971695653bcf9996af747fdba83c2f3a99"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_01_1D880",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yomikomi_01_1D880",
+      "sha256": "748284567ff610a78eea6a115fc945827830aa52b65ad2b3fe53a9844f4300aa"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_01_20280",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yomikomi_01_20280",
+      "sha256": "8807a8bcdf895f18cba123b2209bde34e8c3fb609aa0f91dee58b9014f766449"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_01_20280",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yomikomi_01_20280",
+      "sha256": "e69f3b53587712297dc26598c69fe6a7f7d8065501728520afcc35264cba8a19"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_02_22C80",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yomikomi_02_22C80",
+      "sha256": "45924102cbc247a40f582fd157388cab1ead73b80cf80e59d416f3893d1bccd3"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yomikomi_02_22C80",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yomikomi_02_22C80",
+      "sha256": "0ab51d5e84afca1b0b868edf9d376c77319a190000de408a98c808fe64fa2283"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_01_44D00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_01_44D00",
+      "sha256": "2bd5749edcddaa5dee687ec5ba5dd8bd95f03e0c32226f06bab197f5e0ab3acc"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_01_44D00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_01_44D00",
+      "sha256": "b05fa85ab3178f904b83bce755573ba4b659cc6c45f06abb5a7357a21f9df063"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_01_44D0099",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_01_44D0099",
+      "sha256": "7e6ea97b34b39d7470cb1ec19e7f072ce1291f0cb12bb2603a9938124170f46f"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_01_44D0099",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_01_44D0099",
+      "sha256": "069e75049a508b2fda0cfca5a6cb2a00706f24bb6b89687ec21f89bd206e7996"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_02_4F500",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_02_4F500",
+      "sha256": "996daa75ce103fa688c57f98d90b5924b7f383b28d14387567cc298fee594a77"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_02_4F500",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_02_4F500",
+      "sha256": "6ff16ef97e76bb3131382f311f1ceb2b82a17bd749fef095d752140705ba6b3e"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_03_2_28080",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_03_2_28080",
+      "sha256": "b741759fa6818f8fd5c84427f8c483359307f77a5030751cd6febef96578470f"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_03_2_28080",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_03_2_28080",
+      "sha256": "7b4aa870a5fddd9f3a8cf14b2dbcb2a2fca23e3409b94d3e45192a9fd03acb42"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_04_2_2D480",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_04_2_2D480",
+      "sha256": "a8b7bf09508c44b180c4f10726172144768463109ec8b8951738bf4912dbbee6"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_04_2_2D480",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_04_2_2D480",
+      "sha256": "a627d283ee97f4d682fffecb1f0b03da6951b19bc0ac1a5d9287d7a85b8651cc"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_06_51F00",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_yuka_06_51F00",
+      "sha256": "3ab52c54df675c57d418aabcaba43270192ab673ce952d932c2d91bf746c8144"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_06_51F00",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_06_51F00",
+      "sha256": "63d7e44a8f6e91444865258733d52935e56fccfc309d4365dea9ef1474e4627b"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_yuka_07_4_54900",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_yuka_07_4_54900",
+      "sha256": "3c46bd1678aed67ae9df16320bc6ea89133e47f23ff88a91cc99b7dcf152fcad"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_09_3A600",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_09_3A600",
+      "sha256": "eca1eaf150bd114289c324853cd2ac6fbee67c2ef3c9db0016a2feb314867791"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_09_3A600",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_09_3A600",
+      "sha256": "2b15d702d762efd2f6eb378f9b2d76683a93749739ab886a038cf414a4e02eaf"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_03_2D400",
+      "source": "Djipi's 3DE - 21 Scenes Map 3DS Textures/alt/scenes/shared/spot12_scene/s12_kabe_03_2D400",
+      "sha256": "00316b52aac98ad5cd8d9e8df088c573e3756704c4a58ad575a65db76f62caa7"
+    },
+    {
+      "resource": "scenes/shared/spot12_scene/s12_kabe_03_2D400",
+      "source": "Djipi's 3DE - 20 Scenes Map/alt/scenes/shared/spot12_scene/s12_kabe_03_2D400",
+      "sha256": "e7cbd597d8b1702794e6ac0e097213352e30c3d12891d68d97d5fcfa0f2098ef"
+    }
+  ],
+  "missing": [],
+  "inputs": [
+    {
+      "filename": "Djipi's 3DE - 20 Scenes Map.otr",
+      "sha256": "0f79d188684b1459b722437999a44101df48a1aae44fbfc5674ba51f9e9ad2d4"
+    },
+    {
+      "filename": "Djipi's 3DE - 21 Scenes Map 3DS Textures.otr",
+      "sha256": "cc2d44fc66b4a46e22db75207d5b8a518f02514a4452f443a02f482668aac81d"
+    },
+    {
+      "filename": "oot.o2r",
+      "sha256": "ea80d61b223ee38075fe5383b652998f3b08164e903134922f63f205d995717b"
+    }
+  ]
+}

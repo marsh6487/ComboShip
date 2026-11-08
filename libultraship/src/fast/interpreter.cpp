@@ -2330,6 +2330,13 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         }
     }
 
+    // A runtime terrain copy can request neutral shading. Consult the primary
+    // render tile rather than the last loaded image (which may be a palette or
+    // detail map). Screen rectangles and unused/stale texture slots opt out.
+    const auto& primaryTexture =
+        mRdp->loaded_texture[mRdp->texture_tile[mRdp->first_tile_index].tmem_index].raw_tex_metadata.resource;
+    bool neutralizeShading = !is_rect && primaryTexture && primaryTexture->NeutralizeShading;
+
     // Keep the disabled specialization's working values local, as in the
     // original path; only the enabled specialization reads/writes cached state.
     ColorCombiner* comb;
@@ -2472,6 +2479,14 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         key.options = cc_options;
 
         comb = LookupOrCreateColorCombiner(key);
+        neutralizeShading = neutralizeShading && comb->usedTextures[0];
+        if (neutralizeShading && !use_grayscale) {
+            // Local shader selection only: never alter persistent RDP grayscale
+            // state or the colors that a following actor/water draw inherits.
+            use_grayscale = true;
+            key.options |= SHADER_OPT(GRAYSCALE);
+            comb = LookupOrCreateColorCombiner(key);
+        }
 
 
         for (int i = 0; i < 2; i++) {
@@ -2636,6 +2651,8 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         }
     }
 
+    neutralizeShading = neutralizeShading && usedTextures[0];
+
     if (usedTextures[0]) {
         const auto tile = effective_tile[0];
         TraceAutumnForestDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
@@ -2763,16 +2780,16 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         }
 
         if (use_grayscale) {
-            const auto color = mRdp->grayscale_color;
+            const auto color = neutralizeShading ? RGBA{ 255, 255, 255, 255 } : mRdp->grayscale_color;
             const unsigned sum = unsigned(color.r) + color.g + color.b;
             // All backends multiply mean texel RGB by these float attributes.
             // Mode 2 retains that mean; mode 3 lifts it for snow on dark foliage.
             // Preserve legacy mode's exact arithmetic and texture/fragment alpha.
             const float scale = sum != 0 ? (mRdp->grayscale_frost ? 5.4f : 3.0f) / sum : 0.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.r * scale : color.r / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.g * scale : color.g / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.b * scale : color.b / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.a / 255.0f; // lerp interpolation factor (not alpha)
+            mBufVbo[mBufVboLen++] = !neutralizeShading && mRdp->grayscale_normalize ? color.r * scale : color.r / 255.0f;
+            mBufVbo[mBufVboLen++] = !neutralizeShading && mRdp->grayscale_normalize ? color.g * scale : color.g / 255.0f;
+            mBufVbo[mBufVboLen++] = !neutralizeShading && mRdp->grayscale_normalize ? color.b * scale : color.b / 255.0f;
+            mBufVbo[mBufVboLen++] = color.a / 255.0f; // lerp interpolation factor (not alpha)
         }
 
         // SOH [Enhancement] Toon lighting: world-space normal (aNormal). The dominant light/ambient

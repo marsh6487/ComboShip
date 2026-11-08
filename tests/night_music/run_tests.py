@@ -13,12 +13,13 @@ with tempfile.TemporaryDirectory(prefix='night-music-') as tmp:
                     '-I'+str(ROOT/'combo'),str(ROOT/'tests/night_music/lifecycle_test.cpp'),
                     '-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
-    for host,path in [('soh','soh/soh/Enhancements/audio/SceneNightMusic.cpp'),
-                      ('mm','mm/2s2h/Enhancements/Audio/SceneNightMusic.cpp')]:
+    for host,path,debug_warp in [('soh','soh/soh/Enhancements/audio/SceneNightMusic.cpp',False),
+                                 ('soh-debug-warp','soh/soh/Enhancements/audio/SceneNightMusic.cpp',True),
+                                 ('mm','mm/2s2h/Enhancements/Audio/SceneNightMusic.cpp',False)]:
         production=(ROOT/path).read_text()
         production=production[production.index('static ComboNightMusic::Lifecycle'):production.index('static void RegisterSceneNightMusic')]
         fixture=(ROOT/'tests/night_music/host_test.cpp').read_text().replace('/* PRODUCTION */',production)
-        if host=='soh':
+        if host!='mm':
             native_player=(ROOT/'soh/src/code/z_player_lib.c').read_text()
             native_talk=(ROOT/'soh/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
             bodies=[]
@@ -32,6 +33,7 @@ with tempfile.TemporaryDirectory(prefix='night-music-') as tmp:
             fixture=fixture.replace('/* NATIVE_PLAYER */','\n'.join(bodies))
         cpp=Path(tmp)/(host+'.cpp');cpp.write_text(fixture)
         subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-DCOMBO_BUILD','-DTEST_MM='+str(int(host=='mm')),
+                        '-DTEST_DEBUG_WARP='+str(int(debug_warp)),
                         '-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-no-pie',
                         '-I'+str(ROOT/'combo'),str(cpp),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

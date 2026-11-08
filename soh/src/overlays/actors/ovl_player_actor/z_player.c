@@ -1,5 +1,6 @@
 #include "scene_exit.h"
 #include "ui_visibility.h"
+#include "soh/Enhancements/audio/SeasonWeather.h"
 #include "mods/partners/Partners.h"
 #include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
@@ -2055,21 +2056,43 @@ void Player_PlayFloorSfxByAge(Player* this, u16 sfxId) {
     Player_PlaySfx(this, Player_ApplyFloorAndAgeSfxOffsets(this, sfxId));
 }
 
+static u16 Player_GetStepSfxOffset(Player* this) {
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && !(this->actor.bgCheckFlags & BGCHECKFLAG_WATER) &&
+        !RocBoots_OnWater() && this->actor.floorBgId == BGCHECK_SCENE &&
+        SeasonWeather_ParticleSeasonForPlay(gPlayState) == SEASON_WINTER) {
+        switch (this->floorSfxOffset) {
+            case 0:         // ground
+            case 1:         // sand
+            case 2:         // concrete
+            case 3:         // dirt
+            case 8:         // grass
+                return 0xE; // MM's snow offset; OoT's native slot is a dummy.
+        }
+    }
+    return this->floorSfxOffset;
+}
+
 void Player_PlaySteppingSfx(Player* this, f32 pitchAdjustment) {
     s32 sfxId;
+    u16 stepOffset = Player_GetStepSfxOffset(this);
 
     // MM transformation masks: each transformed form has its own footstep SFX
     // (NA_SE_PL_WALK_GROUND + floor offset + per-form offset: Deku +0xF0,
     // Zora +0x120, Goron +0x150, FD +0x80). Play that instead of Link's walk.
     // Returns 0 for Human/Garo/Gerudo/Pikachu so OOT's footstep still plays.
-    if (TransformMasks_TryPlayMmStepSfx(Player_ApplyFloorSfxOffset(this, NA_SE_PL_WALK_GROUND),
-                                        &this->actor.projectedPos)) {
+    if (TransformMasks_TryPlayMmStepSfx(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
         // form footstep played; fall through to the stats counter below
+    } else if (this->currentBoots != PLAYER_BOOTS_IRON && stepOffset == 0xE &&
+               MmSfx_PlayAtPos(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
+        // Reuse MM's snow step through the existing foreign-audio bridge.
     } else {
         if (this->currentBoots == PLAYER_BOOTS_IRON) {
             sfxId = NA_SE_PL_WALK_HEAVYBOOTS;
         } else {
-            sfxId = Player_ApplyFloorAndAgeSfxOffsets(this, NA_SE_PL_WALK_GROUND);
+            // Standalone SoH can run without MM audio. Keep a soft native step
+            // in that configuration instead of using OoT's silent snow slot.
+            sfxId = (stepOffset == 0xE ? NA_SE_PL_WALK_SAND : NA_SE_PL_WALK_GROUND + stepOffset) +
+                    this->ageProperties->unk_94;
         }
         func_800F4010(&this->actor.projectedPos, sfxId, pitchAdjustment);
     }
@@ -12351,15 +12374,9 @@ void Player_StartMode_TimeTravel(PlayState* play, Player* this) {
             func_80846720(play, this, 0);
         }
     }
-    if (isTimePedestalArrival) {
-        // The native hold synchronizes this animation with the Temple of Time
-        // cutscene. A local pedestal reload has no matching cue, so begin its
-        // exit movement immediately instead of lingering on the first pose.
-        this->av1.actionVar1 = 1;
-        this->skelAnime.endFrame = this->skelAnime.animLength - 1.0f;
-    } else {
-        this->av2.actionVar2 = 20;
-    }
+    // Keep the Temple's first-pose hold in both ages and with Story Skip on or
+    // off. The local arrival then runs the same native hop/sword-flourish action.
+    this->av2.actionVar2 = 20;
 }
 
 void Player_StartMode_Door(PlayState* play, Player* this) {
@@ -12954,6 +12971,12 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
         flags &= ~(1 | 2);
     }
 
+    // The generic water check otherwise emits entry ripples every time the
+    // frozen pin clears WATER. Keep the query, suppress only its ripple effect.
+    if (Seasons_WalksOnWater() && !(this->stateFlags1 & PLAYER_STATE1_IN_WATER) && this->actor.velocity.y <= 0.0f) {
+        flags |= 0x40;
+    }
+
     Math_Vec3f_Copy(&unusedWorldPos, &this->actor.world.pos);
     Actor_UpdateBgCheckInfo(play, &this->actor, vWallCheckHeight, vWallCheckRadius, ceilingCheckHeight, flags);
 
@@ -13259,7 +13282,8 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
             sFloorType = frozen ? 5 : 0;
             if (frozen) {
                 // Ice, not a puddle: the ripple and splash effects both hang off this flag.
-                this->actor.bgCheckFlags &= ~BGCHECKFLAG_WATER;
+                this->actor.bgCheckFlags &= ~(BGCHECKFLAG_WATER | BGCHECKFLAG_WATER_TOUCH);
+                this->floorSfxOffset = NA_SE_PL_WALK_ICE - NA_SE_PL_WALK_GROUND;
             }
             this->floorPitch = this->floorPitchAlt = sFloorShapePitch = 0;
         }

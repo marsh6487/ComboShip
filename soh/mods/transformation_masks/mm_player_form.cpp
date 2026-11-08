@@ -105,6 +105,8 @@ uint32_t OTRGetGameRenderHeight(void);
 #include <ship/resource/Resource.h>
 #include <ship/resource/ResourceManager.h>
 #include <fast/resource/type/DisplayList.h>
+#include <fast/resource/type/Texture.h>
+#include "mm_form_blink_pixels.h"
 
 #define MMFORM_LOG(fmt, ...) lusprintf(__FILE__, __LINE__, LUSLOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
 
@@ -788,6 +790,233 @@ static const char* sFormEyeTextures[MM_PLAYER_FORM_MAX][4] = {
     // GARO - eyes baked into head DL (texture in soh.o2r)
     { NULL, NULL, NULL, NULL },
 };
+
+// BEGIN OPTIONAL CUSTOM FORM BLINK HELPER
+// Existing MM custom-face names, with immutable even-aligned OTR paths.
+// [FD/Deku][base/alt][8 native expression names]. Every row is 128 bytes,
+// so all pointers stay even-aligned and remain valid across alt/cache resets.
+alignas(2) static const char sCustomBlinkEyePaths[2][2][8][128] = {
+    {
+        {
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesOpenTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesHalfTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesClosedTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesRightTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesLeftTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesUpTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesDownTex",
+            "__OTR__objects/object_link_boy/gLinkFierceDeityEyesWincingTex",
+        },
+        {
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesOpenTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesHalfTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesClosedTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesRightTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesLeftTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesUpTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesDownTex",
+            "__OTR__alt/objects/object_link_boy/gLinkFierceDeityEyesWincingTex",
+        },
+    },
+    {
+        {
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesOpenTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesHalfTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesClosedTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesRightTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesLeftTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesUpTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesDownTex",
+            "__OTR__objects/object_link_nuts/gLinkDekuEyesWincingTex",
+        },
+        {
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesOpenTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesHalfTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesClosedTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesRightTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesLeftTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesUpTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesDownTex",
+            "__OTR__alt/objects/object_link_nuts/gLinkDekuEyesWincingTex",
+        },
+    },
+};
+static s32 sCustomBlinkEyeAltState[2] = { -1, -1 };
+static bool sCustomBlinkEyeComplete[2] = { false, false };
+static const char* sCustomBlinkEyeResolved[2][8] = {};
+
+static void MmForm_ResetCustomBlinkEyes(void) {
+    for (s32 slot = 0; slot < 2; ++slot) {
+        sCustomBlinkEyeAltState[slot] = -1;
+        sCustomBlinkEyeComplete[slot] = false;
+        for (s32 i = 0; i < 8; ++i) {
+            sCustomBlinkEyeResolved[slot][i] = NULL;
+        }
+    }
+}
+
+static const char* MmForm_ResolveCustomBlinkEye(s32 form, u8 eyeIndex) {
+    const s32 slot = form == MM_PLAYER_FORM_FIERCE_DEITY ? 0 : form == MM_PLAYER_FORM_DEKU ? 1 : -1;
+    if (slot < 0) {
+        return NULL;
+    }
+    auto manager = Ship::Context::GetRawInstance()->GetResourceManager();
+    if (!manager) {
+        return NULL;
+    }
+    const s32 altState = manager->IsAltAssetsEnabled() ? 1 : 0;
+    // Form-resource pinning resets this cache; an alt toggle independently
+    // invalidates it. Both successful and incomplete sets are rechecked.
+    if (sCustomBlinkEyeAltState[slot] != altState) {
+        sCustomBlinkEyeAltState[slot] = altState;
+        sCustomBlinkEyeComplete[slot] = false;
+        bool complete = true;
+        for (s32 i = 0; i < 8; ++i) {
+            const char* path = NULL;
+            if (altState && MmAssets_ResourceExists(sCustomBlinkEyePaths[slot][1][i])) {
+                path = sCustomBlinkEyePaths[slot][1][i];
+            } else if (MmAssets_ResourceExists(sCustomBlinkEyePaths[slot][0][i])) {
+                path = sCustomBlinkEyePaths[slot][0][i];
+            }
+            sCustomBlinkEyeResolved[slot][i] = path;
+            complete = complete && path != NULL;
+        }
+        sCustomBlinkEyeComplete[slot] = complete;
+    }
+    if (!sCustomBlinkEyeComplete[slot]) {
+        return NULL;
+    }
+    // This companion supplies the existing blink sequence only. A special
+    // or invalid state falls back to Open; directional expressions need a
+    // separate action/animation face-state integration.
+    return sCustomBlinkEyeResolved[slot][eyeIndex < 3 ? eyeIndex : 0];
+}
+// END OPTIONAL CUSTOM FORM BLINK HELPER
+
+// Native heads bind their eyes directly, so segment 08 alone cannot animate
+// them. Keep a pristine active head list and replace only its named eye load in
+// a frame-owned copy. Never mutate a shared archive DL or infer an eye material
+// from arbitrary texture dimensions.
+static const char* sNativeBlinkHeadPaths[2] = {
+    "objects/object_link_boy/gLinkFierceDeityHeadDL",
+    "objects/object_link_nuts/gLinkDekuHeadDL",
+};
+static const char* sNativeBlinkTexturePaths[2] = {
+    "objects/object_link_boy/gLinkFierceDeityEyesTex",
+    "objects/object_link_nuts/object_link_nuts_Tex_0048B0",
+};
+struct MmFormNativeBlinkHead {
+    std::vector<Gfx> instructions;
+    std::vector<size_t> textureLoads;
+    s32 alt = -1;
+};
+static MmFormNativeBlinkHead sNativeBlinkHeads[2];
+// Immutable once generated; raw texture pointers survive cache clears and Alt
+// toggles, and each state has its own identity in the renderer texture cache.
+alignas(8) static uint8_t sNativeBlinkPixels[2][2][MmFormBlink::Bytes];
+static uint8_t sNativeBlinkSource[2][MmFormBlink::Bytes];
+static bool sNativeBlinkPixelsReady[2] = {};
+
+static void MmForm_ResetNativeBlinkHeads(void) {
+    for (auto& head : sNativeBlinkHeads) {
+        head.instructions.clear();
+        head.textureLoads.clear();
+        head.alt = -1;
+    }
+}
+
+static Gfx* MmForm_NativeBlinkHead(PlayState* play, s32 form, u8 eyeIndex, Gfx* currentHead) {
+    const s32 slot = form == MM_PLAYER_FORM_FIERCE_DEITY ? 0 : form == MM_PLAYER_FORM_DEKU ? 1 : -1;
+    if (slot < 0 || eyeIndex < 1 || eyeIndex > 2 || !currentHead)
+        return NULL;
+    // SkeletonLimbFactory keeps the actual limb's DL as an OTR path. A custom
+    // skeleton with a differently named head must never receive native geometry.
+    auto* currentPath = reinterpret_cast<char*>(currentHead);
+    if (!ResourceMgr_OTRSigCheck(currentPath))
+        return NULL;
+    currentPath += 7;
+    if (strncmp(currentPath, "alt/", 4) == 0)
+        currentPath += 4;
+    if (strcmp(currentPath, sNativeBlinkHeadPaths[slot]))
+        return NULL;
+    auto manager = Ship::Context::GetRawInstance()->GetResourceManager();
+    if (!manager)
+        return NULL;
+    auto& head = sNativeBlinkHeads[slot];
+    const s32 alt = manager->IsAltAssetsEnabled() ? 1 : 0;
+    if (head.alt != alt) {
+        head.instructions.clear();
+        head.textureLoads.clear();
+        head.alt = alt;
+        auto resource =
+            std::dynamic_pointer_cast<Fast::DisplayList>(manager->LoadResourceProcess(sNativeBlinkHeadPaths[slot]));
+        if (resource) {
+            head.instructions = resource->Instructions;
+            auto archive = manager->GetArchiveManager();
+            for (size_t i = 0; i < head.instructions.size(); ++i) {
+                auto& command = head.instructions[i];
+                const unsigned op = (command.words.w0 >> 24) & 255;
+                const char* path = NULL;
+                if (op == 0x20 && i + 1 < head.instructions.size()) {
+                    const auto& hashWords = head.instructions[i + 1];
+                    const uint64_t hash = (uint64_t(hashWords.words.w0) << 32) | uint32_t(hashWords.words.w1);
+                    if (archive)
+                        path = archive->HashToCString(hash);
+                } else if (op == 0x25) {
+                    path = reinterpret_cast<const char*>(command.words.w1);
+                }
+                if (path && !strncmp(path, "__OTR__", 7))
+                    path += 7;
+                if (path && !strcmp(path, sNativeBlinkTexturePaths[slot]))
+                    head.textureLoads.push_back(i);
+                // Expanded commands own the following hash/data word, which must
+                // never be interpreted as another command during this scan.
+                if (op == 0x20 || op == 0x31 || op == 0x32 || op == 0x33 || op == 0x35 || op == 0x36 || op == 0x42)
+                    ++i;
+            }
+        }
+    }
+    if (head.textureLoads.empty())
+        return NULL; // e.g. custom segmented HD head
+    if (!sNativeBlinkPixelsReady[slot]) {
+        // Explicit exact base load: optional Alt replacements cannot silently
+        // change the pixel layout used by this native-only derivation.
+        auto texture = std::dynamic_pointer_cast<Fast::Texture>(
+            manager->LoadResourceProcess(sNativeBlinkTexturePaths[slot], true));
+        if (!texture || texture->Type != Fast::TextureType::RGBA16bpp || texture->Flags != 0 ||
+            texture->Width != MmFormBlink::Width || texture->Height != MmFormBlink::Height ||
+            texture->ImageDataSize != MmFormBlink::Bytes || !texture->ImageData)
+            return NULL;
+        for (unsigned state = 1; state <= 2; ++state) {
+            if (!MmFormBlink::Derive(texture->ImageData, texture->ImageDataSize, slot == 1, state,
+                                     sNativeBlinkPixels[slot][state - 1]))
+                return NULL;
+        }
+        memcpy(sNativeBlinkSource[slot], texture->ImageData, MmFormBlink::Bytes);
+        sNativeBlinkPixelsReady[slot] = true;
+    }
+    // A replacement of the native eye atlas without a matching blink bank
+    // should keep its own appearance; do not substitute base eyes into an HD face.
+    auto active = std::dynamic_pointer_cast<Fast::Texture>(manager->LoadResource(sNativeBlinkTexturePaths[slot]));
+    if (!active || active->Width != MmFormBlink::Width || active->Height != MmFormBlink::Height || active->Flags != 0 ||
+        active->Type != Fast::TextureType::RGBA16bpp || active->ImageDataSize != MmFormBlink::Bytes ||
+        !active->ImageData || memcmp(active->ImageData, sNativeBlinkSource[slot], MmFormBlink::Bytes) != 0)
+        return NULL;
+    Gfx* copy = static_cast<Gfx*>(Graph_Alloc(play->state.gfxCtx, head.instructions.size() * sizeof(Gfx)));
+    if (!copy)
+        return NULL;
+    memcpy(copy, head.instructions.data(), head.instructions.size() * sizeof(Gfx));
+    for (size_t index : head.textureLoads) {
+        const unsigned op = (copy[index].words.w0 >> 24) & 255;
+        copy[index].words.w0 = (copy[index].words.w0 & 0xFFFFFF) | (uintptr_t(0xFD) << 24);
+        copy[index].words.w1 = reinterpret_cast<uintptr_t>(sNativeBlinkPixels[slot][eyeIndex - 1]);
+        if (op == 0x20) {
+            copy[index + 1].words.w0 = 0;
+            copy[index + 1].words.w1 = 0;
+        }
+    }
+    return copy;
+}
 
 // =============================================================================
 // Action IDs (forward declaration for MmFormState)
@@ -1599,6 +1828,8 @@ static const char* sFormObjectPaths[MM_PLAYER_FORM_MAX] = {
 // Replicate the iteration manually using the synchronous LoadResourceProcess API, which
 // runs entirely inline without touching the thread pool.
 static void MmForm_PinFormResources(MmPlayerTransformation form) {
+    MmForm_ResetCustomBlinkEyes();
+    MmForm_ResetNativeBlinkHeads();
     sPinnedFormResources.reset();
 
     if (form < 0 || form >= MM_PLAYER_FORM_MAX || sFormObjectPaths[form] == NULL) {
@@ -15024,6 +15255,11 @@ static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
 
     // From OOT z_player_lib.c:1378-1380 — apply headLimbRot to HEAD limb
     if (limbIndex == PLAYER_LIMB_HEAD) {
+        if (*dList != NULL) {
+            Gfx* blinkHead = MmForm_NativeBlinkHead(play, gFormState.currentForm, gFormState.eyeIndex, *dList);
+            if (blinkHead != NULL)
+                *dList = blinkHead;
+        }
         rot->x += player->headLimbRot.z;
         rot->y -= player->headLimbRot.y;
         rot->z += player->headLimbRot.x;
@@ -18431,8 +18667,13 @@ void MmForm_Draw(PlayState* play, Player* player) {
             if (form == MM_PLAYER_FORM_GERUDO) {
                 const char* eyePath = sGerudoEyeTextures[LINK_IS_ADULT ? 1 : 0][eyeIdx < 3 ? eyeIdx : 0];
                 gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)eyePath);
-            } else if (form >= 0 && form < MM_PLAYER_FORM_MAX && sFormEyeTextures[form][eyeIdx] != NULL) {
-                gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sFormEyeTextures[form][eyeIdx]);
+            } else {
+                const char* customEye = MmForm_ResolveCustomBlinkEye(form, eyeIdx);
+                if (customEye != NULL) {
+                    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)customEye);
+                } else if (form >= 0 && form < MM_PLAYER_FORM_MAX && sFormEyeTextures[form][eyeIdx] != NULL) {
+                    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sFormEyeTextures[form][eyeIdx]);
+                }
             }
 
             if (form == MM_PLAYER_FORM_ZORA) {

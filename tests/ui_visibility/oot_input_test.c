@@ -7,6 +7,10 @@ static int armed, hidden = 1, debugEnabled, moonJump, conflictOverride, minimal;
 static unsigned toggles;
 static GameInfo gameInfo;
 GameInfo *gGameInfo = &gameInfo;
+PlayState *gPlayState;
+SaveContext gSaveContext;
+void Play_Main(GameState *state) {}
+static void playerUpdate(Actor *actor, PlayState *play) {}
 int UiVisibility_IsEnabled(void) { return armed; }
 int UiVisibility_IsHidden(void) { return armed && hidden; }
 void UiVisibility_Toggle(void) {
@@ -34,10 +38,17 @@ int Play_InCsMode(PlayState *play) {
 /* PRODUCTION_MAP_VISIBILITY */
 int main(void) {
   static PlayState play;
+  static Player player;
+  gPlayState = &play;
+  play.state.main = Play_Main;
+  play.state.running = 1;
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+  player.actor.update = playerUpdate;
+  gSaveContext.health = 0x30;
+  gSaveContext.gameMode = GAMEMODE_NORMAL;
   play.state.input[0].press.button = BTN_L;
   for (unsigned state = 0; state < 3; ++state) {
-    /* Ordinary/no-map gameplay, pause, and dialogue use the same input entry.
-     * A standalone GameState (file-select) is covered below as well. */
+    /* L belongs to page navigation/dialogue outside normal player control. */
     play.pauseCtx.state = state == 1 ? 6 : 0;
     play.msgCtx.msgMode = state == 2 ? MSGMODE_TEXT_DISPLAYING : MSGMODE_NONE;
     R_MINIMAP_DISABLED = 1;
@@ -48,31 +59,35 @@ int main(void) {
     armed = 1;
     hidden = 1;
     GameState_UpdateUiVisibility(&play.state);
-    REQUIRE(!UiVisibility_IsHidden() && toggles == before + 1 &&
-            R_MINIMAP_DISABLED == 1);
+    unsigned accepted = state == 0 ? 1 : 0;
+    REQUIRE(toggles == before + accepted);
+    REQUIRE(UiVisibility_IsHidden() == (state != 0));
+    REQUIRE(R_MINIMAP_DISABLED == 1);
+    REQUIRE(play.state.input[0].press.button == BTN_L);
     GameState_UpdateUiVisibility(&play.state);
-    REQUIRE(UiVisibility_IsHidden() && toggles == before + 2 &&
-            R_MINIMAP_DISABLED == 1);
+    REQUIRE(UiVisibility_IsHidden() && toggles == before + 2 * accepted);
     play.state.input[0].press.button = 0;
     play.state.input[0].cur.button = BTN_L;
     GameState_UpdateUiVisibility(&play.state);
-    REQUIRE(toggles == before + 2);
+    REQUIRE(toggles == before + 2 * accepted);
     play.state.input[0].press.button = BTN_L;
   }
   GameState fileSelect = {0};
   fileSelect.input[0].press.button = BTN_L;
   unsigned before = toggles;
   GameState_UpdateUiVisibility(&fileSelect);
-  REQUIRE(toggles == before + 1);
+  REQUIRE(toggles == before);
+  play.pauseCtx.state = 0;
+  play.msgCtx.msgMode = MSGMODE_NONE;
   for (unsigned conflicts = 1; conflicts <= 3; ++conflicts) {
     debugEnabled = (conflicts & 1) != 0;
     moonJump = (conflicts & 2) != 0;
     conflictOverride = 0;
     before = toggles;
-    GameState_UpdateUiVisibility(&fileSelect);
+    GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before);
     conflictOverride = 1;
-    GameState_UpdateUiVisibility(&fileSelect);
+    GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before + 1);
   }
   debugEnabled = moonJump = conflictOverride = 0;
@@ -101,6 +116,6 @@ int main(void) {
   REQUIRE(FullUi(&play));
   play.csCtx.state = CS_STATE_UNSKIPPABLE_EXEC;
   REQUIRE(!LegacyMapL0(&play, true) && !LegacyMapL1(&play, true));
-  puts("PASS OoT L input: all native states, held/conflicting buttons, full-UI "
+  puts("PASS OoT L input: player control only, held/conflicting buttons, full-UI "
        "priority and no legacy double-toggle");
 }

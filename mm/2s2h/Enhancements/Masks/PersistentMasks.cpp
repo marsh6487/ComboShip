@@ -52,6 +52,10 @@ static void UpdatePersistentMasksState() {
                 return;
             }
 
+            if (CVarGetInteger("gEnhancements.HideNonTransformationMasks", 0)) {
+                return;
+            }
+
             // This emulates the vanilla check for if the masks should be drawn, specifically around
             // z_player.c 12923 (Player_Draw)
             if (player->stateFlags1 & PLAYER_STATE1_100000) {

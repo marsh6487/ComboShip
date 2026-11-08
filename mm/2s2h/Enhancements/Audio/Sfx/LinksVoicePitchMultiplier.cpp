@@ -22,11 +22,14 @@ void RegisterLinksVoicePitchMultiplier() {
         u16 sfxId = *va_arg(args, u16*);
 
         u8 isVoice = (sfxId >= NA_SE_VO_LI_SWORD_N && sfxId <= NA_SE_VO_DEMO_394) || sfxId == NA_SE_PL_TRANSFORM_VOICE;
-        u8 adult = AdultLink_IsActive() != 0;
+        u8 adult = AdultLink_IsActive() != 0 && player->transformation == PLAYER_FORM_HUMAN;
         u8 editor = CVAR != 0;
         u16 formVoice = 0;
 
-        if (isVoice && CustomForms_VoiceOverride(sfxId, &formVoice)) {
+        u16 baseVoice = sfxId;
+        if (player->transformation == PLAYER_FORM_HUMAN && sfxId >= 0x6820 && sfxId < 0x6840)
+            baseVoice -= 0x20;
+        if (isVoice && CustomForms_VoiceOverride(baseVoice, &formVoice)) {
             // A custom form speaks with its own bank (Keaton = Deku, Garo = Igos) or stays silent.
             *should = false;
             if (formVoice != 0) {

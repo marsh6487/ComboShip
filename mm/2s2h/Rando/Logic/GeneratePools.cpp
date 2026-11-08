@@ -352,9 +352,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_PROGRESSIVE_STICK_CAPACITY);
             itemPool.push_back(RI_OOT_PROGRESSIVE_NUT_CAPACITY);
             itemPool.push_back(RI_OOT_PROGRESSIVE_NUT_CAPACITY);
-            if (hasOotGameplay) {
-                itemPool.push_back(RI_OOT_ABILITY_CHESTS);
-            }
+            // ComboShip receives action abilities from OoT's settings-scoped pool.
+            // This gear category must not bypass OoT's Open Chests shuffle setting.
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L1 Goron Bracelet
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L2 Silver Gauntlets
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L3 Gold Gauntlets

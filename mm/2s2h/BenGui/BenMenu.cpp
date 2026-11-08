@@ -1799,6 +1799,10 @@ void BenMenu::AddEnhancements() {
 
     // Mask Enhancements
     AddWidget(path, "Masks", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Invisible Non-Transformation Masks", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.HideNonTransformationMasks")
+        .Options(CheckboxOptions().Tooltip("Hide worn non-transformation masks while keeping their effects active.\n"
+                                           "Transformation masks remain visible."));
     AddWidget(path, "Equippable While Swimming", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Masks.EquipWhileSwimming")
         .Options(CheckboxOptions().Tooltip("Human Link can equip any non-transformation mask while swimming."));
@@ -2456,9 +2460,10 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "True Hidden UI", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.TrueHiddenUI")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Use L to hide or reveal all game UI and passive overlays, including messages and pause menus. "
-            "Takes priority over Minimal UI. Open application settings remain available; turn this off here to "
-            "return to your Minimal UI and minimap preferences."));
+            "Press L while controlling Link to hide or show game UI and passive overlays, including messages "
+            "and pause menus. Menu and dialogue L inputs do not toggle visibility. Startup and file selection "
+            "remain visible. Takes priority over Minimal UI. Open application settings remain available; "
+            "turn this off here to return to your Minimal UI and minimap preferences."));
 
     // HUD Editor
     path = { "Enhancements", "HUD Editor", SECTION_COLUMN_1 };
@@ -3473,6 +3478,10 @@ void BenMenu::AddNEI() {
         .Options(CheckboxOptions().DefaultValue(true).Tooltip("Garo mask transforms the player."));
 
     AddWidget(masksPath, "MM Masks", WIDGET_SEPARATOR_TEXT);
+    AddWidget(masksPath, "Invisible Non-Transformation Masks", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.HideNonTransformationMasks")
+        .Options(CheckboxOptions().Tooltip("Hide worn non-transformation masks while keeping their effects active.\n"
+                                           "Transformation masks remain visible."));
     AddWidget(masksPath, "MM Masks Page (Inventory + Effects)", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.MmMasks.InventoryEnabled")
         .Options(CheckboxOptions().Tooltip("Third item-kaleido page listing the MM masks.").DefaultValue(true));

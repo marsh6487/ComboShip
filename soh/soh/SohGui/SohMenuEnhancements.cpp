@@ -979,8 +979,8 @@ void SohMenu::AddMenuEnhancements() {
     AddWidget(path, "True Hidden UI", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("TrueHiddenUI"))
         .Options(CheckboxOptions().Tooltip(
-            "Press L to hide or show all game UI, including native pause menus and dialogue.\n"
-            "Game updates and inputs continue. Application settings remain available.\n"
+            "Press L while controlling Link to hide or show game UI, including pause menus and dialogue.\n"
+            "Menu and dialogue L inputs do not toggle visibility. Startup and file selection remain visible.\n"
             "Takes priority over Minimal UI while enabled."));
     AddWidget(path, "Disable Hot/Underwater Warning Text", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DisableTunicWarningText"))

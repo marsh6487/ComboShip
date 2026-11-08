@@ -1,4 +1,5 @@
 #include "global.h"
+#include "mods/voice_pack/din_voice.h"
 #include "2s2h/Enhancements/Audio/AudioEditor.h"
 
 typedef struct {
@@ -129,6 +130,8 @@ void AudioSfx_PlaySfx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* volu
     SfxRequest* reqRead;
 
     if (!gSfxBankMuted[SFX_BANK_SHIFT(sfxId)]) {
+        if (DinVoice_TryPlay(sfxId, pos))
+            return;
         reqWrite = &sSfxRequests[sSfxRequestWriteIndex];
 
         for (i = sSfxRequestReadIndex; sSfxRequestWriteIndex != i; i++) {
@@ -700,6 +703,8 @@ void AudioSfx_PlayActiveSfx(u8 bankId) {
 }
 
 void AudioSfx_StopByBank(u8 bankId) {
+    if (bankId == 6)
+        DinVoice_Stop(0, NULL);
     SfxBankEntry* entry;
     s32 pad;
     SfxBankEntry entryToRemove;
@@ -722,6 +727,8 @@ void AudioSfx_StopByBank(u8 bankId) {
 }
 
 void AudioSfx_StopByPosAndBankImpl(u8 bankId, Vec3f* pos) {
+    if (bankId == 6)
+        DinVoice_Stop(0, pos);
     SfxBankEntry* entry;
     u8 entryIndex = gSfxBanks[bankId][0].next;
     u8 prevEntryIndex = 0;
@@ -754,6 +761,7 @@ void AudioSfx_StopByPosAndBank(u8 bankId, Vec3f* pos) {
 }
 
 void AudioSfx_StopByPos(Vec3f* pos) {
+    DinVoice_Stop(0, pos);
     u8 bankId;
     SfxBankEntry entryToRemove;
 
@@ -766,6 +774,7 @@ void AudioSfx_StopByPos(Vec3f* pos) {
 }
 
 void AudioSfx_StopByPosAndId(Vec3f* pos, u16 sfxId) {
+    DinVoice_Stop(sfxId, pos);
     SfxBankEntry* entry;
     u8 entryIndex = gSfxBanks[SFX_BANK(sfxId)][0].next;
     u8 prevEntryIndex = 0;
@@ -797,6 +806,8 @@ void AudioSfx_StopByPosAndId(Vec3f* pos, u16 sfxId) {
 }
 
 void AudioSfx_StopByTokenAndId(u8 token, u16 sfxId) {
+    if (token == 4)
+        DinVoice_Stop(sfxId, NULL);
     SfxBankEntry* entry;
     u8 entryIndex = gSfxBanks[SFX_BANK(sfxId)][0].next;
     u8 prevEntryIndex = 0;
@@ -827,6 +838,7 @@ void AudioSfx_StopByTokenAndId(u8 token, u16 sfxId) {
 }
 
 void AudioSfx_StopById(u32 sfxId) {
+    DinVoice_Stop(sfxId, NULL);
     SfxBankEntry* entry;
     u8 entryIndex = gSfxBanks[SFX_BANK(sfxId)][0].next;
     u8 prevEntryIndex = 0;
@@ -887,6 +899,7 @@ void AudioSfx_StepBankLerp(u8 bankId) {
 }
 
 void AudioSfx_ProcessActiveSfx(void) {
+    DinVoice_EndFrame();
     u8 bankId;
 
     if (gAudioCtx.seqPlayers[SEQ_PLAYER_SFX].enabled) {
@@ -901,6 +914,8 @@ void AudioSfx_ProcessActiveSfx(void) {
 }
 
 u8 AudioSfx_IsPlaying(u32 sfxId) {
+    if (DinVoice_IsPlaying(sfxId))
+        return true;
     SfxBankEntry* entry;
     u8 entryIndex = gSfxBanks[SFX_BANK(sfxId)][0].next;
 
@@ -916,6 +931,7 @@ u8 AudioSfx_IsPlaying(u32 sfxId) {
 }
 
 void AudioSfx_Reset(void) {
+    DinVoice_Stop(0, NULL);
     u8 bankId;
     u8 i;
     u8 entryIndex;

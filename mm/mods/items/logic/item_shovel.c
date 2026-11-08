@@ -157,11 +157,12 @@ static void ActivateSoftSoil(PlayState* play, Actor* soilActor) {
 
 static void RevealGrotto(PlayState* play, Actor* grottoActor) {
     DoorAna* grotto = (DoorAna*)grottoActor;
-    if ((grotto->actor.params & 0x300) != 0) {
-        if ((grotto->actor.params & 0x200) != 0) {
-            // (MM DoorAna has no collider field — collider destroy dropped. TODO adapt.)
+    s32 type = DOORANA_GET_TYPE(&grotto->actor);
+    if (type == DOORANA_TYPE_HIDDEN_STORMS || type == DOORANA_TYPE_HIDDEN_BOMB) {
+        if (type == DOORANA_TYPE_HIDDEN_BOMB) {
+            Collider_DestroyCylinder(play, &grotto->bombCollider);
         }
-        grotto->actor.params &= ~0x0300;
+        DOORANA_SET_TYPE(&grotto->actor, DOORANA_TYPE_VISIBLE);
         grotto->actionFunc = DoorAna_WaitOpen;
         grotto->actor.flags &= ~ACTOR_FLAG_UPDATE_CULLING_DISABLED;
         Audio_PlaySoundGeneral(NA_SE_SY_CORRECT_CHIME, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,

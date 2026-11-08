@@ -57,7 +57,9 @@ static void UpdateSceneNightMusic() {
         .source = row,
         .enabled = CVarGetInteger("gAudioEditor.EnableNightMusic", 0) != 0 || ranchSelection,
         .night = gSaveContext.dayTime <= 0x4AAA || gSaveContext.dayTime >= 0xB71D,
-        .eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum < 3 && source != NA_BGM_NO_MUSIC &&
+        // Debug Warp uses file 0xFF; the game-mode guard still excludes title demos.
+        .eligible = gSaveContext.gameMode == GAMEMODE_NORMAL &&
+                    (gSaveContext.fileNum < 3 || gSaveContext.fileNum == 0xFF) && source != NA_BGM_NO_MUSIC &&
                     play->sequenceCtx.natureAmbienceId < NATURE_ID_NONE && !dedicated,
         .blocked = blocked,
         // Talking also sets Player_InCsMode. Defer starts/edits while controls

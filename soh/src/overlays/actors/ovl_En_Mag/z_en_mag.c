@@ -1,5 +1,4 @@
 #include "../../../../../combo/ComboGameMode.h"
-#include "ui_visibility.h"
 /*
  * File: z_en_mag.c
  * Overlay: ovl_En_Mag
@@ -777,7 +776,6 @@ comboSkipOriginalLogoBlock:;
 }
 
 void EnMag_Draw(Actor* thisx, PlayState* play) {
-    OotUiDrawScope uiScope = OotUi_BeginDraw(play->state.gfxCtx);
     s32 pad;
     Gfx* gfx;
     Gfx* gfxRef;
@@ -795,5 +793,4 @@ void EnMag_Draw(Actor* thisx, PlayState* play) {
     POLY_OPA_DISP = gfx;
 
     CLOSE_DISPS(play->state.gfxCtx);
-    OotUi_EndDraw(play->state.gfxCtx, uiScope);
 }

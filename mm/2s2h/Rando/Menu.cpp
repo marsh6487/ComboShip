@@ -1,4 +1,5 @@
 #include "Rando/Rando.h"
+#include "Rando/MagicHints.h"
 #include "../../../combo/gui/WhatsNew.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
@@ -952,7 +953,7 @@ static void DrawPriorityItemsPopup() {
             ImGui::PopStyleColor();
         } else {
             for (RandoItemId candidateId : Rando::GetSariaPriorityItemCandidates()) {
-                if (setOfItemsInPool.count(candidateId) == 0) {
+                if (!Rando::MagicHintAvailable(candidateId, setOfItemsInPool)) {
                     continue;
                 }
                 if (std::find(priorityItemsList.begin(), priorityItemsList.end(), candidateId) !=
@@ -1358,9 +1359,10 @@ static void DrawItemPoolTab() {
                                          CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
         CVarCheckbox(
             "Add OoT Items", Rando::StaticData::Options[RO_SHUFFLE_OOT_GEAR].cvar,
-            CheckboxOptions({ { .tooltip = "Adds OoT gear to a solo-MM pool: the Master Sword and Biggoron's Sword\n"
-                                           "chains, Stick/Nut Capacity, Open Chests, Progressive Strength and the\n"
-                                           "ship-vanilla Roc's Feather.\n\nNot considered by logic." } }));
+            CheckboxOptions({ { .tooltip = "Adds the Master Sword and Biggoron's Sword chains, Stick/Nut Capacity,\n"
+                                           "Progressive Strength and the ship-vanilla Roc's Feather.\n\n"
+                                           "In combined seeds, action abilities follow OoT's own shuffle settings.\n"
+                                           "These extra gear items are not considered by MM logic." } }));
     }
     {
         WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_OOT_EQUIPMENT].cvar, nullptr,

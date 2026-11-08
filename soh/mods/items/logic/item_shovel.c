@@ -240,7 +240,8 @@ static void Shovel_Start(Player* p, PlayState* play) {
     shActive = 1;
     shAnimating = 1;
     shAnimTimer = 0;
-    LinkAnimation_PlayOnce(play, &p->upperSkelAnime, anim);
+    // Native item drawing owns upperSkelAnime until the shovel callback runs.
+    // Starting here would replace its equip clip, then finish without digging.
     ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_SHOVEL);
 }
 
@@ -299,6 +300,15 @@ s32 Player_UpperAction_Shovel(Player* p, PlayState* play) {
         return 0;
     if (!shAnimating)
         return 0;
+
+    if (shAnimTimer == 0) {
+        LinkAnimationHeader* anim = NeiAnim_Load(NEI_ANIM_DAMPE_DIG);
+        if (anim == NULL) {
+            Shovel_Stop(p, play);
+            return 0;
+        }
+        LinkAnimation_PlayOnce(play, &p->upperSkelAnime, anim);
+    }
 
     // Update the skeletal animation
     if (LinkAnimation_Update(play, &p->upperSkelAnime)) {

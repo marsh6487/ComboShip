@@ -423,6 +423,23 @@ void Save_SaveFile(void) {
 }
 void Interface_LoadItemIcon1(PlayState*, u16) {
 }
+void Interface_LoadItemIcon2(PlayState*, u16) {
+}
+u8 ItemInput_ButtonIsClaimed(u16) {
+    return false;
+}
+u8 Picto_IsOwned(void) {
+    return false;
+}
+u8 Picto_IsOnLensActive(void) {
+    return false;
+}
+u8 PowerKeg_IsOwned(void) {
+    return false;
+}
+u8 PowerKeg_IsOnBombActive(void) {
+    return false;
+}
 void Interface_ChangeHudVisibilityMode(s16) {
 }
 }
@@ -605,6 +622,9 @@ static void RunInteraction(bool adult, bool rando, bool skip = false, s16 entran
         play.csCtx.frames++;
     BgTokiSwd_Update(&sword.actor, &play);
     REQUIRE(play.transitionTrigger == TRANS_TRIGGER_START);
+    REQUIRE(play.transitionType == TRANS_TYPE_FADE_WHITE);
+    REQUIRE(gSaveContext.nextTransitionType == TRANS_TYPE_FADE_WHITE);
+    REQUIRE(gSaveContext.cutsceneTransitionControl == 1);
     REQUIRE(!BgTokiSwd_GetChildSwordPullFloor(&play, &play.player, &childSwordFloor));
     REQUIRE(play.linkAgeOnLoad == (adult ? LINK_AGE_CHILD : LINK_AGE_ADULT));
     REQUIRE(play.nextEntranceIndex == entrance && play.sceneNum == SCENE_LOST_WOODS);
@@ -971,8 +991,14 @@ static void CheckRequestedSkip(bool adult, bool rando, int setting, bool pressB)
     const Vec3f ceremonyPos = { -716.0f, -61.0f, -2395.0f };
     play.player.actor.world.pos = ceremonyPos;
     BgTokiSwd_Update(&sword.actor, &play);
-    const bool shouldSkip = pressB || (setting < 0 ? rando : setting != 0);
-    if (shouldSkip) {
+    const bool automaticSkip = setting < 0 ? rando : setting != 0;
+    const bool shouldSkip = pressB || automaticSkip;
+    if (automaticSkip) {
+        // Like Temple of Time's terminator, story skip branches on frame 21
+        // without an independent screen-fill ramp before the native fade.
+        REQUIRE(play.transitionTrigger == TRANS_TRIGGER_START);
+        REQUIRE(!play.envCtx.fillScreen);
+    } else if (shouldSkip) {
         for (int frame = 1; frame <= 8; ++frame) {
             REQUIRE(play.transitionTrigger == TRANS_TRIGGER_OFF);
             REQUIRE(play.envCtx.fillScreen && play.envCtx.screenFillColor[3] == 255 * frame / 8);
@@ -983,8 +1009,10 @@ static void CheckRequestedSkip(bool adult, bool rando, int setting, bool pressB)
     }
     REQUIRE((play.transitionTrigger == TRANS_TRIGGER_START) == shouldSkip);
     if (shouldSkip) {
-        REQUIRE(play.transitionType == TRANS_TYPE_FADE_WHITE_FAST);
-        REQUIRE(gSaveContext.nextTransitionType == TRANS_TYPE_FADE_WHITE_FAST);
+        const int fade = automaticSkip ? TRANS_TYPE_FADE_WHITE : TRANS_TYPE_FADE_WHITE_FAST;
+        REQUIRE(play.transitionType == fade);
+        REQUIRE(gSaveContext.nextTransitionType == fade);
+        REQUIRE(gSaveContext.cutsceneTransitionControl == 1);
         REQUIRE(memcmp(&play.player.actor.world.pos, &ceremonyPos, sizeof(Vec3f)) == 0);
         REQUIRE(play.linkAgeOnLoad == (adult ? LINK_AGE_CHILD : LINK_AGE_ADULT));
         REQUIRE(gSaveContext.respawn[0].roomIndex == 10);
@@ -1248,7 +1276,7 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     play.state.input[0].press.button = skipMain ? BTN_B : 0;
     play.state.input[0].cur.button = skipMain ? BTN_B : 0;
     BgTokiSwd_Update(&sword.actor, &play);
-    if (skipMain) {
+    if (skipMain && !storySkipEnabled) {
         for (int frame = 0; frame < 8; ++frame) {
             REQUIRE(play.transitionTrigger == TRANS_TRIGGER_OFF);
             play.state.input[0].press.button = 0;
@@ -1257,8 +1285,9 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     }
     REQUIRE(play.transitionTrigger == TRANS_TRIGGER_START);
     // The departure image must fade out before the synchronous age reload.
-    REQUIRE(play.csCtx.state == CS_STATE_UNSKIPPABLE_EXEC && play.transitionType == TRANS_TYPE_FADE_WHITE_FAST);
-    REQUIRE(gSaveContext.nextTransitionType == TRANS_TYPE_FADE_WHITE_FAST);
+    const int fade = skipMain && !storySkipEnabled ? TRANS_TYPE_FADE_WHITE_FAST : TRANS_TYPE_FADE_WHITE;
+    REQUIRE(play.csCtx.state == CS_STATE_UNSKIPPABLE_EXEC && play.transitionType == fade);
+    REQUIRE(gSaveContext.nextTransitionType == fade);
     Fixture_PlayDestroyAgeHandoff(&play);
     gSaveContext.linkAge = play.linkAgeOnLoad;
     cutsceneAudioFlag = 1; // Cutscene engine owns this while the departure camera is live.
@@ -1300,12 +1329,11 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     REQUIRE(startModeHookCalls == 0); // Never hit the native rando hook that relocates to Temple of Time.
     REQUIRE(normalSwordEquipCalls == 0);
     REQUIRE(arrival.player.skelAnime.animation == age.unk_A0);
-    // A local age swap has no Temple of Time cutscene to synchronize with.
-    // It must begin the native arrival motion immediately rather than holding
-    // its first pose for the native 20 completed updates.
-    REQUIRE(arrival.player.av1.actionVar1 == 1);
-    REQUIRE(arrival.player.av2.actionVar2 == 0);
-    REQUIRE(arrival.player.skelAnime.endFrame == arrival.player.skelAnime.animLength - 1.0f);
+    // Match the Temple's repeat-visit arrival hold before releasing the
+    // native child hop or adult flourish, under either Story Skip setting.
+    REQUIRE(arrival.player.av1.actionVar1 == 0);
+    REQUIRE(arrival.player.av2.actionVar2 == 20);
+    REQUIRE(arrival.player.skelAnime.endFrame == 0.0f);
     REQUIRE(fabsf(arrival.player.actor.world.pos.x + 716) < 0.01f);
     REQUIRE(fabsf(arrival.player.actor.world.pos.y + 62) < 0.01f);
     REQUIRE(fabsf(arrival.player.actor.world.pos.z + 2395) < 0.01f);
@@ -1404,6 +1432,14 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
         }
     } else {
         animationComplete = true;
+        for (int frame = 0; frame < 20; ++frame) {
+            REQUIRE(arrival.player.av1.actionVar1 == 0);
+            Player_Action_8084E9AC(&arrival.player, &arrival);
+            REQUIRE(arrival.player.actionFunc == Player_Action_8084E9AC);
+            REQUIRE(arrival.player.av2.actionVar2 == 19 - frame);
+        }
+        REQUIRE(arrival.player.av1.actionVar1 == 1);
+        REQUIRE(arrival.player.skelAnime.endFrame == arrival.player.skelAnime.animLength - 1.0f);
         Player_Action_8084E9AC(&arrival.player, &arrival);
     }
     REQUIRE(arrival.player.actionFunc == Player_Action_Idle);

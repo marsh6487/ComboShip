@@ -5,7 +5,6 @@
  */
 
 #include <libultraship/libultra.h>
-#include "ui_visibility.h"
 #include "global.h"
 #include "vt.h"
 
@@ -1786,14 +1785,12 @@ void Select_Draw(SelectContext* this) {
     SET_FULLSCREEN_VIEWPORT(&this->view);
     func_800AAA50(&this->view, 0xF);
 
-    OotUiDrawScope uiScope = OotUi_BeginDraw(gfxCtx);
     if (!this->state.running) {
         Select_DrawLoadingScreen(this);
     } else {
         Select_DrawMenu(this);
     }
 
-    OotUi_EndDraw(gfxCtx, uiScope);
     CLOSE_DISPS(gfxCtx);
 }
 

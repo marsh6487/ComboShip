@@ -25,7 +25,9 @@ u8 Seasons_IsDrawn(void) {
 }
 
 u8 Seasons_WalksOnWater(void) {
-    return MMWeather_Season() == SEASON_WINTER;
+    // Saved Rod gameplay applies to temple pools too. Outdoor presentation
+    // can be disabled or manually previewed without changing water collision.
+    return (Seasons_SeasonCount() != 0) && (Seasons_GetSeason() == SEASON_WINTER);
 }
 
 static void Seasons_Stow(PlayState* play, Player* player) {

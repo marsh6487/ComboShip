@@ -30,6 +30,7 @@ s32 gScreenWidth = SCREEN_WIDTH, gScreenHeight = SCREEN_HEIGHT;
 static Gfx work[512], opa[512], xlu[512], overlay[512];
 static Mtx matrix;
 static unsigned fileUpdates, fileDraws, pulses, warnings, innerDraws;
+static unsigned selectMenuDraws, selectLoadingDraws;
 static s16 sWindowContentColors[2][3];
 static s16 sScreenFillAlpha = 100;
 static Gfx sScreenFillSetupDL[] = {gsSPEndDisplayList()};
@@ -76,6 +77,16 @@ Gfx *Graph_BranchDlist(Gfx *branch, Gfx *target) {
   return branch;
 }
 void Gfx_SetupFrame(GraphicsContext *gfx, u8 r, u8 g, u8 b) { gfx->work.p++; }
+void View_SetViewport(View *view, Viewport *viewport) {}
+void func_800AAA50(View *view, s32 arg) {}
+void Select_DrawMenu(SelectContext *select) {
+  ++selectMenuDraws;
+  ++select->state.gfxCtx->overlay.p;
+}
+void Select_DrawLoadingScreen(SelectContext *select) {
+  ++selectLoadingDraws;
+  ++select->state.gfxCtx->overlay.p;
+}
 void Gfx_SetupDL_39Opa(GraphicsContext *gfx) {}
 void Gfx_SetupDL_25Xlu(GraphicsContext *gfx) {}
 Gfx *Gfx_SetupDL_64(Gfx *pointer) { return pointer; }
@@ -165,7 +176,7 @@ int main(void) {
     Title_Draw(&boot);
     REQUIRE(titleYaw == 300 * mode);
     REQUIRE(gfx.polyXlu.p > xlu); /* Boot transition fade remains. */
-    REQUIRE(hidden ? gfx.polyOpa.p == opa : gfx.polyOpa.p > opa);
+    REQUIRE(gfx.polyOpa.p > opa); /* Startup navigation remains visible. */
     EndTitle title = {0};
     reset(&gfx);
     EndTitle_DrawFull(&title.actor, &play);
@@ -202,8 +213,19 @@ int main(void) {
     reset(&gfx);
     EnMag_Draw(&mag.actor, &play);
     REQUIRE(mag.effectScroll == 1);
-    REQUIRE(hidden ? gfx.overlay.p == overlay : gfx.overlay.p > overlay);
-    REQUIRE(hidden ? gfx.polyOpa.p == opa : gfx.polyOpa.p > opa);
+    REQUIRE(gfx.overlay.p > overlay && gfx.polyOpa.p > opa);
+    REQUIRE(hidden == mode); /* Navigation must not change the chosen UI state. */
+    for (unsigned running = 0; running < 2; ++running) {
+      SelectContext select = {0};
+      select.state.gfxCtx = &gfx;
+      select.state.running = running;
+      reset(&gfx);
+      Select_Draw(&select);
+      REQUIRE(gfx.work.p == work + 1 && gfx.overlay.p > overlay);
+      REQUIRE(selectMenuDraws == mode + running);
+      REQUIRE(selectLoadingDraws == mode + 1);
+      REQUIRE(hidden == mode);
+    }
     for (unsigned menu = 0; menu < 3; ++menu) {
       static FileChooseContext file;
       memset(&file, 0, sizeof(file));
@@ -216,10 +238,10 @@ int main(void) {
       FileChoose_Main(&file.state);
       REQUIRE(file.windowAlpha == 1 && file.highlightColor[3] == 1 &&
               file.stickXDir == 1);
-      REQUIRE(gfx.work.p == work + 1 + !hidden); /* Frame setup retained. */
-      REQUIRE(hidden ? gfx.overlay.p == overlay : gfx.overlay.p > overlay);
-      REQUIRE(hidden ? gfx.polyXlu.p == xlu : gfx.polyXlu.p > xlu);
-      REQUIRE(gfx.polyOpa.p > opa); /* Scene fade survives UI suppression. */
+      REQUIRE(gfx.work.p == work + 2); /* Frame setup and menu both remain. */
+      REQUIRE(gfx.overlay.p > overlay && gfx.polyXlu.p > xlu);
+      REQUIRE(gfx.polyOpa.p > opa); /* Menu and scene fade both remain. */
+      REQUIRE(hidden == mode);
       bool fadeFound = false;
       for (Gfx *command = opa; command < gfx.polyOpa.p; ++command)
         fadeFound |= (command->words.w0 >> 24) == G_FILLRECT;
@@ -228,7 +250,8 @@ int main(void) {
   }
   reset(&gfx); /* Assert the final native marker pairs too. */
   REQUIRE(innerDraws == 2 && fileUpdates == 6 && fileDraws == 6 &&
-          pulses == 6 && warnings == 6);
-  puts("PASS OoT reticle/title/file-select: hidden draws retain state, marker "
-       "pairs, physical Triforce and fades");
+          pulses == 6 && warnings == 6 && selectMenuDraws == 2 &&
+          selectLoadingDraws == 2);
+  puts("PASS OoT startup/title/file-select/debug-select stay visible while hidden; "
+       "gameplay suppression, draw state, markers, physical Triforce and fades preserved");
 }
