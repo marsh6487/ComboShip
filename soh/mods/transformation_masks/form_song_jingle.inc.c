@@ -120,7 +120,7 @@ static f32 FormJingle_TicksPerUpdate(u8 tempo) {
 
 void FormJingle_Stop(void) {
     if (sFormJingle.active) {
-        MmGakki_StopNote();
+        MmGakki_StopJingleNote();
     }
     sFormJingle.active = 0;
     sFormJingle.sounding = 0;

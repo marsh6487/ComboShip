@@ -1471,13 +1471,24 @@ typedef struct {
     u8 gerudoQuadDamage;
 
     // Gakki (instrument) state — form-specific ocarina override (from MM z_player.c D_8085D17C)
-    u8 gakkiActive;                      // 0=inactive, 1=start anim, 2=playing loop, 3=ending
+    u8 gakkiActive;                      // 0=inactive, 1=start anim, 2=instrument out, 3=ending
     LinkAnimationHeader* gakkiStartAnim; // Loaded per-form gakkistart
     LinkAnimationHeader* gakkiPlayAnim;  // Loaded per-form gakkiplay
-    Vec3f gakkiScale0;                   // Container/base instrument scale (keyframe interp)
-    Vec3f gakkiScale1;                   // Per-piece instrument scale
-    f32 gakkiPieceScales[5];             // Per-piece scales (Goron drums / Deku pipes)
-    u8 gakkiLastNoteIdx;                 // Track last note to detect new presses (0xFF = none)
+    LinkAnimationHeader* gakkiGoronWaitAnim;
+    LinkAnimationHeader* gakkiDrumAnims[5]; // Native D_8085D714 button order, not clip suffix order
+    Vec3f gakkiScale0;                      // Container/base instrument scale (keyframe interp)
+    Vec3f gakkiScale1;                      // Per-piece instrument scale
+    f32 gakkiPieceScales[5];                // Individual Deku pipe inflation
+    Vec3f gakkiDrumScales[5];
+    f32 gakkiDrumFrames[5];
+    s8 gakkiDrumButton[2]; // Independently active left/right arm strikes, -1 = waiting
+    // Link frame loads include an extra s16 face channel after the joint vectors.
+    // Keep both buffers alive until the animation queue's masked copies finish.
+    alignas(16) Vec3s gakkiDrumJoints[2][PLAYER_LIMB_MAX + 1];
+    u8 gakkiLastNoteIdx;      // Track last note to detect new presses (0xFF = none)
+    u8 gakkiLastButtonIdx;    // Native gesture identity is independent of pitch modifiers
+    u8 gakkiPendingButtonIdx; // An early held note waits for the opening animation
+    u8 gakkiDekuNotePulse;
 
     // Deku cheek inflation during bubble charge (from 2Ship z_player_lib.c:2434-2458)
     f32 dekuCheekScale; // Head limb scale factor (1.0 = normal, up to 1.3 when charging)
@@ -1622,14 +1633,6 @@ static GakkiKeyframe sGakkiDekuStartPieces[] = {
     { 0, { 0, 0, 0 } },       { 4, { 0, 0, 0 } },      { 6, { 120, 150, 60 } },   { 8, { 130, 80, 160 } },
     { 9, { 100, 100, 100 } }, { 10, { 90, 100, 90 } }, { 11, { 100, 100, 100 } },
 };
-// Deku Pipes — play animation: uniform scale (D_801C03A0, z_player_lib.c:1265)
-static GakkiKeyframe sGakkiDekuPlay[] = {
-    { 0, { 100, 100, 100 } },
-    { 2, { 120, 120, 120 } },
-    { 6, { 90, 90, 90 } },
-    { 7, { 93, 93, 93 } },
-};
-
 // Goron Drums — start animation: drum body scale (D_801C0428, z_player_lib.c:1283)
 static GakkiKeyframe sGakkiGoronStart[] = {
     { 0, { 0, 0, 0 } },      { 6, { 0, 0, 0 } },        { 7, { 60, 60, 50 } },     { 8, { 120, 130, 100 } },
@@ -2751,6 +2754,8 @@ static u8 MmForm_LoadFormSkeleton(PlayState* play, MmPlayerTransformation form) 
         // branches below, so a form that declares none was inheriting whichever MM
         // instrument clip the previous transformation left behind and playing it.
         gFormState.gakkiStartAnim = gFormState.gakkiPlayAnim = NULL;
+        gFormState.gakkiGoronWaitAnim = NULL;
+        memset(gFormState.gakkiDrumAnims, 0, sizeof(gFormState.gakkiDrumAnims));
         MmForm_FreeRootMotion();
 
         if (form == MM_PLAYER_FORM_GORON) {
@@ -2842,8 +2847,15 @@ static u8 MmForm_LoadFormSkeleton(PlayState* play, MmPlayerTransformation form) 
             gFormState.chestOpen = MmAnim_Load(MM_ANIM_PG_TBOX_OPEN);
 
             // Gakki (instrument) animations — Goron Drums (from 2Ship z_player.c:D_8085D17C)
-            gFormState.gakkiStartAnim = MmAnim_Load(MM_ANIM_PG_GAKKISTART); // 20 frames
-            gFormState.gakkiPlayAnim = MmAnim_Load(MM_ANIM_PG_GAKKIPLAY);   // 4 frames (play loop)
+            gFormState.gakkiStartAnim = MmAnim_Load(MM_ANIM_PG_GAKKISTART);
+            gFormState.gakkiPlayAnim = MmAnim_Load(MM_ANIM_PG_GAKKIPLAY);
+            gFormState.gakkiGoronWaitAnim = MmAnim_Load(MM_ANIM_PG_GAKKIWAIT);
+            // MM's D_8085D714 is indexed by A, C-down, C-right, C-left, C-up.
+            gFormState.gakkiDrumAnims[0] = MmAnim_Load(MM_ANIM_PG_GAKKIPLAYA);
+            gFormState.gakkiDrumAnims[1] = MmAnim_Load(MM_ANIM_PG_GAKKIPLAYL);
+            gFormState.gakkiDrumAnims[2] = MmAnim_Load(MM_ANIM_PG_GAKKIPLAYD);
+            gFormState.gakkiDrumAnims[3] = MmAnim_Load(MM_ANIM_PG_GAKKIPLAYU);
+            gFormState.gakkiDrumAnims[4] = MmAnim_Load(MM_ANIM_PG_GAKKIPLAYR);
         } else if (form == MM_PLAYER_FORM_ZORA) {
             // Zora punch combo (from 2Ship sMeleeAttackAnimInfo, z_player.c line 3575-3580)
             gFormState.punchA = MmAnim_Load(MM_ANIM_PZ_ATTACKA);
@@ -3525,6 +3537,7 @@ static void MmForm_ApplyFormProperties(Player* player, MmPlayerTransformation fo
 
 // Forward decl — definition is further down with the other SFX helpers.
 static void MmForm_StopGoronRollSfx(void);
+static void MmForm_GakkiVoiceOff(void);
 
 // True while the Goron ball owns PLAYER_STATE3_PAUSE_ACTION_FUNC. Ownership tracking
 // (the sGohtNoSnapOwned pattern from boss_remains.cpp) so the safety net only ever
@@ -3713,9 +3726,13 @@ static void MmForm_RestoreOotState(Player* player) {
     gFormState.punchTrailEffectIndexR = -1;
 
     // Cleanup gakki (instrument) state
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
     gFormState.gakkiActive = 0;
     gFormState.gakkiStartAnim = NULL;
     gFormState.gakkiPlayAnim = NULL;
+    gFormState.gakkiGoronWaitAnim = NULL;
+    memset(gFormState.gakkiDrumAnims, 0, sizeof(gFormState.gakkiDrumAnims));
 
     // Cleanup boomerang (En_Boom actors self-destruct, just clear our tracking)
     gFormState.boomerangHoldTimer = 0;
@@ -5746,6 +5763,7 @@ static u8 MmForm_CheckDamage(Player* player, PlayState* play) {
     MmForm_KillTrail(play, &gFormState.punchTrailEffectIndexR, &gFormState.punchTrailActiveR);
 
     // Clean up gakki (instrument) state — damage interrupts ocarina
+    MmForm_GakkiVoiceOff();
     gFormState.gakkiActive = 0;
 
     // Clean up ledge climb state — damage interrupts the climb
@@ -11972,6 +11990,64 @@ extern "C" void Player_Action_8084E3C4(Player* this_, PlayState* play);
 extern "C" void Player_Action_Idle(Player* this_, PlayState* play);
 extern "C" s32 Player_SetupAction(PlayState* play, Player* this_, void (*actionFunc)(Player*, PlayState*), s32 flags);
 
+static u8 MmForm_GakkiUsesNativeGestures(void) {
+    return gFormState.currentForm >= MM_PLAYER_FORM_GORON && gFormState.currentForm <= MM_PLAYER_FORM_DEKU;
+}
+
+static void MmForm_GakkiResetVisualState(void) {
+    gFormState.gakkiLastButtonIdx = OCARINA_BTN_INVALID;
+    gFormState.gakkiPendingButtonIdx = OCARINA_BTN_INVALID;
+    gFormState.gakkiDekuNotePulse = 0;
+    gFormState.gakkiDrumButton[0] = gFormState.gakkiDrumButton[1] = -1;
+    for (s32 i = 0; i < 5; i++) {
+        gFormState.gakkiDrumFrames[i] = 8.0f;
+        gFormState.gakkiDrumScales[i] = { 1.0f, 1.0f, 1.0f };
+    }
+}
+
+// MM's func_80851F18 layers each strike over pg_gakkiwait, copying only
+// D_8085BA08/D_8085BA20's three arm joints. Opposite arms can finish independently.
+static void MmForm_GakkiUpdateNativeGestures(PlayState* play) {
+    if (gFormState.currentForm == MM_PLAYER_FORM_GORON && gFormState.gakkiGoronWaitAnim != NULL) {
+        static u8 sArmMasks[2][PLAYER_LIMB_MAX] = {
+            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0 },
+        };
+        SkelAnime* skelAnime = &gFormState.formSkelAnime;
+        for (s32 arm = 0; arm < 2; arm++) {
+            s32 button = gFormState.gakkiDrumButton[arm];
+            if (button >= 0 && button < 5 && gFormState.gakkiDrumAnims[button] != NULL &&
+                skelAnime->limbCount <= PLAYER_LIMB_MAX) {
+                LinkAnimationHeader* anim = gFormState.gakkiDrumAnims[button];
+                s32 frame = MIN((s32)gFormState.gakkiDrumFrames[button], Animation_GetLastFrame(anim));
+                AnimationContext_SetLoadFrame(play, anim, frame, skelAnime->limbCount, gFormState.gakkiDrumJoints[arm]);
+                AnimationContext_SetCopyTrue(play, skelAnime->limbCount, skelAnime->jointTable,
+                                             gFormState.gakkiDrumJoints[arm], sArmMasks[arm]);
+            }
+        }
+        for (s32 i = 0; i < 5; i++) {
+            gFormState.gakkiDrumFrames[i] += 1.0f;
+            if (gFormState.gakkiDrumFrames[i] >= 9.0f) {
+                gFormState.gakkiDrumFrames[i] = 8.0f;
+                for (s32 arm = 0; arm < 2; arm++) {
+                    if (gFormState.gakkiDrumButton[arm] == i) {
+                        gFormState.gakkiDrumButton[arm] = -1;
+                    }
+                }
+            }
+        }
+    } else if (gFormState.currentForm == MM_PLAYER_FORM_DEKU) {
+        // A new note holds its selected pipe at 1.2 for this frame. Other frames
+        // use MM's func_80851D30 relaxation, including while a note is held.
+        if (!gFormState.gakkiDekuNotePulse) {
+            for (s32 i = 0; i < 5; i++) {
+                Math_StepToF(&gFormState.gakkiPieceScales[i], 1.0f, 0.04000001f);
+            }
+        }
+        gFormState.gakkiDekuNotePulse = 0;
+    }
+}
+
 // Interpolate per-form instrument scales based on current gakki phase and frame.
 // From MM z_player_lib.c PostLimbDraw: each phase uses different keyframe arrays.
 static void MmForm_GakkiInterpScales(f32 curFrame) {
@@ -11983,6 +12059,9 @@ static void MmForm_GakkiInterpScales(f32 curFrame) {
             if (form == MM_PLAYER_FORM_GORON) {
                 // Goron: single drum body scale (D_801C0428)
                 GakkiKeyframe_Interp(sGakkiGoronStart, curFrame, &gFormState.gakkiScale0);
+                for (s32 i = 0; i < 5; i++) {
+                    gFormState.gakkiDrumScales[i] = gFormState.gakkiScale0;
+                }
             } else if (form == MM_PLAYER_FORM_ZORA) {
                 // Zora: guitar scale (D_801C0538)
                 GakkiKeyframe_Interp(sGakkiZoraStart, curFrame, &gFormState.gakkiScale0);
@@ -12003,21 +12082,27 @@ static void MmForm_GakkiInterpScales(f32 curFrame) {
 
         case 2: // gakkiplay — instruments active, rhythmic scaling
             if (form == MM_PLAYER_FORM_GORON) {
-                // Goron: drum body pulse (D_801C0490)
-                GakkiKeyframe_Interp(sGakkiGoronPlay, curFrame, &gFormState.gakkiScale0);
+                if (gFormState.gakkiGoronWaitAnim != NULL) {
+                    gFormState.gakkiScale0 = { 1.0f, 1.0f, 1.0f };
+                    for (s32 i = 0; i < 5; i++) {
+                        GakkiKeyframe_Interp(sGakkiGoronWait, gFormState.gakkiDrumFrames[i],
+                                             &gFormState.gakkiDrumScales[i]);
+                    }
+                } else {
+                    // Missing optional wait clip: retain the existing full-body play fallback.
+                    GakkiKeyframe_Interp(sGakkiGoronPlay, curFrame, &gFormState.gakkiScale0);
+                    for (s32 i = 0; i < 5; i++) {
+                        gFormState.gakkiDrumScales[i] = gFormState.gakkiScale0;
+                    }
+                }
             } else if (form == MM_PLAYER_FORM_ZORA) {
                 // Zora: guitar strum bounce (D_801C0560)
                 GakkiKeyframe_Interp(sGakkiZoraPlay, curFrame, &gFormState.gakkiScale0);
             } else if (form == MM_PLAYER_FORM_DEKU) {
-                // Deku: per-pipe scale (D_801C03A0, uniform)
-                Vec3f pipeScale;
-                GakkiKeyframe_Interp(sGakkiDekuPlay, curFrame, &pipeScale);
+                // Individual pipe scales belong to the note controller, not the body clip.
                 gFormState.gakkiScale0.x = 1.0f;
                 gFormState.gakkiScale0.y = 1.0f;
                 gFormState.gakkiScale0.z = 1.0f;
-                for (s32 i = 0; i < 5; i++) {
-                    gFormState.gakkiPieceScales[i] = pipeScale.x;
-                }
             }
             break;
     }
@@ -12035,6 +12120,12 @@ static void MmForm_GakkiTickVoice(void) {
     switch (MmGakki_GetVoiceType(gFormState.currentForm)) {
         case GAKKI_VOICE_MM_FONT:
             Audio_StopSfxById(NA_SE_OC_OCARINA);
+            if (AudioOcarina_IsInstrumentSfxMuted()) {
+                // The bank can be muted between note callbacks when recognition
+                // hands sound to a fanfare. Stop an already-held direct note too.
+                MmGakki_StopNote();
+                gFormState.gakkiLastNoteIdx = OCARINA_PITCH_NONE;
+            }
             break;
         case GAKKI_VOICE_NATIVE:
             AudioOcarina_SetInstrument((u8)MmGakki_GetNativeInstrument(gFormState.currentForm));
@@ -12047,22 +12138,18 @@ static void MmForm_GakkiTickVoice(void) {
 // Voice teardown when the instrument goes away.
 static void MmForm_GakkiVoiceOff(void) {
     MmGakki_StopNote();
-    if (MmGakki_GetVoiceType(gFormState.currentForm) == GAKKI_VOICE_NATIVE) {
-        // Defensive: the message system also resets to DEFAULT on close, but if gakki dies
-        // through any other path (damage, form change) the flute must not stick.
+    if (gFormState.gakkiActive != 0 && MmGakki_GetVoiceType(gFormState.currentForm) == GAKKI_VOICE_NATIVE &&
+        AudioOcarina_GetInstrumentId() != OCARINA_INSTRUMENT_OFF &&
+        AudioOcarina_GetInstrumentId() == MmGakki_GetNativeInstrument(gFormState.currentForm)) {
+        // Restore only a native voice this session still owns. SetInstrument(DEFAULT)
+        // re-enables the engine and ducks BGM, so never call it after the host went OFF.
         AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_DEFAULT);
     }
+    gFormState.gakkiLastNoteIdx = OCARINA_PITCH_NONE;
+    MmForm_GakkiResetVisualState();
 }
 
-// Play the form's gakki animation ONCE, from the top — MM's per-note strum/blow/hit.
-// MM (func_80852290, Zora/Deku): the play animation is parked frozen on frame 0 and only
-// runs when a note is actually pressed:
-//     Player_Anim_PlayOnceAdjusted(play, this, D_8085D190[this->transformation]);
-// The Goron is richer still — MM keeps him on gPlayerAnim_pg_gakkiwait and blends
-// per-button drum-hit clips (gakkiplayA/L/D/U/R via D_8085D714 + func_80851EC8/F18) so the
-// correct hand strikes the correct drum. We have neither the wait clip nor the five hit
-// clips imported yet, so every form uses the single-clip behaviour here; when those
-// animations exist, this is the one place that needs to branch per form.
+// Existing generic custom-form gesture and the fallback for a missing native wait clip.
 static void MmForm_GakkiPlayNoteAnim(void) {
     if (gPlayState == NULL || gFormState.gakkiPlayAnim == NULL) {
         return; // voice-only form (Garo/Gerudo): keeps its own pose, by design
@@ -12080,6 +12167,52 @@ static void MmForm_GakkiPlayNoteAnim(void) {
     }
     LinkAnimation_Change(gPlayState, &gFormState.formSkelAnime, gFormState.gakkiPlayAnim, 1.0f, 0.0f, last,
                          ANIMMODE_ONCE, -4.0f);
+}
+
+// Return true when the native form owns this visual event. Audio keeps its exact
+// pitch/bend; only the current engine button selects a drum or pipe. A sharp/flat
+// change on a held button therefore never chooses a different limb or restarts a hit.
+static u8 MmForm_GakkiDriveNativeNote(u8 button, u8 forceAttack) {
+    if (!MmForm_GakkiUsesNativeGestures()) {
+        return 0;
+    }
+    if (button >= 5) {
+        gFormState.gakkiLastButtonIdx = OCARINA_BTN_INVALID;
+        gFormState.gakkiPendingButtonIdx = OCARINA_BTN_INVALID;
+        return 1;
+    }
+    u8 isNewButton = forceAttack || button != gFormState.gakkiLastButtonIdx;
+    gFormState.gakkiLastButtonIdx = button;
+    if (gFormState.gakkiActive == 1) {
+        // The host may accept input before the longer form opening has finished.
+        // Keep the most recent held button without replacing gakkistart's pose.
+        gFormState.gakkiPendingButtonIdx = button;
+        return 1;
+    }
+    if (gFormState.gakkiActive != 2 || !isNewButton) {
+        return 1;
+    }
+    if (gFormState.currentForm == MM_PLAYER_FORM_GORON) {
+        if (gFormState.gakkiGoronWaitAnim != NULL) {
+            static const u8 sDrumArm[5] = { 1, 1, 1, 0, 0 }; // MM D_8085D714
+            gFormState.gakkiDrumButton[sDrumArm[button]] = button;
+            gFormState.gakkiDrumFrames[button] = 3.0f;
+        } else {
+            MmForm_GakkiPlayNoteAnim();
+        }
+    } else {
+        if (gFormState.currentForm == MM_PLAYER_FORM_DEKU) {
+            gFormState.gakkiPieceScales[button] = 1.2f;
+            gFormState.gakkiDekuNotePulse = 1;
+        }
+        if (gPlayState != NULL && gFormState.gakkiPlayAnim != NULL) {
+            // MM's func_80851D30 / func_80852290 restart the native blow/strum
+            // from frame zero on each new button, then hold at the final frame.
+            LinkAnimation_Change(gPlayState, &gFormState.formSkelAnime, gFormState.gakkiPlayAnim, 1.0f, 0.0f,
+                                 Animation_GetLastFrame(gFormState.gakkiPlayAnim), ANIMMODE_ONCE, 0.0f);
+        }
+    }
+    return 1;
 }
 
 // MM_FONT note driver. GameInteractor_ExecuteOnOcarinaNote fires from INSIDE AudioOcarina
@@ -12146,18 +12279,24 @@ extern "C" void* MmForm_KafeiWhistleHandDL(const char* otrPath) {
 // button, or the ocarina replaying a song at them. Everything below the gakkiActive gate
 // is identical for both, which is why they share this instead of the driver being written
 // twice.
-static void MmForm_GakkiDriveNote(uint8_t pitch, float bendFreq) {
+static void MmForm_GakkiDriveNote(uint8_t pitch, float bendFreq, u8 forceAttack) {
+    // Explicit OFF, replay rest/end, and live release all stop only our direct voice.
+    // Do this before the phase guard: interruption may already have cleared the pose.
+    if (pitch == OCARINA_PITCH_NONE) {
+        MmGakki_StopNote();
+        gFormState.gakkiLastNoteIdx = OCARINA_PITCH_NONE;
+        MmForm_GakkiDriveNativeNote(OCARINA_BTN_INVALID, 0);
+        return;
+    }
     if (gFormState.gakkiActive != 1 && gFormState.gakkiActive != 2) {
         return;
     }
 
     const s32 voice = MmGakki_GetVoiceType(gFormState.currentForm);
-    const u8 isNewNote = (pitch != 0xFF /* OCARINA_PITCH_NONE */) && (pitch != gFormState.gakkiLastNoteIdx);
+    const u8 isNewNote = forceAttack || pitch != gFormState.gakkiLastNoteIdx;
 
-    // Animation first, for EVERY voiced form (native flute included): MM plays the
-    // gakki animation once per note press (func_80852290 →
-    // Player_Anim_PlayOnceAdjusted) and leaves it frozen otherwise.
-    if (isNewNote) {
+    u8 button = forceAttack ? AudioOcarina_GetPlaybackButtonIndex() : AudioOcarina_GetCurrentButtonIndex();
+    if (!MmForm_GakkiDriveNativeNote(button, forceAttack) && isNewNote) {
         MmForm_GakkiPlayNoteAnim();
     }
 
@@ -12169,20 +12308,22 @@ static void MmForm_GakkiDriveNote(uint8_t pitch, float bendFreq) {
     }
 
     Audio_StopSfxById(NA_SE_OC_OCARINA);
+    if (AudioOcarina_IsInstrumentSfxMuted()) {
+        // A recognized song's fanfare owns sound while the native ocarina bank is
+        // muted. Keep the visual event above, but do not double its instrument.
+        MmGakki_StopNote();
+        gFormState.gakkiLastNoteIdx = OCARINA_PITCH_NONE;
+        return;
+    }
 
     Player* player = (gPlayState != NULL) ? GET_PLAYER(gPlayState) : NULL;
     Vec3f* pos = (player != NULL) ? &player->actor.projectedPos : NULL;
 
-    if (pitch == 0xFF /* OCARINA_PITCH_NONE */) {
-        if (gFormState.gakkiLastNoteIdx != 0xFF) {
-            MmGakki_StopNote(); // note-off on release, like MM
-        }
-        gFormState.gakkiLastNoteIdx = 0xFF;
-    } else if (isNewNote) {
+    if (isNewNote) {
         MmGakki_PlayPitch(gFormState.currentForm, pitch, bendFreq, pos);
         gFormState.gakkiLastNoteIdx = pitch;
     } else {
-        MmGakki_RefreshNote(); // held note, re-asserted so a stop cannot land on it
+        MmGakki_UpdatePitch(pitch, bendFreq); // held note: retain its sample/envelope, update bend
     }
 }
 
@@ -12198,7 +12339,7 @@ static void MmForm_RegisterOcarinaNoteHook(void) {
     // the replay is heard in the form's voice; a NATIVE form gets that from the
     // SetInstrument in z_message_PAL.c, and an MM_FONT one can only get it from here.
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOcarinaPlaybackNote>(
-        [](uint8_t pitch, float bendFreq) { MmForm_GakkiDriveNote(pitch, bendFreq); });
+        [](uint8_t pitch, float bendFreq) { MmForm_GakkiDriveNote(pitch, bendFreq, 1); });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOcarinaNote>([](uint8_t pitch, float bendFreq,
                                                                                  int8_t instrumentId) {
@@ -12222,7 +12363,7 @@ static void MmForm_RegisterOcarinaNoteHook(void) {
             sKafeiNotePulse = 1;
         }
 
-        MmForm_GakkiDriveNote(pitch, bendFreq);
+        MmForm_GakkiDriveNote(pitch, bendFreq, 0);
     });
 }
 
@@ -12456,10 +12597,27 @@ static void MmForm_UpdateSkinOcarinaVoice(Player* player, PlayState* play) {
     }
 }
 
+static void MmForm_GakkiStartPlayAnimation(PlayState* play) {
+    u8 goronWait = gFormState.currentForm == MM_PLAYER_FORM_GORON && gFormState.gakkiGoronWaitAnim != NULL;
+    LinkAnimationHeader* anim = goronWait ? gFormState.gakkiGoronWaitAnim : gFormState.gakkiPlayAnim;
+    if (anim != NULL) {
+        LinkAnimation_Change(play, &gFormState.formSkelAnime, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim),
+                             goronWait ? ANIMMODE_LOOP : ANIMMODE_ONCE, -6.0f);
+        if (!goronWait) {
+            gFormState.formSkelAnime.playSpeed = 0.0f;
+        }
+    }
+    gFormState.gakkiScale0 = { 1.0f, 1.0f, 1.0f };
+    for (s32 i = 0; i < 5; i++) {
+        gFormState.gakkiPieceScales[i] = 1.0f;
+    }
+}
+
 static void MmForm_EnterGakki(Player* player, PlayState* play) {
     MmForm_RegisterOcarinaNoteHook();
 
     gFormState.gakkiLastNoteIdx = 0xFF; // No note playing yet
+    MmForm_GakkiResetVisualState();
 
     if (gFormState.gakkiStartAnim == NULL) {
         gFormState.gakkiActive = 2; // nothing to draw the instrument with
@@ -12468,11 +12626,7 @@ static void MmForm_EnterGakki(Player* player, PlayState* play) {
         // standing there and only snapped into the pose on the first note. Park on frame
         // 0 of the play clip with the speed at zero: the same place a form with a draw
         // clip lands once that clip ends.
-        if (gFormState.gakkiPlayAnim != NULL && gPlayState != NULL) {
-            LinkAnimation_Change(gPlayState, &gFormState.formSkelAnime, gFormState.gakkiPlayAnim, 1.0f, 0.0f,
-                                 Animation_GetLastFrame(gFormState.gakkiPlayAnim), ANIMMODE_ONCE, -6.0f);
-            gFormState.formSkelAnime.playSpeed = 0.0f;
-        }
+        MmForm_GakkiStartPlayAnimation(play);
         MMFORM_LOG("[MmForm] Gakki enter (no draw clip): form=%d posed=%d", gFormState.currentForm,
                    (s32)(gFormState.gakkiPlayAnim != NULL));
         return;
@@ -12502,29 +12656,12 @@ static void MmForm_UpdateGakki(Player* player, PlayState* play) {
             // Check if start anim finished (from MM Player_Action_63 line 17418)
             if (animDone) {
                 gFormState.gakkiActive = 2;
-                // MM func_808525C4 does NOT loop the play animation: for Zora and Deku it calls
-                // Player_Anim_PlayOnceFreeze(D_8085D190[form]), which is
-                // PlayerAnimation_Change(..., startFrame 0, endFrame 0, ANIMMODE_ONCE) — the
-                // pose sits FROZEN on frame 0. The animation only advances when you actually
-                // press a note (func_80852290 fires Player_Anim_PlayOnceAdjusted on
-                // OCARINA_MODE_ACTIVE + a valid ocarinaButtonIndex). Looping it here made the
-                // forms mime playing non-stop.
-                if (gFormState.gakkiPlayAnim != NULL) {
-                    // Arm the play clip but STOP it, rather than parking it on frame 0.
-                    // Frame 0 is the clip's rest pose, so a plain Change() here yanks the
-                    // form back to it the instant the draw-instrument animation ends and
-                    // again after every note - the pose that reads as broken. playSpeed 0
-                    // holds whatever frame is on screen until a note moves it.
-                    LinkAnimation_Change(play, &gFormState.formSkelAnime, gFormState.gakkiPlayAnim, 1.0f, 0.0f,
-                                         Animation_GetLastFrame(gFormState.gakkiPlayAnim), ANIMMODE_ONCE, -6.0f);
-                    gFormState.formSkelAnime.playSpeed = 0.0f;
-                }
-                // Set scales to 1.0 for play mode
-                gFormState.gakkiScale0.x = 1.0f;
-                gFormState.gakkiScale0.y = 1.0f;
-                gFormState.gakkiScale0.z = 1.0f;
-                for (s32 i = 0; i < 5; i++) {
-                    gFormState.gakkiPieceScales[i] = 1.0f;
+                // MM func_808525C4: Goron waits in a loop; Deku/Zora hold the
+                // play clip's initial pose until an actual note starts it.
+                MmForm_GakkiStartPlayAnimation(play);
+                if (gFormState.gakkiPendingButtonIdx < 5) {
+                    MmForm_GakkiDriveNativeNote(gFormState.gakkiPendingButtonIdx, 1);
+                    gFormState.gakkiPendingButtonIdx = OCARINA_BTN_INVALID;
                 }
                 MMFORM_LOG("[MmForm] Gakki: start→play");
             }
@@ -12532,6 +12669,7 @@ static void MmForm_UpdateGakki(Player* player, PlayState* play) {
         }
 
         case 2: { // Instrument out; the clip only moves while notes are played
+            MmForm_GakkiUpdateNativeGestures(play);
             MmForm_GakkiInterpScales(curFrame);
             MmForm_GakkiTickVoice();
             // Stop at the end rather than letting it reset: the pose has to stay on the
@@ -12554,8 +12692,8 @@ static void MmForm_UpdateGakki(Player* player, PlayState* play) {
             // Reverse animation: curFrame goes from lastFrame toward 0
             // Done when LinkAnimation_Update returns true (reached endFrame=0)
             if (animDone || curFrame <= 0.5f) {
-                gFormState.gakkiActive = 0;
                 MmForm_GakkiVoiceOff();
+                gFormState.gakkiActive = 0;
                 MMFORM_LOG("[MmForm] Gakki: exit done");
             }
             break;
@@ -12574,8 +12712,8 @@ static void MmForm_ExitGakki(Player* player, PlayState* play) {
         gFormState.gakkiActive = 0;
         return;
     }
+    MmForm_GakkiVoiceOff();
     gFormState.gakkiActive = 3;
-    MmSfx_Stop(0x5800); // Stop any playing gakki note
     f32 lastFrame = Animation_GetLastFrame(gFormState.gakkiStartAnim);
     // Play gakkistart in reverse: negative speed, from lastFrame to 0
     // From MM: Player_Anim_PlayOnceAdjustedReverse(D_8085D17C[transformation])
@@ -15124,8 +15262,27 @@ static u8 MmForm_UsesOotAnim(void) {
 // Draw System
 // =============================================================================
 
+static u8 MmForm_GakkiZoraGuitarVisible(void) {
+    if (gFormState.currentForm != MM_PLAYER_FORM_ZORA || gFormState.gakkiActive == 0) {
+        return 0;
+    }
+    // MM only substitutes the guitar hand from frame six of gakkistart.
+    // The same threshold applies while that clip runs backward on put-away.
+    return gFormState.gakkiActive == 2 || gFormState.formSkelAnime.curFrame >= 6.0f;
+}
+
+static void MmForm_GakkiOverrideZoraHand(s32 limbIndex, Gfx** dList) {
+    if (limbIndex == PLAYER_LIMB_L_HAND && MmForm_GakkiZoraGuitarVisible()) {
+        // PostLimbDraw emits both the guitar and its authored grip hand at the
+        // scaled hand matrix. The ordinary open-hand mesh must not overlap it.
+        *dList = NULL;
+    }
+}
+
 static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
     Player* player = (Player*)thisx;
+
+    MmForm_GakkiOverrideZoraHand(limbIndex, dList);
 
     // Sheik's harp is held in bare wings: both hands go, and with the right one goes OoT's
     // ocarina, which is modelled INTO that hand's list rather than beside it. This is why
@@ -15375,11 +15532,26 @@ static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
                 *dList = fdDL;
             }
         } else if (limbIndex == PLAYER_LIMB_R_HAND) {
-            // Right hand: show FD empty hand when in sword stance (no shield for FD).
-            // For other items (hammer etc.), let OOT's right hand DL through.
-            if (sNativeMaskCs.active || player->leftHandType == PLAYER_MODELTYPE_LH_SWORD ||
-                player->leftHandType == PLAYER_MODELTYPE_LH_SWORD_2 ||
-                player->leftHandType == PLAYER_MODELTYPE_LH_BGS || player->leftHandType == PLAYER_MODELTYPE_LH_OPEN) {
+            if (!sNativeMaskCs.active &&
+                (player->rightHandType == PLAYER_MODELTYPE_RH_OCARINA ||
+                 player->rightHandType == PLAYER_MODELTYPE_RH_OOT) &&
+                player->rightHandDLists != NULL) {
+                // The form skeleton bypasses OoT's limb callback. Reuse the
+                // age/item-selected ordinary ocarina hand through normal resource
+                // resolution, so its current native/Alt asset remains authoritative.
+                Gfx* hand = player->rightHandDLists[0]; // form skeleton uses near LOD
+                if (hand != NULL) {
+                    Gfx* resolved =
+                        ResourceMgr_OTRSigCheck((char*)hand) ? ResourceMgr_LoadGfxByName((const char*)hand) : hand;
+                    if (resolved != NULL) {
+                        *dList = resolved;
+                    }
+                }
+            } else if (sNativeMaskCs.active || player->leftHandType == PLAYER_MODELTYPE_LH_SWORD ||
+                       player->leftHandType == PLAYER_MODELTYPE_LH_SWORD_2 ||
+                       player->leftHandType == PLAYER_MODELTYPE_LH_BGS ||
+                       player->leftHandType == PLAYER_MODELTYPE_LH_OPEN) {
+                // No held shield in FD's sword or empty-hand stance.
                 Gfx* fdDL = MmForm_GetFDHandDL(play, FD_DL_RIGHT_HAND_EMPTY);
                 if (fdDL != NULL) {
                     *dList = fdDL;
@@ -16547,17 +16719,15 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
             gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gLinkGoronDrumContainerDL);
             Matrix_Pop();
 
-            // Draw 5 drum skin pieces (from MM D_801C0DF0[])
-            // In Phase 1, all pieces use the same scale as the container.
-            // (Full per-piece scale requires Goron drum hit system with AnimTaskQueue blending.)
+            // Draw 5 drum skins with MM's independent per-strike deformation.
             static const char* sDrumPieceDLs[5] = {
                 gLinkGoronDrumPiece1DL, gLinkGoronDrumPiece2DL, gLinkGoronDrumPiece3DL,
                 gLinkGoronDrumPiece4DL, gLinkGoronDrumPiece5DL,
             };
             for (s32 i = 0; i < 5; i++) {
                 Matrix_Push();
-                Matrix_Scale(gFormState.gakkiScale0.x, gFormState.gakkiScale0.y, gFormState.gakkiScale0.z,
-                             MTXMODE_APPLY);
+                Matrix_Scale(gFormState.gakkiDrumScales[i].x, gFormState.gakkiDrumScales[i].y,
+                             gFormState.gakkiDrumScales[i].z, MTXMODE_APPLY);
                 gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                           G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                 gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sDrumPieceDLs[i]);
@@ -16569,9 +16739,9 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
 
         // --- Zora Guitar at LEFT_HAND ---
         // From MM z_player_lib.c:2574-2587 (OverrideLimbDraw at PLAYER_LIMB_LEFT_HAND)
-        // In MM, guitar replaces the left hand DL via OverrideLimbDraw. Here we draw it
-        // as a post-limb attachment since OverrideLimbDraw is more complex to intercept.
-        if (form == MM_PLAYER_FORM_ZORA && limbIndex == PLAYER_LIMB_L_HAND) {
+        // The ordinary hand is suppressed by MmForm_GakkiOverrideZoraHand.
+        // MM draws the guitar and its dedicated grip hand as separate lists.
+        if (limbIndex == PLAYER_LIMB_L_HAND && MmForm_GakkiZoraGuitarVisible()) {
             // Only draw when scale is non-zero (guitar scales in during gakkistart frame 6+)
             if (gFormState.gakkiScale0.x > 0.01f) {
                 OPEN_DISPS(play->state.gfxCtx);
@@ -16582,6 +16752,7 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
                 gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                           G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                 gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gLinkZoraGuitarDL);
+                gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gLinkZoraGuitarHandDL);
                 Matrix_Pop();
 
                 CLOSE_DISPS(play->state.gfxCtx);
@@ -16634,6 +16805,8 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
 // =============================================================================
 
 static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformation form) {
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
     // 1. Clear stale pointers from previous scene
     MmForm_ClearCachedDLs();
     MmForm_UnpinFormResources();
@@ -16655,6 +16828,8 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
     gFormState.gakkiActive = 0;
     gFormState.gakkiStartAnim = NULL;
     gFormState.gakkiPlayAnim = NULL;
+    gFormState.gakkiGoronWaitAnim = NULL;
+    memset(gFormState.gakkiDrumAnims, 0, sizeof(gFormState.gakkiDrumAnims));
     gFormState.formDLsPinned = 0;
     gFormState.skeletonLoaded = 0;
 
@@ -16754,6 +16929,9 @@ extern "C" {
 
 void MmForm_Init(PlayState* play, Player* player) {
     MmForm_InterruptNativeMaskForScene(player, play, 1);
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
+    gFormState.gakkiActive = 0;
     MmForm_StopGoronRollSfx();
     MmForm_RegisterGoronRollSfxCleanup();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
@@ -19215,6 +19393,9 @@ void MmForm_Draw(PlayState* play, Player* player) {
 // the form's strength override (Goron=3, Zora=1, Deku=0) baked into the save.
 void MmForm_OnDeath(void) {
     MmForm_CancelNativeMaskCutscene(1);
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
+    gFormState.gakkiActive = 0;
     MmForm_StopGoronRollSfx();
     // 1. Restore extended equipment from the transform backup. Must run BEFORE
     //    MmForm_Reset (which would otherwise clear the backup unconditionally).
@@ -19257,6 +19438,9 @@ void MmForm_OnDeath(void) {
 
 void MmForm_Reset(void) {
     MmForm_CancelNativeMaskCutscene(0);
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
+    gFormState.gakkiActive = 0;
     MmForm_StopGoronRollSfx();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
@@ -19346,6 +19530,8 @@ void MmForm_Reset(void) {
         gFormState.gakkiActive = 0;
         gFormState.gakkiStartAnim = NULL;
         gFormState.gakkiPlayAnim = NULL;
+        gFormState.gakkiGoronWaitAnim = NULL;
+        memset(gFormState.gakkiDrumAnims, 0, sizeof(gFormState.gakkiDrumAnims));
         memset(&gFormState.gakkiScale0, 0, sizeof(Vec3f));
         memset(&gFormState.gakkiScale1, 0, sizeof(Vec3f));
         memset(gFormState.gakkiPieceScales, 0, sizeof(gFormState.gakkiPieceScales));

@@ -430,7 +430,13 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
 }
 
 inline void from_json(const json& j, RandoSaveInfo& rando) {
-    j.at("randoInf").get_to(rando.randoInf);
+    // Ownership flags are append-only, just like checks and options. Old saves
+    // must clear absent words even when loading into a reused nonzero context.
+    const auto savedInf = j.at("randoInf").get<std::vector<u16>>();
+    memset(rando.randoInf, 0, sizeof(rando.randoInf));
+    for (size_t i = 0; i < savedInf.size() && i < ARRAY_COUNT(rando.randoInf); ++i) {
+        rando.randoInf[i] = savedInf[i];
+    }
     j.at("randoEvents").get_to(rando.randoEvents);
     // Check IDs are append-only. Old saves have a shorter array; future saves
     // may have a longer one. Preserve known checks and default absent additions.

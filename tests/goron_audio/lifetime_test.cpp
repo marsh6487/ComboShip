@@ -57,7 +57,7 @@ extern "C" void DinFireSword_FinishForget(PlayState* state, Actor* actor) {
     ++finishForgetCalls;
 }
 static struct {
-    int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction;
+    int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction, gakkiActive;
     int cutsceneTimer, cutscenePhase, flashAlpha, zoraSwimEnabled, groundPoundCrackTimer;
     int zoraMeleeActive, zoraJumpTrailActive, hazardVoidType;
     void* savedAgeProperties;
@@ -77,6 +77,10 @@ static u16 channelSfx[16];
 // this fixture keeps the real bank/dispatcher and Goron lifetime entrypoints.
 static void MmForm_InterruptNativeMaskForScene(Player*, PlayState*, u8) {}
 static void MmForm_CancelNativeMaskCutscene(u8) {}
+// The form-instrument suite owns these independent voices. Keep this fixture
+// focused on the native Goron rolling bank and its existing lifetime assertions.
+static void MmForm_GakkiVoiceOff() {}
+extern "C" void FormJingle_Stop() {}
 
 extern "C" void Audio_SetVolScale(u8, u8, u8, u8) {
 }

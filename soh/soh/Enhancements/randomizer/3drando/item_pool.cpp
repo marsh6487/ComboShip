@@ -1,3 +1,4 @@
+#include "../SoulShuffle.h"
 #include <algorithm>
 
 #include "item_pool.hpp"
@@ -962,6 +963,15 @@ bool GenerateItemPool() {
     if (ctx->GetOption(RSK_STARTING_SKULLTULA_TOKEN).Get() < tokensToAdd) {
         AddFixedItemToPool(RG_GOLD_SKULLTULA_TOKEN, tokensToAdd - ctx->GetOption(RSK_STARTING_SKULLTULA_TOKEN).Get());
     }
+
+    // Soul catalog oot_pool begin
+    // Soul families add exactly one progression copy, including plentiful pools.
+    for (const auto& soul : Rando::SoulShuffle::Catalog) {
+        if (ctx->GetOption(soul.option)) {
+            AddItemToPool(soul.item, 1, 1, 1, 1);
+        }
+    }
+    // Soul catalog oot_pool end
 
     if (ctx->GetOption(RSK_SHUFFLE_BOSS_SOULS)) {
         AddItemToPool(RG_GOHMA_SOUL, 2, 1, 1, 1);

@@ -167,8 +167,10 @@ RandoCheckId GetProgressiveCheckInLogic() {
                 RandoItemId rawItem = RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
                 RandoItemId hintItem = Rando::MagicHintIdentity(rawItem, randoCheckId);
                 auto type = Rando::StaticData::Items[itemId].randoItemType;
-                if (hintItem == RI_HINT_MAGIC_STAT_UPGRADE) {
-                    type = RITYPE_MAJOR; // Only the verified non-trap fractional target gains eligibility.
+                if (Rando::IsRpgHintUpgrade(hintItem)) {
+                    if (!Rando::RpgHintUseful(hintItem))
+                        continue;
+                    type = RITYPE_MAJOR; // Only a verified non-trap RPG target gains eligibility.
                 }
                 if (type != RITYPE_MAJOR && type != RITYPE_MASK && !Rando::IsHallmarkHintUpgrade(itemId)) {
                     continue; // Converted duplicates/ammo must not win a progressive-family wish.

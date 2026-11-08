@@ -1,0 +1,157 @@
+{
+  "baseline_commit": "ecdb8128786389c42d709cc32c97a4041e593e8e",
+  "published_baseline_commit": "ced18542387d5ac8879e0f1cb303e790e4e3a1a8",
+  "baseline_tree": "ab1a683f2c91fd14a039cc58800a112ae92966b9",
+  "verified_code_commit": "4bfb3489b5ae61246d6802a3907151ada8c7b2d6",
+  "verified_code_tree": "b1dc61d084f55e17a64845cf051da4ba5cfa6c0a",
+  "source_sha256": {
+    "scripts/ci/regressions.json": "fe00c31aa7ea028e1febc50a4a76ed45ae2c6370258f88716bed27c9197c30d9",
+    "soh/include/functions.h": "3fdb7e91e7661c76af4928d17b22e2352b65341a4b8ac45268e05213cf658220",
+    "soh/mods/transformation_masks/assets/mm_asset_loader.cpp": "6571d9f62034a7459c677e529b64b6a28bce99d37da426a34acb3fc472bf2484",
+    "soh/mods/transformation_masks/assets/mm_asset_loader.h": "15abc73d0e19ad78423f10172449d0aa6084368d831f2969e977c89bbb54854b",
+    "soh/mods/transformation_masks/form_song_jingle.inc.c": "cb3b351e1ffa1165603badbbf86f6aa3a33e9c35b27cd2c4f322747cdc606b22",
+    "soh/mods/transformation_masks/mm_native_transform.inc.h": "80432244d8689ca3ad84ecbdb07acf65ae5bb9d72d9efbd63382cb5a2f112ebf",
+    "soh/mods/transformation_masks/mm_player_form.cpp": "003fc991d5b7af5cd7a94acc2f6b2bb7a237450db02f90c1fdb7dea00744db01",
+    "soh/src/code/code_800EC960.c": "70b674e4a77c145cf88bfce5e8c7691a214d5ff997ec5c4bcd11b3f1b444b598",
+    "tests/form_instruments/audio_test.cpp": "86fdb55dc305297c9c0eba4648a5f01f2929e46eee21c0c20cf47df8aa99a6bd",
+    "tests/form_instruments/button_state_test.py": "b159578a2782d328141b8749d92769181255045434fb677b531c1010018d1444",
+    "tests/form_instruments/controller_test.cpp": "86a1880ff392224d31cd42d40a201dd8b1ec2dc2dbd7b0d71f741e42a21231f5",
+    "tests/form_instruments/run_audio_tests.py": "399ce2976dfb097be3159097949e01ad0788ae3f80e4c7c608b187101f7ae63b",
+    "tests/form_instruments/run_controller_tests.py": "e85b547972ca53eb9fe65317b938137c8fcee6d960034c2bb5f7751a3e32607e",
+    "tests/goron_audio/lifetime_test.cpp": "643bfb2172582613c2c0b49cc86e05a4612288c2fbc46642ae6dc759d88710f2",
+    "tests/native_transformations/audio_lifecycle_test.py": "f3445394c906eae2c4db2998d7ccd63a6552adeef001186447e73c0ea4a6d5b2",
+    "tests/native_transformations/sequence_test.cpp": "08b9622546db4313800894bce19b46f7c33b6941bba00e50cfeae290d0d21859"
+  },
+  "registered_gate": {
+    "suite": "equipment",
+    "name": "Native OoT form instruments, note gestures and independent song voices",
+    "exit": 0,
+    "seconds": 21.63,
+    "engine_cases_per_mode": 1411,
+    "controller_scenarios": 58,
+    "audio_scenarios": 20,
+    "modes": [
+      "original SoH",
+      "ComboShip OoT"
+    ],
+    "sanitizers": "ASan/UBSan; leak detection disabled for runner",
+    "source_unchanged": true
+  },
+  "affected_existing_checks": [
+    {
+      "name": "native transformations",
+      "result": "passed",
+      "scenario_runs": 116
+    },
+    {
+      "name": "transformation audio lifecycle",
+      "result": "passed",
+      "scenario_runs": 30
+    },
+    {
+      "name": "Goron audio sequence/direct backends",
+      "result": "passed",
+      "scenario_runs": 28
+    },
+    {
+      "name": "Zora presentation/audio",
+      "result": "passed",
+      "final_formatted_source": true
+    },
+    {
+      "name": "MM sample render/clock",
+      "result": "passed"
+    },
+    {
+      "name": "MM resource lifetime",
+      "result": "passed",
+      "loader_cases": 6,
+      "native_parser_cases": 7,
+      "parser_environment_note": "Initial missing nlohmann/json.hpp include resolved with existing diagnostic headers; no source assertion changes"
+    },
+    {
+      "name": "CI policy",
+      "result": "passed",
+      "tests": 25
+    }
+  ],
+  "production_objects": [
+    {
+      "source": "soh/mods/transformation_masks/mm_player_form.cpp",
+      "mode": "solo",
+      "returncode": 0,
+      "seconds": 20.37,
+      "source_sha256": "003fc991d5b7af5cd7a94acc2f6b2bb7a237450db02f90c1fdb7dea00744db01",
+      "object_sha256": "3d9770a6d7513628264b6da0293cf39191eb540a2660688c50698d171a82853e",
+      "real_header_dependency_count": 768
+    },
+    {
+      "source": "soh/mods/transformation_masks/mm_player_form.cpp",
+      "mode": "combo",
+      "returncode": 0,
+      "seconds": 22.31,
+      "source_sha256": "003fc991d5b7af5cd7a94acc2f6b2bb7a237450db02f90c1fdb7dea00744db01",
+      "object_sha256": "00d793b7dc65848b7f121a9b16c605e6d3c2fc950f784aa1323d5f8e3b7e4b5d",
+      "real_header_dependency_count": 769
+    },
+    {
+      "source": "soh/mods/transformation_masks/assets/mm_asset_loader.cpp",
+      "mode": "solo",
+      "returncode": 0,
+      "seconds": 12.52,
+      "source_sha256": "6571d9f62034a7459c677e529b64b6a28bce99d37da426a34acb3fc472bf2484",
+      "object_sha256": "911a25609823369634cccb666a0211186103379524e99f059515d01e84d7e78e",
+      "real_header_dependency_count": 825
+    },
+    {
+      "source": "soh/mods/transformation_masks/assets/mm_asset_loader.cpp",
+      "mode": "combo",
+      "returncode": 0,
+      "seconds": 11.48,
+      "source_sha256": "6571d9f62034a7459c677e529b64b6a28bce99d37da426a34acb3fc472bf2484",
+      "object_sha256": "1f160c4a3abc93574e7c37a7d19564ae935df7c9f214ee1a0c3f3614b04c4498",
+      "real_header_dependency_count": 825
+    },
+    {
+      "source": "soh/src/code/code_800EC960.c",
+      "mode": "solo",
+      "returncode": 0,
+      "seconds": 0.64,
+      "source_sha256": "70b674e4a77c145cf88bfce5e8c7691a214d5ff997ec5c4bcd11b3f1b444b598",
+      "object_sha256": "6196c390d50d348efbeba336e79edf93daa0c6746afefe42ecb3a73e474dd6b3",
+      "real_header_dependency_count": 148
+    },
+    {
+      "source": "soh/src/code/code_800EC960.c",
+      "mode": "combo",
+      "returncode": 0,
+      "seconds": 0.65,
+      "source_sha256": "70b674e4a77c145cf88bfce5e8c7691a214d5ff997ec5c4bcd11b3f1b444b598",
+      "object_sha256": "3d4be7eace53318f5f1d9ba6c0ddc19b5d0fb7bf8f56d12d3f95e89f669e46c3",
+      "real_header_dependency_count": 148
+    }
+  ],
+  "compilation_boundary": "Complete translation units, real project headers/dependencies; GNU C++20/C23 Linux non-_DEBUG path, current GBI_FLOAT_MTX/GBI_S32_VTX ABI, assertions enabled; no executable link",
+  "format": "clang-format 14.0.6; eligible changed production paths passed dry-run --Werror",
+  "review": {
+    "independent": true,
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "scope": "final whole candidate versus baseline, native donor comparison and regression fixture review"
+  },
+  "unchanged_protected_paths": [
+    "mm/",
+    "libultraship/",
+    "combo/",
+    "soh/assets/"
+  ],
+  "limitations": [
+    "No configured visual gameplay, audio-device listening, or user acceptance.",
+    "Synthetic controller clips/PCM; controlled resource, matrix, decoder and lock services. Lifecycle fixtures extract cleanup blocks rather than all complete dispatch routes.",
+    "Native MM Soundfont 0 mappings retained; actual donor archive payload/hash unavailable in this environment.",
+    "Existing sampler envelope/vibrato defaults remain; no complete MM sequence-engine parity claim.",
+    "Pre-existing _DEBUG Context::GetLogThreadPool/mLogThreadPool header mismatch reproduced on unchanged baseline.",
+    "Earlier Black Market slowdown/camera issues remain outside this candidate."
+  ]
+}

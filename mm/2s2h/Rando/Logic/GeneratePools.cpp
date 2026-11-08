@@ -1,3 +1,4 @@
+#include "Rando/SoulShuffle.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
@@ -418,6 +419,13 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                 continue;
             }
             itemPool.push_back((RandoItemId)i);
+        }
+    }
+
+    // Native NPC, animal and miscellaneous souls are permanent single-copy majors.
+    for (const auto& soul : SoulShuffle::Catalog) {
+        if (saveInfo.randoSaveOptions[soul.option] == RO_GENERIC_YES) {
+            itemPool.push_back(soul.item);
         }
     }
 

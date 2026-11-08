@@ -1,3 +1,4 @@
+#include "Rando/SoulShuffle.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -10,6 +11,13 @@ extern "C" {
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
+    // Soul catalog mm_remove begin
+    if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
+        Flags_ClearRandoInf(soul->flag);
+        return;
+    }
+    // Soul catalog mm_remove end
+
     switch (randoItemId) {
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             CLEAR_WEEKEVENTREG(WEEKEVENTREG_08_80);

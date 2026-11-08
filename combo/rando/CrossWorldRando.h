@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <stdexcept>
 #include <vector>
 #include <set>
 #include <unordered_map>
@@ -25,6 +26,15 @@
 #include "MagicMirrorShuffle.h"
 
 namespace ComboRando {
+
+// A native generator can return a diagnostic instead of a usable pool. Every
+// consumer, including the legacy fallback, must stop before publishing it.
+inline nlohmann::json ParseStaticDataDump(const std::string& dumpJson, const char* game) {
+    auto dump = nlohmann::json::parse(dumpJson);
+    if (dump.contains("error"))
+        throw std::runtime_error(std::string(game) + ": " + dump.at("error").get<std::string>());
+    return dump;
+}
 
 // ---------- Deterministic 64-bit LCG (Knuth / Newlib constants) ----------
 
@@ -283,13 +293,14 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     std::vector<std::string> mmJunkNames;
     std::vector<CwCheck> allChecks;
     std::vector<CwPlacement> lockedPlacements; // confined pre-placements (own-dungeon keys, etc.)
+    std::unordered_set<std::string> validateLockedChecks;
 
     // Set when a dump carries pool[] but no category — a stale DLL, which would otherwise surface as an
     // unbalanceable pool ("no discardable junk") instead of the rebuild it actually needs.
     std::string missingCategory;
 
     auto parsePool = [&](Game game, const std::string& dumpJson) {
-        auto d = nlohmann::json::parse(dumpJson);
+        auto d = ParseStaticDataDump(dumpJson, game == GAME_OOT ? "OOT" : "MM");
 
         // Fillable checks (name only; the pool below feeds the items).
         for (auto& c : d.value("checks", nlohmann::json::array())) {
@@ -341,6 +352,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             if (check.empty() || item.empty())
                 continue;
             lockedPlacements.push_back({ { game, check }, { game, item, f.value("advancement", true) } });
+            if (f.value("validate", false))
+                validateLockedChecks.insert(std::string(game == GAME_OOT ? "oot:" : "mm:") + check);
         }
     };
 
@@ -1130,9 +1143,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         // the relaxed modes (it was placed off-logic on purpose).
         size_t mmAdvUnreachable = 0, ootAdvUnreachable = 0, junkUnreachable = 0, junkUnreachableOot = 0;
         for (const auto& p : placements) {
-            // Locked placements are the game's own guaranteed-reachable vanilla/confined items — not
-            // the cross-fill's responsibility, and the oracles under-model some. Don't validate them.
-            if (lockedCheckKeys.count(checkKey(p.check)))
+            // Randomly confined native items still need a from-scratch check:
+            // MM's preplacement picks a physical dungeon spot without testing
+            // whether its key is behind that same lock. Keep legacy vanilla and
+            // other fixed placements exempt unless the native adapter opts in.
+            const auto key = checkKey(p.check);
+            if (lockedCheckKeys.count(key) && !validateLockedChecks.count(key))
                 continue;
             const auto& reach = p.check.game == GAME_OOT ? ootFinal : mmFinal;
             if (reach.count(p.check.name))
@@ -1342,14 +1358,15 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
 inline std::string CrossWorldGenerateSpoiler(const std::string& sohDumpJson, const std::string& mmDumpJson,
                                              uint32_t masterSeed) {
+    const auto ootDump = ParseStaticDataDump(sohDumpJson, "OOT");
+    const auto mmDump = ParseStaticDataDump(mmDumpJson, "MM");
     nlohmann::json spoiler;
     spoiler["masterSeed"] = masterSeed;
     spoiler["mode"] = "no-logic native-only (phase1)";
 
-    auto doGame = [&](const char* key, const std::string& dumpJson, uint32_t seed) {
+    auto doGame = [&](const char* key, const nlohmann::json& d, uint32_t seed) {
         nlohmann::json out = nlohmann::json::object();
         try {
-            auto d = nlohmann::json::parse(dumpJson);
             std::vector<std::string> checkNames, poolItems;
             for (auto& c : d.value("checks", nlohmann::json::array())) {
                 std::string n = c.value("name", std::string{});
@@ -1391,8 +1408,8 @@ inline std::string CrossWorldGenerateSpoiler(const std::string& sohDumpJson, con
         spoiler[key] = out;
     };
 
-    doGame("oot", sohDumpJson, masterSeed ^ 0x4F4F5400u);
-    doGame("mm", mmDumpJson, masterSeed ^ 0x4D4D0000u);
+    doGame("oot", ootDump, masterSeed ^ 0x4F4F5400u);
+    doGame("mm", mmDump, masterSeed ^ 0x4D4D0000u);
 
     return spoiler.dump(2);
 }

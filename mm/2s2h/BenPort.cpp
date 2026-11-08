@@ -1,3 +1,4 @@
+#include "Rando/SoulShuffle.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -4569,7 +4570,36 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
 
     // Confine own-dungeon items via MM's own logic (writes RANDO_SAVE_CHECKS, shrinks both pools).
     std::vector<RandoCheckId> checkPoolBefore = checkPool;
-    Rando::Logic::PreplaceConfinedItems(checkPool, itemPool);
+    {
+        // Native confinement reads the live save macros, while generation above
+        // uses a new settings snapshot. A cold/stale live save must not turn
+        // Own Dungeon into Anywhere. Borrow only the rando state transactionally;
+        // keep the generated placements locally and restore even if a fill throws.
+        struct RestoreRandoState {
+            RandoSaveInfo previous = gSaveContext.save.shipSaveInfo.rando;
+            ~RestoreRandoState() {
+                gSaveContext.save.shipSaveInfo.rando = previous;
+            }
+        } restore;
+        gSaveContext.save.shipSaveInfo.rando = saveInfo;
+        Rando::Logic::PreplaceConfinedItems(checkPool, itemPool);
+        // Exclusions can exhaust a confinement group. Native fills retain the
+        // restriction on residual items; the cross fill has no group metadata,
+        // so exporting one as free would silently defeat the user's setting.
+        for (RandoItemId id : itemPool) {
+            if (!Rando::Logic::IsItemAllowedAtCheck(id, RC_UNKNOWN)) {
+                cached = nlohmann::json{
+                    { "error", "MM confined item has no remaining native check: " +
+                                   Rando::StaticData::GetItemDisplayName(id) },
+                    { "checks", nlohmann::json::array() },
+                    { "pool", nlohmann::json::array() },
+                    { "fixed", nlohmann::json::array() }
+                }.dump();
+                return cached.c_str();
+            }
+        }
+        saveInfo = gSaveContext.save.shipSaveInfo.rando;
+    }
     std::set<RandoCheckId> stillFillable(checkPool.begin(), checkPool.end());
 
     // GeneratePools under-fills (MM's own OnFileCreate pads junk); mirror it so every fillable check
@@ -4617,7 +4647,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         auto chkIt = Rando::StaticData::Checks.find(id);
         if (chkIt == Rando::StaticData::Checks.end() || !chkIt->second.name || chkIt->second.name[0] == '\0')
             continue;
-        auto iit = Rando::StaticData::Items.find(RANDO_SAVE_CHECKS[id].randoItemId);
+        auto iit = Rando::StaticData::Items.find(saveInfo.randoSaveChecks[id].randoItemId);
         if (iit == Rando::StaticData::Items.end() || !iit->second.spoilerName || iit->second.spoilerName[0] == '\0')
             continue;
         // ComboShip: friendly check + item names for the normalized combo spoiler. These are genuinely
@@ -4625,6 +4655,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         fixed.push_back({ { "check", Rando::StaticData::GetCheckDisplayName(id) },
                           { "item", Rando::StaticData::GetItemDisplayName(iit->first) },
                           { "advancement", isAdvancement(iit->second) },
+                          { "validate", true },
                           { "hintable", true } });
     }
 
@@ -4779,6 +4810,13 @@ static void ComboGrantTradeSlot(u8 itemId) {
 // Covers the save-context mutations that logic conditions read (INV_CONTENT, equipment,
 // quest items, rando flags, dungeon items, week event regs). Derived from GiveItem.cpp.
 static void GiveItemForOracle(RandoItemId ri) {
+    // Soul catalog mm_oracle begin
+    if (const auto* soul = Rando::SoulShuffle::Find(ri)) {
+        Flags_SetRandoInf(soul->flag);
+        return;
+    }
+    // Soul catalog mm_oracle end
+
     switch (ri) {
         case RI_JUNK:
         case RI_NONE:

@@ -2,6 +2,12 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "name": "Native OoT form instruments, note gestures and independent song voices",
+    "run": "python3 -B tests/form_instruments/button_state_test.py\npython3 -B tests/form_instruments/run_controller_tests.py\npython3 -B tests/form_instruments/run_audio_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "native_abi": "explicit",
     "name": "Native companions, Command Melody acquisition and custom encounter lifecycle",
     "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B -m unittest discover -s tests/partners -v\npython3 -B -m unittest discover -s tests/custom_encounters -v"
@@ -1853,6 +1859,26 @@
     "origin": "gate",
     "name": "Native MM magic and hallmark hint selectors",
     "run": "python3 -B tests/magic_hints/run_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM desired-item catalogues, RPG wishes and saved hint priorities",
+    "run": "python3 -B tests/shuffle_parity/hints/run_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM confined boss keys, exclusions, self-locks and failed-dump rejection",
+    "run": "python3 -B tests/shuffle_parity/boss_keys/run_tests.py --sanitize",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }

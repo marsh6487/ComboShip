@@ -2161,6 +2161,11 @@ void AudioOcarina_EnableInput(u8 inputEnabled) {
  * For all ocarina instrument ids, turn the ocarina on with the instrument id
  */
 void AudioOcarina_SetInstrument(u8 ocarinaInstrumentId) {
+    if (ocarinaInstrumentId == OCARINA_INSTRUMENT_OFF) {
+        // Direct form voices do not belong to the native SFX bank. Cancel them
+        // explicitly, even if the native instrument was already switched off.
+        GameInteractor_ExecuteOnOcarinaPlaybackNote(OCARINA_PITCH_NONE, 1.0f);
+    }
     if (sOcarinaInstrumentId == ocarinaInstrumentId) {
         return;
     }
@@ -2550,6 +2555,34 @@ OcarinaStaff* AudioOcarina_GetPlayingStaff(void) {
 
 OcarinaStaff* AudioOcarina_GetPlaybackStaff(void) {
     return &sPlaybackStaff;
+}
+
+// Instrument hooks run before the display staff is published. Read the actual
+// sounding button here so pitch modifiers never select a different drum/pipe.
+u8 AudioOcarina_GetCurrentButtonIndex(void) {
+    u8 button = sCurOcarinaButtonIndex & 0x3F;
+    if (sCurOcarinaPitch == OCARINA_PITCH_NONE || button > OCARINA_BTN_C_UP) {
+        return OCARINA_BTN_INVALID;
+    }
+    return button;
+}
+
+u8 AudioOcarina_GetPlaybackButtonIndex(void) {
+    if (sPlaybackState == 0 || (sPlaybackPitch & 0x3F) > OCARINA_PITCH_EFLAT5) {
+        return OCARINA_BTN_INVALID;
+    }
+    // Keep the B-flat flag: it identifies which of the two adjacent buttons
+    // produced the same semitone. Mapping the masked hook pitch loses it.
+    u8 button = AudioOcarina_MapNoteToButton(sPlaybackPitch);
+    return button <= OCARINA_BTN_C_UP ? button : OCARINA_BTN_INVALID;
+}
+
+u8 AudioOcarina_IsInstrumentSfxMuted(void) {
+    return gSoundBankMuted[BANK_OCARINA] != 0;
+}
+
+u8 AudioOcarina_GetInstrumentId(void) {
+    return sOcarinaInstrumentId;
 }
 
 void AudioOcarina_RecordSong(void) {

@@ -28,7 +28,7 @@ struct {
     SkelAnime formSkelAnime;
     LinkAnimationHeader* idleAnim;
     LinkAnimationHeader* maskOffStart;
-    u8 skeletonLoaded, zoraSwimEnabled;
+    u8 skeletonLoaded, zoraSwimEnabled, gakkiActive;
     u8 bubbleCharging;
     f32 bubbleCharge, dekuCheekScale;
     s16 bubbleChargeTimer;
@@ -74,6 +74,10 @@ static void ExtEquip_UnequipForTransform() {}
 static void ExtEquip_RestoreFromTransform() {}
 static u8 WolfLinkForm_IsSelected() { return 0; }
 static void WolfLinkForm_PlayTransformSfx(u8) {}
+// Instrument output is covered by tests/form_instruments; these cases retain
+// their native transformation camera/pose/cue ownership boundary.
+static void MmForm_GakkiVoiceOff() {}
+extern "C" void FormJingle_Stop() {}
 
 extern "C" {
 s32 CVarGetInteger(const char*, s32) { return instant; }

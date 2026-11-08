@@ -2027,6 +2027,13 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             fail("empty static-data dump");
             return;
         }
+        try {
+            ComboRando::ParseStaticDataDump(sohDump, "OOT");
+            ComboRando::ParseStaticDataDump(mmDump, "MM");
+        } catch (const std::exception& e) {
+            fail(e.what());
+            return;
+        }
         resolvedMmStart = mmStart; // these dumps used it, so whatever spoiler they end up in must record it
         if (goal.hunt) {
             const int pieces = ComboRando::CountPoolTriforcePieces(sohDump, mmDump);

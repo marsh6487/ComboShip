@@ -1,3 +1,4 @@
+#include "Rando/SoulShuffle.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -152,7 +153,12 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             });
         }
     }
-    switch (randoItemId) {
+    // Soul catalog mm_give begin
+    if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
+        Flags_SetRandoInf(soul->flag);
+    }
+    // Soul catalog mm_give end
+    else switch (randoItemId) {
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             SET_WEEKEVENTREG(WEEKEVENTREG_08_80);
             break;

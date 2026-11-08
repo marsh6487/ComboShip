@@ -128,6 +128,9 @@ static void MmForm_InterruptNativeMaskForScene(Player* player, PlayState* play, 
 }
 
 extern "C" void MmForm_OnPlayDestroy(PlayState* play, Player* player) {
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
+    gFormState.gakkiActive = 0;
     MmForm_InterruptNativeMaskForScene(player, play, 0);
 }
 
