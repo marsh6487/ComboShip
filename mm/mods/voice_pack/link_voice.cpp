@@ -1,6 +1,6 @@
-#include "din_voice.h"
+#include "link_voice.h"
 #include "oot_adult_voice.h"
-#include "din_voice_mixer.h"
+#include "link_voice_mixer.h"
 #include <nlohmann/json.hpp>
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
@@ -21,7 +21,7 @@ std::array<std::array<Clips, 32>, 2> banks;
 std::array<std::array<size_t, 32>, 2> variants{}, selectedVariant{};
 // Same private PRNG/variant-selection approach as OoT's VoicePack_PlayIfMatch.
 std::mt19937 voiceRng{ 0x53767069 };
-DinVoiceMixer mixer;
+LinkVoiceMixer mixer;
 bool attempted = false, available = false, used = false;
 const void* playerPosition = nullptr;
 std::array<std::array<uint32_t, 32>, 2> lastFrame = [] {
@@ -61,6 +61,7 @@ void Load() {
     if (!manager)
         return;
     attempted = true;
+    // Keep the existing optional pack resource namespace for archive compatibility.
     auto file = manager->GetArchiveManager()->LoadFile("custom/din_voice/voices.json");
     if (!file || !file->Buffer)
         return;
@@ -99,7 +100,7 @@ void Load() {
 }
 } // namespace
 
-extern "C" uint8_t DinVoice_TryPlay(uint16_t sfxId, const void* position) {
+extern "C" uint8_t LinkVoice_TryPlay(uint16_t sfxId, const void* position) {
     const bool renewable = !(sfxId & 0x0C00);
     if ((sfxId & 0xF000) == 0x6000)
         sfxId = (sfxId & ~0x0C00) | 0x0800;
@@ -150,24 +151,24 @@ extern "C" uint8_t DinVoice_TryPlay(uint16_t sfxId, const void* position) {
     return 1;
 }
 
-extern "C" void DinVoice_MixInto(int16_t* output, uint32_t frames) {
+extern "C" void LinkVoice_MixInto(int16_t* output, uint32_t frames) {
     mixer.Mix(output, frames);
 }
 
-extern "C" void DinVoice_Stop(uint16_t sfxId, const void* position) {
+extern "C" void LinkVoice_Stop(uint16_t sfxId, const void* position) {
     if ((sfxId & 0xF000) == 0x6000)
         sfxId = (sfxId & ~0x0C00) | 0x0800;
     if (!position || position == playerPosition)
         mixer.Stop(sfxId);
 }
 
-extern "C" uint8_t DinVoice_IsPlaying(uint16_t sfxId) {
+extern "C" uint8_t LinkVoice_IsPlaying(uint16_t sfxId) {
     if ((sfxId & 0xF000) == 0x6000)
         sfxId = (sfxId & ~0x0C00) | 0x0800;
     return mixer.IsPlaying(sfxId);
 }
 
-extern "C" void DinVoice_EndFrame(void) {
+extern "C" void LinkVoice_EndFrame(void) {
     if (used)
         mixer.SetVolume(ReadVolume());
     mixer.EndFrame();

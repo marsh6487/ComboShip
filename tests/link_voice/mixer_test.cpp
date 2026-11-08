@@ -1,9 +1,9 @@
-#include "mm/mods/voice_pack/din_voice_mixer.h"
+#include "mm/mods/voice_pack/link_voice_mixer.h"
 #include <cassert>
 #include <thread>
 #include <atomic>
 int main() {
-    DinVoiceMixer mix;
+    LinkVoiceMixer mix;
     const int16_t pcm[]={1000,2000,-3000,32767,-32768};
     int16_t out[16]={};
     assert(mix.Play(pcm,5,1,1,0x6825,true));

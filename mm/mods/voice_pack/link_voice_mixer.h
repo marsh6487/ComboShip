@@ -8,7 +8,7 @@
 
 // PCM storage belongs to an immutable process-lifetime cache. The audio thread owns
 // each cursor; the game thread writes parameters only after reserving an idle slot.
-class DinVoiceMixer {
+class LinkVoiceMixer {
     struct Slot {
         std::atomic<unsigned> state{ 0 }; // idle, reserved, ready
         std::atomic<bool> cancelled{ false };

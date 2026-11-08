@@ -48,6 +48,9 @@ void func_80839E74(Player*, PlayState*) {
 void func_8084C124(PlayState*, Player*) {
     ++climbContacts;
 }
+// Weather ownership and Roc Boots are outside the Wolf lifecycle fixture.
+int MMWeather_SeasonForPlay(const PlayState*) { return -1; }
+u8 RocBoots_OnWater(void) { return 0; }
 u8 VanillaTB_IsIronBoots(void) {
     return ironBoots;
 }
