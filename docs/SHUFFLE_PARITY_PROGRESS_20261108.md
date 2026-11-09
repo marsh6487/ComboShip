@@ -1,5 +1,19 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Infinity fixture follow-up: actual CI c169 equipment/systems errors identified
+missing InfiniteUpgrades policy declarations in the Grace and seasons extracted
+pool fixtures. Added the real header there and in the equivalent editor pool
+fixture. All three full native runners pass under repository ABI adapters;
+editor includes sanitizer/bounds and actual SaveEditor/GiveItem syntax checks.
+No assertion or warning policy was weakened.
+
+Infinity integration recovery: local `4284a2b3f1e62ccd08fb027717b4f58c21abd74c`,
+independently restored tree `8d853cc41086951f3ef015b9066e4229be937251`, ZIP
+`libfile_d354fe16c7388191bf7809ae604679f3`, SHA-256
+`df067728cdf454e0c38b5936f77af67fdda29ec2e6ca13fb0297bed8c6fcd64c`.
+Real ImGui What's New suite passes 5/5; CI policy 28/28. Full current native
+builds, linked seed validation and configured gameplay remain pending.
+
 Infinite Upgrades integration: real default-off control now replaces the final
 capacity placeholder, with gold real-CVar registration and required CI fixtures.
 Native/custom magic costs, synchronous and pending wallet debits, all 64 starting
