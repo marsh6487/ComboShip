@@ -1,6 +1,7 @@
 #include "Rando/Logic/Logic.h"
 #include "Rando/Bags.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Wallets.h"
 #include "combo/menu/ItemGrantAuditBridge.h"
 #include "FleetShipCombo/FleetSharedItems.h"
 #include "FleetShipCombo/FleetShipCombo.h"
@@ -33,20 +34,29 @@ void FleetShared_BeginReceive() { ++receiveDepth; }
 void FleetShared_EndReceive() { REQUIRE(receiveDepth > 0); --receiveDepth; }
 }
 namespace Rando {
+#include "wallet_convert.inc"
 // Conversion at this boundary only admits an unowned base bag; other starting
 // items are passed through. Full ConvertItem also has a production-TU check.
 RandoItemId ConvertItem(RandoItemId item,RandoCheckId) {
+    if (item == RI_PROGRESSIVE_WALLET)
+        return NativeWalletObtainable(false) ? NativeWalletResolve() : RI_JUNK;
+    if (item == RI_WALLET_CHILD && RandoCapacity_HasWallet()) return RI_JUNK;
     const auto* bag = Bags::Find(item);
     return bag && Flags_GetRandoInf(bag->flag) ? RI_JUNK : item;
 }
 void GiveItem(RandoItemId item,RandoCheckId) {
-    if (Bags::Give(item) || Bags::GiveCapacity(item)) return;
+    if (Bags::Give(item) || Bags::GiveCapacity(item) || Wallets::Give(item)) return;
+    // Native concrete-wallet inventory mutation is an engine boundary here.
+    if (item == RI_WALLET_ADULT) Inventory_ChangeUpgrade(UPG_WALLET,1);
+    if (item == RI_WALLET_GIANT) Inventory_ChangeUpgrade(UPG_WALLET,2);
+    if (item == RI_WALLET_TYCOON) Inventory_ChangeUpgrade(UPG_WALLET,3);
     if (item == RI_DEKU_STICK) NativeRefill(nullptr, ITEM_DEKU_STICK);
     if (item == RI_DEKU_NUT) NativeRefill(nullptr, ITEM_DEKU_NUT);
 }
 #include "bag_starting.inc"
 }
 #ifdef COMBO_BUILD
+#include "wallet_flush.inc"
 void Combo_MM_GiveDormantResolved(RandoItemId item) {
     REQUIRE(receiveDepth == 1);
     ++dormantGrants;
@@ -180,6 +190,8 @@ int main() {
         std::memset(&reloaded,0xFF,sizeof(reloaded));
         legacy.get_to(reloaded);
         REQUIRE(reloaded.randoInf[0] == 0x1234);
+        REQUIRE(reloaded.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] == 0);
+        REQUIRE(!(reloaded.randoInf[RANDO_INF_WALLET_CHILD / 16] & (1u << (RANDO_INF_WALLET_CHILD % 16))));
         for (const auto& bag : Rando::Bags::Catalog) {
             REQUIRE(reloaded.randoSaveOptions[bag.option] == 0);
             REQUIRE(!(reloaded.randoInf[bag.flag / 16] & (1u << (bag.flag % 16))));
@@ -198,9 +210,46 @@ int main() {
         }
 #endif
     }
+    for (bool enabled : {false,true}) {
+        for (bool tycoon : {false,true}) {
+            for (int count = 0; count <= 4; ++count) {
+                gSaveContext = {};
+                gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+                auto& save = gSaveContext.save.shipSaveInfo.rando;
+                for (const auto& [id,row] : Rando::StaticData::Options) save.randoSaveOptions[id] = row.defaultValue;
+                save.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] = enabled;
+                save.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] = tycoon;
+                std::vector<RandoItemId> starts(count, RI_PROGRESSIVE_WALLET);
+                Rando::SetStartingItemsInSave(save,starts);
+                Rando::GrantStartingItems();
+                const int finite = std::min(count, 2 + int(enabled) + int(tycoon));
+                REQUIRE(CUR_UPG_VALUE(UPG_WALLET) == unsigned(std::max(0, finite - int(enabled))));
+                REQUIRE(bool(Flags_GetRandoInf(RANDO_INF_WALLET_CHILD)) == (enabled && count > 0));
+                REQUIRE(Rando::NativeWalletObtainable(false) == (count < 2 + int(enabled) + int(tycoon)));
+                REQUIRE(!Rando::NativeWalletObtainable(true));
+                json persisted = save;
+                auto restored = persisted.get<RandoSaveInfo>();
+                REQUIRE(restored.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] == enabled);
+                const int f = RANDO_INF_WALLET_CHILD;
+                REQUIRE(restored.randoInf[f / 16] == save.randoInf[f / 16]);
+                REQUIRE(Rando::GetStartingItemsFromSave(restored) == starts);
+            }
+        }
+    }
+    std::puts("PASS actual wallet progressive conversion, capped tiers, starting grants and saved ownership");
     std::puts("PASS native bag gates, imports, refills, signed ammo, grant/remove, starting/spoiler/JSON saves and old defaults");
 #ifdef COMBO_BUILD
-    REQUIRE(dormantGrants == 16 && receiveDepth == 0);
+    gSaveContext = {};
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_CHILD_WALLET] = 1;
+    RandoItemId received = RI_UNKNOWN;
+    REQUIRE(GrantMmItemByName("Child's Wallet",&received));
+    REQUIRE(received == RI_WALLET_CHILD && Flags_GetRandoInf(RANDO_INF_WALLET_CHILD));
+    Combo_MM_FlushAccumulators();
+    gSaveContext.save.saveInfo.playerData.rupees = 1;
+    REQUIRE(GrantMmItemByName("RI_WALLET_CHILD",&received));
+    REQUIRE(received == RI_RUPEE_RED && gSaveContext.rupeeAccumulator == 0);
+    REQUIRE(dormantGrants == 18 && receiveDepth == 0);
     std::puts("PASS real friendly/enum foreign-name lookup, guarded dormant grant and duplicate conversion");
 #endif
 }

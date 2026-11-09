@@ -3135,7 +3135,8 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
                 mOptions[RSK_FOREST].Set(RO_CLOSED_FOREST_DEKU_ONLY);
             }
         }
-        // ComboShip: Shared Wallets has no MM equivalent for Child Wallet, so force it off (see deviations/rando.md).
+        // Shared Wallets retain the normal base wallet and scalar tier ABI.
+        // MM normalizes its Child Wallet option off for the same combined policy.
         if (gComboSharedMask & (1 << ComboRando::SF_WALLET)) {
             mOptions[RSK_SHUFFLE_CHILD_WALLET].Set(RO_GENERIC_OFF);
         }

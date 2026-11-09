@@ -1888,7 +1888,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM base bags, capacities, starts, saved ownership and foreign receipts",
-    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }

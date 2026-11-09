@@ -1,6 +1,7 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
+#include "Rando/Wallets.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -156,6 +157,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     }
     switch (randoItemId) {
+        case RI_WALLET_CHILD:
+            Wallets::Give(randoItemId);
+            break;
         case RI_DEKU_STICK_BAG:
         case RI_DEKU_NUT_BAG:
             Bags::Give(randoItemId);

@@ -19,6 +19,8 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRando.Options.RO_SHUFFLE_CHILD_WALLET", Kind::New,
+      "Shuffle MM's base wallet and require wallet ownership for paid interactions." },
     { "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG", Kind::New,
       "Shuffle the base bag required to carry and use Deku Sticks in MM." },
     { "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG", Kind::New,

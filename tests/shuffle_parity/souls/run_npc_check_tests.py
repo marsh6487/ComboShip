@@ -56,6 +56,8 @@ void Own(RandoItemId i){auto*s=Rando::SoulShuffle::Find(i);REQUIRE(s);flags[s->f
 namespace Rando::Logic {
 '''
 source += body(logic, 'inline bool SoulCheckRequirement(') + '\n'
+source += '// Child Wallet shuffle is off in this NPC/time boundary fixture.\n'
+source += 'inline bool WalletCheckRequirement(RandoCheckId) {return true;}\n'
 source += body(logic, 'enum TimeSlice') + ';\n'
 source += '''int now=TIME_DAY1_AM_08_00,wallet=1;bool sword=true,allNight=true;
 unsigned clocks=63;

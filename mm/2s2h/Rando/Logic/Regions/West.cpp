@@ -388,7 +388,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(ZORA_HALL, 3),                    ENTRANCE(ZORA_HALL_ROOMS, 2), true),
         },
         .events = {
-            EVENT(RE_ACCESS_GREEN_POTION_REFILL, CAN_BE_ZORA),
+            EVENT(RE_ACCESS_GREEN_POTION_REFILL, CAN_BE_ZORA && CAN_PAY_FEE(40)),
         },
     };
     Regions[RR_ZORA_HALL_MIKAUS_ROOM] = RandoRegion{ .name = "Mikau's Room", .sceneId = SCENE_BANDROOM,

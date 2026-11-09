@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Wallets.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
@@ -53,6 +54,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 #endif
     std::vector<RandoItemId> startingItems = Rando::GetStartingItemsFromSave(saveInfo);
+    Wallets::NormalizeOptions(saveInfo, Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
     std::vector<RandoItemId> computedStartingItems = Rando::GetComputedStartingItems(saveInfo);
     startingItems.insert(startingItems.end(), computedStartingItems.begin(), computedStartingItems.end());
 
@@ -482,6 +484,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     // Tycoon's Wallet
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET]) {
+        itemPool.push_back(RI_PROGRESSIVE_WALLET);
+    }
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES) {
         itemPool.push_back(RI_PROGRESSIVE_WALLET);
     }
@@ -551,6 +556,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
+        if (startingItem == RI_WALLET_CHILD && saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET])
+            startingItem = RI_PROGRESSIVE_WALLET;
         auto it = std::find(itemPool.begin(), itemPool.end(), startingItem);
         if (it != itemPool.end()) {
             itemPool.erase(it);

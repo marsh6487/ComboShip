@@ -451,9 +451,9 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(NORTH_CLOCK_TOWN, 4),             ENTRANCE(DEKU_SCRUB_PLAYGROUND, 0), true),
         },
         .events = {
-            EVENT(RE_DEKU_PLAYGROUND_1, CAN_BE_DEKU && FIRST_DAY()),
-            EVENT(RE_DEKU_PLAYGROUND_2, CAN_BE_DEKU && SECOND_DAY()),
-            EVENT(RE_DEKU_PLAYGROUND_3, CAN_BE_DEKU && FINAL_DAY()),
+            EVENT(RE_DEKU_PLAYGROUND_1, CAN_BE_DEKU && FIRST_DAY() && CAN_PAY_FEE(10)),
+            EVENT(RE_DEKU_PLAYGROUND_2, CAN_BE_DEKU && SECOND_DAY() && CAN_PAY_FEE(10)),
+            EVENT(RE_DEKU_PLAYGROUND_3, CAN_BE_DEKU && FINAL_DAY() && CAN_PAY_FEE(10)),
         },
     };
     Regions[RR_TOWN_SHOOTING_GALLERY] = RandoRegion{ .sceneId = SCENE_SYATEKI_MIZU,

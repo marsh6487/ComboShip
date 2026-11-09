@@ -1,6 +1,7 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
+#include "Rando/Wallets.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -14,6 +15,8 @@ extern "C" {
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
     if (Bags::Remove(randoItemId))
+        return;
+    if (Wallets::Remove(randoItemId))
         return;
     // Soul catalog mm_remove begin
     if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
@@ -165,6 +168,8 @@ void Rando::RemoveItem(RandoItemId randoItemId) {
                 RemoveItem(RI_WALLET_GIANT);
             } else if (CUR_UPG_VALUE(UPG_WALLET) >= 1) {
                 RemoveItem(RI_WALLET_ADULT);
+            } else {
+                Wallets::Remove(RI_WALLET_CHILD);
             }
             break;
         case RI_SWORD_KOKIRI:

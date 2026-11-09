@@ -3304,6 +3304,7 @@ typedef enum {
     RI_STONE_TOWER_KEY_RING,
     RI_DEKU_STICK_BAG,
     RI_DEKU_NUT_BAG,
+    RI_WALLET_CHILD,
     RI_MAX,
 } RandoItemId;
 
@@ -3727,6 +3728,7 @@ typedef enum {
     RO_SHUFFLE_KEY_RINGS, // Selected native dungeons: bits 0..3; off by default.
     RO_SHUFFLE_DEKU_STICK_BAG,
     RO_SHUFFLE_DEKU_NUT_BAG,
+    RO_SHUFFLE_CHILD_WALLET,
     RO_MAX,
 } RandoOptionId;
 
@@ -3960,6 +3962,7 @@ typedef enum {
     RANDO_INF_STONE_TOWER_KEY_RING,
     RANDO_INF_DEKU_STICK_BAG,
     RANDO_INF_DEKU_NUT_BAG,
+    RANDO_INF_WALLET_CHILD,
     RANDO_INF_MAX,
 } RandoInf;
 

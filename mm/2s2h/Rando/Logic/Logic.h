@@ -260,9 +260,8 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define CAN_USE_MAGIC_ARROW(arrowType) (HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_##arrowType) && HAS_MAGIC)
 #define CAN_LIGHT_TORCH_NEAR_ANOTHER (HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))
 #define KEY_COUNT(dungeon) (gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_##dungeon])
-#define CAN_AFFORD(rc)                                                                                                \
-    ((RANDO_SAVE_CHECKS[rc].price < 100) || (RANDO_SAVE_CHECKS[rc].price <= 200 && CUR_UPG_VALUE(UPG_WALLET) >= 1) || \
-     (CUR_UPG_VALUE(UPG_WALLET) >= 2))
+#define CAN_PAY_FEE(price) ((price) <= CUR_CAPACITY(UPG_WALLET))
+#define CAN_AFFORD(rc) CAN_PAY_FEE(RANDO_SAVE_CHECKS[rc].price)
 #define HAS_ENOUGH_STRAY_FAIRIES(dungeonIndex) \
     (gSaveContext.save.saveInfo.inventory.strayFairies[dungeonIndex] >= RANDO_SAVE_OPTIONS[RO_STRAY_FAIRIES_REQUIRED])
 #define FOUND_ALL_FROGS                                                                  \
@@ -300,11 +299,23 @@ inline bool SoulCheckRequirement(RandoCheckId check) {
     });
 }
 
-#define CHECK(check, condition)                                                                \
-    {                                                                                          \
-        check, {                                                                               \
-            [] { return SoulCheckRequirement(check) && (condition); }, LogicString(#condition) \
-        }                                                                                      \
+inline bool WalletCheckRequirement(RandoCheckId check) {
+    switch (check) {
+#define WALLET_CHECK(id) case id:
+#include "Rando/WalletChecks.inc"
+#undef WALLET_CHECK
+        return RandoCapacity_HasWallet();
+        default:
+            return true;
+    }
+}
+
+#define CHECK(check, condition)                                                                         \
+    {                                                                                                   \
+        check, {                                                                                        \
+            [] { return SoulCheckRequirement(check) && WalletCheckRequirement(check) && (condition); }, \
+                LogicString(#condition)                                                                 \
+        }                                                                                               \
     }
 // STAY macro for region time restrictions - defines when player can stay in a region over time
 // Usage in region definitions: .timeStayRestrictions = { STAY(TIME_NIGHT1_PM_08_00, !HAS_ROOM_KEY) }

@@ -1,8 +1,8 @@
 # MM capacities: WIP implementation evidence
 
-Scope remains the four authorized Coming Soon options. This checkpoint is the
-first native bag vertical; it does not claim Child Wallet, Infinite Upgrades,
-final UI reorganization, linked seed validation or configured gameplay.
+Scope remains the four authorized Coming Soon options. Native bags and Child
+Wallet are integrated in source. Infinite Upgrades, final UI reorganization,
+linked seed validation and configured gameplay remain unfinished.
 
 ## Native bags
 
@@ -82,4 +82,92 @@ real ImGui accent/input/layout/disabled/style tests pass; CI policy tests pass
 25/25. Native pool/runtime regressions are registered in the items CI suite.
 
 Remaining: actual native cycle/gameplay and linked Glitchless seed validation,
-Child Wallet, Infinite Upgrades and the rest of the full item-pool UI reorganization.
+Infinite Upgrades and the rest of the full item-pool UI reorganization.
+
+## Child Wallet foundation (WIP)
+
+The Child Wallet implementation is in progress; its Coming Soon control remains
+disabled. Append-only native item/option/flag identities and a real wallet GI/icon
+are present. Missing base-wallet ownership means zero capacity at native tier 0;
+a Child Wallet flag enables 99, and higher native wallet tiers remain unchanged.
+Rupee grants and the existing dormant accumulator flush honor effective capacity.
+The player update clears stale imported money while no wallet is owned.
+
+Native grants/oracle share the same Child Wallet helper. Duplicate grants do not
+refill money, removal clears missing-wallet money, and progressive conversion
+resolves the base wallet before Adult/Giant/Tycoon. The pool adds one progressive
+source and consumes either concrete or progressive starting selections.
+Combined Shared Wallets normalizes the generated/oracle option snapshot off,
+preserving existing scalar wallet tiers and the UI CVar selection; solo MM keeps
+its requested Child Wallet setting.
+
+The previous CAN_AFFORD admitted every price below 100 unconditionally. It now
+uses effective capacity. Twenty paid minigame/race/lottery reward checks require
+wallet ownership through the real CHECK adapter; unrelated props/conversations
+retain their old conditions. Bean and potion refill sources require their native
+fees (bean10, red20, green40). The swamp boat retains the free rescued-Koume route
+and requires a wallet for the photo/payment route. Full source/scene/cycle audits
+of those interactions and integrated seeds remain pending.
+
+Evidence: the native pool test first failed at the missing Child Wallet catalogue
+entry; current native GeneratePools passes original/Combo supply, Tycoon, starts,
+solo/combined and Shared Wallet combinations. The runtime first failed at the
+old CAN_AFFORD rule; native currency/flush and capacity tests now pass both guards
+with ASan/UBSan. The actual CHECK adapter's paid-gallery rule then failed without
+a wallet and now passes with a free-conversation control. Grant/remove/idempotence
+coverage is included. The commands are:
+
+```
+python3 -B tests/shuffle_parity/key_rings/run_tests.py --sanitize \
+  --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp
+python3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize
+```
+
+This is not a complete Task5 claim: full starting/save/cross-world wallet and
+runtime/logic validation, menu activation and Infinite Upgrades remain pending.
+The prior published bag source was restored after a second local workspace
+reset, with exact tree b2d297fe3cd6eb325e27e0d778557211037b9d9a verified; no new
+build evidence is inferred from lost build outputs. Existing Grace/editor pool
+fixtures now include the actual ring/wallet helpers; the editor grant extractor
+selects the top-level switch rather than relying on its first item label. Their
+native regression commands pass locally.
+
+## Child Wallet integration follow-up
+
+The disabled Child Wallet placeholder is now a real gold-accented option in
+Bags & Capacities. Shared Wallets disables this control in combined mode while
+preserving its requested CVar; solo MM remains independent. The starting-wallet
+selector allows the complete effective Child/Adult/Giant/Tycoon supply.
+
+Actual progressive obtainability/conversion arms and starting-kit traversal
+pass original/Combo sanitizer tests for zero through four starting copies,
+Child on/off and Tycoon on/off. Native JSON/start-list adapters preserve wallet
+ownership and the shorter legacy options default off when loaded into dirty
+state. Actual foreign-name lookup and receive guard accept Child's Wallet and
+RI_WALLET_CHILD, with duplicate conversion to junk instead of repeating the
+base-wallet grant. Conversion/grant engine boundaries remain explicitly bounded
+in the fixture; this is not a linked two-DLL gameplay claim.
+
+Additional source regressions caught two secondary progression routes: the
+native Poe Sister enemy-drop CHECK in Ghost Hut and the three Deku Playground
+events that expose its rupee checks. Each failed without wallet ownership before
+the correction and now passes under both guards, with the original native
+day/clock filters, a free-conversation control and controlled combat capability.
+The Ghost Hut's EnGb2 charges 30 (10 for a replay); the new gate uses 30, preserving
+the existing 99-rupee base-wallet capability. Playground charges 10. Native
+Rupee/flag/clock macros execute in these tests.
+
+Six changed wallet production TUs pass fresh real-header syntax checks; Central
+and East paid regions also pass. Menu passes with the actual native GNU
+-fpermissive policy already declared in mm/CMakeLists.txt. The current BenPort
+check is blocked by missing libzip zip.h after workspace restoration; it is not
+claimed green. The bag checkpoint's CI Linux build has progressed past native
+module/launcher linking into resource generation. Full current-wallet linking,
+integrated seed/cycle/gameplay checks remain pending.
+
+Existing real ImGui accent tests pass and CI policy remains 25/25. Wallet pool,
+runtime, fee and starting/save fixtures are registered in the items suite.
+CI follow-up also fixes the real MM debug renderer include order (native graph
+declarations precede the counted-ring renderer); its real-header check passes.
+The seasons pool and foreign-scale lifecycle fixtures now supply their actual
+new helper/boundary dependencies and pass their native regression commands.

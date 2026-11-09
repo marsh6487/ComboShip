@@ -53,7 +53,7 @@ def main():
     production += glue[glue.index("namespace {"):glue.index('extern "C" const char* FcCombo_NativeNameForItem')]
 
     give = function(source("mm/2s2h/Rando/GiveItem.cpp"), "Rando::GiveItem")
-    switch_start = give.index("    switch (randoItemId) {\n        case RI_CLOCK_TOWN_STRAY_FAIRY:")
+    switch_start = re.search(r"^    switch \(randoItemId\) \{$", give, re.M).start()
     labels = list(re.finditer(r"^        (?:case RI_[A-Z0-9_]+:|default:)", give[switch_start:], re.M))
     # Every selected arm is copied intact from the real switch. All other native/receipt
     # branches are excluded so an accidental ordinary-inventory grant fails immediately.

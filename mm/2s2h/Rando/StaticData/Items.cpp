@@ -38,6 +38,7 @@ namespace StaticData {
 std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_DEKU_STICK_BAG, "the", "Deku Stick Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
     RI(RI_DEKU_NUT_BAG, "the", "Deku Nut Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_NUTS_1, GID_DEKU_NUTS),
+    RI(RI_WALLET_CHILD, "the", "Child's Wallet", RITYPE_MAJOR, ITEM_NONE, GI_WALLET_ADULT, GID_WALLET_ADULT),
     RI(RI_WOODFALL_KEY_RING, "the", "Woodfall Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
     RI(RI_SNOWHEAD_KEY_RING, "the", "Snowhead Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
     RI(RI_GREAT_BAY_KEY_RING, "the", "Great Bay Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
@@ -866,6 +867,7 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_PROGRESSIVE_SWORD:
             return (const char*)gItemIcons[ITEM_SWORD_KOKIRI];
         case RI_PROGRESSIVE_WALLET:
+        case RI_WALLET_CHILD:
             return (const char*)gItemIcons[ITEM_WALLET_ADULT];
         case RI_WALLET_TYCOON:
             return (const char*)gItemIcons[ITEM_WALLET_GIANT];

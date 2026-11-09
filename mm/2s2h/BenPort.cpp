@@ -1,6 +1,7 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
+#include "Rando/Wallets.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -4829,6 +4830,8 @@ static void ComboGrantTradeSlot(u8 itemId) {
 // Covers the save-context mutations that logic conditions read (INV_CONTENT, equipment,
 // quest items, rando flags, dungeon items, week event regs). Derived from GiveItem.cpp.
 static void GiveItemForOracle(RandoItemId ri) {
+    if (Rando::Wallets::Give(ri))
+        return;
     if (Rando::Bags::Give(ri) || Rando::Bags::GiveCapacity(ri))
         return;
     // Soul catalog mm_oracle begin
@@ -5257,6 +5260,8 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
             (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
     }
     // ComboShip (#136): combo owns the goal, so the hidden CVars above must not decide it here either.
+    Rando::Wallets::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando,
+                                     Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
     gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] =
         gMMComboGoalHunt ? RO_GENERIC_YES : RO_GENERIC_NO;
     if (gMMComboGoalHunt) {

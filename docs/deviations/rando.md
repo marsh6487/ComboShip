@@ -2088,11 +2088,14 @@ confined/fixed pre-placements for `mmName`. None of the 16 first-cut families ar
 confined-placed in practice (masks route through trade slots, not confinement), so this is inert
 today — flagged here so a future family addition checks it.
 
-**Wallet special case:** OOT's optional Child Wallet tier has no MM equivalent, so a shared wallet pool
-would be ambiguous (3 copies = child+adult+giant, or adult+giant+tycoon?). When Shared Wallets is on,
-`Context::FinalizeSettings` (`soh/soh/Enhancements/randomizer/settings.cpp`, same `#ifdef COMBO_BUILD`
-seam as the #135 forces) forces `RSK_SHUFFLE_CHILD_WALLET` off, reading `gComboSharedMask` — pushed by
-`SOH_SetComboSharedItems(mask)` before every dump and on reload, mirroring `SOH_SetComboStartingGame`.
+**Wallet special case:** both games now support an optional shuffled Child Wallet.
+Shared Wallets retain the normal base wallet and existing scalar tier ABI, so
+the effective Child Wallet option is off in both games for a combined shared
+wallet seed. OoT normalizes its Context in FinalizeSettings using gComboSharedMask;
+MM normalizes its generated/oracle option snapshot. Requested UI selections are
+preserved, and solo modes keep their independent Child Wallet setting. Three
+shared copies therefore still mean Adult/Giant/Tycoon rather than silently
+adding a new scalar tier or reinterpreting older saves.
 
 **Runtime ABI (C-ABI, canonical `extern "C" __declspec(dllexport)`, try/catch inside):**
 `SOH_/MM_GetSharedTier(family)`, `SOH_/MM_RaiseSharedTier(family, tier)`, `SOH_/MM_SetSharedChangedCb`,

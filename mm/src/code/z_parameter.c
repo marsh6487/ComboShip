@@ -5361,6 +5361,10 @@ void Health_GiveHearts(s16 hearts) {
 }
 
 void Rupees_ChangeBy(s16 rupeeChange) {
+    if (!RandoCapacity_HasWallet()) {
+        RandoCapacity_RepairWallet();
+        return;
+    }
     gSaveContext.rupeeAccumulator += rupeeChange;
 }
 

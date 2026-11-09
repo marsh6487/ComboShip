@@ -243,6 +243,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         return !hasObtainedCheck && !KeyRings::Owned(*ring);
     if (const auto* bag = Bags::Find(randoItemId))
         return !hasObtainedCheck && !Flags_GetRandoInf(bag->flag);
+    if (randoItemId == RI_WALLET_CHILD)
+        return !hasObtainedCheck && !RandoCapacity_HasWallet();
 
     u8 vanillaCantObtain = false;
     if (Rando::StaticData::Items[randoItemId].itemId != ITEM_NONE &&
@@ -893,6 +895,9 @@ RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckI
                 assert(false);
                 return RI_JUNK;
             case RI_PROGRESSIVE_WALLET:
+                if (!RandoCapacity_HasWallet()) {
+                    return RI_WALLET_CHILD;
+                }
                 if (CUR_UPG_VALUE(UPG_WALLET) == 0) {
                     return RI_WALLET_ADULT;
                 } else if (CUR_UPG_VALUE(UPG_WALLET) == 1) {

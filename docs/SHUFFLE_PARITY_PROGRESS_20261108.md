@@ -1,5 +1,26 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Task 5 Child Wallet follow-up: actual progressive/starting/JSON/old-save and
+foreign-name receive paths pass bounded original/Combo ASan/UBSan fixtures.
+Ghost Hut enemy-drop and Playground source-event regressions each RED→GREEN;
+native day/clock and free-interaction controls retained. Real default-off Child
+Wallet UI replaces its placeholder with the gold accent and shared-wallet
+disabled policy; requested selection is preserved. Eight wallet/region TUs
+pass real-header syntax, Menu passes native GNU policy, BenPort currently lacks
+libzip headers after reset and is not claimed compiled. Full linking/seeds/
+cycle/gameplay and Infinite Upgrades remain pending. CI debug renderer include
+order, seasons-pool and scalar lifecycle dependencies repaired and tested.
+
+Task 5 Child Wallet WIP: native catalogue/pool RED→GREEN and missing-wallet
+currency/affordability RED→GREEN, original/Combo guards. Native paid CHECK
+regression RED→GREEN. Saved base ownership, progressive grant/oracle/remove,
+effective capacities, paid-check/refill gates and Shared Wallet snapshot
+normalization implemented. Pool tests cover solo/combined/shared/Tycoon/starts;
+runtime tests use native C currency/flags and the actual dormant flush. Menu
+activation, full wallet save/start/world validation and Infinite Upgrades remain
+pending. Second workspace reset recovered exact published bag tree b2d297fe;
+fresh CI remains separate from previous lost local build outputs.
+
 Task 5 resumed: native bag catalogue/pool regression RED→GREEN, then missing-bag
 runtime/logic regression RED→GREEN under original/Combo guards with ASan/UBSan.
 Shared receipt/oracle bag helpers, independent saved ownership, capacity-before-bag

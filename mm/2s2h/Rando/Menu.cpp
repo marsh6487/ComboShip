@@ -1083,6 +1083,11 @@ static void DrawItemPoolTab() {
                      "Adds one Deku Nut Bag to the pool. Until you find it, you cannot carry or use nuts.\n"
                      "Capacity upgrades can be collected first and take effect once the bag is found.",
                      1);
+    const bool sharedWallets = Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0);
+    ItemPoolCheckbox("Child Wallet", RO_SHUFFLE_CHILD_WALLET,
+                     "Adds a base wallet as the first progressive wallet upgrade. Until you find a wallet,\n"
+                     "you cannot hold rupees or pay for shops and minigames. Free interactions stay available.",
+                     1, sharedWallets ? "Shared Wallets use the normal base wallet in combined games" : nullptr);
     ItemPoolCheckbox("Tycoon's Wallet", RO_SHUFFLE_TYCOON_WALLET,
                      "Adds the Tycoon's Wallet (5,000 rupees) to the item pool\n"
                      "as a third progressive wallet upgrade.",
@@ -1095,8 +1100,6 @@ static void DrawItemPoolTab() {
     ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
     ImGui::SeparatorText("Coming Soon");
     ImGui::PopStyleColor();
-    CVarCheckbox("Child Wallet", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
     CVarCheckbox("Infinite Upgrades", "gPlaceholderBool",
                  CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
     UIWidgets::EndCard();
@@ -1726,9 +1729,13 @@ static void DrawStartingItemsTab() {
                         u8 maxCount = Rando::StaticData::MaxStartingItemsMap.count(item)
                                           ? Rando::StaticData::MaxStartingItemsMap[item]
                                           : 1;
-                        if (item == RI_PROGRESSIVE_WALLET &&
-                            CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar, 0)) {
-                            maxCount = 3;
+                        if (item == RI_PROGRESSIVE_WALLET) {
+                            const bool sharedWallets =
+                                Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0);
+                            maxCount = 2 +
+                                       !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar, 0) +
+                                       (!sharedWallets &&
+                                        !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_CHILD_WALLET].cvar, 0));
                         }
                         if (std::count(setStartingItemsList.begin(), setStartingItemsList.end(), item) < maxCount) {
 

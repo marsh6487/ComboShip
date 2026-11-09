@@ -16,7 +16,6 @@
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 #include "2s2h/BenGui/CosmeticEditor.h"
-#include "../../../combo/ComboMmKeyRingDraw.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorItem.h"
 #endif
@@ -49,6 +48,10 @@ int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, 
 uint16_t Nei_GetOwnedItem(uint8_t slot); // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
 extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
+
+// The shared ring renderer's debug OPEN_DISPS paths need the native graph
+// declarations above even when there is no Release/PCH to supply them.
+#include "../../../combo/ComboMmKeyRingDraw.h"
 
 #define COMBO_SPIN_GI_HOST_MM
 #include "ComboSpinAttackGi.h"

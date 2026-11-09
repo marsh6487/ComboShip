@@ -34,7 +34,17 @@ static inline int RandoCapacity_HasBagForItem(int item) {
     return 1;
 }
 
+static inline int RandoCapacity_HasWallet(void) {
+    const RandoInf flag = RANDO_INF_WALLET_CHILD;
+    return gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
+           !gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] ||
+           CUR_UPG_VALUE(UPG_WALLET) > 0 ||
+           (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
+}
+
 static inline int RandoCapacity_Current(int upgrade) {
+    if (upgrade == UPG_WALLET && !RandoCapacity_HasWallet())
+        return 0;
     return RandoCapacity_HasBag(upgrade) ? gUpgradeCapacities[upgrade][CUR_UPG_VALUE(upgrade)] : 0;
 }
 
@@ -43,6 +53,13 @@ static inline void RandoCapacity_RepairBagAmmo(void) {
         AMMO(ITEM_DEKU_STICK) = 0;
     if (!RandoCapacity_HasBag(UPG_DEKU_NUTS))
         AMMO(ITEM_DEKU_NUT) = 0;
+}
+
+static inline void RandoCapacity_RepairWallet(void) {
+    if (!RandoCapacity_HasWallet()) {
+        gSaveContext.save.saveInfo.playerData.rupees = 0;
+        gSaveContext.rupeeAccumulator = 0;
+    }
 }
 
 #endif
