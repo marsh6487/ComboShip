@@ -12,7 +12,12 @@ fixture = (ROOT/'tests/ui_visibility/mm_interface_fixture.c').read_text()
 names = ['Interface_Draw']
 if 'static bool Interface_IsFullUi(' in source:
     names.insert(0, 'Interface_IsFullUi')
-production = '\n'.join(function(source, name) for name in names)
+# Native inline capacity policy indexes the engine's item-slot mapping.
+# Keep that table verbatim instead of inventing slots at this UI boundary.
+inventory = (ROOT/'mm/src/code/z_inventory.c').read_text()
+slots_begin = inventory.index('u8 gItemSlots[77] = {')
+slots_end = inventory.index('};', slots_begin) + 2
+production = inventory[slots_begin:slots_end] + '\n' + '\n'.join(function(source, name) for name in names)
 fixture = fixture.replace('/* PRODUCTION */', production)
 with tempfile.TemporaryDirectory(prefix='mm-ui-interface-') as directory:
     path = Path(directory)/'test.c'

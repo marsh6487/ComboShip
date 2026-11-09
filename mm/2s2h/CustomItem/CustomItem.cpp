@@ -43,6 +43,9 @@ EnItem00* CustomItem::Spawn(f32 posX, f32 posY, f32 posZ, s16 rot, s16 flags, s1
 
     Actor* actor = Actor_Spawn(&gPlayState->actorCtx, gPlayState, ACTOR_EN_ITEM00, posX, posY, posZ, flags, rot, params,
                                ITEM00_NOTHING);
+    if (actor == nullptr) {
+        return nullptr;
+    }
     EnItem00* enItem00 = (EnItem00*)actor;
 
     if (actionFunc != NULL) {

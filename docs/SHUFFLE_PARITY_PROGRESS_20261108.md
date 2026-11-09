@@ -1,5 +1,131 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Hint/startup recovery: local `580f232da9a73458ceb9e9d16ab74e78afaa5291`,
+independently restored tree `dbede42f4b23b352b3094b93bb8de296f9f3a5c7`, ZIP
+`libfile_f2f4d232ba3081918c6b315bcf0a55b9`, SHA256
+`536bdd637b1350906cf86b848b2436811f0f9942235c7cdb76a37e4529affde6`.
+Post-format native first-drop runtime/combat/pool/hash matrices and soul/hint
+suites pass; clang-format14 and all 28 CI policy checks pass.
+
+MM first-drop vague hints now identify the actual enemy species, replacing
+the old generic misspelled string. Exact check naming remains unchanged.
+Full native location/selection/Desired message and combined clue generation
+fixtures pass both guards and independent spec/quality review. These verify
+source identity and composition, not in-game UI or full graph traversal.
+
+MM environment source checkpoint is a hidden seven-icicle Snowhead entrance
+slice only. Exact authored placement IDs, break-only callbacks, native pool/
+exclusion persistence and physical pickup eligibility are implemented. Failed
+allocation retries bind scene and room; crossing rooms discards stale requests.
+Independent review passes. Native runtime/save/pool sanitizers, 128 exclusion
+subsets and 20 full original/Combo TU syntax checks pass. Actor-parameter,
+proximity/geometry and conservative access-predicate gaps remain before exposure;
+remaining icicles/rocks/boulders/red boulders/soil remain unimplemented. No
+family completion, full Glitchless seed or gameplay acceptance is claimed.
+
+Reviewed source milestone: 43 OoT first-drop families now have 204 audited
+physical witness regions and per-layout 38–43 check pools (43 Vanilla, 40 MQ).
+Runtime, pools, exclusions, settings identity and distinct action-oriented hints
+use the same layout rule. Native runtime/combat/pool/hash/hint fixtures pass
+original/Combo, including all 4096 Vanilla/MQ masks. Full native seeded graph
+proof remains open; the setting stays hidden and off by default.
+
+Soul hint follow-up adds 147 individual native item hint identities and exact
+native translations. Existing name fallbacks were retained; direct Item::GetHint
+now has proper text. MM Saria admits useful legacy enemy souls without changing
+item classifications and resolves only genuine enabled shared counterparts.
+Actual native accessor/encoding/export, combined seed clue generation and MM
+Saria/Desired/provider ownership and source-location fixtures pass; independent
+soul-specific spec/quality review and fresh sanitizer reruns also pass. Full-world
+traversal and configured hint presentation remain acceptance gates.
+
+Confirmed native Linux seed-smoke failure: CI 42566230059 compiled/linked all
+native targets and generated resources, then crashed (SIGSEGV 139) inside
+Rando::Item::operator= from StaticData::InitItemTable, called by
+SOH_InitRandoHeadless. The real table extent RG_MAX was 682 while newly appended
+MM key rings occupied 683–686. The correction preserves all 686 existing
+non-sentinel IDs, reserves old slot 682 with a blank non-progression EVENT row,
+and moves RG_MAX to 687. Name lookup skips the empty row. Before-fix native
+bounds assertions failed; complete real InitItemTable runs twice under strict
+ASan/UBSan in original and Combo modes after the fix. Independent spec/quality
+review and independent sanitizer reruns pass. This is startup-fixture proof;
+a fresh linked native seed run is still required. No passing build or gameplay
+acceptance is inferred.
+
+The e2b4 CI run has completed with the seed backtrace, so the earlier publication
+hold has ended. The next checkpoint includes the reviewed source fixes and
+required native item-table/soul hint regressions. Previous run failures remain
+historical evidence, not evidence that the new tree passes CI.
+
+UI fixture follow-up: e2b4 render CI exposed missing native gItemSlots linkage
+retained by inline capacity policy in the extracted Interface_Draw fixture.
+It now extracts that actual inventory table, leaving UI assertions unchanged.
+The complete UI visibility suite passes native ABI sanitizers, including input,
+HUD/title/file-select, lifetime/vote behavior and 46 full MM original/Combo
+syntax checks. This repairs the fixture; no rendering-policy change.
+
+MM Saria/Desired source-location follow-up: hints now carry actual source
+game/check text, native current magic tiers, metadata-gated shared magic and all
+seven RPG families. Excluded/skipped/cycle-obtained targets no longer win Saria.
+New slot-checked native OoT provider reads real saved placements even without a
+generation pool; Saria additionally uses an initialized native graph and live
+inventory traversal. Inventory/Logic/region/exit/location/no-logic state is
+restored, including exceptions; independent review traced the actual traversal
+mutation footprint and found no blocking gameplay-state omission. Both MM guards
+and native provider/filter/restoration fixtures pass, with full native MM
+conversion/tier functions and exact source location assertions. Four complete
+MM Rando/Saria TUs pass syntax; full OoT compilation still lacks local libzip.
+No unsafe live headless initialization. Absent native graph yields no cross-world
+Saria target; Desired can still locate actual saved copies. Actual cold launch,
+full-world engine traversal, two-module linking and gameplay remain unclaimed.
+
+Verified pinned STB acquisition repair: dependency CMake previously downloaded
+directly over its cache without checking status or content. A historical
+negative control accepted an empty response. The corrected block reuses only
+the exact pinned SHA256, downloads with TLS/status checks to a temporary
+candidate, verifies bytes before promotion and rejects failures during configure.
+Actual pinned HTTPS, seven failure/cache cases and native stbi declarations
+pass. Pinned revision is unchanged. Windows e2b4 build failed for missing stbi
+declarations; its actual downloaded bytes were unavailable, so this consistent
+acquisition failure cause is not claimed independently confirmed or MSVC-fixed.
+No public update until the running Linux seed/backtrace attempt completes.
+
+Separate MM lottery nights source-integrated: default-off real control, original
+night-one identity, two appended checks and three positive ticket-access events.
+Native day/fee/number matching is unchanged; enabled rewards require the exact
+ticket day followed by 18:00–23:00 on its matching night. Callback/messages,
+permanent/cycle guards, full pools (+2 filler), every exclusion subset, JSON,
+native cycle hooks and clock/boundary/fee controls pass original/Combo sanitizers.
+All six complete actor/Central/Menu TUs pass syntax; independent spec/quality
+review passes for bounded candidate scope. Gold real-CVar registration and CI
+native runner added. Three full pool extraction fixture suites pass with real
+Lottery header dependency. Full app link, rendered UI, foreign receipt gameplay
+and configured acceptance remain pending. Tracker retains its generic original
+label; enabled exclusion lists additionally display Night 1 without renaming its
+persistent key. See SHUFFLE_MM_LOTTERY_20261109.md.
+
+Latest unpublished CI recovery: local
+`f560c076445de139f2983be8592c31896e03f8ef`, exact independently restored tree
+`3f0eb06dac02abc943abfcf7629a9f6326c6a57e`, ZIP
+`libfile_f179daa5f458819192aa2421c812b6fd`, SHA-256
+`572d064d252304c60a6f5c84b4d3048545e6ce3f2104f97130415f38796671a1`.
+Public branch remains e2b4e6f while its native CI runs; no build restart.
+
+CI e2b4e6f follow-up: actual item/system failures were two old assertions
+equating the previous last option with RSK_MAX; retain their entire old prefix
+chain and assert the actual appended first-drop neighbor instead. The sword
+receipt fixture now uses real native dungeon-item visual IDs/count policy and
+an assert-false unrelated ring-geometry boundary. Black Market's fixture now
+extracts the real inventory upgrade masks/shifts needed by its retained wallet
+debit guard. Sanitized sword receipts, full native seed settings, full MM item
+receipts, and direct/entry Black Market runners all pass under native ABI
+adapters. No production/assertion/warning-policy workaround.
+
+Publication policy: subsequent ref updates cancel older native CI builds in the
+current Actions concurrency configuration. Hold the next public update until
+the current e2b4e6f build (42566230059) reaches seed/backtrace evidence. Local
+source commits and independently restored durable packages continue meanwhile.
+
 Infinity fixture follow-up: actual CI c169 equipment/systems errors identified
 missing InfiniteUpgrades policy declarations in the Grace and seasons extracted
 pool fixtures. Added the real header there and in the equivalent editor pool

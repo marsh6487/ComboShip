@@ -16,6 +16,7 @@ extern "C" void Partners_Reset(void);
 #include "Enhancements/Graphics/PreludeLoadProbe.h"
 #include "Enhancements/debugger/FrameTimingProbe.h"
 #include "ComboExport.h"
+#include "MMHintBridge.h"
 #include "ComboExtract.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
@@ -6849,6 +6850,155 @@ extern "C" COMBO_EXPORT int SOH_GetOverlayTimers(uint32_t* dayTime, int32_t* isD
         }
     }
     return 1;
+}
+#endif
+
+#ifdef COMBO_BUILD
+// Uses the same live-inventory traversal as the check tracker. Every traversal
+// scratch value is restored before returning to either game's gameplay.
+static std::set<RandomizerCheck> MMHintReachableChecks(const std::vector<RandomizerCheck>& targets) {
+    const auto context = Rando::Context::GetInstance();
+    const auto previousLogic = logic;
+    const auto currentLogic = context->GetLogic();
+    const auto savedLogic = *currentLogic;
+    auto inventory = std::make_unique<SaveContext>(gSaveContext);
+    struct RegionState {
+        Region* region;
+        bool childDay, childNight, adultDay, adultNight, pooled;
+    };
+    std::vector<RegionState> regions;
+    std::vector<std::pair<Rando::Entrance*, bool>> exits;
+    std::vector<std::pair<Rando::ItemLocation*, Rando::ItemLocation>> locations;
+    for (int i = RR_NONE; i < RR_MAX; ++i) {
+        auto region = RegionTable(static_cast<RandomizerRegion>(i));
+        if (!region)
+            continue;
+        regions.push_back({ region, region->childDay, region->childNight, region->adultDay, region->adultNight,
+                            region->addedToPool });
+        for (auto& exit : region->exits)
+            exits.emplace_back(&exit, exit.IsAddedToPool());
+    }
+    for (int i = 0; i < RC_MAX; ++i) {
+        auto location = context->GetItemLocation(static_cast<RandomizerCheck>(i));
+        if (location)
+            locations.emplace_back(location, *location);
+    }
+    const auto noLogic = context->GetOption(RSK_NO_LOGIC).Get();
+    struct Restore {
+        std::function<void()> restore;
+        ~Restore() {
+            restore();
+        }
+    } restore{ [&] {
+        *currentLogic = savedLogic;
+        logic = previousLogic;
+        context->GetOption(RSK_NO_LOGIC).Set(noLogic);
+        for (const auto& state : regions) {
+            state.region->childDay = state.childDay;
+            state.region->childNight = state.childNight;
+            state.region->adultDay = state.adultDay;
+            state.region->adultNight = state.adultNight;
+            state.region->addedToPool = state.pooled;
+        }
+        for (const auto& [exit, pooled] : exits) {
+            if (pooled)
+                exit->AddToPool();
+            else
+                exit->RemoveFromPool();
+        }
+        for (const auto& [location, saved] : locations)
+            *location = saved;
+    } };
+    logic = currentLogic;
+    currentLogic->SetSaveContext(inventory.get());
+    context->GetOption(RSK_NO_LOGIC).Set(RO_GENERIC_OFF);
+    const auto reachable = ReachabilitySearch(targets, RG_NONE, true);
+    return { reachable.begin(), reachable.end() };
+}
+
+extern "C" COMBO_EXPORT const char* OOT_GetMMHintCandidates(int fileNum, int reachableOnly) {
+    static std::string result;
+    nlohmann::json candidates = nlohmann::json::array();
+    const auto context = OTRGlobals::Instance ? OTRGlobals::Instance->gRandoContext : nullptr;
+    try {
+        if (Combo_IsCombinedGame() && fileNum == gSaveContext.fileNum && context) {
+            uint32_t sharedMask = 0;
+            if (!ComboRando::g_comboForeignJson.empty()) {
+                const auto seed = nlohmann::json::parse(ComboRando::g_comboForeignJson);
+                sharedMask = ComboRando::SharedMaskFromKeys(seed.value("sharedItems", nlohmann::json::array()));
+            }
+            const auto foreign = ComboRando::LoadForeignForGame(gSaveContext.fileNum, ComboRando::GAME_OOT);
+            std::vector<RandomizerCheck> targets;
+            for (int i = RC_UNKNOWN_CHECK + 1; i < RC_MAX; ++i) {
+                const auto check = static_cast<RandomizerCheck>(i);
+                const auto definition = Rando::StaticData::GetLocation(check);
+                if (definition && !definition->GetName().empty())
+                    targets.push_back(check);
+            }
+            // A cold save may have real placements without a generation pool.
+            // Saria additionally requires the graph prepared by native save-load.
+            const bool graphReady = !RegionTable(RR_ROOT)->regionName.empty();
+            const auto reachable =
+                reachableOnly && graphReady ? MMHintReachableChecks(targets) : std::set<RandomizerCheck>{};
+            for (const auto check : targets) {
+                auto location = context->GetItemLocation(check);
+                auto definition = Rando::StaticData::GetLocation(check);
+                if (!location || !definition || location->IsExcluded() || location->GetIsSkipped() ||
+                    location->HasObtained() || location->GetCheckStatus() == RCSHOW_COLLECTED ||
+                    location->GetCheckStatus() == RCSHOW_SAVED || (reachableOnly && !reachable.count(check)))
+                    continue;
+                std::string itemName;
+                const char* itemGame = "oot";
+                const auto placed = location->GetPlacedRandomizerGet();
+                if (placed == RG_COMBO_FOREIGN) {
+                    const auto found = foreign.find(definition->GetName());
+                    if (found == foreign.end() || found->second.trap || found->second.itemGame != ComboRando::GAME_MM)
+                        continue;
+                    itemGame = "mm";
+                    itemName = found->second.itemName;
+                } else {
+                    switch (placed) {
+                        case RG_PROGRESSIVE_MAGIC_METER:
+                            if (!(sharedMask & (1u << ComboRando::SF_MAGIC)))
+                                continue;
+                            itemGame = "mm";
+                            itemName = ComboRando::SharedFamilyByIndex(ComboRando::SF_MAGIC).mmName;
+                            break;
+                        case RG_MAGIC_STAT_UPGRADE:
+                        case RG_DEFENSE_UPGRADE:
+                        case RG_SPEED_UPGRADE:
+                        case RG_POWER_UPGRADE:
+                        case RG_CRAWL_SPEED_UPGRADE:
+                        case RG_CLIMB_SPEED_UPGRADE:
+                        case RG_PUSH_SPEED_UPGRADE:
+                            itemName = Rando::StaticData::RetrieveItem(placed).GetName().GetEnglish();
+                            break;
+                        default: {
+                            const auto* soul = Rando::SoulShuffle::Find(placed);
+                            // sharedItems is the fill's EFFECTIVE mask; also verify the
+                            // loaded native family. MM checks its own saved family/ownership.
+                            if (!soul || context->GetOption(soul->option).Get() == 0)
+                                continue;
+                            for (const auto& pair : ComboRando::SharedSoulPairs) {
+                                if ((sharedMask & pair.bit) && std::string_view(soul->name) == pair.ootName) {
+                                    itemGame = "mm";
+                                    itemName = pair.mmName;
+                                    break;
+                                }
+                            }
+                            if (itemName.empty())
+                                continue;
+                            break;
+                        }
+                    }
+                }
+                candidates.push_back(
+                    { { "itemGame", itemGame }, { "itemName", itemName }, { "checkName", definition->GetName() } });
+            }
+        }
+    } catch (const std::exception&) { candidates = nlohmann::json::array(); }
+    result = candidates.dump();
+    return result.c_str();
 }
 #endif
 

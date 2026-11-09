@@ -1,4 +1,5 @@
 #include "ActorBehavior.h"
+#include "Rando/Lottery.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/CustomMessage/CustomMessage.h"
 
@@ -8,11 +9,18 @@ extern "C" {
 void EnKujiya_Wait(EnKujiya* enKujiya, PlayState* play);
 }
 
+static RandoCheckId CurrentLotteryCheck() {
+    return Rando::Lottery::CheckForDay(RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] != 0, CURRENT_DAY);
+}
+
 void Rando::ActorBehavior::InitEnKujiyaBehavior() {
     COND_VB_SHOULD(VB_GIVE_LOTTERY_WINNINGS, IS_RANDO, {
         EnKujiya* refActor = va_arg(args, EnKujiya*);
 
-        RANDO_SAVE_CHECKS[RC_CLOCK_TOWN_WEST_LOTTERY].eligible = true;
+        const auto check = CurrentLotteryCheck();
+        if (check != RC_UNKNOWN) {
+            Rando::Lottery::QueueReward(RANDO_SAVE_CHECKS[check], RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] != 0);
+        }
         refActor->actionFunc = EnKujiya_Wait;
         *should = false;
     });
@@ -21,9 +29,11 @@ void Rando::ActorBehavior::InitEnKujiyaBehavior() {
         auto entry = CustomMessage::LoadVanillaMessageTableEntry(*textId);
         entry.msg = "Step right up! For a measly %p10 Rupees%w, your dreams could come true!\x11\x13\x12";
         entry.msg += "Guess all three numbers to win %p{{itemName}}%w!\x19";
-        RandoItemId randoItemId = RANDO_SAVE_CHECKS[RC_CLOCK_TOWN_WEST_LOTTERY].randoItemId;
-        CustomMessage::Replace(&entry.msg, "{{itemName}}",
-                               Rando::StaticData::GetItemName(randoItemId, true, RC_CLOCK_TOWN_WEST_LOTTERY));
+        const auto check = CurrentLotteryCheck();
+        if (check == RC_UNKNOWN)
+            return;
+        RandoItemId randoItemId = RANDO_SAVE_CHECKS[check].randoItemId;
+        CustomMessage::Replace(&entry.msg, "{{itemName}}", Rando::StaticData::GetItemName(randoItemId, true, check));
 
         CustomMessage::LoadCustomMessageIntoFont(entry);
         *loadFromMessageTable = false;
@@ -32,9 +42,11 @@ void Rando::ActorBehavior::InitEnKujiyaBehavior() {
     COND_ID_HOOK(OnOpenText, 0x2b66, IS_RANDO, [](u16* textId, bool* loadFromMessageTable) {
         auto entry = CustomMessage::LoadVanillaMessageTableEntry(*textId);
         entry.msg = "Congratulations! You win the jackpot: %p{{itemName}}%w!\x19";
-        RandoItemId randoItemId = RANDO_SAVE_CHECKS[RC_CLOCK_TOWN_WEST_LOTTERY].randoItemId;
-        CustomMessage::Replace(&entry.msg, "{{itemName}}",
-                               Rando::StaticData::GetItemName(randoItemId, true, RC_CLOCK_TOWN_WEST_LOTTERY));
+        const auto check = CurrentLotteryCheck();
+        if (check == RC_UNKNOWN)
+            return;
+        RandoItemId randoItemId = RANDO_SAVE_CHECKS[check].randoItemId;
+        CustomMessage::Replace(&entry.msg, "{{itemName}}", Rando::StaticData::GetItemName(randoItemId, true, check));
 
         CustomMessage::LoadCustomMessageIntoFont(entry);
         *loadFromMessageTable = false;

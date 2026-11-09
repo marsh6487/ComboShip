@@ -50,11 +50,13 @@ static bool Spawn(const Entry& entry, Vec3f position) {
 }
 
 bool OnDefeat(Actor* actor) {
-    if (!IS_RANDO || !Randomizer_GetSettingValue(RSK_SHUFFLE_ENEMY_DROPS) || actor == nullptr || gPlayState == nullptr)
+    if (!IS_RANDO || !Randomizer_GetSettingValue(RSK_SHUFFLE_ENEMY_DROPS) || actor == nullptr ||
+        gPlayState == nullptr || gSaveContext.gameMode == GAMEMODE_END_CREDITS)
         return false;
     const auto entry = ForActor(actor->id, actor->params, gSaveContext.linkAge == LINK_AGE_ADULT,
                                 gPlayState->sceneNum == SCENE_DEKU_TREE_BOSS);
-    if (entry == nullptr || pending[entry->check] || Flags_GetRandomizerInf(entry->flag))
+    if (entry == nullptr || !HasSeededCheck(entry->check) || !IsAvailable(entry->check, SeedUsesMQ) ||
+        pending[entry->check] || Flags_GetRandomizerInf(entry->flag))
         return false;
 
     // Only native confirmed death/victory emits eligibility, never unload or
@@ -71,7 +73,8 @@ void DeliverUncollected() {
     if (!player)
         return;
     for (const auto& entry : Catalog) {
-        if (Flags_GetRandomizerInf(entry.defeatedFlag) && !Flags_GetRandomizerInf(entry.flag) && !pending[entry.check])
+        if (HasSeededCheck(entry.check) && IsAvailable(entry.check, SeedUsesMQ) &&
+            Flags_GetRandomizerInf(entry.defeatedFlag) && !Flags_GetRandomizerInf(entry.flag) && !pending[entry.check])
             Spawn(entry, player->world.pos);
     }
 }
@@ -79,7 +82,11 @@ void DeliverUncollected() {
 static void RegisterRuntime() {
     const bool enabled = IS_RANDO && Randomizer_GetSettingValue(RSK_SHUFFLE_ENEMY_DROPS);
     ResetPending();
-    COND_HOOK(OnSceneInit, enabled, [](int16_t) { ResetPending(); });
+    RefreshSeedExclusions();
+    COND_HOOK(OnSceneInit, enabled, [](int16_t) {
+        ResetPending();
+        RefreshSeedExclusions();
+    });
     COND_HOOK(OnPlayerUpdate, enabled, []() { DeliverUncollected(); });
     COND_HOOK(OnActorDestroy, enabled, [](void* actor) { OnDropDestroyed(actor); });
     COND_HOOK(OnEnemyDefeat, enabled, [](void* actor) { OnDefeat(static_cast<Actor*>(actor)); });

@@ -52,10 +52,10 @@ struct Logic {
 '''
 for method in sorted(methods-base):source+=f'template<class...T> bool {method}(T...){{return combat;}}\n'
 source+='};\n'+combat+'\n}\nRando::Logic state;auto*logic=&state;\n'
-source+='template<class F> bool AnyAgeTime(F f){return f();}\n'
+source+='template<class F> bool AnyAgeTime(F f){return f();}\ntemplate<class F> bool SpiritShared(RandomizerRegion,F f){return f();}\n'
 source+='#ifdef COMBO_BUILD\nextern "C" int Combo_SOH_CrossBossLogicalClear(int, int cleared){return cleared;}\n#endif\n'
 source+='struct Witness{RandomizerCheck check;RandomizerGet soul;RandomizerRegion region;bool(*condition)();};\nWitness witnesses[]={\n'
-source+='#define ENEMY_DROP_WITNESS(key,region,condition) {RC_ENEMY_DROP_##key,RG_SOUL_ENEMY_##key,region,[]{return logic->HasItem(RG_SOUL_ENEMY_##key)&&(condition);}},\n#include "soh/soh/Enhancements/randomizer/EnemyFirstDropsWitnesses.inc"\n#include "soh/soh/Enhancements/randomizer/EnemyFirstDropsAdditionalWitnesses.inc"\n#undef ENEMY_DROP_WITNESS\n};\n'
+source+='#define ENEMY_DROP_WITNESS(key,region,scene,quest,condition) {RC_ENEMY_DROP_##key,RG_SOUL_ENEMY_##key,region,[]{return logic->HasItem(RG_SOUL_ENEMY_##key)&&(condition);}},\n#include "soh/soh/Enhancements/randomizer/EnemyFirstDropsWitnesses.inc"\n#include "soh/soh/Enhancements/randomizer/EnemyFirstDropsAdditionalWitnesses.inc"\n#undef ENEMY_DROP_WITNESS\n};\n'
 source+='void CheckWitnessIdentity(){\n'
 for line in witness.splitlines():
  if not line.startswith('ENEMY_DROP_WITNESS('):continue
@@ -85,7 +85,7 @@ int main(){
   for(bool adult:{false,true})for(bool night:{false,true}){state.IsAdult=adult;state.IsChild=!adult;state.AtNight=night;state.AtDay=!night;off|=witness.condition();}
   state.soulsEnabled=true;
  }
- REQUIRE(covered.size()==39);REQUIRE(reachable==covered);
+ REQUIRE(covered.size()==43);REQUIRE(reachable==covered);
  printf("PASS %zu genuine native combat witness types: soul self-lock, weapons, disabled tricks/family controls\n",covered.size());
 }
 '''
@@ -93,5 +93,5 @@ with tempfile.TemporaryDirectory(prefix='oot-enemy-drop-logic-') as t:
  t=Path(t);cpp=t/'test.cpp';cpp.write_text(source)
  for mode in ('original','combo'):
   exe=t/mode
-  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'combo'),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'soh'),'-I'+str(ROOT/'combo'),'-I'+str(ROOT/'libultraship/include'),'-I'+str(ROOT/'soh/include/PR'),'-DF3DEX_GBI_2',*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
   subprocess.run([str(exe)],check=True)

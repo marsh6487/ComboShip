@@ -127,6 +127,7 @@ void Rando::ActorBehavior::OnFileLoad() {
     Rando::ActorBehavior::InitObjGrassBehavior();
     Rando::ActorBehavior::InitObjMoonStoneBehavior();
     Rando::ActorBehavior::InitObjSnowballBehavior();
+    Rando::ActorBehavior::InitBgIcicleBehavior();
     Rando::ActorBehavior::InitObjTaruBehavior();
     Rando::ActorBehavior::InitObjTreeBehavior();
     Rando::ActorBehavior::InitObjTsuboBehavior();

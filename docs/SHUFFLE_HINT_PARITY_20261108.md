@@ -50,3 +50,50 @@ The new native fixture is registered in the items CI group. Existing hint-policy
 regressions remain intact. Source compilation under these fixtures is separate
 from complete game linking, full-world cross-game hint selection and in-game
 appearance/acceptance. The broader shuffle integration remains WIP.
+
+## Actual seed-location resolution follow-up (2026-11-09)
+
+The runtime path now carries a hint target rather than treating every source as
+an MM check ID. Saria preserves the ordered wishes across both worlds before
+falling back to useful reachable progression. Desired Items resolves the actual
+outstanding source and renders the current native upgrade (for example, the
+native `RI_DOUBLE_MAGIC` / "Magic Upgrade" after the first meter). Explicit
+wishes for capped raw copies retain their original item name, matching OoT.
+Native skipped/excluded and cycle-obtained checks no longer win either search.
+
+`OOT_GetMMHintCandidates(fileNum, reachableOnly)` is a declared, exported C ABI
+shared through `combo/MMHintBridge.h`. It enumerates actual loaded native OoT
+placements and the pushed foreign seed map, excluding obtained/saved, excluded,
+skipped and trap placements. All seven native RPG upgrades and foreign MM
+placements retain their actual OoT check name. Shared ordinary magic is admitted
+only by genuine shared placement metadata / the seed's `sharedItems.magic`
+setting; an unrelated OoT magic meter never becomes an MM wish.
+
+For Saria, the provider uses the native check tracker's live-inventory traversal
+with no-logic disabled. It clones inventory and restores the complete Logic
+value and pointer, region access flags, exit pool flags, native ItemLocations
+and the prior no-logic option, including on exceptions. This is a read-only hint
+query, with no generation-oracle reset and no item grants. Desired Items does
+not impose Saria's reachability requirement.
+
+Cold native saves do not require the generation-only `allLocations` pool:
+loaded native placements remain searchable. Saria additionally needs the native
+region graph established by save-load; if the native save/graph is unavailable
+or belongs to a different slot, the provider returns no unverified target.
+The fixture checks an empty generation pool and an absent graph separately.
+A real cold-launch/play-session acceptance run remains outstanding.
+
+Validation adds the complete production MM `ConvertItem`, native RPG magic-tier
+helpers, Desired Items rune preparation and item-name rendering to the native
+fixture. It verifies upgrade identity plus exact source check/game, all seven
+RPG families in both source worlds, shared/nonshared magic, native magic tiers,
+filters, disabled/capped/legacy RPG rules and exception-safe traversal state
+restoration. Native construction, obtainability services, region traversal and
+scene/location rendering are declared fixture boundaries; this does not prove
+a complete generated world's reachability or GPU/UI acceptance.
+
+The full MM `SariasSongHint.cpp` and `Rando.cpp` translation units also pass
+C++20 syntax compilation under original and Combo guards with official restored
+dependencies. The full OoT `OTRGlobals.cpp` syntax check stops at the existing
+missing `zip.h` dependency; its new complete provider/snapshot functions compile
+and run with actual native OoT storage types in the focused fixture.

@@ -1,3 +1,4 @@
+#include "EnemyFirstDrops.h"
 #include "../../../../combo/ComboGameMode.h"
 #include "SeedContext.h"
 #include "static_data.h"
@@ -164,7 +165,23 @@ bool Context::IsQuestOfLocationActive(RandomizerCheck rc) {
            loc->GetQuest() == RCQUEST_VANILLA && mDungeons->GetDungeonFromScene(loc->GetScene())->IsVanilla();
 }
 
+void Context::UpdateEnemyDropExclusions() {
+    for (const auto& entry : EnemyFirstDrops::Catalog) {
+        bool active =
+            mOptions[RSK_SHUFFLE_ENEMY_DROPS] && EnemyFirstDrops::IsAvailable(entry.check, [this](SceneID scene) {
+                auto* dungeon = GetDungeonFromScene(scene);
+                return dungeon && dungeon->IsMQ();
+            });
+        auto* option = StaticData::GetLocation(entry.check)->GetExcludedOption();
+        if (active)
+            option->Unhide();
+        else
+            option->Hide();
+    }
+}
+
 void Context::GenerateLocationPool() {
+    UpdateEnemyDropExclusions();
     allLocations.clear();
     overworldLocations.clear();
     // add wincon here so it is properly logged
@@ -222,7 +239,13 @@ void Context::GenerateLocationPool() {
              (!mOptions[RSK_SHUFFLE_TREES] || mOptions[RSK_NO_LOGIC].Is(RO_GENERIC_OFF))) ||
             (location.GetRCType() == RCTYPE_BUSH && !mOptions[RSK_SHUFFLE_BUSHES]) ||
             (location.GetRCType() == RCTYPE_ICICLE && !mOptions[RSK_SHUFFLE_ICICLES]) ||
-            (location.GetRCType() == RCTYPE_ENEMY_DROP && !mOptions[RSK_SHUFFLE_ENEMY_DROPS]) ||
+            (location.GetRCType() == RCTYPE_ENEMY_DROP &&
+             (!mOptions[RSK_SHUFFLE_ENEMY_DROPS] || !EnemyFirstDrops::IsAvailable(location.GetRandomizerCheck(),
+                                                                                  [this](SceneID scene) {
+                                                                                      auto* dungeon =
+                                                                                          GetDungeonFromScene(scene);
+                                                                                      return dungeon && dungeon->IsMQ();
+                                                                                  }))) ||
             (location.GetRCType() == RCTYPE_RED_ICE && !mOptions[RSK_SHUFFLE_RED_ICE]) ||
             (location.GetRCType() == RCTYPE_SIGN && mOptions[RSK_SHUFFLE_SIGNS].Is(RO_SHUFFLE_SIGNS_OFF)) ||
             (location.GetRCType() == RCTYPE_WONDER_ITEM &&
@@ -305,6 +328,7 @@ void Context::AddExcludedOptions() {
             areaOptions.push_back(excludedOption);
         }
     }
+    UpdateEnemyDropExclusions();
 }
 
 std::vector<RandomizerCheck> Context::GetLocations(const std::vector<RandomizerCheck>& locationPool,
@@ -459,6 +483,7 @@ void Context::ParseSpoiler(const char* spoilerFileName) {
         mEntranceShuffler->ParseJson(spoilerFileJson);
         ParseHintJson(spoilerFileJson);
         mDungeons->ParseJson(spoilerFileJson);
+        UpdateEnemyDropExclusions();
         mTrials->ParseJson(spoilerFileJson);
         mSpoilerLoaded = true;
         mSeedGenerated = false;

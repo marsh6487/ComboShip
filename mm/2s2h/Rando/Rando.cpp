@@ -12,6 +12,8 @@
 #include <ship/Context.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #ifdef COMBO_BUILD
+#include "ComboResolve.h"
+#include "MMHintBridge.h"
 #include "rando/CrossForeign.h" // ComboShip: family-B foreign-item-location fallback
 // ComboShip (#164): combo Hint Tracker reveal sink (the launcher registers it, see BenPort.cpp).
 extern "C" void (*gMMComboHintReveal)(int fileNum, int kind, int poolIndex, const char* key, const char* text);
@@ -77,14 +79,12 @@ std::string Rando::GetHintLocationText(RandoItemId randoItemId, RandoCheckId ran
 
 std::vector<RandoCheckId> Rando::FindMultiItemPlacement(RandoItemId randoItemId) {
     std::vector<RandoCheckId> itemPlacements;
-    for (auto& [randocheckId, check] : Rando::StaticData::Checks) {
-        if (Rando::MagicHintMatches(
-                randoItemId, Rando::MagicHintIdentity(RANDO_SAVE_CHECKS[randocheckId].randoItemId, randocheckId)) ||
-            (HintProgressiveFamily(randoItemId) != randoItemId &&
-             RANDO_SAVE_CHECKS[randocheckId].randoItemId == HintProgressiveFamily(randoItemId) &&
-             randoItemId == ConvertItem(HintProgressiveFamily(randoItemId), randocheckId))) {
-            itemPlacements.push_back(randocheckId);
-        }
+    for (auto& [checkId, check] : Rando::StaticData::Checks) {
+        const auto identity = MagicHintIdentity(RANDO_SAVE_CHECKS[checkId].randoItemId, checkId);
+        if (MagicHintMatches(randoItemId, identity) ||
+            (HintProgressiveFamily(randoItemId) != randoItemId && identity == HintProgressiveFamily(randoItemId) &&
+             randoItemId == ConvertItem(identity, checkId)))
+            itemPlacements.push_back(checkId);
     }
     return itemPlacements;
 }
@@ -156,12 +156,64 @@ static RandoItemId SensorGetDesire(s32 slot) {
 // either way the rune moves on to the next wish.
 static RandoCheckId SensorFindOutstandingCheck(RandoItemId randoItemId) {
     for (RandoCheckId rc : Rando::FindMultiItemPlacement(randoItemId)) {
-        const RandoSaveCheck& save = RANDO_SAVE_CHECKS[rc];
-        if (save.shuffled && !save.obtained && !save.cycleObtained) {
+        if (Rando::HintPlacementOutstanding(rc)) {
             return rc;
         }
     }
     return RC_UNKNOWN;
+}
+
+std::vector<Rando::HintTarget> Rando::GetCrossWorldHintTargets(bool reachableOnly) {
+    std::vector<HintTarget> targets;
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return targets;
+    using Query = const char* (*)(int, int);
+    const auto query = reinterpret_cast<Query>(Combo_ResolveSym("soh", "OOT_GetMMHintCandidates"));
+    if (!query)
+        return targets;
+    try {
+        const auto candidates = nlohmann::json::parse(query(gSaveContext.fileNum, reachableOnly));
+        for (const auto& candidate : candidates) {
+            const auto name = candidate.value("itemName", "");
+            auto item = candidate.value("itemGame", "") == "oot" ? RpgHintIdentityFromName(name) : RI_UNKNOWN;
+            if (candidate.value("itemGame", "") == "mm") {
+                for (const auto& [id, definition] : StaticData::Items) {
+                    if (name == definition.name || name == definition.spoilerName) {
+                        item = id;
+                        break;
+                    }
+                }
+            }
+            const auto checkName = candidate.value("checkName", "");
+            if (item > RI_UNKNOWN && item < RI_MAX && !checkName.empty())
+                targets.push_back({ RC_UNKNOWN, item, "at " + checkName + " (OOT)" });
+        }
+    } catch (const nlohmann::json::exception&) {
+        // A missing/invalid dormant save cannot justify a fabricated location.
+    }
+#endif
+    return targets;
+}
+
+Rando::HintTarget Rando::GetDesiredItemHintTarget(RandoItemId wish) {
+    auto check = SensorFindOutstandingCheck(wish);
+    if (check != RC_UNKNOWN) {
+        auto item = MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check);
+        if (!IsRpgHintUpgrade(item)) {
+            const auto converted = ConvertItem(item, check);
+            // OoT's explicit raw-copy wish still names a capped/duplicate copy.
+            if (converted != RI_JUNK)
+                item = converted;
+        }
+        return { check, item, {} };
+    }
+    for (const auto& target : GetCrossWorldHintTargets(false)) {
+        const auto converted = IsRpgHintUpgrade(target.item) ? target.item : ConvertItem(target.item, RC_UNKNOWN);
+        if (MagicHintMatches(wish, target.item) || wish == converted)
+            return { target.check, converted == RI_JUNK ? target.item : converted, target.locationText };
+    }
+    return {};
 }
 
 /**
@@ -177,13 +229,15 @@ extern "C" u8 SensorRune_PrepareHint(void) {
             continue;
         }
 
-        RandoCheckId rc = SensorFindOutstandingCheck(item);
-        if (rc == RC_UNKNOWN) {
+        const auto target = Rando::GetDesiredItemHintTarget(item);
+        if (!target.IsValid()) {
             continue;
         }
 
-        sSensorHintText = "The slate senses %g" + Rando::StaticData::GetItemName(item) + "%w %y" +
-                          Rando::GetHintLocationText(item, rc) + "%w...";
+        sSensorHintText =
+            "The slate senses %g" + Rando::StaticData::GetItemName(target.item) + "%w %y" +
+            (target.locationText.empty() ? Rando::GetHintLocationText(item, target.check) : target.locationText) +
+            "%w...";
         return 1;
     }
     return 0;

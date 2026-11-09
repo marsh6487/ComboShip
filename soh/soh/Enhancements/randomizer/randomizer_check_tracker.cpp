@@ -1,3 +1,4 @@
+#include "EnemyFirstDrops.h"
 #include <array>
 #include <string>
 #include <sstream>
@@ -2039,7 +2040,9 @@ bool IsCheckShuffled(RandomizerCheck rc) {
                 (showOverworldWonderItems && RandomizerCheckObjects::AreaIsOverworld(loc->GetArea())) ||
                 (showDungeonWonderItems && RandomizerCheckObjects::AreaIsDungeon(loc->GetArea()))) &&
                (loc->GetRCType() != RCTYPE_ICICLE || showIcicles) &&
-               (loc->GetRCType() != RCTYPE_ENEMY_DROP || showEnemyDrops) &&
+               (loc->GetRCType() != RCTYPE_ENEMY_DROP ||
+                (showEnemyDrops && Rando::EnemyFirstDrops::IsAvailable(rc, Rando::EnemyFirstDrops::SeedUsesMQ) &&
+                 Rando::EnemyFirstDrops::HasSeededCheck(rc))) &&
                (loc->GetRCType() != RCTYPE_RED_ICE || showRedIce) &&
                (loc->GetRCType() != RCTYPE_FISH || Rando::Fishsanity::GetFishLocationIncluded(loc)) &&
                (loc->GetRCType() != RCTYPE_FREESTANDING ||

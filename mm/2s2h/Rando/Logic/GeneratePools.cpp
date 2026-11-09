@@ -2,6 +2,7 @@
 #include "Rando/KeyRings.h"
 #include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
+#include "Rando/Lottery.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
@@ -88,6 +89,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         for (auto& [randoCheckId, _] : randoRegion.checks) {
             auto& randoStaticCheck = Rando::StaticData::Checks[randoCheckId];
 
+            if (!Lottery::IsEnabled(randoCheckId, saveInfo.randoSaveOptions[RO_SHUFFLE_LOTTERY_NIGHTS] != 0)) {
+                continue;
+            }
+
             // Initialize the check with it's vanilla item
             if (randoStaticCheck.randoCheckId != RC_UNKNOWN) {
                 saveInfo.randoSaveChecks[randoCheckId].randoItemId = randoStaticCheck.randoItemId;
@@ -172,6 +177,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
             if (randoStaticCheck.randoCheckType == RCTYPE_FREESTANDING &&
                 saveInfo.randoSaveOptions[RO_SHUFFLE_FREESTANDING_ITEMS] == RO_GENERIC_NO) {
+                continue;
+            }
+
+            if (randoStaticCheck.randoCheckType == RCTYPE_ICICLE &&
+                saveInfo.randoSaveOptions[RO_SHUFFLE_ICICLE_DROPS] == RO_GENERIC_NO) {
                 continue;
             }
 

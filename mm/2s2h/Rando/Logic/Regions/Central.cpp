@@ -351,13 +351,36 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_LOTTERY_SHOP] = RandoRegion{ .sceneId = SCENE_TAKARAKUJI,
         .checks = {
-            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY, 
-                  (IS_DAY1() && CLOCK_NIGHT1()) || 
-                  (IS_DAY2() && CLOCK_NIGHT2()) || 
-                  (IS_DAY3() && CLOCK_NIGHT3())),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY,
+                  (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                   ((IS_DAY1() && CLOCK_NIGHT1()) || (IS_DAY2() && CLOCK_NIGHT2()) ||
+                    (IS_DAY3() && CLOCK_NIGHT3()))) ||
+                  (RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_1] &&
+                   BETWEEN(TIME_NIGHT1_PM_06_00, TIME_NIGHT1_PM_11_00))),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2,
+                  RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_2] &&
+                  BETWEEN(TIME_NIGHT2_PM_06_00, TIME_NIGHT2_PM_11_00)),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3,
+                  RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_3] &&
+                  BETWEEN(TIME_NIGHT3_PM_06_00, TIME_NIGHT3_PM_11_00)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(WEST_CLOCK_TOWN, 8),              ENTRANCE(LOTTERY_SHOP, 0), true),
+        },
+        // These positive events mean the ticket can be bought on that exact day.
+        // Reward access is evaluated separately at its actual evening time.
+        .events = {
+            EVENT(RE_LOTTERY_TICKET_DAY_1, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY) && IS_DAY1()),
+            EVENT(RE_LOTTERY_TICKET_DAY_2, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2) && IS_DAY2()),
+            EVENT(RE_LOTTERY_TICKET_DAY_3, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3) && IS_DAY3()),
+        },
+        .timeStayRestrictions = {
+            STAY(TIME_NIGHT1_PM_11_00, false),
+            STAY(TIME_NIGHT2_PM_11_00, false),
+            STAY(TIME_NIGHT3_PM_11_00, false),
         },
     };
     Regions[RR_MAYOR_RESIDENCE] = RandoRegion{ .sceneId = SCENE_SONCHONOIE,

@@ -19,6 +19,8 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS", Kind::New,
+      "Give each MM lottery night its own reward, with daytime tickets and evening winnings." },
     { "gRando.Options.RO_INFINITE_UPGRADES", Kind::New,
       "Add six infinite upgrades that require their normal base items, bags or wallet." },
     { "gRando.Options.RO_SHUFFLE_CHILD_WALLET", Kind::New,

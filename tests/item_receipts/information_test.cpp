@@ -193,7 +193,8 @@ int main() {
   static_assert(RSK_SHUFFLE_ENEMY_SOULS + 1 == RSK_SHUFFLE_NPC_SOULS);
   static_assert(RSK_SHUFFLE_NPC_SOULS + 1 == RSK_SHUFFLE_ANIMAL_SOULS);
   static_assert(RSK_SHUFFLE_ANIMAL_SOULS + 1 == RSK_SHUFFLE_MISC_SOULS);
-  static_assert(RSK_SHUFFLE_MISC_SOULS + 1 == RSK_MAX);
+  static_assert(RSK_SHUFFLE_MISC_SOULS + 1 == RSK_SHUFFLE_ENEMY_DROPS);
+  static_assert(RSK_SHUFFLE_ENEMY_DROPS < RSK_MAX);
   auto ctx = Rando::Context::GetInstance();
   using namespace Rando;
   StaticData::hintTextTable[RHT_CHILD_ALTAR_STONES] = {

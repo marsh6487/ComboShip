@@ -52,7 +52,40 @@ endif()
 
 #=================== STB ===================
 set(STB_DIR ${CMAKE_BINARY_DIR}/_deps/stb)
-file(DOWNLOAD "https://github.com/nothings/stb/raw/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h" "${STB_DIR}/stb_image.h")
+set(STB_IMAGE_SHA256 "c54b15a689e6a1f32c75e2ec23afa442e3e0e37e894b73c1974d08679b20dd5c")
+set(STB_IMAGE_VALID FALSE)
+if(EXISTS "${STB_DIR}/stb_image.h")
+    file(SHA256 "${STB_DIR}/stb_image.h" STB_IMAGE_CACHED_SHA256)
+    if(STB_IMAGE_CACHED_SHA256 STREQUAL STB_IMAGE_SHA256)
+        set(STB_IMAGE_VALID TRUE)
+    endif()
+endif()
+if(NOT STB_IMAGE_VALID)
+    file(MAKE_DIRECTORY "${STB_DIR}")
+    set(STB_IMAGE_CANDIDATE "${STB_DIR}/stb_image.h.download")
+    file(REMOVE "${STB_IMAGE_CANDIDATE}")
+    file(DOWNLOAD
+        "https://raw.githubusercontent.com/nothings/stb/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h"
+        "${STB_IMAGE_CANDIDATE}"
+        TLS_VERIFY ON
+        TIMEOUT 90
+        STATUS STB_IMAGE_DOWNLOAD_STATUS
+    )
+    list(GET STB_IMAGE_DOWNLOAD_STATUS 0 STB_IMAGE_DOWNLOAD_CODE)
+    list(GET STB_IMAGE_DOWNLOAD_STATUS 1 STB_IMAGE_DOWNLOAD_MESSAGE)
+    if(NOT STB_IMAGE_DOWNLOAD_CODE EQUAL 0)
+        file(REMOVE "${STB_IMAGE_CANDIDATE}")
+        message(FATAL_ERROR "Pinned stb_image.h download failed: ${STB_IMAGE_DOWNLOAD_MESSAGE}")
+    endif()
+    file(SHA256 "${STB_IMAGE_CANDIDATE}" STB_IMAGE_DOWNLOADED_SHA256)
+    if(NOT STB_IMAGE_DOWNLOADED_SHA256 STREQUAL STB_IMAGE_SHA256)
+        file(REMOVE "${STB_IMAGE_CANDIDATE}")
+        message(FATAL_ERROR "Pinned stb_image.h SHA256 mismatch: expected ${STB_IMAGE_SHA256}, got ${STB_IMAGE_DOWNLOADED_SHA256}")
+    endif()
+    # Only verified bytes may replace a cached header. Failed downloads leave
+    # any prior cache untouched and stop configuration before native compilation.
+    file(RENAME "${STB_IMAGE_CANDIDATE}" "${STB_DIR}/stb_image.h")
+endif()
 file(WRITE "${STB_DIR}/stb_impl.c" "#define STB_IMAGE_IMPLEMENTATION\n#include \"stb_image.h\"")
 
 add_library(stb STATIC)

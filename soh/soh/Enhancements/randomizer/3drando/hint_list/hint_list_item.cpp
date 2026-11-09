@@ -1,6 +1,7 @@
 #include "../../static_data.h"
 #include "../hints.hpp"
 #include "../../../custom-message/CustomMessageManager.h"
+#include "../../SoulHintText.h"
 
 namespace Rando {
 
@@ -2221,5 +2222,6 @@ void StaticData::HintTable_Init_Item() {
                                                       CustomMessage("a push in the right direction", /*german*/"ein Schubs in die richtige Richtung", /*french*/"une poussée dans la bonne direction")});
 
     // clang-format on
+    SoulHints::Register(hintTextTable);
 }
 } // namespace Rando

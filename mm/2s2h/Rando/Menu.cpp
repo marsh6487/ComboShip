@@ -1,4 +1,5 @@
 #include "Rando/Rando.h"
+#include "Rando/Lottery.h"
 #include "Rando/MagicHints.h"
 #include "Rando/KeyRings.h"
 #include "../../../combo/gui/WhatsNew.h"
@@ -254,6 +255,7 @@ static std::map<RandoCheckType, const char*> checkTypeNames = {
     { RCTYPE_SHOP, "Shop Items" },
     { RCTYPE_SKULL_TOKEN, "Skulltula Tokens" },
     { RCTYPE_SNOWBALL, "Snowballs" },
+    { RCTYPE_ICICLE, "Icicles" },
     { RCTYPE_SONG, "Songs" },
     { RCTYPE_STRAY_FAIRY, "Stray Fairies" },
     { RCTYPE_TINGLE_SHOP, "Tingle Maps" },
@@ -394,6 +396,7 @@ void RefreshMetrics() {
 static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics, {
                                                                    // I Don't love this, but it works...
                                                                    "gRando.ExcludedChecks",
+                                                                   "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS",
                                                                    "gRando.Options.RO_ACCESS_DUNGEONS",
                                                                    "gRando.Options.RO_ACCESS_MAJORA_MASKS_COUNT",
                                                                    "gRando.Options.RO_ACCESS_MAJORA_REMAINS_COUNT",
@@ -1104,6 +1107,17 @@ static void DrawItemPoolTab() {
         6);
     UIWidgets::EndCard();
 
+    UIWidgets::BeginCard("itemPoolLottery");
+    ImGui::SeparatorText("Lottery");
+    if (ItemPoolCheckbox("Separate Lottery Nights", RO_SHUFFLE_LOTTERY_NIGHTS,
+                         "Gives each lottery night its own permanent reward. Adds two checks and two purple rupees.\n"
+                         "Buy a 10-rupee ticket during that day, then match its numbers that evening before 11 PM.\n"
+                         "When disabled, the original single lottery reward can be won on any night.",
+                         2)) {
+        RefreshMetrics();
+    }
+    UIWidgets::EndCard();
+
     UIWidgets::BeginCard("itemPoolSongs");
     ImGui::SeparatorText("Extra Songs");
     ItemPoolCheckbox("Sun's Song", RO_SHUFFLE_SONG_SUN,
@@ -1777,6 +1791,12 @@ static void BulkRestoreChecks(const std::vector<RandoCheckId>& checks) {
     SaveExcludedChecks();
 }
 
+static bool EnvironmentCheckEnabled(RandoCheckId check) {
+    const auto found = Rando::StaticData::Checks.find(check);
+    return found == Rando::StaticData::Checks.end() || found->second.randoCheckType != RCTYPE_ICICLE ||
+           CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_ICICLE_DROPS].cvar, 0) != 0;
+}
+
 static const std::vector<std::string>& GetCheckFilterGroupLabels() {
     static std::vector<std::string> labels;
     static uint32_t builtGeneration = 0;
@@ -1789,12 +1809,22 @@ static const std::vector<std::string>& GetCheckFilterGroupLabels() {
     for (auto& checkFilterGroup : GetCheckFilterGroups()) {
         size_t count;
         if (checkFilterGroup.checks.empty()) {
-            count = setOfChecksInPool.size() + checkExclusionList.size();
+            count = setOfChecksInPool.size() +
+                    std::count_if(checkExclusionList.begin(), checkExclusionList.end(), [](RandoCheckId check) {
+                        return EnvironmentCheckEnabled(check) &&
+                               Rando::Lottery::IsEnabled(
+                                   check,
+                                   CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0);
+                    });
         } else {
             count = std::count_if(
                 checkFilterGroup.checks.begin(), checkFilterGroup.checks.end(), [](RandoCheckId randoCheckId) {
-                    return setOfChecksInPool.contains(randoCheckId) ||
-                           std::binary_search(checkExclusionList.begin(), checkExclusionList.end(), randoCheckId);
+                    return EnvironmentCheckEnabled(randoCheckId) &&
+                           Rando::Lottery::IsEnabled(
+                               randoCheckId,
+                               CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0) &&
+                           (setOfChecksInPool.contains(randoCheckId) ||
+                            std::binary_search(checkExclusionList.begin(), checkExclusionList.end(), randoCheckId));
                 });
         }
         labels.push_back(checkFilterGroup.label + " (" + std::to_string(count) + ")");
@@ -1833,15 +1863,25 @@ static void DrawCheckGroupFilter(UIWidgets::Colors menuThemeColor) {
                        "Bulk actions apply to the checks currently shown.");
 }
 
+static std::string CheckListLabel(RandoCheckId check) {
+    std::string label = Rando::StaticData::CheckNames[check];
+    if (check == RC_CLOCK_TOWN_WEST_LOTTERY &&
+        CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0)) {
+        label += " (Night 1)";
+    }
+    return label;
+}
+
 static bool IsCheckShownAsShuffled(RandoCheckId randoCheckId, ImGuiTextFilter& filter) {
     return randoCheckId != RC_UNKNOWN && setOfChecksInPool.contains(randoCheckId) &&
-           PassesCheckGroupFilter(randoCheckId) &&
-           filter.PassFilter(Rando::StaticData::CheckNames[randoCheckId].c_str());
+           PassesCheckGroupFilter(randoCheckId) && filter.PassFilter(CheckListLabel(randoCheckId).c_str());
 }
 
 static bool IsCheckShownAsExcluded(RandoCheckId randoCheckId, ImGuiTextFilter& filter) {
-    return PassesCheckGroupFilter(randoCheckId) &&
-           filter.PassFilter(Rando::StaticData::CheckNames[randoCheckId].c_str());
+    return EnvironmentCheckEnabled(randoCheckId) &&
+           Rando::Lottery::IsEnabled(
+               randoCheckId, CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0) &&
+           PassesCheckGroupFilter(randoCheckId) && filter.PassFilter(CheckListLabel(randoCheckId).c_str());
 }
 
 static RandoCheckId DrawCheckList(const char* id, const char* title, const char* rowTooltip,
@@ -1870,7 +1910,7 @@ static RandoCheckId DrawCheckList(const char* id, const char* title, const char*
     while (clipper.Step()) {
         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
             RandoCheckId randoCheckId = shownChecks[i];
-            if (ImGui::Selectable(Rando::StaticData::CheckNames[randoCheckId].c_str())) {
+            if (ImGui::Selectable(CheckListLabel(randoCheckId).c_str())) {
                 clickedCheck = randoCheckId;
             }
             UIWidgets::Tooltip(rowTooltip);

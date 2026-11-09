@@ -1947,5 +1947,60 @@
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM separate lottery nights: tickets, clocks, rewards, saves and exclusions",
+    "run": "python3 -B tests/shuffle_parity/time/run_lottery_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Pinned STB acquisition: failed responses, verified cache and native declarations",
+    "run": "python3 -B tests/ci_stb_download/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native item-table bounds and stable key-ring IDs in both build modes",
+    "run": "python3 -B tests/shuffle_parity/item_table_bounds/run_tests.py\npython3 -B tests/shuffle_parity/item_table_bounds/run_tests.py --combo",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "All native soul item hint identities, translations and seed source clues",
+    "run": "python3 -B tests/shuffle_parity/souls/run_hint_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native hidden MM icicle checks: breaks, room retries, pools, saves and exclusions",
+    "run": "python3 -B tests/shuffle_parity/environment/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/run_exclusion_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM first-drop hints name enemy species in Saria, Desired and combined clues",
+    "run": "python3 -B tests/shuffle_parity/hints/run_mm_first_drop_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   }
 ]

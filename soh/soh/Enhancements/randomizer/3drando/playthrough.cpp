@@ -57,6 +57,12 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
         }
     }
 
+    // This hidden WIP setting has no OptionGroup yet. Remove this fallback when
+    // exposing it in a real group, so it participates in the settings hash once.
+    if (ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get()) {
+        settingsStr += "|native-first-enemy-drops=1|";
+    }
+
     if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("DontGenerateSpoiler"), 0)) {
         settingsStr += (char*)gBuildVersion;
     }

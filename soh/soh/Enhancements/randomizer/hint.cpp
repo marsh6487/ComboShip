@@ -282,6 +282,12 @@ const HintText Hint::GetHintText(size_t id) const {
             }
         case HINT_TYPE_ITEM_AREA:
             if (locations.size() > 0) {
+                // Global first-type checks have many physical witnesses. Name
+                // the enemy/action instead of an inherited witness hint area.
+                // ITEM_AREA inserts the item first, matching the [[1]] token.
+                if (StaticData::GetLocation(locations[0])->GetRCType() == RCTYPE_ENEMY_DROP) {
+                    return *StaticData::GetLocation(locations[0])->GetHint();
+                }
                 if (StaticData::GetLocation(locations[0])->IsDungeon()) {
                     return StaticData::hintTextTable[RHT_HOARDS];
                 } else {

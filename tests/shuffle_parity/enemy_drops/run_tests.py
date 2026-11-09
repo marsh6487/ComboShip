@@ -5,14 +5,20 @@ import os,subprocess,tempfile,sys,re
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import functions
+from layout_test_data import expected_layout_masks
+layout_scenes,layout_masks=expected_layout_masks()
 f=functions((ROOT/'soh/src/code/z_actor.c').read_text())
 goma=functions((ROOT/'soh/src/overlays/actors/ovl_En_Goma/z_en_goma.c').read_text())
 gerudo_source=(ROOT/'soh/src/overlays/actors/ovl_En_GeldB/z_en_geldb.c').read_text()
 gerudo=functions(gerudo_source)
+tail_source=(ROOT/'soh/src/overlays/actors/ovl_En_Tp/z_en_tp.c').read_text()
+tail=functions(tail_source)
+tail_enum=next(m[0] for m in re.finditer(r'typedef enum\s*\{.*?\}\s*\w+;',tail_source,re.S) if 'TAILPASARAN_ACTION_DIE' in m[0])
 gerudo_enum=next(m[0] for m in re.finditer(r'typedef enum\s*\{.*?\}\s*\w+;',gerudo_source,re.S) if 'GELDB_DEFEAT' in m[0])
 # Read the actual native bitfield getter; receipt is the existing hook's flag setter.
 with tempfile.TemporaryDirectory(prefix='oot-enemy-drops-') as temp:
  temp=Path(temp)
+ (temp/'native_layouts.inc').write_text('constexpr SceneID layoutScenes[]={'+','.join(layout_scenes)+'};\nconstexpr uint64_t expectedMasks[]={'+','.join(str(mask)+'ULL' for mask in layout_masks)+'};\n')
  (temp/'native_save_flags.inc').write_text(f['Flags_GetRandomizerInf']+'\n'+f['Flags_SetRandomizerInf'])
  native=temp/'native_deaths.c'
  native.write_text('''#include "global.h"
@@ -20,22 +26,24 @@ with tempfile.TemporaryDirectory(prefix='oot-enemy-drops-') as temp:
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "overlays/actors/ovl_En_Goma/z_en_goma.h"
 #include "overlays/actors/ovl_En_GeldB/z_en_geldb.h"
+#include "overlays/actors/ovl_En_Tp/z_en_tp.h"
 #include "objects/object_gol/object_gol.h"
 #include "objects/object_geldb/object_geldb.h"
 extern PlayState* gPlayState;
 void EnGoma_Dead(EnGoma*, PlayState*);
+void EnTp_Die(EnTp*, PlayState*);
 void EnGeldB_Defeated(EnGeldB*, PlayState*);
 void EnGeldB_SetupAction(EnGeldB*, EnGeldBActionFunc);
-'''+gerudo_enum+'\n'+'''// Asset loader/animation are stubbed engine boundaries, retaining native signatures.
+'''+gerudo_enum+'\n'+tail_enum+'\n'+'''// Asset loader/animation are stubbed engine boundaries, retaining native signatures.
 #define Animation_Change(s,a,...) Animation_Change(s,(AnimationHeader*)(a),__VA_ARGS__)
 #define Animation_GetLastFrame(a) Animation_GetLastFrame((void*)(a))
 #define Animation_MorphToPlayOnce(s,a,m) Animation_MorphToPlayOnce(s,(AnimationHeader*)(a),m)
-'''+f['Actor_Kill']+'\n'+goma['EnGoma_SetupDead']+'\n'+gerudo['EnGeldB_SetupDefeated'])
+'''+f['Actor_Kill']+'\n'+goma['EnGoma_SetupDead']+'\n'+gerudo['EnGeldB_SetupDefeated']+'\n'+tail['EnTp_SetupAction']+'\n'+tail['EnTp_SetupDie'])
  flags=['-std=c++20','-DF3DEX_GBI_2','-DCONTROLLERBUTTONS_T=uint32_t','-DSOH_BUILD_DLL','-I'+str(ROOT),'-I'+str(temp)]
  for path in ('soh/include','soh/include/PR','soh/src','soh','soh/assets','soh/soh','libultraship/include','libultraship/src','combo','combo/menu'):
   flags+=['-isystem',str(ROOT/path)]
  if '--sanitize' in sys.argv:
-  flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer']
+  flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-sanitize-recover=all','-fno-pie','-no-pie']
  for mode in ('original','combo'):
   exe=temp/mode
   obj=temp/(mode+'.o')

@@ -3623,6 +3623,7 @@ void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     // from a previously loaded seed in the same Context.
     mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
     mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF);
+    mContext->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Set(RO_GENERIC_OFF);
     // Pre-policy spoilers included Grace without a gate. Loading one after a
     // newer seed must restore that behavior rather than inherit its restriction.
     mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);

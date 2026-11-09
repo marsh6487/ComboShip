@@ -27,6 +27,7 @@ typedef enum {
     RCTYPE_TINGLE_SHOP,
     RCTYPE_TREE,
     RCTYPE_WONDER_ITEM,
+    RCTYPE_ICICLE, // Append-only environmental checks.
     RCTYPE_MAX,
 } RandoCheckType;
 
@@ -2691,6 +2692,11 @@ typedef enum {
 
     // Append-only: Magic Mirror standalone shuffle.
     RC_LOST_WOODS_MAGIC_MIRROR_STUMP,
+    RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2,
+    RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3,
+#define MM_ICICLE(id, scene, room, index, region) id,
+#include "MMEnvironmentIcicles.inc"
+#undef MM_ICICLE
     RC_MAX,
 } RandoCheckId;
 
@@ -3736,6 +3742,8 @@ typedef enum {
     RO_SHUFFLE_DEKU_NUT_BAG,
     RO_SHUFFLE_CHILD_WALLET,
     RO_INFINITE_UPGRADES,
+    RO_SHUFFLE_LOTTERY_NIGHTS,
+    RO_SHUFFLE_ICICLE_DROPS, // WIP: intentionally not exposed until the full family is verified.
     RO_MAX,
 } RandoOptionId;
 
@@ -4064,6 +4072,9 @@ typedef enum {
     RE_BOMBER_CODE,
     RE_DESTROY_MILK_ROAD_BOULDER,
 
+    RE_LOTTERY_TICKET_DAY_1,
+    RE_LOTTERY_TICKET_DAY_2,
+    RE_LOTTERY_TICKET_DAY_3,
     RE_MAX,
 } RandoEvent;
 

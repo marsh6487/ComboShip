@@ -131,7 +131,7 @@ std::vector<RandoItemId> Rando::GetSariaPriorityItemCandidates() {
         std::vector<RandoItemId> result;
         for (auto& [randoItemId, randoStaticItem] : Rando::StaticData::Items) {
             if ((randoStaticItem.randoItemType == RITYPE_MAJOR || randoStaticItem.randoItemType == RITYPE_MASK ||
-                 Rando::IsHallmarkHintUpgrade(randoItemId)) &&
+                 Rando::IsHallmarkHintUpgrade(randoItemId) || Rando::IsSoulHintItem(randoItemId)) &&
                 !IsExcludedFromSariaPriorityItemCandidates(randoItemId)) {
                 result.push_back(randoItemId);
             }
@@ -143,8 +143,11 @@ std::vector<RandoItemId> Rando::GetSariaPriorityItemCandidates() {
 
 static int playedSariasSongState = 0;
 
-RandoCheckId GetProgressiveCheckInLogic() {
+RandoCheckId GetProgressiveCheckInLogic(bool allowFallback = true, RandoItemId onlyWish = RI_UNKNOWN) {
     std::vector<RandoItemId> priorityItems = Rando::GetSariaPriorityItemsFromSave(gSaveContext.save.shipSaveInfo.rando);
+
+    if (onlyWish != RI_UNKNOWN)
+        priorityItems = { onlyWish };
 
     std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> regionTimeStates =
         Rando::Logic::InitializeRegionTimeStates(RR_MAX);
@@ -161,18 +164,22 @@ RandoCheckId GetProgressiveCheckInLogic() {
     for (RandoRegionId regionId : reachableRegions) {
         auto& randoRegion = Rando::Logic::Regions[regionId];
         for (auto& [randoCheckId, accessLogicFunc] : randoRegion.checks) {
-            if (accessLogicFunc.first() && RANDO_SAVE_CHECKS[randoCheckId].shuffled &&
-                !RANDO_SAVE_CHECKS[randoCheckId].obtained) {
+            if (accessLogicFunc.first() && Rando::HintPlacementOutstanding(randoCheckId)) {
                 RandoItemId itemId = Rando::ConvertItem(RANDO_SAVE_CHECKS[randoCheckId].randoItemId, randoCheckId);
                 RandoItemId rawItem = RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
                 RandoItemId hintItem = Rando::MagicHintIdentity(rawItem, randoCheckId);
+                if (hintItem != rawItem && !Rando::IsRpgHintUpgrade(hintItem))
+                    itemId = Rando::ConvertItem(hintItem, randoCheckId);
+                if (!Rando::SoulHintUseful(hintItem))
+                    continue;
                 auto type = Rando::StaticData::Items[itemId].randoItemType;
                 if (Rando::IsRpgHintUpgrade(hintItem)) {
                     if (!Rando::RpgHintUseful(hintItem))
                         continue;
                     type = RITYPE_MAJOR; // Only a verified non-trap RPG target gains eligibility.
                 }
-                if (type != RITYPE_MAJOR && type != RITYPE_MASK && !Rando::IsHallmarkHintUpgrade(itemId)) {
+                if (type != RITYPE_MAJOR && type != RITYPE_MASK && !Rando::IsHallmarkHintUpgrade(itemId) &&
+                    !Rando::IsSoulHintItem(itemId)) {
                     continue; // Converted duplicates/ammo must not win a progressive-family wish.
                 }
 
@@ -183,7 +190,7 @@ RandoCheckId GetProgressiveCheckInLogic() {
                         prioritized = true;
                     }
                 }
-                if (!prioritized && (type == RITYPE_MAJOR || type == RITYPE_MASK)) {
+                if (!prioritized && (type == RITYPE_MAJOR || type == RITYPE_MASK || Rando::IsSoulHintItem(itemId))) {
                     otherChecks.push_back(randoCheckId);
                 }
             }
@@ -200,7 +207,53 @@ RandoCheckId GetProgressiveCheckInLogic() {
     }
 
     // None of the priority items are currently available; fall back to a random reachable major item/mask check.
-    return otherChecks.empty() ? RC_UNKNOWN : otherChecks[Ship_Random(0, otherChecks.size())];
+    return !allowFallback || otherChecks.empty() ? RC_UNKNOWN : otherChecks[Ship_Random(0, otherChecks.size())];
+}
+
+Rando::HintTarget Rando::GetSariaHintTarget() {
+    const auto cross = GetCrossWorldHintTargets(true);
+    for (auto wish : GetSariaPriorityItemsFromSave(gSaveContext.save.shipSaveInfo.rando)) {
+        auto check = GetProgressiveCheckInLogic(false, wish);
+        if (check != RC_UNKNOWN)
+            return { check,
+                     IsRpgHintUpgrade(MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check))
+                         ? MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check)
+                         : ConvertItem(MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check), check),
+                     {} };
+        for (const auto& target : cross) {
+            if (!SoulHintUseful(target.item))
+                continue;
+            const auto converted = IsRpgHintUpgrade(target.item) ? target.item : ConvertItem(target.item, RC_UNKNOWN);
+            if (IsRpgHintUpgrade(target.item) ? !RpgHintUseful(target.item)
+                                              : (StaticData::Items[converted].randoItemType != RITYPE_MAJOR &&
+                                                 StaticData::Items[converted].randoItemType != RITYPE_MASK &&
+                                                 !IsHallmarkHintUpgrade(converted) && !IsSoulHintItem(converted)))
+                continue;
+            if (MagicHintMatches(wish, target.item) || wish == converted)
+                return { target.check, converted, target.locationText };
+        }
+    }
+    auto check = GetProgressiveCheckInLogic();
+    if (check != RC_UNKNOWN)
+        return { check,
+                 IsRpgHintUpgrade(MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check))
+                     ? MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check)
+                     : ConvertItem(MagicHintIdentity(RANDO_SAVE_CHECKS[check].randoItemId, check), check),
+                 {} };
+    for (const auto& target : cross) {
+        if (!SoulHintUseful(target.item))
+            continue;
+        if (IsRpgHintUpgrade(target.item)) {
+            if (RpgHintUseful(target.item))
+                return target;
+            continue;
+        }
+        const auto converted = ConvertItem(target.item, RC_UNKNOWN);
+        const auto type = StaticData::Items[converted].randoItemType;
+        if (type == RITYPE_MAJOR || type == RITYPE_MASK || IsSoulHintItem(converted))
+            return { target.check, converted, target.locationText };
+    }
+    return {};
 }
 
 void Rando::MiscBehavior::SariasSongHint() {
@@ -283,17 +336,20 @@ void Rando::MiscBehavior::SariasSongHint() {
             entry.nextMessageID = 0x1B95;
             entry.msg = "Call out to an old friend for help? You can only do this once.\x02\x11\xC2Yes\x11No";
         } else if (playedSariasSongState == 2) {
-            RandoCheckId randoCheckId = GetProgressiveCheckInLogic();
+            const auto target = Rando::GetSariaHintTarget();
             entry.textboxType = TEXTBOX_TYPE_2;
 
-            if (randoCheckId == RC_UNKNOWN) {
+            if (!target.IsValid()) {
                 entry.msg = "... You call out but there is no response ...";
             } else {
                 entry.msg = "%g... Link? Is that you? Where have you been..?! Zelda has been worried sick about you! "
                             "... You need my help?\x10 Alright but just this once. Search %y{{location}}%g, you will "
-                            "find what you need. Hurry now!";
+                            "find %y{{item}}%g. Hurry now!";
                 CustomMessage::Replace(&entry.msg, "{{location}}",
-                                       Rando::StaticData::GetLocationNameForHint(randoCheckId, true));
+                                       target.locationText.empty()
+                                           ? Rando::StaticData::GetLocationNameForHint(target.check, true)
+                                           : target.locationText);
+                CustomMessage::Replace(&entry.msg, "{{item}}", Rando::StaticData::GetItemName(target.item));
                 Rando::RemoveItem(RI_SONG_SARIA);
                 SaveManager_PersistSariaHintsAvailable();
             }

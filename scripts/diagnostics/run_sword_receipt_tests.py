@@ -28,8 +28,8 @@ bridge = (ROOT / 'mm/2s2h/BenPort.cpp').read_text()
 companion = (ROOT / 'mm/mods/transformation_masks/assets/mm_asset_loader.cpp').read_text()
 common = model[:model.index('using f32=')]
 common = common.replace('name+=7;\n        auto it=', 'name+=7;\n        if(name[0]==\'@\'){const char* colon=strchr(name,\':\');if(!colon)return nullptr;name=colon+1;}\n        auto it=')
-ids = sorted(set(re.findall(r'\bRI_[A-Z0-9_]+\b', native)))
-declarations = 'enum RandoItemId {' + ','.join(ids) + '};\n'
+# The count query is pure native policy; use its real item IDs and declarations.
+declarations = '#include "mm/2s2h/Rando/DungeonItemVisuals.h"\n'
 binding_start = native.index('struct Binding {')
 binding_end = native.index('// Only roots', binding_start)
 declarations += native[binding_start:binding_end]
@@ -38,7 +38,11 @@ custom = (ROOT / 'mm/2s2h/CustomItem/CustomItem.h').read_text()
 flags_start = custom.index('enum CustomItemFlags')
 flags_end = custom.index('};',flags_start)+2
 declarations += '\nnamespace CustomItem {' + custom[flags_start:flags_end] + '}\n'
-production = '\n'.join(function(native, name) for name in [
+# Counted-ring geometry executes in its dedicated renderer fixtures. Any ring
+# draw reached by these sword receipts is a dispatch error.
+key_ring_boundary = function(draw, 'DrawKeyRing').split('{', 1)[0] + \
+    '{ assert(false && "sword receipt must not dispatch key-ring geometry"); }\n'
+production = key_ring_boundary + '\n'.join(function(native, name) for name in [
     'HasMmLegacyGiMod', 'GetSelectedOwnerGi', 'MM_DescribeNeiGi', 'MM_TryDrawNeiGi'])
 production += '\n' + native[native.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
 start = draw.index('    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;')

@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include "Rando/Rando.h"
+#include "Rando/SoulShuffle.h"
 #include <set>
 #include <string_view>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -10,6 +11,24 @@
 #endif
 
 namespace Rando {
+// A native check ID alone cannot identify an OoT-world placement.
+struct HintTarget {
+    RandoCheckId check = RC_UNKNOWN;
+    RandoItemId item = RI_UNKNOWN;
+    std::string locationText;
+    bool IsValid() const {
+        return check != RC_UNKNOWN || !locationText.empty();
+    }
+};
+std::vector<HintTarget> GetCrossWorldHintTargets(bool reachableOnly);
+HintTarget GetSariaHintTarget();
+HintTarget GetDesiredItemHintTarget(RandoItemId wish);
+
+inline bool HintPlacementOutstanding(RandoCheckId check) {
+    const auto& saved = RANDO_SAVE_CHECKS[check];
+    return saved.shuffled && !saved.obtained && !saved.cycleObtained && !saved.skipped;
+}
+
 struct RpgHintDefinition {
     RandoItemId item;
     std::string_view name;
@@ -93,6 +112,26 @@ inline RandoItemId HintProgressiveFamily(RandoItemId item) {
             return item;
     }
 }
+inline bool IsSoulHintItem(RandoItemId item) {
+    return (item >= RI_SOUL_BOSS_GOHT && item <= RI_SOUL_ENEMY_WOLFOS) || SoulShuffle::Find(item) != nullptr;
+}
+
+inline bool SoulHintUseful(RandoItemId item) {
+    int flag = -1;
+    RandoOptionId option = RO_MAX;
+    if (const auto* soul = SoulShuffle::Find(item)) {
+        flag = soul->flag;
+        option = soul->option;
+    } else if (item >= RI_SOUL_BOSS_GOHT && item <= RI_SOUL_ENEMY_WOLFOS) {
+        flag = item - RI_SOUL_BOSS_GOHT + RANDO_INF_OBTAINED_SOUL_OF_BOSS_GOHT;
+        option = item < RI_SOUL_ENEMY_ALIEN ? RO_SHUFFLE_BOSS_SOULS : RO_SHUFFLE_ENEMY_SOULS;
+    }
+    if (flag < 0)
+        return true;
+    return RANDO_SAVE_OPTIONS[option] &&
+           !(gSaveContext.save.shipSaveInfo.rando.randoInf[flag >> 4] & (1u << (flag & 0xF)));
+}
+
 inline bool IsHallmarkHintUpgrade(RandoItemId item) {
     return item == RI_DOUBLE_DEFENSE || HintProgressiveFamily(item) != item;
 }
@@ -108,6 +147,17 @@ inline RandoItemId MagicHintIdentity(RandoItemId item, RandoCheckId check) {
     if (item == RI_COMBO_FOREIGN) {
         const auto* foreign = MiscBehavior::MM_LookupForeign(check);
         if (foreign && !foreign->trap && foreign->itemGame == ComboRando::GAME_OOT) {
+            if (foreign->shared && foreign->itemName == ComboRando::SharedFamilyByIndex(ComboRando::SF_MAGIC).ootName)
+                return RI_PROGRESSIVE_MAGIC;
+            if (foreign->shared) {
+                for (const auto& pair : ComboRando::SharedSoulPairs) {
+                    if (foreign->itemName != pair.ootName)
+                        continue;
+                    for (const auto& [id, definition] : StaticData::Items)
+                        if (IsSoulHintItem(id) && definition.name && pair.mmName == std::string_view(definition.name))
+                            return id;
+                }
+            }
             auto upgrade = RpgHintIdentityFromName(foreign->itemName);
             if (upgrade != RI_UNKNOWN)
                 return upgrade;
