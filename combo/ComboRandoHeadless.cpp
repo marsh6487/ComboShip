@@ -391,6 +391,14 @@ int main(int argc, char** argv) {
             // oracle still gates on (OOT vanilla shop items, MM boss remains when not shuffled) live in
             // the dump's fixed[]. Merge them in so those gates (e.g. MM RemainsCount for the Moon) resolve.
             std::string sohDump = SOH_Dump(), mmDump = MM_Dump();
+            try {
+                ComboRando::ParseStaticDataDump(sohDump, "OOT replay");
+                ComboRando::ParseStaticDataDump(mmDump, "MM replay");
+            } catch (const std::exception& e) {
+                std::cerr << "[playthrough] native preparation failed: " << e.what() << "\n";
+                entranceRestoreFailed = true;
+                return ComboRando::PlaythroughResult{};
+            }
             const std::string sharedPairs = SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "";
             affordabilitySharedGroups =
                 ComboRando::BuildSharedItemGroups(ComboRando::ResolveSharedPairs(sharedPairs, mmDump), sharedMask);
@@ -529,7 +537,7 @@ int main(int argc, char** argv) {
         nlohmann::json pt1 = nlohmann::json::array();
         auto r1 = runPass(false, &pt1);
         if (entranceRestoreFailed) {
-            std::cerr << "[playthrough] could not restore the seed's entrance layout — no verdict\n";
+            std::cerr << "[playthrough] native replay setup failed — no verdict\n";
             return 2;
         }
         if (r1.beatable) {
@@ -546,6 +554,10 @@ int main(int argc, char** argv) {
         std::cout << "[playthrough] Pass 1 stuck (" << blocked(r1) << ") — retrying with ALL tricks\n";
         nlohmann::json pt2 = nlohmann::json::array();
         auto r2 = runPass(true, &pt2);
+        if (entranceRestoreFailed) {
+            std::cerr << "[playthrough] native replay setup failed — no verdict\n";
+            return 2;
+        }
         if (r2.beatable) {
             std::cout << "[playthrough] RESULT: beatable ONLY with tricks beyond the seed's settings (sphere "
                       << r2.beatableSphere << "). With the seed's tricks, Pass 1 got stuck: " << blocked(r1) << ".\n";

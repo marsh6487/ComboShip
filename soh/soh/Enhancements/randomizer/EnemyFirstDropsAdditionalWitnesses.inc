@@ -41,8 +41,9 @@ ENEMY_DROP_WITNESS(STALCHILD, RR_HYRULE_FIELD, SCENE_HYRULE_FIELD, RCQUEST_BOTH,
 // Native RC_LW_SKULL_KID belongs to RR_THE_LOST_WOODS. EnSkj_Init's
 // combat roles initialize health=10 and a sword-vulnerable damage table;
 // the additional hostile roles require the adult trade slot >= Poacher's Saw.
-// Requiring adult + an owned Saw is conservative and preserves that gate.
-ENEMY_DROP_WITNESS(SKULL_KID, RR_THE_LOST_WOODS, SCENE_LOST_WOODS, RCQUEST_BOTH, logic->IsAdult && logic->HasItem(RG_POACHERS_SAW) && logic->CanUseSword())
+// Every later adult-trade item occupies a slot >= Saw too. In particular,
+// unshuffled adult trade supplies Claim Check instead of a shuffled Saw.
+ENEMY_DROP_WITNESS(SKULL_KID, RR_THE_LOST_WOODS, SCENE_LOST_WOODS, RCQUEST_BOTH, logic->IsAdult && (logic->HasItem(RG_POACHERS_SAW) || logic->HasItem(RG_BROKEN_SWORD) || logic->HasItem(RG_PRESCRIPTION) || logic->HasItem(RG_EYEBALL_FROG) || logic->HasItem(RG_EYEDROPS) || logic->HasItem(RG_CLAIM_CHECK)) && logic->CanUseSword())
 // Native lake_hylia.cpp RC_LH_FREESTANDING_POH explicitly models the Guay
 // atop the adult laboratory roof. Preserve roof access, climb and airborne
 // distance, then require the native soul-aware kill instead of mere avoidance.

@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_okarina_tag.c
  * Overlay: ovl_En_Okarina_Tag
@@ -130,7 +131,8 @@ void func_80ABEF2C(EnOkarinaTag* this, PlayState* play) {
                         ocarinaSong = 0xA;
                     }
                     player->stateFlags2 |= PLAYER_STATE2_NEAR_OCARINA_ACTOR;
-                    func_8010BD58(play, ocarinaSong + OCARINA_ACTION_CHECK_SARIA);
+                    func_8010BD58(play, SongEvents_OotAction(play->sceneNum, this->actor.room, play->curSpawn,
+                                                             ocarinaSong + OCARINA_ACTION_CHECK_SARIA));
                     this->actionFunc = func_80ABF0CC;
                 } else if ((this->actor.xzDistToPlayer < (50.0f + this->interactRange) &&
                             ((fabsf(player->actor.world.pos.y - this->actor.world.pos.y) < 40.0f)))) {
@@ -203,16 +205,20 @@ void func_80ABF28C(EnOkarinaTag* this, PlayState* play) {
             if (player->stateFlags2 & PLAYER_STATE2_ATTEMPT_PLAY_FOR_ACTOR) {
                 switch (this->type) {
                     case 1:
-                        func_8010BD58(play, OCARINA_ACTION_CHECK_LULLABY);
+                        func_8010BD58(play, SongEvents_OotAction(play->sceneNum, this->actor.room, play->curSpawn,
+                                                                 OCARINA_ACTION_CHECK_LULLABY));
                         break;
                     case 2:
-                        func_8010BD58(play, OCARINA_ACTION_CHECK_STORMS);
+                        func_8010BD58(play, SongEvents_OotAction(play->sceneNum, this->actor.room, play->curSpawn,
+                                                                 OCARINA_ACTION_CHECK_STORMS));
                         break;
                     case 4:
-                        func_8010BD58(play, OCARINA_ACTION_CHECK_TIME);
+                        func_8010BD58(play, SongEvents_OotAction(play->sceneNum, this->actor.room, play->curSpawn,
+                                                                 OCARINA_ACTION_CHECK_TIME));
                         break;
                     case 6:
-                        func_8010BD58(play, OCARINA_ACTION_CHECK_LULLABY);
+                        func_8010BD58(play, SongEvents_OotAction(play->sceneNum, this->actor.room, play->curSpawn,
+                                                                 OCARINA_ACTION_CHECK_LULLABY));
                         break;
                     default:
                         // "Ocarina Invisible-kun demo start check error source"

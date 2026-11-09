@@ -76,7 +76,8 @@ namespace Rando { struct Context { Option option; static Context*GetInstance(){s
             state.options={RSK_SHUFFLE_ANIMAL_SOULS,RSK_SHUFFLE_NPC_SOULS};
             assert(!state.CanAccessSoulCheck(RC_LW_TRADE_COJIRO));
             state.owned={RG_SOUL_NPC_GROG};assert(state.CanAccessSoulCheck(RC_LW_TRADE_COJIRO));
-            state.owned.clear();assert(state.CanAccessSoulCheck(RC_LW_TRADE_ODD_POTION));
+            state.owned.clear();assert(!state.CanAccessSoulCheck(RC_LW_TRADE_ODD_POTION));
+            state.owned={RG_SOUL_NPC_KOKIRI};assert(state.CanAccessSoulCheck(RC_LW_TRADE_ODD_POTION));
             state.owned={RG_SOUL_ANIMAL_DOG};assert(!state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
             state.owned.insert(RG_SOUL_NPC_DOG_LADY);assert(state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
             state.owned.erase(RG_SOUL_ANIMAL_DOG);assert(!state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
@@ -131,8 +132,8 @@ namespace Rando::Logic {
             options[RO_SHUFFLE_ANIMAL_SOULS]=options[RO_SHUFFLE_NPC_SOULS]=1;
             for(auto c:{RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_HIGH_SCORE,RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_PERFECT_SCORE,
                         RC_SWAMP_SHOOTING_GALLERY_HIGH_SCORE,RC_SWAMP_SHOOTING_GALLERY_PERFECT_SCORE}){
-                assert(!SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,true);
-                assert(SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,false);
+                assert(!SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,true);Own(RI_SOUL_NPC_BAZAAR_SHOPKEEPER,true);
+                assert(SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,false);Own(RI_SOUL_NPC_BAZAAR_SHOPKEEPER,false);
             }
             Own(RI_SOUL_ANIMAL_CUCCO,true);assert(!checks.at(RC_ROMANI_RANCH_GROG).first());
             Own(RI_SOUL_NPC_GROG,true);assert(checks.at(RC_ROMANI_RANCH_GROG).first());

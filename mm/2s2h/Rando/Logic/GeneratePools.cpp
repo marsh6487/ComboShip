@@ -1,10 +1,14 @@
+#include "Rando/SongEvents.h"
+#include "Rando/VanillaCompatibility.h"
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
 #include "Rando/Lottery.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
+#include "Rando/MMEnvironment.h"
 #include "../../../../combo/NeiGracePolicy.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo-only items)
@@ -32,7 +36,13 @@ static void EnsureCommandMelodyInPool(std::vector<RandoItemId>& itemPool) {
         itemPool.push_back(RI_OOT_SONG_COMMAND_MELODY);
 }
 
-void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool) {
+void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool,
+                   bool preserveSongMapping) {
+    VanillaCompatibility::NormalizeSavedState(saveInfo);
+    if (!preserveSongMapping) {
+        Rando::SongEvents::ClearImportedMapping();
+    }
+    Rando::SongEvents::Generate(saveInfo, !preserveSongMapping);
     const bool hasOotGameplay = Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive();
 #ifdef COMBO_BUILD
     // ComboShip (#136): the launcher owns the goal, so the hunt toggle follows it (the Majora soul-lock
@@ -180,8 +190,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                 continue;
             }
 
-            if (randoStaticCheck.randoCheckType == RCTYPE_ICICLE &&
-                saveInfo.randoSaveOptions[RO_SHUFFLE_ICICLE_DROPS] == RO_GENERIC_NO) {
+            if (!MMEnvironment::SourceEligibleForSeed(randoCheckId, hasOotGameplay, saveInfo))
+                continue;
+            const auto environmentOption = MMEnvironment::OptionForType(randoStaticCheck.randoCheckType);
+            if (environmentOption != RO_MAX && saveInfo.randoSaveOptions[environmentOption] == RO_GENERIC_NO) {
                 continue;
             }
 
@@ -443,6 +455,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_RUSTY_KEYS]) {
+        for (const auto& key : RustyDoorKeys::Catalog)
+            itemPool.push_back(key.item);
+    }
+
     // Enemy Souls
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES) {
         for (int i = RI_SOUL_ENEMY_ALIEN; i <= RI_SOUL_ENEMY_WOLFOS; i++) {
@@ -612,8 +629,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }
-            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) || InfiniteUpgrades::Find(itemPool[i]) ||
-                itemPool[i] == RI_DEKU_STICK_BAG || itemPool[i] == RI_DEKU_NUT_BAG) {
+            if (RustyDoorKeys::Find(itemPool[i]) || itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) ||
+                InfiniteUpgrades::Find(itemPool[i]) || itemPool[i] == RI_DEKU_STICK_BAG ||
+                itemPool[i] == RI_DEKU_NUT_BAG) {
                 continue;
             }
             if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&

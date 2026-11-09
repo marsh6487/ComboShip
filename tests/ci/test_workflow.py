@@ -88,10 +88,26 @@ class WorkflowTests(unittest.TestCase):
         native = [step for step in steps if "native_seed_regression.py" in step.get("run", "")]
         self.assertEqual(len(native), 1)
         self.assertNotIn("continue-on-error", native[0])
+        self.assertIn("!cancelled()", native[0]["if"])
+        self.assertIn("steps.native_runtime.outcome == 'success'", native[0]["if"])
         self.assertIn("--case vanilla-on-excluded", native[0]["run"])
         self.assertIn("--case vanilla-off", native[0]["run"])
         evidence = next(step for step in steps if step.get("with", {}).get("name") == "native-first-drops-linux")
         self.assertEqual(evidence["if"], "always()")
+
+    def test_full_native_parity_matrix_is_required_and_retained(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build-linux.yml").read_text())["jobs"]["build"]["steps"]
+        native = [step for step in steps if "native_boss_key_regression.py" in step.get("run", "")]
+        self.assertEqual(len(native), 1)
+        self.assertNotIn("continue-on-error", native[0])
+        self.assertIn("!cancelled()", native[0]["if"])
+        self.assertIn("steps.native_runtime.outcome == 'success'", native[0]["if"])
+        self.assertNotIn("--case", native[0]["run"])
+        self.assertIn("--runtime-dir", native[0]["run"])
+        for name in ("native-first-drops-linux", "native-boss-keys-linux"):
+            evidence = next(step for step in steps if step.get("with", {}).get("name") == name)
+            self.assertEqual(evidence["if"], "always()")
+            self.assertIn("runtime/**", evidence["with"]["path"])
 
     def test_component_dispatch_preserves_builds_and_single_regression_group(self):
         dispatch = yaml.safe_load((ROOT / ".github/workflows/ci-check.yml").read_text())["jobs"]

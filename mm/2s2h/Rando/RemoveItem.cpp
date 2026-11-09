@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
@@ -20,6 +21,8 @@ void Rando::RemoveItem(RandoItemId randoItemId) {
     if (Bags::Remove(randoItemId))
         return;
     if (Wallets::Remove(randoItemId))
+        return;
+    if (RustyDoorKeys::Remove(randoItemId))
         return;
     // Soul catalog mm_remove begin
     if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {

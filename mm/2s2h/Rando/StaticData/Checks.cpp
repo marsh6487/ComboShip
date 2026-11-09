@@ -29,6 +29,9 @@ std::map<RandoCheckId, RandoStaticCheck> Checks = {
 #define MM_ICICLE(id, scene, room, index, region) RC(id, RCTYPE_ICICLE, scene, FLAG_NONE, 0, RI_JUNK),
 #include "Rando/MMEnvironmentIcicles.inc"
 #undef MM_ICICLE
+#define MM_ENVIRONMENT_CHECK(id, type, scene, region) RC(id, type, scene, FLAG_NONE, 0, RI_JUNK),
+#include "Rando/MMEnvironmentChecks.inc"
+#undef MM_ENVIRONMENT_CHECK
     RC(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2, RCTYPE_NPC, SCENE_TAKARAKUJI, FLAG_NONE, 0, RI_RUPEE_PURPLE),
     RC(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3, RCTYPE_NPC, SCENE_TAKARAKUJI, FLAG_NONE, 0, RI_RUPEE_PURPLE),
     RC(RC_LOST_WOODS_MAGIC_MIRROR_STUMP, RCTYPE_NPC, SCENE_LOST_WOODS, FLAG_NONE, 0, RI_OOT_NEI_MAGIC_MIRROR),

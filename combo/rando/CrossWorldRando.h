@@ -20,21 +20,13 @@
 #include <functional>
 #include <nlohmann/json.hpp>
 #include "gui/ComboGenProgress.h"
+#include "NativeRandoDump.h"
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
 #include "CrossDungeonReachability.h"
 #include "MagicMirrorShuffle.h"
 
 namespace ComboRando {
-
-// A native generator can return a diagnostic instead of a usable pool. Every
-// consumer, including the legacy fallback, must stop before publishing it.
-inline nlohmann::json ParseStaticDataDump(const std::string& dumpJson, const char* game) {
-    auto dump = nlohmann::json::parse(dumpJson);
-    if (dump.contains("error"))
-        throw std::runtime_error(std::string(game) + ": " + dump.at("error").get<std::string>());
-    return dump;
-}
 
 // ---------- Deterministic 64-bit LCG (Knuth / Newlib constants) ----------
 
@@ -100,8 +92,9 @@ enum class OotAccess { ALL_REACHABLE, BEATABLE_ONLY, NO_LOGIC };
 // Maps the OOT dump's "accessibility" block to a mode: No Logic wins; else ALR-off => BEATABLE_ONLY;
 // else ALL_REACHABLE. Missing/old dumps default to ALL_REACHABLE (unchanged behavior).
 inline OotAccess OotAccessFromDump(const std::string& sohDumpJson) {
+    const auto dump = ParseOptionalStaticDataDump(sohDumpJson, "OOT");
     try {
-        auto a = nlohmann::json::parse(sohDumpJson).value("accessibility", nlohmann::json::object());
+        auto a = dump.value("accessibility", nlohmann::json::object());
         if (a.value("noLogic", false))
             return OotAccess::NO_LOGIC;
         if (!a.value("allLocationsReachable", true))

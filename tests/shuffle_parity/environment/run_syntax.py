@@ -14,12 +14,12 @@ flags=['-DImTextureID=void*','-std=c++20','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DG
 for path in ('mm/include','mm/include/PR','mm/2s2h','mm','mm/src','mm/assets','libultraship/include','combo','combo/menu'):
  flags+=['-isystem',str(ROOT/path)]
 for mode in ('original','combo'):
- for path in ('ActorBehavior/BgIcicle.cpp','ActorBehavior/ActorBehavior.cpp','CheckTracker/CheckTracker.cpp','Logic/Regions/SnowheadTemple.cpp','StaticData/Checks.cpp','StaticData/Options.cpp','Logic/GeneratePools.cpp','Menu.cpp','../CustomItem/CustomItem.cpp'):
+ for path in ('ActorBehavior/BgIcicle.cpp','ActorBehavior/ActorBehavior.cpp','CheckTracker/CheckTracker.cpp',*[str(p.relative_to(ROOT/'mm/2s2h/Rando')) for p in sorted((ROOT/'mm/2s2h/Rando/Logic/Regions').glob('*.cpp')) if p.name in ('Central.cpp','East.cpp','GreatBayTemple.cpp','MilkRoad.cpp','Moon.cpp','North.cpp','SnowheadTemple.cpp','South.cpp','SpiderHouses.cpp','TerminaField.cpp','West.cpp')],'StaticData/Checks.cpp','StaticData/Options.cpp','Logic/GeneratePools.cpp','Menu.cpp','../CustomItem/CustomItem.cpp'):
   subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),
                   '-fsyntax-only',str(ROOT/'mm/2s2h/Rando'/path)],check=True)
   print('PASS complete native environmental translation unit',mode,path,flush=True)
 
- for path in ('mm/src/overlays/actors/ovl_Bg_Icicle/z_bg_icicle.c',):
+ for path in tuple('mm/src/overlays/actors/'+p for p in ('ovl_Bg_Icicle/z_bg_icicle.c','ovl_En_Ishi/z_en_ishi.c','ovl_Obj_Bombiwa/z_obj_bombiwa.c','ovl_Obj_Hamishi/z_obj_hamishi.c','ovl_Obj_Swprize/z_obj_swprize.c','ovl_Obj_Bean/z_obj_bean.c')):
   cflags=[f for f in flags if f not in ('-std=c++20','-include','nlohmann/json.hpp')]
   subprocess.run([os.environ.get('CC','cc'),'-std=c11',*cflags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),'-fsyntax-only',str(ROOT/path)],check=True)
   print('PASS complete native environmental C translation unit',mode,path,flush=True)

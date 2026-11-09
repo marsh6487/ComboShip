@@ -53,10 +53,24 @@ inline constexpr const Entry* Find(RandomizerCheck check) {
 struct HintSourceDescription {
     std::string en, de, fr;
 };
+// Native Text is EN/FR/DE; CustomMessage is EN/DE/FR. Named fields keep
+// source labels in the correct language when composed into a native clue.
+inline HintSourceDescription SourceNames(const Entry& entry) {
+    switch (entry.soul) {
+#define ENEMY_DROP_NAME(key, french, german) \
+    case RG_SOUL_ENEMY_##key:                \
+        return { entry.name, german, french };
+#include "EnemyFirstDropNames.inc"
+#undef ENEMY_DROP_NAME
+        default:
+            return { entry.name, entry.name, entry.name };
+    }
+}
 // Plain fragments: the enclosing native hint owns their accent and reset.
 inline HintSourceDescription HintSource(const Entry& entry) {
-    return { std::string("the first ") + entry.name + " drop", std::string("bei der ersten Beute von ") + entry.name,
-             std::string("premier butin de ") + entry.name };
+    const auto names = SourceNames(entry);
+    return { std::string("the first ") + names.en + " drop", std::string("bei der ersten Beute des Typs ") + names.de,
+             std::string("le premier butin du type ") + names.fr };
 }
 inline const Entry* ForActor(int actorId, uint16_t params, bool adult, bool gohmaArena) {
     // EnTp emits defeat for severed tail segments too. Only its negative-params

@@ -399,6 +399,7 @@ typedef struct RandoSaveInfo {
     u16 foundTriforcePieces;
     u8 sariaHintsAvailable;
     u16 sariaPriorityItems[16];
+    u8 songEvents[13]; // Seed-owned event songs, separate from song item ownership.
 #ifdef COMBO_BUILD
     u8 pendingTrapCount; // ComboShip: cross-world traps granted while MM was dormant; drained on activation
 #endif

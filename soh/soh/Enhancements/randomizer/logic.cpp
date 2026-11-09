@@ -1,6 +1,7 @@
 #include <initializer_list>
 #include "SoulShuffleEnemy.h"
 #include "SoulShuffle.h"
+#include "RustyDoorKeys.h"
 #include "rando/CrossEntranceBoss.h"
 #include <spdlog/spdlog.h>
 
@@ -57,6 +58,11 @@ bool Logic::CanAccessSoulCheck(RandomizerCheck check) {
 }
 
 bool Logic::HasItem(RandomizerGet itemName) {
+    if (RustyDoorKeys::Find(itemName)) {
+        return RustyDoorKeys::CanUse(itemName, static_cast<bool>(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS)),
+                                     ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get(), HasItem(RG_SKELETON_KEY),
+                                     [this](RandomizerInf flag) { return CheckRandoInf(flag); });
+    }
     // Soul catalog oot_has begin
     if (const auto* soul = SoulShuffle::Find(itemName)) {
         return !ctx->GetOption(soul->option) || CheckRandoInf(soul->flag);
@@ -237,6 +243,7 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_LOST_WOODS_BRIDGE_BEAN_SOUL:
         case RG_LOST_WOODS_BEAN_SOUL:
         case RG_ZORAS_RIVER_BEAN_SOUL:
+        case RG_CLOCK:
         case RG_SKELETON_KEY:
         case RG_RUTOS_LETTER:
             return CheckRandoInf(StaticData::RandoGetToRandInf.at(itemName));
@@ -1730,12 +1737,12 @@ bool Logic::WaterLevel(RandoWaterLevel level) {
             return Get(LOGIC_WATER_LOW) ||
                    // if we could get LOW from HIGH and HIGH from MID, then we can move to LOW from any water level
                    (Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) &&
-                    (Get(LOGIC_WATER_COULD_HIGH_FROM_MID) || Get(LOGIC_WATER_HIGH)) && CanUse(RG_ZELDAS_LULLABY));
+                    (Get(LOGIC_WATER_COULD_HIGH_FROM_MID) || Get(LOGIC_WATER_HIGH)) && CanPlaySongEvent(11));
         case WL_LOW_OR_MID:
             return Get(LOGIC_WATER_LOW) || Get(LOGIC_WATER_MIDDLE) ||
                    // The water level is either at HIGH, in which case we can set it to LOW, LOW, or MID, so we only
                    // have to check COULD_LOW and ZL
-                   ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_LOW)) && CanUse(RG_ZELDAS_LULLABY));
+                   ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_LOW)) && CanPlaySongEvent(11));
         case WL_MID:
             return Get(LOGIC_WATER_MIDDLE) ||
                    // LOGIC_WATER_COULD_MIDDLE is LOGIC_WATER_COULD_MIDDLE_FROM_LOW in practice, due to WL_LOW being a
@@ -1744,7 +1751,7 @@ bool Logic::WaterLevel(RandoWaterLevel level) {
                    // If we have COULD_MIDDLE, we know we could move to LOW from HIGH,
                    // we're either already MID, on LOW can set MID, or on HIGH so you can set LOW and thus MID.
                    ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_COULD_LOW)) &&
-                    Get(LOGIC_WATER_COULD_MIDDLE) && CanUse(RG_ZELDAS_LULLABY));
+                    Get(LOGIC_WATER_COULD_MIDDLE) && CanPlaySongEvent(11));
         case WL_HIGH:
             // If we don't have ZL, we're stuck on high anyway, so we only need to check for if we can reset it to high
             return Get(LOGIC_WATER_HIGH) ||
@@ -2499,6 +2506,7 @@ std::map<RandomizerGet, uint32_t> StaticData::RandoGetToRandInf = {
     { RG_ZORA_MASK, RAND_INF_CHILD_TRADES_HAS_MASK_ZORA },
     { RG_GERUDO_MASK, RAND_INF_CHILD_TRADES_HAS_MASK_GERUDO },
     { RG_MASK_OF_TRUTH, RAND_INF_CHILD_TRADES_HAS_MASK_TRUTH },
+    { RG_CLOCK, RAND_INF_CLOCK },
     { RG_SKELETON_KEY, RAND_INF_HAS_SKELETON_KEY },
     { RG_GREG_RUPEE, RAND_INF_GREG_FOUND },
     { RG_SPEAK_DEKU, RAND_INF_CAN_SPEAK_DEKU },
@@ -2510,6 +2518,9 @@ std::map<RandomizerGet, uint32_t> StaticData::RandoGetToRandInf = {
     { RG_FISHING_POLE, RAND_INF_FISHING_POLE_FOUND },
     { RG_SCARECROWS_SONG, RAND_INF_HAS_SCARECROWS_SONG },
     { RG_ROCS_FEATHER, RAND_INF_OBTAINED_ROCS_FEATHER },
+    { RG_RUSTY_KEY_HYRULE_CASTLE, RAND_INF_RUSTY_KEY_HYRULE_CASTLE },
+    { RG_RUSTY_KEY_RANCH_HOUSE_ROOM, RAND_INF_RUSTY_KEY_RANCH_HOUSE_ROOM },
+    { RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK, RAND_INF_RUSTY_KEY_ADULT_POTION_SHOP_BACK },
     { RG_GUARD_HOUSE_KEY, RAND_INF_GUARD_HOUSE_KEY_OBTAINED },
     { RG_MARKET_BAZAAR_KEY, RAND_INF_MARKET_BAZAAR_KEY_OBTAINED },
     { RG_MARKET_POTION_SHOP_KEY, RAND_INF_MARKET_POTION_SHOP_KEY_OBTAINED },
@@ -2676,6 +2687,10 @@ std::set<RandomizerGet> StaticData::allowBottleMaskTrade = { RG_KEATON_MASK,
 
 void Logic::ApplyItemEffect(Item& item, bool state) {
     auto randoGet = item.GetRandomizerGet();
+    if (const auto* key = RustyDoorKeys::Find(randoGet)) {
+        SetRandoInf(key->flag, state);
+        return;
+    }
     // Soul catalog oot_effect begin
     if (const auto* soul = SoulShuffle::Find(randoGet)) {
         SetRandoInf(soul->flag, state);
@@ -3034,6 +3049,7 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
                 case RG_MASK_OF_TRUTH:
                 case RG_GREG_RUPEE:
                 case RG_SPEAK_DEKU:
+                case RG_CLOCK:
                 case RG_SPEAK_GERUDO:
                 case RG_SPEAK_GORON:
                 case RG_SPEAK_HYLIAN:

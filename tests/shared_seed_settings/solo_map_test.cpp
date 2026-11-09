@@ -2,6 +2,7 @@
 // gate. Config/SoH service calls are boundary observers; native save types are real.
 #include <nlohmann/json.hpp>
 #include "Rando/Rando.h"
+#include "Rando/VanillaCompatibility.h"
 #include "Rando/ItemReceiptText.h"
 #include "combo/ComboGameMode.h"
 #include "combo/gui/WhatsNew.h"

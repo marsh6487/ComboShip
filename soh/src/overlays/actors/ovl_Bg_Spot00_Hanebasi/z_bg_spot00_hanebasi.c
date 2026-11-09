@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 /*
  * File: z_bg_spot00_hanebasi.c
  * Overlay: ovl_Bg_Spot00_Hanebasi
@@ -215,7 +216,7 @@ void BgSpot00Hanebasi_Update(Actor* thisx, PlayState* play) {
         if (play->sceneNum == SCENE_HYRULE_FIELD) {
             if (CHECK_QUEST_ITEM(QUEST_KOKIRI_EMERALD) && CHECK_QUEST_ITEM(QUEST_GORON_RUBY) &&
                 CHECK_QUEST_ITEM(QUEST_ZORA_SAPPHIRE) && !Flags_GetEventChkInf(EVENTCHKINF_ZELDA_FLED_HYRULE_CASTLE) &&
-                LINK_IS_CHILD) {
+                Randomizer_SoulCanAccessCheck(RC_HF_OCARINA_OF_TIME_ITEM) && LINK_IS_CHILD) {
                 Player* player = GET_PLAYER(play);
 
                 if ((player->actor.world.pos.x > -450.0f) && (player->actor.world.pos.x < 450.0f) &&

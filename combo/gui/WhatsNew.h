@@ -19,6 +19,24 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRando.Options.RO_SHUFFLE_RUSTY_KEYS", Kind::New,
+      "Lock MM overworld doors with permanent matching keys; native schedules and forms still apply." },
+    { "gRandoSettings.LockOverworldDoors", Kind::Updated,
+      "OoT overworld door keys cover the complete native door catalogue." },
+    { "gRando.Options.RO_SHUFFLE_ROCK_DROPS", Kind::New, "Shuffle MM small rocks and authored rock rings." },
+    { "gRando.Options.RO_SHUFFLE_BOULDER_DROPS", Kind::New,
+      "Shuffle MM bombable boulders with native size and damage requirements." },
+    { "gRando.Options.RO_SHUFFLE_RED_BOULDER_DROPS", Kind::New,
+      "Shuffle MM red boulders with native Goron and powder-keg interactions." },
+    { "gRando.Options.RO_SHUFFLE_ICICLE_DROPS", Kind::New,
+      "Shuffle MM stalagmites in Snowhead, Great Bay and the Goron Moon trial." },
+    { "gRando.Options.RO_SHUFFLE_SOIL_DROPS", Kind::New,
+      "Shuffle each soft-soil reward after a fresh native bug interaction." },
+
+    { "gRandoSettings.ShuffleSongEvents", Kind::New, "Shuffle songs required by OoT world events." },
+    { "gRandoSettings.ShuffleClock", Kind::New, "Lock OoT time until the Clock is found." },
+    { "gRandoSettings.ClockStart", Kind::New, "Configure OoT time before finding the Clock." },
+    { "gRando.Options.RO_SHUFFLE_SONG_EVENTS", Kind::New, "Shuffle songs required by MM world events." },
     { "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS", Kind::New,
       "Give each MM lottery night its own reward, with daytime tickets and evening winnings." },
     { "gRando.Options.RO_INFINITE_UPGRADES", Kind::New,

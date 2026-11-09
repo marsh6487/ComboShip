@@ -1,3 +1,5 @@
+#include "combo/rando/SongEventsBridge.h"
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 /*
  * File: z_en_dai.c
  * Overlay: ovl_En_Dai
@@ -221,7 +223,8 @@ s32 func_80B3E69C(EnDai* this, PlayState* play) {
 s32 func_80B3E7C8(EnDai* this, PlayState* play) {
     s32 ret = false;
 
-    if (((this->unk_1CE & SUBS_OFFER_MODE_MASK) != SUBS_OFFER_MODE_NONE) &&
+    if (MM_SoulCanInteract(play, this->actor.id, (u16)this->actor.params) &&
+        ((this->unk_1CE & SUBS_OFFER_MODE_MASK) != SUBS_OFFER_MODE_NONE) &&
         Actor_TalkOfferAccepted(&this->actor, &play->state)) {
         SubS_SetOfferMode(&this->unk_1CE, SUBS_OFFER_MODE_NONE, SUBS_OFFER_MODE_MASK);
         this->actionFunc = func_80B3EF90;
@@ -453,10 +456,11 @@ void func_80B3EE8C(EnDai* this, PlayState* play) {
 void func_80B3EEDC(EnDai* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
 
-    if (GameInteractor_Should(VB_OPEN_SNOWHEAD_FROM_SONG,
+    if (MM_SoulCanInteract(play, this->actor.id, (u16)this->actor.params) &&
+        GameInteractor_Should(VB_OPEN_SNOWHEAD_FROM_SONG,
                               (player->transformation == PLAYER_FORM_GORON) &&
                                   (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-                                  (play->msgCtx.lastPlayedSong == OCARINA_SONG_GORON_LULLABY),
+                                  (play->msgCtx.lastPlayedSong == SongEvents_MmSong(1, OCARINA_SONG_GORON_LULLABY)),
                               this)) {
         EnDai_ChangeAnim(this, ENDAI_ANIM_1);
         this->actionFunc = func_80B3EE8C;
@@ -612,7 +616,7 @@ void EnDai_Update(Actor* thisx, PlayState* play) {
         if (!(player->stateFlags2 & PLAYER_STATE2_USING_OCARINA)) {
             SkelAnime_Update(&this->skelAnime);
             func_80B3E834(this);
-            if (!(this->unk_1CE & 0x200)) {
+            if (!(this->unk_1CE & 0x200) && MM_SoulCanInteract(play, this->actor.id, (u16)this->actor.params)) {
                 SubS_Offer(&this->actor, play, 0.0f, 0.0f, PLAYER_IA_NONE, this->unk_1CE & SUBS_OFFER_MODE_MASK);
             }
             func_80B3E460(this);

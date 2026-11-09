@@ -1,3 +1,4 @@
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 /*
  * File: z_en_bombers2.c
  * Overlay: ovl_En_Bombers2
@@ -414,7 +415,9 @@ void EnBombers2_Update(Actor* thisx, PlayState* play) {
     }
     Actor_SetFocus(&this->actor, 20.0f);
     Actor_SetScale(&this->actor, 0.008f);
-    this->actionFunc(this, play);
+    if (MM_SoulCanInteract(play, this->actor.id, (u16)this->actor.params)) {
+        this->actionFunc(this, play);
+    }
     Actor_MoveWithGravity(&this->actor);
     Math_SmoothStepToS(&this->unk_28A, this->unk_290, 1, 0xBB8, 0);
     Math_SmoothStepToS(&this->unk_288, this->unk_28E, 1, 0xBB8, 0);

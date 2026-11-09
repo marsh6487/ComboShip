@@ -1,3 +1,4 @@
+#include "combo/rando/SongEvents.h"
 #include "Spoiler.h"
 #include "Rando/Rando.h"
 
@@ -10,6 +11,13 @@ nlohmann::json GenerateFromSaveContext() {
     spoiler["type"] = "2S2H_RANDO_SPOILER";
     spoiler["commitHash"] = gSaveContext.save.shipSaveInfo.commitHash;
     spoiler["finalSeed"] = gSaveContext.save.shipSaveInfo.rando.finalSeed;
+    spoiler["songEvents"] = gSaveContext.save.shipSaveInfo.rando.songEvents;
+    for (unsigned event = 0; event < 13; ++event) {
+        auto song = gSaveContext.save.shipSaveInfo.rando.songEvents[event];
+        if (song < 20)
+            spoiler["songEventAssignments"][ComboRando::SongEvents::MmLabels[event]] =
+                ComboRando::SongEvents::SongLabels[song];
+    }
 
     spoiler["options"] = nlohmann::json::object();
     for (auto& [randoOptionId, randoStaticOption] : Rando::StaticData::Options) {

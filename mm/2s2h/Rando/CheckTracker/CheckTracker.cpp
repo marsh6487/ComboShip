@@ -152,6 +152,10 @@ std::vector<const char*> checkTypeIconList = {
     /*RCTYPE_TREE*/ gItemIconDekuStickTex,
     /*RCTYPE_WONDER_ITEM*/ gPauseUnusedCursorTex,
     /*RCTYPE_ICICLE*/ gMagicArrowEquipEffectTex,
+    /*RCTYPE_ROCK*/ gMagicArrowEquipEffectTex,
+    /*RCTYPE_BOULDER*/ gMagicArrowEquipEffectTex,
+    /*RCTYPE_RED_BOULDER*/ gMagicArrowEquipEffectTex,
+    /*RCTYPE_SOIL*/ gMagicArrowEquipEffectTex,
 };
 
 static constexpr ImVec4 tintColor = {};
@@ -161,12 +165,13 @@ std::string GetTotalCheckCount() {
     uint32_t collected = 0;
     uint32_t totalShuffled = 0;
     for (auto& [_, randoStaticCheck] : Rando::StaticData::Checks) {
-        if (RANDO_SAVE_CHECKS[randoStaticCheck.randoCheckId].obtained ||
-            RANDO_SAVE_CHECKS[randoStaticCheck.randoCheckId].skipped) {
-            collected++;
+        const auto& check = RANDO_SAVE_CHECKS[randoStaticCheck.randoCheckId];
+        if (!check.shuffled) {
+            continue;
         }
-        if (RANDO_SAVE_CHECKS[randoStaticCheck.randoCheckId].shuffled) {
-            totalShuffled++;
+        totalShuffled++;
+        if (check.obtained || check.skipped) {
+            collected++;
         }
     }
     totalChecks = std::to_string(collected);

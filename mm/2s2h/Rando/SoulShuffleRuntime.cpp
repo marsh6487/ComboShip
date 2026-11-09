@@ -7,7 +7,7 @@ extern "C" {
 #include "variables.h"
 }
 
-extern "C" int MM_SoulCanSpawnNonEnemy(PlayState* play, int actorId, unsigned int params) {
+extern "C" int MM_SoulCanInteract(PlayState* play, int actorId, unsigned int params) {
     if (!play || !IS_RANDO || gSaveContext.gameMode == GAMEMODE_END_CREDITS) {
         return true;
     }
@@ -22,6 +22,11 @@ extern "C" int MM_SoulCanSpawnNonEnemy(PlayState* play, int actorId, unsigned in
 #undef SOUL_NPC
     RandoItemId item = RI_UNKNOWN;
     switch (actorId) {
+        case ACTOR_EN_DNP:
+            // A released bottle keeps the same source ownership in every scene.
+            if ((params & 7) == 1)
+                item = RI_SOUL_NPC_DEKU_PRINCESS;
+            break;
         case ACTOR_EN_SOB1:
 #define SOUL_SHOP(scene, role, soul)                      \
     if (play->sceneId == scene && (params & 0xF) == role) \
@@ -67,4 +72,13 @@ extern "C" int MM_SoulCanSpawnNonEnemy(PlayState* play, int actorId, unsigned in
     }
     const auto* soul = Rando::SoulShuffle::Find(item);
     return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+}
+
+extern "C" int MM_SoulCanSpawnNonEnemy(PlayState* play, int actorId, unsigned int params) {
+    // Physical blockers remain in place; their native updates gate interaction.
+    // Acquiring a soul must never reintroduce a barrier on a later scene load.
+    if (play && ((actorId == ACTOR_EN_DAI && play->sceneId == SCENE_12HAKUGINMAE) ||
+                 (actorId == ACTOR_EN_BOMBERS2 && play->sceneId == SCENE_TOWN)))
+        return true;
+    return MM_SoulCanInteract(play, actorId, params);
 }

@@ -4175,12 +4175,16 @@ void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry) {
 // object_obj_tokeidai is MM-unique (no OoT folder), so plain GSP_MM_DL is safe.
 // =============================================================================
 void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry) {
-    if (!MmAssets_IsAvailable())
+    if (!MmAssets_IsAvailable()) {
+        if (getItemEntry->getItemId == RG_CLOCK)
+            GetItem_Draw(play, GID_STONE_OF_AGONY);
         return;
+    }
 
     f32 clockFaceRotation;    // Z rotation of the clock face
     f32 sunMoonPanelRotation; // Y rotation of the sun/moon panel
     switch ((RandomizerGet)getItemEntry->getItemId) {
+        case RG_CLOCK:
         case RG_MM_TIME_DAY_1:
         case RG_MM_TIME_DAY_2:
         case RG_MM_TIME_DAY_3:

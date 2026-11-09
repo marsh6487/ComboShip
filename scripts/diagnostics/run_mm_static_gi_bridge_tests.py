@@ -22,6 +22,25 @@ if '// Static custom GI bridge recipes.' in owner:
     b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)
     helpers += '\n' + owner[a:b]
 fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
+# The complete extracted custom descriptor contains the added-soul branch.
+# Preserve its actual enum/catalog/resource include protocol. The fixture's
+# previous Get-only enum and synthetic PATH handles duplicate those headers.
+get_enum = '''#define RANDO_ENUM_BEGIN(x) enum x {
+#define RANDO_ENUM_ITEM(x) x,
+#define RANDO_ENUM_END(x) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"'''
+assert fixture.count(get_enum) == 1, 'Missing prior fixture Get enum boundary'
+fixture = fixture.replace(get_enum, '''#include "soh/soh/Enhancements/randomizer/randomizerTypes.h"
+#include "soh/soh/Enhancements/randomizer/SoulShuffle.h"
+#include "soh/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
+#include "soh/assets/soh_assets.h"''')
+resource_names = set(re.findall(r'static const ALIGN_ASSET\(2\) char (\w+)\[\]',
+                                (ROOT/'soh/assets/soh_assets.h').read_text()))
+fixture = re.sub(r'PATH\((\w+)\)', lambda match: '' if match[1] in resource_names else match[0], fixture)
+assert fixture.count('constexpr int TABLE_RANDOMIZER=1;') == 1, 'Missing prior fixture table boundary'
+fixture = fixture.replace('constexpr int TABLE_RANDOMIZER=1;', '')  # native TableIndex now owns it
+
+
 fixture=fixture.replace('int main() {','int main() {\n'+(ROOT/'tests/nei_gi/legacy_catalog_test.inc').read_text(),1)
 # The production resolver uses a once-only warning and the native song-note asset.
 # Logging is outside this draw-submission fixture, as in the mask bridge fixture.

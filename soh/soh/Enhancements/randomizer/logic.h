@@ -84,6 +84,8 @@ class Logic {
     bool ShopItemNotForSale(RandomizerCheck loc);
     bool HookshotOrBoomerang();
     bool ScarecrowsSong();
+    bool CanPlaySongEvent(unsigned event);
+    bool ClockAllowsTimePass();
     bool BlueFire();
     bool HasExplosives();
     bool BlastOrSmash();

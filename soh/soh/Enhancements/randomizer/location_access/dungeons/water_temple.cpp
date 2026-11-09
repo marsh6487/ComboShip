@@ -164,7 +164,7 @@ void RegionTable_Init_WaterTemple() {
 
     areaTable[RR_WATER_TEMPLE_LOW_EMBLEM] = Region("Water Temple Low Emblem", SCENE_WATER_TEMPLE, {
         //Events
-        EVENT_ACCESS(LOGIC_WATER_LOW,       logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_WATER_LOW,       logic->CanPlaySongEvent(11)),
         EVENT_ACCESS(LOGIC_WATER_COULD_LOW, true),
     }, {}, {
         //Exits
@@ -409,7 +409,7 @@ void RegionTable_Init_WaterTemple() {
 
     areaTable[RR_WATER_TEMPLE_PILLAR_2F] = Region("Water Temple Pillar 2F", SCENE_WATER_TEMPLE, {
         //Events
-        EVENT_ACCESS(LOGIC_WATER_MIDDLE,       logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_WATER_MIDDLE,       logic->CanPlaySongEvent(11)),
         EVENT_ACCESS(LOGIC_WATER_COULD_MIDDLE, true),
     }, {
         //Locations
@@ -861,7 +861,7 @@ void RegionTable_Init_WaterTemple() {
     areaTable[RR_WATER_TEMPLE_MQ_LOW_EMBLEM] = Region("Water Temple MQ Low Emblem", SCENE_WATER_TEMPLE, {
         //Events
         EVENT_ACCESS(LOGIC_WATER_COULD_LOW, true),
-        EVENT_ACCESS(LOGIC_WATER_LOW,       logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_WATER_LOW,       logic->CanPlaySongEvent(11)),
     }, {}, {
         //Exits
         ENTRANCE(RR_WATER_TEMPLE_MQ_3_STALFOS_ROOM, logic->WaterLevel(WL_HIGH) && logic->HasFireSource()),
@@ -907,7 +907,7 @@ void RegionTable_Init_WaterTemple() {
     areaTable[RR_WATER_TEMPLE_MQ_PILLAR_2F] = Region("Water Temple MQ Central Pillar 2F", SCENE_WATER_TEMPLE, {
         //Events
         EVENT_ACCESS(LOGIC_WATER_COULD_MIDDLE,         true),
-        EVENT_ACCESS(LOGIC_WATER_MIDDLE,               logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_WATER_MIDDLE,               logic->CanPlaySongEvent(11)),
         //It's possible to do this even on low water, but more awkward. I'm not sure if it's even possible for it to be relevant though.
         EVENT_ACCESS(LOGIC_WATER_MQ_B1_OPENED_PILLAR,  ctx->GetTrickOption(RT_WATER_MQ_CENTRAL_PILLAR) && (logic->HasFireProjectile())),
         EVENT_ACCESS(LOGIC_WATER_MQ_PILLAR_SOT_BLOCK,  logic->CanUse(RG_HOOKSHOT) && logic->CanUse(RG_SONG_OF_TIME)),

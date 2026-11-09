@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_dm_char01.c
  * Overlay: ovl_Dm_Char01
@@ -181,7 +182,7 @@ void func_80AA8698(DmChar01* this, PlayState* play) {
     if (GameInteractor_Should(VB_OPEN_WOODFALL_FROM_SONG,
                               (player->transformation == PLAYER_FORM_DEKU) &&
                                   (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-                                  (play->msgCtx.lastPlayedSong == OCARINA_SONG_SONATA),
+                                  (play->msgCtx.lastPlayedSong == SongEvents_MmSong(0, OCARINA_SONG_SONATA)),
                               this)) {
 
         if ((player2->actor.world.pos.x > -40.0f) && (player2->actor.world.pos.x < 40.0f) &&

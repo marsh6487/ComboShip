@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -9,9 +10,9 @@ void RegionTable_Init_Kakariko() {
         //Events
         EVENT_ACCESS(LOGIC_BUG_ACCESS,         logic->HasItem(RG_POWER_BRACELET)),
         //Open Gate setting is applied in RR_ROOT
-        EVENT_ACCESS(LOGIC_KAKARIKO_GATE_OPEN, logic->IsChild && logic->HasItem(RG_ZELDAS_LETTER)),
+        EVENT_ACCESS(LOGIC_KAKARIKO_GATE_OPEN, logic->HasItem(RG_SOUL_NPC_HYLIAN_GUARD) && logic->IsChild && logic->HasItem(RG_ZELDAS_LETTER)),
         //Needs wallet to be able to get another mask after selling Keaton
-        EVENT_ACCESS(LOGIC_SOLD_KEATON_MASK,   logic->IsChild && logic->Get(LOGIC_KAKARIKO_GATE_OPEN) && logic->HasItem(RG_KEATON_MASK) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_SOLD_KEATON_MASK,   logic->HasItem(RG_SOUL_NPC_HYLIAN_GUARD) && logic->IsChild && logic->Get(LOGIC_KAKARIKO_GATE_OPEN) && logic->HasItem(RG_KEATON_MASK) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_SHEIK_IN_KAKARIKO,                     logic->IsAdult && logic->HasItem(RG_FOREST_MEDALLION) && logic->HasItem(RG_FIRE_MEDALLION) && logic->HasItem(RG_WATER_MEDALLION)),
@@ -147,14 +148,14 @@ void RegionTable_Init_Kakariko() {
     areaTable[RR_KAK_BEHIND_POTION_SHOP] = Region("Kak Behind Potion Shop", SCENE_KAKARIKO_VILLAGE, {}, {}, {
         //Exits
         ENTRANCE(RR_KAK_BACKYARD,    true),
-        ENTRANCE(RR_KAK_POTION_SHOP, logic->IsAdult && logic->AtDay && logic->HasItem(RG_KAK_POTION_SHOP_KEY)),
+        ENTRANCE(RR_KAK_POTION_SHOP, logic->IsAdult && logic->AtDay && logic->HasItem(RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK)),
         //can ledgegrab fence to rooftop with hover boots, but that's more difficult than the unintuitive jump, so not including in default logic
         ENTRANCE(RR_KAK_ROOFTOP,     ctx->GetTrickOption(RT_HOVER_BOOST_SIMPLE) && logic->CanUse(RG_HOVER_BOOTS) && logic->CanUse(RG_MEGATON_HAMMER)),
     });
 
     areaTable[RR_KAK_CARPENTER_BOSS_HOUSE] = Region("Kak Carpenter Boss House", SCENE_KAKARIKO_CENTER_GUEST_HOUSE, {
         //Events
-        EVENT_ACCESS(LOGIC_WAKE_UP_ADULT_TALON, logic->IsAdult && logic->CanUse(RG_POCKET_EGG)),
+        EVENT_ACCESS(LOGIC_WAKE_UP_ADULT_TALON, logic->HasItem(RG_SOUL_NPC_TALON) && logic->IsAdult && logic->CanUse(RG_POCKET_EGG)),
     }, {}, {
         //Exits
         ENTRANCE(RR_KAKARIKO_VILLAGE, true),
@@ -193,14 +194,14 @@ void RegionTable_Init_Kakariko() {
 
     areaTable[RR_KAK_WINDMILL_LOWER] = Region("Kak Windmill Lower", SCENE_WINDMILL_AND_DAMPES_GRAVE, {
         //Events
-        EVENT_ACCESS(LOGIC_DRAIN_WELL, logic->IsChild && logic->CanUse(RG_SONG_OF_STORMS)),
+        EVENT_ACCESS(LOGIC_DRAIN_WELL, logic->IsChild && logic->CanPlaySongEvent(1)),
     }, {
         //Locations
         LOCATION(RC_KAK_WINDMILL_FREESTANDING_POH, logic->CanUse(RG_BOOMERANG)),
         LOCATION(RC_SONG_FROM_WINDMILL,            logic->IsAdult && logic->CanUse(RG_FAIRY_OCARINA)),
     }, {
         //Exits
-        ENTRANCE(RR_KAKARIKO_VILLAGE,   true),
+        ENTRANCE(RR_KAKARIKO_VILLAGE, true),
         ENTRANCE(RR_KAK_WINDMILL_UPPER, (logic->IsAdult && (ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS) || logic->CanGroundJump())) || (logic->IsChild && logic->CanJumpslash() && ctx->GetTrickOption(RT_KAK_CHILD_WINDMILL_POH))),
     });
 

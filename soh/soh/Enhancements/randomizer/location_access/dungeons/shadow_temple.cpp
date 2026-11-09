@@ -335,7 +335,7 @@ void RegionTable_Init_ShadowTemple() {
         //Exits
         ENTRANCE(RR_SHADOW_TEMPLE_ROOM_TO_BOAT,    logic->SmallKeys(SCENE_SHADOW_TEMPLE, 4)),
         ENTRANCE(RR_SHADOW_TEMPLE_SPINNING_BLADES, logic->Get(LOGIC_SHADOW_SHORTCUT_BLOCK) && logic->HasItem(RG_CLIMB)),
-        ENTRANCE(RR_SHADOW_TEMPLE_BEYOND_BOAT,     ((logic->IsAdult && ((logic->HasStrength(1) && logic->HasItem(RG_CLIMB)) || ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS))) || (ctx->GetTrickOption(RT_HOOKSHOT_LADDERS) && logic->CanUse(RG_HOOKSHOT))) && logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_SHADOW_TEMPLE_BEYOND_BOAT,     ((logic->IsAdult && ((logic->HasStrength(1) && logic->HasItem(RG_CLIMB)) || ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS))) || (ctx->GetTrickOption(RT_HOOKSHOT_LADDERS) && logic->CanUse(RG_HOOKSHOT))) && logic->CanPlaySongEvent(12)),
     });
 
     areaTable[RR_SHADOW_TEMPLE_BEYOND_BOAT] = Region("Shadow Temple Beyond Boat", SCENE_SHADOW_TEMPLE, {
@@ -848,7 +848,7 @@ void RegionTable_Init_ShadowTemple() {
         //Exits
         ENTRANCE(RR_SHADOW_TEMPLE_MQ_SHORTCUT_PATH, logic->Get(LOGIC_SHADOW_SHORTCUT_BLOCK) && logic->HasItem(RG_CLIMB)),
         ENTRANCE(RR_SHADOW_TEMPLE_MQ_B4_GIBDO_ROOM, logic->SmallKeys(SCENE_SHADOW_TEMPLE, 5)),
-        ENTRANCE(RR_SHADOW_TEMPLE_MQ_BEYOND_BOAT,   ((logic->IsAdult && ((logic->HasStrength(1) && logic->HasItem(RG_CLIMB)) || ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS))) || logic->CanUse(RG_HOOKSHOT)) && logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_SHADOW_TEMPLE_MQ_BEYOND_BOAT,   ((logic->IsAdult && ((logic->HasStrength(1) && logic->HasItem(RG_CLIMB)) || ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS))) || logic->CanUse(RG_HOOKSHOT)) && logic->CanPlaySongEvent(12)),
     });
 
     areaTable[RR_SHADOW_TEMPLE_MQ_BEYOND_BOAT] = Region("Shadow Temple MQ Beyond Boat", SCENE_SHADOW_TEMPLE, {

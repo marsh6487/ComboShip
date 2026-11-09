@@ -1,3 +1,4 @@
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/SoulShuffle.h"
 #ifndef RANDO_LOGIC_H
 #define RANDO_LOGIC_H
@@ -32,6 +33,9 @@ unsigned char ExtEquip_HasItem(short equipType, unsigned char index);
 
 namespace Rando {
 
+namespace SongEvents {
+bool CanPlay(unsigned event);
+}
 namespace Logic {
 
 // Time slice enum - 45 granular time points throughout MM's 3-day cycle
@@ -140,7 +144,9 @@ inline void SetCurrentRegionTime(const std::unordered_map<RandoRegionId, RegionT
 void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& reachableRegions,
                           std::unordered_map<RandoRegionId, RegionTimeState>& regionTimeStates);
 RandoRegionId GetRegionIdFromEntrance(s32 entrance);
-void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
+// UI previews compute the same pools without replacing saved/imported oracle song mappings.
+void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool,
+                   bool preserveSongMapping = false);
 void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
 void ApplyNearlyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
 void ApplyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
@@ -248,6 +254,9 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define HAS_BOTTLE_ITEM(item) (Inventory_HasItemInBottle(item))
 // TODO: Maybe not reliable because of theif bird stealing bottle
 #define HAS_BOTTLE (INV_CONTENT(ITEM_BOTTLE) != ITEM_NONE)
+#define CAN_BREAK_ENVIRONMENT_ICICLE                                                                           \
+    (CAN_USE_SWORD || CAN_USE_EXPLOSIVE || CAN_BE_GORON || CAN_BE_ZORA || CAN_BE_DEKU || HAS_ITEM(ITEM_BOW) || \
+     HAS_ITEM(ITEM_HOOKSHOT) || HAS_ITEM(ITEM_DEKU_NUT) || HAS_ITEM(ITEM_DEKU_STICK))
 #define CAN_USE_PROJECTILE (HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA)
 #define CAN_ACCESS(access) (RANDO_EVENTS[RE_ACCESS_##access])
 #define CAN_GROW_BEAN_PLANT        \
@@ -280,11 +289,12 @@ inline bool SoulEventRequirement(RandoEvent event) {
     {                                                                              \
         randoEvent, [] { return SoulEventRequirement(randoEvent) && (condition); } \
     }
-#define EXIT(toEntrance, fromEntrance, condition)                           \
-    {                                                                       \
-        toEntrance, {                                                       \
-            fromEntrance, [] { return condition; }, LogicString(#condition) \
-        }                                                                   \
+#define EXIT(toEntrance, fromEntrance, condition)                                                    \
+    {                                                                                                \
+        toEntrance, {                                                                                \
+            fromEntrance, [] { return Rando::RustyDoorKeys::CanExit(fromEntrance) && (condition); }, \
+                LogicString(#condition)                                                              \
+        }                                                                                            \
     }
 #define CONNECTION(region, condition)                         \
     {                                                         \
@@ -419,20 +429,28 @@ inline bool canPlaySong(u8 songId) {
     }
 }
 
+inline bool SoulItemRequirement(RandoItemId item) {
+    const auto* soul = Rando::SoulShuffle::Find(item);
+    return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+}
+
 inline bool CanAccessDungeon(DungeonSceneIndex dungeonIndex) {
+    if (dungeonIndex == DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE &&
+        RANDO_SAVE_OPTIONS[RO_ACCESS_DUNGEONS] != RO_ACCESS_DUNGEONS_OPEN && !SoulItemRequirement(RI_SOUL_NPC_BIGGORON))
+        return false;
     bool hasSongAccess = false;
     bool hasFormAccess = false;
     switch (dungeonIndex) {
         case DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE:
-            hasSongAccess = CAN_PLAY_SONG(SONATA);
+            hasSongAccess = Rando::SongEvents::CanPlay(0);
             hasFormAccess = CAN_BE_DEKU && HAS_ITEM(ITEM_OCARINA_OF_TIME);
             break;
         case DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE:
-            hasSongAccess = CAN_PLAY_SONG(LULLABY);
+            hasSongAccess = Rando::SongEvents::CanPlay(1);
             hasFormAccess = CAN_BE_GORON && HAS_ITEM(ITEM_OCARINA_OF_TIME);
             break;
         case DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE:
-            hasSongAccess = CAN_PLAY_SONG(BOSSA_NOVA);
+            hasSongAccess = Rando::SongEvents::CanPlay(2);
             hasFormAccess = CAN_BE_ZORA && HAS_ITEM(ITEM_OCARINA_OF_TIME);
             break;
         default:
@@ -666,6 +684,19 @@ inline bool ClockFilter() {
 #define MIDNIGHT()                                                                                             \
     (BETWEEN(TIME_NIGHT1_AM_12_00, TIME_DAY2_AM_06_00) || BETWEEN(TIME_NIGHT2_AM_12_00, TIME_DAY3_AM_06_00) || \
      AFTER(TIME_NIGHT3_AM_12_00))
+
+inline bool TradingPostSoulRequirement() {
+    if (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS])
+        return true;
+    // Native 21:30 handoff falls within the solver's 21:00–22:00 slice.
+    const bool curiosityHours =
+        BETWEEN(TIME_DAY1_AM_06_00, TIME_NIGHT1_PM_10_00) || BETWEEN(TIME_DAY2_AM_06_00, TIME_NIGHT2_PM_10_00);
+    const bool workerHours = BETWEEN(TIME_NIGHT1_PM_09_00, TIME_DAY2_AM_06_00) ||
+                             BETWEEN(TIME_NIGHT2_PM_09_00, TIME_DAY3_AM_06_00) ||
+                             BETWEEN(TIME_DAY3_AM_06_00, TIME_NIGHT3_PM_10_00);
+    return (curiosityHours && SoulItemRequirement(RI_SOUL_NPC_FISHING_POND_OWNER)) ||
+           (workerHours && SoulItemRequirement(RI_SOUL_NPC_ROOFTOP_MAN));
+}
 
 inline bool CanKillEnemy(ActorId EnemyId) {
     // If enemy souls are shuffled, and the relevant soul is not obtained, we cannot kill that enemy.

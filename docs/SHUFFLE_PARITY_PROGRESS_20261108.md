@@ -1,77 +1,83 @@
-# SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
+# Shuffle-parity implementation ledger — November 9, 2026
 
-## Authoritative overnight continuation — November 9, 2026
+Plan: `docs/superpowers/plans/2026-11-08-shuffle-parity.md`.
 
-User renewed full-scope implementation/build/regression/checkpoint/publication
-permission. No repeated approval is required. No merge/master/release promotion.
-The former one-implementation-worker restriction in the plan is superseded.
-Six independent implementation workstreams are active; none queued. Workers use
-isolated worktrees; controller integrates shared hunks and allocates appended IDs.
-Do not infer completion from historical entries below this section.
+## Current integrated source and authorization
 
-Recovered actual checkout at `60dd594c7d4597bec1376c5d6e4da239fca2360e`;
-remote PR89 remains `3aee089e433596d3c7da603edee1596e5bc41bbd`.
-No prior workers were active. Preserved all 24 tracked/new source files from the
-uncommitted hint colors/soul GI/first-drop/fixture work in WIP commit
-`7593075a389bc9496e0f001c8d7c7d778a73cb7e`, tree
-`d5db26ba87fcd31704c00e226816b71b7af15236`. This is preservation, not passing
-verification. Source recovery ZIP independently restores that tree from60dd;
-SHA256 `0a466bf473ef4585450e9607664fe33d3ae7743ae13981111c3ad0d24b4e9e1e`,
-persistent recovery ID `libfile_f8c588707a988191a8523fa19b4ccd25`.
+The full user authorization remains active for implementation, six concurrent
+workers, integration, regression repairs, builds, independently recoverable
+checkpoints and publication to candidate/ootmm-shuffle-parity-20261108 / draft
+PR89. No merge, master update or release promotion. The obsolete single-worker
+restriction is removed. All six workers are active; no implementation is queued.
+Controller owns shared integration, identifiers, cross-feature review and pushes.
 
-| Requirement | Owner | Current implementation state | Verification / checkpoint |
+Current controller checkout: `/workspace/scratch/c690840d9328/ComboShip`.
+Public checkpoint: `e360328d03d6d30e38151035a2d5a8d92994d975`.
+The source below is integrated locally through reviewed production fixes `d3c5aa17`;
+publication of this combined tree is the next controller action. Source
+implementation and configured gameplay acceptance remain separate.
+
+A host rollback removed the original later worker trees. All larger features
+have now been reconstructed, committed, independently saved and integrated;
+none is represented only by the lost reports. The older checkout is preserved.
+The R2 integrated recovery package at f7c2ce34 independently restores tree
+4051739b476a9d06cacb2e4111b9a65ba0b47783; persistent ID
+libfile_6b9e89a0be2c819190b008becdd537df. Subsequent worker checkpoints and
+exact-tree evidence are listed in their feature reports. Save the next combined
+checkpoint before the next publication or long build.
+
+## Requirement checklist
+
+| Requirement | Owner | Production source state | Evidence / next action |
 | --- | --- | --- | --- |
-| OoT enemy/NPC/animal/misc souls; MM NPC/animal/misc | souls | Active expansion of incomplete actor-role/world dependencies; existing stable catalog retained | Base7593075a; broad completion unverified |
-| Shared souls counterpart/dedup/grants/saves/reset/menu | souls | Existing foundations retained; production completion active | Base7593075a; no full-world acceptance |
-| OoT first enemy-type drops/V-MQ/defeat/persistence/menu | firstdrops | Existing43 families/204 witnesses retained; final UI/hash/source verification active | Existing4096-layout fixtures historical; fresh native full seeds open |
-| Hint colors/translations/settings | firstdrops | Recovered encoded-color work under fresh verification | Base7593075a WIP |
-| Native/foreign soul GI host flame resource paths | firstdrops | Recovered renderer work under fresh verification | Base7593075a WIP; no GPU acceptance |
-| Rusty overworld keys/pools/grants/save/physical doors/logical exits | door_keys | Production work active BOTH games |3 new native OoT/39 MM keys reserved; clock-first append integration |
-| Song-event shuffle/runtime/solver/persisted assignment/import/plando | song_clock | Production work active BOTH games | No source completion yet |
-| OoT clock/start lock/time/songs/travel | song_clock | Production work active | Appended clock identities reserved; default off |
-| MM rocks/boulders/red boulders/icicles/soil | environment | Expand seven-icicle slice to full families; exact actor placements/access under audit | Existing7 IDs retained; append-only new catalog reserved |
-| MM Stick/Nut Bags, Child Wallet,6 Infinite endpoints | ci_native/controller | Existing source retained; integration audit/native proof active | Historical native fixtures pass; fresh all-feature generation open |
-|4 MM rings1/3/1/4,pools/receipts/cycle/foreign draw | ci_native/controller | Existing source retained; integration/native proof active | Historical native fixtures pass; full native combinations open |
-|3 lottery-night rewards | ci_native/controller | Existing source retained; integrated logic verification active | Prior native night/ticket fixtures pass |
-| Saria/Desired Progressive Magic+7 RPG/source/ownership | ci_native/controller | Existing source retained; integrated verification active | Prior source-location/ownership fixtures pass |
-| Native form instruments/MM banks in OoT,FD ocarina | song_clock/ci_native | Existing recovered source retained; song-event integration active | Prior controller/audio fixtures pass |
-| Item-pool organization/real menus/gold-cyan/global toggle | controller + feature owners | Complete with actual features, preserving CVar identity/disabled behavior | No completed-placeholder claim until real control lands |
-| New exclusions/categories/locations/import/generation | feature owners/controller | Required per catalog and final integrated generation | Every enabled family must get actual generation evidence |
-| CI/regressions/full Linux+Windows build | ci_native | Repair remaining failures independent of features | Remote3aee CI42574618218: all Linux native targets/link and2 native seed smokes PASS; Windows native targets+ZIP PASS; Linux AppImage stage FAIL; items/systems/world regression FAIL |
-| Solo/combined Glitchless/combinations/cycles/save/defaults | ci_native/controller | Real native validation underway | Smoke passes do not satisfy complete feature validation |
-| Both games Own Dungeon boss keys,ST normal/inverted/foreign | ci_native/controller | Real full dual-native seeds required | Controlled prior fixture alone insufficient |
-| Independent review/source checkpoints/publication PR89 | controller | Incremental bounded checkpoints; hold pushes only for useful active builds | No merge/master; source/tests/docs only |
+| OoT enemy/NPC/animal/misc and MM NPC/animal/misc souls | souls | Integrated native roles, actor behavior, room completion, scripted rewards, schedules, shops, quests and physical blockers; decorative roles preserved | 130 OoT / 213 MM rules; 391 / 200 check dependencies; 23 / 37 quest events; 21 suites, 9 sanitizer suites, 76 complete TU checks; final source83f2547a |
+| Shared soul mapping/pools/grants/saves/reset/controls | souls | Integrated68 semantic counterpart edges, pool deduplication and host controls | Native ownership/grant/category/alias checks; source44bc3904/83f2547a; full new native seeds pending |
+| OoT first enemy-type drops, V/MQ, defeat paths, persistent rewards | firstdrops | Integrated43 families/204 witnesses, actual menu, runtime special deaths and layout-aware pools/exclusions; Skull Kid native trade-chain witness repaired | All4096 layout masks, runtime/pool/hash both guards;16a6aac0; actual new linked On seed required |
+| Soul/firstdrop colored hints and translations | souls/firstdrops | Encoded source and reward colors with resets;147 soul names and43 enemy sources EN/FR/DE; host settings preserved | Native147 composed clue checks;44bc3904; no rendered gameplay claim |
+| Native/foreign soul GIs | firstdrops | Owning host boss-flame paths/materials, palettes, scrolling and compatible override paths integrated | 95 OoT +59 MM actual native/foreign callbacks; recovered source verified |
+| Rusty overworld-door keys | door_keys | All27 OoT /39 MM identities, pools, grants, saves, native interactions and matching exits integrated; Castle actual gate and guard payment now bound | M8b600e996 integrated319c60a1; missing/wrong/right/Skeleton/age/form/off/nativeER/legacy24 tests; scene-changing returns free to prevent ER traps |
+| Old door saves/settings and physical entrance ownership | door_keys | Hidden catalog version distinguishes legacy24 and new27; actual generation stamps only new seeds; imports default legacy; metadata excluded from randomization | Legacyv0 identity, coupled/decoupled native ChangeConnections, returns, save/import assertions;dd5d479c/319c60a1 |
+| Actual song-event shuffle in both games | song_clock |18 OoT /13 MM persisted native events, solver, forms/age/instruments, spoilers/import/plando integrated | Native adapters/world checks both guards; review repairs integrated342dfc94/89985404: native learned-song dispatch and actual alternate-mask Human capability |
+| OoT Clock/start time/ownership/day-night/travel | song_clock | Default-off deterministic start lock, grants/save/time transitions/native Sun undead stun integrated | Native tests; review repair integrated342dfc94; actual native tracker/recognition/ownership tests pass both guards |
+| Song mapping lifecycle | song_clock | Native event mapping shared by saved runtime and solver | Preview and native-save-load provenance fixes integratedcc7e3176/180735d3; actual RED/GREEN native lifecycle tests pass both guards |
+| MM rocks/boulders/red boulders/icicles/soil | environment |211 checks/279 physical aliases across36 native regions integrated; real break/bug receipt/retry/cycle safeguards | Full native lifecycle/pools/exclusions and all actual region scene assignments pass; source0efb6489/69f32cc4; solo default181 excludes30 unreachable IronBoot rocks, combined211 |
+| MM Stick/Nut Bags, Child Wallet, six Infinite endpoints | song_clock/ci_native | All native grant/receipt/save/HUD/ownership endpoints retained | Fresh retained integrated64start cases and complete TU checks pass at45f4970a plus fixture closure1a890529 |
+| Four counted MM key rings1/3/1/4 | song_clock/ci_native | Native pools/grants/save/reset and native/foreign rendering retained | All16 choices and actual dungeon behavior pass retained integrated tests; full dual Own Dungeon seeds pending |
+| Three MM lottery-night rewards | song_clock | Native separate-night checks, tickets, receipts and cycle behavior retained | Actual native lottery suite passes frozen45f4970a plus dependency closure |
+| MM Saria/Desired Progressive Magic and seven RPG families | song_clock | Native source locations and current ownership retained | Actual registered Saria/Desired suite and complete TUs pass frozen45f4970a plus closure |
+| Native form instruments/MM soundbanks in OoT; FD ocarina | song_clock | Recovered native controller/audio routing retained; native MM behavior preserved | Actual controller,20audio scenarios, bank/mixer/PCM tests pass frozen45f4970a; no live audio acceptance claim |
+| Menus/pool organization/gold-cyan/global toggle | environment/controller | Actual controls exposed, exact existing CVar IDs, highlights and disabled behavior; pool/exclusion metrics refresh on all new settings including shared controls | Real ImGui input/native pool/cache tests both guards;556d7b6c; Vanilla policy and inactive lottery/tracker receipt repairs integrated621975da/d3c5aa17; independent original/Combo review active |
+| Exclusions/categories/locations/imports/generation | feature owners | Native catalog categories and saved/imported exclusion application integrated | Native environmental/firstdrop/door pool tests; real all-feature native matrix required |
+| Native solo/combined validation adapters | ci_native | Actual SOH and MM fill/replay entrypoints, native pool budget rejection, full seed dump metadata, original/Combo guards integrated | Review repairs integrated3f6e456a/89ff751a/cc4b07c7; actual RED/GREEN transaction/health/replay tests pass; latest linked proof required |
+| Full Linux/Windows targets/link | ci_native/controller | Required workflow builds all native modules and stages runtime | Publice360 Linux all targets/link and ordinary+door smokesPASS; Windows all native targets andZIP PASS; exact latest tree builds still required |
+| Native graph/fill/replay, Glitchless, solo/combined | ci_native/controller | Required8-case actual native matrix plus firstdrop Vanilla cases implemented | Actual e360 Off combined fill/replayPASS; e360 On exposes real Skull Kid witness failure now fixed16a6aac0; latest matrixUNRUN until rebuilt |
+| Dual-game Own Dungeon, Stone Tower normal/inverted, foreign placement | ci_native/controller | Required actual native matrix implements both simultaneous policies, rings, exclusions, negative circular replay | Earlier controlled fixture alone is not completion; latest native generation proof pending |
+| CI/regression failure closure | controller/ci_native | Meaningful assertions and normal diagnostics retained; fixture real dependencies closed | Native heldNEI/sword/env/firstdrop/retained suites now pass; formatted-song fixture closure repaired93ead007; integrated native regression sweep active |
+| IDs/save/default compatibility | ci_native/controller | Existing IDs preserved, appended clocks then doors then environment; mirrored FCI tables retained | Compiled36568 prior IDs,360 OoT and93 MM CVar/defaults unchanged both guards; FCI_MAX465 <=512; native historical JSON extents/tails pass;37889186 |
+| Durable checkpoints/PR89 publication | controller | R1/R2 source and individual reconstruction milestones saved with exact restoration; draft/unmerged maintained | Next complete combined checkpoint and incremental candidate publication pending current review repairs |
 
-Interface rulings: existing IDs never move. Clock append first; door items/flags/
-foreign aliases follow. Environment uses a separate appended MM check include.
-Souls reuse existing IDs. Worker worktrees may edit feature-specific hunks of
-shared enums/menus/save adapters; controller resolves those edits explicitly.
-All new settings remain off by default. No hidden foundation is a completed
-feature. Gameplay acceptance remains separate from source/build evidence.
+## Active work and genuine verification limits
 
-### Integrated milestone 1
+All six owners completed production implementation and bounded independent
+review repairs, and now run frozen integrated regressions and native source
+checks concurrently. Controller integrates fixture-only closure and publishes
+the full tree; ci_native will execute actual compiled modules once available.
+Environmental runtime/placement audits, dualguard save/ownership/receipts,
+learning/song/form/time restrictions and originalIDs/defaults have concrete
+native evidence. No started CI run or passed fixture counts as full generation.
+The independent Vanilla follow-up checks actual tracker totals, lottery slots
+and preserved receipts; it is integratedd3c5aa17. No production feature is
+intentionally deferred.
 
-- Firstdrop worker83981ece integrated as `d1016090`: actual native menu/group
-  control exposed, default Off, compatible once-only settings identity retained.
-  Native runtime/source-combat/hash fixtures cover all4096 layouts in original/
-  Combo under ASan/UBSan; fresh encoded hint colors and95OoT+59MM native/foreign
-  soul GI callbacks pass. Full graph/fill remains separate; required Vanilla
-  native generation now scheduled in CI; configured MQ requires real quest data.
-- CI worker c6443284 integrated as `b169870f`: copied enum fixture closure,
-  native pool headers/link dependencies corrected; complete native pool fixtures
-  pass. Linux now preserves its linked runtime before AppImage and uploads
-  seed/packaging evidence on failure. Real Vanilla Off/On/excluded graph/fill/
-  replay is required after port resources. Native policy30/30 passes in worker.
-- Souls worker893bdfed integrated as `48973cc6`: native scene/parameter role
-  maps expanded. Literal-role and actual native spawn bridge cases pass both
-  guards. This is actor coverage; matching whole-world dependencies still active.
-- Controller adds four actual Shared Souls controls using existing saved
-  category CVars and gold scopes. Real pinned ImGui input confirms all16 drawn
-  Generate/market/soul controls keep IDs/layout/global-toggle/style restoration;
-  each soul preference defaults off and toggles its exact CVar once. No draw-only
-  writes. Initial5/5 full menu probes and28/28 baseline CI policy also passed.
-- Door keys, song-events/clock, environmental families and soul world completion
-  remain active concurrently, with no queued work. No full-scope completion yet.
+The actual e360 native failure evidence is retained separately. Its pool-budget
+failure is repaired by propagating errors and giving parity configurations real
+check capacity, not by dropping progression or weakening assertions. The actual
+Skull Kid witness requires any native adult-trade item at or after Saw, matching
+the native actor; Claim Check is valid. New-source full graph/fill/replay remains
+required. The real `oot-mq.o2r` quest archive is unavailable for local configured
+MQ full generation;4096 layout fixtures are distinct evidence. Gameplay/GPU/audio
+acceptance and unavailable quest-data tests will be identified honestly rather
+than claimed passed. Production implementation continues independently.
 
 ## Historical progress (superseded where stale)
 

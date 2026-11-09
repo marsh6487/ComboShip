@@ -74,7 +74,7 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .connections = {
             CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_BOSS, CAN_USE_EXPLOSIVE),
-            CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_BEFORE_PIT, HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH)),
+            CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_BEFORE_PIT, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_BENEATH_GRAVEYARD) && HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH)),
         },
     };
     Regions[RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_BEFORE_PIT] = RandoRegion{ .name = "Night 2 Grave Before Pit", .sceneId = SCENE_HAKASHITA,
@@ -95,7 +95,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 2),              ENTRANCE(BENEATH_THE_GRAVERYARD, 0), true),
         },
         .connections = {
-            CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_AFTER_PIT, HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH)),
+            CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_AFTER_PIT, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_BENEATH_GRAVEYARD) && HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH)),
         },
     };
     Regions[RR_GHOST_HUT] = RandoRegion{ .sceneId = SCENE_TOUGITES,
@@ -112,7 +112,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(IKANA_CANYON, 13),                ENTRANCE(IKANA_CANYON, 14), true),
         },
         .events = {
-            EVENT(RE_BREAK_SHARP_CURSE, CAN_PLAY_SONG(STORMS)),
+            EVENT(RE_BREAK_SHARP_CURSE, Rando::SongEvents::CanPlay(11)),
         },
     };
     Regions[RR_IKANA_CANYON_GROTTO] = RandoRegion{ .name = "Ikana Canyon Grotto", .sceneId = SCENE_KAKUSIANA,
@@ -223,6 +223,20 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_IKANA_GRAVEYARD_LOWER] = RandoRegion{ .name = "Lower", .sceneId = SCENE_BOTI,
         .checks = {
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_WALL_1, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_WALL_2, CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_WALL_3, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_WALL_4, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_WALL_5, CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_1, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_2, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_3, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_4, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_5, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_6, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_7, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_8, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_IKANA_GRAVEYARD_LOWER_GRASS_01, true),
             CHECK(RC_IKANA_GRAVEYARD_LOWER_GRASS_02, true),
             CHECK(RC_IKANA_GRAVEYARD_LOWER_GRASS_03, true),
@@ -261,7 +275,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(BENEATH_THE_GRAVERYARD, 1),       ENTRANCE(IKANA_GRAVEYARD, 3), HAS_ITEM(ITEM_MASK_CAPTAIN) && IS_NIGHT1()), // Day 1 hole
         },
         .connections = {
-            CONNECTION(RR_IKANA_GRAVEYARD_UPPER, CAN_PLAY_SONG(SONATA)),
+            CONNECTION(RR_IKANA_GRAVEYARD_UPPER, Rando::SongEvents::CanPlay(8)),
         },
         .oneWayEntrances = {
             ENTRANCE(IKANA_GRAVEYARD, 4), // Exiting Dampe's house
@@ -287,7 +301,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_MUSIC_BOX_HOUSE] = RandoRegion{ .sceneId = SCENE_MUSICHOUSE,
         .checks = {
-            CHECK(RC_MUSIC_BOX_HOUSE_FATHER, CAN_PLAY_SONG(HEALING)),
+            CHECK(RC_MUSIC_BOX_HOUSE_FATHER, Rando::SongEvents::CanPlay(5)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 2),                 ENTRANCE(MUSIC_BOX_HOUSE, 0), true),
@@ -295,6 +309,14 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ROAD_TO_IKANA_ABOVE_LEDGE] = RandoRegion{ .name = "Above Ledge", .sceneId = SCENE_IKANAMAE,
         .checks = {
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_1, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_2, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_3, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_4, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_5, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_6, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ROAD_TO_IKANA_LARGE_BOULDER_7, CAN_USE_EXPLOSIVE),
+
             CHECK(RC_ENEMY_DROP_NEJIRON, CanKillEnemy(ACTOR_EN_BAGUO) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
@@ -306,6 +328,15 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ROAD_TO_IKANA_BELOW_LEDGE] = RandoRegion{ .name = "Below Ledge", .sceneId = SCENE_IKANAMAE,
         .checks = {
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_1, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_2, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_3, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_4, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_5, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_6, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_7, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_8, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_ROAD_TO_IKANA_POT, CAN_HOOK_SCARECROW),
             CHECK(RC_ROAD_TO_IKANA_STONE_MASK, HAS_ITEM(ITEM_LENS_OF_TRUTH) && HAS_MAGIC && HAS_BOTTLE && (CAN_ACCESS(RED_POTION_REFILL) || CAN_ACCESS(BLUE_POTION_REFILL))),
             CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
@@ -321,6 +352,8 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ROAD_TO_IKANA_FIELD_SIDE] = RandoRegion{ .name = "Field Side", .sceneId = SCENE_IKANAMAE,
         .checks = {
+            CHECK(RC_ROAD_TO_IKANA_RED_BOULDER, CAN_BE_GORON),
+
             CHECK(RC_ROAD_TO_IKANA_CHEST, HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
             CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
@@ -375,6 +408,10 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_SECRET_SHRINE_ENTRANCE] = RandoRegion{ .name = "Entrance", .sceneId = SCENE_RANDOM,
         .checks = {
+            CHECK(RC_SECRET_SHRINE_SOIL_ITEM_1, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_SECRET_SHRINE_SOIL_ITEM_2, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_SECRET_SHRINE_SOIL_ITEM_3, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+
             CHECK(RC_SECRET_SHRINE_ENTRANCE_GRASS_01, true),
             CHECK(RC_SECRET_SHRINE_ENTRANCE_GRASS_02, true),
             CHECK(RC_SECRET_SHRINE_ENTRANCE_GRASS_03, true),
@@ -484,6 +521,11 @@ static RegisterShipInitFunc initFunc([]() {
         },
     };
     Regions[RR_STONE_TOWER_INVERTED_NEAR_TEMPLE] = RandoRegion{ .sceneId = SCENE_F41,
+        .checks = {
+            CHECK(RC_STONE_TOWER_INVERTED_ROCK_1, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_STONE_TOWER_INVERTED_ROCK_2, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_STONE_TOWER_INVERTED_SOIL_LOWER, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+        },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0),  ENTRANCE(STONE_TOWER_INVERTED, 1), true),
         },
@@ -493,6 +535,8 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_STONE_TOWER_INVERTED_UPPER] = RandoRegion{ .sceneId = SCENE_F41,
         .checks = {
+            CHECK(RC_STONE_TOWER_INVERTED_SOIL_UPPER, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+
             CHECK(RC_STONE_TOWER_INVERTED_CHEST_01, true),
             CHECK(RC_STONE_TOWER_INVERTED_CHEST_02, true),
             CHECK(RC_STONE_TOWER_INVERTED_CHEST_03, true),

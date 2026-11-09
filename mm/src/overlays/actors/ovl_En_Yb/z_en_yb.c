@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_yb.c
  * Overlay: ovl_En_Yb
@@ -359,7 +360,8 @@ void EnYb_Idle(EnYb* this, PlayState* play) {
 
     EnYb_UpdateAnimation(this, play);
     if ((this->actor.xzDistToPlayer < 180.0f) && (fabsf(this->actor.playerHeightRel) < 50.0f) &&
-        (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING) &&
+        (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
+        (play->msgCtx.lastPlayedSong == SongEvents_MmSong(6, OCARINA_SONG_HEALING)) &&
         (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
         this->actionFunc = EnYb_TeachingDance;
         this->teachingCutsceneTimer = 200;

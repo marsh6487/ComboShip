@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_hg.c
  * Overlay: ovl_En_Hg
@@ -398,7 +399,8 @@ void EnHg_WaitForPlayerAction(EnHg* this, PlayState* play) {
     }
 
     if (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) {
-        if ((play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING) && (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
+        if ((play->msgCtx.lastPlayedSong == SongEvents_MmSong(5, OCARINA_SONG_HEALING)) &&
+            (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
             if (GameInteractor_Should(VB_HAVE_HEALED_PAMELAS_FATHER, INV_CONTENT(ITEM_MASK_GIBDO) == ITEM_MASK_GIBDO)) {
                 this->csIdIndex = HG_CS_SONG_OF_HEALING;
             } else {

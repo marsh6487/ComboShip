@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_gb2.c
  * Overlay: ovl_En_Gb2
@@ -377,7 +378,8 @@ void func_80B0FE7C(PlayState* play) {
 }
 
 void func_80B0FEBC(EnGb2* this, PlayState* play) {
-    if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING)) {
+    if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
+        (play->msgCtx.lastPlayedSong == SongEvents_MmSong(3, OCARINA_SONG_HEALING))) {
         play->msgCtx.ocarinaMode = OCARINA_MODE_END;
         SET_EVENTINF(EVENTINF_47);
         this->unk_26E = 0x14D1;

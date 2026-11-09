@@ -1898,7 +1898,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM confined boss keys, exclusions, self-locks and failed-dump rejection",
-    "run": "python3 -B tests/shuffle_parity/boss_keys/run_tests.py --sanitize",
+    "run": "python3 -B tests/shuffle_parity/boss_keys/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/boss_keys/mm_oracle_baseline_test.py\npython3 -B tests/shuffle_parity/boss_keys/headless_services_test.py\npython3 -B tests/shuffle_parity/boss_keys/run_mm_solo_entrypoint_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_boss_validator_test.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
@@ -2007,6 +2007,26 @@
     "suite": "world",
     "origin": "gate",
     "name": "Native seed harness isolation and exact junk validation (scaffolding only)",
-    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py"
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py\npython3 -B tests/shuffle_parity/enemy_drops/run_solo_entrypoint_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native soul runtime, actor, world, ownership and route regression matrices",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_blocker_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_catalog_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_dependency_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_direct_damage_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_dump_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_enemy_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_event_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_menu_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_mm_runtime_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_npc_check_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_physical_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_pool_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_route_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_runtime_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_save_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_scripted_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_shared_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_special_damage_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_world_event_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_world_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native song event adapters, clocks and complete affected production unit syntax",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_oot_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_syntax.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   }
 ]

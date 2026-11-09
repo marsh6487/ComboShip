@@ -44,7 +44,7 @@ def probe(config, mode, output):
     reset=bind('Combo_SOH_Rando_Reset')
     owned=bind('Combo_SOH_Rando_SetOwnedItems',args=(ctypes.c_char_p,))
     reachable=bind('Combo_SOH_Rando_GetReachableChecks',ctypes.c_char_p)
-    setmode(1 if mode=='solo-graph' else 0)
+    setmode(1 if mode.startswith('solo-') else 0)
     init();restore(json.dumps(config['settings']).encode());tricks(b'[]');seed(20261109)
     assets = (1 if Path('oot.o2r').is_file() else 0) | (2 if Path('oot-mq.o2r').is_file() else 0)
     # Match the ROM-free headless ctor's Vanilla fallback. MQ coverage requires
@@ -55,6 +55,7 @@ def probe(config, mode, output):
     require(layout(json.dumps({'masterQuestDungeons':config['mq'],'dungeonLayoutAssets':assets}).encode())==1,
             'selected V/MQ layouts rejected: native quest assets are required; do not create placeholder assets')
     data=json.loads(dump())
+    require('error' not in data, 'actual native item-pool preparation failed: '+repr(data.get('error')))
     actual_settings=json.loads(settings())
     for key,value in config['settings'].items():
         require(actual_settings.get(key)==value, 'native setting did not apply: '+key)
@@ -71,6 +72,20 @@ def probe(config, mode, output):
             require(name in fixed, 'excluded native check is not fixed: '+name)
             require_native_junk(fixed[name]['item'], data, 'excluded native check '+name)
             require(not fixed[name]['advancement'], 'excluded fixed native junk marked advancement: '+name)
+    if mode=='solo-fill':
+        fill=bind('SOH_FillSoloRandoSeed',ctypes.c_char_p,(ctypes.c_uint32,))
+        result=json.loads(fill(20261109))
+        require(result.get('success') and result.get('fillResult')==1 and result.get('nativeReplayBeatable'),
+                'actual native solo Fill/replay failed: '+repr(result.get('error',result)))
+        actual_placed={name for name in result['placements'] if name.startswith(PREFIX)}
+        require(actual_placed==set(config['expected']),'actual solo drop identities differ')
+        require(set(result['layouts']['masterQuestDungeons'])==set(config['mq']),'actual solo layouts changed')
+        for key,value in config['settings'].items():require(result['settings'].get(key)==value,'solo setting changed: '+key)
+        if config['excluded']:
+            for name in actual_placed:
+                require_native_junk(result['placements'][name],data,'excluded actual solo check '+name)
+                require(result['checks'][name]['excluded'],'actual solo exclusion lost: '+name)
+        write(output,{'mode':mode,'case':config['name'],'nativeFill':result});return
     # Real inventory operations and actual ReachabilitySearch. Generous copies
     # cover native small-key/token counts; every listed item is native metadata.
     inventory=[row['name'] for row in data['items']]*100
@@ -144,7 +159,7 @@ def main():
     parser.add_argument('--timeout',type=int,default=1800)
     parser.add_argument('--case',action='append',help='Limit named cases; default all12')
     parser.add_argument('--probe',type=Path,help=argparse.SUPPRESS)
-    parser.add_argument('--probe-mode',choices=('solo-graph','combined-graph'),help=argparse.SUPPRESS)
+    parser.add_argument('--probe-mode',choices=('solo-graph','combined-graph','solo-fill'),help=argparse.SUPPRESS)
     args=parser.parse_args()
     if args.probe:
         probe(json.loads(args.probe.read_text()),args.probe_mode,args.output);return
@@ -158,13 +173,13 @@ def main():
     selected=[case for case in cases() if not args.case or case['name'] in args.case]
     require(selected,'no case selected')
     manifest={'driver':str(driver),'driverSha256':hashlib.sha256(driver.read_bytes()).hexdigest(),
-              'soloFill':'UNSUPPORTED: current CLI only exports combined fill; solo graph is tested separately',
+              'soloFill':'actual native Fill and independent CheckBeatable replay',
               'moduleSha256':module_hashes(work),
               'cases':[]}
     for case in selected:
         folder=out/case['name'];folder.mkdir(exist_ok=True);config=folder/'config.json';write(config,case)
         probes={}
-        for mode in ('solo-graph','combined-graph'):
+        for mode in ('solo-graph','combined-graph','solo-fill'):
             result=folder/(mode+'.json')
             run([sys.executable,str(Path(__file__).resolve()),'--probe',str(config),'--probe-mode',mode,'--output',str(result)],work,folder/(mode+'.log'),args.timeout)
             probes[mode]=json.loads(result.read_text())
@@ -195,9 +210,9 @@ def main():
                 require_native_junk(item,probes['combined-graph']['dump'],'excluded combined check '+name)
         run([str(driver),'--playthrough',str(saved)],work,folder/'playthrough.log',args.timeout)
         manifest['cases'].append({'name':case['name'],'checks':len(actual),'combinedFillReplay':'PASS',
-                                  'soloNativeGraph':'PASS','sourceSoulNegativeCount':len(probes['solo-graph']['ownSoulNegatives'])})
+                                  'soloNativeGraph':'PASS','soloNativeFillReplay':'PASS','sourceSoulNegativeCount':len(probes['solo-graph']['ownSoulNegatives'])})
         write(out/'manifest.json',manifest)
-    print('PASS actual native graph/pool + combined fill/replay:',len(selected),'cases; standalone solo fill remains unsupported')
+    print('PASS actual native graph/pool + combined fill/replay:',len(selected),'cases; actual native solo Fill/replay included')
 
 if __name__=='__main__':
     main()

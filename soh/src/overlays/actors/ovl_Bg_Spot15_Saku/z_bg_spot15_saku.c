@@ -7,6 +7,9 @@
 #include "z_bg_spot15_saku.h"
 #include "objects/object_spot15_obj/object_spot15_obj.h"
 
+extern int Randomizer_RustyCastleGateEnabled(PlayState* play);
+extern int Randomizer_RustyCastleGateLocked(PlayState* play);
+
 #define FLAGS 0
 
 void BgSpot15Saku_Init(Actor* thisx, PlayState* play);
@@ -46,7 +49,7 @@ void BgSpot15Saku_Init(Actor* thisx, PlayState* play) {
     this->unk_170.x = this->dyna.actor.world.pos.x;
     this->unk_170.y = this->dyna.actor.world.pos.y;
     this->unk_170.z = this->dyna.actor.world.pos.z;
-    if (Flags_GetInfTable(INFTABLE_71)) {
+    if (Flags_GetInfTable(INFTABLE_71) && !Randomizer_RustyCastleGateLocked(play)) {
         this->dyna.actor.world.pos.z = 2659.0f;
     }
     this->actionFunc = func_808B4930;
@@ -59,7 +62,9 @@ void BgSpot15Saku_Destroy(Actor* thisx, PlayState* play) {
 }
 
 void func_808B4930(BgSpot15Saku* this, PlayState* play) {
-    if (this->unk_168 && !Flags_GetInfTable(INFTABLE_71)) {
+    if ((this->unk_168 && !Flags_GetInfTable(INFTABLE_71)) ||
+        (Randomizer_RustyCastleGateEnabled(play) && !Randomizer_RustyCastleGateLocked(play) &&
+         this->dyna.actor.world.pos.z >= 2660.0f)) {
         this->timer = 2;
         this->actionFunc = func_808B4978;
     }
@@ -86,6 +91,13 @@ void func_808B4A04(BgSpot15Saku* this, PlayState* play) {
 
 void BgSpot15Saku_Update(Actor* thisx, PlayState* play) {
     BgSpot15Saku* this = (BgSpot15Saku*)thisx;
+
+    if (Randomizer_RustyCastleGateLocked(play)) {
+        // Keep collision closed while missing the key, preserving native save flags
+        // and any pending animation state. Key ownership later resumes native opening.
+        this->dyna.actor.world.pos.z = this->unk_170.z;
+        return;
+    }
 
     if (this->timer != 0) {
         this->timer--;

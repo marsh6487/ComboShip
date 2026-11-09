@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_gg.c
  * Overlay: ovl_En_Gg
@@ -430,7 +431,7 @@ void func_80B359DC(EnGg* this, PlayState* play) {
         }
 
         if ((player->transformation == PLAYER_FORM_HUMAN) && (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-            (play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING)) {
+            (play->msgCtx.lastPlayedSong == SongEvents_MmSong(4, OCARINA_SONG_HEALING))) {
             if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_19_80)) {
                 SET_WEEKEVENTREG(WEEKEVENTREG_19_80);
             }

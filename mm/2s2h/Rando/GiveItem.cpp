@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
@@ -1417,6 +1418,33 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_SPEAK_GORON:
         case RI_OOT_SPEAK_HYLIAN:
         case RI_OOT_SPEAK_KOKIRI:
+        case RI_OOT_RUSTY_KEY_TREASURE_CHEST_GAME:
+        case RI_OOT_RUSTY_KEY_GUARD_HOUSE:
+        case RI_OOT_RUSTY_KEY_HYRULE_CASTLE:
+        case RI_OOT_RUSTY_KEY_DOG_LADY_HOUSE:
+        case RI_OOT_RUSTY_KEY_BACK_ALLEY_HOUSE:
+        case RI_OOT_RUSTY_KEY_BOMBCHU_SHOP:
+        case RI_OOT_RUSTY_KEY_MASK_SHOP:
+        case RI_OOT_RUSTY_KEY_CHILD_BAZAAR:
+        case RI_OOT_RUSTY_KEY_CHILD_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_CHILD_SHOOTING_GALLERY:
+        case RI_OOT_RUSTY_KEY_BOMBCHU_BOWLING:
+        case RI_OOT_RUSTY_KEY_LABORATORY:
+        case RI_OOT_RUSTY_KEY_FISHING_POND:
+        case RI_OOT_RUSTY_KEY_SILO:
+        case RI_OOT_RUSTY_KEY_RANCH_STABLE:
+        case RI_OOT_RUSTY_KEY_RANCH_HOUSE:
+        case RI_OOT_RUSTY_KEY_RANCH_HOUSE_ROOM:
+        case RI_OOT_RUSTY_KEY_GRAVEYARD:
+        case RI_OOT_RUSTY_KEY_WINDMILL:
+        case RI_OOT_RUSTY_KEY_IMPA_HOUSE:
+        case RI_OOT_RUSTY_KEY_CARPENTER_HOUSE:
+        case RI_OOT_RUSTY_KEY_GRANNY_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_ADULT_SHOOTING_GALLERY:
+        case RI_OOT_RUSTY_KEY_SKULLTULA_HOUSE:
+        case RI_OOT_RUSTY_KEY_ADULT_BAZAAR:
+        case RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP_BACK:
         case RI_OOT_SPEAK_ZORA:
         case RI_OOT_GS_TOKEN:
         case RI_JUNK:
@@ -1428,6 +1456,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Bottle_GiveBottle(ITEM_BOTTLE_LETTER_RUTO);
             break;
         default: {
+            if (RustyDoorKeys::Give(randoItemId))
+                break;
             // Soul catalog mm_give begin
             if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
                 Flags_SetRandoInf(soul->flag);

@@ -64,18 +64,42 @@ with tempfile.TemporaryDirectory(prefix='saria-magic-') as tmp:
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
+#include "combo/rando/SongEvents.h"
+namespace Native {
+#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
+}
+using Native::RSK_SHUFFLE_SONG_EVENTS;
+using namespace ComboRando::SongEvents;
+// Inventory/check identifiers remain the narrow cache-service boundary. Song
+// generation executes the production method with real setting identities.
+int32_t CVarGetInteger(const char*, int32_t fallback) {return fallback;}
 using RandomizerCheck=int;
 constexpr int RC_UNKNOWN_CHECK=-1,RG_MAGIC_STAT_UPGRADE=7;
 struct Location{std::string name;int item;int GetPlacedRandomizerGet(){return item;}std::string GetName(){return name;}};
 Location locs[]={{"A late",7},{"Z early",7},{"B early",7},{"Other",1}};
-struct Context{unsigned mFinalSeed=1;void SetSeed(uint32_t);Location* GetItemLocation(int i){return &locs[i];}unsigned GetSeed(){return mFinalSeed;}static Context* GetInstance(){static Context c;return &c;}};
-namespace Rando{using Context=::Context;}
+namespace Rando {
+struct CacheOption {uint8_t value=0;uint8_t Get(){return value;}};
+struct Context{unsigned mFinalSeed=1;std::array<uint8_t,18> songEvents{};
+CacheOption shuffle;CacheOption& GetOption(Native::RandomizerSettingKey key){assert(key==RSK_SHUFFLE_SONG_EVENTS);return shuffle;}
+void SetSeed(uint32_t);void GenerateSongEvents();Location* GetItemLocation(int i){return &locs[i];}unsigned GetSeed(){return mFinalSeed;}static Context* GetInstance(){static Context c;return &c;}};
+}
+using Rando::Context;
 namespace StaticData{Location* GetLocation(int i){return &locs[i];}}
 static int sEarlySariaMagicCheck=-1;
 static uint32_t sEarlySariaMagicSeed=0;
 static bool sSariaMagicReachabilityVerified=false;
 '''
  cache_main=r'''int main(){
+ auto* context=Context::GetInstance();
+ context->songEvents.fill(255);context->SetSeed(1);
+ const std::array<uint8_t,18> defaults={5,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+ assert(context->songEvents==defaults);
+ context->shuffle.value=1;context->songEvents.fill(255);context->SetSeed(1);
+ for(auto song:context->songEvents)assert(song<12);
+ auto mapping=context->songEvents;
+ context->songEvents.fill(255);context->SetSeed(1);assert(context->songEvents==mapping);
+
  CaptureSariaMagicHintLocation({{1,2},{0}});assert(sEarlySariaMagicCheck==2); // full, before optional-copy pruning
  Context::GetInstance()->SetSeed(1);assert(sEarlySariaMagicCheck==-1); // import same raw seed, old check still stat
  CaptureSariaMagicHintLocation({{1,2},{0}});
@@ -87,8 +111,10 @@ static bool sSariaMagicReachabilityVerified=false;
  ctx_source=(ROOT/'soh/soh/Enhancements/randomizer/SeedContext.cpp').read_text()
  setter=block_from(ctx_source,ctx_source.index('void Context::SetSeed('))
  invalidate=block_from(native,native.index('void InvalidateSariaMagicHintLocation('))
- (p/'cache.cpp').write_text(cache_prefix+invalidate+cache+setter+cache_main)
- subprocess.run(['g++','-std=c++20',str(p/'cache.cpp'),'-o',str(p/'cache')],check=True)
+ song_source=(ROOT/'soh/soh/Enhancements/randomizer/SongEvents.cpp').read_text()
+ generate=block_from(song_source,song_source.index('void Rando::Context::GenerateSongEvents('))
+ (p/'cache.cpp').write_text(cache_prefix+invalidate+cache+generate+setter+cache_main)
+ subprocess.run(['g++','-std=c++20','-I'+str(ROOT),str(p/'cache.cpp'),'-o',str(p/'cache')],check=True)
  subprocess.run([str(p/'cache')],check=True)
  fill=(ROOT/'soh/soh/Enhancements/randomizer/3drando/fill.cpp').read_text()
  playthrough=block_from(fill,fill.index('std::vector<RandomizerCheck> GeneratePlaythrough('))

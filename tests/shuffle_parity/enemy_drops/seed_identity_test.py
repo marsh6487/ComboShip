@@ -25,6 +25,7 @@ def run():
  enums='\n'.join(re.search(r'enum class '+name+r'\s*\{.*?\};',option,re.S)[0] for name in ('OptionCategory','OptionGroupType'))
  source=r'''
 #include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -42,7 +43,7 @@ namespace Rando {
 '''+enums+r'''
 // These facades supply already serialized UI choices. The algorithm and hash
 // under test are the untouched production bodies, not a recreated hash policy.
-struct Value{uint8_t value=0;uint8_t Get(){return value;}};
+struct Value{uint8_t value=0;uint8_t Get(){return value;}operator bool()const{return value!=0;}};
 struct Option{
  RandomizerSettingKey key=RSK_FOREST;
  OptionCategory category=OptionCategory::Setting;
@@ -93,6 +94,23 @@ int main(){
   REQUIRE(on==SohUtils::Hash(std::to_string(seed)+"Off|native-first-enemy-drops=1|"+(version?gBuildVersion:"")));
   REQUIRE(on!=off);REQUIRE(on==NativeSettingsHash());REQUIRE(rngSeed==on);
   state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=0;REQUIRE(NativeSettingsHash()==off);
+  // The real pure native compatibility helper controls the appended hash suffix.
+  // A disabled lock toggle and legacy24 both preserve the exact old identity.
+  state.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).value=Rando::RustyDoorKeys::CurrentCatalog;
+  REQUIRE(NativeSettingsHash()==off);
+  state.GetOption(RSK_LOCK_OVERWORLD_DOORS).value=1;
+  state.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).value=Rando::RustyDoorKeys::LegacyCatalog;
+  REQUIRE(NativeSettingsHash()==off);
+  state.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).value=Rando::RustyDoorKeys::CurrentCatalog;
+  auto rusty=NativeSettingsHash();
+  REQUIRE(rusty==SohUtils::Hash(std::to_string(seed)+"Off|rusty-door-keys=27|"+(version?gBuildVersion:"")));
+  REQUIRE(rusty!=off);
+  state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=1;
+  REQUIRE(NativeSettingsHash()==SohUtils::Hash(std::to_string(seed)+"Off|rusty-door-keys=27||native-first-enemy-drops=1|"+(version?gBuildVersion:"")));
+  state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=0;
+  state.GetOption(RSK_LOCK_OVERWORLD_DOORS).value=0;
+  state.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).value=Rando::RustyDoorKeys::LegacyCatalog;
+  REQUIRE(NativeSettingsHash()==off);
   state.GetOption(RSK_FOREST).value=1;REQUIRE(NativeSettingsHash()!=off);
  }
  // Exclusion keys inhabit their own enum and may have the same numeric value
@@ -104,14 +122,17 @@ int main(){
  auto&group=Rando::Settings::GetInstance()->groups[RSG_EXCLUDES_KOKIRI_FOREST];
  group.type=Rando::OptionGroupType::DEFAULT;group.options={&collision};
  REQUIRE(NativeSettingsHash()==SohUtils::Hash("1OffOff"));
- puts("PASS native settings hash/FNV: deterministic On identity, exact legacy Off, existing setting/version controls");
+ puts("PASS native settings hash/FNV: deterministic On identity, exact legacy Off, existing setting/version controls and real legacy24/current27 rusty-key identities");
 }
 '''
  with tempfile.TemporaryDirectory(prefix='enemy-drop-native-hash-') as directory:
   directory=Path(directory);cpp=directory/'hash.cpp';cpp.write_text(source)
   for mode in ('original','combo'):
    exe=directory/mode
-   subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
+   flags=['-std=c++20','-DF3DEX_GBI_2','-DSOH_BUILD_DLL','-DCONTROLLERBUTTONS_T=uint32_t','-I'+str(ROOT)]
+   for path in ('soh/include','soh/include/PR','soh/src','soh','soh/assets','soh/soh','libultraship/include','libultraship/src','combo'):
+    flags+=['-isystem',str(ROOT/path)]
+   subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
    subprocess.run([str(exe)],check=True)
 
 if __name__=='__main__':run()

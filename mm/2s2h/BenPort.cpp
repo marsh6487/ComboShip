@@ -1,8 +1,11 @@
+#include "Rando/SongEvents.h"
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
+#include "Rando/Logic/SeedGeneration.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -3798,6 +3801,7 @@ extern "C" int Controller_ShouldRumble(size_t slot) {
 // ComboShip exports — 2ship.dll side
 // ============================================================
 
+#ifdef COMBO_BUILD
 static std::unique_ptr<Ship::ArchiveManager> gMMArchiveManager;
 
 // Opens mm.o2r + 2ship.o2r into a MM-private ArchiveManager (no context, no window).
@@ -3969,11 +3973,14 @@ extern "C" COMBO_EXPORT void MM_InitRandoHeadless(void) {
     if (inited)
         return;
     inited = true;
+    // Native flag/item dispatch owns this real lightweight service headlessly.
+    if (!GameInteractor::Instance) {
+        GameInteractor::Instance = new GameInteractor();
+    }
     ShipInit::Init("RANDO_LOGIC"); // OwnRMScope("mm") no-ops headlessly (no "mm" RM registered)
     Rando::StaticData::PopulateCheckNames();
 }
 
-#ifdef COMBO_BUILD
 // Defined in mm/src/code/main.c: re-enters ONLY MM's game loop (no heap/thread re-init).
 extern "C" void MM_RunGameLoop(void);
 // Defined in mm/src/code/graph.c: resets the frame state machine so MM_RunGameLoop restarts the
@@ -4756,11 +4763,13 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
     // ComboShip: per-check hint-safe location name (GetLocationNameForHint(rc,false)) — the combo
     // hint layer's cross-game text composition needs the same "region" phrasing MM's own hints use.
     nlohmann::json locationHints = nlohmann::json::object();
+    nlohmann::json checkMetadata = nlohmann::json::object();
     for (auto& [id, chk] : Rando::StaticData::Checks) {
         const std::string& cn = Rando::StaticData::GetCheckDisplayName(id); // ComboShip: friendly name
         if (cn.empty())
             continue;
         locationHints[cn] = Rando::StaticData::GetLocationNameForHint(id, false);
+        checkMetadata[cn] = { { "scene", chk.sceneId }, { "id", static_cast<int>(id) }, { "sourceName", chk.name } };
     }
 
     // ComboShip: the two hint options that decide whether the combo hint layer's cross gossip pool is
@@ -4789,6 +4798,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
                                    { "misc", saveInfo.randoSaveOptions[RO_SHUFFLE_MISC_SOULS] != 0 } };
 
     cached = nlohmann::json{
+        { "songEvents", saveInfo.songEvents },
         { "startingSouls", std::move(startingSouls) },
         { "soulOptions", std::move(soulOptions) },
         { "checks", std::move(checks) },
@@ -4797,6 +4807,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         { "items", std::move(items) },
         { "prices", std::move(prices) },
         { "locationHints", std::move(locationHints) },
+        { "checkMetadata", std::move(checkMetadata) },
         { "options", std::move(options) },
         { "junkPool", std::move(junkPool) }
     }.dump();
@@ -4836,6 +4847,8 @@ static void GiveItemForOracle(RandoItemId ri) {
     if (Rando::Wallets::Give(ri))
         return;
     if (Rando::Bags::Give(ri) || Rando::Bags::GiveCapacity(ri))
+        return;
+    if (Rando::RustyDoorKeys::Give(ri))
         return;
     // Soul catalog mm_oracle begin
     if (const auto* soul = Rando::SoulShuffle::Find(ri)) {
@@ -4928,12 +4941,18 @@ static void GiveItemForOracle(RandoItemId ri) {
             Inventory_ChangeUpgrade(UPG_WALLET, 3);
             break;
 
-        // Heart pieces/containers — logic doesn't check these for reachability, but include for completeness
+        // Real native health gates require complete four-piece sets, matching Item_Give.
         case RI_HEART_CONTAINER:
             gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+            gSaveContext.save.saveInfo.playerData.health += 0x10;
             break;
         case RI_HEART_PIECE:
-            gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+            INCREMENT_QUEST_HEART_PIECE_COUNT;
+            if (EQ_MAX_QUEST_HEART_PIECE_COUNT) {
+                RESET_HEART_PIECE_COUNT;
+                gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+                gSaveContext.save.saveInfo.playerData.health += 0x10;
+            }
             break;
 
         // Bottle
@@ -5233,11 +5252,19 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
         memcpy(&sMM_OracleSavedContext, &gSaveContext, sizeof(SaveContext));
         sMM_OracleSavedRegionTime = gCurrentRegionTime;
         sMM_OracleActive = true;
+        // Mapping validation can throw; Restore must already own the snapshot
+        // and suspended audit even when setup fails before the inventory reset.
+        if (sMM_OracleSavedContext.save.shipSaveInfo.rando.finalSeed == (u32)sMMComboRandoSeed)
+            Rando::SongEvents::RememberSavedMapping(sMM_OracleSavedContext.save.shipSaveInfo.rando);
     }
     memset(&gSaveContext, 0, sizeof(SaveContext));
+    // Match native Sram_ResetSave's valid empty custom slots and contents.
+    Nei_InitNewSave();
     // Empty inventory slots are ITEM_NONE (0xFF), not 0: ITEM_OCARINA_OF_TIME is item id 0, so a
     // zeroed slot makes HAS_ITEM (an equality compare) report the ocarina owned and every song playable.
     memset(gSaveContext.save.saveInfo.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.saveInfo.inventory.items));
+    // Form zero is Fierce Deity; native randomizer files start as Human.
+    gSaveContext.save.playerForm = PLAYER_FORM_HUMAN;
     if (!sMM_OracleInventorySweepDone) { // one-time guard against future zero-collision regressions
         sMM_OracleInventorySweepDone = true;
         for (auto& [id, item] : Rando::StaticData::Items) {
@@ -5262,6 +5289,10 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
         gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[id] =
             (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
     }
+    // Native Sram_InitNewSave begins at three hearts. GrantStartingItems first
+    // applies the kit, then overrides health only for a nondefault option.
+    gSaveContext.save.saveInfo.playerData.healthCapacity = gSaveContext.save.saveInfo.playerData.health = 0x30;
+    Rando::SongEvents::RestoreForOracle(gSaveContext.save.shipSaveInfo.rando);
     // ComboShip (#136): combo owns the goal, so the hidden CVars above must not decide it here either.
     Rando::Wallets::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando,
                                      Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
@@ -5296,6 +5327,11 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
         for (RandoItemId si : startingItems) {
             GiveItemForOracle(Rando::ConvertItem(si));
         }
+    }
+
+    if (RANDO_SAVE_OPTIONS[RO_STARTING_HEALTH] != 3) {
+        gSaveContext.save.saveInfo.playerData.healthCapacity = gSaveContext.save.saveInfo.playerData.health =
+            RANDO_SAVE_OPTIONS[RO_STARTING_HEALTH] * 0x10;
     }
 
     // The memset wiped check prices too; re-apply the rolled/spoiler set or every CAN_AFFORD gate
@@ -5882,7 +5918,9 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Restore(void) {
     sMM_OracleActive = false;
     ItemGrantAudit_Resume();
 }
-#endif // COMBO_BUILD — combo-only region opened above MM_LoadSaveForCombo
+
+#include "Rando/Logic/SoloRandoHeadless.inc"
+#endif // COMBO_BUILD — ComboShip module exports
 
 #ifdef COMBO_BUILD
 // ComboShip: cross-game item-draw exports (MM_GetItemDrawInfo / MM_GetItemAnimDrawInfo). Bodies

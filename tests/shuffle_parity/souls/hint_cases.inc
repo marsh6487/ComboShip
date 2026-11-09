@@ -18,9 +18,13 @@ int main() {
     InitSoulHints();
     InitTemplates();
     std::set<RandomizerHintTextKey> keys;
+    std::set<std::string> frenchNames,germanNames;
     json exported = json::array();
     for (const auto& [id, soul] : itemTable) {
         const auto name = soul.GetName().GetEnglish();
+        assert(soul.GetName().GetFrench()!=name && soul.GetName().GetGerman()!=name);
+        assert(frenchNames.insert(soul.GetName().GetFrench()).second);
+        assert(germanNames.insert(soul.GetName().GetGerman()).second);
         assert(soul.GetHintKey() != RHT_NONE && keys.insert(soul.GetHintKey()).second);
         assert(soul.GetHint().GetClear().GetEnglish(MF_ENCODE) == name);
         Rando::Context::GetInstance()->locations[1].placed = &soul;
@@ -32,8 +36,26 @@ int main() {
         assert(hint.at("clear").at("en") == name);
         assert(hint.at("clear").at("fr") == soul.GetName().GetFrench());
         assert(hint.at("clear").at("de") == soul.GetName().GetGerman());
+        auto composed=Rando::StaticData::hintTextTable[RHT_CAN_BE_FOUND_AT].GetClear();
+        composed.Replace("[[1]]",soul.GetHint().GetClear());
+        composed.Replace("[[2]]",CustomMessage("Kokiri Forest","Kokiri-Wald","Forêt Kokiri"));
+        const std::vector<std::string> localizedRewards={name,soul.GetName().GetGerman(),soul.GetName().GetFrench()};
+        const std::vector<std::string> localizedSources={"Kokiri Forest","Kokiri-Wald","Forêt Kokiri"};
+        for(int language:{LANGUAGE_ENG,LANGUAGE_GER,LANGUAGE_FRA}){
+            auto encoded=composed.GetForLanguage(language,MF_ENCODE);
+            assert(encoded.find("%g"+localizedRewards[language]+"%w")!=std::string::npos);
+            assert(encoded.find("%r"+localizedSources[language]+"%w")!=std::string::npos);
+            assert(encoded.find("[[")==std::string::npos&&encoded.find('#')==std::string::npos);
+            composed.ReplaceColors(encoded);
+            assert(encoded.find(CustomMessage::COLOR(QM_GREEN)+localizedRewards[language]+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+            assert(encoded.find(CustomMessage::COLOR(QM_RED)+localizedSources[language]+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+        }
         exported.push_back({{"name",name},{"hint",hint}});
     }
+    assert(itemTable.at(RG_SOUL_ENEMY_OCTOROK).GetName().GetGerman()=="Gegnerseele: Oktorok");
+    assert(itemTable.at(RG_SOUL_NPC_SARIA).GetName().GetGerman()=="Personenseele: Salia");
+    assert(itemTable.at(RG_SOUL_NPC_DAMPE).GetName().GetFrench()=="Âme de personnage : Igor");
+    assert(itemTable.at(RG_SOUL_ANIMAL_COW).GetName().GetFrench()=="Âme animale : Vache");
     assert(keys.size() == 147);
     assert(Rando::StaticData::hintTextTable[RHT_NONE].GetClear().GetEnglish(MF_ENCODE) == "No Hint");
     json hd{{"options",{{"gossipStoneHints",1},{"hintDistribution",1},{"hintClarity",2}}},

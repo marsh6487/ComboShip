@@ -459,7 +459,7 @@ GetItemEntry Context::GetFinalGIEntry(const RandomizerCheck rc, const bool check
     return giEntry;
 }
 
-void Context::ParseSpoiler(const char* spoilerFileName) {
+void Context::ParseSpoiler(const char* spoilerFileName, bool allowComboEmbedded) {
     InvalidateSariaMagicHintLocation();
     std::ifstream spoilerFileStream(SohUtils::Sanitize(spoilerFileName));
     if (!spoilerFileStream) {
@@ -472,12 +472,15 @@ void Context::ParseSpoiler(const char* spoilerFileName) {
         spoilerFileStream >> spoilerFileJson;
         spoilerFileStream.close();
         // Validate at the parser boundary too: a remembered path bypasses file-drop routing.
-        if (Combo_IsCombinedGame() || spoilerFileJson.value("fileType", std::string()) == "ComboShipRandomizer" ||
+        if ((!allowComboEmbedded && Combo_IsCombinedGame()) ||
+            spoilerFileJson.value("fileType", std::string()) == "ComboShipRandomizer" ||
             !spoilerFileJson.contains("version") || !spoilerFileJson.contains("finalSeed")) {
             return;
         }
         ParseHashIconIndexesJson(spoilerFileJson);
         Rando::Settings::GetInstance()->ParseJson(spoilerFileJson);
+        SetSeed(spoilerFileJson.at("finalSeed").get<uint32_t>());
+        ImportSongEvents(spoilerFileJson);
         ParseItemLocationsJson(spoilerFileJson);
         ParseTricksJson(spoilerFileJson);
         mEntranceShuffler->ParseJson(spoilerFileJson);
@@ -710,5 +713,6 @@ uint32_t Context::GetSeed() const {
 void Context::SetSeed(const uint32_t seed) {
     InvalidateSariaMagicHintLocation();
     mFinalSeed = seed;
+    GenerateSongEvents();
 }
 } // namespace Rando

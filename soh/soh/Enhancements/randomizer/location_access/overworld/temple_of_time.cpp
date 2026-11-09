@@ -38,7 +38,7 @@ void RegionTable_Init_TempleOfTime() {
     }, {
         //Exits
         ENTRANCE(RR_TOT_ENTRANCE,            true),
-        ENTRANCE(RR_TOT_BEYOND_DOOR_OF_TIME, ctx->GetOption(RSK_DOOR_OF_TIME).Is(RO_DOOROFTIME_OPEN) || (logic->CanUse(RG_SONG_OF_TIME) && (ctx->GetOption(RSK_DOOR_OF_TIME).Is(RO_DOOROFTIME_SONGONLY) || (logic->StoneCount() == 3 && logic->HasItem(RG_OCARINA_OF_TIME))))),
+        ENTRANCE(RR_TOT_BEYOND_DOOR_OF_TIME, ctx->GetOption(RSK_DOOR_OF_TIME).Is(RO_DOOROFTIME_OPEN) || (logic->CanPlaySongEvent(0) && (ctx->GetOption(RSK_DOOR_OF_TIME).Is(RO_DOOROFTIME_SONGONLY) || (logic->StoneCount() == 3 && logic->HasItem(RG_OCARINA_OF_TIME))))),
     });
 
     areaTable[RR_TOT_BEYOND_DOOR_OF_TIME] = Region("Beyond Door of Time", SCENE_TEMPLE_OF_TIME, {}, {

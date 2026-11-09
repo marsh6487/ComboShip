@@ -38,7 +38,7 @@ void RegionTable_Init_JabuJabusBelly() {
 
     areaTable[RR_JABU_JABUS_BELLY_HOLES_ROOM] = Region("Jabu Jabus Belly Holes Room", SCENE_JABU_JABU, {
         //Events
-        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_B1, true),
+        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_B1, logic->HasItem(RG_SOUL_NPC_RUTO) && true),
     }, {}, {
         //Exits
         ENTRANCE(RR_JABU_JABUS_BELLY_LIFT_ROOM,              true),
@@ -82,7 +82,7 @@ void RegionTable_Init_JabuJabusBelly() {
     areaTable[RR_JABU_JABUS_BELLY_WATER_SWITCH_ROOM_NORTH] = Region("Jabu Jabus Belly Water Switch Room North", SCENE_JABU_JABU, {
         //Events
         //RANDOTODO check how doorsanity handles ruto
-        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_1F, logic->Get(LOGIC_JABU_RUTO_IN_B1) && (logic->IsAdult || logic->HasItem(RG_BRONZE_SCALE)) && logic->HasItem(RG_SPEAK_ZORA) && logic->HasItem(RG_POWER_BRACELET)),
+        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_1F, logic->HasItem(RG_SOUL_NPC_RUTO) && logic->Get(LOGIC_JABU_RUTO_IN_B1) && (logic->IsAdult || logic->HasItem(RG_BRONZE_SCALE)) && logic->HasItem(RG_SPEAK_ZORA) && logic->HasItem(RG_POWER_BRACELET)),
     }, {
         //Locations
         LOCATION(RC_JABU_JABUS_BELLY_GS_WATER_SWITCH_ROOM, logic->CanGetEnemyDrop(RE_GOLD_SKULLTULA, ED_BOOMERANG)),
@@ -332,7 +332,7 @@ void RegionTable_Init_JabuJabusBelly() {
 
     areaTable[RR_JABU_JABUS_BELLY_MQ_HOLES_ROOM] = Region("Jabu Jabus Belly MQ Holes Room", SCENE_JABU_JABU, {
         //Events
-        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_B1,          true),
+        EVENT_ACCESS(LOGIC_JABU_RUTO_IN_B1,          logic->HasItem(RG_SOUL_NPC_RUTO) && true),
         EVENT_ACCESS(LOGIC_JABU_MQ_FORKED_ROOM_DOOR, (logic->HasExplosives() || ctx->GetTrickOption(RT_BOULDER_COLLISION)) && logic->CanUse(RG_FAIRY_SLINGSHOT)),
     }, {
         //Locations

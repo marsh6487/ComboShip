@@ -123,6 +123,8 @@ static RegisterShipInitFunc initFunc([]() {
     // Swamp Spider House
     Regions[RR_SWAMP_SPIDER_HOUSE_BIG_POT_ROOM_LOWER] = RandoRegion{ .name = "Lower Big Pot Room", .sceneId = SCENE_KINSTA1,
         .checks = {
+            CHECK(RC_SWAMP_SPIDER_HOUSE_ROCK_POTS_ROOM, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_SWAMP_SKULLTULA_POT_ROOM_HIVE_01, CanKillEnemy(ACTOR_EN_SW) && CAN_USE_PROJECTILE),
             CHECK(RC_SWAMP_SKULLTULA_POT_ROOM_HIVE_02, CanKillEnemy(ACTOR_EN_SW) && CAN_USE_PROJECTILE),
             CHECK(RC_SWAMP_SPIDER_HOUSE_POT_ROOM_BEEHIVE_01, CAN_USE_PROJECTILE),
@@ -141,7 +143,7 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .connections = {
             CONNECTION(RR_SWAMP_SPIDER_HOUSE_CENTER_ROOM_LOWER, true),
-            CONNECTION(RR_SWAMP_SPIDER_HOUSE_BIG_POT_ROOM_UPPER, CAN_BE_DEKU && CAN_PLAY_SONG(SONATA))
+            CONNECTION(RR_SWAMP_SPIDER_HOUSE_BIG_POT_ROOM_UPPER, CAN_BE_DEKU && Rando::SongEvents::CanPlay(9))
         }
     };
     Regions[RR_SWAMP_SPIDER_HOUSE_BIG_POT_ROOM_UPPER] = RandoRegion{ .name = "Upper Big Pot Room", .sceneId = SCENE_KINSTA1,
@@ -215,6 +217,9 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_SWAMP_SPIDER_HOUSE_ENTRANCE] = RandoRegion{ .name = "Entrance", .sceneId = SCENE_KINSTA1,
         .checks = {
+            CHECK(RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_1, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_2, (CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_SWAMP_SPIDER_HOUSE_MASK_OF_TRUTH, HAS_ENOUGH_SKULLTULA_TOKENS(SCENE_KINSTA1)),
         },
         .exits = { //     TO                                         FROM
@@ -229,6 +234,8 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_SWAMP_SPIDER_HOUSE_GOLD_ROOM_LOWER] = RandoRegion{ .name = "Lower Gold Room", .sceneId = SCENE_KINSTA1,
         .checks = {
+            CHECK(RC_SWAMP_SPIDER_HOUSE_SOIL_GOLD, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+
             CHECK(RC_SWAMP_SKULLTULA_GOLD_ROOM_HIVE, CanKillEnemy(ACTOR_EN_SW) && CAN_USE_PROJECTILE),
             CHECK(RC_SWAMP_SPIDER_HOUSE_GOLD_ROOM_BEEHIVE_01, CAN_USE_PROJECTILE),
             CHECK(RC_SWAMP_SPIDER_HOUSE_GOLD_ROOM_BEEHIVE_02, CAN_USE_PROJECTILE),
@@ -264,6 +271,11 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_SWAMP_SPIDER_HOUSE_MONUMENT_ROOM] = RandoRegion{ .name = "Monument Room", .sceneId = SCENE_KINSTA1,
         .checks = {
+            CHECK(RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_1, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_2, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_3, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_SWAMP_SPIDER_HOUSE_BOULDER, (CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_SWAMP_SKULLTULA_MONUMENT_ROOM_CRATE_01, CanKillEnemy(ACTOR_EN_SW)),
             CHECK(RC_SWAMP_SKULLTULA_MONUMENT_ROOM_CRATE_02, CanKillEnemy(ACTOR_EN_SW)),
             CHECK(RC_SWAMP_SKULLTULA_MONUMENT_ROOM_LOWER_WALL, CanKillEnemy(ACTOR_EN_SW) && (HAS_ITEM(ITEM_HOOKSHOT) || CAN_BE_ZORA || ((CAN_USE_EXPLOSIVE || CAN_BE_GORON) && CAN_GROW_BEAN_PLANT))),

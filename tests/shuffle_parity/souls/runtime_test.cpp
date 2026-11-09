@@ -20,6 +20,11 @@ static void (*sACVsFuncs[4][4])(PlayState*, CollisionCheckContext*, Collider*, C
 #include "collision.inc"
 static int spawnReachesAllocation=0;
 #include "spawn.inc"
+static int tempClearCount=0;
+extern "C" void Flags_SetTempClear(PlayState*, s32) {++tempClearCount;}
+#include "remove.inc"
+static int observedHammer=-1, updateCalls=0;
+static void ObserveHammer(Actor*,PlayState* play){observedHammer=play->actorCtx.unk_02;++updateCalls;}
 int main() {
     PlayState play{}; Actor actor{};
     gSaveContext.ship.quest.id=QUEST_RANDOMIZER;
@@ -32,15 +37,15 @@ int main() {
     for (const auto& role : expectedNpcs) {
         play.sceneNum = role.scene;
         optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
-        REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(!Randomizer_SoulCanInteract(&play, role.actor, role.params));
         Own(role.soul, true);
-        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(Randomizer_SoulCanInteract(&play, role.actor, role.params));
         Own(role.soul, false);
         optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
-        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(Randomizer_SoulCanInteract(&play, role.actor, role.params));
         play.sceneNum = 0x7FFF;
         optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
-        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(Randomizer_SoulCanInteract(&play, role.actor, role.params));
         optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
     }
 
@@ -221,6 +226,28 @@ int main() {
     CollisionCheck_AC(&play,&context,&at);
     REQUIRE(collisionCount==1);
     REQUIRE(memcmp(&before,&actor,sizeof(actor))==0);
+
+    // Execute the actual removal function, including temp-room-clear policy.
+    optionValues[RSK_SHUFFLE_ENEMY_SOULS]=1;Own(RG_SOUL_ENEMY_STALFOS,false);
+    Actor enemy{};enemy.id=ACTOR_EN_TEST;enemy.category=ACTORCAT_ENEMY;enemy.room=3;
+    play.roomCtx.curRoom.num=3;
+    Randomizer_SoulResetRoomState(&play,-1);
+    play.actorCtx.total=1;play.actorCtx.actorLists[ACTORCAT_ENEMY].length=1;
+    play.actorCtx.actorLists[ACTORCAT_ENEMY].head=&enemy;
+    Actor_RemoveFromCategory(&play,&play.actorCtx,&enemy);
+    REQUIRE(tempClearCount==0);REQUIRE(!Randomizer_SoulCanClearRoom(&play,3));
+    Own(RG_SOUL_ENEMY_STALFOS,true);
+    REQUIRE(!Randomizer_SoulCanClearRoom(&play,3)); // no retroactive clear after despawn
+    Randomizer_SoulResetRoomState(&play,3);
+    REQUIRE(Randomizer_SoulCanClearRoom(&play,3));
+    play.actorCtx.total=1;play.actorCtx.actorLists[ACTORCAT_ENEMY].length=1;
+    play.actorCtx.actorLists[ACTORCAT_ENEMY].head=&enemy;
+    Actor_RemoveFromCategory(&play,&play.actorCtx,&enemy);REQUIRE(tempClearCount==1);
+    // Missing soul masks only the quake-impact input during the native update.
+    Own(RG_SOUL_ENEMY_STALFOS,false);enemy.update=ObserveHammer;play.actorCtx.unk_02=7;
+    Randomizer_SoulUpdateActor(&play,&enemy);REQUIRE(observedHammer==0&&updateCalls==1&&play.actorCtx.unk_02==7);
+    Own(RG_SOUL_ENEMY_STALFOS,true);Randomizer_SoulUpdateActor(&play,&enemy);
+    REQUIRE(observedHammer==7&&updateCalls==2&&play.actorCtx.unk_02==7);
     puts("PASS actual native actor bridge: immunity, special death/update, independent misc, vanilla/credits controls");
     return 0;
 }

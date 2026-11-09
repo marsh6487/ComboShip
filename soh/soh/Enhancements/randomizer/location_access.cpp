@@ -1,3 +1,4 @@
+#include "combo/rando/SongEvents.h"
 #include "EnemyFirstDrops.h"
 #include "location_access.h"
 
@@ -428,7 +429,7 @@ Region::Region(std::string regionName_, SceneID scene_, std::vector<EventAccess>
 Region::~Region() = default;
 
 bool Region::TimePass() {
-    return timePass;
+    return timePass && logic->ClockAllowsTimePass();
 }
 
 void Region::ApplyTimePass() {
@@ -998,7 +999,8 @@ void AccessReset() {
         RegionTable(region)->ResetVariables();
     }
 
-    if (/*Settings::HasNightStart TODO:: Randomize Starting Time*/ false) {
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK).Get() &&
+        ComboRando::SongEvents::ClockStart(ctx->GetOption(RSK_CLOCK_START).Get(), ctx->GetSeed()) >= 0xc000) {
         if (ctx->GetOption(RSK_SELECTED_STARTING_AGE).Is(RO_AGE_CHILD)) {
             RegionTable(RR_ROOT)->childNight = true;
         } else {
@@ -1025,7 +1027,8 @@ void ResetAllLocations() {
         }
     }
 
-    if (/*Settings::HasNightStart TODO:: Randomize Starting Time*/ false) {
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK).Get() &&
+        ComboRando::SongEvents::ClockStart(ctx->GetOption(RSK_CLOCK_START).Get(), ctx->GetSeed()) >= 0xc000) {
         if (ctx->GetOption(RSK_SELECTED_STARTING_AGE).Is(RO_AGE_CHILD)) {
             RegionTable(RR_ROOT)->childNight = true;
         } else {

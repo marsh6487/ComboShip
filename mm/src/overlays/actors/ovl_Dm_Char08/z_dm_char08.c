@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_dm_char08.c
  * Overlay: ovl_Dm_Char08
@@ -310,7 +311,7 @@ void DmChar08_WaitForSong(DmChar08* this, PlayState* play) {
     if (GameInteractor_Should(VB_OPEN_GREAT_BAY_FROM_SONG,
                               (player->transformation == PLAYER_FORM_ZORA) &&
                                   (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-                                  (play->msgCtx.lastPlayedSong == OCARINA_SONG_NEW_WAVE),
+                                  (play->msgCtx.lastPlayedSong == SongEvents_MmSong(2, OCARINA_SONG_NEW_WAVE)),
                               this)) {
         if ((player2->actor.world.pos.x > -5780.0f) && (player2->actor.world.pos.x < -5385.0f)) {
             if ((player2->actor.world.pos.z > 1120.0f) && (player2->actor.world.pos.z < 2100.0f)) {

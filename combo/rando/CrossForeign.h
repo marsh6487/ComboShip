@@ -31,6 +31,7 @@
 #include <nlohmann/json.hpp>
 
 #include "SharedItems.h"
+#include "NativeRandoDump.h"
 
 namespace ComboRando {
 
@@ -195,8 +196,8 @@ struct ForeignItemMeta {
 
 inline std::unordered_map<std::string, ForeignItemMeta> ParseItemMeta(const std::string& dump) {
     std::unordered_map<std::string, ForeignItemMeta> m;
+    const auto d = ParseOptionalStaticDataDump(dump, "native item metadata");
     try {
-        auto d = nlohmann::json::parse(dump);
         for (const auto& it : d.value("items", nlohmann::json::array())) {
             std::string n = it.value("name", "");
             if (n.empty())
@@ -213,11 +214,12 @@ inline std::unordered_map<std::string, ForeignItemMeta> ParseItemMeta(const std:
 }
 
 // OOT's curated ice-trap disguise names from its dump ("iceTrapModels"). `present` = a usable (non-empty)
-// list; a stale dump (no field) or a failed prep (empty field) both fall back to the caller's own filter.
+// list; valid older metadata with no usable list falls back to the caller's own filter.
+// A native preparation diagnostic is rejected before considering that fallback.
 inline std::set<std::string> ParseIceTrapModels(const std::string& dump, bool& present) {
     std::set<std::string> out;
+    const auto d = ParseOptionalStaticDataDump(dump, "OOT trap metadata");
     try {
-        auto d = nlohmann::json::parse(dump);
         auto it = d.find("iceTrapModels");
         if (it != d.end() && it->is_array()) {
             for (const auto& n : *it) {
@@ -414,13 +416,13 @@ inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray, uint
 // GetItemDisplayName, so joining them needs the dump's own token->name map. Without it every pair
 // misses silently. A pair whose mm side is already a friendly name passes through unchanged.
 inline std::vector<CwSharedPair> ResolveSharedPairs(const std::string& sharedPairsJson, const std::string& mmDumpJson) {
+    const auto d = ParseOptionalStaticDataDump(mmDumpJson, "MM shared-item metadata");
     std::vector<CwSharedPair> pairs;
     if (sharedPairsJson.empty()) {
         return pairs;
     }
     std::unordered_map<std::string, std::string> tokenToName;
     try {
-        auto d = nlohmann::json::parse(mmDumpJson);
         for (const auto& it : d.value("items", nlohmann::json::array())) {
             std::string token = it.value("token", std::string{});
             std::string name = it.value("name", std::string{});
@@ -494,6 +496,8 @@ struct CwSharedGroup {
 inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwSharedPair>& pairs, uint32_t mask,
                                                         const std::string& ootDump = "",
                                                         const std::string& mmDump = "") {
+    const nlohmann::json nativeDumps[] = { ParseOptionalStaticDataDump(ootDump, "OOT starting ownership"),
+                                           ParseOptionalStaticDataDump(mmDump, "MM starting ownership") };
     std::vector<CwSharedGroup> groups;
     auto connect = [&](const std::string& oot, const std::string& mm, bool nei, size_t cap, bool soul = false) {
         size_t oi = groups.size(), mi = groups.size();
@@ -556,11 +560,10 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
     }
     // Configured native starts are absent from the native pool. Keep their
     // ownership in the shared graph so every fill/replay query sees the peer.
-    const std::string* dumps[] = { &ootDump, &mmDump };
     for (GameId game : { GAME_OOT, GAME_MM }) {
         std::set<std::string> starts;
         try {
-            auto dump = nlohmann::json::parse(*dumps[game]);
+            const auto& dump = nativeDumps[game];
             if (dump.contains("startingSouls") && dump["startingSouls"].is_array())
                 for (const auto& name : dump["startingSouls"])
                     if (name.is_string())
@@ -618,8 +621,8 @@ inline void SuffixCrossGameItems(nlohmann::json& ootPlacements, nlohmann::json& 
                                  const std::string& mmDump, const std::set<std::string>& sharedNames = {}) {
     auto itemNames = [](const std::string& dump) {
         std::set<std::string> s;
+        const auto d = ParseOptionalStaticDataDump(dump, "native item names");
         try {
-            auto d = nlohmann::json::parse(dump);
             for (auto& it : d.value("pool", nlohmann::json::array()))
                 if (auto n = it.value("name", std::string{}); !n.empty())
                     s.insert(std::move(n));

@@ -56,7 +56,7 @@ for(auto &s:Rando::SoulShuffle::Catalog) {
             pre='#define RANDO_ENUM_BEGIN(n) enum n {\n#define RANDO_ENUM_ITEM(n,...) n,\n#define RANDO_ENUM_END(n) };\n'
             for h in ('RandomizerGet','RandomizerInf','RandomizerSettingKey'):
                 pre+=f'#include "soh/soh/Enhancements/randomizer/randomizerEnums/{h}.h"\n'
-            hdr=(ROOT/'soh/soh/Enhancements/randomizer/SoulShuffle.h').read_text().replace('#pragma once','').replace('#include "randomizerTypes.h"','').replace('../../../../combo/rando/SoulShuffleCatalog.inc','combo/rando/SoulShuffleCatalog.inc')
+            hdr=(ROOT/'soh/soh/Enhancements/randomizer/SoulShuffle.h').read_text().replace('#pragma once','').replace('#include "randomizerTypes.h"','').replace('../../../../combo/rando/', 'combo/rando/').replace('#include "SoulShuffleLegacy.inc"','#include "soh/soh/Enhancements/randomizer/SoulShuffleLegacy.inc"')
             pre+=hdr+'\nusing namespace Rando;\nunsigned short flags[(RAND_INF_MAX+15)/16]{};\n'
             pre+='bool options[RSK_MAX]{}; struct Context{bool GetOption(RandomizerSettingKey k){return options[k];}} context; auto*ctx=&context;\n'
             pre+='bool CheckRandoInf(RandomizerInf f){return flags[f/16] & (1u<<(f%16));}\n'

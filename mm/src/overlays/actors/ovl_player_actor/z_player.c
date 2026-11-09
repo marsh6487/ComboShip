@@ -8,6 +8,7 @@
  */
 
 #include "global.h"
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
@@ -20007,12 +20008,17 @@ void Player_Action_70(Player* this, PlayState* play) {
         } else if (PlayerAnimation_OnFrame(&this->skelAnime, 76.0f)) {
             sp4C = &D_8085D80C[GET_BOTTLE_FROM_IA(this->itemAction) - 1];
 
-            Actor_Spawn(&play->actorCtx, play, sp4C->actorId,
-                        (Math_SinS(this->actor.shape.rot.y) * 5.0f) + this->leftHandWorld.pos.x,
-                        this->leftHandWorld.pos.y,
-                        (Math_CosS(this->actor.shape.rot.y) * 5.0f) + this->leftHandWorld.pos.z, 0x4000,
-                        this->actor.shape.rot.y, 0, sp4C->params);
-            Player_UpdateBottleHeld(play, this, ITEM_BOTTLE, PLAYER_IA_BOTTLE_EMPTY);
+            // Keep the bottle intact until the released actor can exist.
+            if (MM_SoulCanSpawnNonEnemy(play, sp4C->actorId, (u16)sp4C->params)) {
+                Actor* released = Actor_Spawn(&play->actorCtx, play, sp4C->actorId,
+                                              (Math_SinS(this->actor.shape.rot.y) * 5.0f) + this->leftHandWorld.pos.x,
+                                              this->leftHandWorld.pos.y,
+                                              (Math_CosS(this->actor.shape.rot.y) * 5.0f) + this->leftHandWorld.pos.z,
+                                              0x4000, this->actor.shape.rot.y, 0, sp4C->params);
+                if (released != NULL) {
+                    Player_UpdateBottleHeld(play, this, ITEM_BOTTLE, PLAYER_IA_BOTTLE_EMPTY);
+                }
+            }
         } else {
             Player_PlayAnimSfx(this, D_8085D838);
         }

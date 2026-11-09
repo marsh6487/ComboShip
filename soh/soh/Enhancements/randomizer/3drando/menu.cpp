@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "menu.hpp"
 #include "playthrough.hpp"
 #include "soh/Enhancements/debugger/performanceTimer.h"
@@ -14,6 +15,7 @@ Rando::Option* currentSetting;
 bool GenerateRandomizer(std::set<RandomizerCheck> excludedLocations, std::set<RandomizerTrick> enabledTricks,
                         std::string seedInput) {
     const auto ctx = Rando::Context::GetInstance();
+    Rando::RustyDoorKeys::StampNewGeneration(*ctx);
     ResetPerformanceTimers();
     StartPerformanceTimer(PT_WHOLE_SEED);
     ctx->SetSpoilerLoaded(false);

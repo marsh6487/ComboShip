@@ -191,6 +191,7 @@ UNUSED_HANDLER(OOT_DrawForeignPoes)
 UNUSED_HANDLER(OOT_DrawForeignFairyBottle)
 UNUSED_HANDLER(OOT_DrawForeignMagicSpell)
 UNUSED_HANDLER(OOT_DrawForeignSoulFlame)
+UNUSED_HANDLER(OOT_DrawForeignShuffledSoul)
 UNUSED_HANDLER(OOT_DrawForeignOps)
 static constexpr int kMaxMatEntries=8;
 template<class...Args>void ComboForeignTexAnim_Run(Args...){assert(false);}

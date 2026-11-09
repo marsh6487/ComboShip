@@ -7,6 +7,8 @@
 
 #include "vt.h"
 #include "z_en_heishi2.h"
+extern int Randomizer_RustyCastleGateEnabled(PlayState* play);
+extern int Randomizer_RustyCastleGateLocked(PlayState* play);
 #include "objects/object_sd/object_sd.h"
 #include "objects/object_link_child/object_link_child.h"
 #include "overlays/actors/ovl_Bg_Gate_Shutter/z_bg_gate_shutter.h"
@@ -192,6 +194,13 @@ void func_80A531E4(EnHeishi2* this, PlayState* play) {
 void func_80A53278(EnHeishi2* this, PlayState* play) {
     this->unk_30B = 0;
     this->unk_30E = 0;
+    if (this->type == 2 && Randomizer_RustyCastleGateEnabled(play)) {
+        // This precise Castle guard does not offer/charge a redundant bribe in key mode.
+        this->unk_300 = TEXT_STATE_DONE;
+        this->actor.textId = Randomizer_RustyCastleGateLocked(play) ? 0x0203 : 0x7099;
+        this->actionFunc = func_80A5475C;
+        return;
+    }
     if (GameInteractor_Should(VB_CAN_BRIBE_HEISHI2, true, this)) {
         if (Text_GetFaceReaction(play, 5) != 0) {
             this->actor.textId = Text_GetFaceReaction(play, 5);
@@ -248,6 +257,12 @@ void func_80A53278(EnHeishi2* this, PlayState* play) {
 
 void func_80A5344C(EnHeishi2* this, PlayState* play) {
     SkelAnime_Update(&this->skelAnime);
+    if (this->type == 2 && Randomizer_RustyCastleGateEnabled(play)) {
+        // Also protect a choice already pending when a versioned seed was restored.
+        Message_CloseTextbox(play);
+        this->actionFunc = func_80A531E4;
+        return;
+    }
     if ((Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE) && Message_ShouldAdvance(play)) {
         this->unk_300 = TEXT_STATE_EVENT;
         switch (play->msgCtx.choiceIndex) {

@@ -1,6 +1,8 @@
+#include "combo/rando/SongEvents.h"
 #ifndef BenJsonConversions_hpp
 #define BenJsonConversions_hpp
 
+#include "Rando/VanillaCompatibility.h"
 #include <nlohmann/json.hpp>
 #include "../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
@@ -417,6 +419,7 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
         { "randoEvents", rando.randoEvents },
         { "randoSaveChecks", rando.randoSaveChecks },
         { "finalSeed", rando.finalSeed },
+        { "songEvents", rando.songEvents },
         { "randoSaveOptions", rando.randoSaveOptions },
         { "randoStartingItems", rando.randoStartingItems },
         { "foundDungeonKeys", rando.foundDungeonKeys },
@@ -446,12 +449,26 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
         rando.randoSaveChecks[i] = savedChecks[i];
     }
     j.at("finalSeed").get_to(rando.finalSeed);
+    memset(rando.songEvents, 0, sizeof(rando.songEvents));
+    if (j.contains("songEvents"))
+        j.at("songEvents").get_to(rando.songEvents);
     // Options are append-only. A pre-option save has a shorter array; missing
     // entries retain legacy zero values (Grace On), even when reusing a struct.
     const auto savedOptions = j.at("randoSaveOptions").get<std::vector<u32>>();
     memset(rando.randoSaveOptions, 0, sizeof(rando.randoSaveOptions));
     for (size_t i = 0; i < savedOptions.size() && i < ARRAY_COUNT(rando.randoSaveOptions); ++i) {
         rando.randoSaveOptions[i] = savedOptions[i];
+    }
+    // Legacy experimental Vanilla seeds could persist restrictions with no
+    // corresponding item sources and mark disabled dynamic checks shuffled.
+    Rando::VanillaCompatibility::NormalizeSavedState(rando);
+    if (!j.contains("songEvents")) {
+        auto map = ComboRando::SongEvents::Generate(ComboRando::SongEvents::Game::Mm, rando.finalSeed,
+                                                    rando.randoSaveOptions[RO_SHUFFLE_SONG_EVENTS] != 0);
+        std::copy(map.begin(), map.end(), rando.songEvents);
+    } else if (rando.randoSaveOptions[RO_SHUFFLE_SONG_EVENTS]) {
+        auto map = ComboRando::SongEvents::ParseMapping(ComboRando::SongEvents::Game::Mm, j.at("songEvents"));
+        std::copy(map.begin(), map.end(), rando.songEvents);
     }
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);

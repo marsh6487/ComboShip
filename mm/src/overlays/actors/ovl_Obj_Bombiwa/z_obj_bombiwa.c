@@ -5,6 +5,7 @@
  */
 
 #include "z_obj_bombiwa.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "objects/object_bombiwa/object_bombiwa.h"
 
 #include "2s2h/ShipUtils.h"
@@ -182,7 +183,8 @@ void ObjBombiwa_Init(Actor* thisx, PlayState* play) {
     Actor_ProcessInitChain(&this->actor, sInitChain);
     Collider_InitCylinder(play, &this->collider);
 
-    if (Flags_GetSwitch(play, OBJBOMBIWA_GET_SWITCH_FLAG(&this->actor))) {
+    if (GameInteractor_Should(VB_ENVIRONMENT_SOURCE_USED,
+                              Flags_GetSwitch(play, OBJBOMBIWA_GET_SWITCH_FLAG(&this->actor)), &this->actor)) {
         Actor_Kill(&this->actor);
         return;
     }
@@ -234,7 +236,7 @@ void func_80939794(ObjBombiwa* this, PlayState* play) {
             phi_v1 = 0x21;
         }
         EffectSsKakera_Spawn(play, &spB4, &spA8, &spB4, -400, phi_v1, 10, 2, 0, D_8093A9D0[i], 1, 0, 60, -1,
-                             OBJECT_BOMBIWA, object_bombiwa_DL_0009E0);
+                             OBJECT_BOMBIWA, (Gfx*)object_bombiwa_DL_0009E0);
     }
 
     func_800BBFB0(play, &this->actor.world.pos, 60.0f, 8, 80, 140, 1);
@@ -275,7 +277,7 @@ void func_80939994(PlayState* play, Vec3f* arg1) {
             }
         }
         EffectSsKakera_Spawn(play, &spAC, &spA0, &spAC, -450, phi_v0, 15, 0, 0, i, 1, 0, life, -1, OBJECT_BOMBIWA,
-                             object_bombiwa_DL_005990);
+                             (Gfx*)object_bombiwa_DL_005990);
     }
 
     func_800BBFB0(play, arg1, 120.0f, 3, 80, 140, 1);
@@ -322,7 +324,7 @@ void func_80939C50(PlayState* play, Vec3f* arg1) {
             }
         }
         EffectSsKakera_Spawn(play, &spBC, &spB0, &spBC, -450, phi_v0, 15, 0, 0, D_8093A9E0[i], 1, 0, phi_s0, -1,
-                             OBJECT_BOMBIWA, object_bombiwa_DL_005990);
+                             OBJECT_BOMBIWA, (Gfx*)object_bombiwa_DL_005990);
     }
 
     func_800BBFB0(play, arg1, 60.0f, 4, 80, 140, 1);
@@ -342,6 +344,7 @@ void func_80939EF4(ObjBombiwa* this, PlayState* play) {
     }
 
     if (sp28->unk_0C(&this->actor)) {
+        GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, &this->actor, 0);
         Flags_SetSwitch(play, OBJBOMBIWA_GET_SWITCH_FLAG(&this->actor));
         SoundSource_PlaySfxAtFixedWorldPos(play, &this->actor.world.pos, 80, NA_SE_EV_WALL_BROKEN);
         if (OBJBOMBIWA_GET_8000(&this->actor)) {
@@ -457,7 +460,7 @@ void func_8093A418(Actor* thisx, PlayState* play) {
 
     if ((this->actor.projectedPos.z <= 2200.0f) || ((this->unk_203 & 1) && (this->actor.projectedPos.z < 2300.0f))) {
         this->actor.shape.shadowAlpha = 160;
-        Gfx_DrawDListOpa(play, object_bombiwa_DL_0009E0);
+        Gfx_DrawDListOpa(play, (Gfx*)object_bombiwa_DL_0009E0);
         return;
     }
 
@@ -471,7 +474,7 @@ void func_8093A418(Actor* thisx, PlayState* play) {
 
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (s32)sp28);
-        gSPDisplayList(POLY_XLU_DISP++, object_bombiwa_DL_000AF0);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)object_bombiwa_DL_000AF0);
 
         CLOSE_DISPS(play->state.gfxCtx);
     } else {
@@ -497,23 +500,23 @@ void func_8093A608(Actor* thisx, PlayState* play) {
             ((this->unk_203 & 1) && (this->actor.projectedPos.z < 2300.0f))) {
             Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
-            gSPSegment(POLY_OPA_DISP++, 0x08, D_801AEFA0);
+            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)D_801AEFA0);
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x9B, 255, 255, 255, 255);
-            gSPDisplayList(POLY_OPA_DISP++, object_bombiwa_DL_004560);
+            gSPDisplayList(POLY_OPA_DISP++, (Gfx*)object_bombiwa_DL_004560);
 
             Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-            gSPDisplayList(POLY_XLU_DISP++, object_bombiwa_DL_004688);
+            gSPDisplayList(POLY_XLU_DISP++, (Gfx*)object_bombiwa_DL_004688);
         } else if (this->actor.projectedPos.z < 2300.0f) {
             sp38 = (2300.0f - this->actor.projectedPos.z) * 2.55f;
             Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
-            gSPSegment(POLY_XLU_DISP++, 0x08, D_801AEF88);
+            gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)D_801AEF88);
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x9B, 255, 255, 255, (s32)sp38);
-            gSPDisplayList(POLY_XLU_DISP++, object_bombiwa_DL_004560);
+            gSPDisplayList(POLY_XLU_DISP++, (Gfx*)object_bombiwa_DL_004560);
         }
     } else {
         Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -526,7 +529,7 @@ void func_8093A608(Actor* thisx, PlayState* play) {
                 Matrix_Scale(ptr->unk_00, ptr->unk_00, ptr->unk_00, MTXMODE_APPLY);
 
                 MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-                gSPDisplayList(POLY_OPA_DISP++, object_bombiwa_DL_005990);
+                gSPDisplayList(POLY_OPA_DISP++, (Gfx*)object_bombiwa_DL_005990);
             }
         }
     }

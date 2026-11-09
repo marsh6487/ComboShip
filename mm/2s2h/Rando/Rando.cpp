@@ -1,4 +1,5 @@
 #include "Rando/MagicHints.h"
+#include "Rando/SongEvents.h"
 #include "Rando.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -21,6 +22,12 @@ extern "C" void (*gMMComboHintReveal)(int fileNum, int kind, int poolIndex, cons
 
 // When a save is loaded, we want to unregister all hooks and re-register them if it's a rando save
 void OnSaveLoadHandler(s16 fileNum) {
+    // The selected native save, rather than a prior generation in this process,
+    // owns the assignment after JSON loading installs its context.
+    Rando::SongEvents::ClearImportedMapping();
+    if (IS_RANDO) {
+        Rando::SongEvents::RememberSavedMapping(gSaveContext.save.shipSaveInfo.rando);
+    }
     Rando::MiscBehavior::OnFileLoad();
     Rando::ActorBehavior::OnFileLoad();
     Rando::CheckTracker::OnFileLoad();

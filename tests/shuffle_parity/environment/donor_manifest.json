@@ -1,0 +1,4632 @@
+{
+  "pin": "0c0f8a8e1412f3bc979e77a2563293770d58a439",
+  "excluded_unreachable": [
+    "Pinnacle Rock Rock Unreachable 1",
+    "Pinnacle Rock Rock Unreachable 2"
+  ],
+  "checks": [
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_1",
+      "name": "Great Bay Temple Icicle Compass Room 1",
+      "family": "icicle",
+      "region": "RR_GREAT_BAY_TEMPLE_COMPASS_ROOM",
+      "donor_region": "Great Bay Temple Compass Room",
+      "rule": "can_use_ice_arrows && break_icicle",
+      "source": "data/checks/mm/dungeons/great_bay_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_USE_MAGIC_ARROW(ICE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_2",
+      "name": "Great Bay Temple Icicle Compass Room 2",
+      "family": "icicle",
+      "region": "RR_GREAT_BAY_TEMPLE_COMPASS_ROOM",
+      "donor_region": "Great Bay Temple Compass Room",
+      "rule": "can_use_ice_arrows && break_icicle",
+      "source": "data/checks/mm/dungeons/great_bay_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_USE_MAGIC_ARROW(ICE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_3",
+      "name": "Great Bay Temple Icicle Compass Room 3",
+      "family": "icicle",
+      "region": "RR_GREAT_BAY_TEMPLE_COMPASS_ROOM",
+      "donor_region": "Great Bay Temple Compass Room",
+      "rule": "can_use_ice_arrows && break_icicle",
+      "source": "data/checks/mm/dungeons/great_bay_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_USE_MAGIC_ARROW(ICE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_4",
+      "name": "Great Bay Temple Icicle Compass Room 4",
+      "family": "icicle",
+      "region": "RR_GREAT_BAY_TEMPLE_COMPASS_ROOM",
+      "donor_region": "Great Bay Temple Compass Room",
+      "rule": "can_use_ice_arrows && break_icicle",
+      "source": "data/checks/mm/dungeons/great_bay_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_USE_MAGIC_ARROW(ICE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_5",
+      "name": "Great Bay Temple Icicle Compass Room 5",
+      "family": "icicle",
+      "region": "RR_GREAT_BAY_TEMPLE_COMPASS_ROOM",
+      "donor_region": "Great Bay Temple Compass Room",
+      "rule": "can_use_ice_arrows && break_icicle",
+      "source": "data/checks/mm/dungeons/great_bay_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_USE_MAGIC_ARROW(ICE)"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_1",
+      "name": "Moon Trial Goron Icicle 1",
+      "family": "icicle",
+      "region": "RR_MOON_GORON_TRIAL",
+      "donor_region": "Moon Trial Goron Exit",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/moon.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_2",
+      "name": "Moon Trial Goron Icicle 2",
+      "family": "icicle",
+      "region": "RR_MOON_GORON_TRIAL",
+      "donor_region": "Moon Trial Goron Exit",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/moon.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_3",
+      "name": "Moon Trial Goron Icicle 3",
+      "family": "icicle",
+      "region": "RR_MOON_GORON_TRIAL",
+      "donor_region": "Moon Trial Goron Exit",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/moon.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_4",
+      "name": "Moon Trial Goron Icicle 4",
+      "family": "icicle",
+      "region": "RR_MOON_GORON_TRIAL",
+      "donor_region": "Moon Trial Goron Exit",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/moon.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_1",
+      "name": "Secret Shrine Soil Item 1",
+      "family": "soil",
+      "region": "RR_SECRET_SHRINE_ENTRANCE",
+      "donor_region": "Secret Shrine Entrance",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/secret_shrine.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_2",
+      "name": "Secret Shrine Soil Item 2",
+      "family": "soil",
+      "region": "RR_SECRET_SHRINE_ENTRANCE",
+      "donor_region": "Secret Shrine Entrance",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/secret_shrine.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_3",
+      "name": "Secret Shrine Soil Item 3",
+      "family": "soil",
+      "region": "RR_SECRET_SHRINE_ENTRANCE",
+      "donor_region": "Secret Shrine Entrance",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/secret_shrine.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_1",
+      "name": "Snowhead Temple Icicle Entrance 1",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_BEFORE_BLOCK",
+      "donor_region": "Snowhead Temple Entrance",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_2",
+      "name": "Snowhead Temple Icicle Entrance 2",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_BEFORE_BLOCK",
+      "donor_region": "Snowhead Temple Entrance",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_3",
+      "name": "Snowhead Temple Icicle Entrance 3",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_BEFORE_BLOCK",
+      "donor_region": "Snowhead Temple Entrance",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_4",
+      "name": "Snowhead Temple Icicle Entrance 4",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_BEFORE_BLOCK",
+      "donor_region": "Snowhead Temple Entrance",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_5",
+      "name": "Snowhead Temple Icicle Entrance 5",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_BEFORE_BLOCK",
+      "donor_region": "Snowhead Temple Entrance",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_AFTER_BLOCK_1",
+      "name": "Snowhead Temple Icicle Entrance After Block 1",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_AFTER_BLOCK",
+      "donor_region": "Snowhead Temple Main",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_AFTER_BLOCK_2",
+      "name": "Snowhead Temple Icicle Entrance After Block 2",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_ENTRANCE_AFTER_BLOCK",
+      "donor_region": "Snowhead Temple Main",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_KEY_1",
+      "name": "Snowhead Temple Icicle Central Room Near Boss Key 1",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_BEFORE_UPPER_WIZZROBE_ROOM",
+      "donor_region": "Snowhead Temple Boss Key Room",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_KEY_2",
+      "name": "Snowhead Temple Icicle Central Room Near Boss Key 2",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_BEFORE_UPPER_WIZZROBE_ROOM",
+      "donor_region": "Snowhead Temple Boss Key Room",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_1",
+      "name": "Snowhead Temple Icicle Central Room Near Boss 1",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_THIRD_FLOOR",
+      "donor_region": "Snowhead Temple Center Level 4",
+      "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_2",
+      "name": "Snowhead Temple Icicle Central Room Near Boss 2",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_THIRD_FLOOR",
+      "donor_region": "Snowhead Temple Center Level 4",
+      "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_3",
+      "name": "Snowhead Temple Icicle Central Room Near Boss 3",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_THIRD_FLOOR",
+      "donor_region": "Snowhead Temple Center Level 4",
+      "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_4",
+      "name": "Snowhead Temple Icicle Central Room Near Boss 4",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_CENTRAL_ROOM_THIRD_FLOOR",
+      "donor_region": "Snowhead Temple Center Level 4",
+      "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_1",
+      "name": "Snowhead Temple Icicle Snow Room 1",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_SNOW_ROOM",
+      "donor_region": "Snowhead Temple Snow Room",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_2",
+      "name": "Snowhead Temple Icicle Snow Room 2",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_SNOW_ROOM",
+      "donor_region": "Snowhead Temple Snow Room",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_3",
+      "name": "Snowhead Temple Icicle Snow Room 3",
+      "family": "icicle",
+      "region": "RR_SNOWHEAD_TEMPLE_SNOW_ROOM",
+      "donor_region": "Snowhead Temple Snow Room",
+      "rule": "break_icicle",
+      "source": "data/checks/mm/dungeons/snowhead_temple.xml",
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_1",
+      "name": "Swamp Spider House Rock Entrance 1",
+      "family": "rock",
+      "region": "RR_SWAMP_SPIDER_HOUSE_ENTRANCE",
+      "donor_region": "Swamp Spider House",
+      "rule": "true",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_2",
+      "name": "Swamp Spider House Rock Entrance 2",
+      "family": "rock",
+      "region": "RR_SWAMP_SPIDER_HOUSE_ENTRANCE",
+      "donor_region": "Swamp Spider House",
+      "rule": "true",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_POTS_ROOM",
+      "name": "Swamp Spider House Rock Pots Room",
+      "family": "rock",
+      "region": "RR_SWAMP_SPIDER_HOUSE_BIG_POT_ROOM_LOWER",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "true",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_GOLD",
+      "name": "Swamp Spider House Soil Gold",
+      "family": "soil",
+      "region": "RR_SWAMP_SPIDER_HOUSE_GOLD_ROOM_LOWER",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_1",
+      "name": "Swamp Spider House Soil Monument Item 1",
+      "family": "soil",
+      "region": "RR_SWAMP_SPIDER_HOUSE_MONUMENT_ROOM",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_2",
+      "name": "Swamp Spider House Soil Monument Item 2",
+      "family": "soil",
+      "region": "RR_SWAMP_SPIDER_HOUSE_MONUMENT_ROOM",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_3",
+      "name": "Swamp Spider House Soil Monument Item 3",
+      "family": "soil",
+      "region": "RR_SWAMP_SPIDER_HOUSE_MONUMENT_ROOM",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_BOULDER",
+      "name": "Swamp Spider House Boulder",
+      "family": "boulder",
+      "region": "RR_SWAMP_SPIDER_HOUSE_MONUMENT_ROOM",
+      "donor_region": "Swamp Spider House Main",
+      "rule": "can_break_boulders",
+      "source": "data/checks/mm/dungeons/swamp_spider_house.xml",
+      "condition": "(CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_1",
+      "name": "Deku Palace Soil Item 1",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_OUTSIDE",
+      "donor_region": "Deku Palace Front",
+      "rule": "(((is_swamp_cleared || can_use_nayru) && can_swim) || has_mask_deku) && has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (CAN_BE_DEKU || (CAN_USE_ABILITY(SWIM) && Combo_MM_CrossBossLogicalClear(8, RANDO_EVENTS[RE_CLEARED_WOODFALL_TEMPLE])))"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_2",
+      "name": "Deku Palace Soil Item 2",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_OUTSIDE",
+      "donor_region": "Deku Palace Front",
+      "rule": "(((is_swamp_cleared || can_use_nayru) && can_swim) || has_mask_deku) && has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (CAN_BE_DEKU || (CAN_USE_ABILITY(SWIM) && Combo_MM_CrossBossLogicalClear(8, RANDO_EVENTS[RE_CLEARED_WOODFALL_TEMPLE])))"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_3",
+      "name": "Deku Palace Soil Item 3",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_OUTSIDE",
+      "donor_region": "Deku Palace Front",
+      "rule": "(((is_swamp_cleared || can_use_nayru) && can_swim) || has_mask_deku) && has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (CAN_BE_DEKU || (CAN_USE_ABILITY(SWIM) && Combo_MM_CrossBossLogicalClear(8, RANDO_EVENTS[RE_CLEARED_WOODFALL_TEMPLE])))"
+    },
+    {
+      "id": "RC_DEKU_PALACE_BOULDER_1",
+      "name": "Deku Palace Boulder 1",
+      "family": "boulder",
+      "region": "RR_DEKU_PALACE_OUTSIDE",
+      "donor_region": "Deku Palace Front",
+      "rule": "has_bombs && can_swim",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "HAS_ITEM(ITEM_BOMB) && CAN_USE_ABILITY(SWIM)"
+    },
+    {
+      "id": "RC_DEKU_PALACE_BOULDER_2",
+      "name": "Deku Palace Boulder 2",
+      "family": "boulder",
+      "region": "RR_DEKU_PALACE_OUTSIDE",
+      "donor_region": "Deku Palace Front",
+      "rule": "has_bombs && can_swim",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "HAS_ITEM(ITEM_BOMB) && CAN_USE_ABILITY(SWIM)"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_1",
+      "name": "Deku Palace Red Boulder 1",
+      "family": "boulder-red",
+      "region": "RR_DEKU_PALACE_INSIDE_LOWER",
+      "donor_region": "Deku Palace Main",
+      "rule": "can_break_red_boulders",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "CAN_BE_GORON"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_2",
+      "name": "Deku Palace Red Boulder 2",
+      "family": "boulder-red",
+      "region": "RR_DEKU_PALACE_INSIDE_LOWER",
+      "donor_region": "Deku Palace Main",
+      "rule": "can_break_red_boulders",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "CAN_BE_GORON"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_3",
+      "name": "Deku Palace Red Boulder 3",
+      "family": "boulder-red",
+      "region": "RR_DEKU_PALACE_INSIDE_LOWER",
+      "donor_region": "Deku Palace Main",
+      "rule": "can_break_red_boulders",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "CAN_BE_GORON"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_1",
+      "name": "Beans Grotto Soil Item 1",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_BEAN_SALESMAN_GROTTO",
+      "donor_region": "Deku Palace Beans Grotto",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_2",
+      "name": "Beans Grotto Soil Item 2",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_BEAN_SALESMAN_GROTTO",
+      "donor_region": "Deku Palace Beans Grotto",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_3",
+      "name": "Beans Grotto Soil Item 3",
+      "family": "soil",
+      "region": "RR_DEKU_PALACE_BEAN_SALESMAN_GROTTO",
+      "donor_region": "Deku Palace Beans Grotto",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/deku_palace.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_01",
+      "name": "Goron Shrine Rock 01",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_02",
+      "name": "Goron Shrine Rock 02",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_03",
+      "name": "Goron Shrine Rock 03",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_04",
+      "name": "Goron Shrine Rock 04",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_05",
+      "name": "Goron Shrine Rock 05",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_06",
+      "name": "Goron Shrine Rock 06",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_07",
+      "name": "Goron Shrine Rock 07",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_08",
+      "name": "Goron Shrine Rock 08",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_09",
+      "name": "Goron Shrine Rock 09",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_10",
+      "name": "Goron Shrine Rock 10",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_11",
+      "name": "Goron Shrine Rock 11",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_12",
+      "name": "Goron Shrine Rock 12",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_13",
+      "name": "Goron Shrine Rock 13",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_14",
+      "name": "Goron Shrine Rock 14",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_15",
+      "name": "Goron Shrine Rock 15",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_16",
+      "name": "Goron Shrine Rock 16",
+      "family": "rock",
+      "region": "RR_GORON_SHRINE",
+      "donor_region": "Goron Shrine",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_1",
+      "name": "Lone Peak Shrine Large Boulder 1",
+      "family": "boulder",
+      "region": "RR_LONE_PEAK_SHRINE",
+      "donor_region": "Lone Peak Shrine",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_2",
+      "name": "Lone Peak Shrine Large Boulder 2",
+      "family": "boulder",
+      "region": "RR_LONE_PEAK_SHRINE",
+      "donor_region": "Lone Peak Shrine",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_3",
+      "name": "Lone Peak Shrine Large Boulder 3",
+      "family": "boulder",
+      "region": "RR_LONE_PEAK_SHRINE",
+      "donor_region": "Lone Peak Shrine",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/goron_village.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_1",
+      "name": "Great Bay Coast Rock Water Cleared 1",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots && is_ocean_cleared",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]) && Combo_MM_CrossBossLogicalClear(10, RANDO_EVENTS[RE_CLEARED_GREAT_BAY_TEMPLE])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_2",
+      "name": "Great Bay Coast Rock Water Cleared 2",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots && is_ocean_cleared",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]) && Combo_MM_CrossBossLogicalClear(10, RANDO_EVENTS[RE_CLEARED_GREAT_BAY_TEMPLE])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_01",
+      "name": "Great Bay Coast Rock Water 01",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_02",
+      "name": "Great Bay Coast Rock Water 02",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_03",
+      "name": "Great Bay Coast Rock Water 03",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_04",
+      "name": "Great Bay Coast Rock Water 04",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_05",
+      "name": "Great Bay Coast Rock Water 05",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_06",
+      "name": "Great Bay Coast Rock Water 06",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_07",
+      "name": "Great Bay Coast Rock Water 07",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_08",
+      "name": "Great Bay Coast Rock Water 08",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_09",
+      "name": "Great Bay Coast Rock Water 09",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_10",
+      "name": "Great Bay Coast Rock Water 10",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_11",
+      "name": "Great Bay Coast Rock Water 11",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_12",
+      "name": "Great Bay Coast Rock Water 12",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_13",
+      "name": "Great Bay Coast Rock Water 13",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_14",
+      "name": "Great Bay Coast Rock Water 14",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_15",
+      "name": "Great Bay Coast Rock Water 15",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_16",
+      "name": "Great Bay Coast Rock Water 16",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_17",
+      "name": "Great Bay Coast Rock Water 17",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_18",
+      "name": "Great Bay Coast Rock Water 18",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_19",
+      "name": "Great Bay Coast Rock Water 19",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_20",
+      "name": "Great Bay Coast Rock Water 20",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_21",
+      "name": "Great Bay Coast Rock Water 21",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_22",
+      "name": "Great Bay Coast Rock Water 22",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_23",
+      "name": "Great Bay Coast Rock Water 23",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_24",
+      "name": "Great Bay Coast Rock Water 24",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_25",
+      "name": "Great Bay Coast Rock Water 25",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_26",
+      "name": "Great Bay Coast Rock Water 26",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_27",
+      "name": "Great Bay Coast Rock Water 27",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_28",
+      "name": "Great Bay Coast Rock Water 28",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast Water",
+      "rule": "has_mask_blast && has_iron_boots",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_1",
+      "name": "Great Bay Coast Rock Sand 1",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_2",
+      "name": "Great Bay Coast Rock Sand 2",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_3",
+      "name": "Great Bay Coast Rock Sand 3",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_4",
+      "name": "Great Bay Coast Rock Sand 4",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_5",
+      "name": "Great Bay Coast Rock Sand 5",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Coast",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_1",
+      "name": "Great Bay Coast Rock Cliffs 1",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST_CLIFFSIDE",
+      "donor_region": "Great Bay Coast Cliffs",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_2",
+      "name": "Great Bay Coast Rock Cliffs 2",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST_CLIFFSIDE",
+      "donor_region": "Great Bay Coast Cliffs",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_3",
+      "name": "Great Bay Coast Rock Cliffs 3",
+      "family": "rock",
+      "region": "RR_GREAT_BAY_COAST_CLIFFSIDE",
+      "donor_region": "Great Bay Coast Cliffs",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_SOIL",
+      "name": "Great Bay Coast Soil",
+      "family": "soil",
+      "region": "RR_GREAT_BAY_COAST_CLIFFSIDE",
+      "donor_region": "Great Bay Coast Cliffs",
+      "rule": "(can_hookshot || short_hook_anywhere) && has_bugs",
+      "source": "data/checks/mm/overworld/great_bay_coast.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && HAS_ITEM(ITEM_HOOKSHOT)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_1",
+      "name": "Ikana Graveyard Rock Wall 1",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "(event(KEETA_WOKEN) || short_hook_anywhere) && keeta_rock_wall",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_2",
+      "name": "Ikana Graveyard Rock Wall 2",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "(event(KEETA_WOKEN) || short_hook_anywhere) && has_explosives",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_3",
+      "name": "Ikana Graveyard Rock Wall 3",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "(event(KEETA_WOKEN) || short_hook_anywhere) && keeta_rock_wall",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_4",
+      "name": "Ikana Graveyard Rock Wall 4",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "(event(KEETA_WOKEN) || short_hook_anywhere) && keeta_rock_wall",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_5",
+      "name": "Ikana Graveyard Rock Wall 5",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "(event(KEETA_WOKEN) || short_hook_anywhere) && has_explosives",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "CAN_USE_EXPLOSIVE && Rando::SongEvents::CanPlay(8)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_1",
+      "name": "Ikana Graveyard Rock Circle Rock 1",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_2",
+      "name": "Ikana Graveyard Rock Circle Rock 2",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_3",
+      "name": "Ikana Graveyard Rock Circle Rock 3",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_4",
+      "name": "Ikana Graveyard Rock Circle Rock 4",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_5",
+      "name": "Ikana Graveyard Rock Circle Rock 5",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_6",
+      "name": "Ikana Graveyard Rock Circle Rock 6",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_7",
+      "name": "Ikana Graveyard Rock Circle Rock 7",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_8",
+      "name": "Ikana Graveyard Rock Circle Rock 8",
+      "family": "rock",
+      "region": "RR_IKANA_GRAVEYARD_LOWER",
+      "donor_region": "Ikana Graveyard",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/ikana_graveyard.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_1",
+      "name": "Mountain Village Spring Red Boulder 1",
+      "family": "boulder-red",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring && can_break_red_boulders",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_2",
+      "name": "Mountain Village Spring Red Boulder 2",
+      "family": "boulder-red",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring && can_break_red_boulders",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_3",
+      "name": "Mountain Village Spring Red Boulder 3",
+      "family": "boulder-red",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring && can_break_red_boulders",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_1",
+      "name": "Mountain Village Rock Cliff 1",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village Cliff",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE]) && (CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_HOOKSHOT))"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_2",
+      "name": "Mountain Village Rock Cliff 2",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village Cliff",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE]) && (CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_HOOKSHOT))"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_1",
+      "name": "Mountain Village Rock Ground 1",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_2",
+      "name": "Mountain Village Rock Ground 2",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_3",
+      "name": "Mountain Village Rock Ground 3",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_4",
+      "name": "Mountain Village Rock Ground 4",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_5",
+      "name": "Mountain Village Rock Ground 5",
+      "family": "rock",
+      "region": "RR_MOUNTAIN_VILLAGE",
+      "donor_region": "Mountain Village",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/mountain_village.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_1",
+      "name": "Road to Ikana Rock Circle Rock 1",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_2",
+      "name": "Road to Ikana Rock Circle Rock 2",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_3",
+      "name": "Road to Ikana Rock Circle Rock 3",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_4",
+      "name": "Road to Ikana Rock Circle Rock 4",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_5",
+      "name": "Road to Ikana Rock Circle Rock 5",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_6",
+      "name": "Road to Ikana Rock Circle Rock 6",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_7",
+      "name": "Road to Ikana Rock Circle Rock 7",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_8",
+      "name": "Road to Ikana Rock Circle Rock 8",
+      "family": "rock",
+      "region": "RR_ROAD_TO_IKANA_BELOW_LEDGE",
+      "donor_region": "Road to Ikana Center",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_1",
+      "name": "Road to Ikana Large Boulder 1",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_2",
+      "name": "Road to Ikana Large Boulder 2",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_3",
+      "name": "Road to Ikana Large Boulder 3",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_4",
+      "name": "Road to Ikana Large Boulder 4",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_5",
+      "name": "Road to Ikana Large Boulder 5",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_6",
+      "name": "Road to Ikana Large Boulder 6",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_7",
+      "name": "Road to Ikana Large Boulder 7",
+      "family": "boulder",
+      "region": "RR_ROAD_TO_IKANA_ABOVE_LEDGE",
+      "donor_region": "Road to Ikana Top",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_RED_BOULDER",
+      "name": "Road to Ikana Red Boulder",
+      "family": "boulder-red",
+      "region": "RR_ROAD_TO_IKANA_FIELD_SIDE",
+      "donor_region": "Road to Ikana Front",
+      "rule": "can_break_red_boulders",
+      "source": "data/checks/mm/overworld/road_to_ikana.xml",
+      "condition": "CAN_BE_GORON"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_1",
+      "name": "Romani Ranch Soil Days 2-3 Item 1",
+      "family": "soil",
+      "region": "RR_ROMANI_RANCH",
+      "donor_region": "Romani Ranch",
+      "rule": "has_bugs && after(DAY2_AM_06_00)",
+      "source": "data/checks/mm/overworld/romani_ranch.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_2",
+      "name": "Romani Ranch Soil Days 2-3 Item 2",
+      "family": "soil",
+      "region": "RR_ROMANI_RANCH",
+      "donor_region": "Romani Ranch",
+      "rule": "has_bugs && after(DAY2_AM_06_00)",
+      "source": "data/checks/mm/overworld/romani_ranch.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_3",
+      "name": "Romani Ranch Soil Days 2-3 Item 3",
+      "family": "soil",
+      "region": "RR_ROMANI_RANCH",
+      "donor_region": "Romani Ranch",
+      "rule": "has_bugs && after(DAY2_AM_06_00)",
+      "source": "data/checks/mm/overworld/romani_ranch.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAY_1",
+      "name": "Romani Ranch Soil Day 1",
+      "family": "soil",
+      "region": "RR_ROMANI_RANCH",
+      "donor_region": "Romani Ranch",
+      "rule": "has_bugs && before(DAY2_AM_06_00)",
+      "source": "data/checks/mm/overworld/romani_ranch.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && FIRST_DAY()"
+    },
+    {
+      "id": "RC_DOGGY_RACETRACK_SOIL",
+      "name": "Doggy Racetrack Soil",
+      "family": "soil",
+      "region": "RR_DOGGY_RACETRACK",
+      "donor_region": "Doggy Racetrack",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/romani_ranch.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_ROCK_1",
+      "name": "Stone Tower Inverted Rock 1",
+      "family": "rock",
+      "region": "RR_STONE_TOWER_INVERTED_NEAR_TEMPLE",
+      "donor_region": "Stone Tower Top Inverted",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/stone_tower.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_ROCK_2",
+      "name": "Stone Tower Inverted Rock 2",
+      "family": "rock",
+      "region": "RR_STONE_TOWER_INVERTED_NEAR_TEMPLE",
+      "donor_region": "Stone Tower Top Inverted",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/stone_tower.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_SOIL_LOWER",
+      "name": "Stone Tower Inverted Soil Lower",
+      "family": "soil",
+      "region": "RR_STONE_TOWER_INVERTED_NEAR_TEMPLE",
+      "donor_region": "Stone Tower Top Inverted",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/stone_tower.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_SOIL_UPPER",
+      "name": "Stone Tower Inverted Soil Upper",
+      "family": "soil",
+      "region": "RR_STONE_TOWER_INVERTED_UPPER",
+      "donor_region": "Stone Tower Top Inverted Upper",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/stone_tower.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_NEAR_OCEAN",
+      "name": "Termina Field Rock Near Ocean",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD_BEFORE_GREAT_BAY_COAST",
+      "donor_region": "Great Bay Fence",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_1",
+      "name": "Termina Field Rock Wall Mountain 1",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_2",
+      "name": "Termina Field Rock Wall Mountain 2",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_3",
+      "name": "Termina Field Rock Wall Mountain 3",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_4",
+      "name": "Termina Field Rock Wall Mountain 4",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_5",
+      "name": "Termina Field Rock Wall Mountain 5",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_6",
+      "name": "Termina Field Rock Wall Mountain 6",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_7",
+      "name": "Termina Field Rock Wall Mountain 7",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_1",
+      "name": "Termina Field Rock Wall Ocean 1",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_2",
+      "name": "Termina Field Rock Wall Ocean 2",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_3",
+      "name": "Termina Field Rock Wall Ocean 3",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_4",
+      "name": "Termina Field Rock Wall Ocean 4",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_5",
+      "name": "Termina Field Rock Wall Ocean 5",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_1",
+      "name": "Termina Field Rock Circle Rock 1",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_2",
+      "name": "Termina Field Rock Circle Rock 2",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_3",
+      "name": "Termina Field Rock Circle Rock 3",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_4",
+      "name": "Termina Field Rock Circle Rock 4",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_5",
+      "name": "Termina Field Rock Circle Rock 5",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_6",
+      "name": "Termina Field Rock Circle Rock 6",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_7",
+      "name": "Termina Field Rock Circle Rock 7",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_8",
+      "name": "Termina Field Rock Circle Rock 8",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_BOULDER_WEST_GOSSIP",
+      "name": "Termina Field Boulder West Gossip",
+      "family": "boulder",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "can_break_boulders",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_BOULDER_BIO_BABA",
+      "name": "Termina Field Boulder Bio Baba",
+      "family": "boulder",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "can_break_boulders",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_TREE_STUMP",
+      "name": "Termina Field Soil Tree Stump",
+      "family": "soil",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1",
+      "name": "Termina Field Soil Observatory Item 1",
+      "family": "soil",
+      "region": "RR_ASTRAL_OBSERVATORY_OUTSIDE",
+      "donor_region": "Astral Observatory Balcony",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_2",
+      "name": "Termina Field Soil Observatory Item 2",
+      "family": "soil",
+      "region": "RR_ASTRAL_OBSERVATORY_OUTSIDE",
+      "donor_region": "Astral Observatory Balcony",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_3",
+      "name": "Termina Field Soil Observatory Item 3",
+      "family": "soil",
+      "region": "RR_ASTRAL_OBSERVATORY_OUTSIDE",
+      "donor_region": "Astral Observatory Balcony",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_1",
+      "name": "Termina Field Soil Wall Item 1",
+      "family": "soil",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_2",
+      "name": "Termina Field Soil Wall Item 2",
+      "family": "soil",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_3",
+      "name": "Termina Field Soil Wall Item 3",
+      "family": "soil",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_PILLAR",
+      "name": "Termina Field Soil Pillar",
+      "family": "soil",
+      "region": "RR_TERMINA_FIELD",
+      "donor_region": "Termina Field",
+      "rule": "has_bugs",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))"
+    },
+    {
+      "id": "RC_BIO_BABA_GROTTO_ROCK",
+      "name": "Bio Baba Grotto Rock",
+      "family": "rock",
+      "region": "RR_TERMINA_FIELD_BIO_BABA_GROTTO",
+      "donor_region": "Bio Baba Grotto",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/termina_field.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_1",
+      "name": "Twin Islands Rock 1",
+      "family": "rock",
+      "region": "RR_PATH_TO_GORON_VILLAGE",
+      "donor_region": "Near Ramp Grotto",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_2",
+      "name": "Twin Islands Rock 2",
+      "family": "rock",
+      "region": "RR_PATH_TO_GORON_VILLAGE",
+      "donor_region": "Near Ramp Grotto",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_3",
+      "name": "Twin Islands Rock 3",
+      "family": "rock",
+      "region": "RR_PATH_TO_GORON_VILLAGE",
+      "donor_region": "Near Ramp Grotto",
+      "rule": "is_spring",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_1",
+      "name": "Twin Islands Frozen Grotto Large Boulder 1",
+      "family": "boulder",
+      "region": "RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO",
+      "donor_region": "Twin Islands Frozen Grotto",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_2",
+      "name": "Twin Islands Frozen Grotto Large Boulder 2",
+      "family": "boulder",
+      "region": "RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO",
+      "donor_region": "Twin Islands Frozen Grotto",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_3",
+      "name": "Twin Islands Frozen Grotto Large Boulder 3",
+      "family": "boulder",
+      "region": "RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO",
+      "donor_region": "Twin Islands Frozen Grotto",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_4",
+      "name": "Twin Islands Frozen Grotto Large Boulder 4",
+      "family": "boulder",
+      "region": "RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO",
+      "donor_region": "Twin Islands Frozen Grotto",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_5",
+      "name": "Twin Islands Frozen Grotto Large Boulder 5",
+      "family": "boulder",
+      "region": "RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO",
+      "donor_region": "Twin Islands Frozen Grotto",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/twin_islands.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_1",
+      "name": "Zora Cape Rock Island 1",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_hookshot || (can_use_ice_arrows && (is_tall || can_hookshot_short))",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_2",
+      "name": "Zora Cape Rock Island 2",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_hookshot || (can_use_ice_arrows && (is_tall || can_hookshot_short))",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_3",
+      "name": "Zora Cape Rock Island 3",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_hookshot || (can_use_ice_arrows && (is_tall || can_hookshot_short))",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_4",
+      "name": "Zora Cape Rock Island 4",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_hookshot || (can_use_ice_arrows && (is_tall || can_hookshot_short))",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_5",
+      "name": "Zora Cape Rock Island 5",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_hookshot || (can_use_ice_arrows && (is_tall || can_hookshot_short))",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_1",
+      "name": "Zora Cape Rock Water 1",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_2",
+      "name": "Zora Cape Rock Water 2",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_3",
+      "name": "Zora Cape Rock Water 3",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_4",
+      "name": "Zora Cape Rock Water 4",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_5",
+      "name": "Zora Cape Rock Water 5",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "true",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_1",
+      "name": "Zora Cape Rock Sand 1",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "is_ocean_cursed",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_2",
+      "name": "Zora Cape Rock Sand 2",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "is_ocean_cursed",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_3",
+      "name": "Zora Cape Rock Sand 3",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "is_ocean_cursed",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_4",
+      "name": "Zora Cape Rock Sand 4",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "is_ocean_cursed",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_5",
+      "name": "Zora Cape Rock Sand 5",
+      "family": "rock",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "is_ocean_cursed",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_HUMAN || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_1",
+      "name": "Zora Cape Large Boulder 1",
+      "family": "boulder",
+      "region": "RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN",
+      "donor_region": "Great Bay Near Fairy Fountain",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_2",
+      "name": "Zora Cape Large Boulder 2",
+      "family": "boulder",
+      "region": "RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN",
+      "donor_region": "Great Bay Near Fairy Fountain",
+      "rule": "has_explosives",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "CAN_USE_EXPLOSIVE"
+    },
+    {
+      "id": "RC_ZORA_CAPE_BOULDER",
+      "name": "Zora Cape Boulder",
+      "family": "boulder",
+      "region": "RR_ZORA_CAPE",
+      "donor_region": "Zora Cape",
+      "rule": "can_break_boulders",
+      "source": "data/checks/mm/overworld/zora_cape.xml",
+      "condition": "(CAN_BE_GORON || CAN_USE_EXPLOSIVE)"
+    }
+  ],
+  "placements": [
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_1",
+      "scene": "SCENE_SEA",
+      "setup": 0,
+      "room": 4,
+      "index": 3,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_2",
+      "scene": "SCENE_SEA",
+      "setup": 0,
+      "room": 4,
+      "index": 4,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_3",
+      "scene": "SCENE_SEA",
+      "setup": 0,
+      "room": 4,
+      "index": 5,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_4",
+      "scene": "SCENE_SEA",
+      "setup": 0,
+      "room": 4,
+      "index": 6,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_5",
+      "scene": "SCENE_SEA",
+      "setup": 0,
+      "room": 4,
+      "index": 7,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_1",
+      "scene": "SCENE_LAST_GORON",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_2",
+      "scene": "SCENE_LAST_GORON",
+      "setup": 0,
+      "room": 0,
+      "index": 1,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_3",
+      "scene": "SCENE_LAST_GORON",
+      "setup": 0,
+      "room": 0,
+      "index": 2,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_MOON_TRIAL_GORON_ICICLE_4",
+      "scene": "SCENE_LAST_GORON",
+      "setup": 0,
+      "room": 0,
+      "index": 3,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_1",
+      "scene": "SCENE_RANDOM",
+      "setup": 0,
+      "room": 0,
+      "index": 19,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_2",
+      "scene": "SCENE_RANDOM",
+      "setup": 0,
+      "room": 0,
+      "index": 19,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SECRET_SHRINE_SOIL_ITEM_3",
+      "scene": "SCENE_RANDOM",
+      "setup": 0,
+      "room": 0,
+      "index": 19,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_1",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_2",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 1,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_3",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 4,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_4",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 5,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_5",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 6,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_AFTER_BLOCK_1",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 2,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_AFTER_BLOCK_2",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 0,
+      "index": 3,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_KEY_1",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 0,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_KEY_2",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 4,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_1",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 1,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_2",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 2,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_3",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 3,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_4",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 4,
+      "index": 5,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_1",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 10,
+      "index": 0,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_2",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 10,
+      "index": 1,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_3",
+      "scene": "SCENE_HAKUGIN",
+      "setup": 0,
+      "room": 10,
+      "index": 2,
+      "slice": 0,
+      "family": "icicle"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_1",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 0,
+      "index": 3,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_ENTRANCE_2",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 0,
+      "index": 4,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_ROCK_POTS_ROOM",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 4,
+      "index": 5,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_GOLD",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 2,
+      "index": 13,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_1",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 3,
+      "index": 14,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_2",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 3,
+      "index": 14,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_SOIL_MONUMENT_ITEM_3",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 3,
+      "index": 14,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_SWAMP_SPIDER_HOUSE_BOULDER",
+      "scene": "SCENE_KINSTA1",
+      "setup": 0,
+      "room": 3,
+      "index": 18,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_1",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_2",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_DEKU_PALACE_SOIL_ITEM_3",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_DEKU_PALACE_BOULDER_1",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 0,
+      "index": 19,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_DEKU_PALACE_BOULDER_2",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 0,
+      "index": 20,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_1",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 1,
+      "index": 12,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_2",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 1,
+      "index": 13,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_DEKU_PALACE_RED_BOULDER_3",
+      "scene": "SCENE_22DEKUCITY",
+      "setup": 0,
+      "room": 1,
+      "index": 14,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_1",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 12,
+      "index": 9,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_2",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 12,
+      "index": 9,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_BEANS_GROTTO_SOIL_ITEM_3",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 12,
+      "index": 9,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_01",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 2,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_01",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 7,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_02",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 3,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_02",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 8,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_03",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 4,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_03",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 9,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_04",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 5,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_04",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 10,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_05",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 6,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_05",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 11,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_06",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 7,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_06",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 12,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_07",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 8,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_07",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 13,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_08",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 9,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_08",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 14,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_09",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 10,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_09",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 15,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_10",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 11,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_10",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 16,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_11",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 12,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_11",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 17,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_12",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 13,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_12",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 18,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_13",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 14,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_13",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 19,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_14",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 15,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_14",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 20,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_15",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 16,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_15",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 21,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_16",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 0,
+      "room": 0,
+      "index": 17,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GORON_SHRINE_ROCK_16",
+      "scene": "SCENE_16GORON_HOUSE",
+      "setup": 1,
+      "room": 0,
+      "index": 22,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_1",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 5,
+      "index": 6,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_2",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 5,
+      "index": 7,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_LONE_PEAK_SHRINE_LARGE_BOULDER_3",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 5,
+      "index": 9,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 69,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 86,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 66,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 89,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_01",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 67,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_01",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 95,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_02",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 68,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_02",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 93,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_03",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 70,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_03",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 74,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_04",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 71,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_04",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 77,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_05",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 72,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_05",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 79,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_06",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 73,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_06",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 81,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_07",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 74,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_07",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 78,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_08",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 75,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_08",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 84,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_09",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 76,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_09",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 82,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_10",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 77,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_10",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 73,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_11",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 78,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_11",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 76,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_12",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 79,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_12",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 83,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_13",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 80,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_13",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 90,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_14",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 81,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_14",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 96,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_15",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 82,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_15",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 102,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_16",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 83,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_16",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 99,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_17",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 84,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_17",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 97,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_18",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 85,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_18",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 98,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_19",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 86,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_19",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 75,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_20",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 87,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_20",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 100,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_21",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 88,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_21",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 91,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_22",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 89,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_22",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 85,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_23",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 90,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_23",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 88,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_24",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 91,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_24",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 87,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_25",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 92,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_25",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 92,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_26",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 93,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_26",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 94,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_27",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 94,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_27",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 80,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_28",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 103,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_WATER_28",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 101,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 95,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 105,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 96,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 107,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_3",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 97,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_3",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 104,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_4",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 98,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_4",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 106,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_5",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 99,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_SAND_5",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 103,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 100,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_1",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 110,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 101,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_2",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 109,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_3",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 102,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_ROCK_CLIFFS_3",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 108,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_SOIL",
+      "scene": "SCENE_30GYOSON",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_GREAT_BAY_COAST_SOIL",
+      "scene": "SCENE_30GYOSON",
+      "setup": 1,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_1",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 34,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_2",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 35,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_3",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 36,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_4",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 37,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_WALL_5",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 38,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_1",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_2",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 1,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_3",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 2,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_4",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 3,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_5",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 4,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_6",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 5,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_7",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 6,
+      "family": "rock"
+    },
+    {
+      "id": "RC_IKANA_GRAVEYARD_ROCK_CIRCLE_ROCK_8",
+      "scene": "SCENE_BOTI",
+      "setup": 0,
+      "room": 1,
+      "index": 44,
+      "slice": 7,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_1",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_2",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 1,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_3",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 2,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_1",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 14,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_2",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 15,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_1",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 16,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_2",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 17,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_3",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 18,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_4",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 19,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_MOUNTAIN_VILLAGE_ROCK_GROUND_5",
+      "scene": "SCENE_10YUKIYAMANOMURA2",
+      "setup": 0,
+      "room": 0,
+      "index": 20,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_1",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_2",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 1,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_3",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 2,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_4",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 3,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_5",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 4,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_6",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 5,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_7",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 6,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_ROCK_CIRCLE_ROCK_8",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 7,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_1",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 60,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_2",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 62,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_3",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 64,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_4",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 65,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_5",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 66,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_6",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 67,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_LARGE_BOULDER_7",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 68,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ROAD_TO_IKANA_RED_BOULDER",
+      "scene": "SCENE_IKANAMAE",
+      "setup": 0,
+      "room": 0,
+      "index": 5,
+      "slice": 0,
+      "family": "boulder-red"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_1",
+      "scene": "SCENE_F01",
+      "setup": 0,
+      "room": 0,
+      "index": 48,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_2",
+      "scene": "SCENE_F01",
+      "setup": 0,
+      "room": 0,
+      "index": 48,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_3",
+      "scene": "SCENE_F01",
+      "setup": 0,
+      "room": 0,
+      "index": 48,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_ROMANI_RANCH_SOIL_DAY_1",
+      "scene": "SCENE_F01",
+      "setup": 0,
+      "room": 0,
+      "index": 49,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_DOGGY_RACETRACK_SOIL",
+      "scene": "SCENE_F01_B",
+      "setup": 0,
+      "room": 0,
+      "index": 8,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_ROCK_1",
+      "scene": "SCENE_F41",
+      "setup": 0,
+      "room": 0,
+      "index": 21,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_ROCK_2",
+      "scene": "SCENE_F41",
+      "setup": 0,
+      "room": 0,
+      "index": 22,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_SOIL_LOWER",
+      "scene": "SCENE_F41",
+      "setup": 0,
+      "room": 0,
+      "index": 0,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_STONE_TOWER_INVERTED_SOIL_UPPER",
+      "scene": "SCENE_F41",
+      "setup": 0,
+      "room": 0,
+      "index": 1,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_NEAR_OCEAN",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 127,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_1",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 128,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_2",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 130,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_3",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 131,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_4",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 134,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_5",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 135,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_6",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 136,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_MOUNTAIN_7",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 139,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_1",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 129,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_2",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 132,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_3",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 133,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_4",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 137,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_WALL_OCEAN_5",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 138,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_1",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_2",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 1,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_3",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 2,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_4",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 3,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_5",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 4,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_6",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 5,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_7",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 6,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_ROCK_CIRCLE_ROCK_8",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 140,
+      "slice": 7,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_BOULDER_WEST_GOSSIP",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 198,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_BOULDER_BIO_BABA",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 199,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_TREE_STUMP",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 5,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 6,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_2",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 6,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_3",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 6,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_1",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 7,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_2",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 7,
+      "slice": 1,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_WALL_ITEM_3",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 7,
+      "slice": 2,
+      "family": "soil"
+    },
+    {
+      "id": "RC_TERMINA_FIELD_SOIL_PILLAR",
+      "scene": "SCENE_00KEIKOKU",
+      "setup": 0,
+      "room": 0,
+      "index": 8,
+      "slice": 0,
+      "family": "soil"
+    },
+    {
+      "id": "RC_BIO_BABA_GROTTO_ROCK",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 11,
+      "index": 1,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_1",
+      "scene": "SCENE_17SETUGEN2",
+      "setup": 0,
+      "room": 0,
+      "index": 24,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_2",
+      "scene": "SCENE_17SETUGEN2",
+      "setup": 0,
+      "room": 0,
+      "index": 25,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_ROCK_3",
+      "scene": "SCENE_17SETUGEN2",
+      "setup": 0,
+      "room": 0,
+      "index": 26,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_1",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 14,
+      "index": 10,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_2",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 14,
+      "index": 11,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_3",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 14,
+      "index": 12,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_4",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 14,
+      "index": 13,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_5",
+      "scene": "SCENE_KAKUSIANA",
+      "setup": 0,
+      "room": 14,
+      "index": 14,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 32,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 32,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 33,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 33,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_3",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 34,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_3",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 34,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_4",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 35,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_4",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 35,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_5",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 36,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_ISLAND_5",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 36,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 37,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 37,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 38,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 38,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_3",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 39,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_3",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 39,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_4",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 40,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_4",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 40,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_5",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 41,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_WATER_5",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 41,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 53,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 54,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_3",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 55,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_4",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 56,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_ROCK_SAND_5",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 57,
+      "slice": 0,
+      "family": "rock"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 42,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_1",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 42,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 43,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_LARGE_BOULDER_2",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 43,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_BOULDER",
+      "scene": "SCENE_31MISAKI",
+      "setup": 0,
+      "room": 0,
+      "index": 44,
+      "slice": 0,
+      "family": "boulder"
+    },
+    {
+      "id": "RC_ZORA_CAPE_BOULDER",
+      "scene": "SCENE_31MISAKI",
+      "setup": 1,
+      "room": 0,
+      "index": 44,
+      "slice": 0,
+      "family": "boulder"
+    }
+  ]
+}

@@ -35,6 +35,7 @@ extern "C" {int gComboGameMode=COMBO_GAME_MM;}
 #define SPDLOG_ERROR(...) ((void)0)
 '''
 source=(ROOT/'mm/2s2h/Rando/MiscBehavior/OnFileCreate.cpp').read_text()
+generation=(ROOT/'mm/2s2h/Rando/Logic/SeedGeneration.cpp').read_text()
 spoiler=(ROOT/'mm/2s2h/Rando/Spoiler/File.cpp').read_text()
 apply=(ROOT/'mm/2s2h/Rando/Spoiler/Apply.cpp').read_text()
 creation=COMMON+r'''
@@ -116,7 +117,7 @@ void SaveOotItemAreas(uint32_t,nlohmann::json){assert(Combo_IsCombinedGame());}
 }
 namespace MiscBehavior {void OnFileCreate(s16);}
 }
-'''+block(source,'void Rando::MiscBehavior::OnFileCreate(')+r'''
+'''+ 'namespace Rando {\n'+block(generation,'void PrepareNewRandomizedSave(')+'\n'+block(generation,'std::string GenerateSeedInSaveContext(')+'\n}\n'+block(source,'void Rando::MiscBehavior::OnFileCreate(')+r'''
 int main(int argc,char** argv) {
     std::filesystem::current_path(argv[1]);
     Rando::MiscBehavior::OnFileCreate(0); // native vanilla

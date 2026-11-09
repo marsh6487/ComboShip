@@ -3323,6 +3323,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_OWL_ZORA_CAPE:
             DrawOwlStatue();
             break;
+        case RI_OOT_CLOCK:
         case RI_TIME_DAY_1:
         case RI_TIME_NIGHT_1:
         case RI_TIME_DAY_2:
@@ -3330,7 +3331,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_TIME_DAY_3:
         case RI_TIME_NIGHT_3:
         case RI_TIME_PROGRESSIVE:
-            DrawClock(randoItemId, actor);
+            DrawClock(randoItemId == RI_OOT_CLOCK ? RI_TIME_DAY_1 : randoItemId, actor);
             break;
         case RI_WALLET_TYCOON:
             DrawTycoonWallet();

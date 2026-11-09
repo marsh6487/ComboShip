@@ -36,6 +36,9 @@ std::map<RandoCheckId,Check> Checks={
 #define MM_ICICLE(id, scene, room, index, region) {id,{#id}},
 #include "mm/2s2h/Rando/MMEnvironmentIcicles.inc"
 #undef MM_ICICLE
+#define MM_ENVIRONMENT_CHECK(id,type,scene,region) {id,{#id,type}},
+#include "mm/2s2h/Rando/MMEnvironmentChecks.inc"
+#undef MM_ENVIRONMENT_CHECK
 };
 '''+function(checks,'GetCheckIdFromName')+'\n}\n'+function(source,'GetExcludedChecksFromConfig')+'\n'+function(source,'SetExcludedChecksInConfig')+r'''
 }
@@ -55,17 +58,41 @@ int main(){
   REQUIRE(GetExcludedChecksFromConfig()==ids);
 
  }
- puts("PASS actual environmental exclusion names serialize/reload for all 128 subsets");
+ for(const auto& [id,row]:StaticData::Checks){
+  std::vector<RandoCheckId> ids{id};SetExcludedChecksInConfig(ids);
+  auto serialized=Ship::Context::GetRawInstance()->config.value.dump();Ship::Context::GetRawInstance()->config.value=json::parse(serialized);
+  REQUIRE(GetExcludedChecksFromConfig()==ids);
+  for(optionOn=0;optionOn<2;++optionOn)REQUIRE(EnvironmentCheckEnabled(id)==bool(optionOn));
+ }
+ const RandoCheckType families[]={RCTYPE_ROCK,RCTYPE_BOULDER,RCTYPE_RED_BOULDER,RCTYPE_ICICLE,RCTYPE_SOIL};
+ for(int mask=0;mask<32;++mask){
+  std::vector<RandoCheckId> ids;
+  for(const auto& [id,row]:StaticData::Checks)for(int i=0;i<5;++i)if((mask&(1<<i))&&row.randoCheckType==families[i])ids.push_back(id);
+  SetExcludedChecksInConfig(ids);auto serialized=Ship::Context::GetRawInstance()->config.value.dump();Ship::Context::GetRawInstance()->config.value=json::parse(serialized);REQUIRE(GetExcludedChecksFromConfig()==ids);
+ }
+ combined=false;startingBoot=false;optionOn=1;
+ int unavailable=0;for(const auto& [id,row]:StaticData::Checks){
+  REQUIRE(EnvironmentCheckEnabled(id)==!Rando::MMEnvironment::RequiresIronBoots(id));
+  unavailable+=!EnvironmentCheckEnabled(id);
+ }
+ REQUIRE(unavailable==30);startingBoot=true;
+ for(const auto& [id,row]:StaticData::Checks)REQUIRE(EnvironmentCheckEnabled(id));
+ puts("PASS128 legacy subsets,211 exclusions,32 family combinations and solo/source-availability policy");
 }
 '''
 menu=(ROOT/'mm/2s2h/Rando/Menu.cpp').read_text()
-cpp=cpp.replace('int main(){', 'int optionOn;\nint CVarGetInteger(const char*,int){return optionOn;}\nnamespace Rando::StaticData {struct Option{const char* cvar;};std::map<RandoOptionId,Option> Options={{RO_SHUFFLE_ICICLE_DROPS,{"test option service"}}};}\n'+function(menu,'EnvironmentCheckEnabled')+'\nint main(){')
+header=(ROOT/'mm/2s2h/Rando/MMEnvironment.h').read_text()
+helper='namespace Rando::MMEnvironment { '+''.join(function(header,name) for name in ('RequiresIronBoots','SourceEligible','OptionForType'))+' }\n'
+helper+='bool combined=true,startingBoot=false; int Combo_IsCombinedGame(){return combined;} int FleetCombo_UnifiedPoolActive(){return 0;}\nnamespace Rando {std::vector<RandoItemId> GetStartingItemsFromConfig(){return startingBoot?std::vector<RandoItemId>{RI_OOT_IRON_BOOTS}:std::vector<RandoItemId>{};}}\n'
+helper+=function(menu,'EnvironmentSourceAvailable')+'\n'
+cpp=cpp.replace('int main(){', helper+'int optionOn;\nint CVarGetInteger(const char*,int){return optionOn;}\nnamespace Rando::StaticData {struct Option{const char* cvar;};std::map<RandoOptionId,Option> Options={{RO_SHUFFLE_ICICLE_DROPS,{"icicle"}},{RO_SHUFFLE_ROCK_DROPS,{"rock"}},{RO_SHUFFLE_BOULDER_DROPS,{"boulder"}},{RO_SHUFFLE_RED_BOULDER_DROPS,{"red"}},{RO_SHUFFLE_SOIL_DROPS,{"soil"}}};}\n'+function(menu,'EnvironmentCheckEnabled')+'\nint main(){')
+
 cpp=cpp.replace('  REQUIRE(GetExcludedChecksFromConfig()==ids);','  REQUIRE(GetExcludedChecksFromConfig()==ids);\n  for(optionOn=0;optionOn<2;++optionOn)for(auto id:ids)REQUIRE(EnvironmentCheckEnabled(id)==bool(optionOn));')
 with tempfile.TemporaryDirectory(prefix='environment-exclusions-') as td:
  td=Path(td);src=td/'test.cpp';src.write_text(cpp)
  for mode in ('original','combo'):
   exe=td/mode
-  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(src),'-o',str(exe)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'mm/2s2h/Rando'),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(src),'-o',str(exe)],check=True)
   subprocess.run([str(exe)],check=True)
 
 menu=(ROOT/'mm/2s2h/Rando/Menu.cpp').read_text()

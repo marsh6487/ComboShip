@@ -35,23 +35,15 @@ def fixture():
 #include <vector>
 #include "rando/CrossForeign.h"
 #include "rando/SariaHintPolicy.h"
+#include "soh/Enhancements/randomizer/EnemyFirstDrops.h"
 using namespace std::literals::string_literals;
 struct CwItemReceiptPresentation {};
 class Text;
 enum TextBoxType { TEXTBOX_TYPE_BLACK, TEXTBOX_TYPE_BLUE };
 enum TextBoxPosition { TEXTBOX_POS_BOTTOM };
 using ItemID = int;
-using RandomizerHint = int;
-using HintType = int;
-using RandomizerHintTextKey = int;
-using RandomizerGet = int;
-using RandomizerArea = int;
-using RandomizerCheck = int;
-using TrialKey = int;
 enum { LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRA, LANGUAGE_JPN, LANGUAGE_MAX };
-enum { RH_NONE, RH_SARIA_HINT, RSK_SARIA_HINT, RSK_MAGIC_STAT_UPGRADE,
-       HINT_TYPE_HINT_KEY, HINT_TYPE_MESSAGE, RHT_SARIA_TALK_HINT, RHT_SARIA_SONG_HINT,
-       RC_UNKNOWN_CHECK = 0, RC_MAX = 4, RG_MAGIC_STAT_UPGRADE = 7, RCAREA_INVALID = -1 };
+
 #define TODO_TRANSLATE "TranslateThis"
 #define SPDLOG_DEBUG(...) ((void)0)
 extern "C" int SariaFixture_GetClassic(void);
@@ -146,7 +138,7 @@ struct Context {
 }
 using namespace Rando;
 namespace RandomizerCheckObjects { std::string GetRCAreaName(int home) { return home == 1 ? "Kokiri Forest" : "Hyrule Field"; } }
-static int sEarlySariaMagicCheck = RC_UNKNOWN_CHECK;
+static RandomizerCheck sEarlySariaMagicCheck = RC_UNKNOWN_CHECK;
 static uint32_t sEarlySariaMagicSeed;
 static bool sSariaMagicReachabilityVerified;
 struct GameInteractor {

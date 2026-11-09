@@ -1,3 +1,5 @@
+#include "Rando/SongEvents.h"
+#include "Rando/VanillaCompatibility.h"
 #include "Spoiler.h"
 #include "Rando/Rando.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -19,6 +21,12 @@ void ApplyToSaveContext(nlohmann::json spoiler) {
             spoiler["options"].value(randoStaticOption.name, (uint32_t)randoStaticOption.defaultValue);
     }
 
+    VanillaCompatibility::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando);
+    if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_VANILLA) {
+        VanillaCompatibility::NormalizeSavedState(gSaveContext.save.shipSaveInfo.rando);
+    } else {
+        Rando::SongEvents::Import(gSaveContext.save.shipSaveInfo.rando, spoiler);
+    }
     if (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_GOLD_SKULLTULAS]) {
         RANDO_SAVE_OPTIONS[RO_SKULLTULA_TOKENS_REQUIRED] = SPIDER_HOUSE_TOKENS_REQUIRED;
     }
@@ -104,6 +112,7 @@ void ApplyToSaveContext(nlohmann::json spoiler) {
             RANDO_SAVE_CHECKS[randoCheckId].shuffled = true;
         }
     }
+    VanillaCompatibility::NormalizeSavedState(gSaveContext.save.shipSaveInfo.rando);
 }
 
 } // namespace Spoiler

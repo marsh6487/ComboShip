@@ -1732,6 +1732,15 @@ void ComboMenu::DrawGamePanel(const char* gameKey) {
     }
     ImGui::EndChild();
 }
+static void ApplySharedRandoOptionChange(const char* cvar) {
+    auto& model = ComboMenuModel::Get();
+    model.EnsureLoaded();
+    if (model.Oot().applyCVarChange)
+        model.Oot().applyCVarChange(cvar);
+    if (model.Mm().applyCVarChange)
+        model.Mm().applyCVarChange(cvar);
+}
+
 void ComboMenu::DrawComboPanel() {
     ResolveComboGenSyms();
     bool vanilla = CVarGetInteger("gCombo.NewFileVanilla", 0) != 0;
@@ -1916,6 +1925,7 @@ void ComboMenu::DrawComboPanel() {
                 ComboRando::ComboMenu_PushCheckbox(goalTheme);
                 if (ImGui::Checkbox(def.label, &on)) {
                     CVarSetInteger(def.cvar, on ? 1 : 0);
+                    ApplySharedRandoOptionChange(def.cvar);
                 }
                 ComboRando::ComboMenu_PopCheckbox();
                 ImGui::SetItemTooltip("%s", def.tooltip);
@@ -1940,8 +1950,10 @@ void ComboMenu::DrawComboPanel() {
                 WhatsNew::Scope releaseHighlight(category.cvar, sharedSoulLabels[i],
                                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
                 ComboRando::ComboMenu_PushCheckbox(goalTheme);
-                if (ImGui::Checkbox(sharedSoulLabels[i], &on))
+                if (ImGui::Checkbox(sharedSoulLabels[i], &on)) {
                     CVarSetInteger(category.cvar, on ? 1 : 0);
+                    ApplySharedRandoOptionChange(category.cvar);
+                }
                 ComboRando::ComboMenu_PopCheckbox();
             }
             ImGui::SetItemTooltip("Share matching %s souls when that soul family is enabled in both games. "

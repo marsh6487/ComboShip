@@ -28,7 +28,7 @@ void RegionTable_Init_BottomOfTheWell() {
         //Events
         EVENT_ACCESS(LOGIC_STICK_ACCESS,       logic->CanBreakPots()),
         EVENT_ACCESS(LOGIC_NUT_ACCESS,         logic->CanBreakPots()),
-        EVENT_ACCESS(LOGIC_BOTW_LOWERED_WATER, logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_BOTW_LOWERED_WATER, logic->CanPlaySongEvent(16)),
     }, {
         //Locations
         LOCATION(RC_BOTTOM_OF_THE_WELL_FRONT_LEFT_FAKE_WALL_CHEST,   (ctx->GetTrickOption(RT_LENS_BOTW) || logic->CanUse(RG_LENS_OF_TRUTH)) && logic->HasItem(RG_OPEN_CHEST)),
@@ -305,7 +305,7 @@ void RegionTable_Init_BottomOfTheWell() {
         //You have to throw the pot from further back to hit the switch from the front instead of the top, trying to hit the "fingers" directly
         //This unintuitiveness means it should be a trick. ZL is needed to get a clear path to carry the pot
         EVENT_ACCESS(LOGIC_BOTW_LOWERED_WATER,   logic->CanHitSwitch(ED_SHORT_JUMPSLASH)),
-        EVENT_ACCESS(LOGIC_BOTW_MQ_OPENED_GATES, logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_BOTW_MQ_OPENED_GATES, logic->CanPlaySongEvent(16)),
     }, {
         //Locations
         //Implies CanBreakPots(). Hitting this with rang through the wall is possible but would be a trick.

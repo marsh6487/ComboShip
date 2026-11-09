@@ -857,6 +857,8 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->dlists[0] = gGiScaleDL;
             out->dlists[1] = gGiScaleWaterDL;
             return 1;
+        case RG_CLOCK:
+            return CwSimple(out, gGiStoneOfAgonyDL, false, 0.035f);
         case RG_SKELETON_KEY: // env-tinted skeleton key (Randomizer_DrawSkeletonKey)
             out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
             out->dlistCount = 1;

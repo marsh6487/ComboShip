@@ -15,6 +15,9 @@ combat=''
 for name,next_name in [('CanKillEnemy','CanPassEnemy'),('CanGetDekuBabaSticks','CanGetDekuBabaNuts'),('CanGetDekuBabaNuts','CanHitEyeTargets')]:
  start=native.index('bool Logic::'+name+'(');end=native.index('\nbool Logic::'+next_name+'(',start)
  combat+=native[start:end]+'\n'
+skull_native=(ROOT/'soh/src/overlays/actors/ovl_En_Skj/z_en_skj.c').read_text()
+skull_gate=re.search(r'INV_CONTENT\(ITEM_TRADE_ADULT\) < ITEM_SAW',skull_native)
+assert skull_gate, 'Native Skull Kid trade threshold changed; re-audit witness'
 witness=(r/'EnemyFirstDropsWitnesses.inc').read_text()+'\n'+(r/'EnemyFirstDropsAdditionalWitnesses.inc').read_text()
 methods=set(re.findall(r'logic->(\w+)\(',witness))
 base={'HasItem','CanUse','CanKillEnemy','Get','CanGetDekuBabaSticks','CanGetDekuBabaNuts','EffectiveHealth'}
@@ -22,6 +25,7 @@ methods|={'BlastOrSmash','CanAttack','CanDamage','CanJumpslash','CanJumpslashExc
 source=r'''
 #include "soh/soh/Enhancements/randomizer/EnemyFirstDrops.h"
 #include "combo/rando/CrossEntranceBoss.h"
+#include "z64item.h"
 #include <cstdio>
 #include <cassert>
 #include <cstdlib>
@@ -38,10 +42,11 @@ struct Context {
 namespace Rando {
 struct Logic {
  bool IsAdult=true,IsChild=false,AtDay=true,AtNight=false,combat=true,soulsEnabled=true;
- RandomizerGet missing=RG_NONE;
+ RandomizerGet missing=RG_NONE, trade=RG_NONE; bool restrictTrade=false;
  Context*ctx=&context;
  bool HasItem(RandomizerGet item){
   if(item>=RG_SOUL_ENEMY_STALFOS&&item<=RG_SOUL_ENEMY_THIEVES)return !soulsEnabled||item!=missing;
+  if(restrictTrade && item>=RG_COJIRO && item<=RG_CLAIM_CHECK)return item==trade;
   return combat;
  }
  bool CanUse(RandomizerGet){return combat;}
@@ -65,9 +70,29 @@ for line in witness.splitlines():
  enemy=enemies[0] if key=='GOHMA_LARVA' else enemies[-1]
  source+=f'REQUIRE(Rando::SoulShuffle::EnemyForLogic({enemy})==RG_SOUL_ENEMY_{key});\n'
 source+='}\n'
+source+='bool NativeSkullKidTradeGate(int inventory){return !('+skull_gate[0].replace('INV_CONTENT(ITEM_TRADE_ADULT)','inventory')+');}\n'
 source+=r'''
 int main(){
  CheckWitnessIdentity();
+ // Exercise the actual witness with one concrete trade item at a time, matching
+ // the native EnSkj_Init comparison rather than an all-items fixture inventory.
+ state.restrictTrade=true;state.IsAdult=true;state.IsChild=false;
+ const std::pair<RandomizerGet,int> trades[]={
+  {RG_COJIRO,ITEM_COJIRO},{RG_ODD_MUSHROOM,ITEM_ODD_MUSHROOM},{RG_ODD_POTION,ITEM_ODD_POTION},
+  {RG_POACHERS_SAW,ITEM_SAW},{RG_BROKEN_SWORD,ITEM_SWORD_BROKEN},{RG_PRESCRIPTION,ITEM_PRESCRIPTION},
+  {RG_EYEBALL_FROG,ITEM_FROG},{RG_EYEDROPS,ITEM_EYEDROPS},{RG_CLAIM_CHECK,ITEM_CLAIM_CHECK}};
+ for(const auto& [trade,nativeSlot]:trades){
+  state.trade=trade;bool reached=false;
+  for(const auto& witness:witnesses)if(witness.check==RC_ENEMY_DROP_SKULL_KID)reached|=witness.condition();
+  REQUIRE(reached==NativeSkullKidTradeGate(nativeSlot));
+ }
+ state.trade=RG_NONE;
+ for(const auto& witness:witnesses)if(witness.check==RC_ENEMY_DROP_SKULL_KID)REQUIRE(!witness.condition());
+ state.trade=RG_CLAIM_CHECK;state.IsAdult=false;state.IsChild=true;
+ for(const auto& witness:witnesses)if(witness.check==RC_ENEMY_DROP_SKULL_KID)REQUIRE(!witness.condition());
+ state.IsAdult=true;state.IsChild=false;state.missing=RG_SOUL_ENEMY_SKULL_KID;
+ for(const auto& witness:witnesses)if(witness.check==RC_ENEMY_DROP_SKULL_KID)REQUIRE(!witness.condition());
+ state.missing=RG_NONE;state.restrictTrade=false;
  std::set<RandomizerCheck> covered, reachable;
  for(auto& witness:witnesses){
   REQUIRE(witness.region!=RR_ROOT);covered.insert(witness.check);
@@ -86,7 +111,7 @@ int main(){
   state.soulsEnabled=true;
  }
  REQUIRE(covered.size()==43);REQUIRE(reachable==covered);
- printf("PASS %zu genuine native combat witness types: soul self-lock, weapons, disabled tricks/family controls\n",covered.size());
+ printf("PASS %zu genuine native combat witness types: soul self-lock, weapons, disabled tricks/family controls; Skull Kid native trade threshold9 items\n",covered.size());
 }
 '''
 with tempfile.TemporaryDirectory(prefix='oot-enemy-drop-logic-') as t:

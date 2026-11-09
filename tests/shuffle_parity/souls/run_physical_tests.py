@@ -26,11 +26,11 @@ source='''#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
 struct Logic {
  bool IsAdult=false,IsChild=true,AtDay=true,enabled=true,soul=false;
  std::set<int> items;std::set<std::string> abilities;
- bool HasItem(RandomizerGet i){return (i==RG_SOUL_ANIMAL_CUCCO||i==RG_SOUL_ANIMAL_COW)?(!enabled||soul):items.count(i);}
+ bool HasItem(RandomizerGet i){return (i==RG_SOUL_ANIMAL_CUCCO||i==RG_SOUL_ANIMAL_COW||i==RG_SOUL_ENEMY_BABY_DODONGO)?(!enabled||soul):items.count(i);}
  bool CanUse(RandomizerGet i){return items.count(i);}
  bool CanUseCucco();
 '''
-for method in sorted(methods):source+='template<class...T> bool '+method+'(T...){return abilities.count("'+method+'");}\n'
+for method in sorted(methods):source+='template<class...T> bool '+method+'(T...){return '+('items.count(RG_KOKIRI_SWORD)' if method=='CanAttack' else 'abilities.count("'+method+'")')+';}\n'
 source+='''} state; auto*logic=&state;
 struct Option {bool Is(int){return false;}};
 struct Ctx {std::set<int> tricks;Option GetOption(int){return {};};bool GetTrickOption(int t){return tricks.count(t);}} context;auto*ctx=&context;
@@ -38,7 +38,7 @@ template<class F> bool AnyAgeTime(F f){return f();}
 '''+helper+'\n'
 source+='std::function<bool()> predicates[]={\n'+',\n'.join('[]{return '+e+';}' for e in exprs)+'};\nint main(){\n'
 for i,row in enumerate(rows):
- tool='RG_FAIRY_SLINGSHOT' if row['soul']=='RG_SOUL_ANIMAL_COW' else 'RG_POWER_BRACELET'
+ tool='RG_KOKIRI_SWORD' if row['soul']=='RG_SOUL_ENEMY_BABY_DODONGO' else ('RG_FAIRY_SLINGSHOT' if row['soul']=='RG_SOUL_ANIMAL_COW' else 'RG_POWER_BRACELET')
  source+=f'state=Logic{{}};context=Ctx{{}};state.items={{{tool}}};\n'
  if row['target']=='RR_GV_FORTRESS_SIDE':source+='context.tricks.insert(RT_GV_CHILD_CUCCO_JUMP);state.abilities.insert("CanJumpslash");\n'
  if row['target']=='RR_ZR_BEHIND_WATERFALL':source+='context.tricks.insert(RT_ZR_CUCCO);\n'
@@ -46,7 +46,7 @@ for i,row in enumerate(rows):
  if row['target']=='RC_KAK_SILVER_BOULDER':source+='state.IsAdult=true;state.IsChild=false;state.items.insert(RG_LONGSHOT);state.abilities.insert("CanBreakSilverBoulder");\n'
  source+=f'REQUIRE(!predicates[{i}]());state.soul=true;REQUIRE(predicates[{i}]());state.items.erase({tool});REQUIRE(!predicates[{i}]());state.items.insert({tool});state.soul=false;state.enabled=false;REQUIRE(predicates[{i}]());\n'
  # Real alternate native routes must continue with no soul and no carrying ability.
- alternatives={'RR_GV_UPPER_STREAM':'state.abilities.insert("TakeDamage");','RR_GV_CRATE_LEDGE':'state.items.insert(RG_LONGSHOT);','RR_KAK_BACKYARD':'state.IsAdult=true;state.IsChild=false;','RR_ZR_PILLAR':'state.items.insert(RG_HOVER_BOOTS);','RC_ZR_NEAR_DOMAIN_FREESTANDING_POH':'state.items.insert(RG_BOOMERANG);','RR_ZR_FRONT':'state.items.insert(RG_BRONZE_SCALE);','RR_ZR_BEHIND_WATERFALL':'state.items.insert(RG_ZELDAS_LULLABY);'}
+ alternatives={'RR_GV_UPPER_STREAM':'state.abilities.insert("TakeDamage");','RR_GV_CRATE_LEDGE':'state.items.insert(RG_LONGSHOT);','RR_KAK_BACKYARD':'state.IsAdult=true;state.IsChild=false;','RR_ZR_PILLAR':'state.items.insert(RG_HOVER_BOOTS);','RC_ZR_NEAR_DOMAIN_FREESTANDING_POH':'state.items.insert(RG_BOOMERANG);','RR_ZR_FRONT':'state.items.insert(RG_BRONZE_SCALE);','RR_ZR_BEHIND_WATERFALL':'state.items.insert(RG_ZELDAS_LULLABY);','RR_DODONGOS_CAVERN_SE_ROOM':'state.abilities.insert("CanBreakMudWalls");'}
  if row['target'] in alternatives:
   source+='state.enabled=true;state.items.erase(RG_POWER_BRACELET);'+alternatives[row['target']]+f'REQUIRE(predicates[{i}]());\n'
 source+='puts("PASS native physical/check predicates: missing/owned/off, strength and alternate-route controls");}\n'

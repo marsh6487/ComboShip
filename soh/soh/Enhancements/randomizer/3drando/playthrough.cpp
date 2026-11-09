@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -67,6 +68,10 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
         }
     }
 
+    if (ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS) &&
+        Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get())) {
+        settingsStr += "|rusty-door-keys=27|";
+    }
     if (shuffleEnemyDrops) {
         settingsStr += "|native-first-enemy-drops=1|";
     }

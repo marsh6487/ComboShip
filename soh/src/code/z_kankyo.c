@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "global.h"
 #include "ui_visibility.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
@@ -950,6 +951,7 @@ void func_800766C4(PlayState* play);
 
 void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContext* lightCtx, PauseContext* pauseCtx,
                         MessageContext* msgCtx, GameOverContext* gameOverCtx, GraphicsContext* gfxCtx) {
+    SongEvents_OotApplyClockLock();
     f32 sp8C;
     f32 sp88 = 0.0f;
     u16 i;
@@ -995,7 +997,9 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
                 if ((envCtx->unk_1A == 0) && !FrameAdvance_IsEnabled(play) &&
                     (play->transitionMode == TRANS_MODE_OFF || ((void)0, gSaveContext.gameMode) != GAMEMODE_NORMAL)) {
 
-                    if (IS_DAY || gTimeSpeed >= 0x190) {
+                    if (SongEvents_OotClockLocked()) {
+                        SongEvents_OotApplyClockLock();
+                    } else if (IS_DAY || gTimeSpeed >= 0x190) {
                         gSaveContext.dayTime += gTimeSpeed;
                     } else {
                         gSaveContext.dayTime += gTimeSpeed * 2; // time moves twice as fast at night

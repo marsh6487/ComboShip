@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_bsb.c
  * Overlay: ovl_En_Bsb
@@ -562,7 +563,8 @@ void func_80C0BFE8(EnBsb* this, PlayState* play) {
             this->playedSfx = false;
         }
 
-        if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (play->msgCtx.lastPlayedSong == OCARINA_SONG_SONATA)) {
+        if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
+            (play->msgCtx.lastPlayedSong == SongEvents_MmSong(8, OCARINA_SONG_SONATA))) {
             play->msgCtx.ocarinaMode = OCARINA_MODE_END;
             Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_BOSS);
             func_80C0C0F4(this, play);

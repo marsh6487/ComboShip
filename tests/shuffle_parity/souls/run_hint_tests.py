@@ -18,6 +18,11 @@ import run_item_hint_export_tests as native
 
 def fixture():
     code = native.fixture().split(native.TESTS)[0]
+    # Use the actual native language selector enum, including MAX for Replace.
+    native_z64=(ROOT/'soh/include/z64.h').read_text()
+    end=native_z64.index('} Language;')+len('} Language;')
+    begin=native_z64.rfind('typedef enum {',0,end)
+    code=code.replace('enum { LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRA };',native_z64[begin:end])
     # Use complete real enum definitions (including append-only catalogue keys).
     code = code.replace('enum RandomizerHintTextKey { RHT_NONE, RHT_AUTHORED };', '''
 #define RANDO_ENUM_BEGIN(name) enum name {
@@ -50,6 +55,11 @@ def fixture():
         code += native.block(text_source, marker)
     messages = (ROOT / 'soh/soh/Enhancements/custom-message/CustomMessageManager.cpp').read_text()
     code += native.block(messages, 'CustomMessage::CustomMessage(Text text,')
+    code += native.block(messages, 'static const std::unordered_map<std::string, std::string> percentColors', True)
+    for signature in ('void CustomMessage::Replace(std::string&& oldStr, CustomMessage newMessage)',
+                      'void CustomMessage::ReplaceColors(', 'std::string CustomMessage::COLOR('):
+        code += native.block(messages, signature)
+
     code += r'''
 using RandomizerCheck = int;
 namespace Rando {

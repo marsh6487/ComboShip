@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "ActorBehavior.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -21,7 +22,7 @@ void Rando::ActorBehavior::InitDmChar01Behavior() {
         }
 
         bool hasSongAccess = (gPlayState->msgCtx.ocarinaMode == OCARINA_MODE_EVENT &&
-                              gPlayState->msgCtx.lastPlayedSong == OCARINA_SONG_SONATA);
+                              gPlayState->msgCtx.lastPlayedSong == SongEvents_MmSong(0, OCARINA_SONG_SONATA));
 
         bool hasFormAccess =
             (player->transformation == PLAYER_FORM_DEKU && (gPlayState->msgCtx.ocarinaMode == OCARINA_MODE_EVENT ||

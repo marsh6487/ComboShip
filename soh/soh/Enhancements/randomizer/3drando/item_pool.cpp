@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "../SoulShuffle.h"
 #include <algorithm>
 
@@ -1033,9 +1034,16 @@ bool GenerateItemPool() {
     }
 
     // Keys
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK)) AddFixedItemToPool(RG_CLOCK);
     if (ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS)) {
         // only 1 is added to the ice trap pool, to avoid the pool being filled with them.
         // a random one is chosen in Rando::Traps::GetTrapTrickModel
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_HYRULE_CASTLE, 2, 1, 1, 1, false);
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_RANCH_HOUSE_ROOM, 2, 1, 1, 1, false);
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK, 2, 1, 1, 1, false);
         AddItemToPool(RG_GUARD_HOUSE_KEY, 2, 1, 1, 1);
         AddItemToPool(RG_MARKET_BAZAAR_KEY, 2, 1, 1, 1, false);
         AddItemToPool(RG_MARKET_POTION_SHOP_KEY, 2, 1, 1, 1, false);

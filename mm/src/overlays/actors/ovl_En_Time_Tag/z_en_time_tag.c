@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_time_tag.c
  * Overlay: ovl_En_Time_Tag
@@ -117,7 +118,8 @@ void EnTimeTag_RooftopOath_Cutscene(EnTimeTag* this, PlayState* play) {
 void EnTimeTag_RooftopOath_Wait(EnTimeTag* this, PlayState* play) {
     Actor* thisx = &this->actor;
 
-    if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (play->msgCtx.lastPlayedSong == OCARINA_SONG_OATH)) {
+    if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
+        (play->msgCtx.lastPlayedSong == SongEvents_MmSong(12, OCARINA_SONG_OATH))) {
         if (this->actor.csId != CS_ID_NONE) {
             this->actionFunc = EnTimeTag_RooftopOath_Cutscene;
             CutsceneManager_Queue(thisx->csId);

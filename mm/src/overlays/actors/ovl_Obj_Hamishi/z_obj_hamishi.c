@@ -5,6 +5,7 @@
  */
 
 #include "z_obj_hamishi.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 
 #include "2s2h/ShipUtils.h"
@@ -126,7 +127,7 @@ void func_809A10F4(ObjHamishi* this, PlayState* play) {
         }
 
         EffectSsKakera_Spawn(play, &spBC, &spC8, &this->actor.world.pos, gravity, phi_v0, 30, 5, 0, D_809A1AD4[i], 3, 0,
-                             70, 1, GAMEPLAY_FIELD_KEEP, gFieldSilverBoulderDebrisDL);
+                             70, 1, GAMEPLAY_FIELD_KEEP, (Gfx*)gFieldSilverBoulderDebrisDL);
     }
 
     func_800BBFB0(play, &this->actor.world.pos, 140.0f, 6, 180, 90, 1);
@@ -180,7 +181,8 @@ void ObjHamishi_Init(Actor* thisx, PlayState* play) {
     func_809A13A0(this, play);
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 2.3f);
 
-    if (Flags_GetSwitch(play, OBJHAMISHI_GET_SWITCH_FLAG(&this->actor))) {
+    if (GameInteractor_Should(VB_ENVIRONMENT_SOURCE_USED,
+                              Flags_GetSwitch(play, OBJHAMISHI_GET_SWITCH_FLAG(&this->actor)), &this->actor)) {
         Actor_Kill(&this->actor);
         return;
     }
@@ -232,6 +234,7 @@ void ObjHamishi_Update(Actor* thisx, PlayState* play) {
             } else {
                 func_809A10F4(this, play);
                 SoundSource_PlaySfxAtFixedWorldPos(play, &this->actor.world.pos, 40, NA_SE_EV_WALL_BROKEN);
+                GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, &this->actor, 0);
                 Flags_SetSwitch(play, OBJHAMISHI_GET_SWITCH_FLAG(&this->actor));
                 Actor_Kill(&this->actor);
             }
@@ -271,20 +274,20 @@ void ObjHamishi_Draw(Actor* thisx, PlayState* play) {
         thisx->shape.shadowAlpha = 160;
         Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
-        gSPSegment(POLY_OPA_DISP++, 0x08, D_801AEFA0);
+        gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)D_801AEFA0);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 170, 130, 255);
-        gSPDisplayList(POLY_OPA_DISP++, gFieldSilverBoulderDL);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gFieldSilverBoulderDL);
     } else if (thisx->projectedPos.z < 2250.0f) {
         f32 sp20 = (2250.0f - thisx->projectedPos.z) * 2.55f;
 
         thisx->shape.shadowAlpha = sp20 * 0.627451f;
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
-        gSPSegment(POLY_XLU_DISP++, 0x08, D_801AEF88);
+        gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)D_801AEF88);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 170, 130, (s32)sp20);
-        gSPDisplayList(POLY_XLU_DISP++, gFieldSilverBoulderDL);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gFieldSilverBoulderDL);
     } else {
         thisx->shape.shadowAlpha = 0;
     }

@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
     conversions = (ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text()
     a = conversions.index('inline void to_json(json& j, const RandoSaveCheck&')
     b = conversions.index('inline void to_json(json& j, const Vec3f&', a)
-    (build/'bag_json.inc').write_text(conversions[a:b])
+    (build/'bag_json.inc').write_text('#include "combo/rando/SongEvents.h"\n'+conversions[a:b])
     starting = (ROOT/'mm/2s2h/Rando/StartingItems.cpp').read_text()
     (build/'bag_starting.inc').write_text('\n'.join(function(starting,n) for n in (
         'GetComputedStartingItems','GetStartingItemsFromSave','SetStartingItemsInSave',

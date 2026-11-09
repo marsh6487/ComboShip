@@ -5,6 +5,7 @@
  */
 
 #include "z_obj_bean.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "objects/object_mamenoki/object_mamenoki.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
@@ -301,8 +302,8 @@ void func_809375C8(ObjBean* this, PlayState* play) {
 
 void func_809375F4(ObjBean* this, PlayState* play) {
     static Gfx* D_80939024[] = {
-        gKakeraLeafMiddleDL,
-        gKakeraLeafTipDL,
+        (Gfx*)gKakeraLeafMiddleDL,
+        (Gfx*)gKakeraLeafTipDL,
     };
     Vec3f spC4;
     Vec3f spB8;
@@ -392,7 +393,7 @@ void ObjBean_Init(Actor* thisx, PlayState* play) {
         this->dyna.actor.shape.rot.z = 0;
         this->unk_1FE |= 2;
 
-        DynaPolyActor_LoadMesh(play, &this->dyna, &object_mamenoki_Colheader_0004BC);
+        DynaPolyActor_LoadMesh(play, &this->dyna, (CollisionHeader*)object_mamenoki_Colheader_0004BC);
         Collider_SetCylinder(play, &this->collider, &this->dyna.actor, &sCylinderInit1);
         Collider_UpdateCylinder(&this->dyna.actor, &this->collider);
 
@@ -405,7 +406,9 @@ void ObjBean_Init(Actor* thisx, PlayState* play) {
         func_80936CF0(this, play);
 
         if (!OBJBEAN_GET_80(&this->dyna.actor) &&
-            Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0)) &&
+            GameInteractor_Should(VB_ENVIRONMENT_SOIL_USED,
+                                  Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0)),
+                                  &this->dyna.actor) &&
             !Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 1)) && func_800FE9B4(play)) {
             Flags_SetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 1));
         }
@@ -528,7 +531,9 @@ void func_80937DEC(ObjBean* this, PlayState* play) {
         func_80937C10(this);
     }
 
-    if (Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0))) {
+    if (GameInteractor_Should(VB_ENVIRONMENT_SOIL_USED,
+                              Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0)),
+                              &this->dyna.actor)) {
         this->unk_1E4 = 5;
     } else {
         this->unk_1E4 = 0;
@@ -551,7 +556,9 @@ void func_80937FC8(ObjBean* this, PlayState* play) {
             Flags_SetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_2(&this->dyna.actor, 0));
         }
 
-        if (Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0))) {
+        if (GameInteractor_Should(VB_ENVIRONMENT_SOIL_USED,
+                                  Flags_GetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0)),
+                                  &this->dyna.actor)) {
             this->unk_1E4 = 5;
         } else {
             s32 pad;
@@ -614,6 +621,7 @@ void func_80938298(ObjBean* this, PlayState* play) {
 
     if (this->unk_1E0 >= 3) {
         this->unk_1E4 = 3;
+        GameInteractor_Should(VB_ENVIRONMENT_SOIL_BURROW, true, &this->dyna.actor);
         Flags_SetSwitch(play, OBJBEAN_GET_SWITCH_FLAG_1(&this->dyna.actor, 0));
         this->unk_1E4 = 5;
         func_8093833C(this);
@@ -944,11 +952,11 @@ void func_80938E00(Actor* thisx, PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
 
     if (this->unk_1FE & 4) {
-        gSPDisplayList(POLY_OPA_DISP++, object_mamenoki_DL_000090);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)object_mamenoki_DL_000090);
     }
 
     if (this->unk_1FE & 2) {
-        gSPDisplayList(POLY_OPA_DISP++, object_mamenoki_DL_0002D0);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)object_mamenoki_DL_0002D0);
     }
 
     if (this->unk_1FE & 1) {
@@ -957,7 +965,7 @@ void func_80938E00(Actor* thisx, PlayState* play) {
         Matrix_Scale(this->unk_1B8, this->unk_1B8, this->unk_1B8, MTXMODE_APPLY);
 
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-        gSPDisplayList(POLY_OPA_DISP++, object_mamenoki_DL_000530);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)object_mamenoki_DL_000530);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
@@ -966,5 +974,5 @@ void func_80938E00(Actor* thisx, PlayState* play) {
 void func_80938F50(Actor* thisx, PlayState* play) {
     ObjBean* this = (ObjBean*)thisx;
 
-    Gfx_DrawDListXlu(play, object_mamenoki_DL_002208);
+    Gfx_DrawDListXlu(play, (Gfx*)object_mamenoki_DL_002208);
 }

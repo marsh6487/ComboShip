@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "rando/CrossEntranceBoss.h"
 #include "ui_visibility.h"
 #include "global.h"
@@ -2233,11 +2234,13 @@ void Cutscene_HandleConditionalTriggers(PlayState* play) {
     if ((gSaveContext.gameMode == GAMEMODE_NORMAL) && (gSaveContext.respawnFlag <= 0) &&
         (gSaveContext.cutsceneIndex < 0xFFF0)) {
         if ((gSaveContext.entranceIndex == ENTR_DESERT_COLOSSUS_OUTSIDE_TEMPLE) &&
-            !Flags_GetEventChkInf(EVENTCHKINF_LEARNED_REQUIEM_OF_SPIRIT)) {
+            !Flags_GetEventChkInf(EVENTCHKINF_LEARNED_REQUIEM_OF_SPIRIT) &&
+            Randomizer_SoulCanAccessCheck(RC_SHEIK_AT_COLOSSUS)) {
             Flags_SetEventChkInf(EVENTCHKINF_LEARNED_REQUIEM_OF_SPIRIT);
             gSaveContext.entranceIndex = ENTR_DESERT_COLOSSUS_EAST_EXIT;
             gSaveContext.cutsceneIndex = 0xFFF0;
-        } else if (GameInteractor_Should(
+        } else if (Randomizer_SoulCanAccessCheck(RC_SHEIK_IN_KAKARIKO) &&
+                   GameInteractor_Should(
                        VB_BE_ELIGIBLE_FOR_NOCTURNE_OF_SHADOW,
                        ((gSaveContext.entranceIndex == ENTR_KAKARIKO_VILLAGE_FRONT_GATE) && LINK_IS_ADULT &&
                         Combo_SOH_CrossBossLogicalClear(
@@ -2250,14 +2253,16 @@ void Cutscene_HandleConditionalTriggers(PlayState* play) {
             Flags_SetEventChkInf(EVENTCHKINF_BONGO_BONGO_ESCAPED_FROM_WELL);
             gSaveContext.cutsceneIndex = 0xFFF0;
         } else if ((gSaveContext.entranceIndex == ENTR_LOST_WOODS_BRIDGE_EAST_EXIT) &&
-                   !Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_SARIA_ON_BRIDGE)) {
+                   !Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_SARIA_ON_BRIDGE) &&
+                   Randomizer_SoulCanAccessCheck(RC_LW_GIFT_FROM_SARIA)) {
             Flags_SetEventChkInf(EVENTCHKINF_SPOKE_TO_SARIA_ON_BRIDGE);
             if (GameInteractor_Should(VB_GIVE_ITEM_FAIRY_OCARINA, true)) {
                 Item_Give(play, ITEM_OCARINA_FAIRY);
             }
             gSaveContext.entranceIndex = ENTR_LOST_WOODS_SOUTH_EXIT;
             gSaveContext.cutsceneIndex = 0xFFF0;
-        } else if (GameInteractor_Should(
+        } else if (Randomizer_SoulCanAccessCheck(RC_TOT_LIGHT_ARROWS_CUTSCENE) &&
+                   GameInteractor_Should(
                        VB_BE_ELIGIBLE_FOR_LIGHT_ARROWS,
                        (CHECK_QUEST_ITEM(QUEST_MEDALLION_SPIRIT) && CHECK_QUEST_ITEM(QUEST_MEDALLION_SHADOW) &&
                         LINK_IS_ADULT &&

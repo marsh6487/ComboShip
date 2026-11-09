@@ -53,7 +53,7 @@ def main():
                         '-c', str(source), '-o', str(native_object)], check=True)
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-g', '-DCOMBO_BUILD',
                         '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-no-pie',
-                        '-I' + str(ROOT / 'combo'), '-I' + os.environ.get('NLOHMANN_JSON_INCLUDE', '/usr/include'),
+                        *['-I' + str(ROOT / path) for path in includes], '-I' + os.environ.get('NLOHMANN_JSON_INCLUDE', '/usr/include'),
                         str(runtime_source), str(native_object), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True, env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})
 

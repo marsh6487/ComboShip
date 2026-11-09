@@ -16,6 +16,7 @@ from layout_test_data import expected_layout_masks
 scenes,expected=expected_layout_masks()
 source=r'''
 #include "soh/Enhancements/randomizer/EnemyFirstDrops.h"
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/hint.h"
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/dungeon.h"
@@ -198,6 +199,9 @@ int main(){
   REQUIRE(!(loadedFlags[entry.flag>>4]&(1u<<(entry.flag&15))));
   REQUIRE(!(loadedFlags[entry.defeatedFlag>>4]&(1u<<(entry.defeatedFlag&15))));
  }
+ REQUIRE(EnemyFirstDrops::SourceNames(*EnemyFirstDrops::Find(RC_ENEMY_DROP_OCTOROK)).de=="Oktorok");
+ REQUIRE(EnemyFirstDrops::SourceNames(*EnemyFirstDrops::Find(RC_ENEMY_DROP_TEKTITE)).fr=="Araknon");
+ REQUIRE(EnemyFirstDrops::SourceNames(*EnemyFirstDrops::Find(RC_ENEMY_DROP_FLARE_DANCER)).fr=="Danse-Flamme");
  EnemyFirstDrops::RegisterLocations();
  InitSariaColorTemplates();
  StaticData::RetrieveItem(RG_MM_SOUL_GOHT)=Item(RG_MM_SOUL_GOHT,Text("Soul of Goht","Âme de Goht","Seele von Goht"),ITEMTYPE_ITEM,0,true,LOGIC_NONE,RHT_ITEM_MM_SOUL_GOHT,ITEM_CATEGORY_MAJOR);
@@ -217,6 +221,8 @@ int main(){
    auto messages=nativeHint.GetHintText().GetClear().GetAllMessages(MF_RAW);
    REQUIRE(messages[0].find(entry.name)!=std::string::npos);
    REQUIRE(messages[0].find("[[1]]")!=std::string::npos);
+   const auto localized=EnemyFirstDrops::SourceNames(entry);
+   const std::array<std::string,3> enemyNames={localized.en,localized.de,localized.fr};
    const auto source=EnemyFirstDrops::HintSource(entry);
    const std::array<std::string,3> sourceNames={source.en,source.de,source.fr};
    for(auto key:{RHT_SARIA_TALK_HINT,RHT_SARIA_SONG_HINT}){
@@ -237,19 +243,23 @@ int main(){
    const auto encoded=colored.GetAllMessages(MF_ENCODE);
    const std::array<std::string,3> rewards={"Soul of Goht","Seele von Goht","Âme de Goht"};
    for(size_t language=0;language<encoded.size();++language){
-    REQUIRE(encoded[language].find("%r"+std::string(entry.name)+"%w")!=std::string::npos);
+    REQUIRE(encoded[language].find("%r"+enemyNames[language]+"%w")!=std::string::npos);
     REQUIRE(encoded[language].find("%g"+rewards[language]+"%w")!=std::string::npos);
     REQUIRE(encoded[language].find('#')==std::string::npos);
     REQUIRE(encoded[language].find("%w%w")==std::string::npos);
     auto bytes=encoded[language];colored.ReplaceColors(bytes);
-    REQUIRE(bytes.find(CustomMessage::COLOR(QM_RED)+entry.name+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+    REQUIRE(bytes.find(CustomMessage::COLOR(QM_RED)+enemyNames[language]+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
     REQUIRE(bytes.find(CustomMessage::COLOR(QM_GREEN)+rewards[language]+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
    }
   }
   REQUIRE(hintKeys.insert(location->GetHintKey()).second);
-  for(auto&text:location->GetHint()->GetClear().GetAllMessages(MF_RAW)){
-   REQUIRE(text.find(entry.name)!=std::string::npos);
-   REQUIRE(text.find("[[1]]")!=std::string::npos);
+  const auto rawMessages=location->GetHint()->GetClear().GetAllMessages(MF_RAW);
+  const auto localized=EnemyFirstDrops::SourceNames(entry);
+  const std::array<std::string,3> nativeNames={localized.en,localized.de,localized.fr};
+  REQUIRE(rawMessages.size()==nativeNames.size());
+  for(size_t language=0;language<rawMessages.size();++language){
+   REQUIRE(rawMessages[language].find(nativeNames[language])!=std::string::npos);
+   REQUIRE(rawMessages[language].find("[[1]]")!=std::string::npos);
   }
  }
  REQUIRE(hintKeys.size()==43);
@@ -277,8 +287,14 @@ int main(){
  PoolFixtureSettings settings;
  auto oldSeed=nlohmann::json{{"seed","historical"},{"finalSeed",1}};
  auto newSeed=oldSeed;newSeed["settings"]={{"Shuffle Enemy First Drops","On"}};
+ ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Set(RustyDoorKeys::CurrentCatalog);
+ ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS).Set(1);
  settings.ParseJson(newSeed);REQUIRE(ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get()==1);
+ REQUIRE(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()==RustyDoorKeys::LegacyCatalog);
+ REQUIRE(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS).Get()==1);
+ ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Set(RustyDoorKeys::CurrentCatalog);
  settings.ParseJson(oldSeed);REQUIRE(ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get()==0);
+ REQUIRE(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()==RustyDoorKeys::LegacyCatalog);
  std::set<RandomizerCheck>allDrops;
  for(auto&entry:EnemyFirstDrops::Catalog)allDrops.insert(entry.check);
  REQUIRE(StaticData::ParseExcludedLocations(StaticData::SerializeExcludedLocations(allDrops))==allDrops);
@@ -332,12 +348,19 @@ with tempfile.TemporaryDirectory(prefix='oot-first-drop-pool-') as t:
  flags=['-O1','-std=c++20','-DF3DEX_GBI_2','-DCONTROLLERBUTTONS_T=uint32_t','-DSOH_BUILD_DLL','-I'+str(ROOT)]
  for path in ('soh/include','soh/include/PR','soh/src','soh','soh/assets','soh/soh','libultraship/include','libultraship/src','combo','combo/menu'):
   flags+=['-isystem',str(ROOT/path)]
- # Native trick/option headers include ImGui; use the installed package metadata.
- # CPATH remains available for non-system dependency checkouts.
- pkg=subprocess.run(['pkg-config','--cflags','imgui'],capture_output=True,text=True)
- if pkg.returncode==0:
+ # Native option headers require the project's pinned ImGui. An explicit -I
+ # from an older distro pkg-config wins over CPATH, even when CI already
+ # provides the correct dependency. Prefer the actual supplied checkout.
+ candidates=[os.environ.get('IMGUI_DIR',''),*os.environ.get('CPATH','').split(os.pathsep)]
+ imgui=next((Path(p) for p in candidates if p and (Path(p)/'imgui.h').is_file()),None)
+ if imgui is not None:
+  flags+=['-I'+str(imgui)]
+ else:
+  pkg=subprocess.run(['pkg-config','--atleast-version=1.91','imgui'],capture_output=True,text=True)
+  if pkg.returncode!=0:
+   raise RuntimeError('Set IMGUI_DIR to the pinned ImGui v1.91.9b-docking checkout')
   import shlex
-  flags+=shlex.split(pkg.stdout)
+  flags+=shlex.split(subprocess.check_output(['pkg-config','--cflags','imgui'],text=True))
  for mode in ('original','combo'):
   exe=t/mode
   subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),str(r/'EnemyFirstDrops.cpp'),str(r/'location.cpp'),str(r/'randomizerEnumStrings.cpp'),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-o',str(exe)],check=True)

@@ -1,5 +1,6 @@
 #include "FleetShipCombo/FleetShipCombo.h"
 #include "Rando/Logic/Logic.h"
+#include "Rando/KeyRings.h"
 #include "Rando/StaticData/StaticData.h"
 #include "rando/CrossWorldRando.h"
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"

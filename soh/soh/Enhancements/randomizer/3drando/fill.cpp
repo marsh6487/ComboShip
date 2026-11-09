@@ -16,6 +16,7 @@
 #include <vector>
 #include <list>
 #include <set>
+#include <stdexcept>
 #include <spdlog/spdlog.h>
 
 using namespace Rando;
@@ -560,16 +561,16 @@ std::vector<RandomizerCheck> ReachabilitySearch(const std::vector<RandomizerChec
         const auto& region = RegionTable(startingRegion);
         if (startingAgeTime == RAT_CHILD_DAY) {
             region->childDay = true;
-            region->childNight = region->timePass;
+            region->childNight = region->TimePass();
         } else if (startingAgeTime == RAT_CHILD_NIGHT) {
             region->childNight = true;
-            region->childDay = region->timePass;
+            region->childDay = region->TimePass();
         } else if (startingAgeTime == RAT_ADULT_DAY) {
             region->adultDay = true;
-            region->adultNight = region->timePass;
+            region->adultNight = region->TimePass();
         } else if (startingAgeTime == RAT_ADULT_NIGHT) {
             region->adultNight = true;
-            region->adultDay = region->timePass;
+            region->adultDay = region->TimePass();
         }
     }
     if (calculatingAvailableChecks) {
@@ -1792,7 +1793,10 @@ void ComboFillConfined() {
     RegionTable_Init();
     ctx->ItemReset();
     ctx->GenerateLocationPool();
-    GenerateItemPool();
+    if (!GenerateItemPool()) {
+        throw std::runtime_error("native OOT item pool generation failed (items=" + std::to_string(itemPool.size()) +
+                                 ", available=" + std::to_string(ctx->CountEmptyLocations(false)) + ")");
+    }
     GenerateStartingInventory();
     FillExcludedLocations();
     SetAreas();

@@ -2723,6 +2723,7 @@ void Actor_InitContext(PlayState* play, ActorContext* actorCtx, ActorEntry* acto
     SavedSceneFlags* savedSceneFlags;
     s32 i;
 
+    Randomizer_SoulResetRoomState(play, -1);
     savedSceneFlags = SceneFlags_Get(play->sceneNum); // SOH [Unbound]
     SceneFlagsExt_LoadClear(play->sceneNum);          // SOH [Unbound] clear/temp flags for rooms >= 32
 
@@ -2780,6 +2781,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
     unkFlag = 0;
 
     if (play->numSetupActors != 0) {
+        Randomizer_SoulResetRoomState(play, play->roomCtx.curRoom.num);
         actorEntry = &play->setupActorList[0];
         for (i = 0; i < play->numSetupActors; i++) {
             Actor* spawnedActor = Actor_SpawnEntry(&play->actorCtx, actorEntry++, play);
@@ -2903,7 +2905,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         }
                         actorsUpdated++;
                         DinFireSword_FinishBeginActor(play, actor);
-                        actor->update(actor, play);
+                        Randomizer_SoulUpdateActor(play, actor);
                         DinFireSword_FinishEndActor(play, actor);
                         if (actorSpan.epoch != 0) {
                             FrameTiming_EndNamedSpan("actor_update", actorTimingName, actorSpan);
@@ -3662,6 +3664,8 @@ void Actor_AddToCategory(ActorContext* actorCtx, Actor* actorToAdd, u8 actorCate
 Actor* Actor_RemoveFromCategory(PlayState* play, ActorContext* actorCtx, Actor* actorToRemove) {
     Actor* newHead;
 
+    Randomizer_SoulNoteRemovedActor(play, actorToRemove);
+
     actorCtx->total--;
     actorCtx->actorLists[actorToRemove->category].length--;
 
@@ -3681,7 +3685,8 @@ Actor* Actor_RemoveFromCategory(PlayState* play, ActorContext* actorCtx, Actor* 
     actorToRemove->prev = NULL;
 
     if ((actorToRemove->room == play->roomCtx.curRoom.num) && (actorToRemove->category == ACTORCAT_ENEMY) &&
-        (actorCtx->actorLists[ACTORCAT_ENEMY].length == 0)) {
+        (actorCtx->actorLists[ACTORCAT_ENEMY].length == 0) &&
+        Randomizer_SoulCanClearRoom(play, play->roomCtx.curRoom.num)) {
         Flags_SetTempClear(play, play->roomCtx.curRoom.num);
     }
 

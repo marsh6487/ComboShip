@@ -101,6 +101,7 @@ jobs:
       # Save the built validator/runtime before distribution packaging. A linuxdeploy
       # download or AppImage failure must not discard a fully linked native build.
       - name: Stage native Linux runtime
+        id: native_runtime
         run: ./scripts/linux/make-appimage.sh build-cmake _packages --stage-only
 
       - name: Upload ComboShip-linux artifact
@@ -111,6 +112,7 @@ jobs:
           if-no-files-found: error
 
       - name: Verify actual native first-drop graph, fill and replay (Vanilla)
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
         timeout-minutes: 90
         run: >
           python3 -B tests/shuffle_parity/enemy_drops/native_seed_regression.py
@@ -124,7 +126,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-first-drops-linux
-          path: ${{ runner.temp }}/native-first-drops
+          path: |
+            ${{ runner.temp }}/native-first-drops
+            !${{ runner.temp }}/native-first-drops/runtime/**
+          if-no-files-found: warn
+
+      - name: Verify actual native both-solo and combined parity seeds
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 120
+        run: >
+          python3 -B tests/shuffle_parity/boss_keys/native_boss_key_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-boss-keys"
+
+      - name: Preserve native parity seed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-boss-keys-linux
+          path: |
+            ${{ runner.temp }}/native-boss-keys
+            !${{ runner.temp }}/native-boss-keys/runtime/**
           if-no-files-found: warn
 
       # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r

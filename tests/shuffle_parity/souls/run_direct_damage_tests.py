@@ -6,13 +6,8 @@ assert (ROOT/'soh/soh/Enhancements/randomizer/SoulShuffleRuntime.cpp').exists(),
 assert 'Randomizer_SoulShouldUpdateActor(play, actor)' in (ROOT/'soh/src/code/z_actor.c').read_text(), 'native special-death update loop bypasses soul gate'
 assert 'Randomizer_SoulCanSpawnNonEnemy' in (ROOT/'soh/soh/Enhancements/randomizer/SoulShuffleRuntime.cpp').read_text(), 'native optional actor gate absent'
 with tempfile.TemporaryDirectory(prefix='soul-runtime-') as t:
-    actors=(ROOT/'soh/src/code/z_actor.c').read_text()
-    a=actors.index('Actor* Actor_Spawn(');b=actors.index('    ActorDBEntry* dbEntry',a)
-    (Path(t)/'spawn.inc').write_text(actors[a:b]+'    ++spawnReachesAllocation;return nullptr;\n}\n')
-    collision=(ROOT/'soh/src/code/z_collision_check.c').read_text()
-    start=collision.index('void CollisionCheck_AC(')
-    end=collision.index('\n/**',start)
-    (Path(t)/'collision.inc').write_text(collision[start:end])
+    from runtime_fixture import prepare_runtime
+    prepare_runtime(t)
     def body(path, signature):
         source=(ROOT/path).read_text(); start=source.index(signature); brace=source.index('{',start); depth=1; end=brace+1
         while depth:

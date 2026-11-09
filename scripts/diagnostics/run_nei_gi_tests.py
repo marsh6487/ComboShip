@@ -223,6 +223,7 @@ FOREIGN_DRAW_STUB(OOT_DrawForeignPoes)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFairyBottle)
 bool OOT_DrawForeignFairyContainer(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; return true; }
 FOREIGN_DRAW_STUB(OOT_DrawForeignSoulFlame)
+FOREIGN_DRAW_STUB(OOT_DrawForeignShuffledSoul)
 FOREIGN_DRAW_STUB(OOT_DrawForeignOps)
 #undef FOREIGN_DRAW_STUB
 void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const uint8_t[4], const char*) {

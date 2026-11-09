@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "z_en_dodongo.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "overlays/actors/ovl_En_Bombf/z_en_bombf.h"
@@ -783,7 +784,8 @@ void EnDodongo_Update(Actor* thisx, PlayState* play) {
     if (this->actionState > DODONGO_DEATH) {
         CollisionCheck_SetAC(play, &play->colChkCtx, &this->colliderBody.base);
     }
-    if ((this->actionState >= DODONGO_IDLE) && EnDodongo_AteBomb(this, play)) {
+    if ((this->actionState >= DODONGO_IDLE) && Randomizer_SoulCanDamageActor(play, &this->actor) &&
+        EnDodongo_AteBomb(this, play)) {
         EnDodongo_SetupSwallowBomb(this);
     }
     if (this->actionState == DODONGO_BREATHE_FIRE) {

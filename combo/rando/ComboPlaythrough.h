@@ -66,8 +66,8 @@ inline std::vector<CwPlacedItem> ParseSpoilerPlacements(const std::string& spoil
     auto loadAdv = [&](GameId g, const std::string& dumpJson) {
         if (dumpJson.empty())
             return;
+        const auto d = ParseStaticDataDump(dumpJson, g == GAME_OOT ? "OOT replay metadata" : "MM replay metadata");
         try {
-            auto d = nlohmann::json::parse(dumpJson);
             for (auto& it : d.value("pool", nlohmann::json::array())) {
                 bool adv = it.value("advancement", true);
                 advByName[g][it.value("name", "")] |= adv;

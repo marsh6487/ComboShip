@@ -45,6 +45,7 @@ def cases():
                    'mq':mq, 'expected':sorted(expected), 'excluded':excluded,
                    'settings':{'gRandoSettings.ShuffleEnemyDrops':int(enabled),
                                'gRandoSettings.ShuffleEnemySouls':1,
+                               'gRandoSettings.SkijerCustomItems':0,
                                'gRandoSettings.NoLogic':0,
                                'gRandoSettings.AllChecksReachable':1,
                                'gRandoSettings.BaseIceTraps':0,

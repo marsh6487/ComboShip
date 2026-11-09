@@ -103,5 +103,12 @@
     "kind": "ENTRANCE",
     "target": "RR_JABU_JABUS_BELLY_MQ_LIFT_ROOM",
     "soul": "RG_SOUL_ANIMAL_COW"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/dungeons/dodongos_cavern.cpp",
+    "source": "RR_DODONGOS_CAVERN_SE_CORRIDOR",
+    "kind": "ENTRANCE",
+    "target": "RR_DODONGOS_CAVERN_SE_ROOM",
+    "soul": "RG_SOUL_ENEMY_BABY_DODONGO"
   }
 ]

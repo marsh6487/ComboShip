@@ -1,3 +1,4 @@
+#include "RustyDoorKeys.h"
 #include "../../../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -234,6 +235,9 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_SLEEPING_WATERFALL, {"Closed", "Open"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SleepingWaterfall"));
     OPT_U8(RSK_JABU_OPEN, {"Closed", "Open"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("JabuJabu"));
     OPT_BOOL(RSK_LOCK_OVERWORLD_DOORS, CVAR_RANDOMIZER_SETTING("LockOverworldDoors"));
+    OPT_U8(RSK_RUSTY_DOOR_KEY_VERSION, "Rusty Door Key Catalog", {"Legacy24", "Rusty27"}, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("RustyDoorKeyCatalogVersion"), "Saved seed compatibility version.",
+           WIDGET_CVAR_COMBOBOX, 0, true);
     // ComboShip: (#133)
     OPT_CALLBACK(RSK_LOCK_OVERWORLD_DOORS, {
         if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("LockOverworldDoors"), RO_GENERIC_OFF) == RO_GENERIC_OFF) {
@@ -661,6 +665,9 @@ void Settings::CreateOptions() {
         }
     });
     OPT_U8(RSK_LINKS_POCKET_REWARD, {"Any Reward", "Any Stone", "Any Medallion", "Light Medallion"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("LinksPocketReward"), WIDGET_CVAR_COMBOBOX, RO_LINKS_POCKET_ANY_REWARD);
+    OPT_U8(RSK_SHUFFLE_SONG_EVENTS, "Shuffle Song Events", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSongEvents"), "Randomize songs required to activate world events. Song items use their own setting.", WIDGET_CVAR_COMBOBOX);
+    OPT_U8(RSK_SHUFFLE_CLOCK, "Shuffle Clock", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleClock"), "Lock OoT to the configured starting time until the Clock is found.", WIDGET_CVAR_COMBOBOX);
+    OPT_U8(RSK_CLOCK_START, "Clock Starting Time", {"Day", "Night", "Random"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ClockStart"), "Time held before the Clock is found. Random is deterministic for the seed.", WIDGET_CVAR_COMBOBOX);
     OPT_U8(RSK_SHUFFLE_SONGS, {"Off", "Song Locations", "Dungeon Rewards", "Anywhere"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSongs"), WIDGET_CVAR_COMBOBOX, RO_SONG_SHUFFLE_SONG_LOCATIONS);
     OPT_U8(RSK_SHOPSANITY, {"Off", "Specific Count", "Random"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("Shopsanity"), WIDGET_CVAR_COMBOBOX, RO_SHOPSANITY_OFF);
     OPT_CALLBACK(RSK_SHOPSANITY, {
@@ -1128,10 +1135,10 @@ void Settings::CreateOptions() {
         }
     });
     OPT_BOOL(RSK_SHUFFLE_BEAN_SOULS, CVAR_RANDOMIZER_SETTING("ShuffleBeanSouls"), IMFLAG_SEPARATOR_BOTTOM, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
-    OPT_U8(RSK_SHUFFLE_ENEMY_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleEnemySouls"), WIDGET_CVAR_COMBOBOX);
-    OPT_U8(RSK_SHUFFLE_NPC_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleNpcSouls"), WIDGET_CVAR_COMBOBOX);
-    OPT_U8(RSK_SHUFFLE_ANIMAL_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleAnimalSouls"), WIDGET_CVAR_COMBOBOX);
-    OPT_U8(RSK_SHUFFLE_MISC_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleMiscSouls"), WIDGET_CVAR_COMBOBOX);
+    OPT_U8(RSK_SHUFFLE_ENEMY_SOULS, "Enemy Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleEnemySouls"), "Enemies remain immune to damage until their corresponding soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_NPC_SOULS, "NPC Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleNpcSouls"), "Native NPC conversation, shop, quest and minigame roles require their corresponding soul. Blocking NPCs retain their barriers until their soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_ANIMAL_SOULS, "Animal Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleAnimalSouls"), "Animals and their checks become available after their corresponding soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_MISC_SOULS, "Miscellaneous Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleMiscSouls"), "Gold Skulltula and Business Scrub actors and checks require their corresponding soul.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
     OPT_U8(RSK_SHUFFLE_BOSS_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleBossSouls"), WIDGET_CVAR_COMBOBOX);
     OPT_BOOL(RSK_SHUFFLE_DEKU_STICK_BAG, CVAR_RANDOMIZER_SETTING("ShuffleDekuStickBag"), IMFLAG_SEPARATOR_BOTTOM, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_CALLBACK(RSK_SHUFFLE_DEKU_STICK_BAG, {
@@ -2280,6 +2287,10 @@ void Settings::CreateOptions() {
                                                                               &mOptions[RSK_SHUFFLE_DUNGEON_REWARDS],
                                                                               &mOptions[RSK_GERUDO_KEYS],
                                                                               &mOptions[RSK_SHUFFLE_BOSS_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_NPC_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                                                           },
                                                                           WidgetContainerType::SECTION);
     mOptionGroups[RSG_MENU_COLUMN_DUNGEON_ITEMS] =
@@ -2327,6 +2338,9 @@ void Settings::CreateOptions() {
         OptionGroup::SubGroup("Shuffle Items",
                               {
                                   &mOptions[RSK_SHUFFLE_SONGS],
+                                  &mOptions[RSK_SHUFFLE_SONG_EVENTS],
+                                  &mOptions[RSK_SHUFFLE_CLOCK],
+                                  &mOptions[RSK_CLOCK_START],
                                   &mOptions[RSK_SHUFFLE_TOKENS],
                                   &mOptions[RSK_SHUFFLE_KOKIRI_SWORD],
                                   &mOptions[RSK_SHUFFLE_MASTER_SWORD],
@@ -2674,6 +2688,9 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_DUNGEON_REWARDS],
                                             &mOptions[RSK_LINKS_POCKET],
                                             &mOptions[RSK_SHUFFLE_SONGS],
+                                            &mOptions[RSK_SHUFFLE_SONG_EVENTS],
+                                            &mOptions[RSK_SHUFFLE_CLOCK],
+                                            &mOptions[RSK_CLOCK_START],
                                             &mOptions[RSK_SHOPSANITY],
                                             &mOptions[RSK_SHOPSANITY_COUNT],
                                             &mOptions[RSK_SHOPSANITY_PRICES],
@@ -2779,6 +2796,10 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED],
                                             &mOptions[RSK_PROGRESSIVE_GORON_SWORD],
                                             &mOptions[RSK_SHUFFLE_BOSS_SOULS],
+                                            &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
+                                            &mOptions[RSK_SHUFFLE_NPC_SOULS],
+                                            &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
+                                            &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                             &mOptions[RSK_SHUFFLE_DEKU_STICK_BAG],
                                             &mOptions[RSK_SHUFFLE_DEKU_NUT_BAG],
                                             &mOptions[RSK_SHUFFLE_FREESTANDING],
@@ -3103,6 +3124,7 @@ void Settings::UpdateAllOptions() {
 
 void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocations,
                                const std::set<RandomizerTrick>& enabledTricks) {
+    GenerateSongEvents();
 #ifdef COMBO_BUILD
     if (Combo_IsCombinedGame()) {
         // ComboShip: the Happy Mask Shop scene is the OOT->MM portal and never runs, so its hint can never
@@ -3618,6 +3640,7 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
 }
 
 void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
+    RustyDoorKeys::ResetImportedCatalog(*mContext);
     mContext->SetSeedString(spoilerFileJson.at("seed").get<std::string>());
     mContext->SetSeed(spoilerFileJson.at("finalSeed").get<uint32_t>());
     // A native spoiler from before this option must not retain the setting
@@ -3740,6 +3763,8 @@ void Settings::RandomizeAllSettings() {
             case RSK_STARTING_ZORA_MASK:
             case RSK_STARTING_GERUDO_MASK:
             case RSK_STARTING_MASK_OF_TRUTH:
+            // Internal saved migration metadata is never a randomized user option.
+            case RSK_RUSTY_DOOR_KEY_VERSION:
             // ComboShip: (#133/#134) opt-outs, never randomized
             case RSK_EXCLUDE_MASK_SHOP_KEY:
             case RSK_EXCLUDE_MASK_SHOP_ENTRANCE:

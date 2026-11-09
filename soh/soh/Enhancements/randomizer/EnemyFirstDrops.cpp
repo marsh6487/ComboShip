@@ -29,11 +29,12 @@ void RegisterLocations() {
         // the explicit Global label and SCENE_ID_MAX avoid a false physical scene.
         // A first-type reward is global: describe the action rather than one
         // witness dungeon. Distinct keys also preserve spoiler hint identities.
-        StaticData::hintTextTable[entry.hint] = HintText(
-            CustomMessage(std::string("They say that defeating your first #") + entry.name + "# rewards #[[1]]#.",
-                          std::string("Man sagt, der erste besiegte #") + entry.name + "# bringt #[[1]]#.",
-                          std::string("Selon la rumeur, vaincre votre premier #") + entry.name + "# rapporte #[[1]]#.",
-                          { QM_RED, QM_GREEN }));
+        const auto sourceNames = SourceNames(entry);
+        StaticData::hintTextTable[entry.hint] = HintText(CustomMessage(
+            std::string("They say that defeating your first #") + entry.name + "# rewards #[[1]]#.",
+            std::string("Man sagt, der erste besiegte Gegner vom Typ #") + sourceNames.de + "# bringt #[[1]]#.",
+            std::string("Selon la rumeur, le premier ennemi vaincu du type #") + sourceNames.fr + "# rapporte #[[1]]#.",
+            { QM_RED, QM_GREEN }));
         const auto name = std::string("Global Enemy Drop: ") + entry.name;
         *StaticData::GetLocation(entry.check) =
             Location::Base(entry.check, RCQUEST_BOTH, RCTYPE_ENEMY_DROP, RCAREA_HYRULE_FIELD, ACTOR_ID_MAX,

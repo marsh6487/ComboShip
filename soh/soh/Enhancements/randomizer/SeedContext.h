@@ -34,6 +34,10 @@ class ItemLocation;
 class Context {
   public:
     Context();
+    std::array<uint8_t, 18> songEvents{};
+    void GenerateSongEvents();
+    void ImportSongEvents(const nlohmann::json& source);
+    nlohmann::json ExportSongEvents() const;
     static std::shared_ptr<Context> CreateInstance();
     static std::shared_ptr<Context> GetInstance();
     void InitStaticData();
@@ -120,7 +124,7 @@ class Context {
 
     GetItemEntry GetFinalGIEntry(RandomizerCheck rc, bool checkObtainability = true, GetItemID ogItemId = GI_NONE,
                                  bool spoilAreas = false);
-    void ParseSpoiler(const char* spoilerFileName);
+    void ParseSpoiler(const char* spoilerFileName, bool allowComboEmbedded = false);
     void ParseHashIconIndexesJson(const nlohmann::json& spoilerFileJson);
     void ParseItemLocationsJson(const nlohmann::json& spoilerFileJson);
     void WriteHintJson(nlohmann::ordered_json& spoilerFileJson);

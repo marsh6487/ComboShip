@@ -1,5 +1,6 @@
 #include "Rando/Rando.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/Bags.h"
 #include "Rando/InfiniteUpgrades.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -240,6 +241,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         hasObtainedCheck = RANDO_SAVE_CHECKS[randoCheckId].obtained;
     }
 
+    if (const auto* key = RustyDoorKeys::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(key->flag);
     if (const auto* ring = KeyRings::Find(randoItemId))
         return !hasObtainedCheck && !KeyRings::Owned(*ring);
     if (const auto* bag = Bags::Find(randoItemId))

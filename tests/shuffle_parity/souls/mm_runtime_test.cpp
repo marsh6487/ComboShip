@@ -29,6 +29,16 @@ static void EnNwc_ChangeState(EnNwc *self, s16 state) {
 #include "mm_chicks.inc"
 static int spawnReachesAllocation=0;
 #include "mm_spawn.inc"
+static int bottleSpawns=0,bottleConsumed=0;static bool releaseAllocationFails=false;static Actor releasedActor{};
+extern "C" {
+f32 Math_SinS(s16){return 0;} f32 Math_CosS(s16){return 1;}
+Actor* Actor_Spawn(ActorContext*,PlayState*,s16,f32,f32,f32,s16,s16,s16,s32){++bottleSpawns;return releaseAllocationFails?nullptr:&releasedActor;}
+void Player_UpdateBottleHeld(PlayState*,Player*,ItemId,PlayerItemAction){++bottleConsumed;}
+}
+static void ReleaseBottle(PlayState*play,Player*self,s16 actorId,s16 params){
+ struct {s16 actorId,params;} data{actorId,params};auto*sp4C=&data;
+#include "mm_bottle.inc"
+}
 int main(){
     PlayState play{};
     // Existing native chicks remain safe and cannot start the march without
@@ -62,6 +72,33 @@ int main(){
 
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
 
+    // Actual native bottle-release statements: both ownership gates precede consume.
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=1;play.sceneId=SCENE_22DEKUCITY;
+    ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);REQUIRE(bottleSpawns==0&&bottleConsumed==0);
+    Own(RI_SOUL_NPC_DEKU_PRINCESS);ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);
+    REQUIRE(bottleSpawns==0&&bottleConsumed==0);
+    Own(RI_SOUL_NPC_DEKU_KING);releaseAllocationFails=true;ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);
+    REQUIRE(bottleSpawns==1&&bottleConsumed==0);
+    releaseAllocationFails=false;ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);
+    REQUIRE(bottleSpawns==2&&bottleConsumed==1);
+    Own(RI_SOUL_NPC_DEKU_PRINCESS,false);play.sceneId=SCENE_00KEIKOKU;
+    ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);REQUIRE(bottleConsumed==1);
+    ReleaseBottle(&play,&player,ACTOR_EN_DNP,3);REQUIRE(bottleConsumed==2); // unknown/custom role
+    ReleaseBottle(&play,&player,ACTOR_EN_FISH,0);REQUIRE(bottleConsumed==3);
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=0;
+    ReleaseBottle(&play,&player,ACTOR_EN_DNP,1);REQUIRE(bottleConsumed==4);
+    Own(RI_SOUL_NPC_DEKU_KING,false);
+    // Native Moon child roles include running copies through type 8; type 9 is not a child role.
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=1;play.sceneId=SCENE_SOUGEN;
+    REQUIRE(!MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_JS,8));
+    REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_JS,9));
+    Own(RI_SOUL_NPC_MOON_CHILDREN);REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_JS,8));Own(RI_SOUL_NPC_MOON_CHILDREN,false);
+    // Ranch quest roles require Romani/Cremia; aliens and UFO keep their enemy path.
+    play.sceneId=SCENE_F01;
+    for(int type:{0,5,7,9,11,12}) REQUIRE(!MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_INVADEPOH,type<<4));
+    for(int type:{1,2,3,4,6,8,10,13}) REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_INVADEPOH,type<<4));
+    Own(RI_SOUL_NPC_MALON);REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_INVADEPOH,0));Own(RI_SOUL_NPC_MALON,false);
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=0;
     // Literal independent native role expectations, not generated from the runtime map.
     struct ExpectedNpc { int actor; int scene; unsigned params; RandoItemId soul; };
     const ExpectedNpc expectedNpcs[] = {
@@ -70,15 +107,15 @@ int main(){
     for (const auto& role : expectedNpcs) {
         play.sceneId = role.scene;
         RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 1;
-        REQUIRE(!MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(!MM_SoulCanInteract(&play, role.actor, role.params));
         Own(role.soul, true);
-        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(MM_SoulCanInteract(&play, role.actor, role.params));
         Own(role.soul, false);
         RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 0;
-        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(MM_SoulCanInteract(&play, role.actor, role.params));
         play.sceneId = 0x7FFF;
         RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 1;
-        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        REQUIRE(MM_SoulCanInteract(&play, role.actor, role.params));
         RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 0;
     }
 
@@ -210,4 +247,5 @@ int main(){
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;gSaveContext.gameMode=GAMEMODE_END_CREDITS;
     REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_BUTTE,0));
     puts("PASS real MM optional-soul bridge and native preallocation spawn gate, host/custom/legacy controls");
+    return 0;
 }

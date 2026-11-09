@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 /*
  * File: z_en_kz.c
  * Overlay: ovl_En_Kz
@@ -509,6 +510,9 @@ void EnKz_Update(Actor* thisx, PlayState* play) {
     CollisionCheck_SetOC(play, &play->colChkCtx, &this->collider.base);
     SkelAnime_Update(&this->skelanime);
     EnKz_UpdateEyes(this);
+    if (!Randomizer_SoulCanInteract(play, this->actor.id, (u16)this->actor.params)) {
+        return; // Keep the native OC cylinder and any already-moved position.
+    }
     Actor_MoveXZGravity(&this->actor);
     if (this->actionFunc != EnKz_StartTimer) {
         func_80A9CB18(this, play);

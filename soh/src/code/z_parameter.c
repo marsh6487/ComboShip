@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "../../../combo/ComboGameMode.h"
 #include "ui_visibility.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
@@ -7757,7 +7758,10 @@ void Interface_Update(PlayState* play) {
         }
 
         // handle suns song in areas where time moves
-        if (play->envCtx.timeIncrement != 0) {
+        if (SongEvents_OotSunSongTimeLocked()) {
+            // Keep native undead-freeze signaling; Clock gates only time and travel.
+            gSaveContext.sunsSongState = SUNSSONG_SPECIAL;
+        } else if (play->envCtx.timeIncrement != 0) {
             if (gSaveContext.sunsSongState != SUNSSONG_SPEED_TIME) {
                 D_80125B60 = 0;
                 if ((gSaveContext.dayTime >= 0x4555) && (gSaveContext.dayTime <= 0xC001)) {

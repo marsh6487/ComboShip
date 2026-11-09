@@ -3,9 +3,17 @@
 #undef main
 #include "2s2h/CustomItem/CustomItem.h"
 #include "Rando/MMEnvironment.h"
+#include "rando/SongEvents.h"
 #include <cstdarg>
 #include <functional>
 #include <map>
+#include <set>
+#include "src/overlays/actors/ovl_Obj_Mure2/z_obj_mure2.h"
+#include "src/overlays/actors/ovl_Obj_Bean/z_obj_bean.h"
+#include "src/overlays/actors/ovl_Obj_Swprize/z_obj_swprize.h"
+extern "C" { void ObjSwprize_DoNothing(ObjSwprize*,PlayState*); void func_80C25640(ObjSwprize*); void func_80C25654(ObjSwprize*,PlayState*); }
+#include "rando/CrossEntranceBoss.h"
+#include "2s2h/FleetShipCombo/FleetComboIds.h"
 namespace Rando::ActorBehavior {
 void InitBgIcicleBehavior();
 }
@@ -13,7 +21,7 @@ namespace Hooks {
 std::map<int, std::function<void(Actor *, bool *)>> ShouldActorInit;
 std::map<int, std::function<void(Actor *)>> OnActorUpdate, OnActorDestroy;
 std::function<void(s8, s8)> scene;
-std::function<void(bool *, va_list)> broken;
+std::map<int, std::function<void(bool *, va_list)>> behaviors;
 } // namespace Hooks
 #undef COND_ID_HOOK
 #undef COND_HOOK
@@ -21,7 +29,7 @@ std::function<void(bool *, va_list)> broken;
 #define COND_ID_HOOK(kind, id, cond, ...) Hooks::kind[id] = __VA_ARGS__
 #define COND_HOOK(kind, cond, ...) Hooks::scene = __VA_ARGS__
 #define COND_VB_SHOULD(id, cond, ...)                                          \
-  Hooks::broken = [](bool *should, va_list args) __VA_ARGS__
+  Hooks::behaviors[id] = [](bool *should, va_list args) __VA_ARGS__
 static std::map<const Actor *, s16> indices;
 static std::map<const void *, RandoCheckId> checkIds;
 extern "C" {
@@ -43,13 +51,13 @@ void SetObjectRandoCheckId(const void *actor, RandoCheckId id) {
 } // namespace Rando::ActorBehavior
 static bool failAllocation;
 static int allocations;
-static EnItem00 itemStorage[32];
+static EnItem00 itemStorage[1024];
 extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *, s16 id, f32 x, f32 y,
                               f32 z, s16 rx, s16 ry, s16 rz, s32 params) {
   ++allocations;
   if (failAllocation)
     return nullptr;
-  REQUIRE(allocations < 32);
+  REQUIRE(allocations < 1024);
   auto &item = itemStorage[allocations];
   item = {};
   item.actor.id = id;
@@ -71,11 +79,11 @@ extern "C" void Matrix_Scale(f32, f32, f32, MatrixMode) {}
 static int vanillaDrops, kills;
 extern "C" {
 bool GameInteractor_Should(GIVanillaBehavior id, uint32_t result, ...) {
-  REQUIRE(id == VB_ICICLE_DROP_COLLECTIBLE);
+  REQUIRE(Hooks::behaviors.contains(id));
   bool should = result;
   va_list args;
   va_start(args, result);
-  Hooks::broken(&should, args);
+  Hooks::behaviors[id](&should, args);
   va_end(args);
   return should;
 }
@@ -106,11 +114,13 @@ s32 CollisionCheck_SetAT(PlayState *, CollisionCheckContext *, Collider *) {
 void BgIcicle_Regrow(BgIcicle *, PlayState *) {}
 #include "environment_native_break.inc"
 
+#include "native_services.inc"
+
 static bool Break(Actor *actor, ...) {
   bool should = true;
   va_list args;
   va_start(args, actor);
-  Hooks::broken(&should, args);
+  Hooks::behaviors[VB_ICICLE_DROP_COLLECTIBLE](&should, args);
   va_end(args);
   return should;
 }
@@ -142,7 +152,7 @@ static void TestActualEnvironmentalRules() {
   reset();
   for (auto &[id, rule] : rules)
     REQUIRE(!rule.first());
-  for (int item : {ITEM_BOW, ITEM_DEKU_NUT, ITEM_MASK_DEKU, ITEM_MASK_GORON,
+  for (int item : {ITEM_BOW, ITEM_HOOKSHOT, ITEM_DEKU_STICK, ITEM_DEKU_NUT, ITEM_MASK_DEKU, ITEM_MASK_GORON,
                    ITEM_MASK_ZORA}) {
     reset();
     INV_CONTENT(item) = item;
@@ -159,6 +169,11 @@ static void TestActualEnvironmentalRules() {
   for (auto &[id, rule] : rules)
     REQUIRE(!rule.first());
 }
+#include "all_families.inc"
+#include "native_transition_tests.inc"
+#include "all_rules_tests.inc"
+#include "source_eligibility_tests.inc"
+
 int main() {
   if (std::getenv("MM_ENV_RED_SPAWN")) {
     static PlayState allocationPlay{};
@@ -170,6 +185,10 @@ int main() {
     return 0;
   }
   using namespace Rando;
+  TestAllNativeEnvironmentRules();
+  TestNativeEnvironmentTransitions();
+  TestAllEnvironmentFamilies();
+  TestActualSourceAvailability();
   TestActualEnvironmentalRules();
   const RandoCheckType iconIndices[] = {
 #include "environment_category_indices.inc"
@@ -188,9 +207,10 @@ int main() {
     for (bool excludeAll : {false, true}) {
       excluded.clear();
       if (excludeAll)
-        for (auto &p : MMEnvironment::Icicles)
+        for (auto &p : MMEnvironment::Sources)
           excluded.push_back(p.check);
       std::sort(excluded.begin(), excluded.end());
+      excluded.erase(std::unique(excluded.begin(),excluded.end()),excluded.end());
       auto save = std::make_unique<RandoSaveInfo>();
       for (auto &[id, row] : StaticData::Options)
         save->randoSaveOptions[id] = row.defaultValue;
@@ -200,7 +220,7 @@ int main() {
       Logic::GeneratePools(*save, checks, items);
       if (!on && !excludeAll)
         baselineItems = items.size();
-      REQUIRE(items.size() == baselineItems + ((on && !excludeAll) ? 7 : 0));
+      REQUIRE(items.size() == baselineItems + ((on && !excludeAll) ? 25 : 0));
       for (auto &p : MMEnvironment::Icicles) {
         REQUIRE(std::count(checks.begin(), checks.end(), p.check) ==
                 int(on && !excludeAll));
@@ -332,7 +352,7 @@ int main() {
       BgIcicle_UpdateAttacked(&ice, &play);
       REQUIRE(vanillaDrops ==
               before + int(!shuffled && mode != ICICLE_STALACTITE_REGROW));
-      REQUIRE(allocations == spawns + int(shuffled));
+      REQUIRE(allocations == spawns + int(shuffled && mode != ICICLE_STALACTITE_REGROW));
       REQUIRE(!saved.eligible);
       if (mode == ICICLE_STALACTITE_REGROW) {
         int count = allocations;

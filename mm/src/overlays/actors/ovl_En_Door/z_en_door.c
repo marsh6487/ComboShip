@@ -29,6 +29,8 @@
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
+extern int Rando_RustyDoorLocked(PlayState* play, Actor* actor);
+
 #define DOOR_AJAR_SLAM_RANGE 120.0f
 #define DOOR_AJAR_OPEN_RANGE (2 * DOOR_AJAR_SLAM_RANGE)
 
@@ -716,7 +718,7 @@ void EnDoor_Idle(EnDoor* this, PlayState* play) {
 
         this->actionFunc = EnDoor_OpenScheduleActor;
         Actor_PlaySfx(&this->knobDoor.dyna.actor, NA_SE_EV_DOOR_OPEN);
-    } else if (!Player_InCsMode(play)) {
+    } else if (!Player_InCsMode(play) && !Rando_RustyDoorLocked(play, &this->knobDoor.dyna.actor)) {
         Vec3f playerPosRelToDoor;
 
         // Check if player is near this door and looking at it
@@ -938,8 +940,8 @@ void EnDoor_Draw(Actor* thisx, PlayState* play) {
                 gSPDisplayList(POLY_OPA_DISP++, gDoorLeftDL);
             }
         }
-        if (this->lockTimer) {
-            Actor_DrawDoorLock(play, this->lockTimer, DOORLOCK_NORMAL);
+        if (this->lockTimer || Rando_RustyDoorLocked(play, &this->knobDoor.dyna.actor)) {
+            Actor_DrawDoorLock(play, this->lockTimer ? this->lockTimer : 10, DOORLOCK_NORMAL);
         }
 
         CLOSE_DISPS(play->state.gfxCtx);

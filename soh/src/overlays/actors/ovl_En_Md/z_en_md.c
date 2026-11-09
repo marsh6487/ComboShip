@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_md.c
@@ -750,7 +751,8 @@ void EnMd_BlockPath(EnMd* this, PlayState* play) {
         Actor_UpdateFidgetTables(play, this->fidgetTableY, this->fidgetTableZ, 17);
     }
 
-    if ((this->interactInfo.talkState == NPC_TALK_STATE_IDLE) && (play->sceneNum == SCENE_LOST_WOODS)) {
+    if (Randomizer_SoulCanInteract(play, this->actor.id, (u16)this->actor.params) &&
+        (this->interactInfo.talkState == NPC_TALK_STATE_IDLE) && (play->sceneNum == SCENE_LOST_WOODS)) {
         if (player->stateFlags2 & PLAYER_STATE2_ATTEMPT_PLAY_FOR_ACTOR) {
             player->stateFlags2 |= PLAYER_STATE2_PLAY_FOR_ACTOR;
             player->unk_6A8 = &this->actor;
@@ -820,7 +822,9 @@ void EnMd_Update(Actor* thisx, PlayState* play) {
     EnMd_UpdateEyes(this);
     EnMd_UpdateAlphaByDistance(this, play);
     Actor_MoveXZGravity(&this->actor);
-    EnMd_UpdateTalking(this, play);
+    if (Randomizer_SoulCanInteract(play, this->actor.id, (u16)this->actor.params)) {
+        EnMd_UpdateTalking(this, play);
+    }
     Actor_UpdateBgCheckInfo(play, &this->actor, 0.0f, 0.0f, 0.0f, 4);
     this->actionFunc(this, play);
 }
