@@ -1,5 +1,72 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Soul follow-up: native OoT gallery controller/host and bowling host, plus both
+MM gallery hosts, now require their exact soul only in native scenes. Eight
+reward checks and the positive OoT bowling/refill event agree with runtime;
+unrelated actors/scenes, wallet, language and bow requirements remain tested.
+Native runtime, dependency/CHECK/event, enemy, damage, physical, pool and full
+shared graph/fill/bridge fixtures pass. Full NPC/shared menus remain hidden:
+many major quests and scheduled families are still unclassified.
+
+Recovered actual Windows annotations identify C2375 on shared-soul exports:
+both prior native header declarations lacked COMBO_EXPORT present on their
+definitions. Both headers now match; native complete bridge TUs and guards pass,
+but the MSVC rerun is still required. This supersedes the earlier unavailable-
+logs statement. The unrelated catalogue fixture's relative SharedSoulCatalog
+include and save fixture's missing local spdlog dependency remain recorded.
+
+CI follow-up: repaired the five extracted fixtures' missing native soul/key-ring/
+wallet dependencies without weakening production or assertions. Sword fallback
+(both hosts, ASan/UBSan), Moon's Tear (all five paired phases, 4197 scenarios per
+phase) and wand suites pass with the actual native ABI compiler adapters.
+Damage soul boundary matches its native header under GCC14 -Wall -Werror;
+the full damage fixture remains locally blocked by existing GCC14 native pointer
+conversions and an En_Rd resource declaration, not claimed passed. CI's original
+failure was its missing soul symbol. Failure-only Linux seed-smoke gdb backtrace
+collection now preserves original failure/signal exit codes; CI-policy tests
+pass 28/28. The actual linked seed crash is not yet diagnosed or fixed.
+
+Infinite foundation recovery: local `3814c766dd6010de22f5e50a32057ddd75752d10`,
+exact independently restored tree `770a37999125b88eda58daea33afecab9c81b979`,
+ZIP `libfile_d06f952f7b288191baa28d02339e56fa`, SHA-256
+`bdcc3c7ed0b2ebf32a197fc4dbc18b47c573cee01897005215f39458e02f9f73`.
+Fresh six-family pool and runtime original/Combo sanitizer fixtures pass.
+
+Ruling: user explicitly requested parallel execution after poor elapsed-time
+progress. Replace the earlier one-implementation-worker cap with disjoint owned
+workstreams: CI fixtures, MM infinity completion, OoT first enemy-type drops,
+existing soul actor/logic gaps, plus read-only linked-seed investigation. Root
+owns staging, shared presentation/CI registries, ledger and publication. Workers
+do not commit or stage; no shared file has two implementation owners.
+
+Task 5 Infinite Upgrades foundation (WIP): append-only six-item catalogue,
+default-off boolean option, unique pool supply and native saved ownership are
+implemented. Native ammo/currency, immediate magic costs, all five continuous
+magic states and NEI common magic helpers pass original/Combo ASan/UBSan tests.
+Missing-base ownership and unchanged raw upgrade tiers/Chateau event are tested.
+UI activation, starting category/icons, dedicated receipt/save round trips,
+player/custom-equipment affordability gates and four-digit wallet dispatch are
+unfinished. Do not enable the placeholder or claim gameplay acceptance yet.
+
+Ruling: keep the requested Infinite Upgrades checkbox and six distinct native
+endpoint items. Do not add speculative Progressive/Condensed UI modes. Separate
+endpoint identities avoid shared scalar-family trimming discarding MM's extra
+infinite copy, preserve all old finite progressive chains and shared ABI tiers,
+and require the ordinary base item/bag/wallet. Infinity ownership is not a
+Chateau Romani event, a raw capacity-tier promotion or an RPG-stat grant.
+
+Latest published Child Wallet checkpoint: public
+`fac20a0132d087d0ebaf5c8637ec4fb3fee47f04`, local
+`9c1408fe4d16f4c2ec91fef447ed128769fd0139`, exact tree
+`e10179139cbbda75f73f06139876eeb52d0c4ec4`. CI run 42556362719:
+fast source/world/entrances passed; Linux compiled and linked all targets and
+generated both resource archives, then seed smoke crashed (exit 139, undiagnosed).
+Windows compilation and systems/items/equipment/render regressions failed.
+Known fixture omissions: sword damage soul predicate; sword fallback key-ring
+dispatch declaration; Moon's Tear key-ring/wallet dependencies; Storm actor
+spawn soul predicate. These are not yet claimed repaired. Windows full logs
+currently fail transport; no cause inferred. No merge/master/gameplay approval.
+
 Task 5 Child Wallet follow-up: actual progressive/starting/JSON/old-save and
 foreign-name receive paths pass bounded original/Combo ASan/UBSan fixtures.
 Ghost Hut enemy-drop and Playground source-event regressions each RED→GREEN;

@@ -51,6 +51,14 @@ namespace Rando { struct Context { Option option; static Context*GetInstance(){s
             text+='#define SOUL_CHECK(c,...) {c,{__VA_ARGS__}},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
             test='''
             state.options={RSK_SHUFFLE_NPC_SOULS};
+            for(auto c:{RC_MARKET_SHOOTING_GALLERY_REWARD,RC_KAK_SHOOTING_GALLERY_REWARD,
+                        RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE,RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE})
+                assert(!state.CanAccessSoulCheck(c));
+            state.owned={RG_SOUL_NPC_SHOOTING_GALLERY_OWNER,RG_SOUL_NPC_BOMBCHU_BOWLING_LADY};
+            for(auto c:{RC_MARKET_SHOOTING_GALLERY_REWARD,RC_KAK_SHOOTING_GALLERY_REWARD,
+                        RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE,RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE})
+                assert(state.CanAccessSoulCheck(c));
+            state.owned.clear();
             for(auto p:std::vector<Pair>{
                 {RC_KAK_TRADE_ODD_MUSHROOM,{RG_SOUL_NPC_OLD_HAG}},
                 {RC_KAK_GRANNYS_SHOP,{RG_SOUL_NPC_OLD_HAG}},
@@ -111,6 +119,7 @@ bool Flags_GetRandoInf(RandoInf f){return flags[f/16] & (1u<<(f%16));}
 void Own(RandoItemId item,bool owned){auto*s=Rando::SoulShuffle::Find(item);assert(s);if(owned)flags[s->flag/16]|=1u<<(s->flag%16);else flags[s->flag/16]&=~(1u<<(s->flag%16));}
 namespace Rando::Logic {
 '''+body(mm_logic,'inline bool SoulCheckRequirement(')+'\n'
+            text+='// Child Wallet shuffle is off in this soul boundary fixture.\ninline bool WalletCheckRequirement(RandoCheckId) {return true;}\n'
             text+='struct Pair {RandoCheckId check;std::vector<RandoItemId> souls;};\n'
             text+='#define SOUL_CHECK(c,...) {c,{__VA_ARGS__}},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
             start=mm_logic.index('#define CHECK(');end=mm_logic.index('// STAY macro',start)
@@ -120,6 +129,11 @@ namespace Rando::Logic {
             std::map<RandoCheckId,std::pair<std::function<bool()>,LogicString>> checks={
                 CHECK(RC_ROMANI_RANCH_GROG,true), CHECK(RC_DOGGY_RACETRACK_PIECE_OF_HEART,false)};
             options[RO_SHUFFLE_ANIMAL_SOULS]=options[RO_SHUFFLE_NPC_SOULS]=1;
+            for(auto c:{RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_HIGH_SCORE,RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_PERFECT_SCORE,
+                        RC_SWAMP_SHOOTING_GALLERY_HIGH_SCORE,RC_SWAMP_SHOOTING_GALLERY_PERFECT_SCORE}){
+                assert(!SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,true);
+                assert(SoulCheckRequirement(c));Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER,false);
+            }
             Own(RI_SOUL_ANIMAL_CUCCO,true);assert(!checks.at(RC_ROMANI_RANCH_GROG).first());
             Own(RI_SOUL_NPC_GROG,true);assert(checks.at(RC_ROMANI_RANCH_GROG).first());
             Own(RI_SOUL_ANIMAL_CUCCO,false);assert(!checks.at(RC_ROMANI_RANCH_GROG).first());

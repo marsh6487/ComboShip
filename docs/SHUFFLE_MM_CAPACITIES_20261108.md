@@ -1,5 +1,35 @@
 # MM capacities: WIP implementation evidence
 
+## Infinite Upgrades foundation — unfinished
+
+The default-off boolean option supplies one each of Infinite Quiver, Infinite
+Bomb Bag, Infinite Deku Sticks, Infinite Deku Nuts, Infinite Magic and Infinite
+Wallet. Unique endpoints preserve finite progressive identities and avoid
+cross-game scalar-family trimming removing an infinity upgrade. Plentiful does
+not duplicate them; starting selections subtract their supply.
+
+Saved ownership requires its ordinary item/bag/wallet before becoming effective.
+Native ammo/currency consumption and both native/common-NEI magic consumption
+honor infinity without changing raw upgrade tiers, base ownership, RPG stats or
+the Chateau Romani event flag. The player pre-update restores only usable owned
+infinite families. Original and Combo sanitizer fixtures cover ammo extrema,
+missing bases, native continuous magic states and independent Chateau behavior.
+The common NEI affordability test failed before its production predicate was
+extended and passes afterward. Audio, scene/cutscene and visual callbacks are
+controlled boundaries; this is not configured gameplay proof.
+
+Commands (GCC/G++ 14, nlohmann 3.11.3 include path through CPATH):
+
+```
+python3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize
+python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize
+```
+
+Still pending: starting-category/icons, real menu activation and gold accent,
+dedicated receipt/save round trips, player and custom-equipment affordability
+and direct-drain adapters, wallet HUD dispatch, full linked seeds and gameplay.
+The old Infinite Upgrades placeholder intentionally remains disabled.
+
 Scope remains the four authorized Coming Soon options. Native bags and Child
 Wallet are integrated in source. Infinite Upgrades, final UI reorganization,
 linked seed validation and configured gameplay remain unfinished.

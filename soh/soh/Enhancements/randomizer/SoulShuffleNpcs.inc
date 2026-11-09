@@ -22,3 +22,11 @@ SOUL_NPC(ACTOR_EN_MK, SCENE_LAKESIDE_LABORATORY, true, RG_SOUL_NPC_SCIENTIST)
 SOUL_NPC(ACTOR_EN_MS, SCENE_ZORAS_RIVER, true, RG_SOUL_NPC_BEAN_SALESMAN)
 SOUL_NPC(ACTOR_EN_JS, SCENE_HAUNTED_WASTELAND, true, RG_SOUL_NPC_CARPET_MAN)
 SOUL_NPC(ACTOR_EN_FU, SCENE_WINDMILL_AND_DAMPES_GRAVE, true, RG_SOUL_NPC_GURU_GURU)
+
+// Native gallery controller owns the host and target actors. Gate both roles
+// before allocation, so no controller initializes a game without its keeper.
+SOUL_NPC(ACTOR_EN_SYATEKI_ITM, SCENE_SHOOTING_GALLERY, true, RG_SOUL_NPC_SHOOTING_GALLERY_OWNER)
+SOUL_NPC(ACTOR_EN_SYATEKI_MAN, SCENE_SHOOTING_GALLERY, true, RG_SOUL_NPC_SHOOTING_GALLERY_OWNER)
+// Bowling child actors are created by this unique host; the independent walls
+// explicitly tolerate her absence. Params do not select alternate host roles.
+SOUL_NPC(ACTOR_EN_BOM_BOWL_MAN, SCENE_BOMBCHU_BOWLING_ALLEY, true, RG_SOUL_NPC_BOMBCHU_BOWLING_LADY)

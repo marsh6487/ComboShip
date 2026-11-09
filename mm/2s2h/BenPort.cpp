@@ -2,6 +2,7 @@
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -4830,6 +4831,8 @@ static void ComboGrantTradeSlot(u8 itemId) {
 // Covers the save-context mutations that logic conditions read (INV_CONTENT, equipment,
 // quest items, rando flags, dungeon items, week event regs). Derived from GiveItem.cpp.
 static void GiveItemForOracle(RandoItemId ri) {
+    if (Rando::InfiniteUpgrades::Give(ri))
+        return;
     if (Rando::Wallets::Give(ri))
         return;
     if (Rando::Bags::Give(ri) || Rando::Bags::GiveCapacity(ri))

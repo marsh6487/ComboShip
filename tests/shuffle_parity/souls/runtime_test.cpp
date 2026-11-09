@@ -49,6 +49,9 @@ int main() {
     // mask, or matching a different EnHy role must fail these controls.
     struct NpcRole { int actor; int scene; unsigned params; RandomizerGet soul; };
     const NpcRole roles[] = {
+        {ACTOR_EN_SYATEKI_ITM, SCENE_SHOOTING_GALLERY, 0, RG_SOUL_NPC_SHOOTING_GALLERY_OWNER},
+        {ACTOR_EN_SYATEKI_MAN, SCENE_SHOOTING_GALLERY, 0, RG_SOUL_NPC_SHOOTING_GALLERY_OWNER},
+        {ACTOR_EN_BOM_BOWL_MAN, SCENE_BOMBCHU_BOWLING_ALLEY, 0xFFFF, RG_SOUL_NPC_BOMBCHU_BOWLING_LADY},
         {ACTOR_EN_DS, SCENE_POTION_SHOP_GRANNY, 0xFFFF, RG_SOUL_NPC_OLD_HAG},
         {ACTOR_EN_MK, SCENE_LAKESIDE_LABORATORY, 0xFFFF, RG_SOUL_NPC_SCIENTIST},
         {ACTOR_EN_MS, SCENE_ZORAS_RIVER, 0xFFFF, RG_SOUL_NPC_BEAN_SALESMAN},

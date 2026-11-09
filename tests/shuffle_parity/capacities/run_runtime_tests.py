@@ -32,16 +32,29 @@ refills = 'u8 NativeRefill(PlayState* play,u8 item) {'+prefix+'    if'+give[star
 '''
 counts = re.search(r'^s16 sAmmoRefillCounts\[\] = \{[^}]*\};',parameter,re.M)
 assert counts, 'native ammo refill table missing'
-services = tables+'\n'+counts[0]+'\n'+ '\n'.join(function(actor,n) for n in (
-    'Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf'))+'\n'+function(inventory,'Inventory_ChangeUpgrade')+'\n'+refills+'\n'+function(parameter,'Inventory_ChangeAmmo')+'\n'+function(parameter,'Rupees_ChangeBy')
+magic_globals = '\n'.join(re.search(r'^s16 '+name+r' = [^;]*;',parameter,re.M)[0] for name in (
+    'sMagicMeterOutlinePrimRed','sMagicMeterOutlinePrimGreen','sMagicMeterOutlinePrimBlue','sMagicBorderRatio'))
+services = tables+'\n'+counts[0]+'\n'+magic_globals+'\n'+ '\n'.join(function(actor,n) for n in (
+    'Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf','Flags_SetWeekEventReg'))+'\n'+function(inventory,'Inventory_ChangeUpgrade')+'\n'+refills+'\n'+function(parameter,'Inventory_ChangeAmmo')+'\n'+function(parameter,'Rupees_ChangeBy')+'\n'+function(parameter,'Magic_Consume')+'\n'+function(parameter,'Magic_Update')
+equipment = (ROOT/'mm/mods/items/helpers/equip_helper.c').read_text()
+services += '\n#ifndef MAGIC_REQ\n#define MAGIC_REQ(amount) (amount)\n#endif\n'
+services += '\n'.join(function(equipment,n) for n in ('ItemMagic_IsInfinite','ItemMagic_Consume','ItemMagic_HasEnough'))
 # Flag notifications and the unrelated powder-keg cap are engine boundaries.
 services = '''#include "global.h"
 #include "variables.h"
 #include "functions.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 void GameInteractor_ExecuteOnFlagSet(FlagType,u32) {}
 void GameInteractor_ExecuteOnFlagUnset(FlagType,u32) {}
 bool GameInteractor_Should(GIVanillaBehavior,uint32_t result,...) {return result;}
+void Audio_PlaySfx(u16 id) {}
+bool Play_InCsMode(PlayState* play) {return false;}
+s32 Player_GetEnvironmentalHazard(PlayState* play) {return 0;}
+u8 ExtEquip_CapeOwned(void) {return 0;}
+int32_t CVarGetInteger(const char* name,int32_t fallback) {return fallback;}
+int16_t ComboRpg_MagicCapacity(int16_t native) {return native;}
+void Magic_FlashMeterBorder(void) {}
 '''+services
 with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
     build = Path(directory)
@@ -97,8 +110,9 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
         cflags = [f for f in flags if f not in ('-std=c++20','-include',str(ROOT/'tests/shuffle_parity/souls/headless.h'))]
         subprocess.run([os.environ.get('CC','cc'),'-std=c11',*cflags,*(['-DCOMBO_BUILD'] if combo else []),
                         '-c',str(build/'bag_services.c'),'-o',str(native)],check=True)
-        fixture = 'wallet_runtime_test.cpp' if '--wallet-only' in sys.argv else 'runtime_test.cpp'
-        catalogues = [] if '--wallet-only' in sys.argv else [
+        fixture = ('infinite_runtime_test.cpp' if '--infinite-only' in sys.argv else
+                   'wallet_runtime_test.cpp' if '--wallet-only' in sys.argv else 'runtime_test.cpp')
+        catalogues = [] if '--wallet-only' in sys.argv or '--infinite-only' in sys.argv else [
             str(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp'),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp')]
         subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if combo else []),
                         str(Path(__file__).with_name(fixture)),*catalogues,

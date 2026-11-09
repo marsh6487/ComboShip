@@ -3,6 +3,13 @@
 from pathlib import Path
 import argparse, os, re, subprocess, tempfile
 ROOT=Path(__file__).resolve().parents[3]
+# Every prior declaration must carry the same DLL linkage as its definition.
+# MSVC rejects adding dllexport only at the definition (C2375).
+for folder, prefix in [('soh/soh/Enhancements/randomizer', 'SOH'), ('mm/2s2h/Rando', 'MM')]:
+    header = (ROOT/folder/'SoulShuffleShared.h').read_text()
+    for declaration in [f'COMBO_EXPORT void {prefix}_GrantSharedSoulForSlot(',
+                        f'COMBO_EXPORT const char* {prefix}_ExtractSharedSoulState(']:
+        assert declaration in header, f'missing DLL linkage on declaration: {declaration}'
 # Source catalog audit uses native grant identities, not display-name inference at runtime.
 rows=re.findall(r'SHARED_SOUL\((\w+), (\w+), (\w+), "([^"]+)", "([^"]+)"\)',(ROOT/'combo/rando/SharedSoulCatalog.inc').read_text())
 assert len(rows)==68

@@ -68,13 +68,19 @@ std::string CleanConditionString(const char*s){return s;}
 struct EventAccess {LogicVal id;const char*name;bool(*condition)();std::string text;};
 '''+access[a:b]+'\nEventAccess events[]={\n'
 for file,region,event in [('haunted_wasteland','RR_HAUNTED_WASTELAND','LOGIC_CARPET_MERCHANT'),
-                          ('kakariko','RR_KAK_WINDMILL_LOWER','LOGIC_DRAIN_WELL')]:
+                          ('kakariko','RR_KAK_WINDMILL_LOWER','LOGIC_DRAIN_WELL'),
+                          ('market','RR_MARKET_BOMBCHU_BOWLING','LOGIC_COULD_PLAY_BOWLING')]:
  text=(ROOT/f'soh/soh/Enhancements/randomizer/location_access/overworld/{file}.cpp').read_text()
  start=text.index('areaTable['+region+']');end=text.find('areaTable[',start+1)
  line=next(l for l in text[start:end].splitlines() if 'EVENT_ACCESS('+event+',' in l)
  source+=line+'\n'
 source+='''};
 int main(){
+ state.items={RG_CHILD_WALLET,RG_SPEAK_HYLIAN};REQUIRE(!events[2].condition());
+ state.items.insert(RG_SOUL_NPC_BOMBCHU_BOWLING_LADY);REQUIRE(events[2].condition());
+ state.items.erase(RG_CHILD_WALLET);REQUIRE(!events[2].condition());state.items.insert(RG_CHILD_WALLET);
+ state.items.erase(RG_SPEAK_HYLIAN);REQUIRE(!events[2].condition());state.items.insert(RG_SPEAK_HYLIAN);
+ state.items.erase(RG_SOUL_NPC_BOMBCHU_BOWLING_LADY);state.enabled=false;REQUIRE(events[2].condition());state.enabled=true;
  state.items={RG_ADULT_WALLET};REQUIRE(!events[0].condition());
  state.items.insert(RG_SOUL_NPC_CARPET_MAN);REQUIRE(events[0].condition());
  capacity=199;REQUIRE(!events[0].condition());capacity=200;

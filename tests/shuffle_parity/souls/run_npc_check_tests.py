@@ -11,7 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[3]
 logic = (ROOT / 'mm/2s2h/Rando/Logic/Logic.h').read_text()
-central = (ROOT / 'mm/2s2h/Rando/Logic/Regions/Central.cpp').read_text()
+central = '\n'.join((ROOT / f'mm/2s2h/Rando/Logic/Regions/{region}.cpp').read_text() for region in ('Central', 'South'))
 
 
 def body(source, signature):
@@ -35,6 +35,10 @@ def check(name):
 
 
 pairs = [
+    ('RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_HIGH_SCORE', 'RI_SOUL_NPC_SHOOTING_GALLERY_OWNER'),
+    ('RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_PERFECT_SCORE', 'RI_SOUL_NPC_SHOOTING_GALLERY_OWNER'),
+    ('RC_SWAMP_SHOOTING_GALLERY_HIGH_SCORE', 'RI_SOUL_NPC_SHOOTING_GALLERY_OWNER'),
+    ('RC_SWAMP_SHOOTING_GALLERY_PERFECT_SCORE', 'RI_SOUL_NPC_SHOOTING_GALLERY_OWNER'),
     ('RC_CLOCK_TOWN_WEST_BANK_ADULTS_WALLET', 'RI_SOUL_NPC_BANKER'),
     ('RC_CLOCK_TOWN_WEST_BANK_INTEREST', 'RI_SOUL_NPC_BANKER'),
     ('RC_CLOCK_TOWN_WEST_BANK_PIECE_OF_HEART', 'RI_SOUL_NPC_BANKER'),
@@ -59,16 +63,16 @@ source += body(logic, 'inline bool SoulCheckRequirement(') + '\n'
 source += '// Child Wallet shuffle is off in this NPC/time boundary fixture.\n'
 source += 'inline bool WalletCheckRequirement(RandoCheckId) {return true;}\n'
 source += body(logic, 'enum TimeSlice') + ';\n'
-source += '''int now=TIME_DAY1_AM_08_00,wallet=1;bool sword=true,allNight=true;
+source += '''int now=TIME_DAY1_AM_08_00,wallet=1;bool sword=true,allNight=true,bow=true;
 unsigned clocks=63;
 bool RawBefore(TimeSlice s){return now<s;}
 bool RawAfter(TimeSlice s){return now>=s;}
 bool RawBetween(TimeSlice a,TimeSlice b){return now>=a && now<b;}
 bool SettingClocks(){return true;}
 bool OwnsHalfDayForMode(int i){return clocks&(1u<<i);}
-enum { UPG_WALLET, ITEM_MASK_ALL_NIGHT };
+enum { UPG_WALLET, ITEM_MASK_ALL_NIGHT, ITEM_BOW };
 #define CUR_UPG_VALUE(x) ((x)==UPG_WALLET ? wallet : 0)
-#define HAS_ITEM(x) ((x)==ITEM_MASK_ALL_NIGHT && allNight)
+#define HAS_ITEM(x) (((x)==ITEM_MASK_ALL_NIGHT && allNight) || ((x)==ITEM_BOW && bow))
 #define CAN_USE_HUMAN_SWORD sword
 '''
 for line in logic.splitlines():
@@ -84,7 +88,7 @@ source += 'std::map<RandoCheckId,std::pair<std::function<bool()>,LogicString>> c
 source += ',\n'.join(check(name) for name, _ in pairs) + '\n};\n}\nusing namespace Rando::Logic;\nint main(){\n'
 for name, soul in pairs:
     time = 'TIME_NIGHT1_PM_08_00' if 'GURU_GURU' in name else 'TIME_DAY1_AM_08_00'
-    source += f'''now={time};wallet=1;sword=allNight=true;clocks=63;
+    source += f'''now={time};wallet=1;sword=allNight=bow=true;clocks=63;
     std::fill(std::begin(flags),std::end(flags),0);options[RO_SHUFFLE_NPC_SOULS]=1;
     Own(RI_SOUL_NPC_CITIZEN);REQUIRE(!checks.at({name}).first());
     Own({soul});REQUIRE(checks.at({name}).first());
@@ -110,6 +114,10 @@ REQUIRE(!checks.at(RC_STOCK_POT_INN_GRANDMA_SHORT_STORY).first());
 now=TIME_DAY1_AM_08_00;sword=false;REQUIRE(!checks.at(RC_SWORDSMAN_SCHOOL_PIECE_OF_HEART).first());sword=true;
 now=TIME_NIGHT3_PM_11_00;REQUIRE(!checks.at(RC_SWORDSMAN_SCHOOL_PIECE_OF_HEART).first());
 now=TIME_NIGHT3_PM_10_00;REQUIRE(checks.at(RC_SWORDSMAN_SCHOOL_PIECE_OF_HEART).first());
+Own(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER);bow=false;
+for(auto c:{RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_HIGH_SCORE,RC_CLOCK_TOWN_EAST_SHOOTING_GALLERY_PERFECT_SCORE,
+            RC_SWAMP_SHOOTING_GALLERY_HIGH_SCORE,RC_SWAMP_SHOOTING_GALLERY_PERFECT_SCORE})
+    REQUIRE(!checks.at(c).first());bow=true;
 std::fill(std::begin(flags),std::end(flags),0);
 for(auto c:{RC_SWORDSMAN_SCHOOL_POT_01,RC_SWORDSMAN_SCHOOL_POT_05,
             RC_STOCK_POT_INN_STAFF_ROOM_CHEST,RC_STOCK_POT_INN_GUEST_ROOM_CHEST})

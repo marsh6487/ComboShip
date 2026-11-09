@@ -14314,6 +14314,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
     // FleetSync may import raw tiers/slots; base bag ownership stays local.
     RandoCapacity_RepairBagAmmo();
     RandoCapacity_RepairWallet();
+    RandoCapacity_RepairInfinite();
 
     // Full-width Shadow Crystal input must be reserved before equipment/tool raw-pad listeners.
     WolfLinkHost_PreUpdate(play, this);

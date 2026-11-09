@@ -29,7 +29,7 @@ jobs:
             libusb-dev libusb-1.0-0-dev libsdl2-dev libsdl2-net-dev libpng-dev libglew-dev \
             nlohmann-json3-dev libtinyxml2-dev libspdlog-dev ninja-build \
             libogg-dev libopus-dev opus-tools libopusfile-dev libvorbis-dev \
-            libzip-dev zipcmp zipmerge ziptool
+            libzip-dev zipcmp zipmerge ziptool gdb
 
       # ~2600 objects across lus/soh/2ship/combo: ccache is the difference between ~90 min cold
       # and a few minutes warm. In-repository PRs can warm their own scoped cache;
@@ -87,7 +87,7 @@ jobs:
       # Fixed seed keeps failures reproducible; exit code is the verdict (0 = beatable).
       - name: Smoke-test seed generation (comborando)
         working-directory: build-cmake/combo
-        run: ./comborando --seed ci-linux-smoke --count 1
+        run: python3 ../../scripts/ci/run_seed_smoke.py ./comborando --seed ci-linux-smoke --count 1
 
       - name: Smoke-test door-only cross-game entrance generation
         working-directory: build-cmake/combo

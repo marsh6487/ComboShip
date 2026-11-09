@@ -42,9 +42,65 @@ static inline int RandoCapacity_HasWallet(void) {
            (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
 }
 
+static inline int RandoCapacity_InfiniteFlag(RandoInf flag) {
+    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO &&
+           (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
+}
+
+static inline int RandoCapacity_InfiniteAmmo(int item) {
+    RandoInf flag;
+    int upgrade;
+    switch (item) {
+        case ITEM_BOW:
+            flag = RANDO_INF_INFINITE_BOW;
+            upgrade = UPG_QUIVER;
+            break;
+        case ITEM_BOMB:
+        case ITEM_BOMBCHU:
+            flag = RANDO_INF_INFINITE_BOMB_BAG;
+            upgrade = UPG_BOMB_BAG;
+            break;
+        case ITEM_DEKU_STICK:
+            flag = RANDO_INF_INFINITE_STICKS;
+            upgrade = UPG_DEKU_STICKS;
+            break;
+        case ITEM_DEKU_NUT:
+            flag = RANDO_INF_INFINITE_NUTS;
+            upgrade = UPG_DEKU_NUTS;
+            break;
+        default:
+            return 0;
+    }
+    return RandoCapacity_InfiniteFlag(flag) && RandoCapacity_HasBag(upgrade) && CUR_UPG_VALUE(upgrade) > 0 &&
+           INV_CONTENT(item) == item;
+}
+
+static inline int RandoCapacity_InfiniteMagic(void) {
+    return RandoCapacity_InfiniteFlag(RANDO_INF_INFINITE_MAGIC) &&
+           gSaveContext.save.saveInfo.playerData.isMagicAcquired && gSaveContext.magicCapacity > 0;
+}
+
+static inline int RandoCapacity_InfiniteWallet(void) {
+    return RandoCapacity_InfiniteFlag(RANDO_INF_INFINITE_WALLET) && RandoCapacity_HasWallet();
+}
+
+static inline int RandoCapacity_CanSpendMagic(int amount) {
+    return RandoCapacity_InfiniteMagic() || gSaveContext.save.saveInfo.playerData.magic >= amount;
+}
+
 static inline int RandoCapacity_Current(int upgrade) {
     if (upgrade == UPG_WALLET && !RandoCapacity_HasWallet())
         return 0;
+    if (upgrade == UPG_WALLET && RandoCapacity_InfiniteWallet())
+        return gUpgradeCapacities[upgrade]
+                                 [gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] ? 3
+                                                                                                                  : 2];
+    if ((upgrade == UPG_QUIVER && RandoCapacity_InfiniteAmmo(ITEM_BOW)) ||
+        (upgrade == UPG_BOMB_BAG &&
+         (RandoCapacity_InfiniteAmmo(ITEM_BOMB) || RandoCapacity_InfiniteAmmo(ITEM_BOMBCHU))) ||
+        (upgrade == UPG_DEKU_STICKS && RandoCapacity_InfiniteAmmo(ITEM_DEKU_STICK)) ||
+        (upgrade == UPG_DEKU_NUTS && RandoCapacity_InfiniteAmmo(ITEM_DEKU_NUT)))
+        return gUpgradeCapacities[upgrade][3];
     return RandoCapacity_HasBag(upgrade) ? gUpgradeCapacities[upgrade][CUR_UPG_VALUE(upgrade)] : 0;
 }
 
@@ -58,6 +114,21 @@ static inline void RandoCapacity_RepairBagAmmo(void) {
 static inline void RandoCapacity_RepairWallet(void) {
     if (!RandoCapacity_HasWallet()) {
         gSaveContext.save.saveInfo.playerData.rupees = 0;
+        gSaveContext.rupeeAccumulator = 0;
+    }
+}
+
+static inline void RandoCapacity_RepairInfinite(void) {
+    const int items[] = { ITEM_BOW, ITEM_BOMB, ITEM_BOMBCHU, ITEM_DEKU_STICK, ITEM_DEKU_NUT };
+    const int upgrades[] = { UPG_QUIVER, UPG_BOMB_BAG, UPG_BOMB_BAG, UPG_DEKU_STICKS, UPG_DEKU_NUTS };
+    int i;
+    for (i = 0; i < 5; ++i)
+        if (RandoCapacity_InfiniteAmmo(items[i]))
+            AMMO(items[i]) = RandoCapacity_Current(upgrades[i]);
+    if (RandoCapacity_InfiniteMagic())
+        gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicCapacity;
+    if (RandoCapacity_InfiniteWallet()) {
+        gSaveContext.save.saveInfo.playerData.rupees = RandoCapacity_Current(UPG_WALLET);
         gSaveContext.rupeeAccumulator = 0;
     }
 }

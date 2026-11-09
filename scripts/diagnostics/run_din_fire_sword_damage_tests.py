@@ -38,7 +38,13 @@ def main(test_source=None):
     }
     with tempfile.TemporaryDirectory(prefix="din-fire-sword-damage-") as temp:
         temp = Path(temp)
-        wrappers = []
+        # Souls are disabled/all-owned in this damage-only fixture. Include the
+        # native declaration so changes to the C ABI fail during compilation.
+        soul_boundary = temp / "SoulBoundary.c"
+        soul_boundary.write_text('#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"\n'
+                                 'int Randomizer_SoulCanDamageActor(struct PlayState* play, struct Actor* actor) '
+                                 '{ return 1; }\n')
+        wrappers = [str(soul_boundary)]
         # Compile unchanged actor translation units and expose only their actual
         # static table/initializer. Section GC discards unneeded runtime code.
         for name, (actor, table) in tables.items():

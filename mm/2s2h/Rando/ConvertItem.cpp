@@ -1,6 +1,7 @@
 #include "Rando/Rando.h"
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
@@ -243,6 +244,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         return !hasObtainedCheck && !KeyRings::Owned(*ring);
     if (const auto* bag = Bags::Find(randoItemId))
         return !hasObtainedCheck && !Flags_GetRandoInf(bag->flag);
+    if (const auto* upgrade = InfiniteUpgrades::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(upgrade->flag);
     if (randoItemId == RI_WALLET_CHILD)
         return !hasObtainedCheck && !RandoCapacity_HasWallet();
 

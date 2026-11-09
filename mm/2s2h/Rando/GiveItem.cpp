@@ -2,6 +2,7 @@
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -157,6 +158,14 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     }
     switch (randoItemId) {
+        case RI_INFINITE_BOW:
+        case RI_INFINITE_BOMB_BAG:
+        case RI_INFINITE_STICKS:
+        case RI_INFINITE_NUTS:
+        case RI_INFINITE_MAGIC:
+        case RI_INFINITE_WALLET:
+            InfiniteUpgrades::Give(randoItemId);
+            break;
         case RI_WALLET_CHILD:
             Wallets::Give(randoItemId);
             break;

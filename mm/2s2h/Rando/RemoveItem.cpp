@@ -2,6 +2,7 @@
 #include "Rando/KeyRings.h"
 #include "Rando/Bags.h"
 #include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -14,6 +15,8 @@ extern "C" {
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
+    if (InfiniteUpgrades::Remove(randoItemId))
+        return;
     if (Bags::Remove(randoItemId))
         return;
     if (Wallets::Remove(randoItemId))

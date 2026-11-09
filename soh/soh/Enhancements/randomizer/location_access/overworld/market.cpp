@@ -169,7 +169,7 @@ void RegionTable_Init_Market() {
 
     areaTable[RR_MARKET_BOMBCHU_BOWLING] = Region("Market Bombchu Bowling", SCENE_BOMBCHU_BOWLING_ALLEY, {
         //Events
-        EVENT_ACCESS(LOGIC_COULD_PLAY_BOWLING, logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_COULD_PLAY_BOWLING, logic->HasItem(RG_SOUL_NPC_BOMBCHU_BOWLING_LADY) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE,  logic->Get(LOGIC_COULD_PLAY_BOWLING) && logic->BombchusEnabled()),

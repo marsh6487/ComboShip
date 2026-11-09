@@ -1,6 +1,7 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
@@ -547,6 +548,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     EnsureCommandMelodyInPool(itemPool);
 
     KeyRings::TransformPool(saveInfo, itemPool);
+    if (saveInfo.randoSaveOptions[RO_INFINITE_UPGRADES]) {
+        for (const auto& upgrade : InfiniteUpgrades::Catalog)
+            itemPool.push_back(upgrade.item);
+    }
     // Base bags are separate entitlements from ammo and capacity upgrades.
     // Insert before starting-inventory subtraction; never duplicate in Plentiful.
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_DEKU_STICK_BAG])
@@ -597,8 +602,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }
-            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) || itemPool[i] == RI_DEKU_STICK_BAG ||
-                itemPool[i] == RI_DEKU_NUT_BAG) {
+            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) || InfiniteUpgrades::Find(itemPool[i]) ||
+                itemPool[i] == RI_DEKU_STICK_BAG || itemPool[i] == RI_DEKU_NUT_BAG) {
                 continue;
             }
             if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&

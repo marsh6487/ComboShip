@@ -15,3 +15,7 @@ SOUL_NPC(ACTOR_EN_NB, SCENE_YADOYA, true, RI_SOUL_NPC_OLD_HAG)
 SOUL_NPC(ACTOR_EN_NB, SCENE_OMOYA, true, RI_SOUL_NPC_OLD_HAG)
 // Low byte selects teacher/scared roles; high byte is the native path index.
 SOUL_NPC(ACTOR_EN_KENDO_JS, SCENE_DOUJOU, (params & 0xFF) <= 1, RI_SOUL_NPC_CARPET_MAN)
+
+// This host owns each native gallery's targets; params only encode path index.
+SOUL_NPC(ACTOR_EN_SYATEKI_MAN, SCENE_SYATEKI_MIZU, true, RI_SOUL_NPC_SHOOTING_GALLERY_OWNER)
+SOUL_NPC(ACTOR_EN_SYATEKI_MAN, SCENE_SYATEKI_MORI, true, RI_SOUL_NPC_SHOOTING_GALLERY_OWNER)
