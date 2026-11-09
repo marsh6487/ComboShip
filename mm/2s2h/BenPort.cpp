@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Bags.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -4828,6 +4829,8 @@ static void ComboGrantTradeSlot(u8 itemId) {
 // Covers the save-context mutations that logic conditions read (INV_CONTENT, equipment,
 // quest items, rando flags, dungeon items, week event regs). Derived from GiveItem.cpp.
 static void GiveItemForOracle(RandoItemId ri) {
+    if (Rando::Bags::Give(ri) || Rando::Bags::GiveCapacity(ri))
+        return;
     // Soul catalog mm_oracle begin
     if (const auto* soul = Rando::SoulShuffle::Find(ri)) {
         Flags_SetRandoInf(soul->flag);

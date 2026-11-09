@@ -1,5 +1,25 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Task 5 resumed: native bag catalogue/pool regression RED→GREEN, then missing-bag
+runtime/logic regression RED→GREEN under original/Combo guards with ASan/UBSan.
+Shared receipt/oracle bag helpers, independent saved ownership, capacity-before-bag
+handling and native refill/player gates implemented. Six whole production TUs
+pass native syntax checks with fresh text headers. This is a WIP foundation;
+bag UI/cross-world validation, Child Wallet, Infinite Upgrades and final world
+seed verification remain pending. See SHUFFLE_MM_CAPACITIES_20261108.md.
+
+Task 5 bag follow-up: real default-off controls now replace the two bag
+placeholders in a Bags & Capacities card and use gold What's New accents. Actual
+starting/spoiler/save adapters, JSON old-save defaults and native foreign-name
+receive traversal pass bounded original/Combo sanitizer fixtures. Menu native
+syntax and real ImGui accent regression pass; CI policy 25/25 passes. Full linked
+seed/cycle/gameplay validation is still pending; Child Wallet and Infinite
+Upgrades are still not implemented. Bag foundation durable checkpoint is
+`4a7ad053e7c6479d0cafe55c410900fbcc0e4a2e`, tree
+`8353d3d8b9f76b12d01de8adba8ff9a6e5ed1569`, source ZIP
+`libfile_59985575248481918ecf205824554224` (SHA-256
+`a9538dae2ebc5f2868c1d713e2f1cf6108b7014800bc24c435373592b17f5121`).
+
 Baseline: `ced18542387d5ac8879e0f1cb303e790e4e3a1a8`, tree `ab1a683f2c91fd14a039cc58800a112ae92966b9`.
 User authorized the full spec and incremental public WIP source checkpoints. Dedicated candidate branch exists. No source implementation was performed before the final authorization.
 

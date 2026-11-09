@@ -4289,6 +4289,11 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
     u8 temp;
     u8 slot;
 
+    if (!RandoCapacity_HasBagForItem(item)) {
+        RandoCapacity_RepairBagAmmo();
+        return ITEM_NONE;
+    }
+
     slot = SLOT(item);
     if (item >= ITEM_DEKU_STICKS_5) {
         slot = SLOT(sExtraItemBases[item - ITEM_DEKU_STICKS_5]);
@@ -4429,7 +4434,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 2);
-        AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 2);
+        AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_STICK_UPGRADE_30) {
@@ -4437,7 +4442,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 3);
-        AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 3);
+        AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_NUT_UPGRADE_30) {
@@ -4445,7 +4450,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 2);
-        AMMO(ITEM_DEKU_NUT) = CAPACITY(UPG_DEKU_NUTS, 2);
+        AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_NUT_UPGRADE_40) {
@@ -4453,7 +4458,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 3);
-        AMMO(ITEM_DEKU_NUT) = CAPACITY(UPG_DEKU_NUTS, 3);
+        AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_STICK) {
@@ -5360,23 +5365,11 @@ void Rupees_ChangeBy(s16 rupeeChange) {
 }
 
 void Inventory_ChangeAmmo(s16 item, s16 ammoChange) {
-    if (item == ITEM_DEKU_STICK) {
-        AMMO(ITEM_DEKU_STICK) += ammoChange;
-
-        if (AMMO(ITEM_DEKU_STICK) >= CUR_CAPACITY(UPG_DEKU_STICKS)) {
-            AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
-        } else if (AMMO(ITEM_DEKU_STICK) < 0) {
-            AMMO(ITEM_DEKU_STICK) = 0;
-        }
-
-    } else if (item == ITEM_DEKU_NUT) {
-        AMMO(ITEM_DEKU_NUT) += ammoChange;
-
-        if (AMMO(ITEM_DEKU_NUT) >= CUR_CAPACITY(UPG_DEKU_NUTS)) {
-            AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
-        } else if (AMMO(ITEM_DEKU_NUT) < 0) {
-            AMMO(ITEM_DEKU_NUT) = 0;
-        }
+    if (item == ITEM_DEKU_STICK || item == ITEM_DEKU_NUT) {
+        // Clamp in an int before storing s8 ammo; large pickups must not wrap.
+        s32 capacity = CUR_CAPACITY(item == ITEM_DEKU_STICK ? UPG_DEKU_STICKS : UPG_DEKU_NUTS);
+        s32 next = (s32)AMMO(item) + ammoChange;
+        AMMO(item) = CLAMP(next, 0, capacity);
 
     } else if (item == ITEM_BOMBCHU) {
         AMMO(ITEM_BOMBCHU) += ammoChange;

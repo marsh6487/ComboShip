@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Bags.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -12,6 +13,8 @@ extern "C" {
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
+    if (Bags::Remove(randoItemId))
+        return;
     // Soul catalog mm_remove begin
     if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
         Flags_ClearRandoInf(soul->flag);

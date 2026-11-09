@@ -542,6 +542,12 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     EnsureCommandMelodyInPool(itemPool);
 
     KeyRings::TransformPool(saveInfo, itemPool);
+    // Base bags are separate entitlements from ammo and capacity upgrades.
+    // Insert before starting-inventory subtraction; never duplicate in Plentiful.
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_DEKU_STICK_BAG])
+        itemPool.push_back(RI_DEKU_STICK_BAG);
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_DEKU_NUT_BAG])
+        itemPool.push_back(RI_DEKU_NUT_BAG);
 
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
@@ -584,7 +590,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }
-            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i])) {
+            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) || itemPool[i] == RI_DEKU_STICK_BAG ||
+                itemPool[i] == RI_DEKU_NUT_BAG) {
                 continue;
             }
             if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&

@@ -19,6 +19,10 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG", Kind::New,
+      "Shuffle the base bag required to carry and use Deku Sticks in MM." },
+    { "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG", Kind::New,
+      "Shuffle the base bag required to carry and use Deku Nuts in MM." },
     { "gRandoSettings.ShuffleEnemySouls", Kind::New, "Shuffle enemy souls in OoT." },
     { "gRandoSettings.ShuffleNpcSouls", Kind::New, "Shuffle NPC souls in OoT." },
     { "gRandoSettings.ShuffleAnimalSouls", Kind::New, "Shuffle animal souls in OoT." },

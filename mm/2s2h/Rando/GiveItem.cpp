@@ -1,5 +1,6 @@
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Bags.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -155,6 +156,10 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     }
     switch (randoItemId) {
+        case RI_DEKU_STICK_BAG:
+        case RI_DEKU_NUT_BAG:
+            Bags::Give(randoItemId);
+            break;
         case RI_WOODFALL_KEY_RING:
         case RI_SNOWHEAD_KEY_RING:
         case RI_GREAT_BAY_KEY_RING:
@@ -1309,25 +1314,10 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             }
             break;
         }
-        // Deku stick / nut capacity, the same shape as the bomb bag above: bump the native upgrade
-        // level and top the ammo up to the new capacity. The FC row is a 2-level chain (v1 has no
-        // bag-gate), so level 1 of the native upgrade is assumed and these take it to 2 and then 3 —
-        // sticks 20 -> 30, nuts 30 -> 40. Also makes sure the slot itself is owned, since MM's logic
-        // gates on HAS_ITEM(ITEM_DEKU_STICK/NUT) and a capacity with no stick is useless.
-        case RI_OOT_PROGRESSIVE_STICK_CAPACITY: {
-            uint8_t lvl = CUR_UPG_VALUE(UPG_DEKU_STICKS);
-            Inventory_ChangeUpgrade(UPG_DEKU_STICKS, lvl < 3 ? lvl + 1 : 3);
-            INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
-            AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
+        case RI_OOT_PROGRESSIVE_STICK_CAPACITY:
+        case RI_OOT_PROGRESSIVE_NUT_CAPACITY:
+            Bags::GiveCapacity(randoItemId);
             break;
-        }
-        case RI_OOT_PROGRESSIVE_NUT_CAPACITY: {
-            uint8_t lvl = CUR_UPG_VALUE(UPG_DEKU_NUTS);
-            Inventory_ChangeUpgrade(UPG_DEKU_NUTS, lvl < 3 ? lvl + 1 : 3);
-            INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
-            AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
-            break;
-        }
         case RI_OOT_ROCS_FEATHER:
             // SoH's OTHER feather (RG_ROCS_FEATHER): the SHIP-VANILLA one, which lives in the Nayru's
             // Love cell and cycles with it. Nothing to do with Skijer's feather in SLOT_ROCS — the two

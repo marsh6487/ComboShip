@@ -36,6 +36,8 @@ namespace StaticData {
 
 // clang-format off
 std::map<RandoItemId, RandoStaticItem> Items = {
+    RI(RI_DEKU_STICK_BAG, "the", "Deku Stick Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
+    RI(RI_DEKU_NUT_BAG, "the", "Deku Nut Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_NUTS_1, GID_DEKU_NUTS),
     RI(RI_WOODFALL_KEY_RING, "the", "Woodfall Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
     RI(RI_SNOWHEAD_KEY_RING, "the", "Snowhead Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
     RI(RI_GREAT_BAY_KEY_RING, "the", "Great Bay Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
@@ -598,7 +600,8 @@ std::map<RandoItemId, RandoStaticItem> Items = {
 
 std::map<StartingItemCategory, std::vector<RandoItemId>> StartingItemsMap = {
     { STARTING_ITEMS_INVENTORY, 
-        { RI_OCARINA,               RI_PROGRESSIVE_BOW, RI_ARROW_FIRE,  RI_ARROW_ICE,   RI_ARROW_LIGHT,
+        { RI_DEKU_STICK_BAG, RI_DEKU_NUT_BAG,
+          RI_OCARINA,               RI_PROGRESSIVE_BOW, RI_ARROW_FIRE,  RI_ARROW_ICE,   RI_ARROW_LIGHT,
           RI_PROGRESSIVE_BOMB_BAG,  RI_BOMBCHU,         RI_DEKU_STICK,  RI_DEKU_NUT,    RI_MAGIC_BEAN,
           RI_POWDER_KEG,            RI_PICTOGRAPH_BOX,  RI_LENS,        RI_HOOKSHOT,    RI_GREAT_FAIRY_SWORD,
           RI_BOTTLE_EMPTY
@@ -818,6 +821,10 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
 
 const char* GetIconTexturePath(RandoItemId randoItemId) {
     switch (randoItemId) {
+        case RI_DEKU_NUT_BAG:
+            return (const char*)gItemIcons[ITEM_DEKU_NUT];
+        case RI_DEKU_STICK_BAG:
+            return (const char*)gItemIcons[ITEM_DEKU_STICK];
         case RI_SHIELD_MIRROR:
             return COMBO_IKANA_SHIELD_ICON;
         case RI_BOMBCHU:

@@ -1,5 +1,6 @@
 #include "Rando/Rando.h"
 #include "Rando/KeyRings.h"
+#include "Rando/Bags.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
@@ -240,6 +241,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
 
     if (const auto* ring = KeyRings::Find(randoItemId))
         return !hasObtainedCheck && !KeyRings::Owned(*ring);
+    if (const auto* bag = Bags::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(bag->flag);
 
     u8 vanillaCantObtain = false;
     if (Rando::StaticData::Items[randoItemId].itemId != ITEM_NONE &&

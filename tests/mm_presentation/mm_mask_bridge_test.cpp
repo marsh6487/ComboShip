@@ -197,6 +197,11 @@ void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false,bool=true)
 void ComboSwordGi_ApplyEffectFit(NeiGi::Kind,bool=false,int=0) {assert(0 && "mask selected sword effects fit");}
 float ComboSwordGi_ParticleScale(NeiGi::Kind,bool=false,int=0,bool=true) {assert(0 && "mask selected sword particle size");return 1.f;}
 void DrawOotSlateRuneFlame(uint8_t,uint8_t,uint8_t) {assert(0 && "mask selected sword flame");}
+// Counted ring geometry has dedicated native receiving-host fixtures. A mask
+// receipt must never select that newly supported foreign draw kind.
+namespace ComboMmKeyRing {
+template<class... T> bool Draw(T...) {assert(false && "mask selected key-ring draw");return false;}
+}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

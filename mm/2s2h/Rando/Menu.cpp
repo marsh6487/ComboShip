@@ -1071,6 +1071,18 @@ static void DrawItemPoolTab() {
                      "Adds the Skeleton Key to the item pool. Collecting it immediately grants "
                      "the maximum number of Small Keys for every dungeon.",
                      1, skeletonKeyDisabledReason);
+    UIWidgets::EndCard();
+
+    UIWidgets::BeginCard("itemPoolCapacities");
+    ImGui::SeparatorText("Bags & Capacities");
+    ItemPoolCheckbox("Deku Stick Bag", RO_SHUFFLE_DEKU_STICK_BAG,
+                     "Adds one Deku Stick Bag to the pool. Until you find it, you cannot carry or use sticks.\n"
+                     "Capacity upgrades can be collected first and take effect once the bag is found.",
+                     1);
+    ItemPoolCheckbox("Deku Nut Bag", RO_SHUFFLE_DEKU_NUT_BAG,
+                     "Adds one Deku Nut Bag to the pool. Until you find it, you cannot carry or use nuts.\n"
+                     "Capacity upgrades can be collected first and take effect once the bag is found.",
+                     1);
     ItemPoolCheckbox("Tycoon's Wallet", RO_SHUFFLE_TYCOON_WALLET,
                      "Adds the Tycoon's Wallet (5,000 rupees) to the item pool\n"
                      "as a third progressive wallet upgrade.",
@@ -1083,10 +1095,6 @@ static void DrawItemPoolTab() {
     ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
     ImGui::SeparatorText("Coming Soon");
     ImGui::PopStyleColor();
-    CVarCheckbox("Deku Stick Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Deku Nut Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
     CVarCheckbox("Child Wallet", "gPlaceholderBool",
                  CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
     CVarCheckbox("Infinite Upgrades", "gPlaceholderBool",

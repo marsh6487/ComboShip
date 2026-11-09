@@ -133,4 +133,5 @@ int main() {
         }
     }
     std::puts("PASS actual MM catalogues/pools: all 16 ring selections, four placement modes, densities and computed starting items");
+    return 0;
 }

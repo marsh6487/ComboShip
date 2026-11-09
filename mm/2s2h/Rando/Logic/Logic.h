@@ -196,7 +196,7 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define IS_DEITY (GET_PLAYER_FORM == PLAYER_FORM_FIERCE_DEITY)
 #define IS_GORON (GET_PLAYER_FORM == PLAYER_FORM_GORON)
 #define IS_HUMAN (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)
-#define HAS_ITEM(item) (INV_CONTENT(item) == item)
+#define HAS_ITEM(item) (INV_CONTENT(item) == item && RandoCapacity_HasBagForItem(item))
 #define CAN_BE_DEKU (IS_DEKU || HAS_ITEM(ITEM_MASK_DEKU))
 #define CAN_BE_ZORA (IS_ZORA || HAS_ITEM(ITEM_MASK_ZORA))
 #define CAN_BE_DEITY (IS_DEITY || HAS_ITEM(ITEM_MASK_FIERCE_DEITY))

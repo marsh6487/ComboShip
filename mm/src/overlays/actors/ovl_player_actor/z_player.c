@@ -5019,6 +5019,9 @@ void func_80831944(PlayState* play, Player* this) {
 }
 
 void Player_UseItem(PlayState* play, Player* this, ItemId item) {
+    if (!RandoCapacity_HasBagForItem(item)) {
+        return;
+    }
     WolfLinkHost_OnUseItem(play, this, item);
     // Skijer's NEI — SHIP-VANILLA Roc's Feather (the one sharing the Nayru's Love cell, NOT Skijer's
     // page-2 feather). SoH implements it by answering false to VB_CHANGE_HELD_ITEM_AND_USE_ITEM, so
@@ -14307,6 +14310,9 @@ void Player_Update(Actor* thisx, PlayState* play) {
     s32 pad;
     Input input;
     s32 pad2;
+
+    // FleetSync may import raw tiers/slots; base bag ownership stays local.
+    RandoCapacity_RepairBagAmmo();
 
     // Full-width Shadow Crystal input must be reserved before equipment/tool raw-pad listeners.
     WolfLinkHost_PreUpdate(play, this);

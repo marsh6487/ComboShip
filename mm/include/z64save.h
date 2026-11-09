@@ -1906,4 +1906,6 @@ extern s32 gFlashOwlSaveNumPages[];
 
 extern SaveContext gSaveContext;
 
+#include "rando_capacity.h"
+
 #endif
