@@ -1012,5 +1012,8 @@ RandoItemType Rando::GetItemTypeForCheck(RandoItemId randoItemId, RandoCheckId r
         }
     }
 #endif
-    return Rando::StaticData::Items[Rando::ConvertItem(randoItemId, randoCheckId)].randoItemType;
+    const auto converted = Rando::ConvertItem(randoItemId, randoCheckId);
+    if (RustyDoorKeys::IsDoorKeyItem(converted))
+        return RITYPE_SMALL_KEY;
+    return Rando::StaticData::Items[converted].randoItemType;
 }

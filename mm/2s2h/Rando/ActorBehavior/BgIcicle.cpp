@@ -1,11 +1,15 @@
 #include "ActorBehavior.h"
 #include "Rando/MMEnvironment.h"
+#include "Rando/MMEnvironmentCSMC.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/ObjectExtension/ActorListIndex.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include <map>
 #include <set>
 extern "C" {
 #include "variables.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_Obj_Mure2/z_obj_mure2.h"
 #include "overlays/actors/ovl_Obj_Bean/z_obj_bean.h"
 #include "overlays/actors/ovl_Obj_Swprize/z_obj_swprize.h"
@@ -65,6 +69,59 @@ RandoCheckId IdentifySource(Actor* actor, s8 slice = 0) {
         gPlayState->sceneId, Rando::MMEnvironment::NormalizeSetup(gPlayState->sceneId, gSaveContext.sceneLayer),
         actor->room, GetActorListIndex(actor), slice, actor->id);
 }
+} // namespace
+static void DrawEnvironmentalMarker(Actor* actor, PlayState* play, RandoCheckId check, s8 slice) {
+    if (!IS_RANDO || !play || !play->state.gfxCtx || !Rando::MMEnvironmentCSMC::IsEnvironmentalCheck(check))
+        return;
+    const auto& saved = RANDO_SAVE_CHECKS[check];
+    if (!Rando::MMEnvironmentCSMC::CanMark(check, saved, pendingDrops.contains(check), activeDrops.contains(check)) ||
+        saved.randoItemId <= RI_UNKNOWN || saved.randoItemId >= RI_MAX)
+        return;
+    const auto geometry = Rando::MMEnvironmentCSMC::GeometryFor(*actor);
+    if (geometry.scale <= 0.0f)
+        return;
+    // This is the same live native/foreign category resolver as MM pots and
+    // crates, including native progressives and foreign trap/importance policy.
+    const auto category =
+        CVarGetInteger("gRando.CSMC", 0)
+            ? Rando::MMEnvironmentCSMC::CategoryForType(Rando::GetItemTypeForCheck(saved.randoItemId, check))
+            : Rando::MMEnvironmentCSMC::Category::Major;
+    const auto primary = ComboRando::ContainerCategoryColors::Get(category);
+    const auto secondary = ComboRando::ContainerCategoryColors::Get(category, 1);
+    Matrix_Push();
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y + geometry.height, actor->world.pos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    if (actor->id == ACTOR_OBJ_SWPRIZE)
+        Matrix_Translate((slice - 1) * geometry.spacing, 0.0f, 0.0f, MTXMODE_APPLY);
+    Matrix_Scale(geometry.scale, geometry.scale, geometry.scale, MTXMODE_APPLY);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL60_XluNoCD(play->state.gfxCtx);
+    gDPPipeSync(POLY_XLU_DISP++);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, primary.r, primary.g, primary.b, 190);
+    gDPSetEnvColor(POLY_XLU_DISP++, secondary.r, secondary.g, secondary.b, 0);
+    gDPSetCombineLERP(POLY_XLU_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0, PRIMITIVE,
+                      ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gLensFlareCircleDL);
+    gDPPipeSync(POLY_XLU_DISP++);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+}
+static void DrawEnvironmentalSource(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_OBJ_SWPRIZE) {
+        for (s8 slice = 0; slice < 3; ++slice)
+            DrawEnvironmentalMarker(actor, play, IdentifySource(actor, slice), slice);
+    } else {
+        DrawEnvironmentalMarker(actor, play, Rando::ActorBehavior::GetObjectRandoCheckId(actor), 0);
+    }
+}
+static void DrawEnvironmentalSoil(Actor* actor, PlayState* play) {
+    // Native Swprize has no geometry or draw callback. A visual-only callback
+    // makes its authored soil reward source renderable without changing Bean.
+    DrawEnvironmentalSource(actor, play);
+}
+namespace {
 bool HasUncollectedSoil(Actor* soil) {
     for (s8 slice = 0; slice < 3; ++slice) {
         const auto check = IdentifySource(soil, slice);
@@ -99,6 +156,21 @@ void Rando::ActorBehavior::InitBgIcicleBehavior() {
             const auto check = IdentifySource(actor);
             if (check != RC_UNKNOWN && RANDO_SAVE_CHECKS[check].shuffled)
                 SetObjectRandoCheckId(actor, check);
+            if (actor->id == ACTOR_OBJ_SWPRIZE && !actor->draw) {
+                for (s8 slice = 0; slice < 3; ++slice) {
+                    const auto soilCheck = IdentifySource(actor, slice);
+                    if (soilCheck != RC_UNKNOWN && RANDO_SAVE_CHECKS[soilCheck].shuffled) {
+                        actor->draw = DrawEnvironmentalSoil;
+                        break;
+                    }
+                }
+            }
+        });
+        COND_ID_HOOK(OnActorDraw, id, IS_RANDO, [](Actor* actor) {
+            // Soil's visual-only draw already emitted its slices. An existing
+            // non-null draw (if supplied elsewhere) keeps its native geometry.
+            if (actor->draw != DrawEnvironmentalSoil)
+                DrawEnvironmentalSource(actor, gPlayState);
         });
     }
     COND_VB_SHOULD(VB_OBJ_MURE2_SET_CHILD_ROOM, IS_RANDO, {

@@ -54,10 +54,18 @@ struct StructureProbe {
         const auto od = nlohmann::json::parse(ootDump), md = nlohmann::json::parse(mmDump);
         ootOwned = StructuralOwned(od);
         mmOwned = StructuralOwned(md);
+        // These native randomized items have not been placed yet. Structural
+        // connectivity assumes them like pool items; the later item fill must
+        // earn them at a reachable member of their native allowed-check set.
+        for (auto [dump, owned] : { std::pair{ &od, &ootOwned }, std::pair{ &md, &mmOwned } })
+            for (const auto& entry : dump->value("fixed", nlohmann::json::array()))
+                if (entry.contains("allowedChecks"))
+                    owned->push_back(entry.at("item").get<std::string>());
         auto fixed = [](const nlohmann::json& dump) {
             std::vector<Fixed> placements;
             for (const auto& entry : dump.value("fixed", nlohmann::json::array()))
-                placements.push_back({ entry.at("check").get<std::string>(), entry.at("item").get<std::string>() });
+                if (!entry.contains("allowedChecks"))
+                    placements.push_back({ entry.at("check").get<std::string>(), entry.at("item").get<std::string>() });
             return placements;
         };
         ootFixed = fixed(od);

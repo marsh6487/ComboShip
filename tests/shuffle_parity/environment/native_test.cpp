@@ -1,6 +1,13 @@
+#define CVarGetInteger EnvironmentFoundationCVarGetInteger
 #define main KeyRingFoundationMain
 #include "../key_rings/native_test.cpp"
 #undef main
+#undef CVarGetInteger
+static bool csmcEnabled=false;
+extern "C" int32_t CVarGetInteger(const char* key,int32_t fallback){return !strcmp(key,"gRando.CSMC")?csmcEnabled:fallback;}
+#include "Rando/MMEnvironmentCSMC.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "Rando/MMEnvironment.h"
 #include "Rando/VanillaCompatibility.h"
@@ -20,7 +27,7 @@ void InitBgIcicleBehavior();
 }
 namespace Hooks {
 std::map<int, std::function<void(Actor *, bool *)>> ShouldActorInit;
-std::map<int, std::function<void(Actor *)>> OnActorUpdate, OnActorDestroy;
+std::map<int, std::function<void(Actor *)>> OnActorUpdate, OnActorDestroy, OnActorDraw;
 std::function<void(s8, s8)> scene;
 std::map<int, std::function<void(bool *, va_list)>> behaviors;
 } // namespace Hooks
@@ -69,9 +76,9 @@ extern "C" Actor *Actor_Spawn(ActorContext *, PlayState *, s16 id, f32 x, f32 y,
 }
 namespace Rando {
 void DrawItem(RandoItemId, RandoCheckId, Actor *) {}
-RandoItemId ConvertItem(RandoItemId id, RandoCheckId) { return id; }
+
 } // namespace Rando
-extern "C" void Matrix_Scale(f32, f32, f32, MatrixMode) {}
+#include "csmc/native_services.inc"
 #include "2s2h/GameInteractor/GameInteractor_VanillaBehavior.h"
 #include "environment_callbacks.inc"
 #include "environment_json.inc"
@@ -174,6 +181,7 @@ static void TestActualEnvironmentalRules() {
 #include "native_transition_tests.inc"
 #include "all_rules_tests.inc"
 #include "source_eligibility_tests.inc"
+#include "csmc/render_cases.inc"
 
 int main() {
   if (std::getenv("MM_ENV_RED_SPAWN")) {
@@ -186,6 +194,7 @@ int main() {
     return 0;
   }
   using namespace Rando;
+  TestEnvironmentCSMC();
   TestAllNativeEnvironmentRules();
   TestNativeEnvironmentTransitions();
   TestAllEnvironmentFamilies();

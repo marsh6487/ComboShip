@@ -30,6 +30,7 @@ std::vector<RandomizerGet> Generate(int climb,int chest,int abundance) {
 }
 namespace Mm {
 #include "mm/2s2h/Rando/Types.h"
+#include "mm_rusty_visual.inc"
 std::map<std::string,int> cvars;
 int CVarGetInteger(const char* name,int fallback){auto it=cvars.find(name);return it==cvars.end()?fallback:it->second;}
 void CVarSetInteger(const char* name,int value){cvars[name]=value;}

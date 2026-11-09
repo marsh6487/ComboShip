@@ -4583,6 +4583,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
 
     // Confine own-dungeon items via MM's own logic (writes RANDO_SAVE_CHECKS, shrinks both pools).
     std::vector<RandoCheckId> checkPoolBefore = checkPool;
+    std::map<RandoItemId, nlohmann::json> confinedChecks;
     {
         // Native confinement reads the live save macros, while generation above
         // uses a new settings snapshot. A cold/stale live save must not turn
@@ -4595,6 +4596,18 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
             }
         } restore;
         gSaveContext.save.shipSaveInfo.rando = saveInfo;
+        // Export native confinement over the original eligible pool, before random
+        // preplacement removes checks. The combined solver must choose these
+        // coordinates with logic: a random native spot can be behind its own key.
+        for (RandoItemId item : itemPool) {
+            if (Rando::Logic::RandoItemIdToConfinementGroup(item) < 0 || confinedChecks.count(item))
+                continue;
+            auto& allowed = confinedChecks[item];
+            allowed = nlohmann::json::array();
+            for (RandoCheckId check : checkPoolBefore)
+                if (Rando::Logic::IsItemAllowedAtCheck(item, check))
+                    allowed.push_back(Rando::StaticData::GetCheckDisplayName(check));
+        }
         Rando::Logic::PreplaceConfinedItems(checkPool, itemPool);
         // Exclusions can exhaust a confinement group. Native fills retain the
         // restriction on residual items; the cross fill has no group metadata,
@@ -4628,6 +4641,10 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
     // ComboShip: native category, so the cross fill can trim ONLY junk — `advancement` alone can't say
     // that (it lumps junk with hearts/traps). Unknown maps to "major" so it is never trimmable.
     auto categoryName = [](const auto& it) -> const char* {
+        // Door keys share the gray small-key cue across both hosts. Keep their
+        // native MAJOR type and advancement status unchanged for gameplay/fill.
+        if (Rando::RustyDoorKeys::IsDoorKeyItem(it.randoItemId))
+            return "smallKey";
         switch (it.randoItemType) {
             case RITYPE_JUNK:
                 return "junk";
@@ -4669,6 +4686,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
                           { "item", Rando::StaticData::GetItemDisplayName(iit->first) },
                           { "advancement", isAdvancement(iit->second) },
                           { "validate", true },
+                          { "allowedChecks", confinedChecks.at(iit->first) },
                           { "hintable", true } });
     }
 

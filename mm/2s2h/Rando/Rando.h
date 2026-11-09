@@ -69,8 +69,9 @@ RandoItemId CurrentJunkItem(RandoCheckId randoCheckId = RC_UNKNOWN);
 RandoItemId CurrentTrapItem(RandoCheckId randoCheckId = RC_UNKNOWN);
 bool IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 RandoItemId ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
-// Container-matches-contents type for a check. Same as Items[ConvertItem(...)].randoItemType, except a
-// ComboShip foreign check resolves the real cross-game item's category behind the junk sentinel.
+// Visual container category after ConvertItem resolves owned/unavailable items.
+// Door keys use SMALL_KEY without changing native gameplay types. A ComboShip
+// foreign check resolves its real cross-game category behind the junk sentinel.
 RandoItemType GetItemTypeForCheck(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 RandoCheckId FindItemPlacement(RandoItemId randoItemId);
 // Like GetLocationNameForHint(FindItemPlacement(id)); on ComboShip builds, falls back to the combo

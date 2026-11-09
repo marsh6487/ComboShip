@@ -1,6 +1,7 @@
 #include "FleetShipCombo/FleetShipCombo.h"
 #include "Rando/Logic/Logic.h"
 #include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
 #include "Rando/StaticData/StaticData.h"
 #include "rando/CrossWorldRando.h"
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"
@@ -109,6 +110,16 @@ static int VerifyFixed(const J& dump) {
         auto rc = Rando::StaticData::GetCheckIdFromName(row.at("check").get<std::string>().c_str());
         REQUIRE(std::find(excluded.begin(), excluded.end(), rc) == excluded.end());
         REQUIRE(OwnPhysicalDungeon(id, Rando::StaticData::Checks.at(rc).sceneId));
+        REQUIRE(row.at("allowedChecks").is_array());
+        REQUIRE(!row.at("allowedChecks").empty());
+        std::set<std::string> candidates;
+        for (const auto& candidate : row.at("allowedChecks")) {
+            REQUIRE(candidates.insert(candidate.get<std::string>()).second);
+            auto check = Rando::StaticData::GetCheckIdFromName(candidate.get<std::string>().c_str());
+            REQUIRE(std::find(excluded.begin(), excluded.end(), check) == excluded.end());
+            REQUIRE(OwnPhysicalDungeon(id, Rando::StaticData::Checks.at(check).sceneId));
+        }
+        REQUIRE(candidates.count(row.at("check").get<std::string>()));
         ++count;
     }
     return count;
@@ -235,8 +246,20 @@ int main(int argc, char** argv) try {
                 if (observe) std::cerr << "Stone Tower Boss Key outside dungeon: seed=" << seed << " check=" << check << '\n';
             }
         }
-        if (!observe) for (const auto& row : dump["fixed"])
-            REQUIRE(placed["mm"][row["check"].get<std::string>()] == row["item"]);
+        if (!observe) for (const auto& row : dump["fixed"]) {
+            if (!row.contains("allowedChecks")) {
+                REQUIRE(placed["mm"][row["check"].get<std::string>()] == row["item"]);
+                continue;
+            }
+            int copies = 0;
+            for (const auto& [check, item] : placed["mm"].items())
+                if (item == row["item"]) {
+                    REQUIRE(std::find(row["allowedChecks"].begin(), row["allowedChecks"].end(), check) !=
+                            row["allowedChecks"].end());
+                    ++copies;
+                }
+            REQUIRE(copies == 1);
+        }
     }
     std::cerr << "seeded full-catalog pool/combined fills=" << fills << " MM boss keys in OoT=" << foreignKeys
               << " Stone Tower normal=" << normal << " inverted=" << inverted << '\n';
@@ -245,6 +268,65 @@ int main(int argc, char** argv) try {
     REQUIRE(Rando::Logic::SceneIdToDungeon(SCENE_INISIE_N) == DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE);
     REQUIRE(Rando::Logic::SceneIdToDungeon(SCENE_INISIE_R) == DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE);
     REQUIRE(Rando::Logic::SceneIdToDungeon(SCENE_INISIE_BS) == DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE);
+
+    // Exact native check/item identities from the linked seed failures. These
+    // boundary-oracle controls isolate the two possession locks; the full native
+    // seed harness separately replays the actual graph.
+    for (auto [item, target] : {
+             std::pair{RI_STONE_TOWER_KEY_RING, RC_STONE_TOWER_TEMPLE_INVERTED_WIZZROBE_CHEST},
+             std::pair{RI_STONE_TOWER_BOSS_KEY, RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_HEART_CONTAINER}}) {
+        auto configured = settings;
+        configured["gRando.Options.RO_PLACEMENT_SMALL_KEYS"] = RO_DUNGEON_ITEM_OWN_DUNGEON;
+        configured["gRando.Options.RO_SHUFFLE_KEY_RINGS"] = 15;
+        MM_RestoreRandoSettings(configured.dump().c_str());
+        const auto name = Rando::StaticData::GetItemDisplayName(item);
+        const auto targetName = Rando::StaticData::GetCheckDisplayName(target);
+        J specimen;
+        for (unsigned seed = 200; seed < 300; ++seed) {
+            sMMComboRandoSeed = seed;
+            specimen = J::parse(MM_DumpRandoStaticData());
+            if (std::any_of(specimen["checks"].begin(), specimen["checks"].end(),
+                            [&](const J& row) { return row["name"] == targetName; })) break;
+        }
+        auto row = std::find_if(specimen["fixed"].begin(), specimen["fixed"].end(),
+                                [&](const J& row) { return row["item"] == name; });
+        REQUIRE(row != specimen["fixed"].end());
+        auto targetRow = std::find_if(specimen["checks"].begin(), specimen["checks"].end(),
+                                      [&](const J& row) { return row["name"] == targetName; });
+        REQUIRE(targetRow != specimen["checks"].end());
+        (*targetRow)["name"] = (*row)["check"];
+        (*row)["check"] = targetName;
+        SetReach(specimen);
+        auto reach = J::parse(mmReach); J filtered = J::array();
+        for (const auto& check : reach) if (check != targetName) filtered.push_back(check);
+        mmReach = filtered.dump(); blocked[targetName] = name;
+        auto legacy = specimen;
+        for (auto& entry : legacy["fixed"]) entry.erase("allowedChecks");
+        REQUIRE(!ComboRando::CrossWorldCombinedFill(od.dump(), legacy.dump(), 20261109, oo, mo).success);
+        auto corrected = ComboRando::CrossWorldCombinedFill(od.dump(), specimen.dump(), 20261109, oo, mo);
+        REQUIRE(corrected.success);
+        bool fallbackRejected = false;
+        try { ComboRando::CrossWorldGenerateSpoiler(od.dump(), specimen.dump(), 20261109); }
+        catch (const std::runtime_error& error) {
+            fallbackRejected = std::string(error.what()).find("logical combined solver") != std::string::npos;
+        }
+        REQUIRE(fallbackRejected);
+        auto placements = J::parse(corrected.spoilerJson);
+        REQUIRE(placements["mm"][targetName] != name);
+        REQUIRE(Unchanged(*before));
+        for (auto corruption : {0, 1, 2, 3}) {
+            auto bad = specimen;
+            auto entry = std::find_if(bad["fixed"].begin(), bad["fixed"].end(),
+                                     [&](const J& row) { return row["item"] == name; });
+            if (corruption == 0) (*entry)["allowedChecks"] = J::array();
+            if (corruption == 1) (*entry)["allowedChecks"].push_back((*entry)["allowedChecks"][0]);
+            if (corruption == 2) (*entry)["allowedChecks"].push_back("not a native eligible check");
+            if (corruption == 3) bad["checks"].push_back({{"name", targetName}});
+            REQUIRE(!ComboRando::CrossWorldCombinedFill(od.dump(), bad.dump(), 20261109, oo, mo).success);
+        }
+        std::cerr << "PASS native confinement self-lock relocation and invalid schema controls: " << name << '\n';
+    }
+    MM_RestoreRandoSettings(settings.dump().c_str());
 
     // Imported exclusions cover every boss-key vanilla chest and many ordinary
     // checks; an excluded check cannot receive any required key.
@@ -259,11 +341,22 @@ int main(int argc, char** argv) try {
     }
     // Placement flag distinguishes randomized confined checks from vanilla ones.
     SetReach(dump, true);
+    for (const auto& row : dump["fixed"])
+        if (row.contains("allowedChecks"))
+            for (const auto& check : row["allowedChecks"])
+                blocked[check.get<std::string>()] = row["item"].get<std::string>();
+    {
+        auto reach = J::parse(mmReach);
+        J filtered = J::array();
+        for (const auto& check : reach)
+            if (!blocked.count(check.get<std::string>())) filtered.push_back(check);
+        mmReach = filtered.dump();
+    }
     auto impossible = ComboRando::CrossWorldCombinedFill(od.dump(), dump.dump(), 129, oo, mo);
     REQUIRE(!impossible.success);
     // Legacy fixed placements retain their existing validation semantics.
     auto legacy = dump;
-    for (auto& row : legacy["fixed"]) row.erase("validate");
+    for (auto& row : legacy["fixed"]) { row.erase("validate"); row.erase("allowedChecks"); }
     auto unvalidated = ComboRando::CrossWorldCombinedFill(od.dump(), legacy.dump(), 129, oo, mo);
     REQUIRE(unvalidated.success);
     // Failure after confinement must also restore the exact live save bytes.

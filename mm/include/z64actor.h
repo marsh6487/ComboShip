@@ -846,6 +846,7 @@ void Flags_SetCollectible(struct PlayState* play, s32 flag);
 
 void TitleCard_InitBossName(struct GameState* gameState, TitleCardContext* titleCtx, TexturePtr texture, s16 x, s16 y,
                             u8 width, u8 height);
+void TitleCard_Update(struct GameState* gameState, TitleCardContext* titleCtx);
 
 s32 Actor_SetPlayerImpact(struct PlayState* play, PlayerImpactType type, s32 timer, f32 dist, Vec3f* pos);
 f32 Actor_GetPlayerImpact(struct PlayState* play, f32 range, Vec3f* pos, PlayerImpactType* type);

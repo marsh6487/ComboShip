@@ -45,7 +45,7 @@ def compile_unit(unit):
     host = unit.split('/')[0]
     source = ROOT / unit
     c = source.suffix == '.c'
-    roots = [ROOT / host / p for p in ('', 'include', 'include/PR', 'src', 'assets', 'mods',
+    roots = [ROOT] + [ROOT / host / p for p in ('', 'include', 'include/PR', 'src', 'assets', 'mods',
                                       '2s2h' if host == 'mm' else 'soh')]
     roots += [ROOT / p for p in ('combo', 'combo/menu', 'combo/title', 'libultraship/include',
                                 'libultraship', 'ZAPDTR/ZAPD/resource/type', 'torch/lib/n64graphics')]

@@ -208,7 +208,7 @@ def expected_environment(case, combined, starting_items):
     return catalog['environment'] if combined or starts_with_iron_boots else catalog['environment'] - catalog['ironBootRocks']
 
 
-def validate_mm_wallets(enabled, placements, data, settings):
+def validate_mm_wallets(enabled, placements, data, settings, retained=None):
     """Child Wallet adds progressive supply; it is resolved only at native grant."""
     require(isinstance(settings, dict), 'native MM wallet settings missing')
     require(settings.get('gRando.Options.RO_SHUFFLE_CHILD_WALLET') == int(enabled),
@@ -228,12 +228,65 @@ def validate_mm_wallets(enabled, placements, data, settings):
     require(supply[progressive] == expected, 'native progressive wallet supply differs: ' + str(supply[progressive]))
     require(supply[child] == 0, 'native pool/fixed contains a phantom concrete Child Wallet')
     counts = Counter(plain(item) for item in placements.values())
-    require(counts[progressive] == supply[progressive], 'filled progressive wallet count differs: ' + str(counts[progressive]))
+    expected_placements = supply[progressive] if retained is None else retained
+    require(counts[progressive] == expected_placements, 'filled progressive wallet count differs: ' + str(counts[progressive]))
     require(counts[child] == 0, 'filled seed contains a phantom concrete Child Wallet')
     return {'progressiveWallets': expected, 'concreteChildWallets': 0}
 
 
-def validate_features(case, game, placements, data, combined=False, starting_items=None, settings=None):
+def validate_shared_wallets(case, spoiler, probes, owned):
+    """Verify the actual unconditional FC pair's native max-count dedup contract."""
+    enabled = case in ('mm-parity', 'all-parity')
+    require('wallets' not in spoiler.get('sharedItems', []), 'native wallet preset unexpectedly enabled optional family sharing')
+    pairs = probes['oot'].get('sharedPairs')
+    require(isinstance(pairs, list), 'actual exported FC pairs missing')
+    wallets = [pair for pair in pairs if pair.get('mm') == 'RI_PROGRESSIVE_WALLET']
+    require(len(wallets) == 1, 'actual FC wallet pair missing or duplicated')
+    pair = wallets[0]
+    fc_source = (ROOT / 'soh/soh/FleetShipCombo/FleetComboItems.h').read_text()
+    chain = re.search(r'X\(FCI_WALLET,\s*(\d+),\s*FCI_F_NONE,\s*RG_PROGRESSIVE_WALLET,\s*RI_PROGRESSIVE_WALLET,', fc_source)
+    require(chain is not None and pair.get('chain') == int(chain[1]), 'actual FC wallet chain differs from native source')
+    mm_names = {row['token']: row['name'] for row in probes['mm']['dump']['items']
+                if row.get('token') in ('RI_PROGRESSIVE_WALLET', 'RI_WALLET_CHILD')}
+    require(len(mm_names) == 2, 'actual MM wallet token metadata missing')
+    names = {'oot': pair.get('oot'), 'mm': mm_names['RI_PROGRESSIVE_WALLET']}
+    require(names['oot'] and sum(row['name'] == names['oot'] for row in probes['oot']['dump']['items']) == 1,
+            'actual FC OOT wallet name has no unique native metadata')
+    source = {}
+    for game in ('oot', 'mm'):
+        data = probes[game]['dump']
+        item = [row for row in data['items'] if row['name'] == names[game]]
+        require(len(item) == 1 and item[0].get('advancement') is True and item[0].get('trap') is False,
+                'native shared wallet source flags differ: ' + game)
+        require(not any(row['name'] == mm_names['RI_WALLET_CHILD'] for row in data['pool']) and
+                not any(row['item'] == mm_names['RI_WALLET_CHILD'] for row in data['fixed']),
+                'shared native source contains phantom concrete Child Wallet')
+        require(not any(row['item'] == names[game] for row in data['fixed']), 'wallet preset unexpectedly has fixed native wallet supply')
+        source[game] = sum(row['name'] == names[game] for row in data['pool'])
+    require(source == {'oot': 2, 'mm': 2 + int(enabled)}, 'actual native wallet source counts differ: ' + repr(source))
+    # CrossWorldRando keeps max(NEI aliases), retaining the OOT source first.
+    total = max(source.values())
+    retained = {'oot': min(source['oot'], total), 'mm': max(0, total - source['oot'])}
+    for game in ('oot', 'mm'):
+        count = sum(plain(item) == names[game] for item in owned[game].values())
+        require(count == retained[game], 'actual shared wallet owner retention differs: ' + game + ' ' + str(count))
+        require(not any(plain(item) == mm_names['RI_WALLET_CHILD'] for item in owned[game].values()),
+                'shared seed contains phantom concrete Child Wallet')
+    foreign_wallets = set()
+    for row in spoiler.get('foreign', []):
+        if plain(row['itemName']) == names.get(row['itemGame']):
+            require(row.get('shared') is True, 'actual FC wallet foreign record lost shared flag')
+            check = (row['checkGame'], row['checkName'])
+            require(check not in foreign_wallets, 'duplicate shared wallet foreign record')
+            foreign_wallets.add(check)
+            require(row['checkGame'] != row['itemGame'] and
+                    plain(spoiler[row['checkGame']]['placements'][row['checkName']]) == row['itemName'],
+                    'shared wallet foreign record disagrees with actual placement')
+    require(sum(retained.values()) == total, 'shared wallet source maximum lost')
+    return {'nativeSourceCounts': source, 'retainedByOwner': retained, 'canonicalTotal': total}
+
+
+def validate_features(case, game, placements, data, combined=False, starting_items=None, settings=None, wallet_retained=None):
     catalog = feature_catalogue()
     # For combined seeds, foreign placements are disambiguated before this call.
     counts = Counter(plain(x) for x in placements.values())
@@ -246,7 +299,8 @@ def validate_features(case, game, placements, data, combined=False, starting_ite
     if game == 'mm':
         for name in catalog['parity']:
             require(counts[name] == int(enabled_parity), 'MM capacity/infinite/ring identity count: ' + name)
-        wallet = validate_mm_wallets(enabled_parity, placements, data, settings)
+        require(not combined or wallet_retained is not None, 'combined wallet source contract missing')
+        wallet = validate_mm_wallets(enabled_parity, placements, data, settings, retained=wallet_retained)
         active_sources = {metadata(data)[name]['sourceName'] for name in active_checks(data)}
         env = active_sources & catalog['environment']
         expected_env = expected_environment(case, combined, starting_items)
@@ -377,6 +431,10 @@ def probe(case, game, mode, output):
     require(not data.get('accessibility', {}).get('noLogic'), 'native graph switched to No Logic')
     require(not data.get('startingSouls'), 'unexpected starting souls invalidate native replay')
     result = {'game': game, 'mode': mode, 'case': case, 'settings': actual_settings, 'dump': data, 'excluded': excluded}
+    if mode == 'combined' and game == 'oot':
+        exported = native.soh.SOH_DumpSharedItemPairs
+        exported.restype = ctypes.c_char_p; exported.argtypes = []
+        result['sharedPairs'] = json.loads(exported())
     if game == 'oot': result['layouts'] = native.dump('DumpDungeonLayouts')
     if mode == 'solo':
         filled = native.call('FillSoloRandoSeed', SEED, result=ctypes.c_char_p, args=(ctypes.c_uint32,))
@@ -413,6 +471,7 @@ def owner_placements(spoiler):
 
 def validate_combined(case, spoiler, probes):
     result = {}; owned = owner_placements(spoiler)
+    result['sharedWallets'] = validate_shared_wallets(case, spoiler, probes, owned)
     all_values = [plain(x) for p in owned.values() for x in p.values()]
     for game in ('oot', 'mm'):
         require(not spoiler[game].get('enabledTricks'), 'native combined seed enabled tricks')
@@ -427,7 +486,8 @@ def validate_combined(case, spoiler, probes):
             require(plain(row['itemName']) not in KEY_SCENES['oot'] and plain(row['itemName']) not in KEY_SCENES['mm'], 'own dungeon boss key exported foreign')
         # Feature counts consume the real owner across both hosts.
         validate_features(case, game, owned[game], probes[game]['dump'], combined=True,
-                          starting_items=probes[game]['settings'].get('gRando.StartingItems'), settings=spoiler[game]['settings'])
+                          starting_items=probes[game]['settings'].get('gRando.StartingItems'), settings=spoiler[game]['settings'],
+                          wallet_retained=result['sharedWallets']['retainedByOwner']['mm'] if game == 'mm' else None)
     validate_rings(case, spoiler['mm']['placements'], probes['mm']['dump'],
                    {row['checkName'] for row in spoiler.get('foreign', []) if row['checkGame'] == 'mm'})
     require(len(spoiler.get('foreign', [])) > 0, 'actual combined fill has no cross-game placements')
@@ -459,20 +519,36 @@ def negative_replay(driver, work, folder, spoiler, probes, timeout):
     altered = json.loads(json.dumps(spoiler))
     placements = altered['mm']['placements']
     key_check = next(name for name, item in placements.items() if plain(item) == 'Stone Tower Boss Key')
-    goals = [name for name, row in metadata(probes['mm']['dump']).items()
-             if row['sourceName'] == 'RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP']
-    require(len(goals) == 1 and goals[0] in placements, 'native Stone Tower boss-warp placement absent')
-    goal = goals[0]
+    rows = metadata(probes['mm']['dump'])
+    def native_check(source):
+        names = [name for name, row in rows.items() if row['sourceName'] == source]
+        require(len(names) == 1 and names[0] in placements, 'native circular control check absent: ' + source)
+        return names[0]
+    goal = native_check('RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP')
+    heart = native_check('RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_HEART_CONTAINER')
     foreign = {(row['checkGame'], row['checkName']) for row in altered.get('foreign', [])}
-    require(('mm', key_check) not in foreign and ('mm', goal) not in foreign and key_check != goal,
-            'circular negative needs two genuine native MM placements')
-    placements[key_check], placements[goal] = placements[goal], placements[key_check]
+    require(len({key_check, goal, heart}) == 3 and
+            all(('mm', check) not in foreign for check in (key_check, goal, heart)),
+            'circular negative needs three genuine native MM placements')
+    # A two-way swap moves Twinmold's Remains outside the lock and can be
+    # legitimately beatable. Keep that required reward inside the same native
+    # boss room while making its only key depend on itself; conserve every item.
+    placements[key_check], placements[goal], placements[heart] = (
+        placements[heart], placements[key_check], placements[goal])
+    require(Counter(placements.values()) == Counter(spoiler['mm']['placements'].values()) and
+            altered.get('foreign', []) == spoiler.get('foreign', []),
+            'circular negative changed the qualified item multiset or foreign ownership')
     path = folder / 'circular-negative.json'; write(path, altered)
+    control = folder / 'circular-native-control-input.json'
+    write(control, {'original': spoiler, 'altered': altered, 'probe': probes['mm']})
+    run([sys.executable, str(Path(__file__).with_name('native_circular_negative_control.py')),
+         '--input', str(control), '--output', str(folder / 'circular-native-gates.json')],
+        work, folder / 'circular-native-gates.log', timeout)
     with (folder / 'circular-negative.log').open('w') as stream:
         result = subprocess.run([str(driver), '--playthrough', str(path)], cwd=work,
                                 env={**os.environ, 'SHIP_HOME': str(work)}, stdout=stream,
                                 stderr=subprocess.STDOUT, timeout=timeout)
-    require(result.returncode in (1, 3), 'native replay accepted circular boss-key seed or failed setup: ' + str(result.returncode))
+    require(result.returncode == 1, 'native replay accepted circular boss-key seed or failed setup: ' + str(result.returncode))
     return result.returncode
 
 

@@ -124,6 +124,14 @@ int main() {
                                  return 1;
                                }}};
   const auto dump = Dump().dump();
+  {
+    auto tagged = Dump();
+    tagged["fixed"][0]["allowedChecks"] = Json::array({"Confined song chest", "Native check"});
+    StructureProbe movable(tagged.dump(), tagged.dump(), oot, mm, false);
+    assert(movable.ootFixed.size() == 2 && movable.mmFixed.size() == 2);
+    assert(std::count(movable.ootOwned.begin(), movable.ootOwned.end(), "Saria's Song") == 1);
+    assert(std::count(movable.mmOwned.begin(), movable.mmOwned.end(), "Saria's Song") == 1);
+  }
   const uint64_t seed = 123;
   rejected = GenerateSeed(dungeons, seed);
   // A blanket grant of fixed items certifies this self-locking song map. The

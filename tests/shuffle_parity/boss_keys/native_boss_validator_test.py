@@ -13,12 +13,54 @@ class NativeOutputValidatorTests(unittest.TestCase):
         progressive, child = items['RI_PROGRESSIVE_WALLET'], items['RI_WALLET_CHILD']
         count = 2 + int(enabled)
         placements = {'wallet:' + str(i): progressive + ' (MM)' for i in range(count)}
-        data = {'items': [{'token': token, 'name': items[token]} for token in
+        data = {'items': [{'token': token, 'name': items[token], 'advancement': True, 'trap': False} for token in
                           ('RI_PROGRESSIVE_WALLET', 'RI_WALLET_CHILD')],
                 'pool': [{'name': progressive} for _ in range(count)], 'fixed': []}
         settings = {'gRando.Options.RO_SHUFFLE_CHILD_WALLET': int(enabled),
                     'gRando.Options.RO_SHUFFLE_TYCOON_WALLET': 0, 'gRando.StartingItems': []}
         return placements, data, settings, progressive, child
+
+    def shared_wallet_sample(self, enabled):
+        _, mm, settings, name, _ = self.wallet_sample(enabled)
+        oot = {'items': [{'name': name, 'advancement': True, 'trap': False}],
+               'pool': [{'name': name}, {'name': name}], 'fixed': []}
+        probes = {'oot': {'dump': oot, 'sharedPairs': [{'oot': name, 'mm': 'RI_PROGRESSIVE_WALLET', 'chain': 4}]},
+                  'mm': {'dump': mm, 'settings': settings}}
+        spoiler = {'sharedItems': [], 'oot': {'placements': {'OOT0': name}},
+                   'mm': {'placements': {'MM0': name, **({'MM1': name} if enabled else {})}},
+                   'foreign': [{'checkGame': 'mm', 'checkName': 'MM0', 'itemGame': 'oot', 'itemName': name, 'shared': True}]}
+        return probes, spoiler
+
+    def test_shared_wallets_use_actual_pair_and_native_source_maximum(self):
+        for enabled in (False, True):
+            probes, spoiler = self.shared_wallet_sample(enabled)
+            result = native.validate_shared_wallets('mm-parity' if enabled else 'own', spoiler, probes,
+                                                   native.owner_placements(spoiler))
+            self.assertEqual(result, {'nativeSourceCounts': {'oot': 2, 'mm': 2 + int(enabled)},
+                                     'retainedByOwner': {'oot': 2, 'mm': int(enabled)}, 'canonicalTotal': 2 + int(enabled)})
+
+    def test_shared_wallets_reject_missing_excess_wrong_owner_pair_and_flags(self):
+        probes, spoiler = self.shared_wallet_sample(True)
+        name = probes['oot']['sharedPairs'][0]['oot']
+        for change in ('missing', 'excess', 'owner', 'shared', 'duplicate', 'phantom'):
+            bad = deepcopy(spoiler)
+            if change == 'missing': del bad['mm']['placements']['MM1']
+            if change == 'excess': bad['mm']['placements']['extra'] = name
+            if change == 'owner': bad['foreign'][0]['itemGame'] = 'mm'
+            if change == 'shared': bad['foreign'][0]['shared'] = False
+            if change == 'duplicate': bad['foreign'].append(deepcopy(bad['foreign'][0]))
+            if change == 'phantom': bad['mm']['placements']['phantom'] = "Child's Wallet"
+            with self.assertRaises(AssertionError):
+                native.validate_shared_wallets('mm-parity', bad, probes, native.owner_placements(bad))
+        for change in ('missing', 'duplicate', 'chain', 'supply', 'flags'):
+            bad = deepcopy(probes)
+            if change == 'missing': bad['oot']['sharedPairs'] = []
+            if change == 'duplicate': bad['oot']['sharedPairs'] *= 2
+            if change == 'chain': bad['oot']['sharedPairs'][0]['chain'] = 1
+            if change == 'supply': bad['mm']['dump']['pool'].pop()
+            if change == 'flags': bad['oot']['dump']['items'][0]['advancement'] = False
+            with self.assertRaises(AssertionError):
+                native.validate_shared_wallets('mm-parity', spoiler, bad, native.owner_placements(spoiler))
 
     def test_native_child_wallet_uses_two_or_three_progressive_items(self):
         for enabled in (False, True):

@@ -677,10 +677,16 @@ static void DrawGeneralTab() {
 
     ImGui::SeparatorText("Live Options");
     ImGui::TextWrapped("These options can be changed on the fly, and are not tied to the seed generation.");
-    UIWidgets::CVarCheckbox(
-        "Container Style Matches Contents", "gRando.CSMC",
-        UIWidgets::CheckboxOptions().Tooltip("This will make the contents of a container match the container itself. "
-                                             "Eg chests, pots, crates, grass, etc."));
+    {
+        WhatsNew::Scope releaseHighlight("gRando.CSMC", "Container Style Matches Contents",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        UIWidgets::CVarCheckbox(
+            "Container Style Matches Contents", "gRando.CSMC",
+            UIWidgets::CheckboxOptions().Tooltip(
+                "Show the assigned reward's category on shuffled containers and environmental checks. "
+                "Includes chests, pots, crates, grass, rocks, boulders, icicles and soft soil, "
+                "including cross-game rewards. Environmental checks keep a generic gold marker when this is off."));
+    }
 
     UIWidgets::CVarCombobox(
         "Junk Items", "gRando.JunkItems", &junkItemsOptions,

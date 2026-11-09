@@ -24,6 +24,18 @@ inline const Entry* Find(RandoItemId item) {
             return &key;
     return nullptr;
 }
+// Visual classification includes both native keys and OoT aliases. Keep native
+// ownership/door logic on Find(), which deliberately contains only MM keys.
+inline constexpr bool IsDoorKeyItem(RandoItemId item) {
+    switch (item) {
+#define RUSTY_KEY(game, key, rg, ri, flag, name) case ri:
+#include "../../../combo/rando/RustyDoorKeyCatalog.inc"
+#undef RUSTY_KEY
+        return true;
+        default:
+            return false;
+    }
+}
 inline bool CanUse(RandoItemId item) {
     const auto* key = Find(item);
     return !key || !RANDO_SAVE_OPTIONS[RO_SHUFFLE_RUSTY_KEYS] || Flags_GetRandoInf(key->flag);

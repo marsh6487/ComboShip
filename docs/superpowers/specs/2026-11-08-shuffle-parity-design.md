@@ -82,3 +82,15 @@ Source provenance: `BossSoul-Flame-Alpha-Repair-POC5-20261020.zip`, SHA256
 Archive resources are local audit inputs only and must not enter the public
 source checkpoint. Callback/resource-path tests are distinct from configured
 GPU/mod-stack acceptance.
+
+## Environmental reward category presentation
+
+The user's November 9 follow-up confirms that environmental shuffles must also
+show contents-category cues on their source objects, as existing OoT shuffled
+rocks and icicles do. MM uses its existing live `gRando.CSMC` control and native
+render resources. Resolve the actual assigned reward through the existing native
+and cross-game category resolver; do not classify a foreign reward by its saved
+sentinel. Preserve OoT's existing category palette, normal object rendering,
+collected/disabled behavior, and the global menu accent toggle. This presentation
+must never grant items or change seed assignments. The updated existing control
+receives the established cyan accent.

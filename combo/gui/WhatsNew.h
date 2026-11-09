@@ -32,6 +32,8 @@ inline constexpr Entry kControls[]{
       "Shuffle MM stalagmites in Snowhead, Great Bay and the Goron Moon trial." },
     { "gRando.Options.RO_SHUFFLE_SOIL_DROPS", Kind::New,
       "Shuffle each soft-soil reward after a fresh native bug interaction." },
+    { "gRando.CSMC", Kind::Updated,
+      "MM environmental checks also show their assigned reward category, including cross-game items." },
 
     { "gRandoSettings.ShuffleSongEvents", Kind::New, "Shuffle songs required by OoT world events." },
     { "gRandoSettings.ShuffleClock", Kind::New, "Lock OoT time until the Clock is found." },

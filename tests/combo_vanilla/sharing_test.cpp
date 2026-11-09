@@ -3,9 +3,14 @@
 #include "mm/mods/nei_save.h"
 #include "mm/2s2h/FleetShipCombo/FleetComboItems.h"
 #include "combo/rando/RpgStatsJson.h"
+#include "mm/2s2h/Rando/Types.h"
+#include "mm/2s2h/Rando/SoulShuffleShared.h"
 #else
 #include "soh/mods/nei_save.h"
+#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
+#include "soh/soh/Enhancements/randomizer/SoulShuffleShared.h"
 #endif
+#include "combo/rando/SharedSoulRuntime.h"
 #include <cassert>
 #include <iostream>
 #include <cstring>
@@ -41,13 +46,34 @@ static int sReceiveDepth{};
 static bool sPullPending{};
 static void* gPlayState = reinterpret_cast<void*>(1);
 static unsigned peerExtracts{}, peerApplies{};
+static unsigned peerSoulExtracts{}, peerSoulGrants{}, nativeSoulGrants{};
+static uint32_t soulMask{};
+static std::set<std::string> nativeSoulFlags;
+static json peerSoulState;
 static json sentPacket;
 static json sNetFlat;
 static int sNetMismatchStreak{}, sNetFutileResyncs{}, sNetResyncCooldownLeft{};
 static constexpr int kNetResyncCooldown = 10;
 static void FleetShipCombo_PushPacket(const char* wire) { sentPacket = json::parse(wire); }
 static const char* ExtractPeerState() { ++peerExtracts; return "{}"; }
-static void* Combo_ResolveSym(const char*, const char*) { return reinterpret_cast<void*>(ExtractPeerState); }
+static const char* ExtractPeerSoulState() {
+    ++peerSoulExtracts;
+    static std::string wire;
+    wire = peerSoulState.dump();
+    return wire.c_str();
+}
+static void* Combo_ResolveSym(const char* module, const char* name) {
+#ifdef TEST_MM
+    assert(std::string(module) == "soh");
+    const std::string prefix = "SOH";
+#else
+    assert(std::string(module) == "2ship");
+    const std::string prefix = "MM";
+#endif
+    if (name == prefix + "_ExtractSharedState") return reinterpret_cast<void*>(ExtractPeerState);
+    assert(name == prefix + "_ExtractSharedSoulState");
+    return reinterpret_cast<void*>(ExtractPeerSoulState);
+}
 static void FleetSync_ApplySharedState(const char*) { ++peerApplies; }
 struct FleetSharedReceiveGuard {
     FleetSharedReceiveGuard() { ++sReceiveDepth; }
@@ -75,7 +101,9 @@ static void GrantOotItemByName(const char* name, void*) { assert(name && *name);
 #define GrantSharedItem SOH_GrantSharedItem
 #define INV_CONTENT(item) gSaveContext.inventory.items[SLOT_NAYRUS_LOVE]
 #endif
+#ifndef COMBO_EXPORT
 #define COMBO_EXPORT
+#endif
 #define ARRAY_COUNT(a) (static_cast<int>(sizeof(a) / sizeof((a)[0])))
 #ifndef TEST_MM
 using s32 = int32_t;
@@ -83,6 +111,50 @@ using u8 = uint8_t;
 struct Player { uint16_t heldItemId; };
 static u8 TwilightUpgrade_IsClawshotActive() { return 0; }
 #endif
+// This fixture owns Vanilla NEI storage and FleetShared routing. Real native
+// soul flags/grants remain controlled services; the production public wrappers
+// and complete SharedSoulRuntime perform category, slot and ownership routing.
+struct SoulServiceAdapter {
+    static ComboRando::GameId Game() {
+#ifdef TEST_MM
+        return ComboRando::GAME_MM;
+#else
+        return ComboRando::GAME_OOT;
+#endif
+    }
+    static int Slot() { return gSaveContext.fileNum; }
+    static uint32_t Mask() {
+        return Combo_IsCombinedGame() && !Combo_IsVanilla() && Slot() >= 0 && Slot() <= 2 ? soulMask : 0;
+    }
+    static int SourceItem() {
+#ifdef TEST_MM
+        return RI_SOUL_ENEMY_OCTOROK;
+#else
+        return RG_SOUL_ENEMY_OCTOROK;
+#endif
+    }
+    static const char* LocalName() {
+        return Game() == ComboRando::GAME_OOT ? ComboRando::SharedSoulPairs[0].ootName
+                                             : ComboRando::SharedSoulPairs[0].mmName;
+    }
+    static const char* PeerName() {
+        return Game() == ComboRando::GAME_OOT ? ComboRando::SharedSoulPairs[0].mmName
+                                             : ComboRando::SharedSoulPairs[0].ootName;
+    }
+    static std::string ItemName(int item) { return item == SourceItem() ? LocalName() : ""; }
+    static std::string LegacyPeerName(int) { return {}; }
+    static bool Owned(const std::string& name) { return nativeSoulFlags.contains(name); }
+    static void GrantNative(const char* name) {
+        assert(sReceiveDepth == 1 && name == std::string(LocalName()));
+        ++nativeSoulGrants;
+        nativeSoulFlags.insert(name);
+    }
+    static void GrantPeer(const char* name, int slot, uint32_t mask) {
+        assert(name == std::string(PeerName()) && slot == Slot() && mask == ComboRando::SS_ENEMY);
+        ++peerSoulGrants;
+    }
+};
+using Runtime = ComboRando::SharedSoulRuntime<SoulServiceAdapter>;
 #include "native_adapter.inc"
 
 static void TestHashPolicy() {
@@ -302,6 +374,73 @@ static void TestNativeAdapters(const json& incoming) {
 #endif
 }
 
+static void TestSharedSoulRouting() {
+    gComboGameMode = COMBO_GAME_BOTH;
+    gComboVanillaMode = 0;
+    gSaveContext.fileNum = 0;
+    soulMask = ComboRando::SS_ENEMY;
+    const auto ordinary = legacyFanouts;
+    const auto peerBefore = peerSoulGrants;
+    FleetShared_OnNativeObtained(7); // Ordinary receipt retains the legacy path.
+    assert(legacyFanouts == ordinary + 1 && peerSoulGrants == peerBefore);
+    FleetShared_OnNativeObtained(SoulServiceAdapter::SourceItem());
+    assert(legacyFanouts == ordinary + 1 && peerSoulGrants == peerBefore + 1);
+    assert(nativeSoulGrants == 0); // Native source ownership is not granted recursively.
+    soulMask = 0;
+    FleetShared_OnNativeObtained(SoulServiceAdapter::SourceItem());
+    assert(legacyFanouts == ordinary + 2 && peerSoulGrants == peerBefore + 1);
+    soulMask = ComboRando::SS_ENEMY;
+    sReceiveDepth = 1;
+    FleetShared_OnNativeObtained(SoulServiceAdapter::SourceItem());
+    sReceiveDepth = 0;
+    for (int mode : {COMBO_GAME_OOT, COMBO_GAME_MM}) {
+        gComboGameMode = mode;
+        FleetShared_OnNativeObtained(SoulServiceAdapter::SourceItem());
+    }
+    gComboGameMode = COMBO_GAME_BOTH;
+    gComboVanillaMode = 1;
+    FleetShared_OnNativeObtained(SoulServiceAdapter::SourceItem());
+    assert(legacyFanouts == ordinary + 2 && peerSoulGrants == peerBefore + 1);
+
+    gComboVanillaMode = 0;
+    const auto nativeBefore = gSaveContext;
+    const auto neiBefore = live;
+    peerSoulState = {{"slot", 0}, {"mask", uint32_t(ComboRando::SS_ENEMY)},
+                     {"owned", json::array({SoulServiceAdapter::PeerName()})}};
+    const auto extracts = peerSoulExtracts;
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(peerSoulExtracts == extracts + 1 && nativeSoulGrants == 1);
+    assert(nativeSoulFlags == std::set<std::string>{SoulServiceAdapter::LocalName()});
+    assert(!sPullPending && sReceiveDepth == 0);
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(nativeSoulGrants == 1); // Exact native ownership makes reconciliation idempotent.
+    nativeSoulFlags.clear();
+    peerSoulState["slot"] = 1;
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(nativeSoulFlags.empty() && nativeSoulGrants == 1);
+    peerSoulState["slot"] = 0;
+    peerSoulState["mask"] = uint32_t(ComboRando::SS_NPC);
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(nativeSoulFlags.empty() && nativeSoulGrants == 1);
+    peerSoulState["mask"] = uint32_t(ComboRando::SS_ENEMY);
+    soulMask = 0;
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(nativeSoulFlags.empty() && nativeSoulGrants == 1);
+    soulMask = ComboRando::SS_ENEMY;
+    gComboVanillaMode = 1;
+    sPullPending = true;
+    PullFromPeerWhenReady();
+    assert(nativeSoulFlags.empty() && nativeSoulGrants == 1 && sReceiveDepth == 0);
+    assert(!std::memcmp(&nativeBefore, &gSaveContext, sizeof(gSaveContext)));
+    assert(!std::memcmp(&neiBefore, &live, sizeof(live)));
+    std::cout << "PASS real shared-soul wrappers/runtime: ordinary fallthrough, handled receipt, slot/category, Vanilla/solo/receive gates and idempotent native ownership\n";
+}
+
 int main() {
     Receiver oot;
     oot.world = World::Oot;
@@ -437,5 +576,6 @@ int main() {
     assert(FilterSharing(delta, oot).empty());
     TestHashPolicy();
     TestNativeAdapters(incoming);
+    TestSharedSoulRouting();
     std::cout << "PASS NEI-only ownership, native progression isolation, first-cycle quarantine, exact aliases, sword prerequisites, full-width cells and idempotent grants\n";
 }

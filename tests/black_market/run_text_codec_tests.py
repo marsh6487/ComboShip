@@ -60,6 +60,10 @@ static void Market_Audio(u16 sound, ...) { (void)sound; }
     else:
         body = body.replace('#include "message_data_static.h"',
                             '#include "message_data_static.h"\n#include "message_data_fmt_nes.h"')
+        # Song activation is outside this ordinary-text codec boundary. Retain
+        # the native close branch and abort if it unexpectedly requests a song.
+        body += ('static int Market_SongIntercept(int song) { (void)song; abort(); }\n'
+                 '#define SongEvents_MmInterceptSong Market_SongIntercept\n')
     decoded = "msgCtx->decodedBuffer.schar" if mm else "msgCtx->msgBufDecoded"
     body += "void MarketTest_RenderControls(PlayState* play) {\n"
     body += "MessageContext* msgCtx = &play->msgCtx; Font* font = &msgCtx->font;\nGfx* gfx = NULL; Gfx** gfxP = &gfx;\n"
@@ -69,6 +73,16 @@ static void Market_Audio(u16 sound, ...) { (void)sound; }
     body += case("MESSAGE_EVENT", "MESSAGE_EVENT2" if mm else "MESSAGE_NAME")
     body += "default: " + ("" if mm else "if (character == MESSAGE_COLOR) ++i; ") + "break;\n}\n}\n}\n"
     lifecycle = (ROOT / ("mm/src/code/z_message.c" if mm else "soh/src/code/z_message_PAL.c")).read_text()
+    if mm:
+        # Keep the actual session storage: the reservation is private to the
+        # native message owner. Compile that owner once with these controls,
+        # rather than shadowing its static state in another translation unit.
+        body = '#include "' + str(ROOT / 'mm/src/code/z_message.c') + '"\n' + body
+        body += ("\nvoid MarketTest_ReserveSong(PlayState* play, s16 song) {\n"
+                 "sSongEventReservedSong = sLastPlayedSong = song;\n"
+                 "play->msgCtx.lastPlayedSong = song;\n}\n"
+                 "int MarketTest_SongReservationCleared(void) {\n"
+                 "return sSongEventReservedSong == -1 && sLastPlayedSong == 0xFF;\n}\n")
     if not mm:
         # Keep the whole native Start/Continue/Close wrappers. Their OpenText
         # boundary loads actual MarketText and runs the native common reset;
@@ -127,7 +141,7 @@ def run_mm(folder):
     flags = common_flags(includes) + ["-DMM_BUILD_DLL"]
     units = []
     c_sources = [ROOT / "mm/src/code" / (name + ".c")
-                 for name in ("z_message", "z_message_nes", "z_message_staff", "z_kanfont")]
+                 for name in ("z_message_nes", "z_message_staff", "z_kanfont")]
     # Message_OpenText resets the real optional-title context; link its C owner.
     c_sources.append(ROOT / "mm/2s2h/Enhancements/Graphics/OotLocationTitleCard.c")
     for c_source in c_sources:

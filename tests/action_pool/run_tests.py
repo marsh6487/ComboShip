@@ -18,7 +18,13 @@ unified=block(mm[mm.index('// Combo (OoT+MM)'):],'if (FleetCombo_UnifiedPoolActi
 gear=block(block(mm[mm.index('// Combo (OoT+MM)'):],'if (!FleetCombo_UnifiedPoolActive())'),'if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_GEAR]')
 # The generated harness leaves these production branches unchanged.
 a=oot.index('if (ctx->GetOption(RSK_SHUFFLE_CLIMB))');b=oot.index('if (ctx->GetOption(RSK_SHUFFLE_SPEAK))',a)
+rusty=block(read('mm/2s2h/Rando/RustyDoorKeys.h'),'inline constexpr bool IsDoorKeyItem(')
+# Keep the real pure catalog predicate while resolving its production-relative
+# include from the generated fixture's temporary directory.
+rusty=rusty.replace('#include "../../../combo/rando/RustyDoorKeyCatalog.inc"',
+                    '#include "'+str(ROOT/'combo/rando/RustyDoorKeyCatalog.inc')+'"')
 fragments={
+ 'mm_rusty_visual.inc':'namespace Rando::RustyDoorKeys {\n'+rusty+'\n}\n',
  'oot_add.inc':block(oot,'void AddItemToPool('),
  'oot_pool_map.inc':oot[oot.index('const std::map<RandomizerGet,'):oot.index('void AddItemToPool(')],
  'oot_actions.inc':oot[a:b],

@@ -602,6 +602,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([str(integrated), str(generated_routes)], check=True)
 
     information = (ROOT / 'tests/item_receipts/information_test.cpp').read_text()
+    # This source-slice fixture has no engine host. Use the verbatim seed-policy
+    # contract from the owner header; importing z64 would replace its unrelated
+    # altar/font service boundaries. ResetImportedCatalog remains the real template.
+    rusty = (ROOT / 'soh/soh/Enhancements/randomizer/RustyDoorKeys.h').read_text()
+    rusty_policy = rusty[rusty.index('inline constexpr const char* CatalogVersionCVar'):
+                         rusty.index('inline RandomizerGet LegacySourceItem(')]
+    information = information.replace('namespace Rando {',
+        'namespace Rando::RustyDoorKeys {\n' + rusty_policy + '\n}\nnamespace Rando {', 1)
     hint = (ROOT / 'soh/soh/Enhancements/randomizer/hint.cpp').read_text()
     save = (ROOT / 'soh/soh/SaveManager.cpp').read_text()
     save_header = (ROOT / 'soh/soh/SaveManager.h').read_text()

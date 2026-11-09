@@ -17,6 +17,7 @@ cc = sys.argv[2] if len(sys.argv) > 2 else "cc"
 source = root / "soh/src/code/z_kankyo.c"
 prefixes = sorted(set(re.findall(r"CVAR_PREFIX_\w+", (root / "soh/soh/cvar_prefixes.h").read_text())))
 common = ["-std=gnu11", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=6"]
+common += ["-I" + str(root)]
 common += ['-D' + p + '="test"' for p in prefixes]
 common += ["-I" + p for p in ["soh/assets", "soh/include", "soh/src", "soh/mods", "soh",
                               "libultraship/include", "ZAPDTR/ZAPD/resource/type", "combo",

@@ -27,7 +27,7 @@ scene_bridge += 'SceneDB* SceneDB::Instance = new SceneDB();\n'
 for signature in ('void SceneDB::SeedVanillaScenes()', 'SceneDB::Entry& SceneDB::RetrieveEntry(int32_t id)',
                   'extern "C" int32_t SceneDB_HorseAllowed(int32_t id)'):
     scene_bridge += block_from(scene_source, scene_source.index(signature)) + '\n'
-flags = ['-std=gnu2x', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-Icombo', '-Icombo/menu', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
+flags = ['-std=gnu2x', '-I' + str(ROOT), '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-Icombo', '-Icombo/menu', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
          '-Werror=implicit-function-declaration', '-Wno-int-conversion',
          '-Wno-incompatible-pointer-types', '-Wno-discarded-qualifiers',
          '-Wno-discarded-array-qualifiers',

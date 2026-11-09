@@ -39,7 +39,7 @@ def compile_unit(path):
     host = path.split("/", 1)[0]
     native = ROOT / path
     is_c = native.suffix == ".c"
-    roots = [ROOT / host, ROOT / host / "include", ROOT / host / "include/PR",
+    roots = [ROOT, ROOT / host, ROOT / host / "include", ROOT / host / "include/PR",
              ROOT / host / "src", ROOT / host / "assets", ROOT / host / "mods",
              ROOT / host / ("soh" if host == "soh" else "2s2h"), ROOT / "combo",
              ROOT / "combo/menu", ROOT / "combo/title", ROOT / "libultraship/include", ROOT / "libultraship",

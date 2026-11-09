@@ -31,6 +31,8 @@ extern "C" void Message_OpenText(PlayState*, u16);
 extern "C" void Message_Decode(PlayState*);
 extern "C" void MarketTest_RenderControls(PlayState*);
 extern "C" void MarketTest_CloseTick(PlayState*);
+extern "C" void MarketTest_ReserveSong(PlayState*, s16);
+extern "C" int MarketTest_SongReservationCleared(void);
 // Diagnostic output is a boundary service; keep the real receipt/message path.
 extern "C" void lusprintf(const char*, int, int, const char*, ...) {}
 extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation*);
@@ -163,9 +165,20 @@ static void TestReleaseContract() {
         }
         Message_CloseTextbox(&play);
         assert(play.msgCtx.msgMode == MSGMODE_TEXT_CLOSING && play.msgCtx.stateTimer == 2);
+        assert(MarketTest_SongReservationCleared());
+        if (conversation == 2) {
+            MarketTest_ReserveSong(&play, OCARINA_SONG_TIME);
+            assert(!MarketTest_SongReservationCleared());
+        }
         MarketTest_CloseTick(&play);
         assert(Message_GetState(&play.msgCtx) == TEXT_STATE_CLOSING);
+        if (conversation == 2) assert(!MarketTest_SongReservationCleared());
         MarketTest_CloseTick(&play);
+        assert(MarketTest_SongReservationCleared());
+        if (conversation == 2) {
+            assert(play.msgCtx.ocarinaAction == OCARINA_ACTION_CHECK_NOTIME_DONE);
+            assert(play.msgCtx.ocarinaMode == OCARINA_MODE_EVENT);
+        }
         assert(Message_GetState(&play.msgCtx) == TEXT_STATE_NONE && play.msgCtx.msgLength == 0);
         assert(play.msgCtx.currentTextId == 0 && play.msgCtx.stateTimer == 0);
         // No MessageContext reset here: the next iteration re-talks through native StartTextbox.

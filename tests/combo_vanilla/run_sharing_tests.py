@@ -55,6 +55,14 @@ for game in ('soh', 'mm'):
             unused = '    (void)sh;\n' if 'Equips(' in signature else ''
             snippets.append(function[:pos] + guard + '\n' + unused + '    ++legacyCalls;\n}')
         shared = sync_path.with_name('FleetSharedItems.cpp').read_text()
+        # Keep the actual soul receipt/reconciliation wrappers and complete
+        # shared runtime. The fixture supplies only native flag/grant services.
+        soul_path = ROOT / ('soh/soh/Enhancements/randomizer/SoulShuffleShared.cpp' if game == 'soh'
+                            else 'mm/2s2h/Rando/SoulShuffleShared.cpp')
+        soul = soul_path.read_text()
+        prefix = 'SOH' if game == 'soh' else 'MM'
+        snippets += [extract(soul, 'extern "C" int ' + prefix + '_ShareSoulReceipt('),
+                     extract(soul, 'extern "C" void ' + prefix + '_ApplySharedSoulState(')]
         fanout = extract(shared, 'extern "C" void FleetShared_OnNativeObtained(')
         boundary = fanout.index('    // Share the concrete' if game == 'mm' else '    // Native magic')
         snippets.append(fanout[:boundary] + '    (void)nativeId; ++legacyFanouts;\n}')

@@ -43,6 +43,52 @@ with tempfile.TemporaryDirectory(prefix='mm-environment-') as td:
  assert len(rules)==211
  (build/'environment_all_rules.inc').write_text('\n'.join(rules))
 
+ # Native graphics/category implementations, not a modeled renderer or type map.
+ matrix=(ROOT/'mm/src/code/sys_matrix.c').read_text()
+ skin=(ROOT/'mm/src/code/z_skin_matrix.c').read_text()
+ graph=(ROOT/'mm/src/code/graph.c').read_text()
+ rcp=(ROOT/'mm/src/code/z_rcp.c').read_text()
+ bridge=(ROOT/'mm/src/code/stubs.c').read_text()
+ setup=re.search(r'^Gfx gSetupDLs\[SETUPDL_MAX\]\[6\] = \{.*?^};',rcp,re.M|re.S)[0]
+ graphics='extern "C" {\n'+setup+'\n'+'\n'.join(function(src,name) for src,name in (
+  (skin,'SkinMatrix_SetTranslate'),(skin,'SkinMatrix_SetScale'),
+  (matrix,'Matrix_MtxFCopy'),(matrix,'Matrix_Push'),(matrix,'Matrix_Pop'),
+  (matrix,'Matrix_Translate'),(matrix,'Matrix_Scale'),(matrix,'Matrix_ReplaceRotation'),
+  (graph,'Graph_OpenDisps'),(graph,'Graph_CloseDisps'),(bridge,'gSPDisplayList'),
+  (rcp,'Gfx_SetupDL60_XluNoCD'),(rcp,'Gfx_SetupDL25_Xlu')))+'\n}\n'
+ (build/'environment_csmc_native_graphics.inc').write_text(graphics)
+ nativeHeights={}
+ for actorId,name in (('ACTOR_BG_ICICLE','ovl_Bg_Icicle/z_bg_icicle.c'),('ACTOR_EN_ISHI','ovl_En_Ishi/z_en_ishi.c'),
+                      ('ACTOR_OBJ_BOMBIWA','ovl_Obj_Bombiwa/z_obj_bombiwa.c'),('ACTOR_OBJ_HAMISHI','ovl_Obj_Hamishi/z_obj_hamishi.c')):
+  source=(ROOT/'mm/src/overlays/actors'/name).read_text()
+  values=re.findall(r'\{\s*\d+,\s*(\d+),\s*-?\d+,\s*\{\s*0,\s*0,\s*0\s*}\s*}',source)
+  assert values,actorId
+  nativeHeights[actorId]=int(values[0]) if actorId=='ACTOR_EN_ISHI' else max(map(int,values))
+ bounds='static float NativeCsmcColliderHeight(const Actor& actor){switch(actor.id){'
+ for actorId,height in nativeHeights.items():
+  reference='.4f' if actorId=='ACTOR_OBJ_HAMISHI' else '.1f'
+  bounds+='case '+actorId+':return '+str(height)+'*std::fabs(actor.scale.y)/'+reference+';'
+ bounds+='default:return 0;}}\n'
+ (build/'environment_csmc_native_bounds.inc').write_text(bounds)
+
+ convert=(ROOT/'mm/2s2h/Rando/ConvertItem.cpp').read_text()
+ rpg=(ROOT/'mm/mods/combo_rpg.cpp').read_text()
+ clock=(ROOT/'mm/2s2h/Rando/MiscBehavior/ClockShuffle.cpp').read_text()
+ conversion=function(rpg,'ComboRpg_IsEnabled')+'\n'+function(rpg,'ComboRpg_NativeMagicTier')+'\n'
+ conversion+=function(clock,'GetHalfDayIndexFromClockItem')+'\n'
+ conversion+=function(convert,'Rando::ConvertItem')+'\n#ifdef COMBO_BUILD\n'+function(convert,'ForeignTypeFromCategory')+'\n#endif\n'+function(convert,'Rando::GetItemTypeForCheck')
+ (build/'environment_csmc_conversion.inc').write_text(conversion)
+ ben=(ROOT/'mm/2s2h/BenPort.cpp').read_text()
+ def native_chunk(marker):
+  start=ben.index(marker,ben.index('extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData'))
+  opening=ben.index('{',start);end=opening+1;depth=1
+  while depth:depth+=(ben[end]=='{')-(ben[end]=='}');end+=1
+  return ben[start:end]
+ export='#ifdef COMBO_BUILD\nstatic nlohmann::json CsmcExportActualPool(const std::vector<RandoItemId>& itemPool){\n'
+ export+=native_chunk('auto isAdvancement =')+';\n'+native_chunk('auto categoryName =')+';\n'
+ export+='nlohmann::json pool=nlohmann::json::array();\n'+native_chunk('for (RandoItemId iid : itemPool)')+'\nreturn pool;\n}\n#endif\n'
+ (build/'environment_csmc_rusty_export.inc').write_text(export)
+
  tracker=(ROOT/'mm/2s2h/Rando/CheckTracker/CheckTracker.cpp').read_text()
  icon_table=tracker[tracker.index('std::vector<const char*> checkTypeIconList'):tracker.index('static constexpr ImVec4 tintColor')]
  (build/'environment_category_indices.inc').write_text(','.join(re.findall(r'/\*(RCTYPE_\w+)\*/',icon_table)))
