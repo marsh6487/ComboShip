@@ -460,3 +460,66 @@ and peer save storage remain test boundaries; no dual-module gameplay proof is
 claimed. The known review issues for direct slot/category receipts, successful MM
 dump metadata, configured starting ownership and oracle overflow are addressed.
 Broad NPC/world parity and full configured runtime validation remain unfinished.
+
+## NPC cluster 1: Anju and animal hosts — 2026-11-09
+
+Shared review checkpoint: `d6ae61cb0e3ee0732c3157433ed3cdf96bf1f282`.
+This bounded NPC cluster adds OoT EnNiwLady (Anju) in Kakariko and Impa's house,
+MM native Grog in Cucco Shack, and MM Mamamu Yan in Doggy Racetrack. Positive
+scene/role tables run at the existing preallocation boundary; unknown scenes,
+generic viewers and Grog's unused alternate role are unaffected. Grog's native
+0xFE01 parameter is normalized from the engine's signed s16 spawn argument.
+EnNiwLady and EnAob01 do not assign separate roles through actor params.
+
+Native check adapters now support multiple required souls per explicit check.
+Anju's child reward requires both Anju and Cucco; her adult egg and Pocket Cucco
+trade require Anju only (an inventory egg is not a spawned Cucco). Grog requires
+Grog and Cucco; the race reward requires Dog Lady and Dog. Existing age, time,
+item, speech, mask and event conditions remain ANDed. There are now 292 OoT and
+117 MM explicit check rows; three rows contain two requirements. Adjacent crates,
+trees, pots and the independent racetrack chest remain ungated by these NPCs.
+
+Source evidence: EnNiwLady_Init selects Impa's-house night behavior; native
+z_en_niw_lady.c grants child bottle, adult Pocket Egg and Cojiro through its three
+reward hooks. Kakariko's native region contains the corresponding three checks.
+MM z_en_hs.h documents the actual 0xFE01 role and unused params==1 branch;
+MilkRoad.cpp owns Grog's Bremen-mask and dog-race Mask-of-Truth predicates.
+EnAob01_Init owns spawning both ordinary dogs and racedogs. Native EnNwc_FindGrog,
+EnNwc_IsFound and EnNwc_CheckFound already refuse the march when Grog is absent;
+the pointer-using follow state is only entered after that check. No initialization
+cancellation, destructor workaround or extra chick suppression is introduced.
+
+Fresh tests first reproduced RED independently in both real check adapters and
+both native spawn bridges. GREEN passed original/Combo guards:
+
+- `CXX=g++-14 python3 tests/shuffle_parity/souls/run_dependency_tests.py` executes
+  the native adapters/stored predicate boundaries for every manifest row, removes
+  each required soul independently, covers options-off and unrelated false
+  conditions, and tests the adult inventory/ambient-check negative controls.
+- With `CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14`, both
+  `run_runtime_tests.py` and `run_mm_runtime_tests.py` pass whole production bridge
+  TUs and actual engine preallocation prefixes. They cover exact native scenes,
+  Grog's signed params, missing/owned/off states, both animal/NPC combinations,
+  unknown placements and existing enemy/vanilla controls. MM also executes the
+  actual native chick finder/capture functions with native structs: no Grog, no
+  Bremen march, out of range, and successful normal capture. Only the C `this`
+  identifier is renamed; sound and state-transition effects are test boundaries.
+- `run_native_compile.py --database /workspace/scratch/198fa7c65e91/build-cmake-recovered/compile_commands.json`
+  with `--only` for both SoulShuffleRuntime.cpp files, OoT logic.cpp, Kakariko.cpp
+  and MM MilkRoad.cpp passes complete production syntax using recovered native
+  flags. The runner copies CMake's forced PCH header as text and remaps paths to
+  this worktree, preventing another checkout's compiled native definitions from
+  contaminating this test. MM initially lacked SDL's architecture include path;
+  sourcing recovered-tooling/production-env.sh resolved that environment failure.
+
+This proves these roles/check boundaries, not configured scene transitions or a
+complete native-world seed. NPC families beyond this cluster remain incomplete,
+including MM Anju's schedules and OoT Grog/Dog Lady. The controls stay hidden.
+No native item/flag/setting IDs, pools, UI, capacity or key-ring behavior changed.
+
+Controller CI review additionally requested full clang-format 14 normalization of
+both SoulShuffleRuntime.cpp files and OoT logic.cpp. Their dry-run/Werror formatter
+checks pass. The controller subsequently assigned MM Logic.h formatting to this
+cluster as well; its dry-run/Werror check passes. The controller owns the separate
+OoT enemy-header formatting repair. Native tests were rerun after the cluster's initial formatting and passed;
+no unrelated suite was rerun solely for final whitespace normalization.

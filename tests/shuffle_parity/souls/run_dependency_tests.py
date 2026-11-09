@@ -35,10 +35,10 @@ with tempfile.TemporaryDirectory(prefix='soul-dependency-') as temp:
     for game,folder in [('oot','soh/soh/Enhancements/randomizer'),('mm','mm/2s2h/Rando')]:
         manifest=f'{folder}/SoulShuffleChecks.inc'
         if game=='oot':
-            text='#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"\n'
+            text='#include "soh/soh/Enhancements/randomizer/SoulShuffle.h"\n'
             text+='''
-struct Logic { bool enabled=false; RandomizerGet owned=RG_NONE;
- bool HasItem(RandomizerGet i) { return !enabled || owned==i; }
+struct Logic { std::set<RandomizerSettingKey> options;std::set<RandomizerGet> owned;
+ bool HasItem(RandomizerGet i) {auto*s=Rando::SoulShuffle::Find(i);return !s||!options.count(s->option)||owned.count(i);}
  bool CanAccessSoulCheck(RandomizerCheck check);
 } state;
 auto*logic=&state;
@@ -47,21 +47,29 @@ namespace Rando { struct Context { Option option; static Context*GetInstance(){s
 '''+body(oot_src,'bool Logic::CanAccessSoulCheck(')+'\n'
             access_body=body(access[access.index('class LocationAccess {'):], 'bool GetConditionsMet() const')
             text+='struct Check {RandomizerCheck location;bool(*condition_function)();'+access_body+'};\n'
-            text+='struct Pair {RandomizerCheck check;RandomizerGet soul;};\n'
-            text+='#define SOUL_CHECK(c,s) {c,s},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
+            text+='struct Pair {RandomizerCheck check;std::vector<RandomizerGet> souls;};\n'
+            text+='#define SOUL_CHECK(c,...) {c,{__VA_ARGS__}},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
             test='''
-            // Later MQ cow-labelled wonders are independent EnWonderItem colliders.
-            state.enabled=true;state.owned=RG_NONE;
-            for(auto c:{RC_JABU_JABUS_BELLY_MQ_HOLES_COW,
-                        RC_JABU_JABUS_BELLY_MQ_WONDER_ELEVATOR_COW,
-                        RC_JABU_JABUS_BELLY_MQ_WONDER_BASEMENT_LEFT_COW_1,
-                        RC_JABU_JABUS_BELLY_MQ_WONDER_BEFORE_BOSS_LEFT_COW})
+            state.options={RSK_SHUFFLE_ANIMAL_SOULS,RSK_SHUFFLE_NPC_SOULS};
+            state.owned={RG_SOUL_ANIMAL_CUCCO};
+            assert(!state.CanAccessSoulCheck(RC_KAK_ANJU_AS_CHILD));
+            state.owned.insert(RG_SOUL_NPC_ANJU);assert(state.CanAccessSoulCheck(RC_KAK_ANJU_AS_CHILD));
+            state.owned.erase(RG_SOUL_ANIMAL_CUCCO);assert(!state.CanAccessSoulCheck(RC_KAK_ANJU_AS_CHILD));
+            state.options.erase(RSK_SHUFFLE_ANIMAL_SOULS);assert(state.CanAccessSoulCheck(RC_KAK_ANJU_AS_CHILD));
+            state.options.insert(RSK_SHUFFLE_ANIMAL_SOULS);
+            assert(state.CanAccessSoulCheck(RC_KAK_ANJU_AS_ADULT));
+            assert(state.CanAccessSoulCheck(RC_KAK_TRADE_POCKET_CUCCO));
+            state.owned.clear();assert(state.CanAccessSoulCheck(RC_KAK_NEAR_IMPAS_HOUSE_POT_1));
+            for(auto c:{RC_JABU_JABUS_BELLY_MQ_HOLES_COW,RC_JABU_JABUS_BELLY_MQ_WONDER_ELEVATOR_COW,
+                        RC_JABU_JABUS_BELLY_MQ_WONDER_BASEMENT_LEFT_COW_1,RC_JABU_JABUS_BELLY_MQ_WONDER_BEFORE_BOSS_LEFT_COW})
                 assert(state.CanAccessSoulCheck(c));
             for(auto &p:pairs){
                 Check c{p.check,[]{return true;}};
-                state.enabled=false;state.owned=RG_NONE;assert(c.GetConditionsMet());
-                state.enabled=true;assert(!c.GetConditionsMet());
-                state.owned=p.soul;assert(c.GetConditionsMet());
+                state.options.clear();state.owned.clear();assert(c.GetConditionsMet());
+                for(auto item:p.souls)state.options.insert(Rando::SoulShuffle::Find(item)->option);
+                assert(!c.GetConditionsMet());
+                state.owned.insert(p.souls.begin(),p.souls.end());assert(c.GetConditionsMet());
+                for(auto item:p.souls){state.owned.erase(item);assert(!c.GetConditionsMet());state.owned.insert(item);}
                 c.condition_function=[]{return false;};assert(!c.GetConditionsMet());
                 Rando::Context::GetInstance()->option.noLogic=true;assert(c.GetConditionsMet());
                 Rando::Context::GetInstance()->option.noLogic=false;
@@ -71,33 +79,39 @@ namespace Rando { struct Context { Option option; static Context*GetInstance(){s
             text+='''unsigned options[RO_MAX]{};unsigned short flags[(RANDO_INF_MAX+15)/16]{};
 #define RANDO_SAVE_OPTIONS options
 bool Flags_GetRandoInf(RandoInf f){return flags[f/16] & (1u<<(f%16));}
+void Own(RandoItemId item,bool owned){auto*s=Rando::SoulShuffle::Find(item);assert(s);if(owned)flags[s->flag/16]|=1u<<(s->flag%16);else flags[s->flag/16]&=~(1u<<(s->flag%16));}
 namespace Rando::Logic {
 '''+body(mm_logic,'inline bool SoulCheckRequirement(')+'\n'
-            text+='struct Pair {RandoCheckId check;RandoItemId soul;};\n'
-            text+='#define SOUL_CHECK(c,s) {c,s},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
+            text+='struct Pair {RandoCheckId check;std::vector<RandoItemId> souls;};\n'
+            text+='#define SOUL_CHECK(c,...) {c,{__VA_ARGS__}},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
             start=mm_logic.index('#define CHECK(');end=mm_logic.index('// STAY macro',start)
             text+=mm_logic[start:end]+'\nstruct LogicString {LogicString(const char*){}};\n'
             text+='}\nusing namespace Rando::Logic;\n'
-            test='''for(auto&p:pairs){
-                auto*s=Rando::SoulShuffle::Find(p.soul);assert(s);
-                std::fill(std::begin(options),std::end(options),0);
-                std::fill(std::begin(flags),std::end(flags),0);
-                assert(SoulCheckRequirement(p.check));
-                options[s->option]=1;assert(!SoulCheckRequirement(p.check));
-                flags[s->flag/16]|=1u<<(s->flag%16);assert(SoulCheckRequirement(p.check));
-            }
-            // Execute the exact native macro that every original/combined caller stores.
+            test='''
             std::map<RandoCheckId,std::pair<std::function<bool()>,LogicString>> checks={
                 CHECK(RC_ROMANI_RANCH_GROG,true), CHECK(RC_DOGGY_RACETRACK_PIECE_OF_HEART,false)};
-            std::fill(std::begin(flags),std::end(flags),0);options[RO_SHUFFLE_ANIMAL_SOULS]=1;
-            assert(!checks.at(RC_ROMANI_RANCH_GROG).first());
-            auto*s=Rando::SoulShuffle::Find(RI_SOUL_ANIMAL_CUCCO);flags[s->flag/16]|=1u<<(s->flag%16);
-            assert(checks.at(RC_ROMANI_RANCH_GROG).first());
-            options[RO_SHUFFLE_ANIMAL_SOULS]=0;assert(!checks.at(RC_DOGGY_RACETRACK_PIECE_OF_HEART).first());
+            options[RO_SHUFFLE_ANIMAL_SOULS]=options[RO_SHUFFLE_NPC_SOULS]=1;
+            Own(RI_SOUL_ANIMAL_CUCCO,true);assert(!checks.at(RC_ROMANI_RANCH_GROG).first());
+            Own(RI_SOUL_NPC_GROG,true);assert(checks.at(RC_ROMANI_RANCH_GROG).first());
+            Own(RI_SOUL_ANIMAL_CUCCO,false);assert(!checks.at(RC_ROMANI_RANCH_GROG).first());
+            options[RO_SHUFFLE_ANIMAL_SOULS]=0;assert(checks.at(RC_ROMANI_RANCH_GROG).first());
+            std::fill(std::begin(flags),std::end(flags),0);options[RO_SHUFFLE_NPC_SOULS]=1;
+            for(auto c:{RC_CUCCO_SHACK_LARGE_CRATE_01,RC_CUCCO_SHACK_TREE,RC_DOGGY_RACETRACK_CHEST,RC_DOGGY_RACETRACK_POT_01})
+                assert(SoulCheckRequirement(c));
+            for(auto&p:pairs){
+                std::fill(std::begin(options),std::end(options),0);
+                std::fill(std::begin(flags),std::end(flags),0);assert(SoulCheckRequirement(p.check));
+                for(auto item:p.souls)options[Rando::SoulShuffle::Find(item)->option]=1;
+                assert(!SoulCheckRequirement(p.check));
+                for(auto item:p.souls)Own(item,true);assert(SoulCheckRequirement(p.check));
+                for(auto item:p.souls){Own(item,false);assert(!SoulCheckRequirement(p.check));Own(item,true);}
+            }
+            std::fill(std::begin(options),std::end(options),0);
+            assert(!checks.at(RC_DOGGY_RACETRACK_PIECE_OF_HEART).first());
             '''
-        cpp=temp/(game+'.cpp');cpp.write_text('#include <cassert>\n#include <algorithm>\n#include <map>\n#include <functional>\n'+text+'\nint main(){'+test+'}\n')
+        cpp=temp/(game+'.cpp');cpp.write_text('#include <cassert>\n#include <algorithm>\n#include <set>\n#include <vector>\n#include <map>\n#include <functional>\n'+text+'\nint main(){'+test+'}\n')
         for mode in ('original','combo'):
             exe=temp/(game+mode)
-            subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/folder),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
+            subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/folder),'-I'+str(ROOT/'soh/include'),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
             subprocess.run([str(exe)],check=True)
-print('PASS actual check-predicate boundaries: all explicit dependencies, missing/present/off and unrelated conditions')
+print('PASS actual native check boundaries: every required soul independently missing, owned/off and unrelated conditions')

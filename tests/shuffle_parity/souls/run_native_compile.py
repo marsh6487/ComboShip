@@ -9,9 +9,11 @@ import json
 from pathlib import Path
 import shlex
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[3]
 FILES = (
+    "mm/2s2h/Rando/Logic/Regions/MilkRoad.cpp",
     'soh/soh/Enhancements/randomizer/SoulShuffleShared.cpp',
     'mm/2s2h/Rando/SoulShuffleShared.cpp',
     'soh/soh/FleetShipCombo/FleetSharedItems.cpp',
@@ -40,6 +42,9 @@ parser.add_argument('--database', type=Path, required=True)
 parser.add_argument('--only', action='append', choices=FILES)
 args = parser.parse_args()
 entries = json.loads(args.database.read_text())
+# Do not import another worktree's native definitions through a compiled PCH.
+# Retain the same forced-header contents, remapped to this source tree, as text.
+pch_temp = tempfile.TemporaryDirectory(prefix='soul-native-pch-')
 for file in args.only or FILES:
     template = file
     if file.endswith(('/SoulShuffleRuntime.cpp', '/SoulShuffleShared.cpp')) and not any(e['file'].endswith('/'+file) for e in entries):
@@ -52,6 +57,12 @@ for file in args.only or FILES:
     i = 0
     while i < len(command):
         argument = command[i]
+        if argument == '-include' and 'cmake_pch' in command[i + 1]:
+            header = Path(pch_temp.name) / (str(len(list(Path(pch_temp.name).iterdir()))) + '.h')
+            header.write_text(Path(command[i + 1]).read_text().replace(source_root, str(ROOT)))
+            rewritten += ['-include', str(header)]
+            i += 2
+            continue
         if argument in ('-o', '-MF', '-MT', '-MQ'):
             i += 2
             continue

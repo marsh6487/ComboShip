@@ -48,6 +48,31 @@ int main() {
     optionValues[RSK_SHUFFLE_NPC_SOULS]=0;
     play.sceneNum=0;
     REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));
+    optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
+    for (int scene : {SCENE_KAKARIKO_VILLAGE, SCENE_IMPAS_HOUSE}) {
+      play.sceneNum = scene;
+      optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
+      REQUIRE(
+          Randomizer_SoulCanSpawnNonEnemy(&play, ACTOR_EN_NIW_LADY, 0xFFFF));
+      optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
+      REQUIRE(
+          !Randomizer_SoulCanSpawnNonEnemy(&play, ACTOR_EN_NIW_LADY, 0xFFFF));
+      Actor_Spawn(&play.actorCtx, &play, ACTOR_EN_NIW_LADY, 0, 0, 0, 0, 0, 0,
+                  -1);
+      REQUIRE(spawnReachesAllocation == 0);
+      Own(RG_SOUL_NPC_ANJU, true);
+      REQUIRE(
+          Randomizer_SoulCanSpawnNonEnemy(&play, ACTOR_EN_NIW_LADY, 0xFFFF));
+      Actor_Spawn(&play.actorCtx, &play, ACTOR_EN_NIW_LADY, 0, 0, 0, 0, 0, 0,
+                  -1);
+      REQUIRE(spawnReachesAllocation == 1);
+      spawnReachesAllocation = 0;
+      Own(RG_SOUL_NPC_ANJU, false);
+    }
+    play.sceneNum = SCENE_HYRULE_CASTLE;
+    REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, ACTOR_EN_NIW_LADY, 0xFFFF));
+    REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, ACTOR_EN_VIEWER, 0));
+    optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
     optionValues[RSK_SHUFFLE_ANIMAL_SOULS]=1;
     REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));
     REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_NIW,0));

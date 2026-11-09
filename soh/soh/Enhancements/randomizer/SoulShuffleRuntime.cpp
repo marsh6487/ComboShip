@@ -13,7 +13,8 @@ extern "C" int Randomizer_SoulCanDamageActor(PlayState* play, Actor* actor) {
         return true;
     }
     const auto item = Rando::SoulShuffle::EnemyForActor(actor->id, static_cast<uint16_t>(actor->params),
-                                                      gSaveContext.linkAge == LINK_AGE_ADULT, play->sceneNum == SCENE_DEKU_TREE_BOSS);
+                                                        gSaveContext.linkAge == LINK_AGE_ADULT,
+                                                        play->sceneNum == SCENE_DEKU_TREE_BOSS);
     const auto* soul = Rando::SoulShuffle::Find(item);
     return !soul || !Randomizer_GetSettingValue(soul->option) || Flags_GetRandomizerInf(soul->flag);
 }
@@ -32,22 +33,44 @@ extern "C" int Randomizer_SoulCanSpawnNonEnemy(PlayState* play, int actorId, uns
     if (!play || !IS_RANDO || gSaveContext.gameMode == GAMEMODE_END_CREDITS) {
         return true;
     }
+    const auto npcAvailable = [](RandomizerGet item) {
+        const auto* soul = Rando::SoulShuffle::Find(item);
+        return !soul || !Randomizer_GetSettingValue(soul->option) || Flags_GetRandomizerInf(soul->flag);
+    };
+#define SOUL_NPC(actor, scene, role, soul)                                            \
+    if (actorId == actor && play->sceneNum == scene && (role) && !npcAvailable(soul)) \
+        return false;
+#include "SoulShuffleNpcs.inc"
+#undef SOUL_NPC
     RandomizerGet item = RG_NONE;
     switch (actorId) {
         case ACTOR_EN_OSSAN:
-#define SOUL_SHOP(scene, role, soul) if (play->sceneNum == scene && params == role) item = soul;
+#define SOUL_SHOP(scene, role, soul)               \
+    if (play->sceneNum == scene && params == role) \
+        item = soul;
 #include "SoulShuffleShops.inc"
 #undef SOUL_SHOP
             break;
         case ACTOR_EN_NIW:
-        case ACTOR_EN_NWC: item = RG_SOUL_ANIMAL_CUCCO; break;
-        case ACTOR_EN_COW: item = RG_SOUL_ANIMAL_COW; break;
-        case ACTOR_EN_DOG: item = RG_SOUL_ANIMAL_DOG; break;
-        case ACTOR_EN_BUTTE: item = RG_SOUL_ANIMAL_BUTTERFLY; break;
+        case ACTOR_EN_NWC:
+            item = RG_SOUL_ANIMAL_CUCCO;
+            break;
+        case ACTOR_EN_COW:
+            item = RG_SOUL_ANIMAL_COW;
+            break;
+        case ACTOR_EN_DOG:
+            item = RG_SOUL_ANIMAL_DOG;
+            break;
+        case ACTOR_EN_BUTTE:
+            item = RG_SOUL_ANIMAL_BUTTERFLY;
+            break;
         case ACTOR_EN_DNS:
-        case ACTOR_EN_SHOPNUTS: item = RG_SOUL_MISC_BUSINESS_SCRUB; break;
+        case ACTOR_EN_SHOPNUTS:
+            item = RG_SOUL_MISC_BUSINESS_SCRUB;
+            break;
         case ACTOR_EN_SW:
-            if (params & 0xE000) item = RG_SOUL_MISC_GS;
+            if (params & 0xE000)
+                item = RG_SOUL_MISC_GS;
             break;
         case ACTOR_EN_TA:
             // This native minigame host dereferences all three super-cucco
@@ -55,7 +78,8 @@ extern "C" int Randomizer_SoulCanSpawnNonEnemy(PlayState* play, int actorId, uns
             if (play->sceneNum == SCENE_LON_LON_BUILDINGS && params != 1 && params != 2)
                 item = RG_SOUL_ANIMAL_CUCCO;
             break;
-        default: break; // Generic viewers, shop/cutscene proxies and custom actors are unaffected.
+        default:
+            break; // Generic viewers, shop/cutscene proxies and custom actors are unaffected.
     }
     const auto* soul = Rando::SoulShuffle::Find(item);
     return !soul || !Randomizer_GetSettingValue(soul->option) || Flags_GetRandomizerInf(soul->flag);

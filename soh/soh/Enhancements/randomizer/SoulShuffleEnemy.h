@@ -8,11 +8,16 @@ namespace Rando::SoulShuffle {
 // composer ghosts and child Skull Kid roles retain their native behavior.
 inline RandomizerGet EnemyForActor(int actorId, uint16_t params, bool adult, bool gohmaArena) {
     switch (actorId) {
-        case ACTOR_EN_GOMA: return gohmaArena ? RG_NONE : RG_SOUL_ENEMY_GOHMA_LARVA;
-        case ACTOR_EN_AM: return params == 0 ? RG_NONE : RG_SOUL_ENEMY_ARMOS;
-        case ACTOR_EN_POH: return params == 2 || params == 3 ? RG_NONE : RG_SOUL_ENEMY_POE;
-        case ACTOR_EN_SKJ: return adult ? RG_SOUL_ENEMY_SKULL_KID : RG_NONE;
-        case ACTOR_EN_SW: return params & 0xE000 ? RG_SOUL_MISC_GS : RG_SOUL_ENEMY_SKULLWALLTULA;
+        case ACTOR_EN_GOMA:
+            return gohmaArena ? RG_NONE : RG_SOUL_ENEMY_GOHMA_LARVA;
+        case ACTOR_EN_AM:
+            return params == 0 ? RG_NONE : RG_SOUL_ENEMY_ARMOS;
+        case ACTOR_EN_POH:
+            return params == 2 || params == 3 ? RG_NONE : RG_SOUL_ENEMY_POE;
+        case ACTOR_EN_SKJ:
+            return adult ? RG_SOUL_ENEMY_SKULL_KID : RG_NONE;
+        case ACTOR_EN_SW:
+            return params & 0xE000 ? RG_SOUL_MISC_GS : RG_SOUL_ENEMY_SKULLWALLTULA;
         case ACTOR_EN_TEST:
             return RG_SOUL_ENEMY_STALFOS;
         case ACTOR_EN_OKUTA:
@@ -98,58 +103,104 @@ inline RandomizerGet EnemyForActor(int actorId, uint16_t params, bool adult, boo
             return RG_SOUL_ENEMY_GUAY;
         case ACTOR_EN_GELDB:
             return RG_SOUL_ENEMY_THIEVES;
-        default: return RG_NONE;
+        default:
+            return RG_NONE;
     }
 }
 
 // This is ANDed with native weapons/tricks in the real CanKillEnemy body.
 inline RandomizerGet EnemyForLogic(RandomizerEnemy enemy) {
     switch (enemy) {
-        case RE_GOLD_SKULLTULA: return RG_SOUL_MISC_GS;
-        case RE_BIG_SKULLTULA: return RG_SOUL_ENEMY_SKULLTULA;
-        case RE_DODONGO: return RG_SOUL_ENEMY_DODONGO;
-        case RE_LIZALFOS: return RG_SOUL_ENEMY_LIZALFOS_DINOLFOS;
-        case RE_GOHMA_LARVA: return RG_SOUL_ENEMY_GOHMA_LARVA;
-        case RE_KEESE: return RG_SOUL_ENEMY_KEESE;
-        case RE_FIRE_KEESE: return RG_SOUL_ENEMY_KEESE;
-        case RE_GUAY: return RG_SOUL_ENEMY_GUAY;
-        case RE_MAD_SCRUB: return RG_SOUL_ENEMY_DEKU_SCRUB;
-        case RE_BLUE_BUBBLE: return RG_SOUL_ENEMY_BUBBLE;
-        case RE_POE: return RG_SOUL_ENEMY_POE;
-        case RE_DEAD_HAND: return RG_SOUL_ENEMY_DEAD_HAND;
-        case RE_DEKU_BABA: return RG_SOUL_ENEMY_DEKU_BABA;
-        case RE_WITHERED_DEKU_BABA: return RG_SOUL_ENEMY_DEKU_BABA;
-        case RE_LIKE_LIKE: return RG_SOUL_ENEMY_LIKE_LIKE;
-        case RE_STALFOS: return RG_SOUL_ENEMY_STALFOS;
-        case RE_IRON_KNUCKLE: return RG_SOUL_ENEMY_IRON_KNUCKLE;
-        case RE_FLARE_DANCER: return RG_SOUL_ENEMY_FLARE_DANCER;
-        case RE_WOLFOS: return RG_SOUL_ENEMY_WOLFOS;
-        case RE_FLOORMASTER: return RG_SOUL_ENEMY_FLOORMASTER;
-        case RE_REDEAD: return RG_SOUL_ENEMY_REDEAD_GIBDO;
-        case RE_MEG: return RG_SOUL_ENEMY_POE;
-        case RE_ARMOS: return RG_SOUL_ENEMY_ARMOS;
-        case RE_GREEN_BUBBLE: return RG_SOUL_ENEMY_BUBBLE;
-        case RE_DINOLFOS: return RG_SOUL_ENEMY_LIZALFOS_DINOLFOS;
-        case RE_TORCH_SLUG: return RG_SOUL_ENEMY_TORCH_SLUG;
-        case RE_FREEZARD: return RG_SOUL_ENEMY_FREEZARD;
-        case RE_SHELL_BLADE: return RG_SOUL_ENEMY_SHELL_BLADE;
-        case RE_SPIKE: return RG_SOUL_ENEMY_SPIKE;
-        case RE_WHITE_WOLFOS: return RG_SOUL_ENEMY_WOLFOS;
-        case RE_STINGER: return RG_SOUL_ENEMY_STINGER;
-        case RE_BIG_OCTO: return RG_SOUL_ENEMY_OCTOROK;
-        case RE_GERUDO_WARRIOR: return RG_SOUL_ENEMY_THIEVES;
-        case RE_GIBDO: return RG_SOUL_ENEMY_REDEAD_GIBDO;
-        case RE_DARK_LINK: return RG_SOUL_ENEMY_DARK_LINK;
-        case RE_ANUBIS: return RG_SOUL_ENEMY_ANUBIS;
-        case RE_BEAMOS: return RG_SOUL_ENEMY_BEAMOS;
-        case RE_WALLMASTER: return RG_SOUL_ENEMY_WALLMASTER;
-        case RE_PURPLE_LEEVER: return RG_SOUL_ENEMY_LEEVER;
-        case RE_TENTACLE: return RG_SOUL_ENEMY_PARASITE;
-        case RE_BARI: return RG_SOUL_ENEMY_BIRI_BARI;
-        case RE_SHABOM: return RG_SOUL_ENEMY_SHABOM;
-        case RE_OCTOROK: return RG_SOUL_ENEMY_OCTOROK;
-        case RE_WALLTULA: return RG_SOUL_ENEMY_SKULLWALLTULA;
-        default: return RG_NONE; // Bosses and noncombat guards retain existing predicates.
+        case RE_GOLD_SKULLTULA:
+            return RG_SOUL_MISC_GS;
+        case RE_BIG_SKULLTULA:
+            return RG_SOUL_ENEMY_SKULLTULA;
+        case RE_DODONGO:
+            return RG_SOUL_ENEMY_DODONGO;
+        case RE_LIZALFOS:
+            return RG_SOUL_ENEMY_LIZALFOS_DINOLFOS;
+        case RE_GOHMA_LARVA:
+            return RG_SOUL_ENEMY_GOHMA_LARVA;
+        case RE_KEESE:
+            return RG_SOUL_ENEMY_KEESE;
+        case RE_FIRE_KEESE:
+            return RG_SOUL_ENEMY_KEESE;
+        case RE_GUAY:
+            return RG_SOUL_ENEMY_GUAY;
+        case RE_MAD_SCRUB:
+            return RG_SOUL_ENEMY_DEKU_SCRUB;
+        case RE_BLUE_BUBBLE:
+            return RG_SOUL_ENEMY_BUBBLE;
+        case RE_POE:
+            return RG_SOUL_ENEMY_POE;
+        case RE_DEAD_HAND:
+            return RG_SOUL_ENEMY_DEAD_HAND;
+        case RE_DEKU_BABA:
+            return RG_SOUL_ENEMY_DEKU_BABA;
+        case RE_WITHERED_DEKU_BABA:
+            return RG_SOUL_ENEMY_DEKU_BABA;
+        case RE_LIKE_LIKE:
+            return RG_SOUL_ENEMY_LIKE_LIKE;
+        case RE_STALFOS:
+            return RG_SOUL_ENEMY_STALFOS;
+        case RE_IRON_KNUCKLE:
+            return RG_SOUL_ENEMY_IRON_KNUCKLE;
+        case RE_FLARE_DANCER:
+            return RG_SOUL_ENEMY_FLARE_DANCER;
+        case RE_WOLFOS:
+            return RG_SOUL_ENEMY_WOLFOS;
+        case RE_FLOORMASTER:
+            return RG_SOUL_ENEMY_FLOORMASTER;
+        case RE_REDEAD:
+            return RG_SOUL_ENEMY_REDEAD_GIBDO;
+        case RE_MEG:
+            return RG_SOUL_ENEMY_POE;
+        case RE_ARMOS:
+            return RG_SOUL_ENEMY_ARMOS;
+        case RE_GREEN_BUBBLE:
+            return RG_SOUL_ENEMY_BUBBLE;
+        case RE_DINOLFOS:
+            return RG_SOUL_ENEMY_LIZALFOS_DINOLFOS;
+        case RE_TORCH_SLUG:
+            return RG_SOUL_ENEMY_TORCH_SLUG;
+        case RE_FREEZARD:
+            return RG_SOUL_ENEMY_FREEZARD;
+        case RE_SHELL_BLADE:
+            return RG_SOUL_ENEMY_SHELL_BLADE;
+        case RE_SPIKE:
+            return RG_SOUL_ENEMY_SPIKE;
+        case RE_WHITE_WOLFOS:
+            return RG_SOUL_ENEMY_WOLFOS;
+        case RE_STINGER:
+            return RG_SOUL_ENEMY_STINGER;
+        case RE_BIG_OCTO:
+            return RG_SOUL_ENEMY_OCTOROK;
+        case RE_GERUDO_WARRIOR:
+            return RG_SOUL_ENEMY_THIEVES;
+        case RE_GIBDO:
+            return RG_SOUL_ENEMY_REDEAD_GIBDO;
+        case RE_DARK_LINK:
+            return RG_SOUL_ENEMY_DARK_LINK;
+        case RE_ANUBIS:
+            return RG_SOUL_ENEMY_ANUBIS;
+        case RE_BEAMOS:
+            return RG_SOUL_ENEMY_BEAMOS;
+        case RE_WALLMASTER:
+            return RG_SOUL_ENEMY_WALLMASTER;
+        case RE_PURPLE_LEEVER:
+            return RG_SOUL_ENEMY_LEEVER;
+        case RE_TENTACLE:
+            return RG_SOUL_ENEMY_PARASITE;
+        case RE_BARI:
+            return RG_SOUL_ENEMY_BIRI_BARI;
+        case RE_SHABOM:
+            return RG_SOUL_ENEMY_SHABOM;
+        case RE_OCTOROK:
+            return RG_SOUL_ENEMY_OCTOROK;
+        case RE_WALLTULA:
+            return RG_SOUL_ENEMY_SKULLWALLTULA;
+        default:
+            return RG_NONE; // Bosses and noncombat guards retain existing predicates.
     }
 }
 } // namespace Rando::SoulShuffle

@@ -277,8 +277,8 @@ inline bool SoulEventRequirement(RandoEvent event) {
     return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
 }
 
-#define EVENT(randoEvent, condition)         \
-    {                                        \
+#define EVENT(randoEvent, condition)                                               \
+    {                                                                              \
         randoEvent, [] { return SoulEventRequirement(randoEvent) && (condition); } \
     }
 #define EXIT(toEntrance, fromEntrance, condition)                           \
@@ -294,15 +294,17 @@ inline bool SoulEventRequirement(RandoEvent event) {
         }                                                     \
     }
 inline bool SoulCheckRequirement(RandoCheckId check) {
-    const auto* soul = Rando::SoulShuffle::Find(Rando::SoulShuffle::CheckItem(check));
-    return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+    return Rando::SoulShuffle::CheckRequirements(check, [](RandoItemId item) {
+        const auto* soul = Rando::SoulShuffle::Find(item);
+        return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+    });
 }
 
-#define CHECK(check, condition)                               \
-    {                                                         \
-        check, {                                              \
+#define CHECK(check, condition)                                                                \
+    {                                                                                          \
+        check, {                                                                               \
             [] { return SoulCheckRequirement(check) && (condition); }, LogicString(#condition) \
-        }                                                     \
+        }                                                                                      \
     }
 // STAY macro for region time restrictions - defines when player can stay in a region over time
 // Usage in region definitions: .timeStayRestrictions = { STAY(TIME_NIGHT1_PM_08_00, !HAS_ROOM_KEY) }

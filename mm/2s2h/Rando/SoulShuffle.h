@@ -1,4 +1,5 @@
 #pragma once
+#include <initializer_list>
 #include "Types.h"
 
 namespace Rando::SoulShuffle {
@@ -51,15 +52,18 @@ inline constexpr RandoItemId EventItem(RandoEvent event) {
             return RI_UNKNOWN;
     }
 }
-inline constexpr RandoItemId CheckItem(RandoCheckId check) {
+template <class Requirement> inline bool CheckRequirements(RandoCheckId check, Requirement requirement) {
     switch (check) {
-#define SOUL_CHECK(check, item) \
-    case check:                 \
-        return item;
+#define SOUL_CHECK(check, ...)                   \
+    case check:                                  \
+        for (RandoItemId item : { __VA_ARGS__ }) \
+            if (!requirement(item))              \
+                return false;                    \
+        return true;
 #include "SoulShuffleChecks.inc"
 #undef SOUL_CHECK
         default:
-            return RI_UNKNOWN;
+            return true;
     }
 }
 } // namespace Rando::SoulShuffle

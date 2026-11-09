@@ -1,3 +1,4 @@
+#include <initializer_list>
 #include "SoulShuffleEnemy.h"
 #include "SoulShuffle.h"
 #include "rando/CrossEntranceBoss.h"
@@ -42,10 +43,16 @@ bool Logic::CanUseCucco() {
 
 bool Logic::CanAccessSoulCheck(RandomizerCheck check) {
     switch (check) {
-#define SOUL_CHECK(check, item) case check: return HasItem(item);
+#define SOUL_CHECK(check, ...)                     \
+    case check:                                    \
+        for (RandomizerGet item : { __VA_ARGS__ }) \
+            if (!HasItem(item))                    \
+                return false;                      \
+        return true;
 #include "SoulShuffleChecks.inc"
 #undef SOUL_CHECK
-        default: return true;
+        default:
+            return true;
     }
 }
 
