@@ -1285,6 +1285,15 @@ void Rando::StaticData::InitItemTable() {
 
     // clang-format on
 
+    // Every added soul uses its native token body plus the existing boss-soul flame.
+#define SOUL(game, family, key, name) SOUL_##game(family, key, name)
+#define SOUL_OOT(family, key, name) itemTable[RG_SOUL_##family##_##key].SetCustomDrawFunc(Randomizer_DrawShuffledSoul);
+#define SOUL_MM(family, key, name)
+#include "../../../../combo/rando/SoulShuffleCatalog.inc"
+#undef SOUL_MM
+#undef SOUL_OOT
+#undef SOUL
+
     // Init itemNameToEnum
     for (auto& item : itemTable) {
         // Easiest way to filter out all the empty values from the array, since we still technically want the 0/RG_NONE

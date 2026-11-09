@@ -2,6 +2,7 @@
 // includes. Only config storage, pack availability and saving are fixtures.
 #include "gui/WhatsNew.h"
 #include "BlackMarketRoomMagic.h"
+#include "rando/SharedSouls.h"
 #include <imgui_internal.h>
 #include <algorithm>
 #include <iostream>
@@ -119,6 +120,7 @@ constexpr const char* labels[] = {
     "Cross-Game Interiors", "Cross-Game Shops", "Cross-Game Door Interiors", "Cross-Game Grottos and Graves",
     "Pricing##BlackMarket", "Dungeon Purchase Unlocks", "Regular Granny Interior", "Magical Room Materials",
     "Animated Item Seals",
+    "Shared Enemy Souls", "Shared NPC Souls", "Shared Animal Souls", "Shared Miscellaneous Souls",
 };
 constexpr const char* bossKey = "gCombo.Rando.CrossBossEntrances";
 const Row& Find(const FrameResult& frame, const char* label) {
@@ -260,6 +262,23 @@ void Probe() {
           "a real animated-seals click toggles the default-on value and schedules exactly one save");
     Check(config["unrelated-sentinel"] == 73, "native callbacks preserve unrelated settings");
 
+    for (size_t i = 0; i < std::size(ComboRando::SharedSoulCategories); ++i) {
+        Seed(true);
+        const auto& category = ComboRando::SharedSoulCategories[i];
+        const auto* label = labels[12 + i];
+        Check(CVarGetInteger(category.cvar, 0) == 0, "shared souls default off without writing config");
+        Click(label);
+        Check(writes == std::vector<std::pair<std::string, int>>{{category.cvar, 1}} &&
+                  config[category.cvar] == 1,
+              std::string(label) + " writes its actual category CVar exactly once");
+        writes.clear();
+        Click(label);
+        Check(writes == std::vector<std::pair<std::string, int>>{{category.cvar, 0}} &&
+                  config[category.cvar] == 0,
+              std::string(label) + " can restore its disabled seed preference");
+    }
+
+
     Seed(true, true);
     config[BlackMarketGranny::kCvar] = 1;
     config[WhatsNew::kEnabledCvar] = 0;
@@ -294,5 +313,5 @@ int main() {
     ImGui::DestroyContext();
     if (Fixture::failures)
         return 1;
-    std::cout << "PASS real ImGui Generate/Black Market: 12 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
+    std::cout << "PASS real ImGui Generate/Black Market/shared souls: 16 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, saved soul preferences, boss toggle, seals save and unavailable Granny reset\n";
 }

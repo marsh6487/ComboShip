@@ -35,6 +35,7 @@ def main():
     functions = "static std::string sSensorHintText;\n" + "\n".join(body(rando, signature) for signature in (
         "std::vector<RandoCheckId> Rando::FindMultiItemPlacement(",
         "static RandoItemId SensorGetDesire(", "static RandoCheckId SensorFindOutstandingCheck(",
+        "Rando::HintTarget Rando::GetDesiredItemHintTarget(",
         'extern "C" u8 SensorRune_PrepareHint(', 'extern "C" void SensorRune_OpenHint('))
     functions += "\n" + body(moon, "void OverrideSubJsText(")
     functions += "\n" + "\n".join(body(menu, signature) for signature in (
@@ -50,7 +51,7 @@ def main():
         source = Path(temporary) / "test.cpp"
         source.write_text(fixture)
         binary = Path(temporary) / "test"
-        command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-w", "-DF3DEX_GBI_2",
+        command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-DF3DEX_GBI_2",
                    *([] if args.standalone else ["-DCOMBO_BUILD"]), "-DMM_BUILD_DLL",
                    "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"),
                    *["-I" + str(ROOT / path) for path in includes]]

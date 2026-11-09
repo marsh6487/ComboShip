@@ -1925,6 +1925,32 @@ void ComboMenu::DrawComboPanel() {
     }
     ImGui::TextDisabled("One item counts for both games. Applied at generation. Masks need Ocarina of\n"
                         "Time's Shuffle Masks on. Shared Wallets turns off Shuffle Child Wallet.");
+    ImGui::SeparatorText("Shared Souls");
+    static constexpr const char* sharedSoulLabels[] = { "Shared Enemy Souls", "Shared NPC Souls", "Shared Animal Souls",
+                                                        "Shared Miscellaneous Souls" };
+    static_assert(std::size(sharedSoulLabels) == std::size(ComboRando::SharedSoulCategories));
+    if (ImGui::BeginTable("##sharedsoulcols", 2, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings)) {
+        for (size_t i = 0; i < std::size(ComboRando::SharedSoulCategories); ++i) {
+            const auto& category = ComboRando::SharedSoulCategories[i];
+            if (i % 2 == 0)
+                ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(static_cast<int>(i % 2));
+            bool on = CVarGetInteger(category.cvar, 0) != 0;
+            {
+                WhatsNew::Scope releaseHighlight(category.cvar, sharedSoulLabels[i],
+                                                 CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+                ComboRando::ComboMenu_PushCheckbox(goalTheme);
+                if (ImGui::Checkbox(sharedSoulLabels[i], &on))
+                    CVarSetInteger(category.cvar, on ? 1 : 0);
+                ComboRando::ComboMenu_PopCheckbox();
+            }
+            ImGui::SetItemTooltip("Share matching %s souls when that soul family is enabled in both games. "
+                                  "One shuffled soul grants every matching counterpart. Saved with the seed.",
+                                  category.option);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::TextDisabled("Enable the matching soul shuffle in both games to share that family.");
     ImGui::Separator();
 
     // Cosmetics (#169): each game randomizes on its own by default; sync makes MM take OOT's colors.

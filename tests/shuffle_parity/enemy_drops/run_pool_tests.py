@@ -42,6 +42,7 @@ std::array<Location,RC_MAX> StaticData::locationTable;
 std::array<Item,RG_MAX>StaticData::itemTable;
 std::array<HintText,RHT_MAX> StaticData::hintTextTable;
 std::unordered_map<RandomizerHint,StaticHintInfo>StaticData::staticHintInfoMap;
+std::unordered_map<uint32_t,RandomizerHintTextKey>StaticData::areaNames;
 std::unordered_map<std::string,RandomizerSettingKey>StaticData::optionNameToEnum;
 std::unordered_map<std::string,RandomizerCheck>StaticData::locationNameToEnum,StaticData::excludedLocationToEnum;
 std::multimap<std::tuple<s16,s16,s32>,RandomizerCheck>StaticData::CheckFromActorMultimap;
@@ -64,7 +65,23 @@ source+='}\n'
 source+=(ROOT/'soh/soh/Enhancements/custom-message/text.cpp').read_text().splitlines()[5]+'\n'
 message=(ROOT/'soh/soh/Enhancements/custom-message/CustomMessageManager.cpp').read_text()
 for sig in ('CustomMessage::CustomMessage(std::string english_, std::string german_, std::string french_, TextBoxType', 'CustomMessage::CustomMessage(std::string english_, TextBoxType', 'const std::vector<std::string> CustomMessage::GetAllMessages('):source+=function(message,sig)+'\n'
-source+='void CustomMessage::ProcessMessageFormat(std::string&,MessageFormat format) const {REQUIRE(format==MF_RAW); }\n'
+source+='using namespace std::literals::string_literals;\n'
+for map_name in ('colorToPercent','percentColors'):
+ source+=re.search(r'static const std::unordered_map<[^\n]+> '+map_name+r' = \{.*?\n\};',message,re.S)[0]+'\n'
+for sig in ('CustomMessage::CustomMessage(std::string english_, std::string german_, std::string french_,\n',
+            'void CustomMessage::EncodeColors(', 'void CustomMessage::ReplaceColors(', 'std::string CustomMessage::COLOR(',
+            'void CustomMessage::Replace(std::string&& oldStr, CustomMessage newMessage)',
+            'void CustomMessage::ProcessMessageFormat('):
+ source+=function(message,sig)+'\n'
+source+='void CustomMessage::FormatString(std::string&)const {abort();}\nvoid CustomMessage::CleanString(std::string&)const {abort();}\nvoid CustomMessage::AutoFormatString(std::string&)const {abort();}\n'
+
+item_source=(r/'item.cpp').read_text()
+constructors=list(re.finditer(r'Item::Item\(const RandomizerGet',item_source))
+a=constructors[-1].start();b=item_source.index('\n}',a)+2
+source+='namespace Rando {\n'+item_source[a:b]+'\n'+function(item_source,'const Text& Item::GetName(')+'\n}\n'
+text_source=(ROOT/'soh/soh/Enhancements/custom-message/text.cpp').read_text()
+source+=function(text_source,'Text::Text(std::string english_, std::string french_, std::string german_)')+'\n'
+source+=function(text_source,'const std::string& Text::GetEnglish(')+'\n'
 hints=(r/'3drando/hints.cpp').read_text()
 for sig in ('HintText::HintText(CustomMessage', 'const CustomMessage& HintText::GetClear('):source+=function(hints,sig)+'\n'
 source+='constexpr SceneID layoutScenes[]={'+','.join(scenes)+'};\n'
@@ -101,8 +118,15 @@ struct PoolFixtureContext {
 PoolFixtureContext*PoolFixtureContext::GetInstance(){return &state;}
 using namespace Rando;
 '''
+for sig in ('const CustomMessage& HintText::GetObscure(size_t', 'const CustomMessage& HintText::GetAmbiguous(size_t', 'const CustomMessage& HintText::GetHintMessage('):source+=function(hints,sig).replace('Rando::Context::GetInstance()','PoolFixtureContext::GetInstance()')+'\n'
 hint=(r/'hint.cpp').read_text()
-for sig in ('Hint::Hint()', 'void Hint::AddHintedLocation(', 'void Hint::SetHintType(', 'const HintText Hint::GetHintText('):source+='namespace Rando {\n'+function(hint,sig).replace('Rando::Context::GetInstance()','PoolFixtureContext::GetInstance()')+'\n}\n'
+for sig in ('Hint::Hint()', 'void Hint::AddHintedLocation(', 'void Hint::SetHintType(', 'const HintText Hint::GetHintText(', 'const HintText Hint::GetAreaHintText(', 'const CustomMessage Hint::GetAreaName(', 'void Hint::SetForeignAreas('):source+='namespace Rando {\n'+function(hint,sig).replace('Rando::Context::GetInstance()','PoolFixtureContext::GetInstance()')+'\n}\n'
+templates=(r/'3drando/hint_list.cpp').read_text()
+source+='void InitSariaColorTemplates(){auto&hintTextTable=StaticData::hintTextTable;\n'
+for key in ('RHT_SARIA_TALK_HINT','RHT_SARIA_SONG_HINT'):
+ a=templates.index('hintTextTable['+key+'] =');b=templates.index('));',a)+3
+ source+=templates[a:b]+'\n'
+source+='}\n'
 # Reachability itself is the explicit boundary: verify the native hint search
 # removes its own reward, resets logic, and restores the saved placement.
 source+='RandomizerCheck testedHint;bool stoneReachable=false;\nstd::vector<RandomizerCheck>ReachabilitySearch(std::vector<RandomizerCheck> stones){REQUIRE(ctx->GetItemLocation(testedHint)->GetPlacedRandomizerGet()==RG_NONE);return stoneReachable?stones:std::vector<RandomizerCheck>{};}\n'
@@ -148,6 +172,14 @@ spoiler=(r/'3drando/spoiler_log.cpp').read_text()
 source+=re.search(r'^std::map<RandomizerHintTextKey, Rando::ItemLocation\*> hintedLocations;',spoiler,re.M)[0]+'\n'
 spoiler_insert=re.search(r'        if \(location->IsAHintAccessible\(\)\) \{\n            hintedLocations.emplace.*?\n        \}',spoiler,re.S)[0]
 source+='void RecordSpoilerHint(RandomizerCheck key){auto*location=ctx->GetItemLocation(key);\n'+spoiler_insert+'\n}\n'
+exporter=(ROOT/'soh/soh/OTRGlobals.cpp').read_text()
+source+='static std::string sCachedHintText;static RandomizerCheck sensorCheck=RC_UNKNOWN_CHECK;\n'
+source+='static RandomizerGet SensorGetDesire(s32 slot){return slot==0?RG_MM_SOUL_GOHT:RG_NONE;}\n'
+source+='static RandomizerCheck FindOutstandingCheckFor(RandomizerGet){return sensorCheck;}\n'
+source+='static const char*GetVagueLocationDesc(RandomizerCheckType){return "ordinary control";}\n'
+source+='namespace RandomizerCheckObjects {std::string GetRCAreaName(RandomizerCheckArea){return "Hyrule Field";}}\n'
+source+='#ifndef SENSOR_DESIRE_SLOTS\n#define SENSOR_DESIRE_SLOTS 5\n#endif\n'
+source+=function(exporter,'extern "C" u8 Randomizer_SensorBuildHint(')+'\n'
 source+=r'''
 int main(){
  SavedArrayBoundary saved;
@@ -167,6 +199,15 @@ int main(){
   REQUIRE(!(loadedFlags[entry.defeatedFlag>>4]&(1u<<(entry.defeatedFlag&15))));
  }
  EnemyFirstDrops::RegisterLocations();
+ InitSariaColorTemplates();
+ StaticData::RetrieveItem(RG_MM_SOUL_GOHT)=Item(RG_MM_SOUL_GOHT,Text("Soul of Goht","Âme de Goht","Seele von Goht"),ITEMTYPE_ITEM,0,true,LOGIC_NONE,RHT_ITEM_MM_SOUL_GOHT,ITEM_CATEGORY_MAJOR);
+ sensorCheck=EnemyFirstDrops::Catalog[0].check;
+ REQUIRE(Randomizer_SensorBuildHint());
+ REQUIRE(sCachedHintText=="The slate senses %gSoul of Goht%w&in the first %rStalfos%w drop...");
+ {CustomMessage message(sCachedHintText);auto bytes=sCachedHintText;message.ReplaceColors(bytes);
+  REQUIRE(bytes.find(CustomMessage::COLOR(QM_GREEN)+"Soul of Goht"+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+  REQUIRE(bytes.find(CustomMessage::COLOR(QM_RED)+"Stalfos"+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);}
+
  std::set<RandomizerHintTextKey>hintKeys;
  for(auto&entry:EnemyFirstDrops::Catalog){
   auto*location=StaticData::GetLocation(entry.check);
@@ -176,6 +217,34 @@ int main(){
    auto messages=nativeHint.GetHintText().GetClear().GetAllMessages(MF_RAW);
    REQUIRE(messages[0].find(entry.name)!=std::string::npos);
    REQUIRE(messages[0].find("[[1]]")!=std::string::npos);
+   const auto source=EnemyFirstDrops::HintSource(entry);
+   const std::array<std::string,3> sourceNames={source.en,source.de,source.fr};
+   for(auto key:{RHT_SARIA_TALK_HINT,RHT_SARIA_SONG_HINT}){
+    auto saria=StaticData::hintTextTable[key].GetClear();
+    saria.Replace("[[1]]",nativeHint.GetAreaName(0));
+    auto encodedSaria=saria.GetAllMessages(MF_ENCODE);
+    for(size_t language=0;language<encodedSaria.size();++language){
+     REQUIRE(encodedSaria[language].find("%r"+sourceNames[language]+"%w")!=std::string::npos);
+     REQUIRE(encodedSaria[language].find("%g")!=std::string::npos);
+     REQUIRE(encodedSaria[language].find("%w%w")==std::string::npos);
+    }
+   }
+   nativeHint.SetForeignAreas({"Woodfall Temple (MM)"});
+   REQUIRE(nativeHint.GetAreaName(0).GetAllMessages(MF_RAW)[0]=="Woodfall Temple (MM)");
+   nativeHint.SetForeignAreas({});
+   auto colored=nativeHint.GetHintText().GetClear();
+   colored.Replace("[[1]]",CustomMessage("Soul of Goht","Seele von Goht","Âme de Goht"));
+   const auto encoded=colored.GetAllMessages(MF_ENCODE);
+   const std::array<std::string,3> rewards={"Soul of Goht","Seele von Goht","Âme de Goht"};
+   for(size_t language=0;language<encoded.size();++language){
+    REQUIRE(encoded[language].find("%r"+std::string(entry.name)+"%w")!=std::string::npos);
+    REQUIRE(encoded[language].find("%g"+rewards[language]+"%w")!=std::string::npos);
+    REQUIRE(encoded[language].find('#')==std::string::npos);
+    REQUIRE(encoded[language].find("%w%w")==std::string::npos);
+    auto bytes=encoded[language];colored.ReplaceColors(bytes);
+    REQUIRE(bytes.find(CustomMessage::COLOR(QM_RED)+entry.name+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+    REQUIRE(bytes.find(CustomMessage::COLOR(QM_GREEN)+rewards[language]+CustomMessage::COLOR(QM_WHITE))!=std::string::npos);
+   }
   }
   REQUIRE(hintKeys.insert(location->GetHintKey()).second);
   for(auto&text:location->GetHint()->GetClear().GetAllMessages(MF_RAW)){
@@ -263,6 +332,12 @@ with tempfile.TemporaryDirectory(prefix='oot-first-drop-pool-') as t:
  flags=['-O1','-std=c++20','-DF3DEX_GBI_2','-DCONTROLLERBUTTONS_T=uint32_t','-DSOH_BUILD_DLL','-I'+str(ROOT)]
  for path in ('soh/include','soh/include/PR','soh/src','soh','soh/assets','soh/soh','libultraship/include','libultraship/src','combo','combo/menu'):
   flags+=['-isystem',str(ROOT/path)]
+ # Native trick/option headers include ImGui; use the installed package metadata.
+ # CPATH remains available for non-system dependency checkouts.
+ pkg=subprocess.run(['pkg-config','--cflags','imgui'],capture_output=True,text=True)
+ if pkg.returncode==0:
+  import shlex
+  flags+=shlex.split(pkg.stdout)
  for mode in ('original','combo'):
   exe=t/mode
   subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),str(r/'EnemyFirstDrops.cpp'),str(r/'location.cpp'),str(r/'randomizerEnumStrings.cpp'),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-o',str(exe)],check=True)

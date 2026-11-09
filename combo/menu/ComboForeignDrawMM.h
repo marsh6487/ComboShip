@@ -849,6 +849,19 @@ inline void MM_DrawForeignMusicNote(const ComboForeignDrawInfoOOT* info) {
     CLOSE_DISPS(gfxCtx);
 }
 
+// The token remains OoT-owned; use the host's unchanged boss-native flame.
+inline void MM_DrawForeignShuffledSoul(const ComboForeignDrawInfoOOT* info) {
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MM_FOREIGN_PIN_OPA();
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[0]);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(gPlayState, info->primColorXlu, translate, scale);
+}
+
 // OoT's simpler boss souls use MM's native flame plus the owner-routed generic skull.
 inline void MM_DrawForeignBossSoul(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
@@ -1450,6 +1463,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         case CW_DRAW_KIND_SONG_GI:
         case CW_DRAW_KIND_MUSIC_NOTE:
             MM_DrawForeignMusicNote(info);
+            break;
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
+            MM_DrawForeignShuffledSoul(info);
             break;
         case CW_DRAW_KIND_BOSS_SOUL:
             MM_DrawForeignBossSoul(info);

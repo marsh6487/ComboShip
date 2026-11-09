@@ -24,6 +24,26 @@ int main() {
     PlayState play{}; Actor actor{};
     gSaveContext.ship.quest.id=QUEST_RANDOMIZER;
 
+    // Literal independent native role expectations, not generated from the runtime map.
+    struct ExpectedNpc { int actor; int scene; unsigned params; RandomizerGet soul; };
+    const ExpectedNpc expectedNpcs[] = {
+#include "oot_npc_roles.inc"
+    };
+    for (const auto& role : expectedNpcs) {
+        play.sceneNum = role.scene;
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Own(role.soul, true);
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Own(role.soul, false);
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        play.sceneNum = 0x7FFF;
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
+    }
+
     struct Shop { int scene; unsigned params; RandomizerGet soul; };
     Shop shops[]={
 #define SOUL_SHOP(scene,params,soul) {scene,params,soul},
@@ -86,7 +106,9 @@ int main() {
         spawnReachesAllocation = 0;
         Own(role.soul, false);
         if (role.actor == ACTOR_EN_HY) {
-            REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 7));
+            // EnHy role 7 now has its own Astronomer soul.
+            if (role.scene == SCENE_MARKET_DAY || role.scene == SCENE_KAKARIKO_VILLAGE)
+                REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 7));
             REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 0x40));
             REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 0x45));
         }

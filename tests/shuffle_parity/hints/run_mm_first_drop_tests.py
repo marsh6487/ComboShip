@@ -28,6 +28,15 @@ std::string Rando::GetItemLocationHintName(RandoItemId, bool) { return "in an Un
 '''
     cpp += function((ROOT / 'mm/2s2h/ShipUtils.cpp').read_text(), 'convertEnumToReadableName')
     cpp += function((ROOT / 'mm/2s2h/CustomMessage/CustomMessage.cpp').read_text(), 'CustomMessage::Replace')
+    cpp += function((ROOT / 'mm/2s2h/CustomMessage/CustomMessage.cpp').read_text(), 'CustomMessage::ReplaceColorChars')
+    start = saria.index('                entry.msg = "%g... Link?')
+    end = saria.index('                Rando::RemoveItem(RI_SONG_SARIA);',start)
+    cpp += 'std::string NativeSariaText(const Rando::HintTarget& target){ CustomMessage::Entry entry;\n' + saria[start:end] + '\nreturn entry.msg;}\n'
+    gossip = (ROOT / 'mm/2s2h/Rando/ActorBehavior/EnGs.cpp').read_text()
+    start = gossip.index('                entry.msg = "They say %g{{item}}')
+    end = gossip.index('                ComboReportStoneHint(',start)
+    cpp += 'std::string NativeGossipText(RandoCheckId randoCheckId,bool showExact){CustomMessage::Entry entry;auto&saveCheck=RANDO_SAVE_CHECKS[randoCheckId];\n' + gossip[start:end] + '\nreturn entry.msg;}\n'
+
     cpp += '''\nextern "C" s16 Play_GetOriginalSceneId(s16 scene) { return scene; }
 const char* Ship_GetSceneName(s16) { return "Fixture scene boundary"; }
 namespace Rando::StaticData {

@@ -43,6 +43,10 @@ for d in mods presets randomizer; do
     if [ -d "$DEPLOY/$d" ]; then cp -r "$DEPLOY/$d" "$STAGE/"; fi
 done
 cp "$BUILD/soh/soh.o2r" "$BUILD/mm/2ship.o2r" "$STAGE/"
+if [ "${3:-}" = "--stage-only" ]; then
+    echo "Native runtime: $STAGE"
+    exit 0
+fi
 
 # --- AppDir: the staged tree under usr/bin, minus comborando (headless validator; the
 # AppImage is the game — the validator ships in the plain ComboShip-linux artifact).
@@ -57,10 +61,15 @@ rm -f "$APPDIR/usr/bin/comborando"
 # The pinned release matches upstream 2ship's CMake/Packaging.cmake.
 LINUXDEPLOY="${LINUXDEPLOY:-$OUT/linuxdeploy-x86_64.AppImage}"
 if [ ! -x "$LINUXDEPLOY" ]; then
-    echo "Downloading linuxdeploy..."
-    curl -fsSL -o "$LINUXDEPLOY" \
-        https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20240109-1/linuxdeploy-x86_64.AppImage
-    chmod +x "$LINUXDEPLOY"
+    LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20240109-1/linuxdeploy-x86_64.AppImage
+    echo "Downloading linuxdeploy: $LINUXDEPLOY_URL"
+    DOWNLOAD="$(mktemp "${LINUXDEPLOY}.download.XXXXXX")"
+    trap 'rm -f "$DOWNLOAD"' EXIT
+    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+        --connect-timeout 30 --max-time 300 --output "$DOWNLOAD" "$LINUXDEPLOY_URL"
+    chmod +x "$DOWNLOAD"
+    mv "$DOWNLOAD" "$LINUXDEPLOY"
+    trap - EXIT
 fi
 
 # --deploy-deps-only: the launcher dlopens these rather than linking them, so linuxdeploy

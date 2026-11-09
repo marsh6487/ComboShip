@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include "randomizerEnums.h"
 #include "SoulShuffleEnemy.h"
 #include "z64scene.h"
@@ -48,6 +49,14 @@ inline constexpr const Entry* Find(RandomizerCheck check) {
         if (entry.check == check)
             return &entry;
     return nullptr;
+}
+struct HintSourceDescription {
+    std::string en, de, fr;
+};
+// Plain fragments: the enclosing native hint owns their accent and reset.
+inline HintSourceDescription HintSource(const Entry& entry) {
+    return { std::string("the first ") + entry.name + " drop", std::string("bei der ersten Beute von ") + entry.name,
+             std::string("premier butin de ") + entry.name };
 }
 inline const Entry* ForActor(int actorId, uint16_t params, bool adult, bool gohmaArena) {
     // EnTp emits defeat for severed tail segments too. Only its negative-params

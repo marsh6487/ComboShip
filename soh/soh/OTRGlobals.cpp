@@ -6,6 +6,7 @@ extern "C" void Partners_Reset(void);
 
 #include "rando/MagicMirrorShuffle.h"
 #include "Enhancements/randomizer/SoulShuffle.h"
+#include "Enhancements/randomizer/EnemyFirstDrops.h"
 #include "../../combo/ComboGameMode.h"
 #include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
@@ -3844,6 +3845,11 @@ extern "C" u8 Randomizer_SensorBuildHint(void) {
         }
 
         Rando::Location* loc = Rando::StaticData::GetLocation(rc);
+        if (const auto* drop = Rando::EnemyFirstDrops::Find(rc)) {
+            sCachedHintText = "The slate senses %g" + Rando::StaticData::RetrieveItem(rg).GetName().GetEnglish() +
+                              "%w&in the first %r" + drop->name + "%w drop...";
+            return 1;
+        }
         // %g = green (the item), %y = yellow (the area), %w = white, & = newline.
         sCachedHintText = "The slate senses %g" + Rando::StaticData::RetrieveItem(rg).GetName().GetEnglish() +
                           "%w&in %y" + RandomizerCheckObjects::GetRCAreaName(loc->GetArea()) + "%w,&" +
@@ -6278,6 +6284,11 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoHintData(void) {
                                { "overworld", loc->IsOverworld() },
                                { "song", loc->GetRCType() == RCTYPE_SONG_LOCATION },
                                { "locationHint", Combo_HintTextToJson(*loc->GetHint()) } });
+            if (const auto* drop = Rando::EnemyFirstDrops::Find(static_cast<RandomizerCheck>(i))) {
+                const auto source = Rando::EnemyFirstDrops::HintSource(*drop);
+                checks.back()["enemyDropName"] = drop->name;
+                checks.back()["enemyDropSource"] = { { "en", source.en }, { "de", source.de }, { "fr", source.fr } };
+            }
         }
         out["checks"] = std::move(checks);
 

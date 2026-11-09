@@ -19,6 +19,8 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "soh/Enhancements/randomizer/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "ComboCollectibleShimmerHost.h"
 
 #include <ship/resource/CrossRMRegistry.h>
@@ -259,6 +261,20 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             return CwSimple(out, gStatPushSpeedDL, false, 1.0f);
         default:
             break;
+    }
+
+    if (Rando::SoulShuffle::Find(rg)) {
+        out->drawKind = CW_DRAW_KIND_SHUFFLED_SOUL;
+        out->dlistCount = 2;
+        out->dlists[0] = gGiSkulltulaTokenDL;
+        out->dlists[1] = gBossSoulFlameDL;
+        out->xluStartIndex = 1;
+        // An older consumer can safely retain the body and bind a valid segment
+        // for its plain fallback; new consumers use the exact native boss pass.
+        out->xluSeg8TexScroll = 1;
+        out->primColorXlu[0] = out->primColorXlu[1] = out->primColorXlu[2] = 155;
+        out->primColorXlu[3] = 255;
+        return 1;
     }
 
     // Boss souls: bespoke func the gid-keyed table can't express (vestigial skull-token gid).

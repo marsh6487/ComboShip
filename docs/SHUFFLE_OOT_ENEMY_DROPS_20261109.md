@@ -1,6 +1,6 @@
-# Native OoT first enemy-type drops — source checkpoint, hidden pending native seed proof
+# Native OoT first enemy-type drops — exposed source candidate, native seed proof pending
 
-The complete catalogue now has **43 native enemy families and 204 source-audited witness regions**. Physical eligibility is per seed: **38–43 checks**, with 43 in all-Vanilla and 40 in all-MQ. No fictitious Root witness is used. The option remains default off, default hidden, absent from menu groups and skipped by RandomizeAllSettings. Source and focused native fixtures are not a completed full-graph seed or configured gameplay acceptance claim.
+The complete catalogue now has **43 native enemy families and 204 source-audited witness regions**. Physical eligibility is per seed: **38–43 checks**, with 43 in all-Vanilla and 40 in all-MQ. No fictitious Root witness is used. The candidate exposes the default-off option in the actual Shuffle Items menu and generation settings group; RandomizeAllSettings includes it. Source and focused native fixtures are not a completed full-graph seed or configured gameplay acceptance claim. Integration/publication must retain the native seed gate below.
 
 ## Production behavior
 
@@ -10,7 +10,7 @@ The complete catalogue now has **43 native enemy families and 204 source-audited
 - All source predicates stay on genuine native regions and retain original age/time/event restrictions, then require the matching native soul and native kill capability. CanPass-only witnesses also require a real kill. Manual source cases cover GUAY, PEAHAT, SKULLWALLTULA and TAILPASARN; source references appear beside each row. The profile matrix validates native region scene and Vanilla/MQ ownership independently.
 - Native location/item pools, exports, exclusion presentation and tracker use the same selected-layout rule. Each active check adds one filler slot in solo/unified mode. Inactive/off exclusion rows hide. Exclusion names persist/round-trip and excluded fill assigns junk. Settings JSON explicitly resets a missing hidden option to Off; native save-array loading defaults appended options and flags while preserving legacy entries.
 - Global checks have SCENE_ID_MAX and no owning dungeon. Their existing Hyrule Field tracker/exclusion bucket is labelled `Global Enemy Drop: <type>`; it does not assert that the actor lives in Hyrule Field. Logical witness areas remain real. Own Dungeon placement explicitly rejects first-drop checks even when a witness inherits a dungeon hint area.
-- CVar identity is `CVAR_RANDOMIZER_SETTING("ShuffleEnemyDrops")` (native prefix gRandoSettings). While hidden outside OptionGroups, an On-only token participates in the actual native settings hash; Off preserves the exact legacy hash. **Remove/reconcile that fallback when adding the option to a real OptionGroup to avoid hashing it twice.** Controller owns What's New registration and exposure.
+- CVar identity is `CVAR_RANDOMIZER_SETTING("ShuffleEnemyDrops")` (native prefix gRandoSettings). The real generation option group supplies the setting to the hash. Its compatibility serializer emits the existing On-only token once at the end, preserving both exact legacy Off and already issued hidden-On hashes. It skips the ordinary Off/On token, and distinguishes native setting keys from numerically overlapping exclusion keys. Controller owns What's New registration and publication.
 
 ## Hints
 
@@ -40,8 +40,8 @@ Recorded meaningful RED→GREEN regressions: lost unique reward after reload; ta
 ## Hard gates still open
 
 1. Build the current source and run real native Glitchless seeds in solo/combined with selected Vanilla/MQ layouts, progression exclusions, source soul self-lock negatives and receipt/export checks. The local native headless generator requires built SoH/2Ship DLLs; focused fixtures are not that proof. Controller's configured CI owns this gate.
-2. Configured gameplay acceptance: real collected/check-tracker state, allocations/transitions/save reload, hint presentation/selection and cross-game delivery. The widget remains hidden until full native graph seeds pass.
-3. Once gates pass, expose the actual menu option, reconcile the temporary settings-hash fallback, complete supported UI review and controller-owned What's New accent. This worker did not stage, commit, publish or promote master.
+2. Configured gameplay acceptance: real collected/check-tracker state, allocations/transitions/save reload, hint presentation/selection and cross-game delivery.
+3. The actual menu exposure and compatible one-time hash serialization are implemented and fixture/syntax checked in the candidate. Complete supported UI review and controller-owned What's New accent; native graph/seed proof is required before integrating the exposed candidate as complete. No master promotion is implied.
 
 ## Owned source and recovery inventory
 

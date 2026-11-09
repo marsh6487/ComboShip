@@ -1,5 +1,7 @@
 #include "ComboIkanaShieldResources.h"
 #include "Rando/Rando.h"
+#include "Rando/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "Rando/DungeonItemVisuals.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -594,6 +596,19 @@ std::unordered_map<RandoItemId, std::function<void()>> soulDrawMap = {
     { RI_SOUL_ENEMY_WOLFOS,         DrawWolfos },
 };
 // clang-format on
+
+// Added souls have native token metadata, not an enemy/boss model index.
+void DrawShuffledSoul() {
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiSkulltulaTokenDL);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const uint8_t color[3] = { 155, 155, 155 };
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(gPlayState, color, translate, scale);
+}
 
 void DrawSoul(RandoItemId randoItemId) {
     auto it = soulDrawMap.find(randoItemId);
@@ -3991,6 +4006,10 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             break;
         }
         default:
+            if (Rando::SoulShuffle::Find(randoItemId)) {
+                DrawShuffledSoul();
+                break;
+            }
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             break;
     }

@@ -1,4 +1,5 @@
 #include "hint.h"
+#include "EnemyFirstDrops.h"
 #include "string"
 #include "SeedContext.h"
 #include "static_data.h"
@@ -621,6 +622,12 @@ const CustomMessage Hint::GetAreaName(uint8_t slot) const {
     // as a string and is returned verbatim. Skijer's NEI
     if (foreignAreas.size() > slot && !foreignAreas[slot].empty()) {
         return CustomMessage(foreignAreas[slot]);
+    }
+    if (slot < locations.size()) {
+        if (const auto* drop = EnemyFirstDrops::Find(locations[slot])) {
+            const auto source = EnemyFirstDrops::HintSource(*drop);
+            return CustomMessage(source.en, source.de, source.fr);
+        }
     }
     uint8_t nameNum = 0;
     if (areaNamesChosen.size() > slot) {

@@ -2002,5 +2002,11 @@
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native seed harness isolation and exact junk validation (scaffolding only)",
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py"
   }
 ]

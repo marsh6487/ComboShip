@@ -20,7 +20,7 @@
 - Every new shuffle and completed item-pool control uses the existing What's New accent: gold for new controls,
   cyan for updated controls. Register its real CVar and use a presentation scope for direct widgets; preserve IDs,
   layout, disabled states and the global accent toggle. Add remaining families as their actual settings land.
-- Only one delegated implementation worker at a time; explicit file ownership. Independent research may run concurrently. Controller edits separate owned files.
+- User authorization 2026-11-09 supersedes the old single-worker restriction. Run six independent implementation workers concurrently in isolated worktrees. Controller owns shared integration, append-only ID allocation, publication and overall verification; serialize only genuine dependencies/conflicts.
 
 ## Review Focus
 

@@ -5,6 +5,19 @@ ROOT=Path(__file__).resolve().parents[3]
 
 def run():
  native=(ROOT/'soh/soh/Enhancements/randomizer/3drando/playthrough.cpp').read_text()
+ settings=(ROOT/'soh/soh/Enhancements/randomizer/settings.cpp').read_text()
+ # Supply the exposed option through the actual generation group schema. The
+ # previous hand-authored group omitted it and could not detect double hashing
+ # when a hidden option became a menu entry.
+ shuffle=re.search(r'mOptionGroups\[RSG_SHUFFLE\]\s*=\s*OptionGroup\(.*?\}\);',settings,re.S)[0]
+ keys=re.findall(r'&mOptions\[(RSK_\w+)\]',shuffle)
+ assert keys.count('RSK_SHUFFLE_ENEMY_DROPS') == 1, 'first drops missing from native generation group'
+ menu=re.search(r'mOptionGroups\[RSG_MENU_SECTION_BASIC_SHUFFLES\].*?WidgetContainerType::SECTION\);',settings,re.S)[0]
+ assert menu.count('&mOptions[RSK_SHUFFLE_ENEMY_DROPS]') == 1, 'first drops missing from real menu'
+ declaration=re.search(r'OPT_BOOL\(RSK_SHUFFLE_ENEMY_DROPS,.*?\);',settings,re.S)[0]
+ assert not re.search(r'RO_GENERIC_OFF,\s*true',declaration), 'first drops still hidden'
+ randomize=settings[settings.index('void Settings::RandomizeAllSettings()'):]
+ assert not re.search(r'case RSK_SHUFFLE_ENEMY_DROPS\s*:',randomize), 'first drops excluded from random settings'
  start=native.index('    std::string settingsStr;');end=native.index('    int ret = Fill();',start)
  body=native[start:end]
  util=(ROOT/'soh/soh/util.cpp').read_text();a=util.index('uint32_t SohUtils::Hash(');b=util.index('\n}',a)+2
@@ -32,7 +45,8 @@ namespace Rando {
 struct Value{uint8_t value=0;uint8_t Get(){return value;}};
 struct Option{
  RandomizerSettingKey key=RSK_FOREST;
- OptionCategory GetCategory(){return OptionCategory::Setting;}
+ OptionCategory category=OptionCategory::Setting;
+ OptionCategory GetCategory(){return category;}
  size_t GetOptionCount(){return 2;}
  RandomizerSettingKey GetKey(){return key;}
  std::string GetOptionText(uint8_t value){return value?"On":"Off";}
@@ -46,8 +60,12 @@ struct Group{
  std::vector<Option*>&GetOptions(){return options;}
 };
 struct Settings{
- Option legacy;std::array<Group,RSG_MAX>groups;
- Settings(){groups[0].type=OptionGroupType::DEFAULT;groups[0].options={&legacy};}
+ Option legacy,firstDrops;std::array<Group,RSG_MAX>groups;
+ Settings(){
+  firstDrops.key=RSK_SHUFFLE_ENEMY_DROPS;
+  groups[0].type=OptionGroupType::DEFAULT;groups[0].options={&legacy};
+  groups[RSG_SHUFFLE].type=OptionGroupType::DEFAULT;groups[RSG_SHUFFLE].options={&firstDrops};
+ }
  static Settings*GetInstance(){static Settings value;return &value;}
  auto&GetOptionGroups(){return groups;}
 };
@@ -72,10 +90,20 @@ int main(){
   auto expected=SohUtils::Hash(std::to_string(seed)+"Off"+(version?gBuildVersion:""));
   auto off=NativeSettingsHash();REQUIRE(off==expected);REQUIRE(rngSeed==off);REQUIRE(state.hash==std::to_string(off));
   state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=1;auto on=NativeSettingsHash();
+  REQUIRE(on==SohUtils::Hash(std::to_string(seed)+"Off|native-first-enemy-drops=1|"+(version?gBuildVersion:"")));
   REQUIRE(on!=off);REQUIRE(on==NativeSettingsHash());REQUIRE(rngSeed==on);
   state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=0;REQUIRE(NativeSettingsHash()==off);
   state.GetOption(RSK_FOREST).value=1;REQUIRE(NativeSettingsHash()!=off);
  }
+ // Exclusion keys inhabit their own enum and may have the same numeric value
+ // as an appended setting. They must still serialize their ordinary choice.
+ noSpoiler=false;state.seed=1;state.GetOption(RSK_FOREST).value=0;
+ state.GetOption(RSK_SHUFFLE_ENEMY_DROPS).value=0;
+ Rando::LocationOption collision;collision.key=RSK_SHUFFLE_ENEMY_DROPS;
+ collision.category=Rando::OptionCategory::LocationExclusion;
+ auto&group=Rando::Settings::GetInstance()->groups[RSG_EXCLUDES_KOKIRI_FOREST];
+ group.type=Rando::OptionGroupType::DEFAULT;group.options={&collision};
+ REQUIRE(NativeSettingsHash()==SohUtils::Hash("1OffOff"));
  puts("PASS native settings hash/FNV: deterministic On identity, exact legacy Off, existing setting/version controls");
 }
 '''

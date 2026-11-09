@@ -1,5 +1,115 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+## Authoritative overnight continuation — November 9, 2026
+
+User renewed full-scope implementation/build/regression/checkpoint/publication
+permission. No repeated approval is required. No merge/master/release promotion.
+The former one-implementation-worker restriction in the plan is superseded.
+Six independent implementation workstreams are active; none queued. Workers use
+isolated worktrees; controller integrates shared hunks and allocates appended IDs.
+Do not infer completion from historical entries below this section.
+
+Recovered actual checkout at `60dd594c7d4597bec1376c5d6e4da239fca2360e`;
+remote PR89 remains `3aee089e433596d3c7da603edee1596e5bc41bbd`.
+No prior workers were active. Preserved all 24 tracked/new source files from the
+uncommitted hint colors/soul GI/first-drop/fixture work in WIP commit
+`7593075a389bc9496e0f001c8d7c7d778a73cb7e`, tree
+`d5db26ba87fcd31704c00e226816b71b7af15236`. This is preservation, not passing
+verification. Source recovery ZIP independently restores that tree from60dd;
+SHA256 `0a466bf473ef4585450e9607664fe33d3ae7743ae13981111c3ad0d24b4e9e1e`,
+persistent recovery ID `libfile_f8c588707a988191a8523fa19b4ccd25`.
+
+| Requirement | Owner | Current implementation state | Verification / checkpoint |
+| --- | --- | --- | --- |
+| OoT enemy/NPC/animal/misc souls; MM NPC/animal/misc | souls | Active expansion of incomplete actor-role/world dependencies; existing stable catalog retained | Base7593075a; broad completion unverified |
+| Shared souls counterpart/dedup/grants/saves/reset/menu | souls | Existing foundations retained; production completion active | Base7593075a; no full-world acceptance |
+| OoT first enemy-type drops/V-MQ/defeat/persistence/menu | firstdrops | Existing43 families/204 witnesses retained; final UI/hash/source verification active | Existing4096-layout fixtures historical; fresh native full seeds open |
+| Hint colors/translations/settings | firstdrops | Recovered encoded-color work under fresh verification | Base7593075a WIP |
+| Native/foreign soul GI host flame resource paths | firstdrops | Recovered renderer work under fresh verification | Base7593075a WIP; no GPU acceptance |
+| Rusty overworld keys/pools/grants/save/physical doors/logical exits | door_keys | Production work active BOTH games |3 new native OoT/39 MM keys reserved; clock-first append integration |
+| Song-event shuffle/runtime/solver/persisted assignment/import/plando | song_clock | Production work active BOTH games | No source completion yet |
+| OoT clock/start lock/time/songs/travel | song_clock | Production work active | Appended clock identities reserved; default off |
+| MM rocks/boulders/red boulders/icicles/soil | environment | Expand seven-icicle slice to full families; exact actor placements/access under audit | Existing7 IDs retained; append-only new catalog reserved |
+| MM Stick/Nut Bags, Child Wallet,6 Infinite endpoints | ci_native/controller | Existing source retained; integration audit/native proof active | Historical native fixtures pass; fresh all-feature generation open |
+|4 MM rings1/3/1/4,pools/receipts/cycle/foreign draw | ci_native/controller | Existing source retained; integration/native proof active | Historical native fixtures pass; full native combinations open |
+|3 lottery-night rewards | ci_native/controller | Existing source retained; integrated logic verification active | Prior native night/ticket fixtures pass |
+| Saria/Desired Progressive Magic+7 RPG/source/ownership | ci_native/controller | Existing source retained; integrated verification active | Prior source-location/ownership fixtures pass |
+| Native form instruments/MM banks in OoT,FD ocarina | song_clock/ci_native | Existing recovered source retained; song-event integration active | Prior controller/audio fixtures pass |
+| Item-pool organization/real menus/gold-cyan/global toggle | controller + feature owners | Complete with actual features, preserving CVar identity/disabled behavior | No completed-placeholder claim until real control lands |
+| New exclusions/categories/locations/import/generation | feature owners/controller | Required per catalog and final integrated generation | Every enabled family must get actual generation evidence |
+| CI/regressions/full Linux+Windows build | ci_native | Repair remaining failures independent of features | Remote3aee CI42574618218: all Linux native targets/link and2 native seed smokes PASS; Windows native targets+ZIP PASS; Linux AppImage stage FAIL; items/systems/world regression FAIL |
+| Solo/combined Glitchless/combinations/cycles/save/defaults | ci_native/controller | Real native validation underway | Smoke passes do not satisfy complete feature validation |
+| Both games Own Dungeon boss keys,ST normal/inverted/foreign | ci_native/controller | Real full dual-native seeds required | Controlled prior fixture alone insufficient |
+| Independent review/source checkpoints/publication PR89 | controller | Incremental bounded checkpoints; hold pushes only for useful active builds | No merge/master; source/tests/docs only |
+
+Interface rulings: existing IDs never move. Clock append first; door items/flags/
+foreign aliases follow. Environment uses a separate appended MM check include.
+Souls reuse existing IDs. Worker worktrees may edit feature-specific hunks of
+shared enums/menus/save adapters; controller resolves those edits explicitly.
+All new settings remain off by default. No hidden foundation is a completed
+feature. Gameplay acceptance remains separate from source/build evidence.
+
+### Integrated milestone 1
+
+- Firstdrop worker83981ece integrated as `d1016090`: actual native menu/group
+  control exposed, default Off, compatible once-only settings identity retained.
+  Native runtime/source-combat/hash fixtures cover all4096 layouts in original/
+  Combo under ASan/UBSan; fresh encoded hint colors and95OoT+59MM native/foreign
+  soul GI callbacks pass. Full graph/fill remains separate; required Vanilla
+  native generation now scheduled in CI; configured MQ requires real quest data.
+- CI worker c6443284 integrated as `b169870f`: copied enum fixture closure,
+  native pool headers/link dependencies corrected; complete native pool fixtures
+  pass. Linux now preserves its linked runtime before AppImage and uploads
+  seed/packaging evidence on failure. Real Vanilla Off/On/excluded graph/fill/
+  replay is required after port resources. Native policy30/30 passes in worker.
+- Souls worker893bdfed integrated as `48973cc6`: native scene/parameter role
+  maps expanded. Literal-role and actual native spawn bridge cases pass both
+  guards. This is actor coverage; matching whole-world dependencies still active.
+- Controller adds four actual Shared Souls controls using existing saved
+  category CVars and gold scopes. Real pinned ImGui input confirms all16 drawn
+  Generate/market/soul controls keep IDs/layout/global-toggle/style restoration;
+  each soul preference defaults off and toggles its exact CVar once. No draw-only
+  writes. Initial5/5 full menu probes and28/28 baseline CI policy also passed.
+- Door keys, song-events/clock, environmental families and soul world completion
+  remain active concurrently, with no queued work. No full-scope completion yet.
+
+## Historical progress (superseded where stale)
+
+CI fixture repair ready: copied RandoCheckId declarations in item_grant_audit
+and cross_hints/gossip now resolve the actual repository icicle catalogue.
+Both reproduced the exact missing include before correction; complete native
+runners now pass, including cross-hint ASan/UBSan. Production/assertions remain
+unchanged. No equivalent copied-enum closure found in the remaining fixtures.
+
+Native first-drop integration harness preserved as WIP: 12 derived configs,
+actual DLL graph probes and actual combined driver fill/replay commands.
+Export signatures/schema review passes. Fresh-only evidence directories,
+pinned child SHIP_HOME, real CLI symlink negatives and exact native junk IDs
+are tested. Helpers do not synthesize native graph outputs. Actual DLL/seed
+execution is UNRUN locally; standalone solo full fill is unsupported by the
+current export surface and is not relabeled as combined seed acceptance.
+
+Published checkpoint `3aee089e433596d3c7da603edee1596e5bc41bbd` exactly
+matches local `fbdc6c3ff309196f3d3dfe4411d839c0440218be`, tree
+`b8d62d6e0b02377c1a71ddc905ada9629dbbeb32`. MM recovery ZIP
+`libfile_56fcfacadad48191852faf02e85b43b2`, SHA256
+`22364ba4c48fb5b6234df2bae52a08526d12a9c078f380eb423bead46bd5f370`,
+independently restores that exact tree. Draft PR89 remains unmerged.
+
+Current CI42574618218 fast source checks pass; Linux/Windows builds remain
+in progress. Actual items job129020226454 exposed a copied Types.h enum block
+whose new MMEnvironmentIcicles.inc relative include is unavailable in its temp
+fixture. This extracted-fixture closure is being repaired without changing
+production or assertions. Preserve the current native build until it reaches
+seed evidence; a new branch update would cancel it.
+
+User clarified that soul/first-drop hints require colored enemy and item names,
+and new soul GIs must use the existing boss-soul flame texture path. Exact
+POC5 archives were retrieved/audited locally; their bytes are excluded from
+source publication. Independent hint and rendering workstreams are verifying
+actual encoded color spans and native/cross-game resource resolution. These
+visual follow-ups are not claimed implemented in the published checkpoint.
+
 Hint/startup recovery: local `580f232da9a73458ceb9e9d16ab74e78afaa5291`,
 independently restored tree `dbede42f4b23b352b3094b93bb8de296f9f3a5c7`, ZIP
 `libfile_f2f4d232ba3081918c6b315bcf0a55b9`, SHA256

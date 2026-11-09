@@ -1,4 +1,5 @@
 #include "hints.hpp"
+#include "../EnemyFirstDrops.h"
 
 #include "../rng.h"
 #include "fill.hpp"
@@ -917,13 +918,18 @@ bool EnsureSariaMagicHint() {
 
     CustomMessage area;
     if (selected != RC_UNKNOWN_CHECK) {
-        const auto* location = StaticData::GetLocation(selected);
-        const auto home = location->GetArea();
-        const std::string name =
-            home == RCAREA_INVALID ? location->GetName() : RandomizerCheckObjects::GetRCAreaName(home);
-        if (name.empty())
-            return false;
-        area = CustomMessage(name);
+        if (const auto* drop = EnemyFirstDrops::Find(selected)) {
+            const auto source = EnemyFirstDrops::HintSource(*drop);
+            area = CustomMessage(source.en, source.de, source.fr);
+        } else {
+            const auto* location = StaticData::GetLocation(selected);
+            const auto home = location->GetArea();
+            const std::string name =
+                home == RCAREA_INVALID ? location->GetName() : RandomizerCheckObjects::GetRCAreaName(home);
+            if (name.empty())
+                return false;
+            area = CustomMessage(name);
+        }
     } else {
         std::string foreign;
 #ifdef COMBO_BUILD

@@ -39,6 +39,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboSoulGiFlameOOT.h"
 #include "ComboCollectibleShimmerDraw.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -639,6 +640,20 @@ inline void OOT_DrawForeignSoulFlame(PlayState* play, const ComboForeignDrawInfo
     OOT_RestoreForeignSegs(play, segs, 1);
 }
 
+// Added MM souls keep the MM-owned token; the flame belongs to the receiving
+// host so its existing boss-soul Alt texture pack applies independently.
+inline void OOT_DrawForeignShuffledSoul(PlayState* play, const ComboForeignDrawInfo* info) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    OOT_FOREIGN_PIN_OPA();
+    COMBO_FOREIGN_MTX(POLY_OPA_DISP++);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[0]);
+    CLOSE_DISPS(play->state.gfxCtx);
+    ComboSoulGi_DrawOotFlame(play, info->primColorXlu);
+    int32_t segments[] = { 8 };
+    OOT_RestoreForeignSegs(play, segments, 1);
+}
+
 // Same independent weapon flame as MM's DrawOotSlateRuneFlame. Its resource
 // belongs to OoT, and its scroll/billboard use the active host frame and pose.
 inline void OOT_DrawForeignWeaponFlame(PlayState* play, const uint8_t color[4]) {
@@ -1156,6 +1171,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
                 }
                 return; // the native fallback includes its pink hex overlay
             }
+            break;
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
+            OOT_DrawForeignShuffledSoul(play, info);
             break;
         case CW_DRAW_KIND_MM_SOUL_FLAME:
             OOT_DrawForeignSoulFlame(play, info);

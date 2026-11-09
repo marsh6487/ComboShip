@@ -98,12 +98,10 @@ jobs:
           --cross-interior-entrances=0 --cross-grotto-entrances=0
           --cross-shop-entrances=1 --cross-door-interior-entrances=1
 
-      # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
-      # are ROM-extracted by the user and never built or shipped here) and packages it as a
-      # self-contained AppImage — linuxdeploy bundles the system .so deps and combo/linux/AppRun
-      # recreates the launcher's portable cwd layout in a writable data dir at run time.
-      - name: Stage Linux package + build AppImage
-        run: ./scripts/linux/make-appimage.sh build-cmake _packages
+      # Save the built validator/runtime before distribution packaging. A linuxdeploy
+      # download or AppImage failure must not discard a fully linked native build.
+      - name: Stage native Linux runtime
+        run: ./scripts/linux/make-appimage.sh build-cmake _packages --stage-only
 
       - name: Upload ComboShip-linux artifact
         uses: actions/upload-artifact@v4
@@ -111,6 +109,39 @@ jobs:
           name: ComboShip-linux
           path: _packages/stage
           if-no-files-found: error
+
+      - name: Verify actual native first-drop graph, fill and replay (Vanilla)
+        timeout-minutes: 90
+        run: >
+          python3 -B tests/shuffle_parity/enemy_drops/native_seed_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-first-drops"
+          --case vanilla-off --case vanilla-on --case vanilla-on-excluded
+
+      - name: Preserve native seed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-first-drops-linux
+          path: ${{ runner.temp }}/native-first-drops
+          if-no-files-found: warn
+
+      # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
+      # are ROM-extracted by the user and never built or shipped here) and packages it as a
+      # self-contained AppImage — linuxdeploy bundles the system .so deps and combo/linux/AppRun
+      # recreates the launcher's portable cwd layout in a writable data dir at run time.
+      - name: Stage Linux package + build AppImage
+        shell: bash
+        run: ./scripts/linux/make-appimage.sh build-cmake _packages 2>&1 | tee "$RUNNER_TEMP/linux-packaging.log"
+
+      - name: Preserve packaging diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packaging-log
+          path: ${{ runner.temp }}/linux-packaging.log
+          if-no-files-found: warn
 
       # GitHub zips artifact contents on download, which drops the exec bit — the docs tell users
       # to chmod +x the AppImage after unzipping (standard for CI-distributed AppImages).

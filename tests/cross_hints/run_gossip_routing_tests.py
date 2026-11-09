@@ -107,6 +107,7 @@ def build(exporter_override=None):
 def mm_fixture():
     block = native.block
     actor = source("mm/2s2h/Rando/ActorBehavior/EnGs.cpp")
+    # Enum text moves into the temporary fixture; retain its actual catalogue include closure.
     types = source("mm/2s2h/Rando/Types.h")
     convert = source("mm/2s2h/Rando/ConvertItem.cpp")
     names = source("mm/2s2h/Rando/StaticData/Items.cpp")
@@ -144,7 +145,8 @@ def main():
         cpp.write_text(build(args.baseline_exporter))
         binary = root / "test"
         command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-DCOMBO_BUILD",
-                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"), "-I" + str(ROOT / "combo")]
+                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"), "-I" + str(ROOT / "combo"),
+                   "-I" + str(ROOT), "-I" + str(ROOT / "mm/2s2h/Rando")]
         if args.sanitize:
             command += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                         "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]

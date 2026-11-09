@@ -46,7 +46,7 @@ def function(text, signature):
 
 with tempfile.TemporaryDirectory(prefix='item_grant_audit_') as td:
     td = Path(td)
-    flags = ['-std=c++17', '-Wall', '-Wextra', '-Werror', '-O1', '-I', str(ROOT / 'combo/menu')]
+    flags = ['-std=c++17', '-Wall', '-Wextra', '-Werror', '-O1', '-I', str(ROOT / 'combo/menu'), '-I', str(ROOT), '-I', str(ROOT / 'mm/2s2h/Rando')]
     sanitizer = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-no-pie']
     env = {**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'}
 
@@ -83,6 +83,7 @@ using s8=int8_t; using s16=int16_t;
             preamble += declaration(zsave, 'ShipRandomizerSaveContextData') + '\n'
         else:
             types = read('mm/2s2h/Rando/Types.h')
+            # Relocated enum text must retain its real production catalogue include closure.
             preamble += declaration(types, 'RandoCheckId') + '\n'
             preamble += declaration(types, 'RandoInf') + '\n'
             preamble += declaration(zsave, 'SavePlayerData') + '\n'

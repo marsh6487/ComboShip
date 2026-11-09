@@ -45,10 +45,12 @@ def main():
     panel = read("combo/gui/ComboMenu.cpp")
     start = panel.index('ImGui::SeparatorText("Entrances");', panel.index("void ComboMenu::DrawComboPanel("))
     entrances = panel[start:panel.index("// Shared Items", start)]
+    start = panel.index('ImGui::SeparatorText("Shared Souls");')
+    shared_souls = panel[start:panel.index("// Cosmetics", start)]
     appearance = block(read("combo/gui/BlackMarketAppearance.h"), "inline void DrawAppearance()")
     with tempfile.TemporaryDirectory(prefix="generate-release-") as temporary:
         directory = Path(temporary)
-        (directory / "generate_controls.inc").write_text(entrances)
+        (directory / "generate_controls.inc").write_text(entrances + shared_souls)
         (directory / "black_market_appearance.inc").write_text(appearance)
         binary = directory / "generate"
         sanitizers = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",

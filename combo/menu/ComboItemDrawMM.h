@@ -14,6 +14,8 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#include "2s2h/Rando/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
 #include "ComboCollectibleShimmerHost.h"
 #undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
@@ -1321,6 +1323,17 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     if (MM_FillSimpleDrawInfo(id, out)) {
         return 1; // flippers / ice trap / ocarina buttons / triforce shards
+    }
+    if (Rando::SoulShuffle::Find(id)) {
+        out->drawKind = CW_DRAW_KIND_SHUFFLED_SOUL;
+        out->dlistCount = 2;
+        out->dlists[0] = gGiSkulltulaTokenDL;
+        out->dlists[1] = gameplay_keep_DL_01ACF0;
+        out->xluStartIndex = 1;
+        out->xluSeg8TexScroll = 1; // safe plain fallback on a pre-kind-44 consumer
+        out->primColorXlu[0] = out->primColorXlu[1] = out->primColorXlu[2] = 155;
+        out->primColorXlu[3] = 255;
+        return 1;
     }
     if (MM_FillEnemySoulDrawInfo(id, out)) {
         return 1; // enemy souls: colored soul flame, no table row

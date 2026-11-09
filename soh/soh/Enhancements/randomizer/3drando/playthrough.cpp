@@ -32,6 +32,7 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
     ctx->FinalizeSettings(excludedLocations, enabledTricks);
     // once the settings have been finalized turn them into a string for hashing
     std::string settingsStr;
+    bool shuffleEnemyDrops = false;
     auto& optionGroups = Rando::Settings::GetInstance()->GetOptionGroups();
     for (size_t i = 0; i < RSG_MAX; i++) {
         auto& optionGroup = optionGroups[i];
@@ -43,6 +44,15 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
         for (Rando::Option* option : optionGroup.GetOptions()) {
             if (option->GetCategory() != Rando::OptionCategory::Toggle) {
                 if (option->GetOptionCount() > 0) {
+                    // Preserve the original Off hash and the already issued On
+                    // identity. Serialize this append-only setting once, at the
+                    // end, rather than adding another generic Off/On token now
+                    // that it is present in the real generation option group.
+                    if (option->GetCategory() == Rando::OptionCategory::Setting &&
+                        option->GetKey() == RSK_SHUFFLE_ENEMY_DROPS) {
+                        shuffleEnemyDrops = ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get();
+                        continue;
+                    }
                     if (i >= RSG_EXCLUDES_KOKIRI_FOREST && i <= RSG_EXCLUDES_GANONS_CASTLE) {
                         auto locationOption = static_cast<Rando::LocationOption*>(option);
                         settingsStr += option->GetOptionText(ctx->GetLocationOption(locationOption->GetKey()).Get());
@@ -57,9 +67,7 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
         }
     }
 
-    // This hidden WIP setting has no OptionGroup yet. Remove this fallback when
-    // exposing it in a real group, so it participates in the settings hash once.
-    if (ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get()) {
+    if (shuffleEnemyDrops) {
         settingsStr += "|native-first-enemy-drops=1|";
     }
 

@@ -120,7 +120,7 @@ static_assert(RG_MM_KEY_RING_STONE_TOWER < RG_MAX, "Stone Tower row exceeds nati
         else:
             cpp.write_text(checks + native_fixture())
         includes = [ROOT, ROOT / 'soh', ROOT / 'soh/include', ROOT / 'soh/include/PR',
-                    ROOT / 'soh/src', ROOT / 'soh/assets', ROOT / 'libultraship/include', ROOT / 'combo', ROOT / 'combo/menu']
+                    ROOT / 'soh/src', ROOT / 'soh/assets', RANDO, ROOT / 'libultraship/include', ROOT / 'combo', ROOT / 'combo/menu']
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-g', '-O0',
                         '-DF3DEX_GBI_2', '-DCONTROLLERBUTTONS_T=uint32_t',
                         *(['-DCOMBO_BUILD'] if args.combo else []),

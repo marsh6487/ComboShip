@@ -82,6 +82,7 @@ typedef enum {
     CW_DRAW_KIND_SILVER_RUPEE = 41,         /* OPA seg8 = segTexPath (owner RM), dl0; optional grayscale */
     CW_DRAW_KIND_MAGIC_MIRROR = 42,         /* receiving host draws authored procedural Mirror + leaves */
     CW_DRAW_KIND_MM_KEY_RING = 43,          /* metal/emblem/ring paths; op[0].a=count, .b=MM dungeon */
+    CW_DRAW_KIND_SHUFFLED_SOUL = 44,        /* native token body dl0 + receiving-host boss flame, owner root dl1 */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -271,6 +272,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_BLUE_FIRE:
         case CW_DRAW_KIND_JEWEL:
         case CW_DRAW_KIND_SKULL_TOKEN:
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
         case CW_DRAW_KIND_BOSS_SOUL:
         case CW_DRAW_KIND_DOUBLE_DEFENSE:
         case CW_DRAW_KIND_BRONZE_SCALE:

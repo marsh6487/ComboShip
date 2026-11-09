@@ -62,6 +62,26 @@ int main(){
 
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
 
+    // Literal independent native role expectations, not generated from the runtime map.
+    struct ExpectedNpc { int actor; int scene; unsigned params; RandoItemId soul; };
+    const ExpectedNpc expectedNpcs[] = {
+#include "mm_npc_roles.inc"
+    };
+    for (const auto& role : expectedNpcs) {
+        play.sceneId = role.scene;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(!MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Own(role.soul, true);
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Own(role.soul, false);
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 0;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        play.sceneId = 0x7FFF;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 0;
+    }
+
     struct Shop { int scene; unsigned params; RandoItemId soul; };
     Shop shops[]={
 #define SOUL_SHOP(scene,params,soul) {scene,params,soul},
@@ -85,7 +105,7 @@ int main(){
     }
     struct NpcRole { int actor; int scene; unsigned params; RandoItemId soul; };
     const NpcRole roles[] = {
-        {ACTOR_EN_SYATEKI_MAN, SCENE_SYATEKI_MORI, 0xFE00, RI_SOUL_NPC_SHOOTING_GALLERY_OWNER},
+        {ACTOR_EN_SYATEKI_MAN, SCENE_SYATEKI_MORI, 0xFE00, RI_SOUL_NPC_BAZAAR_SHOPKEEPER},
         {ACTOR_EN_SYATEKI_MAN, SCENE_SYATEKI_MIZU, 0xFE00, RI_SOUL_NPC_SHOOTING_GALLERY_OWNER},
         {ACTOR_EN_GINKO_MAN, SCENE_ICHIBA, 0xFFFF, RI_SOUL_NPC_BANKER},
         {ACTOR_EN_GURUGURU, SCENE_ALLEY, 1, RI_SOUL_NPC_GURU_GURU},

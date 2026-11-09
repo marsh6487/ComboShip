@@ -2,6 +2,7 @@
 #include "ComboIkanaShieldResources.h"
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "draw.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "NeiGiRender.h"
 #include <ship/resource/Resource.h>
 #include "soh/frame_interpolation.h"
@@ -102,6 +103,8 @@ extern "C" {
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 }
+
+#include "ComboSoulGiFlameOOT.h"
 
 #include "ComboMaskShimmer.h"
 #include "ComboCollectibleShimmerHost.h"
@@ -1001,6 +1004,18 @@ extern "C" void Randomizer_DrawBeanSprout(PlayState* play, GetItemEntry* getItem
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gMagicBeanSeedlingDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Added enemy/NPC/animal/misc souls retain their native token body and use the
+// boss-owned flame material. Never send their arbitrary IDs through boss slot math.
+extern "C" void Randomizer_DrawShuffledSoul(PlayState* play, GetItemEntry*) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiSkulltulaTokenDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+    const uint8_t color[3] = { 155, 155, 155 };
+    ComboSoulGi_DrawOotFlame(play, color);
 }
 
 extern "C" void Randomizer_DrawBossSoul(PlayState* play, GetItemEntry* getItemEntry) {
@@ -3292,7 +3307,7 @@ static void MmSoul_DrawFallbackFlame(PlayState* play, GetItemEntry* getItemEntry
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gDPSetGrayscaleColor(POLY_XLU_DISP++, r, g, b, 255);
     gSPGrayscale(POLY_XLU_DISP++, true);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiBlueFireFlameDL);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gBossSoulFlameDL);
     gSPGrayscale(POLY_XLU_DISP++, false);
     Matrix_Pop();
 

@@ -62,7 +62,9 @@ def check():
     soul = draw.split('void Randomizer_DrawBossSoul(',1)[1].split('// Draw the generic boss soul model',1)[0]
     assert '(Gfx*)gBossSoulFlameDL' in soul and 'gGiBlueFireFlameDL' not in soul
     # Remaining bottle/effect users retain their original generic root.
-    assert draw.count('(Gfx*)gGiBlueFireFlameDL') == 2
+    assert draw.count('(Gfx*)gGiBlueFireFlameDL') == 1
+    fallback = draw.split('static void MmSoul_DrawFallbackFlame(', 1)[1].split('// --- generic skeleton-soul engine', 1)[0]
+    assert '(Gfx*)gBossSoulFlameDL' in fallback and 'gGiBlueFireFlameDL' not in fallback
     recipe = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
     assert 'out->dlists[0] = gBossSoulFlameDL;' in recipe
     assert 'out->flameDlPath = gBossSoulFlameDL;' in recipe
