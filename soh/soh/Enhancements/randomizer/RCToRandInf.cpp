@@ -20,6 +20,9 @@ bool IdentifyCheck(CheckIdentity* id, Rando::Location* loc, bool allowUnknown) {
 }
 
 std::map<RandomizerCheck, RandomizerInf> rcToRandomizerInf = {
+#define ENEMY_FIRST_DROP(key, name) { RC_ENEMY_DROP_##key, RAND_INF_ENEMY_DROP_##key },
+#include "EnemyFirstDropsCatalog.inc"
+#undef ENEMY_FIRST_DROP
     { RC_LOST_WOODS_MAGIC_MIRROR_STUMP, RAND_INF_MAGIC_MIRROR_STUMP },
     { RC_KF_LINKS_HOUSE_COW, RAND_INF_COWS_MILKED_KF_LINKS_HOUSE_COW },
     { RC_LW_DEKU_SCRUB_NEAR_DEKU_THEATER_RIGHT, RAND_INF_SCRUBS_PURCHASED_LW_DEKU_SCRUB_NEAR_DEKU_THEATER_RIGHT },

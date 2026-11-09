@@ -3206,6 +3206,14 @@ RANDO_ENUM_ITEM(RAND_INF_SOUL_ANIMAL_DOG)
 RANDO_ENUM_ITEM(RAND_INF_SOUL_ANIMAL_BUTTERFLY)
 RANDO_ENUM_ITEM(RAND_INF_SOUL_MISC_GS)
 RANDO_ENUM_ITEM(RAND_INF_SOUL_MISC_BUSINESS_SCRUB)
+// Native first enemy-type drops, append only.
+#define ENEMY_FIRST_DROP(key, name) RANDO_ENUM_ITEM(RAND_INF_ENEMY_DROP_##key)
+#include "../EnemyFirstDropsCatalog.inc"
+#undef ENEMY_FIRST_DROP
+// Saved eligibility is distinct from receipt: unique enemies need not respawn.
+#define ENEMY_FIRST_DROP(key, name) RANDO_ENUM_ITEM(RAND_INF_ENEMY_DEFEATED_##key)
+#include "../EnemyFirstDropsCatalog.inc"
+#undef ENEMY_FIRST_DROP
 RANDO_ENUM_ITEM(RAND_INF_MAX)
 
 RANDO_ENUM_END(RandomizerInf)

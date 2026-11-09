@@ -19,6 +19,8 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRando.Options.RO_INFINITE_UPGRADES", Kind::New,
+      "Add six infinite upgrades that require their normal base items, bags or wallet." },
     { "gRando.Options.RO_SHUFFLE_CHILD_WALLET", Kind::New,
       "Shuffle MM's base wallet and require wallet ownership for paid interactions." },
     { "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG", Kind::New,
@@ -26,6 +28,8 @@ inline constexpr Entry kControls[]{
     { "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG", Kind::New,
       "Shuffle the base bag required to carry and use Deku Nuts in MM." },
     { "gRandoSettings.ShuffleEnemySouls", Kind::New, "Shuffle enemy souls in OoT." },
+    { "gRandoSettings.ShuffleEnemyDrops", Kind::New,
+      "Shuffle the first confirmed defeat reward for each OoT enemy type." },
     { "gRandoSettings.ShuffleNpcSouls", Kind::New, "Shuffle NPC souls in OoT." },
     { "gRandoSettings.ShuffleAnimalSouls", Kind::New, "Shuffle animal souls in OoT." },
     { "gRandoSettings.ShuffleMiscSouls", Kind::New, "Shuffle miscellaneous souls in OoT." },

@@ -933,6 +933,9 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_SHUFFLE_BOULDERS, {"Off", "Dungeons", "Overworld", "All Boulders"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleBoulders"), WIDGET_CVAR_COMBOBOX, RO_SHUFFLE_BOULDERS_OFF);
     OPT_BOOL(RSK_SHUFFLE_TREES, CVAR_RANDOMIZER_SETTING("ShuffleTrees"));
     OPT_BOOL(RSK_SHUFFLE_BUSHES, CVAR_RANDOMIZER_SETTING("ShuffleBushes"));
+    // Keep unexposed until the remaining native witness families are audited.
+    OPT_BOOL(RSK_SHUFFLE_ENEMY_DROPS, {"Off", "On"}, OptionCategory::Setting,
+             CVAR_RANDOMIZER_SETTING("ShuffleEnemyDrops"), WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF, true);
     OPT_BOOL(RSK_SHUFFLE_ICICLES, CVAR_RANDOMIZER_SETTING("ShuffleIcicles"));
     OPT_BOOL(RSK_SHUFFLE_RED_ICE, CVAR_RANDOMIZER_SETTING("ShuffleRedIce"));
     OPT_U8(RSK_SHUFFLE_SIGNS, {"Off", "Dungeons", "Overworld", "All Signs"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSigns"), WIDGET_CVAR_COMBOBOX, RO_SHUFFLE_SIGNS_OFF);
@@ -3678,6 +3681,7 @@ void Settings::RandomizeAllSettings() {
     // Randomize all settings except tricks
     for (int i = 0; i < RSK_MAX; i++) {
         switch (static_cast<RandomizerSettingKey>(i)) {
+            case RSK_SHUFFLE_ENEMY_DROPS: // Unexposed first-drop witness audit is still in progress.
             case RSK_STARTING_SKULLTULA_TOKEN:
             case RSK_STARTING_HEARTS:
             case RSK_STARTING_ZELDAS_LULLABY:

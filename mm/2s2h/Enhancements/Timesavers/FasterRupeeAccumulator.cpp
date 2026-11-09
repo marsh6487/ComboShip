@@ -11,6 +11,10 @@ void RegisterFasterRupeeAccumulator() {
             return;
         }
 
+        if (RandoCapacity_InfiniteWallet() && gSaveContext.rupeeAccumulator < 0) {
+            gSaveContext.rupeeAccumulator = 0;
+        }
+
         if (gSaveContext.rupeeAccumulator == 0) {
             return;
         }

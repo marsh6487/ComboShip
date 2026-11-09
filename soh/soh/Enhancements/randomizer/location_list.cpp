@@ -1,3 +1,4 @@
+#include "EnemyFirstDrops.h"
 #include "static_data.h"
 #include "randomizerEnumStrings.h"
 #include "z64save.h"
@@ -148,6 +149,7 @@ std::vector<RandomizerCheck> Rando::StaticData::GetSongFairyLocations() {
 }
 
 void Rando::StaticData::InitLocationTable() {
+    EnemyFirstDrops::RegisterLocations();
     // clang-format off
     //                                                                                                Randomizer Check                                                 Quest            Type                                Area                                 Actor ID              Scene ID                            Params                        Flags Short Name                                     Hint Text Key                                                    Vanilla Item                                                        Spoiler Collection Check                                                                                                      Vanilla Progression  Price
     locationTable[RC_UNKNOWN_CHECK] =                                                  Location::Base(RC_UNKNOWN_CHECK,                                                RCQUEST_BOTH,    RCTYPE_STANDARD,                    RCAREA_INVALID,                      ACTOR_ID_MAX,         SCENE_ID_MAX,                       0x00,                               "Invalid Location",                            RHT_NONE,                                                        RG_NONE);

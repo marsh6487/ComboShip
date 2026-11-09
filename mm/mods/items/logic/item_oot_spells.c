@@ -322,7 +322,7 @@ s32 OotSpells_TryUseItem(PlayState* play, Player* this, s32 itemAction, s32 item
         // Farore's Wind with an existing warp point bypasses the magic check (opens the menu).
         if (((itemAction == PLAYER_IA_FARORES_WIND) && ComboFw_HasPoint(Nei_Save()->fwSet != 0) && !isMedallionSpell) ||
             ((gSaveContext.magicCapacity != 0) && (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
-             (gSaveContext.save.saveInfo.playerData.magic >= MAGIC_REQ(sOotMagicSpellCosts[magicSpell])))) {
+             RandoCapacity_CanSpendMagic(MAGIC_REQ(sOotMagicSpellCosts[magicSpell])))) {
             this->itemAction = itemAction;
             this->unk_AA5 = PLAYER_UNKAA5_5; // OoT this->unk_6AD = 4
             sOotSw97SpellActive = isMedallionSpell;

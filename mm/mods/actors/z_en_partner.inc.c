@@ -457,7 +457,7 @@ static void UseFaroresWind(EnPartner* this, PlayState* play, u8 started) {
     Player* player = GET_PLAYER(play);
 
     if (started == 1) {
-        if (gSaveContext.save.saveInfo.playerData.magic <= 0 || gSaveContext.magicState != MAGIC_STATE_IDLE) {
+        if (!RandoCapacity_CanSpendMagic(1) || gSaveContext.magicState != MAGIC_STATE_IDLE) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
             this->usedItem = 0xFF;
             return;
@@ -490,13 +490,16 @@ static void UseFaroresWind(EnPartner* this, PlayState* play, u8 started) {
         gSaveContext.magicState = MAGIC_STATE_METER_FLASH_1;
         this->magicTimer--;
         if (this->magicTimer <= 0) {
-            if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
+            if (!RandoCapacity_CanSpendMagic(1)) {
                 gSaveContext.save.saveInfo.playerData.magic = 0;
                 EndFaroresWind(this, play);
                 return;
             }
-            gSaveContext.save.saveInfo.playerData.magic--; // Note: after the `if` statement so that the last
-            this->magicTimer = 20;                         // tick of magic gives the full count of frames
+            // The last finite tick still gives its full count of frames.
+            if (!RandoCapacity_InfiniteMagic()) {
+                gSaveContext.save.saveInfo.playerData.magic--;
+            }
+            this->magicTimer = 20;
         }
     }
 
@@ -630,7 +633,7 @@ static void UseBeans(Actor* thisx, PlayState* play, u8 started) {
 static void UseSpell(Actor* thisx, PlayState* play, u8 started, u8 spellType) {
     EnPartner* this = (EnPartner*)thisx;
 
-    if (gSaveContext.save.saveInfo.playerData.magic > 0) {
+    if (RandoCapacity_CanSpendMagic(1)) {
         if (this->itemTimer <= 0 && this->usedSpell == 0) {
             if (started == 1) {
                 this->usedSpell = spellType;
@@ -664,9 +667,11 @@ static void UseSpell(Actor* thisx, PlayState* play, u8 started, u8 spellType) {
                 gSaveContext.magicState = MAGIC_STATE_METER_FLASH_1;
                 this->magicTimer--;
                 if (this->magicTimer <= 0) {
-                    gSaveContext.save.saveInfo.playerData.magic--;
+                    if (!RandoCapacity_InfiniteMagic()) {
+                        gSaveContext.save.saveInfo.playerData.magic--;
+                    }
                     this->magicTimer = 20;
-                    if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
+                    if (!RandoCapacity_CanSpendMagic(1)) {
                         gSaveContext.save.saveInfo.playerData.magic = 0;
 
                         this->itemTimer = 10;

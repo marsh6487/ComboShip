@@ -1,5 +1,43 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-11-08-shuffle-parity.md
 
+Infinite Upgrades integration: real default-off control now replaces the final
+capacity placeholder, with gold real-CVar registration and required CI fixtures.
+Native/custom magic costs, synchronous and pending wallet debits, all 64 starting
+selections, native JSON/spoiler/icons and bounded foreign receipts pass original/
+Combo sanitizer fixtures. Existing bag/wallet controls pass. Review found and
+fixed possible reduction of an imported tier-3 wallet, plus four-digit HUD
+registration with Tycoon off. Exact raw tiers/base ownership/Chateau remain
+unchanged. Independent spec/quality review passes for bounded candidate scope.
+Additional failing-first native regression fixes headless infinite Tycoon
+capacity: the private endpoint ceiling is at least 5000 independently of HUD
+initialization or a shared-table 999 import. Raw tiers/table remain unchanged;
+finite controls, missing bases, 5000/5001 affordability and custom 6000 capacity
+pass original/Combo sanitizers.
+Fresh full native player and parameter C syntax passes with real headers;
+standalone equipment fragments need their actual unity includes and are not
+claimed compiled separately. C++ production checks currently lack libzip headers;
+the full current executable, live config UI, linked seeds and gameplay are not
+claimed accepted. See the capacity report for precise fixture boundaries.
+
+First enemy-drop source checkpoint: local
+`c0a454748c3952efe6c030548ce3212ed792ead6`, exact independently restored tree
+`c95883fe1d617fc1d25394ac97979b653c4e9dc3`, ZIP
+`libfile_2904d296396c8191a62ad3e5282271cb`, SHA-256
+`ca709c741281543e9f6ef30adf3a331f6610233661738d2d77cd360ea109e0de`.
+43 native defeat checks, saved defeat/receipt flags, unique-reward redelivery,
+native pools and exclusion round trips are verified in bounded fixtures. 39
+source-backed witness families at this checkpoint; four missing and full V/MQ/
+seed validation remain hard gates, so the option is hidden and not randomized.
+Original MM drops are unchanged. New CI runners cover the native runtime,
+combat predicates and actual pool/exclusion algorithms.
+
+Public checkpoint `c169dc014934e0756cf94f17729ee3b3e50ad5b9` exactly matches
+local `fd77df56a2c1434f9705e4eda903620eaa90f6a4`, tree
+`a444294f0cb3e870d9d5f5fcd532e05818f34472`. It includes the earlier infinity
+foundation, gallery/bowling souls and export/fixture/diagnostic fixes. CI
+42565140750 fast source checks pass; native build/regression matrix is pending.
+No merge, master promotion or gameplay acceptance.
+
 Soul follow-up: native OoT gallery controller/host and bowling host, plus both
 MM gallery hosts, now require their exact soul only in native scenes. Eight
 reward checks and the positive OoT bowling/refill event agree with runtime;

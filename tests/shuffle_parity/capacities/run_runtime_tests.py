@@ -34,11 +34,64 @@ counts = re.search(r'^s16 sAmmoRefillCounts\[\] = \{[^}]*\};',parameter,re.M)
 assert counts, 'native ammo refill table missing'
 magic_globals = '\n'.join(re.search(r'^s16 '+name+r' = [^;]*;',parameter,re.M)[0] for name in (
     'sMagicMeterOutlinePrimRed','sMagicMeterOutlinePrimGreen','sMagicMeterOutlinePrimBlue','sMagicBorderRatio'))
-services = tables+'\n'+counts[0]+'\n'+magic_globals+'\n'+ '\n'.join(function(actor,n) for n in (
+icon_tables = '\n'.join(re.search(r'^'+declaration+r' = \{.*?^\};',source,re.M|re.S)[0] for source,declaration in (
+    (inventory,r'TexturePtr gItemIcons\[\]'),
+    ((ROOT/'mm/src/code/z_message.c').read_text(),r's16 D_801CFF94\[\]')))
+icon_tables = re.search(r'^#define MESSAGE_ITEM_NONE .+$',(ROOT/'mm/src/code/z_message.c').read_text(),re.M)[0]+'\n'+icon_tables
+icon_tables = ('#include "interface/parameter_static/parameter_static.h"\n#include "archives/icon_item_static/icon_item_static_yar.h"\n#include "archives/icon_item_24_static/icon_item_24_static_yar.h"\n'+icon_tables) if '--infinite-integration' in sys.argv else ''
+services = icon_tables+'\n'+tables+'\n'+counts[0]+'\n'+magic_globals+'\n'+ '\n'.join(function(actor,n) for n in (
     'Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf','Flags_SetWeekEventReg'))+'\n'+function(inventory,'Inventory_ChangeUpgrade')+'\n'+refills+'\n'+function(parameter,'Inventory_ChangeAmmo')+'\n'+function(parameter,'Rupees_ChangeBy')+'\n'+function(parameter,'Magic_Consume')+'\n'+function(parameter,'Magic_Update')
 equipment = (ROOT/'mm/mods/items/helpers/equip_helper.c').read_text()
 services += '\n#ifndef MAGIC_REQ\n#define MAGIC_REQ(amount) (amount)\n#endif\n'
 services += '\n'.join(function(equipment,n) for n in ('ItemMagic_IsInfinite','ItemMagic_Consume','ItemMagic_HasEnough'))
+# Actual player-arrow/spell affordability expressions, with their real cost tables.
+player = (ROOT/'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
+spells = (ROOT/'mm/mods/items/logic/item_oot_spells.c').read_text()
+for source,table,index,name in ((player,'sMagicArrowCosts','magicArrowType','NativeArrowAffordable'),
+                               (spells,'sOotMagicSpellCosts','magicSpell','NativeSpellAffordable')):
+    services += '\n'+re.search(r'(?:static )?u8 '+table+r'\[\] = \{.*?\};',source,re.S)[0]
+    expression = re.search(r'RandoCapacity_CanSpendMagic\(MAGIC_REQ\('+table+r'\['+index+r'\]\)\)',source)[0]
+    services += '\nint '+name+'(int '+index+') { return '+expression+'; }\n'
+
+# Execute the exact production direct-deduction blocks. Actor spawning, collision,
+# input timing and visual callbacks remain outside this bounded fixture.
+remains = (ROOT/'mm/mods/boss_remains/boss_remains.cpp').read_text()
+for name in ('kGohtThunderMagicCost','kOdolwaMothMagicCost'):
+    services += '\n'+re.search(r'(?:static )?constexpr s16 '+name+r' = [^;]+;',remains)[0].replace('constexpr','const')
+blocks = []
+for path in ('mm/mods/boss_remains/boss_remains.cpp','mm/mods/equipment/behaviors/equip_pegasus.c','mm/mods/actors/z_en_partner.inc.c'):
+    source = (ROOT/path).read_text()
+    found = re.findall(r'if \(!RandoCapacity_InfiniteMagic\(\)\) \{\s*gSaveContext.save.saveInfo.playerData.magic(?:--| -= [^;]+);\s*\}',source)
+    assert len(found) == (5 if 'boss_remains' in path else 1 if 'pegasus' in path else 2), path
+    blocks += found
+for i,block in enumerate(blocks):
+    services += '\nvoid NativeDirectMagic'+str(i)+'(void) { '+block+' }\n'
+trident = (ROOT/'mm/mods/equipment/behaviors/equip_trident.c').read_text()
+services += '\n'+re.search(r'^#define TRI_BALL_MAGIC_COST .+$',trident,re.M)[0]+'\n'
+services += function(trident,'Trident_PayBallMagic').replace('static void','void')
+
+wallet_hud = (ROOT/'mm/2s2h/Rando/MiscBehavior/TycoonWallet.cpp').read_text()
+hud_checks = re.findall(r'if \((CUR_CAPACITY\(UPG_WALLET\) >= 1000)\)',wallet_hud)
+assert len(hud_checks) == 2
+hud_registration = re.search(r'bool shouldRegister = ([^;]+);',wallet_hud)[1]
+services += '\n'+re.search(r'^#define IS_RANDO .+$',(ROOT/'mm/2s2h/Rando/Rando.h').read_text(),re.M)[0]+'\nint NativeWalletHudRegistered(void) { return '+hud_registration+'; }\n'
+assert 'if (shouldRegister && RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES)' in wallet_hud
+
+services += '\nint NativeWalletFourDigits(void) { return '+hud_checks[0]+'; }\n'
+
+# Native accumulator paths and exact synchronous purchase charge guards.
+a = parameter.index('    // Imported or pending debits cannot consume an owned Infinite Wallet.')
+b = parameter.index('    // Update perfect letters',a)
+services += '\nvoid NativeRupeeTick(void) { '+parameter[a:b]+' }\n'
+faster = (ROOT/'mm/2s2h/Enhancements/Timesavers/FasterRupeeAccumulator.cpp').read_text()
+a = faster.index('[]() {') + len('[]() {')
+b = faster.index('    });',a)
+services += '\nvoid NativeFasterRupeeTick(void) { '+faster[a:b]+' }\n'
+for i,path in enumerate(('mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp','mm/2s2h/Enhancements/Gameplay/ComboVanillaRewards.cpp')):
+    source = (ROOT/path).read_text()
+    charge = re.search(r'if \(!RandoCapacity_InfiniteWallet\(\)\) \{\s*gSaveContext.save.saveInfo.playerData.rupees -= [^;]+;\s*\}',source)[0]
+    services += '\nvoid NativePurchaseCharge'+str(i)+'(int price) { struct { int price; } sReceipt = {price}; '+charge+' }\n'
+
 # Flag notifications and the unrelated powder-keg cap are engine boundaries.
 services = '''#include "global.h"
 #include "variables.h"
@@ -73,6 +126,8 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
                                       function(bridge,'GrantMmItemByName'))
     conversion = (ROOT/'mm/2s2h/Rando/ConvertItem.cpp').read_text()
     obtainable = function(conversion[conversion.index('bool Rando::IsItemObtainable('):],'Rando::IsItemObtainable')
+    infinite = obtainable[obtainable.index('    if (const auto* upgrade = InfiniteUpgrades::Find'):obtainable.index('    if (randoItemId == RI_WALLET_CHILD)')]
+    (build/'infinite_obtainable.inc').write_text('bool NativeInfiniteObtainable(RandoItemId randoItemId,bool hasObtainedCheck) {\n'+infinite+'\nreturn false; }\n')
     a = obtainable.index('        case RI_PROGRESSIVE_WALLET:')
     b = obtainable.index('        case RI_WALLET_ADULT:',a)
     resolve = function(conversion[conversion.index('RandoItemId Rando::ConvertItem('):],'Rando::ConvertItem')
@@ -110,7 +165,8 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
         cflags = [f for f in flags if f not in ('-std=c++20','-include',str(ROOT/'tests/shuffle_parity/souls/headless.h'))]
         subprocess.run([os.environ.get('CC','cc'),'-std=c11',*cflags,*(['-DCOMBO_BUILD'] if combo else []),
                         '-c',str(build/'bag_services.c'),'-o',str(native)],check=True)
-        fixture = ('infinite_runtime_test.cpp' if '--infinite-only' in sys.argv else
+        fixture = ('infinite_integration_test.cpp' if '--infinite-integration' in sys.argv else
+                   'infinite_runtime_test.cpp' if '--infinite-only' in sys.argv else
                    'wallet_runtime_test.cpp' if '--wallet-only' in sys.argv else 'runtime_test.cpp')
         catalogues = [] if '--wallet-only' in sys.argv or '--infinite-only' in sys.argv else [
             str(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp'),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp')]

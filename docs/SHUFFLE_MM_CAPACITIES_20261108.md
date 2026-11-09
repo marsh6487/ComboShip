@@ -1,6 +1,10 @@
 # MM capacities: WIP implementation evidence
 
-## Infinite Upgrades foundation — unfinished
+Current source status: all four capacity controls are implemented. Full native
+builds, linked Glitchless seeds and configured gameplay remain validation gates.
+The sections below retain the evidence and limitations of earlier checkpoints.
+
+## Infinite Upgrades foundation — historical unfinished checkpoint
 
 The default-off boolean option supplies one each of Infinite Quiver, Infinite
 Bomb Bag, Infinite Deku Sticks, Infinite Deku Nuts, Infinite Magic and Infinite
@@ -30,9 +34,8 @@ dedicated receipt/save round trips, player and custom-equipment affordability
 and direct-drain adapters, wallet HUD dispatch, full linked seeds and gameplay.
 The old Infinite Upgrades placeholder intentionally remains disabled.
 
-Scope remains the four authorized Coming Soon options. Native bags and Child
-Wallet are integrated in source. Infinite Upgrades, final UI reorganization,
-linked seed validation and configured gameplay remain unfinished.
+Scope remains the four authorized Coming Soon options. The later integration
+follow-up below supersedes the foundation's pending menu/runtime list.
 
 ## Native bags
 
@@ -201,3 +204,69 @@ CI follow-up also fixes the real MM debug renderer include order (native graph
 declarations precede the counted-ring renderer); its real-header check passes.
 The seasons pool and foreign-scale lifecycle fixtures now supply their actual
 new helper/boundary dependencies and pass their native regression commands.
+
+
+## Infinite Upgrades native integration follow-up
+
+The real default-off Infinite Upgrades checkbox now replaces its disabled
+placeholder in Bags & Capacities and uses the ordinary gold-accent scope. Its
+existing `gRando.Options.RO_INFINITE_UPGRADES` identity is unchanged. Six unique
+major items have native starting-inventory entries and receipt/start icons.
+Actual starting-list, spoiler and RandoSaveInfo JSON adapters preserve all 64
+endpoint selections and their saved flags; shorter legacy option arrays default
+the setting off even when loaded into dirty memory. The kit finishes by repairing
+only usable infinite families, including when duplicate conversion skipped a
+previously owned endpoint's grant.
+
+Player affordability gates now honor owned Infinite Magic for elemental arrows,
+Deku bubbles, Goron spikes, Zora barrier, Giant's Mask and sword beams. The
+spell-activation gate and direct drains in boss-remains, Pegasus and partner
+abilities use the same native ownership policy. Trident's pending cost clamp
+leaves infinite magic consumption unchanged. Existing finite behavior and
+Chateau's independent event flag remain intact; visual meter/opacity and refill
+checks remain native.
+
+Infinite Wallet preserves the larger of the already owned native wallet capacity
+and its configured ceiling. A previously owned tier 3 therefore retains 999 or
+5000 capacity even when the Tycoon option is off. Four-digit HUD dispatch uses
+effective capacity >=1000, including an infinite base wallet with Tycoon enabled.
+Dispatch hooks register for every randomizer save; only enabled Tycoon seeds
+write capacity tier 3, so retained four-digit wallets also draw correctly with
+that option off.
+The private infinite ceiling is at least 5000 when Tycoon is enabled, even
+headlessly before the native HUD initializer runs or after a shared-table import
+of 999. It does not mutate the shared table or raw tiers. A failing-first native
+regression now passes both guards for 5000/5001 affordability, spending, missing
+base ownership, finite 99/999 controls and preserved custom 6000 capacity.
+Native and accelerated rupee accumulators discard pending negative debits only
+for an effective owned Infinite Wallet. Black Market and combined vanilla reward
+purchases retain their authorization, award, receipt and save order while their
+synchronous debit is skipped for that wallet; missing wallet ownership does not
+activate the endpoint.
+
+GCC/G++ 14 with the recovered nlohmann 3.11.3 include path passes original and
+Combo ASan/UBSan fixtures for the six-family pool, native runtime, start/save and
+bounded foreign receipt adapters. The runtime executes the actual native magic
+state machine, eight direct-deduction blocks, complete Trident payment function,
+actual arrow/spell affordability expressions, both accumulator paths and the two
+synchronous purchase charge guards, with finite and missing-base controls.
+Existing bag and Child Wallet runtime fixtures also pass both guards.
+
+```
+CC=gcc-14 CXX=g++-14 CPATH=/workspace/scratch/198fa7c65e91/recovered-tooling/deps \
+  python3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize
+CC=gcc-14 CXX=g++-14 CPATH=/workspace/scratch/198fa7c65e91/recovered-tooling/deps \
+  python3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-integration --sanitize
+CC=gcc-14 CXX=g++-14 CPATH=/workspace/scratch/198fa7c65e91/recovered-tooling/deps \
+  python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize
+```
+
+These bounded fixtures do not prove full actor input/collision/spawn/render
+integration, a linked two-DLL receipt, live CVar/config UI behavior, a fresh full
+production link, integrated Glitchless seeds, or configured cycle/gameplay
+acceptance. Native icon tables and actual catalogue lookup are compiled; archive
+texture loading is not exercised. Conversion/grant, audio and engine callbacks
+are explicitly controlled boundaries. Full current source compilation and
+linked/runtime acceptance remain required; the restored local environment lacks
+the complete production dependency sysroot. This is source integration evidence,
+not a claim that all four authorized Coming Soon options are accepted complete.

@@ -830,6 +830,10 @@ bool GenerateItemPool() {
     bool bushesActive = (bool)ctx->GetOption(RSK_SHUFFLE_BUSHES);
     PlaceItemsForType(RCTYPE_BUSH, bushesActive, false);
 
+    // Each global first-type check contributes one filler slot, in solo and unified pools.
+    if (ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS))
+        PlaceItemsForType(RCTYPE_ENEMY_DROP, true, false);
+
     // Shuffle Wonder Items
     bool overworldWonderItemsActive = ctx->GetOption(RSK_SHUFFLE_WONDER_ITEMS).Is(RO_SHUFFLE_WONDER_ITEMS_OVERWORLD) ||
                                ctx->GetOption(RSK_SHUFFLE_WONDER_ITEMS).Is(RO_SHUFFLE_WONDER_ITEMS_ALL);

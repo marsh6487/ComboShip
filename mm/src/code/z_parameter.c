@@ -10345,6 +10345,11 @@ void Interface_Update(PlayState* play) {
 
     LifeMeter_UpdateColors(play);
 
+    // Imported or pending debits cannot consume an owned Infinite Wallet.
+    if (RandoCapacity_InfiniteWallet() && gSaveContext.rupeeAccumulator < 0) {
+        gSaveContext.rupeeAccumulator = 0;
+    }
+
     // Update rupees
     if (gSaveContext.rupeeAccumulator != 0) {
         if (gSaveContext.rupeeAccumulator > 0) {

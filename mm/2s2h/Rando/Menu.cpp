@@ -1097,11 +1097,11 @@ static void DrawItemPoolTab() {
                                                 "Silver Rupee for 1 rupee). When enabled, those rupees can be "
                                                 "purchased any number of times per cycle; otherwise only once "
                                                 "per cycle." } }));
-    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
-    ImGui::SeparatorText("Coming Soon");
-    ImGui::PopStyleColor();
-    CVarCheckbox("Infinite Upgrades", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
+    ItemPoolCheckbox(
+        "Infinite Upgrades", RO_INFINITE_UPGRADES,
+        "Adds six unique upgrades: Infinite Quiver, Bomb Bag, Deku Sticks, Deku Nuts, Magic and Wallet.\n"
+        "Each requires its normal item, bag or wallet before it works. Finite upgrades remain in the pool.",
+        6);
     UIWidgets::EndCard();
 
     UIWidgets::BeginCard("itemPoolSongs");

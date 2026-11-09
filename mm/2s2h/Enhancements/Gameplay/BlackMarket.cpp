@@ -485,7 +485,9 @@ void GiveMarketReceipt(Actor* actor, PlayState* play) {
     if (!sReceipt.Acknowledge(gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, CUSTOM_ITEM_PARAM))
         return;
     // Reward, balance and sold bit enter one synchronous native snapshot.
-    gSaveContext.save.saveInfo.playerData.rupees -= sReceipt.price;
+    if (!RandoCapacity_InfiniteWallet()) {
+        gSaveContext.save.saveInfo.playerData.rupees -= sReceipt.price;
+    }
     CommitPurchase(sSession.state, sReceipt.slot);
     sStockRefreshPending = true;
     SaveManager_SaveCurrentForCombo(true);

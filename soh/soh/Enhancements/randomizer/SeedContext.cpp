@@ -222,6 +222,7 @@ void Context::GenerateLocationPool() {
              (!mOptions[RSK_SHUFFLE_TREES] || mOptions[RSK_NO_LOGIC].Is(RO_GENERIC_OFF))) ||
             (location.GetRCType() == RCTYPE_BUSH && !mOptions[RSK_SHUFFLE_BUSHES]) ||
             (location.GetRCType() == RCTYPE_ICICLE && !mOptions[RSK_SHUFFLE_ICICLES]) ||
+            (location.GetRCType() == RCTYPE_ENEMY_DROP && !mOptions[RSK_SHUFFLE_ENEMY_DROPS]) ||
             (location.GetRCType() == RCTYPE_RED_ICE && !mOptions[RSK_SHUFFLE_RED_ICE]) ||
             (location.GetRCType() == RCTYPE_SIGN && mOptions[RSK_SHUFFLE_SIGNS].Is(RO_SHUFFLE_SIGNS_OFF)) ||
             (location.GetRCType() == RCTYPE_WONDER_ITEM &&

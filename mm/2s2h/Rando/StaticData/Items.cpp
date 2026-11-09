@@ -608,6 +608,8 @@ std::map<RandoItemId, RandoStaticItem> Items = {
 std::map<StartingItemCategory, std::vector<RandoItemId>> StartingItemsMap = {
     { STARTING_ITEMS_INVENTORY, 
         { RI_DEKU_STICK_BAG, RI_DEKU_NUT_BAG,
+          RI_INFINITE_BOW, RI_INFINITE_BOMB_BAG, RI_INFINITE_STICKS, RI_INFINITE_NUTS,
+          RI_INFINITE_MAGIC, RI_INFINITE_WALLET,
           RI_OCARINA,               RI_PROGRESSIVE_BOW, RI_ARROW_FIRE,  RI_ARROW_ICE,   RI_ARROW_LIGHT,
           RI_PROGRESSIVE_BOMB_BAG,  RI_BOMBCHU,         RI_DEKU_STICK,  RI_DEKU_NUT,    RI_MAGIC_BEAN,
           RI_POWDER_KEG,            RI_PICTOGRAPH_BOX,  RI_LENS,        RI_HOOKSHOT,    RI_GREAT_FAIRY_SWORD,
@@ -747,6 +749,7 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
             return GI_HEART_CONTAINER;
         case RI_SINGLE_MAGIC:
             return GI_MAGIC_JAR_SMALL;
+        case RI_INFINITE_MAGIC:
         case RI_DOUBLE_MAGIC:
             return GI_MAGIC_JAR_BIG;
         case RI_GREAT_SPIN_ATTACK:
@@ -828,8 +831,10 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
 
 const char* GetIconTexturePath(RandoItemId randoItemId) {
     switch (randoItemId) {
+        case RI_INFINITE_NUTS:
         case RI_DEKU_NUT_BAG:
             return (const char*)gItemIcons[ITEM_DEKU_NUT];
+        case RI_INFINITE_STICKS:
         case RI_DEKU_STICK_BAG:
             return (const char*)gItemIcons[ITEM_DEKU_STICK];
         case RI_SHIELD_MIRROR:
@@ -843,6 +848,7 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return (const char*)gItemIcons[ITEM_HEART_CONTAINER];
         case RI_SINGLE_MAGIC:
             return (const char*)gItemIcons[ITEM_MAGIC_JAR_SMALL];
+        case RI_INFINITE_MAGIC:
         case RI_DOUBLE_MAGIC:
             return (const char*)gItemIcons[ITEM_MAGIC_JAR_BIG];
         case RI_GREAT_SPIN_ATTACK:
@@ -866,8 +872,10 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_WOODFALL_MAP:
         case RI_STONE_TOWER_MAP:
             return (const char*)gItemIcons[ITEM_COMPASS];
+        case RI_INFINITE_BOMB_BAG:
         case RI_PROGRESSIVE_BOMB_BAG:
             return (const char*)gItemIcons[ITEM_BOMB_BAG_20];
+        case RI_INFINITE_BOW:
         case RI_PROGRESSIVE_BOW:
             return (const char*)gItemIcons[ITEM_BOW];
         case RI_PROGRESSIVE_SWORD:
@@ -875,6 +883,7 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_PROGRESSIVE_WALLET:
         case RI_WALLET_CHILD:
             return (const char*)gItemIcons[ITEM_WALLET_ADULT];
+        case RI_INFINITE_WALLET:
         case RI_WALLET_TYCOON:
             return (const char*)gItemIcons[ITEM_WALLET_GIANT];
         case RI_PROGRESSIVE_LULLABY:

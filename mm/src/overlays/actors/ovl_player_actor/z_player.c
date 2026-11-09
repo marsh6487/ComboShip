@@ -3080,7 +3080,7 @@ void func_8082F1AC(PlayState* play, Player* this) {
     f32 sp3C;
     s32 var_v0;
 
-    if ((gSaveContext.save.saveInfo.playerData.magic != 0) && (this->stateFlags1 & PLAYER_STATE1_10)) {
+    if (RandoCapacity_CanSpendMagic(1) && (this->stateFlags1 & PLAYER_STATE1_10)) {
         if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
             Magic_Consume(play, 0, MAGIC_CONSUME_GORON_ZORA);
         }
@@ -4200,7 +4200,7 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 return;
             }
 
-            if ((this->currentMask == PLAYER_MASK_GIANT) && (gSaveContext.save.saveInfo.playerData.magic == 0)) {
+            if ((this->currentMask == PLAYER_MASK_GIANT) && (!RandoCapacity_CanSpendMagic(1))) {
                 func_80838A20(play, this);
             }
 
@@ -4419,7 +4419,7 @@ s32 func_808305BC(PlayState* play, Player* this, ItemId* item, ArrowType* typePa
     }
 
     if (this->transformation == PLAYER_FORM_DEKU) {
-        return ((gSaveContext.save.saveInfo.playerData.magic >= 2) ||
+        return (RandoCapacity_CanSpendMagic(2) ||
                 (CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) && (play->sceneId == SCENE_BOWLING)))
                    ? 1
                    : 0;
@@ -4489,8 +4489,7 @@ s32 func_808306F8(Player* this, PlayState* play) {
                     if ((ARROW_GET_MAGIC_FROM_TYPE(arrowType) >= ARROW_MAGIC_FIRE) &&
                         (ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_LIGHT)) {
                         // Skijer's NEI: Magic Cape halves elemental-arrow costs (gate matches consume).
-                        if (((void)0, gSaveContext.save.saveInfo.playerData.magic) <
-                            MAGIC_REQ(sMagicArrowCosts[magicArrowType])) {
+                        if (!RandoCapacity_CanSpendMagic(MAGIC_REQ(sMagicArrowCosts[magicArrowType]))) {
                             arrowType = ARROW_TYPE_NORMAL;
                             magicArrowType = ARROW_MAGIC_INVALID;
                         }
@@ -5087,8 +5086,7 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                                                       : itemAction - PLAYER_IA_MASK_FIERCE_DEITY;
 
                 if (((this->currentMask != PLAYER_MASK_GIANT) && (itemAction == PLAYER_IA_MASK_GIANT) &&
-                     ((gSaveContext.magicState != MAGIC_STATE_IDLE) ||
-                      (gSaveContext.save.saveInfo.playerData.magic == 0))) ||
+                     ((gSaveContext.magicState != MAGIC_STATE_IDLE) || (!RandoCapacity_CanSpendMagic(1)))) ||
                     (!(this->stateFlags1 & PLAYER_STATE1_8000000) &&
                      BgCheck_EntityCheckCeiling(&play->colCtx, &sp54, &this->actor.world.pos,
                                                 sPlayerAgeProperties[playerForm].ceilingCheckHeight, &sp5C, &sp58,
@@ -6082,7 +6080,7 @@ void func_808332A0(PlayState* play, Player* this, s32 magicCost, s32 isSwordBeam
             if (this->focusActor != NULL) {
                 pitch = Math_Vec3f_Pitch(&this->bodyPartsPos[PLAYER_BODYPART_WAIST], &this->focusActor->focus.pos);
             }
-            if (!isMasterBeam && gSaveContext.save.saveInfo.playerData.magic == 0) {
+            if (!isMasterBeam && !RandoCapacity_CanSpendMagic(1)) {
                 return;
             }
         }
@@ -13991,9 +13989,8 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
         this->autoLockOnActor = NULL;
 
         Math_StepToF(&this->windSpeed, 0.0f, 0.5f);
-        if ((this->unk_B62 != 0) ||
-            ((gSaveContext.magicState == MAGIC_STATE_IDLE) && (gSaveContext.save.saveInfo.playerData.magic != 0) &&
-             (this->stateFlags1 & PLAYER_STATE1_10))) {
+        if ((this->unk_B62 != 0) || ((gSaveContext.magicState == MAGIC_STATE_IDLE) && RandoCapacity_CanSpendMagic(1) &&
+                                     (this->stateFlags1 & PLAYER_STATE1_10))) {
             func_8082F1AC(play, this);
         }
 
@@ -21604,9 +21601,9 @@ void Player_Action_96(Player* this, PlayState* play) {
             Math_StepToC(&this->av1.actionVar1, 4, 1);
 
             uint8_t vanillaSpikeModeCondition =
-                (this->stateFlags3 & PLAYER_STATE3_80000) && (!CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_A) ||
-                                                              (gSaveContext.save.saveInfo.playerData.magic == 0) ||
-                                                              ((this->av1.actionVar1 == 4) && (this->unk_B08 < 12.0f)));
+                (this->stateFlags3 & PLAYER_STATE3_80000) &&
+                (!CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_A) || (!RandoCapacity_CanSpendMagic(1)) ||
+                 ((this->av1.actionVar1 == 4) && (this->unk_B08 < 12.0f)));
             if (GameInteractor_Should(VB_GORON_ROLL_DISABLE_SPIKE_MODE, vanillaSpikeModeCondition)) {
                 if (Math_StepToS(&this->unk_B86[1], 0, 1)) {
                     this->stateFlags3 &= ~PLAYER_STATE3_80000;
@@ -21727,7 +21724,7 @@ void Player_Action_96(Player* this, PlayState* play) {
                     if (this->unk_B86[1] == 0) {
                         if (GameInteractor_Should(VB_GORON_ROLL_INCREASE_SPIKE_LEVEL,
                                                   (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
-                                                      (gSaveContext.save.saveInfo.playerData.magic >= 2) &&
+                                                      RandoCapacity_CanSpendMagic(2) &&
                                                       (this->av2.actionVar2 >= 0x36B0))) {
                             this->av1.actionVar1++;
                             Actor_PlaySfx_Flagged2(&this->actor, NA_SE_PL_GORON_BALL_CHARGE - SFX_FLAG);

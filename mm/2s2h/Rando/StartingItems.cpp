@@ -145,6 +145,9 @@ void GrantStartingItems() {
         // Clear any accumulator from starting wallet items since rupees are set directly.
         gSaveContext.rupeeAccumulator = 0;
     }
+
+    // Endpoints may precede their ordinary base item in the configured list.
+    RandoCapacity_RepairInfinite();
 }
 
 std::vector<RandoItemId> GetStartingItemsFromSpoiler(nlohmann::json& spoiler) {

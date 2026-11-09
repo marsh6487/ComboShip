@@ -1887,8 +1887,8 @@
     "suite": "items",
     "origin": "gate",
     "native_abi": "explicit",
-    "name": "Native MM base bags, capacities, starts, saved ownership and foreign receipts",
-    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize",
+    "name": "Native MM bags, wallet and infinite upgrades: pools, runtime, starts, saves and foreign receipts",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-integration --sanitize",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
@@ -1935,6 +1935,15 @@
     "origin": "gate",
     "name": "Link age voice dispatch, fallback, and mixer regression",
     "run": "c++ -std=c++20 -pthread -I. -fsanitize=address,undefined -fno-pie -no-pie tests/link_voice/mixer_test.cpp -o \"$RUNNER_TEMP/age-voice-mixer\"\n\"$RUNNER_TEMP/age-voice-mixer\"\npython3 -B tests/link_voice/run_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native OoT first enemy-type drops: defeats, saved redelivery, souls, pools and exclusions",
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/enemy_drops/run_logic_tests.py\npython3 -B tests/shuffle_parity/enemy_drops/run_pool_tests.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }

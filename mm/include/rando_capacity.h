@@ -91,10 +91,17 @@ static inline int RandoCapacity_CanSpendMagic(int amount) {
 static inline int RandoCapacity_Current(int upgrade) {
     if (upgrade == UPG_WALLET && !RandoCapacity_HasWallet())
         return 0;
-    if (upgrade == UPG_WALLET && RandoCapacity_InfiniteWallet())
-        return gUpgradeCapacities[upgrade]
-                                 [gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] ? 3
-                                                                                                                  : 2];
+    if (upgrade == UPG_WALLET && RandoCapacity_InfiniteWallet()) {
+        const int finite = gUpgradeCapacities[upgrade][CUR_UPG_VALUE(upgrade)];
+        const int tycoon = gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET];
+        int ceiling = gUpgradeCapacities[upgrade][tycoon ? 3 : 2];
+        // The oracle does not initialize HUD hooks, and FleetSync may restore
+        // native tier 3 to 999. Keep the owned endpoint's configured ceiling
+        // deterministic without changing finite tiers or the shared table.
+        if (tycoon && ceiling < 5000)
+            ceiling = 5000;
+        return finite > ceiling ? finite : ceiling;
+    }
     if ((upgrade == UPG_QUIVER && RandoCapacity_InfiniteAmmo(ITEM_BOW)) ||
         (upgrade == UPG_BOMB_BAG &&
          (RandoCapacity_InfiniteAmmo(ITEM_BOMB) || RandoCapacity_InfiniteAmmo(ITEM_BOMBCHU))) ||

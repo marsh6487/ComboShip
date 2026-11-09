@@ -296,13 +296,15 @@ static void Pegasus_StateRunning(Player* p, PlayState* play) {
     Pegasus_ApplyPose(p, play);
 
     // Collider + magic drain: only when has magic
-    if (gSaveContext.save.saveInfo.playerData.magic > 0) {
+    if (RandoCapacity_CanSpendMagic(1)) {
         Pegasus_UpdateCollider(play, p);
 
         gExtEquipBehavior.pegasusMagicTick++;
         if (gExtEquipBehavior.pegasusMagicTick >= PEGASUS_MAGIC_INTERVAL) {
             gExtEquipBehavior.pegasusMagicTick = 0;
-            gSaveContext.save.saveInfo.playerData.magic--;
+            if (!RandoCapacity_InfiniteMagic()) {
+                gSaveContext.save.saveInfo.playerData.magic--;
+            }
             if (gSaveContext.save.saveInfo.playerData.magic < 0)
                 gSaveContext.save.saveInfo.playerData.magic = 0;
         }
@@ -445,7 +447,7 @@ static void Pegasus_Draw(Player* p, PlayState* play) {
     if (gExtEquipBehavior.pegasusState != PEGASUS_RUNNING)
         return;
 
-    if (gSaveContext.save.saveInfo.playerData.magic <= 0)
+    if (!RandoCapacity_CanSpendMagic(1))
         return;
 
     OPEN_DISPS(play->state.gfxCtx);

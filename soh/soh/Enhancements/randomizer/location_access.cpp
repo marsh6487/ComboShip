@@ -1,3 +1,4 @@
+#include "EnemyFirstDrops.h"
 #include "location_access.h"
 
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -918,6 +919,8 @@ void RegionTable_Init() {
     RegionTable_Init_IceCavern();
     RegionTable_Init_GerudoTrainingGround();
     RegionTable_Init_GanonsCastle();
+
+    EnemyFirstDrops::RegisterAccess();
 
     // Set parent regions
     for (uint32_t i = RR_ROOT; i < RR_MAX; i++) {
