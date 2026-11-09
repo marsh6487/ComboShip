@@ -16,10 +16,12 @@ extern "C" COMBO_EXPORT const char* MM_FillSoloRandoSeed(uint32_t seed) {
             bool seedSet;
             bool dormantGive = Rando::gComboDormantGive;
             int suppressRecord = gFcCombo_SuppressRecord;
+            decltype(sMMComboCheckPrices) checkPrices = sMMComboCheckPrices;
             ~RestoreNativeState() {
                 gPlayState = play;
                 Rando::gComboDormantGive = dormantGive;
                 gFcCombo_SuppressRecord = suppressRecord;
+                sMMComboCheckPrices = std::move(checkPrices);
                 Combo_MM_Rando_Restore();
                 sMMComboRandoSeed = seed;
                 sMMComboRandoSeedSet = seedSet;
@@ -37,6 +39,7 @@ extern "C" COMBO_EXPORT const char* MM_FillSoloRandoSeed(uint32_t seed) {
         result["inputSeed"] = Rando::GenerateSeedInSaveContext(std::to_string(seed));
         result["finalSeed"] = gSaveContext.save.shipSaveInfo.rando.finalSeed;
         result["placements"] = nlohmann::json::object();
+        result["prices"] = nlohmann::json::object();
         result["checks"] = nlohmann::json::object();
         for (const auto& [id, check] : Rando::StaticData::Checks) {
             if (id == RC_UNKNOWN)
@@ -44,7 +47,12 @@ extern "C" COMBO_EXPORT const char* MM_FillSoloRandoSeed(uint32_t seed) {
             const auto& name = Rando::StaticData::GetCheckDisplayName(id);
             const auto& saved = RANDO_SAVE_CHECKS[id];
             const auto item = saved.shuffled ? saved.randoItemId : check.randoItemId;
-            if (name.empty() || item == RI_UNKNOWN)
+            if (name.empty())
+                continue;
+            // Native generation owns these rolls. Include zero and every check
+            // type so replay never reuses stale probe prices or rerolls them.
+            result["prices"][name] = saved.price;
+            if (item == RI_UNKNOWN)
                 continue;
             result["placements"][name] = Rando::StaticData::GetItemDisplayName(item);
             result["checks"][name] = { { "scene", check.sceneId },

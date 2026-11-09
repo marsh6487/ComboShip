@@ -33,6 +33,7 @@ assert fixture.count(get_enum) == 1, 'Missing prior fixture Get enum boundary'
 fixture = fixture.replace(get_enum, '''#include "soh/soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/soh/Enhancements/randomizer/SoulShuffle.h"
 #include "soh/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
+#include "soh/assets/objects/object_gi_map/object_gi_map.h"
 #include "soh/assets/soh_assets.h"''')
 resource_names = set(re.findall(r'static const ALIGN_ASSET\(2\) char (\w+)\[\]',
                                 (ROOT/'soh/assets/soh_assets.h').read_text()))

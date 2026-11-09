@@ -253,11 +253,17 @@ def validate_rings(case, placements, data, foreign=()):
 
 
 def mm_replay(native, filled, data):
+    prices = filled.get('prices')
+    require(isinstance(prices, dict) and set(filled['placements']) <= prices.keys(),
+            'native solo generation omitted authoritative per-check prices')
+    require(all(isinstance(name, str) and type(value) is int and 0 <= value <= 65535
+                for name, value in prices.items()), 'native solo price payload is invalid')
     reset = native.bind('Combo_MM_Rando_Reset')
     owned = native.bind('Combo_MM_Rando_SetOwnedItems', args=(ctypes.c_char_p,))
     reach = native.bind('Combo_MM_Rando_GetReachableChecks', ctypes.c_char_p)
     restore = native.bind('Combo_MM_Rando_Restore')
     native.call('SetComboRandoSeed', filled['finalSeed'], args=(ctypes.c_uint64,))
+    native.call('SetCheckPrices', json.dumps(prices).encode(), args=(ctypes.c_char_p,))
     inventory = []; credited = set(); reachable = set(); spheres = []
     try:
         while True:

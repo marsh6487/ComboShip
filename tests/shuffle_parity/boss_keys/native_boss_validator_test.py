@@ -55,6 +55,39 @@ class NativeOutputValidatorTests(unittest.TestCase):
         self.assertEqual(owned['mm'], {'oot:A': 'Foreign Key'})
         self.assertEqual(owned['oot'], {'oot:B': 'Native Key (OOT)', 'mm:C': 'Foreign Bow'})
 
+    def test_mm_solo_replay_installs_exact_generated_prices_before_reset(self):
+        events=[]
+        generated={'native paid check':17,'native free check':0,'goal':0}
+        class NativeBoundary:
+            prices={'native paid check':199,'native free check':88}
+            def call(self,name,*values,**kwargs):
+                events.append(name)
+                if name=='SetComboRandoSeed':self.seed=values[0]
+                elif name=='SetCheckPrices':self.prices=native.json.loads(values[0])
+                else:raise AssertionError('unexpected native setup call: '+name)
+            def bind(self,name,*args,**kwargs):
+                def reset():
+                    self_outer.assertEqual(self.prices,generated)
+                    self_outer.assertEqual(self.seed,1234)
+                    events.append('Reset')
+                return {'Combo_MM_Rando_Reset':reset,'Combo_MM_Rando_SetOwnedItems':lambda _:None,
+                        'Combo_MM_Rando_GetReachableChecks':lambda:native.json.dumps(list(generated)).encode(),
+                        'Combo_MM_Rando_Restore':lambda:events.append('Restore')}[name]
+        self_outer=self
+        filled={'finalSeed':1234,'prices':generated,'placements':{x:'junk' for x in generated},
+                'checks':{x:{'shuffled':False} for x in generated}}
+        data={'checkMetadata':{'goal':{'sourceName':'RC_MOON_MAJORA_POT_01'}},'items':[]}
+        native.mm_replay(NativeBoundary(),filled,data)
+        self.assertEqual(events[:3],['SetComboRandoSeed','SetCheckPrices','Reset'])
+        self.assertEqual(events[-1],'Restore')
+
+    def test_mm_solo_replay_rejects_missing_or_untyped_prices_before_native_calls(self):
+        filled={'finalSeed':1234,'placements':{'goal':'junk'},'checks':{'goal':{'shuffled':False}}}
+        for prices in (None,{}, {'goal':True}, {'goal':-1}, {'goal':65536}):
+            candidate={**filled}
+            if prices is not None:candidate['prices']=prices
+            with self.assertRaises(AssertionError):native.mm_replay(object(),candidate,{})
+
     def test_native_environment_identity_set_respects_solo_acquisition_routes(self):
         catalog = native.feature_catalogue()
         combined = native.expected_environment('all-parity', True, [])

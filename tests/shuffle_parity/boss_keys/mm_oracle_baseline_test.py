@@ -22,6 +22,7 @@ item_source=(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp').read_text();a=item_sourc
 health_catalog=item_source[a:b]+'std::map<RandoItemId,RandoStaticItem> Items={\n'+'\n'.join(re.findall(r'^    RI\(RI_HEART_(?:CONTAINER|PIECE),[^\n]+',item_source,re.M))+'\n};\n#undef RI\n'+block(item_source,'RandoItemId GetItemIdFromName(')
 restore=block(source,'extern "C" COMBO_EXPORT void Combo_MM_Rando_Restore(void)')
 set_seed=block(source,'extern "C" COMBO_EXPORT void MM_SetComboRandoSeed(')
+apply_prices=block(source,'static void Combo_MM_ApplyCheckPrices() {')
 sram=(ROOT/'mm/src/code/z_sram_NES.c').read_text();native_player=re.search(r'^SavePlayerData sSaveDefaultPlayerData = \{.*?^\};',sram,re.M|re.S)[0]
 song=(ROOT/'mm/2s2h/Rando/SongEvents.cpp').read_text();song_prefix=song[song.index('namespace SE ='):song.index('void ClearImportedMapping')]
 song_bodies=song_prefix+block(song,'void RememberSavedMapping(')+'\n'+block(song,'void Generate(')+'\n'+block(song,'void RestoreForOracle(')+'\n}\n'
@@ -33,6 +34,7 @@ program='''
 #include "combo/menu/ItemGrantAuditBridge.h"
 #include <cassert>
 #include <cstring>
+#include <unordered_map>
 #define COMBO_EXPORT
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
@@ -84,7 +86,8 @@ extern "C" void ItemGrantAudit_Suspend(){++auditSuspensions;}
 extern "C" void ItemGrantAudit_Resume(){assert(auditSuspensions>0);--auditSuspensions;}
 extern "C" void ItemGrantAudit_Begin(const char*,int,int,int){}
 extern "C" void ItemGrantAudit_End(){}
-void Combo_MM_ApplyCheckPrices(){}
+std::unordered_map<uint32_t,uint16_t> sMMComboCheckPrices;
+'''+apply_prices+'''
 void GiveItemForOracle(RandoItemId);
 bool sMM_OracleActive=false,sMM_OracleInventorySweepDone=false,sMMComboRandoSeedSet=true;
 SaveContext sMM_OracleSavedContext{};
@@ -152,17 +155,28 @@ int main(){
  GiveOracleHealth(count==16?RI_HEART_CONTAINER:RI_HEART_PIECE);SameHealth(native);
  }
  Combo_MM_Rando_Restore();assert(auditSuspensions==0);
+ RANDO_SAVE_CHECKS[RC_CURIOSITY_SHOP_SPECIAL_ITEM].price=123;
+ RANDO_SAVE_CHECKS[RC_BOMB_SHOP_ITEM_03].price=456;
+ auto beforePrices=gSaveContext;
+ sMMComboCheckPrices={{RC_CURIOSITY_SHOP_SPECIAL_ITEM,199},{RC_BOMB_SHOP_ITEM_03,88}};
+ const auto originalPrices=sMMComboCheckPrices;
+ sMMComboCheckPrices={{RC_CURIOSITY_SHOP_SPECIAL_ITEM,17},{RC_BOMB_SHOP_ITEM_03,0}};
+ Combo_MM_Rando_Reset();
+ assert(RANDO_SAVE_CHECKS[RC_CURIOSITY_SHOP_SPECIAL_ITEM].price==17);
+ assert(RANDO_SAVE_CHECKS[RC_BOMB_SHOP_ITEM_03].price==0);
+ Combo_MM_Rando_Restore();assert(!memcmp(&beforePrices,&gSaveContext,sizeof(gSaveContext))&&auditSuspensions==0);
+ sMMComboCheckPrices=originalPrices;
  memset(&gSaveContext,0x5a,sizeof(gSaveContext));auto live=gSaveContext;
  gComboGameMode=COMBO_GAME_MM;sMMComboRandoSeed=77;sMMComboRandoSeedSet=true;
  gCurrentRegionTime=91;auto*play=reinterpret_cast<PlayState*>(uintptr_t(0x1234));gPlayState=play;
  gFcCombo_SuppressRecord=9;malformedKit=true;
  auto failed=nlohmann::json::parse(MM_FillSoloRandoSeed(2027));
- assert(!failed["success"].get<bool>() && !sMM_OracleActive && auditSuspensions==0);
+ assert(!failed["success"].get<bool>() && !sMM_OracleActive && auditSuspensions==0 && sMMComboCheckPrices==originalPrices);
  assert(!memcmp(&gSaveContext,&live,sizeof(live)) && gPlayState==play && gCurrentRegionTime==91);
  assert(sMMComboRandoSeed==77 && sMMComboRandoSeedSet && !Rando::gComboDormantGive && gFcCombo_SuppressRecord==9);
  malformedKit=false;configuredKit.clear();
  auto second=nlohmann::json::parse(MM_FillSoloRandoSeed(2028));
- assert(second["success"].get<bool>() && !sMM_OracleActive && auditSuspensions==0);
+ assert(second["success"].get<bool>() && !sMM_OracleActive && auditSuspensions==0 && sMMComboCheckPrices==originalPrices);
  assert(!memcmp(&gSaveContext,&live,sizeof(live)) && gPlayState==play && sMMComboRandoSeed==77);
  // A malformed imported event mapping throws even before inventory clearing.
  gSaveContext.save.shipSaveInfo.rando.finalSeed=2029;

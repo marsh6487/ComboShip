@@ -648,6 +648,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD/resource/type
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/
     ${CMAKE_CURRENT_SOURCE_DIR}/../combo
+    # Canonical shared contracts use the unambiguous combo/... include prefix.
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_SOURCE_DIR}/combo/menu
     ${CMAKE_SOURCE_DIR}/combo/title
     .

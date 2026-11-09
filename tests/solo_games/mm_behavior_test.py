@@ -5,9 +5,13 @@ import re
 import os
 import subprocess
 import tempfile
+import argparse
 
 ROOT = Path(__file__).resolve().parents[2]
 DEPS = Path(os.environ.get('COMBO_TEST_DEPS', str(ROOT / 'build-deps'))) / 'include'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--sanitize', action='store_true')
+args = parser.parse_args()
 
 def block(source, marker):
     start = source.index(marker)
@@ -163,35 +167,67 @@ int main() {
 pools = (ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
 pool_prefix = pools[pools.index('void GeneratePools('):pools.index('    std::vector<RandoItemId> startingItems')]
 fleet = (ROOT/'mm/2s2h/FleetShipCombo/FleetShipCombo.cpp').read_text()
-pool_program = COMMON + r'''
+legacy_start=fleet.index('constexpr uint32_t kFscMagic')
+legacy_end=fleet.index('#ifdef _WIN32',legacy_start)
+# Keep the actual legacy getter and LazyOpen behavior. Only OS shared-memory
+# acquisition is controlled; standalone has no attached legacy host process.
+getter_marker='int FleetShipCombo_GetActiveGame(void)'
+legacy_getter_start=fleet.index(getter_marker,fleet.index(getter_marker)+len(getter_marker))
+legacy_access='#ifndef COMBO_BUILD\n'+fleet[legacy_start:legacy_end]+r'''
+FscShared* sShared=nullptr;
+bool sLazyOpenTried=false;
+FscShared* MapShared(bool create) {assert(!create);return nullptr;}
+'''+block(fleet,'FscShared* LazyOpen()')+'\n'+block(fleet[legacy_getter_start:],getter_marker)+'\n#endif\n'
+
+# This boundary executes the current native helper dependencies with their real
+# types and declaration/default argument, rather than a four-slot model save.
+pool_program = COMMON.replace('#define COMBO_BUILD\n', '') + r'''
 #include <vector>
+#include "Rando/SongEvents.h"
+#include "Rando/VanillaCompatibility.h"
 #include "mm/2s2h/FleetShipCombo/FleetShipCombo.h"
-''' + block(fleet, 'int FleetCombo_UnifiedPoolActive(void)') + r'''
-using RandoCheckId=int;using RandoItemId=int;
-constexpr int RO_SHUFFLE_TRIFORCE_PIECES=0,RO_TRIFORCE_PIECES_REQUIRED=1,RO_TRIFORCE_PIECES_MAX=2;
-constexpr int RO_GENERIC_YES=1,RO_GENERIC_NO=0,RO_GENERIC_ON=1,RO_SHUFFLE_MAGIC_MIRROR=3;
-struct RandoSaveInfo {uint32_t randoSaveOptions[4]={1,7,9,0};};
+''' + legacy_access + block(fleet, 'int FleetCombo_UnifiedPoolActive(void)') + r'''
 int mirrorRequested=0,mirrorReads=0;
-int CVarGetInteger(const char* name,int fallback) {
+extern "C" int32_t CVarGetInteger(const char* name,int32_t fallback) {
     assert(std::string(name)=="gRando.Generation.ShuffleMagicMirror" && fallback==0);
     ++mirrorReads;return mirrorRequested;
 }
-int gMMComboGoalHunt=0,gMMComboGoalRequired=99,gMMComboGoalPieces=100;
-''' + pool_prefix + '}\n' + r'''
+extern "C" { int gMMComboGoalHunt=0,gMMComboGoalRequired=99,gMMComboGoalPieces=100; }
+namespace Rando::Logic {
+''' + pool_prefix + '}\n}\n' + r'''
 int main() {
+    using Rando::Logic::GeneratePools;
     assert(!FleetCombo_UnifiedPoolActive()); // Actual modern launcher boundary, even with stale callbacks.
-    RandoSaveInfo info;std::vector<int> checks,items;
-    GeneratePools(info,checks,items);
-    assert(info.randoSaveOptions[0]==1 && info.randoSaveOptions[1]==7 && info.randoSaveOptions[2]==9);
+    RandoSaveInfo info{};std::vector<RandoCheckId> checks;std::vector<RandoItemId> items;
+    info.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES]=1;
+    info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]=7;
+    info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]=9;
+    GeneratePools(info,checks,items); // Uses the actual header's default fourth argument.
+    assert(info.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES]==1 &&
+           info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==7 &&
+           info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==9);
     assert(mirrorReads==0 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
-    gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);assert(info.randoSaveOptions[0]==0);
+#ifdef COMBO_BUILD
+    gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);
+    assert(info.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES]==0);
     assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
     mirrorRequested=1;gComboGameMode=COMBO_GAME_MM;GeneratePools(info,checks,items);
     assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
     gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);
     assert(mirrorReads==2 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==RO_GENERIC_ON);
     gMMComboGoalHunt=1;GeneratePools(info,checks,items);
-    assert(info.randoSaveOptions[1]==99 && info.randoSaveOptions[2]==100);
+    assert(info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==99 &&
+           info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==100);
+#else
+    // An original 2Ship build cannot enable combined overrides through globals.
+    gComboGameMode=COMBO_GAME_BOTH;mirrorRequested=1;gMMComboGoalHunt=1;
+    GeneratePools(info,checks,items);
+    assert(!FleetCombo_UnifiedPoolActive() && mirrorReads==0);
+    assert(info.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES]==1 &&
+           info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==7 &&
+           info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==9);
+    assert(info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+#endif
     std::cout<<"MM native randomizer goals passed\n";
 }
 '''
@@ -272,12 +308,29 @@ failed=[]
 with tempfile.TemporaryDirectory(prefix='mm-solo-behavior-') as d:
     tmp=Path(d)
     for name,program in [('save',save_program),('menu',menu_program),('boss',goal_program),('pool',pool_program),('entry',entry_program),('opening',opening_program),('triforce',triforce_program)]:
-        cpp=tmp/(name+'.cpp');exe=tmp/name;cpp.write_text(program)
-        compiled=subprocess.run(['g++','-std=c++20','-Wall','-Wextra','-Wno-unused-parameter','-I',str(ROOT),'-I',str(DEPS),str(cpp),'-o',str(exe)])
-        if compiled.returncode:
-            failed.append(name+' (compile)');continue
-        run_dir=tmp/(name+'-run');run_dir.mkdir()
-        ran=subprocess.run([str(exe),str(run_dir)])
-        if ran.returncode:failed.append(name)
+        # Pool helper uses both real native build guards; the other legacy
+        # boundary programs retain their combined-host solo/session controls.
+        for combined in ((False,True) if name=='pool' else (True,)):
+            label=name+('-combo' if combined else '-original')
+            cpp=tmp/(label+'.cpp');exe=tmp/label;cpp.write_text(program)
+            flags=['-std=c++20','-Wall','-Wextra','-Wno-unused-parameter','-I'+str(ROOT),'-I'+str(DEPS)]
+            sources=[str(cpp)]
+            if name=='pool':
+                flags+=['-DMM_BUILD_DLL','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX',
+                        '-DCONTROLLERBUTTONS_T=uint32_t','-include',str(ROOT/'tests/shuffle_parity/souls/headless.h'),
+                        '-ffunction-sections','-fdata-sections','-Wl,--gc-sections']
+                for path in ('mm/include','mm/include/PR','mm/2s2h','mm','mm/src','mm/assets','libultraship/include','combo','combo/menu'):
+                    flags+=['-isystem',str(ROOT/path)]
+                if combined:flags+=['-DCOMBO_BUILD']
+                sources+=[str(ROOT/'mm/2s2h/Rando/SongEvents.cpp')]
+            if args.sanitize:
+                flags+=['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
+            compiled=subprocess.run([os.environ.get('CXX','c++'),*flags,*sources,'-o',str(exe)])
+            if compiled.returncode:
+                failed.append(label+' (compile)');continue
+            run_dir=tmp/(label+'-run');run_dir.mkdir()
+            ran=subprocess.run([str(exe),str(run_dir)])
+            if ran.returncode:failed.append(label)
+            else:print('PASS MM solo behavior',label,flush=True)
 if failed:
     raise SystemExit('MM behavior failures: '+', '.join(failed))

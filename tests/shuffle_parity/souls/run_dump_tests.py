@@ -20,6 +20,11 @@ starts=(ROOT/'mm/2s2h/Rando/StartingItems.cpp').read_text()
 getter=body(starts,'std::vector<RandoItemId> GetStartingItemsFromSave(')+'\n'+body(starts,'void SetStartingItemsInSave(')
 oracle=s[s.index('extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void)'):]
 oracle=body(oracle,'    {\n        auto startingItems = Rando::GetStartingItemsFromConfig();')
+checks_source=(ROOT/'mm/2s2h/Rando/StaticData/Checks.cpp').read_text()
+a=checks_source.index('#define RC(');b=checks_source.index('// clang-format off',a)
+check_ids=('RC_CLOCK_TOWN_WEST_BANK_PIECE_OF_HEART','RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2')
+check_rows='\n'.join(next(line for line in checks_source.splitlines() if re.match(r'\s*RC\('+key+r'\s*,',line)) for key in check_ids)
+native_checks=checks_source[a:b]+'\nstd::map<RandoCheckId,RandoStaticCheck> Checks = {\n'+check_rows+'\n};\n#undef RC\n'
 cpp='''#include <nlohmann/json.hpp>
 #include "Rando/Rando.h"
 #include "Rando/SoulShuffle.h"
@@ -29,9 +34,12 @@ extern "C" { SaveContext gSaveContext{}; }
 std::vector<RandoItemId> configured,granted;
 static void GiveItemForOracle(RandoItemId item){granted.push_back(item);}
 namespace Rando::StaticData {
-std::map<RandoCheckId,RandoStaticCheck> Checks;
-const std::string& GetCheckDisplayName(RandoCheckId){static std::string name="Native fixture check";return name;}
-std::string GetLocationNameForHint(RandoCheckId,bool){return "Native fixture location";}
+'''+native_checks+'''
+// Display/hint naming services are explicit data-context boundaries; metadata
+// fields and identity rows above come directly from the native source.
+const std::string& GetCheckDisplayName(RandoCheckId id){static std::map<RandoCheckId,std::string> names;return names.try_emplace(id,Checks.at(id).name).first->second;}
+std::string GetLocationNameForHint(RandoCheckId id,bool){return std::string("Fixture hint for ")+Checks.at(id).name;}
+
 }
 namespace Rando {
 std::vector<RandoItemId> GetStartingItemsFromConfig(){return configured;}
@@ -62,6 +70,16 @@ int main(){
   nativeStarts[4]=RI_SOUL_ENEMY_ALIEN; // no native OoT counterpart
   auto result=nlohmann::json::parse(Success());
   assert(result["startingSouls"].size()==4);
+  assert(result.at("checkMetadata").size()==2);
+  for(auto id:{RC_CLOCK_TOWN_WEST_BANK_PIECE_OF_HEART,RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2}){
+   const auto& native=Rando::StaticData::Checks.at(id);const auto& name=Rando::StaticData::GetCheckDisplayName(id);
+   const auto& metadata=result.at("checkMetadata").at(name);
+   assert(metadata.is_object()&&metadata.at("scene").is_number_integer()&&metadata.at("id").is_number_integer());
+   assert(metadata.at("sourceName").is_string());
+   assert(metadata.at("scene")==native.sceneId&&metadata.at("id")==static_cast<int>(id));
+   assert(metadata.at("sourceName")==native.name);
+   assert(result.at("locationHints").at(name)==Rando::StaticData::GetLocationNameForHint(id,false));
+  }
   for(int i=0;i<4;++i){
    const char* name=Rando::SoulShuffle::SharedName(static_cast<RandoItemId>(nativeStarts[i]));
    assert(std::find(result["startingSouls"].begin(),result["startingSouls"].end(),name)!=result["startingSouls"].end());

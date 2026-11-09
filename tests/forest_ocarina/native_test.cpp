@@ -470,7 +470,10 @@ static OcarinaView PlayAndCancel(int form, bool allowMissing = false) {
   player.actionFunc = Player_Action_63;
   player.skelAnime.mode = ANIMMODE_LOOP;
   player.av2.actionVar2 = 0;
+  sSongEventReservedSong = OCARINA_SONG_TIME;
   Player_Action_63(&player, &play);
+  Require(sSongEventReservedSong == -1,
+          "native staff opener clears an earlier song-event reservation");
   Require(play.msgCtx.msgMode == MSGMODE_OCARINA_STARTING &&
               play.interfaceCtx.bButtonInterfaceDoActionActive &&
               gSaveContext.nextHudVisibility == HUD_VISIBILITY_B_ALT,

@@ -36,7 +36,7 @@ def main():
         game = filename.split('/')[0]
         cpp = filename.endswith('.cpp')
         compiler = shlex.split(os.environ.get('CXX' if cpp else 'CC', 'c++' if cpp else 'cc'))
-        includes = (f'{game}/include', f'{game}/include/PR', f'{game}/src', game, f'{game}/assets',
+        includes = ('.', f'{game}/include', f'{game}/include/PR', f'{game}/src', game, f'{game}/assets',
                     f'{game}/2s2h' if game == 'mm' else 'soh/soh', 'libultraship/include', 'libultraship/src',
                     'combo', 'combo/menu')
         flags = ['-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-DCONTROLLERBUTTONS_T=uint32_t', '-DLOG_LEVEL_GAME_PRINTS=0',

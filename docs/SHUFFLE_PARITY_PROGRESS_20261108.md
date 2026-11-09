@@ -83,6 +83,42 @@ The separate Windows preflight42638388511 remains active and is not markedPASS.
 Latest-tree Linux/Windows links and actual complete seed-generation matrices
 are still required; component checks do not replace them.
 
+## Build/regression repair checkpoint after744942d7
+
+Corrected public744942d7 passed the complete fast source gate. Both native
+builds and all six regression groups ran concurrently (run42640168473).
+Linux exposed a real target include-path gap: new canonical combo/... headers
+were not reachable from the native CMake include blocks. Both native targets
+now include their shared repository parent. A real CMake probe evaluates each
+actual include block with ambient CPATH removed and compiles the shared header;
+it reproduces both original failures and passes after repair. All34 CI policy
+tests pass. No compiler diagnostic policy was weakened.
+
+Windows stopped in the native file-select/SDL check: a newly prepended door
+header bypassed the existing SDL_MAIN_HANDLED preamble. Header placement is
+repaired; the actual native query passes engine-first and SDL-first Windows
+entry-point policies. Both Windows lightweight preflight runs have otherwise
+passed complete UI and launchers; full game builds remain required.
+
+Reported regression rows have bounded actual-header/native-helper repairs:
+receipt/portal ROOT include and full entrance row PASS; dungeon reward pools
+64 native configurations PASS; static GI real Stone of Agony header and adjacent
+render sanitizers PASS; Grace pool actual policy/song/environment dependencies
+PASS; native forest song reservation declaration/reset controls PASS. Legacy
+solo helpers now use actual native option types and song/pool signatures; their
+complete registered row continues through further legacy fixture closure.
+Independent door review approved the soul metadata tests including real Bank
+and Lottery Night2 rows. Subsequent fixture-only updates can continue while
+new native builds run, without cancelling useful builds.
+
+MM solo replay now exports the exact saved per-check price map, including free
+zero-price checks, and installs it after finalSeed and before Reset. Native
+GeneratePools must not reroll prices for replay. Oracle RAII also restores the
+caller price cache on success and setup failure. The real saved-price/export/
+Reset/restore and negative stale-cache tests pass; independent review passes.
+This closes a fidelity defect in validation, not a claimed completed native
+solo seed run. New linked modules and the full eight-case proof remain needed.
+
 ## Active work and genuine verification limits
 
 All six owners completed production implementation and bounded independent

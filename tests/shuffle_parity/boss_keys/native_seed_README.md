@@ -14,7 +14,7 @@ The all-parity case simultaneously enables both games' five soul families, all f
 
 Before filling any case, an actual overfull native configuration must report the native item budget error, export empty pools, and fail native standalone generation. The adapter must never continue with a partial pool or switch to a full vanilla fallback.
 
-The own case additionally moves the real Stone Tower key behind its actual boss warp and requires configured native replay to reject that circular seed. The fresh output contains per-process native settings/static metadata, exact solo placements, MM independent collection spheres, consolidated settings/spoilers, logs, module and driver SHA256, and a manifest written only after each full case passes. Failure retains evidence and fails CI. The evidence artifact excludes its runtime symlink tree; the built runtime is uploaded independently before validation or AppImage packaging.
+The own case additionally moves the real Stone Tower key behind its actual boss warp and requires configured native replay to reject that circular seed. The fresh output contains per-process native settings/static metadata, exact solo placements, MM independent collection spheres with every exact generated per-check price (including zero) installed before traversal, consolidated settings/spoilers, logs, module and driver SHA256, and a manifest written only after each full case passes. Failure retains evidence and fails CI. The evidence artifact excludes its runtime symlink tree; the built runtime is uploaded independently before validation or AppImage packaging.
 
 These are genuine Vanilla layout native fills. Full MQ/mixed first-drop cases remain a separate opt-in matrix in `enemy_drops/native_seed_regression.py` and require the caller's actual configured MQ asset archive. Nothing fabricates an availability marker or substitutes a fixture graph. The small validator and entrypoint tests check schema/lifecycle boundaries and are not linked seed proof. No gameplay acceptance is claimed by these commands.
 
@@ -26,3 +26,5 @@ python3 -B scripts/diagnostics/run_native_syntax.py --repo "$PWD" \
 ```
 
 The helper reads native CMake PCH and CVar prefix definitions, honors `CC`/`CXX` and inherited `CPATH`, and optionally accepts a pinned real-header `--toolkit` directory. It retains the existing native GNU compiler policy. Syntax success is separate from native linking, configured seed proof, and gameplay acceptance.
+
+The MM solo export snapshots the caller's price cache and restores it with the live save/seed state on success or failure. Its price payload comes directly from the completed native save; replay does not rerun GeneratePools or reuse pre-generation probe prices.

@@ -169,7 +169,7 @@ int main() {
 
 with tempfile.TemporaryDirectory(prefix='portal-save-') as directory:
     cpp=Path(directory)/'test.cpp'; binary=Path(directory)/'test'; cpp.write_text(source)
-    includes=['mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']
+    includes=['.','mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']
     command=[os.environ.get('CXX','c++'),'-std=c++20','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2',
              '-DFMT_HEADER_ONLY','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
              *['-I'+str(ROOT/path) for path in includes]]

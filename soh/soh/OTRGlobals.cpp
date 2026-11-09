@@ -1,10 +1,10 @@
-#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 extern "C" void Partners_Reset(void);
 // This module accesses GameState::main and owns no SDL entry point.
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
 #endif
 
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "rando/MagicMirrorShuffle.h"
 #include "Enhancements/randomizer/SoulShuffle.h"
 #include "Enhancements/randomizer/EnemyFirstDrops.h"
