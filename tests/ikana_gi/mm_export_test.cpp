@@ -5,9 +5,12 @@
 #include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
+#include "mm/2s2h/Rando/SoulShuffle.h"
 #include "mm/include/z64item.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "mm/assets/objects/object_gi_shield_3/object_gi_shield_3.h"
+#include "mm/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
+#include "mm/assets/objects/gameplay_keep/gameplay_keep.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>

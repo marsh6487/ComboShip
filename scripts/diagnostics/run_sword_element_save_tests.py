@@ -90,7 +90,7 @@ static void Init() { NeiSave_Init(false); }
             cpp.write_text(source)
             roots = [ROOT / host / path for path in ('', 'include', 'include/PR', 'src', 'assets',
                                                      '2s2h' if host == 'mm' else 'soh')]
-            roots += [ROOT / path for path in ('libultraship/include', 'combo')]
+            roots += [ROOT / path for path in ('libultraship/include', 'combo', '')]
             command = [os.environ.get('CXX', 'c++'), '-std=c++20', '-w', '-DF3DEX_GBI_2',
                        '-DFMT_HEADER_ONLY', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                        *['-I' + str(path) for path in roots + includes], str(cpp), '-o', str(binary)]

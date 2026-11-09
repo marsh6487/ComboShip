@@ -42,7 +42,7 @@ def native_fixture(host):
 
 def compiler_flags(host, combo):
     includes = [f'{host}/include', f'{host}/src', f'{host}/assets', host, f'{host}/mods',
-                'libultraship/include', 'combo', 'combo/menu']
+                'libultraship/include', 'combo', 'combo/menu', '']
     cvars = ['CMake/soh-cvars.cmake']
     if host == 'mm':
         includes += ['mm/include/PR', 'mm/2s2h']

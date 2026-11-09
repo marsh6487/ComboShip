@@ -152,6 +152,8 @@ void ApplyNearlyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::
 void ApplyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
 bool StaysAtVanillaCheck(RandoItemId itemId, const RandoSaveInfo& saveInfo);
 bool IsSongLocationItem(RandoItemId itemId);
+int CheckIdToConfinementGroup(RandoCheckId checkId);
+int RandoItemIdToConfinementGroup(RandoItemId itemId);
 bool IsItemAllowedAtCheck(RandoItemId itemId, RandoCheckId checkId);
 size_t SelectItemForCheck(const std::vector<RandoItemId>& itemPool, const std::vector<RandoCheckId>& checkPool,
                           RandoCheckId checkId);
@@ -210,6 +212,13 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define CAN_BE_HUMAN                                                                                        \
     (IS_HUMAN || (IS_DEITY && HAS_ITEM(ITEM_MASK_FIERCE_DEITY)) || (IS_ZORA && HAS_ITEM(ITEM_MASK_ZORA)) || \
      (IS_DEKU && HAS_ITEM(ITEM_MASK_DEKU)) || (IS_GORON && HAS_ITEM(ITEM_MASK_GORON)))
+// Native ordinary forms may don another owned transformation mask, then
+// remove it to become Human. Fierce Deity cannot equip those ordinary masks.
+// New feature rules share this capability without changing legacy form gates.
+inline bool CanReturnToHuman() {
+    return CAN_BE_HUMAN ||
+           (!IS_DEITY && (HAS_ITEM(ITEM_MASK_DEKU) || HAS_ITEM(ITEM_MASK_GORON) || HAS_ITEM(ITEM_MASK_ZORA)));
+}
 #define CHECK_MAX_HP(TARGET_HP) ((TARGET_HP * 16) <= gSaveContext.save.saveInfo.playerData.healthCapacity)
 #define HAS_MAGIC (gSaveContext.save.saveInfo.playerData.isMagicAcquired)
 #define CAN_HOOK_SCARECROW \

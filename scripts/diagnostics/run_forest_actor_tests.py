@@ -43,7 +43,7 @@ def main():
         flags = ['-std=gnu11', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DNDEBUG', '-D_LANGUAGE_C', '-DFMT_HEADER_ONLY',
                  '-DCONTROLLERBUTTONS_T=uint32_t', '-DLOG_LEVEL_GAME_PRINTS=6',
                  '-Imm/include', '-Imm/include/PR', '-Imm/src', '-Imm/assets', '-Imm',
-                 '-Imm/2s2h', '-Ilibultraship/include', '-Icombo', '-Icombo/menu']
+                 '-Imm/2s2h', '-Ilibultraship/include', '-Icombo', '-Icombo/menu', '-I' + str(ROOT)]
         run('cc', *flags, work/'viewer.c', '-lm', '-o', work/'viewer')
         run(work/'viewer')
         run('c++', '-std=c++20', *flags[1:], 'mm/tests/forest_epona_test.cpp', '-lm', '-o', work/'epona')

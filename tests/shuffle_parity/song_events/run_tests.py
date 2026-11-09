@@ -59,6 +59,16 @@ with tempfile.TemporaryDirectory(prefix='song-event-native-') as td:
     if not rules:print('SKIP Keeta environmental lambdas: absent in this isolated source; set SONG_WORLD_SOURCE_ROOT to integrated tree',flush=True)
     generated='#define SONG_KEETA_ROCK_COUNT '+str(len(rules))+'\n'
     generated+='static std::vector<std::function<bool()>> NativeKeetaRockRules(){return {'+','.join('[]{return '+rule+';}' for rule in rules)+'};}\n'
+    # Execute the actual new environmental predicates with the native form
+    # transition/table matrix, rather than modeling their Human requirement.
+    for filename,check,name in (
+        ('Central.cpp','RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1','NativeObservatorySoilRule'),
+        ('West.cpp','RC_GREAT_BAY_COAST_ROCK_WATER_01','NativeWaterRockRule'),
+        ('West.cpp','RC_GREAT_BAY_COAST_ROCK_SAND_1','NativeSandRockRule')):
+        source=(worldRoot/'mm/2s2h/Rando/Logic/Regions'/filename).read_text()
+        rule=re.search(r'CHECK\('+check+r',\s*(.*)\),',source)
+        if not rule:raise RuntimeError('Missing native environmental CHECK '+check)
+        generated+='static bool '+name+'(){return '+rule[1]+';}\n'
     inventory=(ROOT/'mm/src/code/z_inventory.c').read_text()
     generated+='extern "C" {\n'+'\n'.join(re.search(r'^(?:u16|u8) '+name+r'\[\] = \{.*?^\};',inventory,re.M|re.S)[0] for name in ('gEquipMasks','gEquipShifts'))+'\n}\n'
     (Path(td)/'keeta_native_rules.inc').write_text(generated)

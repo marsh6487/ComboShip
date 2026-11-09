@@ -63,7 +63,7 @@ def feature_catalogue():
                                  (ROOT / 'combo/rando/RustyDoorKeyCatalog.inc').read_text(), re.M):
         rusty[game.lower()].append(name)
     items = item_rows()
-    parity = {name for token, name in items.items() if token in ('RI_DEKU_STICK_BAG', 'RI_DEKU_NUT_BAG', 'RI_WALLET_CHILD')
+    parity = {name for token, name in items.items() if token in ('RI_DEKU_STICK_BAG', 'RI_DEKU_NUT_BAG')
               or token.startswith('RI_INFINITE_') or re.fullmatch(r'RI_(WOODFALL|SNOWHEAD|GREAT_BAY|STONE_TOWER)_KEY_RING', token)}
     environment = set(re.findall(r'MM_ENVIRONMENT_CHECK\((RC_[A-Z0-9_]+),',
                                  (ROOT / 'mm/2s2h/Rando/MMEnvironmentChecks.inc').read_text()))
@@ -112,6 +112,14 @@ def settings_for(case):
         for token in MM_FEATURES:
             mm['gRando.Options.RO_' + token] = 15 if token == 'SHUFFLE_KEY_RINGS' else 1
     return {'oot': oot, 'mm': mm}
+
+
+def saved_setting(settings, key):
+    # Production omits legacy0 to preserve old off/24-family snapshot identities.
+    # An absent current1 remains a mismatch; no other setting gains a default.
+    if key == 'gRandoSettings.RustyDoorKeyCatalogVersion':
+        return settings.get(key, 0)
+    return settings.get(key)
 
 
 def module_name(game):
@@ -163,6 +171,11 @@ def exclusions(case, game, data):
             inverted = '_INVERTED_' in source
             if inverted != (case == 'stone-inverted'):
                 names.append(source)
+    if game == 'mm':
+        # Native GetExcludedChecksFromConfig serializes in numeric RC order.
+        # Request that same order while retaining exact snapshot equality below.
+        source_ids = {row['sourceName']: row['id'] for row in metadata(data).values()}
+        return sorted(set(names), key=source_ids.__getitem__)
     return sorted(set(names))
 
 
@@ -195,7 +208,32 @@ def expected_environment(case, combined, starting_items):
     return catalog['environment'] if combined or starts_with_iron_boots else catalog['environment'] - catalog['ironBootRocks']
 
 
-def validate_features(case, game, placements, data, combined=False, starting_items=None):
+def validate_mm_wallets(enabled, placements, data, settings):
+    """Child Wallet adds progressive supply; it is resolved only at native grant."""
+    require(isinstance(settings, dict), 'native MM wallet settings missing')
+    require(settings.get('gRando.Options.RO_SHUFFLE_CHILD_WALLET') == int(enabled),
+            'native Child Wallet option changed')
+    require(settings.get('gRando.Options.RO_SHUFFLE_TYCOON_WALLET') == 0,
+            'native wallet contract requires the configured Tycoon-off preset')
+    require(settings.get('gRando.StartingItems') == [], 'native wallet contract requires the configured empty starts')
+    names = {row['token']: row['name'] for row in data['items'] if row.get('token') in
+             ('RI_PROGRESSIVE_WALLET', 'RI_WALLET_CHILD')}
+    require(len(names) == 2, 'native wallet item metadata missing')
+    progressive, child = names['RI_PROGRESSIVE_WALLET'], names['RI_WALLET_CHILD']
+    checks = (ROOT / 'mm/2s2h/Rando/StaticData/Checks.cpp').read_text()
+    baseline = len(re.findall(r'^\s*RC\([^\n]+,\s*RI_PROGRESSIVE_WALLET\),\s*$', checks, re.M))
+    require(baseline == 2, 'native baseline wallet checks changed')
+    expected = baseline + int(enabled)
+    supply = Counter([row['name'] for row in data['pool']] + [row['item'] for row in data['fixed']])
+    require(supply[progressive] == expected, 'native progressive wallet supply differs: ' + str(supply[progressive]))
+    require(supply[child] == 0, 'native pool/fixed contains a phantom concrete Child Wallet')
+    counts = Counter(plain(item) for item in placements.values())
+    require(counts[progressive] == supply[progressive], 'filled progressive wallet count differs: ' + str(counts[progressive]))
+    require(counts[child] == 0, 'filled seed contains a phantom concrete Child Wallet')
+    return {'progressiveWallets': expected, 'concreteChildWallets': 0}
+
+
+def validate_features(case, game, placements, data, combined=False, starting_items=None, settings=None):
     catalog = feature_catalogue()
     # For combined seeds, foreign placements are disambiguated before this call.
     counts = Counter(plain(x) for x in placements.values())
@@ -208,6 +246,7 @@ def validate_features(case, game, placements, data, combined=False, starting_ite
     if game == 'mm':
         for name in catalog['parity']:
             require(counts[name] == int(enabled_parity), 'MM capacity/infinite/ring identity count: ' + name)
+        wallet = validate_mm_wallets(enabled_parity, placements, data, settings)
         active_sources = {metadata(data)[name]['sourceName'] for name in active_checks(data)}
         env = active_sources & catalog['environment']
         expected_env = expected_environment(case, combined, starting_items)
@@ -229,6 +268,7 @@ def validate_features(case, game, placements, data, combined=False, starting_ite
         soul_names = catalog['souls'][game] | {row['name'] for row in data['items'] if 'Soul' in row['name']}
         require(not any(counts[x] for x in soul_names), 'disabled souls leaked into actual seed')
     return {'rustyIdentities': len(catalog['rusty'][game]) if enabled_rusty else 0,
+            'walletSupply': wallet if game == 'mm' else None,
             'nativeEnvironmentChecks': len(expected_env) if game == 'mm' else 0,
             'environmentPolicy': 'combined native OoT route' if combined else 'native solo configured starts'}
 
@@ -279,7 +319,14 @@ def mm_replay(native, filled, data):
         missing = [name for name, item in filled['placements'].items()
                    if filled['checks'][name]['shuffled'] and item in advancement and name not in reachable]
         require(not missing, 'actual native MM solo advancement checks unreachable: ' + repr(missing))
-        return {'nativeGoal': goal[0], 'spheres': spheres, 'reachableChecks': len(reachable)}
+        wallet_collected = 0
+        if filled.get('settings', {}).get('gRando.Options.RO_SHUFFLE_CHILD_WALLET') == 1:
+            wallets = [row['name'] for row in data['items'] if row.get('token') == 'RI_PROGRESSIVE_WALLET']
+            require(len(wallets) == 1, 'native replay wallet metadata missing')
+            wallet_collected = inventory.count(wallets[0])
+            require(wallet_collected > 0, 'native replay never granted progressive Child Wallet supply')
+        return {'nativeGoal': goal[0], 'spheres': spheres, 'reachableChecks': len(reachable),
+                'nativeProgressiveWalletsCollected': wallet_collected}
     finally:
         restore()
 
@@ -325,7 +372,7 @@ def probe(case, game, mode, output):
         native.restore(configured); data = native.dump('DumpRandoStaticData')
     actual_settings = native.dump('DumpRandoSettings')
     for key, value in configured.items():
-        require(actual_settings.get(key) == value, 'native setting did not apply: ' + key)
+        require(saved_setting(actual_settings, key) == value, 'native setting did not apply: ' + key)
     require('error' not in data, 'native static dump failed after exclusions: ' + repr(data.get('error')))
     require(not data.get('accessibility', {}).get('noLogic'), 'native graph switched to No Logic')
     require(not data.get('startingSouls'), 'unexpected starting souls invalidate native replay')
@@ -336,14 +383,14 @@ def probe(case, game, mode, output):
         filled = json.loads(filled)
         require(filled.get('success'), 'native solo generation failed: ' + repr(filled))
         for key, value in configured.items():
-            require(filled['settings'].get(key) == value, 'actual solo generation changed native setting: ' + key)
+            require(saved_setting(filled['settings'], key) == value, 'actual solo generation changed native setting: ' + key)
         if game == 'oot':
             require(filled['fillResult'] == 1 and filled['nativeReplayBeatable'], 'native OoT solo replay failed')
         else:
             result['replay'] = mm_replay(native, filled, data)
         result['keys'] = validate_keys(game, filled['placements'], data, excluded, case if case.startswith('stone-') else None)
         result['features'] = validate_features(case, game, filled['placements'], data,
-                                               starting_items=filled['settings'].get('gRando.StartingItems'))
+                                               starting_items=filled['settings'].get('gRando.StartingItems'), settings=filled['settings'])
         if game == 'mm': validate_rings(case, filled['placements'], data)
         result['nativeFill'] = filled
     else:
@@ -373,14 +420,14 @@ def validate_combined(case, spoiler, probes):
         exclusion_key = 'gRandoSettings.ExcludedLocations' if game == 'oot' else 'gRando.ExcludedChecks'
         expected_settings[exclusion_key] = probes[game]['settings'][exclusion_key]
         for key, value in expected_settings.items():
-            require(spoiler[game]['settings'].get(key) == value, 'actual combined generation changed native setting: ' + key)
+            require(saved_setting(spoiler[game]['settings'], key) == value, 'actual combined generation changed native setting: ' + key)
         result[game] = validate_keys(game, spoiler[game]['placements'], probes[game]['dump'], probes[game]['excluded'],
                                      case if case.startswith('stone-') else None)
         for row in spoiler.get('foreign', []):
             require(plain(row['itemName']) not in KEY_SCENES['oot'] and plain(row['itemName']) not in KEY_SCENES['mm'], 'own dungeon boss key exported foreign')
         # Feature counts consume the real owner across both hosts.
         validate_features(case, game, owned[game], probes[game]['dump'], combined=True,
-                          starting_items=probes[game]['settings'].get('gRando.StartingItems'))
+                          starting_items=probes[game]['settings'].get('gRando.StartingItems'), settings=spoiler[game]['settings'])
     validate_rings(case, spoiler['mm']['placements'], probes['mm']['dump'],
                    {row['checkName'] for row in spoiler.get('foreign', []) if row['checkGame'] == 'mm'})
     require(len(spoiler.get('foreign', [])) > 0, 'actual combined fill has no cross-game placements')

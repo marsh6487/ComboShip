@@ -1,8 +1,10 @@
 #include "Logic.h"
 #include "2s2h/Rando/Types.h"
+#include "regs.h"
 
-#include <numeric>
-#include <iterator>
+#include <algorithm>
+#include <map>
+#include <stdexcept>
 #include <spdlog/spdlog.h>
 
 extern "C" {
@@ -11,261 +13,249 @@ extern "C" {
 uint64_t GetUnixTimestamp();
 }
 
-namespace Rando {
+namespace Rando::Logic {
+namespace {
 
-namespace Logic {
+// Assumed inventory is a search input, never an acquisition in either game.
+// Restore the entire native state on success and on every exceptional exit.
+struct FillSimulation {
+    SaveContext original = gSaveContext;
+    uint64_t regionTime = gCurrentRegionTime;
+    bool originalSimulation = gItemGrantSimulation;
+    RegEditor* registers = gRegEditor;
+    RegEditor originalRegisters{};
+    FillSimulation() {
+        if (registers != nullptr) {
+            originalRegisters = *registers;
+        }
+        gItemGrantSimulation = true;
+    }
+    void RestoreRegisters() const {
+        if (registers != nullptr) {
+            *registers = originalRegisters;
+        }
+    }
+    ~FillSimulation() {
+        gSaveContext = original;
+        gCurrentRegionTime = regionTime;
+        RestoreRegisters();
+        gItemGrantSimulation = originalSimulation;
+    }
+};
+
+} // namespace
 
 void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool) {
-    uint64_t tick = GetUnixTimestamp();
-
-    SaveContext copiedSaveContext;
-    memcpy(&copiedSaveContext, &gSaveContext, sizeof(SaveContext));
-
-    std::set<RandoRegionId> regionsInLogic = { RR_MAX };
-    std::set<RandoCheckId> checksInLogic;
-    std::set<std::pair<RandoEvent, std::function<bool()>>*> eventsInLogic;
-
-    // Initialize time states using shared function
-    std::unordered_map<RandoRegionId, RegionTimeState> regionTimeStates = InitializeRegionTimeStates(RR_MAX);
-
-    RandoCheckId checkWithJunk = RC_UNKNOWN;
-    std::set<RandoItemId> nonJunkItemsThatWeHaveTried;
-    std::vector<RandoCheckId> checksWithJunk;
-    std::vector<int> checksWithJunkWeights;
-    int weight = 1;
-
-    // Inital shuffle of the item pool (Following shuffles done at the end of the loop)
-    if (itemPool.size() > 1) {
-        for (size_t i = 0; i < itemPool.size(); i++) {
-            size_t j = Ship_Random(0, itemPool.size());
-            std::swap(itemPool[i], itemPool[j]);
+    const uint64_t tick = GetUnixTimestamp();
+    FillSimulation simulation;
+    const std::set<RandoCheckId> shuffledChecks(checkPool.begin(), checkPool.end());
+    std::map<RandoCheckId, RandoItemId> placements;
+    size_t probes = 0, backtracks = 0, maximumDepth = 0;
+    auto checkBudget = [&] {
+        if (GetUnixTimestamp() - tick > 10000) {
+            SPDLOG_ERROR("Glitchless search budget: placed={} maximum={} probes={} backtracks={}", placements.size(),
+                         maximumDepth, probes, backtracks);
+            throw std::runtime_error("Generation took too long, aborting");
         }
+    };
+    if (checkPool.size() != itemPool.size() || shuffledChecks.size() != checkPool.size()) {
+        throw std::runtime_error("Glitchless item/check pools are not balanced and unique");
     }
 
-    auto handleError = [&](std::string message) {
-        SPDLOG_ERROR("Items/Checks: {}/{}", itemPool.size(), checkPool.size());
+    // Keep occurrences, including duplicate keys/progressives and health. A set
+    // of item IDs loses quantities; RemoveItem cannot undo progressive grants.
+    std::vector<RandoItemId> order = itemPool;
+    for (size_t i = 0; i < order.size(); i++) {
+        std::swap(order[i], order[Ship_Random(0, order.size())]);
+    }
+    std::stable_sort(order.begin(), order.end(), [](RandoItemId a, RandoItemId b) {
+        return (RandoItemIdToConfinementGroup(a) >= 0) > (RandoItemIdToConfinementGroup(b) >= 0);
+    });
 
-        // Log out the checks that are still in the pool
-        for (auto& randoCheckId : checkPool) {
-            SPDLOG_ERROR("Check still in pool: {}", Rando::StaticData::Checks[randoCheckId].name);
+    auto grant = [](RandoItemId item) {
+        // Native UNKNOWN converts to JUNK; these three IDs have no inventory
+        // behavior. Still collect their checks and keep every pool occurrence.
+        if (item == RI_UNKNOWN || item == RI_NONE || item == RI_JUNK) {
+            return;
         }
-        // Log out the items that are still in the pool
-        for (RandoItemId randoItemId : itemPool) {
-            SPDLOG_ERROR("Item still in pool: {}", Rando::StaticData::Items[randoItemId].spoilerName);
+        const auto resolved = ConvertItem(item);
+        if (resolved != RI_UNKNOWN && resolved != RI_NONE && resolved != RI_JUNK) {
+            GiveItem(resolved);
         }
-
-        memcpy(&gSaveContext, &copiedSaveContext, sizeof(SaveContext));
-        throw std::runtime_error(message);
     };
 
-    while (true) {
-        // Break if we've been running for too long
-        if (GetUnixTimestamp() - tick > 10000) {
-            handleError("Generation took too long, aborting");
+    // Cache exact native suffix inventories once. Each entry includes every
+    // occurrence in that suffix (including health/ammo), never RemoveItem undo.
+    // Probes copy these states; they do not re-grant the whole assumed pool.
+    std::vector<SaveContext> assumed(order.size() + 1);
+    assumed.back() = simulation.original;
+    for (size_t i = order.size(); i-- > 0;) {
+        checkBudget();
+        simulation.RestoreRegisters();
+        gSaveContext = assumed[i + 1];
+        gCurrentRegionTime = simulation.regionTime;
+        grant(order[i]);
+        assumed[i] = gSaveContext;
+    }
+
+    // Every probe rebuilds inventory, events, region times and collected checks.
+    // An unfilled shuffled check still contains its vanilla placeholder in the
+    // native save: it may be reachable, but must never grant that placeholder.
+    auto reachable = [&](size_t assumeFrom) {
+        checkBudget();
+        probes++;
+        simulation.RestoreRegisters();
+        gSaveContext = assumed[assumeFrom];
+        gCurrentRegionTime = simulation.regionTime;
+        for (auto [check, item] : placements) {
+            RANDO_SAVE_CHECKS[check].randoItemId = item;
+            RANDO_SAVE_CHECKS[check].shuffled = true;
         }
-
-        bool regionsInLogicChanged = false;
-        bool eventsInLogicChanged = false;
-        bool checksInLogicChanged = false;
-
-        // Crawl through all reachable regions and add any new reachable regions
-        auto prevRegionsInLogicSize = regionsInLogic.size();
-        for (RandoRegionId regionId : regionsInLogic) {
-            FindReachableRegions(regionId, regionsInLogic, regionTimeStates);
-        }
-        if (regionsInLogic.size() != prevRegionsInLogicSize) {
-            regionsInLogicChanged = true;
-        }
-
-        for (RandoRegionId regionId : regionsInLogic) {
-            auto& randoRegion = Regions[regionId];
-
-            // Set current region time for check evaluation
-            SetCurrentRegionTime(regionTimeStates, regionId);
-
-            // Apply any new events
-            for (auto& randoEvent : randoRegion.events) {
-                if (!eventsInLogic.contains(&randoEvent) && randoEvent.second()) {
-                    RANDO_EVENTS[randoEvent.first]++;
-                    eventsInLogic.insert(&randoEvent);
-                    eventsInLogicChanged = true;
-                }
+        std::set<RandoRegionId> regions = { RR_MAX };
+        std::set<RandoCheckId> checks;
+        std::set<std::pair<RandoEvent, std::function<bool()>>*> events;
+        auto times = InitializeRegionTimeStates(RR_MAX);
+        uint64_t ownedTime = TimeLogic::GetOwnedTimeSlices();
+        bool changed;
+        do {
+            checkBudget();
+            changed = false;
+            const auto previousTimes = times;
+            const size_t previousRegions = regions.size();
+            for (RandoRegionId region : regions) {
+                FindReachableRegions(region, regions, times);
             }
-
-            // Apply any new checks
-            for (auto& [randoCheckId, checkLogic] : randoRegion.checks) {
-                if (!checksInLogic.contains(randoCheckId) && checkLogic.first()) {
-                    // VALIDATION: Verify check is reachable with owned time
-                    TimeLogic::ValidateRegionTimeOwnership(regionId, randoCheckId,
-                                                           regionTimeStates[regionId].timeSlices, "Glitchless");
-
-                    checksInLogic.insert(randoCheckId);
-
-                    RandoItemId randoItemId = RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
-
-                    auto it = std::find(checkPool.begin(), checkPool.end(), randoCheckId);
-                    bool inPool = it != checkPool.end();
-                    if (inPool) {
-                        checkPool.erase(it);
-
-                        size_t pickIndex = SelectItemForCheck(itemPool, checkPool, randoCheckId);
-                        if (pickIndex == itemPool.size()) {
-                            handleError("No allowed item remains for reachable check: " +
-                                        std::string(Rando::StaticData::Checks[randoCheckId].name));
-                        }
-
-                        randoItemId = RANDO_SAVE_CHECKS[randoCheckId].randoItemId = itemPool[pickIndex];
-                        RANDO_SAVE_CHECKS[randoCheckId].shuffled = true;
-
-                        itemPool.erase(itemPool.begin() + pickIndex);
-
-                        if (Rando::StaticData::Items[randoItemId].randoItemType == RITYPE_JUNK ||
-                            Rando::StaticData::Items[randoItemId].randoItemType == RITYPE_HEALTH) {
-                            checksWithJunk.push_back(randoCheckId);
-                            checksWithJunkWeights.push_back(weight);
-                            SPDLOG_TRACE("Item Placed: {}:{}", Rando::StaticData::Checks[randoCheckId].name,
-                                         Rando::StaticData::Items[randoItemId].spoilerName);
-                        } else {
-                            SPDLOG_DEBUG("Item Placed: {}:{}", Rando::StaticData::Checks[randoCheckId].name,
-                                         Rando::StaticData::Items[randoItemId].spoilerName);
-                        }
+            changed |= regions.size() != previousRegions;
+            for (RandoRegionId region : regions) {
+                SetCurrentRegionTime(times, region);
+                for (auto& event : Regions[region].events) {
+                    if (!events.contains(&event) && event.second()) {
+                        RANDO_EVENTS[event.first]++;
+                        events.insert(&event);
+                        changed = true;
                     }
-
-                    GiveItem(ConvertItem(randoItemId));
-
-                    // Update time states for all regions when time items are obtained
-                    if (randoItemId >= RI_TIME_DAY_1 && randoItemId <= RI_TIME_PROGRESSIVE) {
-                        uint64_t newTimeSlices = TimeLogic::GetOwnedTimeSlices();
-                        // Update RR_MAX time state first - this is the source for new region discoveries
-                        if (regionTimeStates.find(RR_MAX) != regionTimeStates.end()) {
-                            regionTimeStates[RR_MAX].timeSlices = newTimeSlices;
+                }
+                for (auto& [check, condition] : Regions[region].checks) {
+                    if (!checks.contains(check) && condition.first()) {
+                        TimeLogic::ValidateRegionTimeOwnership(region, check, times[region].timeSlices, "Glitchless");
+                        checks.insert(check);
+                        if (!shuffledChecks.contains(check) || placements.contains(check)) {
+                            grant(RANDO_SAVE_CHECKS[check].randoItemId);
                         }
-                        // Update existing region time states to reflect new owned time
-                        for (auto& [regionId, timeState] : regionTimeStates) {
-                            timeState.timeSlices = newTimeSlices;
-                            // Expand time forward based on region's stay restrictions
-                            if (timeState.canStayOverTime) {
-                                timeState.timeSlices = TimeLogic::ExpandTimeForward(newTimeSlices, Regions[regionId]);
-                            }
-                        }
-                    }
-
-                    checksInLogicChanged = true;
-                }
-            }
-        }
-
-        if (itemPool.empty()) {
-            // Done!
-            break;
-        }
-
-        // Choose a random check with junk, and attempt to place progressive items until we unlock something
-        if (!regionsInLogicChanged && !checksInLogicChanged && !eventsInLogicChanged) {
-            if (checkWithJunk == RC_UNKNOWN) {
-                if (checksWithJunk.empty()) {
-                    handleError("Out of checks to replace, cannot place remaining items");
-                }
-
-                if (checksWithJunk.size() == 1) {
-                    checkWithJunk = checksWithJunk[0];
-                    checksWithJunk.pop_back();
-                    checksWithJunkWeights.pop_back();
-                } else {
-                    std::vector<double> cumulativeWeights(checksWithJunkWeights.size());
-                    std::partial_sum(checksWithJunkWeights.begin(), checksWithJunkWeights.end(),
-                                     cumulativeWeights.begin());
-                    double random = Ship_Random(0, cumulativeWeights.back());
-                    auto it = std::upper_bound(cumulativeWeights.begin(), cumulativeWeights.end(), random);
-                    size_t index = std::distance(cumulativeWeights.begin(), it);
-
-                    checkWithJunk = checksWithJunk[index];
-
-                    // Remove the check from the list of checks with junk
-                    checksWithJunk.erase(checksWithJunk.begin() + index);
-                    checksWithJunkWeights.erase(checksWithJunkWeights.begin() + index);
-                }
-
-                SPDLOG_DEBUG("Nothing changed, attempting to replace check: {}",
-                             Rando::StaticData::Checks[checkWithJunk].name);
-            }
-
-            std::vector<std::pair<RandoItemId, int>> nonJunkItemsThatWeHaveNotTried;
-            bool anyNonJunkItemsLeft = false;
-            for (size_t i = 0; i < itemPool.size(); i++) {
-                if (Rando::StaticData::Items[itemPool[i]].randoItemType != RITYPE_JUNK &&
-                    Rando::StaticData::Items[itemPool[i]].randoItemType != RITYPE_HEALTH) {
-                    anyNonJunkItemsLeft = true;
-                    if (nonJunkItemsThatWeHaveTried.find(itemPool[i]) == nonJunkItemsThatWeHaveTried.end() &&
-                        IsItemAllowedAtCheck(itemPool[i], checkWithJunk)) {
-                        nonJunkItemsThatWeHaveNotTried.push_back({ itemPool[i], i });
+                        changed = true;
                     }
                 }
             }
-
-            if (!anyNonJunkItemsLeft) {
-                handleError("No non-junk items left to place, progression is impossible");
-            }
-
-            if (nonJunkItemsThatWeHaveNotTried.empty()) {
-                SPDLOG_TRACE("Already tried all non-junk items, leaving the last non-junk item in place: {}: {}",
-                             Rando::StaticData::Checks[checkWithJunk].name,
-                             Rando::StaticData::Items[RANDO_SAVE_CHECKS[checkWithJunk].randoItemId].spoilerName);
-                checkWithJunk = RC_UNKNOWN;
-                nonJunkItemsThatWeHaveTried.clear();
-                continue;
-            }
-
-            // Remove item and place it back in the pool
-            RandoItemId oldRandoItemId = RANDO_SAVE_CHECKS[checkWithJunk].randoItemId;
-            auto& [newRandoItemId, indexInPool] = nonJunkItemsThatWeHaveNotTried[0];
-
-            RANDO_SAVE_CHECKS[checkWithJunk].randoItemId = newRandoItemId;
-
-            SPDLOG_DEBUG("Item Replaced Junk: {}:{}", Rando::StaticData::Checks[checkWithJunk].name,
-                         Rando::StaticData::Items[newRandoItemId].spoilerName);
-
-            RemoveItem(oldRandoItemId);
-            GiveItem(ConvertItem(newRandoItemId));
-
-            itemPool.erase(itemPool.begin() + indexInPool);
-            itemPool.push_back(oldRandoItemId);
-
-            nonJunkItemsThatWeHaveTried.insert(newRandoItemId);
-            SPDLOG_TRACE("Attempting to replaced junk item: {}:{}", Rando::StaticData::Checks[checkWithJunk].name,
-                         Rando::StaticData::Items[newRandoItemId].spoilerName);
-        } else {
-            weight++;
-            if (checkWithJunk != RC_UNKNOWN) {
-                SPDLOG_DEBUG("Successfully Replaced junk item with: {}:{}",
-                             Rando::StaticData::Checks[checkWithJunk].name,
-                             Rando::StaticData::Items[RANDO_SAVE_CHECKS[checkWithJunk].randoItemId].spoilerName);
-            }
-            checkWithJunk = RC_UNKNOWN;
-            nonJunkItemsThatWeHaveTried.clear();
-
-            // Shuffle the item pool
-            if (itemPool.size() > 1) {
-                for (size_t i = 0; i < itemPool.size(); i++) {
-                    size_t j = Ship_Random(0, itemPool.size());
-                    std::swap(itemPool[i], itemPool[j]);
+            // Match native time-item propagation, while also observing time-mask
+            // growth when no new region/event/check was discovered this pass.
+            const uint64_t newOwnedTime = TimeLogic::GetOwnedTimeSlices();
+            if (newOwnedTime != ownedTime) {
+                ownedTime = newOwnedTime;
+                for (auto& [region, state] : times) {
+                    state.timeSlices = ownedTime;
+                    if (state.canStayOverTime) {
+                        state.timeSlices = TimeLogic::ExpandTimeForward(ownedTime, Regions[region]);
+                    }
                 }
+                changed = true;
             }
+            for (auto& [region, state] : times) {
+                auto old = previousTimes.find(region);
+                changed |= old == previousTimes.end() || old->second.timeSlices != state.timeSlices;
+            }
+        } while (changed);
+        return checks;
+    };
+
+    const auto fullInventory = reachable(0);
+    for (RandoCheckId check : checkPool) {
+        if (!fullInventory.contains(check)) {
+            throw std::runtime_error("Native full item pool cannot reach check: " +
+                                     std::string(Rando::StaticData::Checks[check].name));
         }
     }
 
-    for (auto& randoCheckId : checksInLogic) {
-        copiedSaveContext.save.shipSaveInfo.rando.randoSaveChecks[randoCheckId].randoItemId =
-            RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
-        copiedSaveContext.save.shipSaveInfo.rando.randoSaveChecks[randoCheckId].shuffled =
-            RANDO_SAVE_CHECKS[randoCheckId].shuffled;
+    struct Choice {
+        std::vector<RandoCheckId> checks;
+        size_t next = 0;
+        RandoCheckId placed = RC_UNKNOWN;
+    };
+    std::vector<Choice> choices;
+    size_t depth = 0;
+    while (depth < order.size()) {
+        checkBudget();
+        if (choices.size() == depth) {
+            const auto accessible = reachable(depth + 1);
+            std::map<int, size_t> needed, available;
+            for (size_t i = depth + 1; i < order.size(); i++) {
+                const int group = RandoItemIdToConfinementGroup(order[i]);
+                if (group >= 0) {
+                    needed[group]++;
+                }
+            }
+            for (RandoCheckId check : checkPool) {
+                if (!placements.contains(check)) {
+                    available[CheckIdToConfinementGroup(check)]++;
+                }
+            }
+            Choice choice;
+            for (RandoCheckId check : checkPool) {
+                if (placements.contains(check) || !accessible.contains(check) ||
+                    !IsItemAllowedAtCheck(order[depth], check)) {
+                    continue;
+                }
+                const int usedGroup = CheckIdToConfinementGroup(check);
+                bool reserved = true;
+                for (auto [group, count] : needed) {
+                    if (count > available[group] - (group == usedGroup ? 1 : 0)) {
+                        reserved = false;
+                        break;
+                    }
+                }
+                if (reserved) {
+                    choice.checks.push_back(check);
+                }
+            }
+            for (size_t i = 0; i < choice.checks.size(); i++) {
+                std::swap(choice.checks[i], choice.checks[Ship_Random(0, choice.checks.size())]);
+            }
+            choices.push_back(std::move(choice));
+        }
+        auto& choice = choices[depth];
+        if (choice.next == choice.checks.size()) {
+            choices.pop_back();
+            if (depth == 0) {
+                throw std::runtime_error("No reachable native placement satisfies Glitchless confinement");
+            }
+            depth--;
+            backtracks++;
+            placements.erase(choices[depth].placed);
+            choices[depth].placed = RC_UNKNOWN;
+            continue;
+        }
+        choice.placed = choice.checks[choice.next++];
+        placements.emplace(choice.placed, order[depth]);
+        depth++;
+        maximumDepth = std::max(maximumDepth, depth);
     }
 
-    memcpy(&gSaveContext, &copiedSaveContext, sizeof(SaveContext));
-
-    SPDLOG_INFO("Successfully placed all items with Glitchless logic");
+    // No assumed items survive this replay. Require every pool check, not only
+    // the goal, before atomically publishing placements into the original save.
+    const auto replay = reachable(order.size());
+    for (RandoCheckId check : checkPool) {
+        if (!replay.contains(check)) {
+            throw std::runtime_error("Native Glitchless replay cannot reach placed check: " +
+                                     std::string(Rando::StaticData::Checks[check].name));
+        }
+    }
+    for (auto [check, item] : placements) {
+        auto& saved = simulation.original.save.shipSaveInfo.rando.randoSaveChecks[check];
+        saved.randoItemId = item;
+        saved.shuffled = true;
+    }
+    checkPool.clear();
+    itemPool.clear();
+    SPDLOG_INFO("Successfully placed all items with native Glitchless assumed fill and replay");
 }
 
-} // namespace Logic
-
-} // namespace Rando
+} // namespace Rando::Logic

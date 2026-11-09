@@ -16,6 +16,7 @@ extern "C" void Partners_Reset(void);
 #include "BenPort.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "Rando/Logic/HeadlessRegisters.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
@@ -3977,6 +3978,7 @@ extern "C" COMBO_EXPORT void MM_InitRandoHeadless(void) {
     if (!GameInteractor::Instance) {
         GameInteractor::Instance = new GameInteractor();
     }
+    Rando::Headless::EnsureRegisterEditor(gRegEditor);
     ShipInit::Init("RANDO_LOGIC"); // OwnRMScope("mm") no-ops headlessly (no "mm" RM registered)
     Rando::StaticData::PopulateCheckNames();
 }

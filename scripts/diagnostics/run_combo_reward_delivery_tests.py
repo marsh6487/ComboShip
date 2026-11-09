@@ -57,6 +57,14 @@ def main():
     assert re.search(r"case ITEM_CHATEAU_ROMANI:\s*return PLAYER_IA_BOTTLE_POTION_BLUE;", player)
     notification = read("tests/reward_delivery/notification_test.cpp")
     give = read("mm/2s2h/Rando/GiveItem.cpp")
+    # NativePickup transplants a Rando namespace fragment; retain the actual
+    # production TLS declaration/definition and import its original lookup scope.
+    simulation_declaration = re.search(r"^extern thread_local bool gItemGrantSimulation;",
+                                       read("mm/2s2h/Rando/Rando.h"), re.M).group(0)
+    simulation_definition = re.search(r"^thread_local bool Rando::gItemGrantSimulation[^;]*;",
+                                      give, re.M).group(0)
+    notification = ("namespace Rando {\n" + simulation_declaration + "\n}\n" +
+                    simulation_definition + "\nusing Rando::gItemGrantSimulation;\n" + notification)
     start = give.rfind("        if", 0, give.index("!Rando::gComboDormantGive"))
     notification = notification.replace("/* NATIVE_TOAST */", statement(give, start))
     for host, path, name in (("OOT", "soh/soh/Enhancements/randomizer/hook_handlers.cpp", "OOT_DeliverForeign"),

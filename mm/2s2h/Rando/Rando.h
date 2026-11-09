@@ -19,6 +19,9 @@
 
 namespace Rando {
 
+// Scoped native inventory probes must not emit real acquisition side effects.
+extern thread_local bool gItemGrantSimulation;
+
 void Init();
 void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, Actor* actor = nullptr);
 // CheckQueue has already resolved/frozen this award; do not consult changed inventory again.

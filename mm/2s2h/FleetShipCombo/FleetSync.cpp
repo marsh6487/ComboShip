@@ -2637,11 +2637,17 @@ static void ItemGrantAuditLog(const std::string& record) {
 } // namespace
 // Diagnostics must not throw into gameplay; no PlayState pointers are dereferenced here.
 extern "C" void ItemGrantAudit_Begin(const char* source, int item, int check, int quiet) {
+    if (Rando::gItemGrantSimulation) {
+        return;
+    }
     try {
         sItemGrantAudit.Begin(CaptureItemGrantAudit(), source, item, check, quiet != 0, ItemGrantAuditLog);
     } catch (...) {}
 }
 extern "C" void ItemGrantAudit_End(void) {
+    if (Rando::gItemGrantSimulation) {
+        return;
+    }
     try {
         sItemGrantAudit.End(CaptureItemGrantAudit(), ItemGrantAuditLog);
     } catch (...) {}

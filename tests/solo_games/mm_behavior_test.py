@@ -273,8 +273,13 @@ int main(){
 '''
 
 give=(ROOT/'mm/2s2h/Rando/GiveItem.cpp').read_text()
+simulation_declaration=re.search(r'^extern thread_local bool gItemGrantSimulation;',
+                                (ROOT/'mm/2s2h/Rando/Rando.h').read_text(),re.M).group(0)
+simulation_definition=re.search(r'^thread_local bool Rando::gItemGrantSimulation[^;]*;',give,re.M).group(0)
+simulation_state=('namespace Rando {\n'+simulation_declaration+'\n}\n'+simulation_definition+
+                  '\nusing Rando::gItemGrantSimulation;\n')
 triforce_case=give[give.index('        case RI_TRIFORCE_PIECE:'):give.index('        // Technically these should never be used')]
-triforce_program=COMMON+r'''
+triforce_program=COMMON+simulation_state+r'''
 #include <vector>
 constexpr int RI_TRIFORCE_PIECE=1,RI_TRIFORCE_PIECE_PREVIOUS=2,RI_SOUL_BOSS_MAJORA=3;
 constexpr int RO_TRIFORCE_PIECES_REQUIRED=0,RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA=0;

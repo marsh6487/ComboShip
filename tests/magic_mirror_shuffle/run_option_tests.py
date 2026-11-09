@@ -4,13 +4,31 @@ import os
 import subprocess
 import sys
 import tempfile
+import argparse
+import re
 ROOT=Path(__file__).resolve().parents[2]
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--sanitize',action='store_true')
+args=parser.parse_args()
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import block_from
 extract=lambda s,q:block_from(s,s.index(q))
 oot=(ROOT/'soh/soh/OTRGlobals.cpp').read_text()
 mm=(ROOT/'mm/2s2h/BenPort.cpp').read_text()
 settings=(ROOT/'soh/soh/Enhancements/randomizer/settings.cpp').read_text()
+# This MM-hosted boundary cannot include the OoT z64 host alongside MM z64.
+# Retain the actual standalone key-enum expansion protocol and the exact
+# scalar RustyDoorKeys header contract used by these extracted callbacks.
+rusty=(ROOT/'soh/soh/Enhancements/randomizer/RustyDoorKeys.h').read_text()
+rusty_impl=(ROOT/'soh/soh/Enhancements/randomizer/LockOverworldDoors.cpp').read_text()
+option=(ROOT/'soh/soh/Enhancements/randomizer/option.cpp').read_text()
+rusty_contract='namespace Rando::RustyDoorKeys {\n'+'\n'.join(
+ re.search(r'^inline constexpr [^\n]*\b'+name+r'\s*=.*;',rusty,re.M)[0]
+ for name in ('CatalogVersionCVar','LegacyCatalog','CurrentCatalog'))+'\n'+extract(rusty,'inline constexpr uint8_t GenerationVersion(')+'\n'+extract(rusty_impl,'void PrepareNewGeneration(')+'\n}'
+option_methods='\n'.join(extract(option,signature).replace('Option::','FakeOption::') for signature in (
+ 'RandomizerSettingKey Option::GetKey() const',
+ 'const std::string& Option::GetCVarName() const',
+ 'uint8_t Option::GetOptionIndex() const'))
 bodies='\n'.join(extract(s,q) for s,q in [
  (oot,'extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM('),
  (oot,'extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings('),
@@ -31,10 +49,19 @@ fixture=r'''
 #include "NeiSeasonsPolicy.h"
 #include "tests/test_require.h"
 #include <map>
+#include <array>
 #include <cstring>
 #define COMBO_EXPORT
 #define CVAR_RANDOMIZER_SETTING(name) "gRandoSettings." name
-#define RSK_SHUFFLE_MAGIC_MIRROR 1
+// Same default expansion as randomizerEnums.h, scoped to the actual key enum
+// to avoid importing the other host's unrelated global option enums.
+#define RANDO_ENUM_BEGIN(EnumName) typedef enum EnumName {
+#define RANDO_ENUM_ITEM(name, ...) name __VA_OPT__(=) __VA_ARGS__,
+#define RANDO_ENUM_END(EnumName) } EnumName;
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h"
+#undef RANDO_ENUM_BEGIN
+#undef RANDO_ENUM_ITEM
+#undef RANDO_ENUM_END
 extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
 static std::map<std::string,int> ints;
 static std::map<std::string,std::string> strings;
@@ -44,9 +71,19 @@ extern "C" const char* CVarGetString(const char* key,const char* fallback){auto 
 extern "C" void CVarSetString(const char* key,const char* value){strings[key]=value;}
 extern "C" void CVarClear(const char* key){ints.erase(key);strings.erase(key);}
 static bool Combo_ClearNumericExclusions(){return false;}
+/* RUSTY CONTRACT */
 namespace Rando {
-struct FakeOption {std::string cvar; const std::string& GetCVarName()const{return cvar;} int GetOptionIndex()const{return CVarGetInteger(cvar.c_str(),0);}};
-struct Settings {static Settings* GetInstance(){static Settings s;return &s;} std::vector<FakeOption> GetAllOptions(){return {{"gRandoSettings.ShuffleMagicMirror"}};}};
+// Metadata/container allocation remains the service boundary. Identity and
+// accessors use the native enum and the unchanged native Option method bodies.
+struct FakeOption {
+ RandomizerSettingKey key;std::string cvarName;uint8_t defaultOption=0;
+ RandomizerSettingKey GetKey()const;const std::string& GetCVarName()const;uint8_t GetOptionIndex()const;
+};
+/* OPTION METHODS */
+struct Settings {static Settings* GetInstance(){static Settings s;return &s;} std::vector<FakeOption> GetAllOptions(){return {
+ {RSK_SHUFFLE_MAGIC_MIRROR,"gRandoSettings.ShuffleMagicMirror"},
+ {RSK_LOCK_OVERWORLD_DOORS,"gRandoSettings.LockOverworldDoors"},
+ {RSK_RUSTY_DOOR_KEY_VERSION,RustyDoorKeys::CatalogVersionCVar}};}};
 namespace StaticData {
 std::map<RandoOptionId,RandoStaticOption> Options={{RO_SHUFFLE_MAGIC_MIRROR,{RO_SHUFFLE_MAGIC_MIRROR,"RO_SHUFFLE_MAGIC_MIRROR","gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0}}};
 std::map<RandoCheckId,RandoStaticCheck> Checks;
@@ -61,9 +98,9 @@ void SetStartingItemsInConfig(std::vector<RandoItemId>&){}
 }
 /* BODIES */
 struct Value {int value=0;void Set(int v){value=v;}};
-struct Ctx {Value option;Value& GetOption(int){return option;}} context;
+struct Ctx {std::array<Value,RSK_MAX> options{};Value& GetOption(RandomizerSettingKey key){return options.at(key);}} context;
 static Ctx* mContext=&context;
-int EffectiveOot(){context.option.value=CVarGetInteger("gRandoSettings.ShuffleMagicMirror",0);/* OOT */return context.option.value;}
+int EffectiveOot(){context.GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(CVarGetInteger("gRandoSettings.ShuffleMagicMirror",0));/* OOT */return context.GetOption(RSK_SHUFFLE_MAGIC_MIRROR).value;}
 int EffectiveMm(){nlohmann::json options={{"RO_SHUFFLE_MAGIC_MIRROR",CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)}};/* MM */return options["RO_SHUFFLE_MAGIC_MIRROR"].get<int>();}
 int main(){
  for(bool oot:{false,true})for(bool mm:{false,true}) {
@@ -76,6 +113,7 @@ int main(){
   REQUIRE(CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)==mm);
   REQUIRE(EffectiveOot()==(oot||mm)&&EffectiveMm()==(oot||mm));
   const auto os=std::string(SOH_DumpRandoSettings()),ms=std::string(MM_DumpRandoSettings());
+  REQUIRE(!nlohmann::json::parse(os).contains(Rando::RustyDoorKeys::CatalogVersionCVar));
   ints["gRando.Generation.ShuffleMagicMirror"]=0;
   SOH_RestoreRandoSettings(os.c_str());MM_RestoreRandoSettings(ms.c_str());
   REQUIRE(EffectiveOot()==(oot||mm)&&EffectiveMm()==(oot||mm));
@@ -83,13 +121,41 @@ int main(){
   REQUIRE(CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)==mm);
   REQUIRE(!CVarGetInteger("gMods.CustomItems.Enabled",0)&&!CVarGetInteger("gRando.Options.RO_SHUFFLE_NEI_ITEMS",0));
  }
+ // Real preparation stamps only new generations; snapshots preserve the
+ // nonzero catalog identity and omit legacy zero without confusing Mirror.
+ for(bool locked:{false,true}) {
+  gComboGameMode=COMBO_GAME_BOTH;
+  CVarSetInteger("gRandoSettings.LockOverworldDoors",locked);
+  CVarSetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,!locked);
+  CVarSetInteger("gRandoSettings.ShuffleMagicMirror",1);
+  CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0);
+  context.GetOption(RSK_LOCK_OVERWORLD_DOORS).Set(17);
+  context.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Set(29);
+  SOH_NormalizeComboGraceFromMM();
+  REQUIRE(CVarGetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,-1)==Rando::RustyDoorKeys::GenerationVersion(locked));
+  REQUIRE(EffectiveOot()==1 && EffectiveMm()==1);
+  REQUIRE(context.GetOption(RSK_LOCK_OVERWORLD_DOORS).value==17 && context.GetOption(RSK_RUSTY_DOOR_KEY_VERSION).value==29);
+  const auto snapshot=std::string(SOH_DumpRandoSettings());
+  const auto json=nlohmann::json::parse(snapshot);
+  REQUIRE(json.contains(Rando::RustyDoorKeys::CatalogVersionCVar)==locked);
+  REQUIRE(json.at("gRandoSettings.ShuffleMagicMirror")==1);
+  CVarSetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,!locked);
+  CVarSetInteger("gRandoSettings.LockOverworldDoors",!locked);
+  SOH_RestoreRandoSettings(snapshot.c_str());
+  REQUIRE(CVarGetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,Rando::RustyDoorKeys::LegacyCatalog)==Rando::RustyDoorKeys::GenerationVersion(locked));
+  REQUIRE(ints.contains(Rando::RustyDoorKeys::CatalogVersionCVar)==locked);
+  REQUIRE(CVarGetInteger("gRandoSettings.LockOverworldDoors",-1)==locked);
+  REQUIRE(EffectiveOot()==1 && EffectiveMm()==1);
+ }
+ CVarSetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,1);
  SOH_RestoreRandoSettings("{}");MM_RestoreRandoSettings("{}");
+ REQUIRE(CVarGetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,Rando::RustyDoorKeys::LegacyCatalog)==0);
  REQUIRE(!EffectiveOot()&&!EffectiveMm()&&!CVarGetInteger("gRando.Generation.ShuffleMagicMirror",0));
  CVarSetInteger("gRando.Generation.ShuffleMagicMirror",1);gComboGameMode=COMBO_GAME_MM;
  REQUIRE(!EffectiveMm()&&!EffectiveOot());
  puts("PASS active normalizer + native seed flag policies + real snapshot/restore: OR requests, unchanged UI/NEI, both serialized, new-to-old OFF, solo ignores combined override");
 }
-'''.replace('/* BODIES */',bodies).replace('/* OOT */',force_oot).replace('/* MM */',force_mm)
+'''.replace('/* RUSTY CONTRACT */',rusty_contract).replace('/* OPTION METHODS */',option_methods).replace('/* BODIES */',bodies).replace('/* OOT */',force_oot).replace('/* MM */',force_mm)
 # Verify the real launcher calls the normalizer before each native dump sequence.
 launcher=(ROOT/'combo/ComboShip.cpp').read_text()
 assert launcher.index('SOH_NormalizeComboGraceFromMM();',launcher.index('const bool haveOracles')) < launcher.index('SOH_DumpRandoStaticData()',launcher.index('const bool haveOracles'))
@@ -98,6 +164,7 @@ assert 'mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF)' in ex
 with tempfile.TemporaryDirectory(prefix='mirror-active-options-') as td:
  temp=Path(td);(temp/'test.cpp').write_text(fixture)
  flags=['-std=c++20','-w','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DCONTROLLERBUTTONS_T=uint32_t']
+ if args.sanitize:flags+=['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
  for p in ['', 'mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']:
   flags+=['-I'+str(ROOT/p)]
  result=subprocess.run([os.environ.get('CXX','c++'),*flags,str(temp/'test.cpp'),'-o',str(temp/'test')],capture_output=True,text=True)

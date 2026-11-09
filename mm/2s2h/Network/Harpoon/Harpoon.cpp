@@ -1,5 +1,6 @@
 #include "Harpoon.h"
 #include "HarpoonSkinSync.h"
+#include "Rando/Rando.h"
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -166,7 +167,7 @@ void Harpoon::RequestRoomList() {
 }
 
 void Harpoon::SendFlag(bool set, int flagType, int sceneId, uint32_t flag) {
-    if (state_.load() < HarpoonConnState::InRoom)
+    if (Rando::gItemGrantSimulation || state_.load() < HarpoonConnState::InRoom)
         return;
     json msg = { { "type", set ? HarpoonPT::SAVE_SET_FLAG : HarpoonPT::SAVE_UNSET_FLAG },
                  { "payload",

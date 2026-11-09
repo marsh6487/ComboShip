@@ -1,3 +1,4 @@
+#include <optional>
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/RustyDoorKeys.h"
@@ -81,16 +82,21 @@ extern "C" void (*gMMComboSharedChanged)(int game, int fileNum);
 extern "C" int Combo_MM_BombchuBagShared(void);
 #endif
 
+thread_local bool Rando::gItemGrantSimulation = false;
+
 void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
-    ItemGrantAudit::Scope itemGrantAuditScope("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
+    std::optional<ItemGrantAudit::Scope> itemGrantAuditScope;
+    if (!gItemGrantSimulation) {
+        itemGrantAuditScope.emplace("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
+    }
     // FleetShipCombo cross-item record: on obtaining ANY FC-shared item, bump its fcId-indexed count
     // (comboObtainedFc, synced to OoT) and the local shadow (comboAppliedFc, since it's granted here).
     // Re-entrancy guard: GiveItem recurses for progressives/ConvertItem and RI_TRIFORCE_PIECE ->
     // RI_SOUL_BOSS_MAJORA — only the OUTERMOST call records so a single pickup counts once.
-    static int sGiveDepth = 0;
+    static thread_local int sGiveDepth = 0;
     struct DepthGuard {
         DepthGuard() {
-            if (sGiveDepth == 0) {
+            if (sGiveDepth == 0 && !gItemGrantSimulation) {
                 gRandoPickupSerial++; // outermost call only — progressives recurse through here
             }
             sGiveDepth++;
@@ -100,7 +106,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     } _dg;
 #ifdef COMBO_BUILD
-    if (sGiveDepth == 1) {
+    if (sGiveDepth == 1 && !gItemGrantSimulation) {
         SPDLOG_INFO("[ItemGrantAudit] MM native grant: file={} seed={} item={} check={} dormant={} suppressed={}",
                     (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, (int)randoItemId,
                     (int)randoCheckId, (int)Rando::gComboDormantGive, (int)gFcCombo_SuppressRecord);
@@ -139,14 +145,16 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
                 nei->comboAppliedFc[fc]++;
             }
         }
-        FleetShared_OnNativeObtained((int)recordId); // ComboShip: hand OoT its half of a shared item
+        if (!gItemGrantSimulation) {
+            FleetShared_OnNativeObtained((int)recordId); // Real acquisition: hand OoT its half.
+        }
         // "You found X" corner toast — parity with SoH's EnItem00 pickup notification
         // (soh hook_handlers.cpp ~1330). Outermost call only = one toast per pickup (recursion for
         // progressives/ConvertItem stays silent), and cross-sync deficit grants (SuppressRecord) stay
         // silent too, matching OoT where FC arrivals don't toast.
         // A dormant cross-grant is presented and notified by the finder. Queuing its
         // toast here would replay it only when the player switches back to MM.
-        if (
+        if (!gItemGrantSimulation &&
 #ifdef COMBO_BUILD
             !Rando::gComboDormantGive &&
 #endif
@@ -278,7 +286,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             // ComboShip (#136): combo owns the goal — the launcher sums both games' counts and decides.
             // Works for dormant grants too; it dispatches the silent finalize instead of the ending.
             if (Combo_IsCombinedGame()) {
-                if (gMMComboTriforceProgress != NULL) {
+                if (!gItemGrantSimulation && gMMComboTriforceProgress != NULL) {
                     gMMComboTriforceProgress(1, gSaveContext.fileNum);
                 }
                 break;
@@ -290,12 +298,14 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
                 if (!Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA)) {
                     Rando::GiveItem(RI_SOUL_BOSS_MAJORA);
                 }
-                GameInteractor_ExecuteOnGameCompletion();
-                GameInteractor::Instance->events.emplace_back(
-                    GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
-                                       .cutsceneIndex = 0xFFF7,
-                                       .transitionTrigger = TRANS_TRIGGER_START,
-                                       .transitionType = TRANS_TYPE_FADE_BLACK });
+                if (!gItemGrantSimulation) {
+                    GameInteractor_ExecuteOnGameCompletion();
+                    GameInteractor::Instance->events.emplace_back(
+                        GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
+                                           .cutsceneIndex = 0xFFF7,
+                                           .transitionTrigger = TRANS_TRIGGER_START,
+                                           .transitionType = TRANS_TYPE_FADE_BLACK });
+                }
             }
             break;
         // Technically these should never be used, but leaving them here just in case
@@ -667,6 +677,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Flags_SetRandoInf(RANDO_INF_OBTAINED_SWIM);
             break;
         case RI_TRAP:
+            if (gItemGrantSimulation) {
+                break; // Trap placement remains intact; hypothetical grants never offer traps.
+            }
 #ifdef COMBO_BUILD
             // ComboShip: traps need a live play state; dormant defers to Traps.cpp drain.
             if (Rando::gComboDormantGive) {
@@ -1480,7 +1493,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
     }
 #ifdef COMBO_BUILD
     // ComboShip: Shared Items — single exit poke, mirrors the #136 Triforce poke above.
-    if (Combo_IsCombinedGame() && gMMComboSharedChanged != NULL) {
+    if (!gItemGrantSimulation && Combo_IsCombinedGame() && gMMComboSharedChanged != NULL) {
         gMMComboSharedChanged(1, gSaveContext.fileNum);
     }
 #endif

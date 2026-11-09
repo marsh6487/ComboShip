@@ -8,12 +8,13 @@ The full user authorization remains active for implementation, six concurrent
 workers, integration, regression repairs, builds, independently recoverable
 checkpoints and publication to candidate/ootmm-shuffle-parity-20261108 / draft
 PR89. No merge, master update or release promotion. The obsolete single-worker
-restriction is removed. All six workers are active; no implementation is queued.
+restriction is removed. All six production workstreams are integrated. Their owners continue independent
+regression review/repair and native verification; no production task is deferred.
 Controller owns shared integration, identifiers, cross-feature review and pushes.
 
 Current controller checkout: `/workspace/scratch/c690840d9328/ComboShip`.
-Public full-source checkpoint: `af7891b6c7383ab1655262d8913933ab20b6800d`
-(tree3979ee578e674442801a6f5ac78d568f267915e4, localb6ac6346).
+Public current checkpoint: `0ba8722effcd0da1fffd031b6efd99077797c1e1`
+(treee5b92f543c3853071bad3b0497817426c5a01edd, local84972ff2).
 The source below is integrated locally through reviewed production fixes `d3c5aa17`, with post-publication fixture repairs;
 The full source is published on the existing draft. Current CI repair changes
 close real test dependencies and Castle formatting; no feature is deferred. Source
@@ -118,6 +119,87 @@ caller price cache on success and setup failure. The real saved-price/export/
 Reset/restore and negative stale-cache tests pass; independent review passes.
 This closes a fidelity defect in validation, not a claimed completed native
 solo seed run. New linked modules and the full eight-case proof remain needed.
+
+## Current R8 publication and verification
+
+R8 current public0ba8722e exact treee5b92f543c3853071bad3b0497817426c5a01edd
+passed fast source checks, including all34 policy/real-CMake tests. Windows
+preflight42644096590 passed real configuration, libultraship, complete UI and
+launchers. Full Linux/Windows engine jobs129254066531/129254066140 in
+run42644096504 continue; actual firstdrop and eight-case both-solo/combined
+proofs are pending the staged runtime, not markedPASS.
+
+Exact R8 compiled audit again verifies36568 prior IDs,360 OoT/93 MM prior
+CVar/default identities, actual old native save JSON tails, foreign465/512
+capacity and both guard snapshots. Oracle price export/reset/cache restore
+is independently reviewed and passes real native-type tests.
+
+The unpublished e11e6499 runner-only checkpoint retains real native shared
+headers/SongEvents linkage across13 legacy runners. Native pools,192-case
+item availability,4096 grant controls, mirror/seasons/editor/Grace saves,
+actual source hints/UI and full syntax controls pass; assertions remain.
+Further legacy native-flow and BlackMarket door fixture repairs continue,
+with production policy left intact. Preserve the active native builds before
+another publication. Source recovery R8 is independently saved as
+libfile_330b9efcb69481919da33f9892d97cae, SHA256
+0ca3f6a41242082fa69cc1f34d46078f23776cf9762996ec5ba7b8601ae90be3.
+
+## Final integrated native repair candidate
+
+R8 actual full Linux SOH/MM/comborando/comboui/launcher builds, both resource
+archives, ordinary and cross-door smokes passed; full Windows engine/UI/launcher
+builds and ZIP packaging passed. Runtime artifact13688208416 SHA256
+60a1f16d5b9ce70b5ed60ddce5ba4226cc3e6dd9714d40727f957f638af06a6d
+is retained unchanged with exact module provenance.
+
+Actual fresh R8 firstdrop Vanilla Off/On/On-excluded native graph, standalone
+fill/replay, combined generation and independent CLI replay allPASS. Enabled
+profiles retain43 checks each and total172 own-soul negative controls. This
+proves the previously failing native Skull Kid later-trade witness. Native
+budget behavior (MM padding/unreachable junk and43 excluded OoT junk trimming)
+is recorded honestly in the evidence; no universal MM-location claim is made.
+
+Actual parity testing exposed and repaired three native initialization/fidelity
+problems: pristine Config::SetBlock ignored array blocks on a null root;
+headless MM left native RegEditor uninitialized for real map grants; the seed
+harness misread deliberate legacy0 door-version omission, native exclusion sort
+order and progressive Child Wallet supply. Real Config/Regs/source/API tests
+and strict negative controls pass; assertions remain strict. Empty leafnull
+is preserved as the native canonical empty-list representation. The shared
+runtime is not silently patched or relabeled as rebuilt source.
+
+The actual all-feature MM native generator then exhausted early reachable
+slots under the old junk-only replacement strategy. The integrated reverse
+assumed fill tracks exact occurrences including health, native confinement,
+real time/events/fixed checks and prefix backtracking, restores state between
+probes and requires native no-assumption ALL pool-check replay before commit.
+Native10-second/10-attempt limits remain. Virtual inventory simulation has a
+thread-local scope isolating only external notifications/completion/audit/timer
+state, preserving actual inventory/FC/RPG/soul behavior and real receipt logs.
+Existing RegEditor pointer/contents are preserved on success and failure.
+
+The complete newly compiled solver/Give/SeedGeneration/Solo component was bound
+to103 actual native functions/data from the verified R8 module, without replacing
+reachability or changing its text/disk. OLD complete-TU control reproduced the
+original native OWN output exactly. New solver native allParity fill+strict
+feature/key/ring counts and original native independent replayPASS (21spheres,
+2825reachable checks; empty starts;181eligible solo environment checks;39keys;
+three progressive wallets). Independent new OWN and StoneNormal native fills
+and original-oracle replaysPASS firstattempt within10seconds. These are strong
+component results, not a substitute for final freshly linked public modules.
+
+Final independent0c5245 source/state approval and ASan/UBSan tests pass both
+guards, including six actual native map grants, registers, nested/error/TLS
+controls; historical register-state failure reproduces. All211 environmental
+rules have native positive witnesses and8910form/tool/time comparisons perguard;
+all142new Human terms use the factored native mask-return capability. Old generic
+world behavior and all numeric IDs remain. Final solo fixture row passes three
+compiled probes and20 native boundary suites. The remaining gate is the fresh
+integrated Linux/Windows build and all eight real native solo/combined seed
+profiles. Owners: ci_native allParity/builds; door_keys OWN/StoneNormal;
+song_clock excluded/StoneInverted; firstdrops rusty/MMparity; souls allOff.
+Workers are prepared; launch against the final verified rebuilt runtime in
+separate fresh evidence directories. No production feature is deferred.
 
 ## Active work and genuine verification limits
 

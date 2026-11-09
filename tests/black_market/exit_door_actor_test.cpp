@@ -8,15 +8,28 @@
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <nlohmann/json.hpp>
 
 static PlayState play;
 static Player player;
 static EnDoor door;
 static TransitionActorEntry entry;
 SaveContext gSaveContext;
+#ifdef EXIT_DOOR_OOT
+// The actual bridge owns source classification/version and native flag policy.
+#include "soh/Enhancements/randomizer/LockOverworldDoors.cpp"
+static u8 rustySettings[RSK_MAX]{};
+extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey key) { return rustySettings[key]; }
+extern "C" int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
+extern "C" void CVarSetInteger(const char*, int32_t) { assert(false && "actor test cannot prepare a new seed"); }
+#else
+#include "Rando/RustyDoorKeys.cpp"
+#endif
+/* NATIVE RUSTY FLAG ACCESS */
 static int spawns, animationStarts;
 static AnimationHeader* playedAnimation;
 static bool cutscene;
+static int scheduleSounds;
 /* NATIVE TRANSITION INDEX STATE */
 static constexpr bool oot =
 #ifdef EXIT_DOOR_OOT
@@ -56,7 +69,7 @@ Gfx* D_809FCEE4[5][2];
 #else
 extern "C" bool Player_InCsMode(PlayState*) { return cutscene; }
 extern "C" s32 Actor_TalkOfferAccepted(Actor*, GameState*) { return false; }
-extern "C" void Actor_PlaySfx(Actor*, u16) { assert(false); }
+extern "C" void Actor_PlaySfx(Actor*, u16 sfx) { assert(sfx == NA_SE_EV_DOOR_OPEN); ++scheduleSounds; }
 extern "C" void func_80122F28(Player*) {}
 extern "C" s32 Schedule_RunScript(PlayState*, u8*, ScheduleOutput*) { assert(false); return false; }
 extern "C" int ComboBlackMarket_IsAuthoredDoor(PlayState*, Actor*) { return false; }
@@ -102,7 +115,123 @@ extern "C" void DynaPoly_DeleteBgActor(PlayState*, DynaCollisionContext*, s32) {
 
 /* NATIVE FUNCTIONS */
 
+static void SetRandomizedDoorMode(bool randomized, bool enabled) {
+#ifdef EXIT_DOOR_OOT
+    gSaveContext.ship.quest.id = randomized ? QUEST_RANDOMIZER : QUEST_NORMAL;
+    rustySettings[RSK_LOCK_OVERWORLD_DOORS] = enabled;
+    rustySettings[RSK_RUSTY_DOOR_KEY_VERSION] = Rando::RustyDoorKeys::CurrentCatalog;
+#else
+    gSaveContext.save.shipSaveInfo.saveType = randomized ? SAVETYPE_RANDO : SAVETYPE_VANILLA;
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_RUSTY_KEYS] = enabled;
+#endif
+}
+static void ClearOwnedDoorKeys() {
+#ifdef EXIT_DOOR_OOT
+    std::memset(gSaveContext.ship.randomizerInf, 0, sizeof(gSaveContext.ship.randomizerInf));
+#else
+    std::memset(gSaveContext.save.shipSaveInfo.rando.randoInf, 0,
+                sizeof(gSaveContext.save.shipSaveInfo.rando.randoInf));
+#endif
+}
+static void OwnDoorKey(bool correct) {
+#ifdef EXIT_DOOR_OOT
+    auto flag = correct ? RAND_INF_GUARD_HOUSE_KEY_OBTAINED : RAND_INF_RICHARDS_HOUSE_KEY_OBTAINED;
+    gSaveContext.ship.randomizerInf[flag >> 4] |= 1u << (flag & 15);
+#else
+    auto item = correct ? RI_RUSTY_KEY_TOURIST_INFORMATION : RI_RUSTY_KEY_POTION_SHOP;
+    const auto* key = Rando::RustyDoorKeys::Find(item); assert(key);
+    gSaveContext.save.shipSaveInfo.rando.randoInf[key->flag >> 4] |= 1u << (key->flag & 15);
+#endif
+}
+static void NativeRustyDoorControls() {
+    // Exercise the real missing/wrong/owned gate in the actual native Idle body,
+    // rather than replacing the newly introduced dependency with an always-open stub.
+#ifdef EXIT_DOOR_OOT
+    play.sceneNum = SCENE_MARKET_ENTRANCE_DAY;
+    play.transiActorCtx.list = &entry; play.transiActorCtx.numActors = 1;
+    DoorActor().transitionIndex = 0;
+    DoorActor().params = DOOR_SCENEEXIT << 7;
+    door.playerIsOpening = false;
+#else
+    play.sceneId = SCENE_20SICHITAI;
+    TransitionActorEntry sourceEntries[4]{}; sourceEntries[3] = entry;
+    play.transitionActors.list = sourceEntries; play.transitionActors.count = 4;
+    DoorActor().params = (3 << 10) | 7;
+    door.knobDoor.requestOpen = false;
+    door.doorType = ENDOOR_TYPE_WHOLE_DAY;
+    door.typeVar.data = 7;
+    play.actorCtx.halfDaysBit = HALFDAYBIT_DAY1_DAWN;
+#endif
+    cutscene = false; door.lockTimer = 0;
+    player.actor.world.pos = { -10, 0, 459 };
+    player.actor.shape.rot.y = -32768;
+    const s16 nativeParams = DoorActor().params;
+    SetRandomizedDoorMode(true, true); ClearOwnedDoorKeys();
+    player.doorType = PLAYER_DOORTYPE_NONE;
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_NONE);
+    OwnDoorKey(false);
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_NONE);
+    OwnDoorKey(true);
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_HANDLE);
+    assert(DoorActor().params == nativeParams && "ownership must not rewrite protected/native door types");
+    // A key query is read-only for decorative/checkable state; do not invoke
+    // Idle on a door whose native setup selects another action callback.
+    const auto originalAction = door.actionFunc;
+#ifdef EXIT_DOOR_OOT
+    DoorActor().params = (DOOR_CHECKABLE << 7) | 1;
+    const s16 protectedParams = DoorActor().params;
+    assert(!Randomizer_RustyDoorLocked(&play, &DoorActor()));
+#else
+    DoorActor().params = (3 << 10) | ENDOOR_PARAMS_FRAMED(ENDOOR_FRAMED_FRAME);
+    const s16 protectedParams = DoorActor().params;
+    assert(!Rando_RustyDoorLocked(&play, &DoorActor()));
+#endif
+    assert(DoorActor().params == protectedParams && door.actionFunc == originalAction);
+    DoorActor().params = nativeParams;
+    player.doorType = PLAYER_DOORTYPE_NONE; cutscene = true;
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_NONE);
+    cutscene = false;
+    // An owned rusty key never supplies the native dungeon key requirement.
+    door.lockTimer = 1; player.doorType = PLAYER_DOORTYPE_NONE;
+#ifdef EXIT_DOOR_OOT
+    gSaveContext.inventory.dungeonKeys[gSaveContext.mapIndex] = 0;
+    EnDoor_Idle(&door, &play);
+    assert(player.doorType == PLAYER_DOORTYPE_NONE && player.naviTextId == -0x203);
+#else
+    DUNGEON_KEY_COUNT(gSaveContext.mapIndex) = 0;
+    EnDoor_Idle(&door, &play);
+    assert(player.doorType == PLAYER_DOORTYPE_TALKING && DoorActor().textId == 0x1802);
+#endif
+    door.lockTimer = 0;
+#ifndef EXIT_DOOR_OOT
+    // Preserve native closed-day messaging even with the correct rusty key.
+    door.typeVar.data = 0; player.doorType = PLAYER_DOORTYPE_NONE;
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_TALKING);
+    door.typeVar.data = 7;
+    // Schedule actors keep their native opening branch even without a player key.
+    ClearOwnedDoorKeys(); door.openTimer = 1;
+    const int beforeSounds = scheduleSounds;
+    EnDoor_Idle(&door, &play);
+    assert(door.actionFunc == EnDoor_OpenScheduleActor && scheduleSounds == beforeSounds + 1);
+    door.openTimer = 0;
+#endif
+    ClearOwnedDoorKeys();
+    for (bool randomized : {false, true}) {
+        SetRandomizedDoorMode(randomized, false); player.doorType = PLAYER_DOORTYPE_NONE;
+        EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_HANDLE);
+    }
+    SetRandomizedDoorMode(false, true); player.doorType = PLAYER_DOORTYPE_NONE;
+    EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_HANDLE);
+    std::puts("PASS native rusty door bridge + Idle: missing/wrong/owned, off/vanilla, cutscene and native protected/closed-day/schedule controls");
+}
 int main() {
+#ifdef EXIT_DOOR_OOT
+    play.sceneNum = SCENE_POTION_SHOP_GRANNY;
+#else
+    play.sceneId = COMBO_BLACK_MARKET_SCENE;
+#endif
+    // The real black-market exit stays free with rusty shuffling enabled and no key.
+    SetRandomizedDoorMode(true, true);
     play.roomCtx.curRoom.num = 0; play.roomCtx.prevRoom.num = -1;
     entry.id = ACTOR_EN_DOOR; entry.pos = { -10, 0, 420 };
     entry.sides[0].room = 0; entry.sides[1].room = -1;
@@ -156,6 +285,10 @@ int main() {
                 EnDoor_Idle(&door, &play);
                 assert(player.doorActor == &DoorActor() && player.doorType == PLAYER_DOORTYPE_HANDLE &&
                        player.doorDirection == side);
+                cutscene = true; player.doorType = PLAYER_DOORTYPE_NONE;
+                EnDoor_Idle(&door, &play); assert(player.doorType == PLAYER_DOORTYPE_NONE);
+                cutscene = false; EnDoor_Idle(&door, &play);
+                assert(player.doorType == PLAYER_DOORTYPE_HANDLE);
 #ifdef EXIT_DOOR_OOT
                 door.animStyle = (side < 0 ? 0 : 2) + (LINK_IS_ADULT ? 0 : 1);
                 door.playerIsOpening = true;
@@ -216,5 +349,6 @@ int main() {
     assert(spawns==before+2 && DoorActor().transitionIndex==65 && sSpawnTransitionIndex==-1);
     EnDoor_Destroy(&DoorActor(),&play);
 #endif
+    NativeRustyDoorControls();
     std::puts("PASS native door actors: actual scene spawn/proximity, all host forms/ages and both sides, animation dispatch, concrete door limb list, duplicate prevention and three teardown/reload cycles");
 }

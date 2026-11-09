@@ -32,6 +32,8 @@
 #include "soh/Enhancements/randomizer/fishsanity.h"
 #include "soh/Enhancements/randomizer/rng.h"
 #include "soh/Enhancements/randomizer/randomizerEnumStrings.h"
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
+#include "combo/rando/SongEvents.h"
 #include "soh/Enhancements/Lang/Lang.h"
 #include "rando/SharedItems.h"
 #include "rando/OotDungeonLayouts.h"

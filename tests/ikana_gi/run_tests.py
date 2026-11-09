@@ -18,6 +18,14 @@ def function(source,name):
     while depth:
         depth+=(source[cursor]=='{')-(source[cursor]=='}');cursor+=1
     return source[match.start():cursor]
+def braced_case(source,label):
+    match=re.search(r'^\s*case '+re.escape(label)+r':\s*\{',source,re.M)
+    if not match:raise RuntimeError('Missing production braced case '+label)
+    cursor,depth=match.end(),1
+    while depth and cursor<len(source):
+        depth+=(source[cursor]=='{')-(source[cursor]=='}');cursor+=1
+    if depth:raise RuntimeError('Unclosed production case '+label)
+    return source[match.start():cursor]
 def read(path):return (ROOT/path).read_text()
 source=read('tests/ikana_gi/presentation_test.cpp')
 source=source.replace('/* OOT_NATIVE_DRAW */',function(read('soh/soh/Enhancements/randomizer/draw.cpp'),'DrawMmGiModel')+'\n'+function(read('soh/soh/Enhancements/randomizer/draw.cpp'),'Randomizer_DrawExtShieldOfIkana'))
@@ -26,9 +34,11 @@ case=re.search(r'        case RG_EXT_SHIELD_OF_IKANA:.*?(?=\n        case )',own
 source=source.replace('/* OOT_DESCRIPTOR */',function(owner,'CwSimple')+'\nint DescribeIkana(CwItemDrawInfo* out){switch(RG_EXT_SHIELD_OF_IKANA){\n'+case+'\n}return 0;}')
 mm_draw=read('mm/2s2h/Rando/DrawItem.cpp')
 native=function(mm_draw,'DrawResolvedItem')
-case=re.search(r'        case RI_SHIELD_MIRROR:.*?(?=\n        case )',native,re.S)
-if case:case=case[0]
-else:case=re.search(r'        default:\s*GetItem_Draw\(gPlayState,.*?break;',native,re.S)[0]
+# Mirror Shield may be the last case before default. Copy its complete braced
+# body, including the unavailable-resource fallback, never an unrelated default.
+case=braced_case(native,'RI_SHIELD_MIRROR')
+assert 'ResourceMgr_IsIkanaShieldGiAvailable()' in case and 'DrawNativeIkanaFallback()' in case, 'actual native Ikana shield dispatch'
+assert 'default:' not in case and 'DrawShuffledSoul' not in case, 'shield case must not absorb the default soul dispatch'
 # Keep the real namespace-qualified caller: block-scope DISPS declarations in
 # this context must still resolve to the global C interpolation implementation.
 gfx=read('mm/include/gfx.h')
@@ -37,7 +47,7 @@ source=source.replace('/* MM_NATIVE_DRAW */',port+'\n'
     '#undef OPEN_DISPS\n#undef CLOSE_DISPS\n'
     '#define OPEN_DISPS(x) { OPEN_DISPS_PORT_HELPERS(x);\n'
     '#define CLOSE_DISPS(x) CLOSE_DISPS_PORT_HELPERS(x); }\n'+
-    (function(mm_draw,'DrawNativeIkanaFallback')+'\n' if 'static void DrawNativeIkanaFallback(' in mm_draw else '')+
+    function(mm_draw,'DrawNativeIkanaFallback')+'\n'+
     'namespace Rando { void DrawNativeIkanaGI(); }\n'
     'void Rando::DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}\n'
     'using Rando::DrawNativeIkanaGI;')

@@ -116,8 +116,12 @@ def production(host, grant_ref=None):
             metadata.append("{RI_" + ri + ", {.itemId = " + item + "}}")
         parts.append("namespace Rando::StaticData {\n"
                      "std::map<RandoItemId, RandoStaticItem> Items = {" + ",".join(metadata) + "}; }\n")
-        record = between(grant, "    if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0)",
-                         "        FleetShared_OnNativeObtained((int)recordId)") + "\n}\n"
+        record = block(grant, "    if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0)")
+        # Retain the complete native ownership/record-ID section. Peer delivery
+        # and presentation remain outside this fixture's documented boundary;
+        # remove their complete source blocks, including any simulation guards.
+        record = record.replace(block(record, "        if (!gItemGrantSimulation) {"), "", 1)
+        record = record.replace(block(record, "        if (!gItemGrantSimulation &&\n"), "", 1)
         cases = between(grant, "        case RI_SOUL_BOSS_GOHT:", "        case RI_FROG_BLUE:")
         cases += between(grant, "        case RI_MOONS_TEAR:", "        case RI_POWDER_KEG:")
         parts.append("static int gFcCombo_SuppressRecord = 0;\n"

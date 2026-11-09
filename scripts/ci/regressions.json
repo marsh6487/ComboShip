@@ -2007,7 +2007,7 @@
     "suite": "world",
     "origin": "gate",
     "name": "Native seed harness isolation and exact junk validation (scaffolding only)",
-    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py\npython3 -B tests/shuffle_parity/enemy_drops/run_solo_entrypoint_test.py"
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py\npython3 -B tests/shuffle_parity/enemy_drops/run_solo_entrypoint_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_boss_validator_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_snapshot_contract_test.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/boss_keys/native_simulation_guard_test.py"
   },
   {
     "suite": "world",

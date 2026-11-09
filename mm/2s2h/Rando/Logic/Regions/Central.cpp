@@ -9,9 +9,9 @@ using namespace Rando::Logic;
 static RegisterShipInitFunc initFunc([]() {
     Regions[RR_ASTRAL_OBSERVATORY_OUTSIDE] = RandoRegion{ .name = "Outside Astral Observatory", .sceneId = SCENE_00KEIKOKU,
         .checks = {
-            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
-            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_2, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
-            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_3, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_2, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_3, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
 
             CHECK(RC_ASTRAL_OBSERVATORY_MOON_TEAR, true),
         },

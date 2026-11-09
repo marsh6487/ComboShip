@@ -142,6 +142,78 @@ extern "C" void func_808389BC(PlayState*, Player*) {}
 extern "C" void func_80838A20(PlayState*, Player*) {}
 extern "C" bool NativeMaskTransition(Player*,PlayState*);
 extern "C" u8 gPlayerFormItemRestrictions[PLAYER_FORM_MAX][114];
+static void TestHumanEnvironmentAccess(Player& player,PlayState& play) {
+    using namespace Rando::Logic;
+    struct Mask {ItemId item;PlayerItemAction action;PlayerTransformation form;};
+    const Mask masks[]={{ITEM_MASK_DEKU,PLAYER_IA_MASK_DEKU,PLAYER_FORM_DEKU},
+                        {ITEM_MASK_GORON,PLAYER_IA_MASK_GORON,PLAYER_FORM_GORON},
+                        {ITEM_MASK_ZORA,PLAYER_IA_MASK_ZORA,PLAYER_FORM_ZORA}};
+    gItemSlots[ITEM_MASK_DEKU]=SLOT_MASK_DEKU;gItemSlots[ITEM_MASK_GORON]=SLOT_MASK_GORON;
+    gItemSlots[ITEM_MASK_ZORA]=SLOT_MASK_ZORA;gItemSlots[ITEM_MASK_FIERCE_DEITY]=SLOT_MASK_FIERCE_DEITY;
+    gItemSlots[ITEM_BOTTLE]=SLOT_BOTTLE_1;INV_CONTENT(ITEM_BOTTLE)=ITEM_BOTTLE;
+    gItemSlots[ITEM_MASK_BLAST]=SLOT_MASK_BLAST;INV_CONTENT(ITEM_MASK_BLAST)=ITEM_MASK_BLAST;
+    gItemSlots[ITEM_BOMB]=SLOT_BOMB;INV_CONTENT(ITEM_BOMB)=ITEM_NONE;
+    gItemSlots[ITEM_BOMBCHU]=SLOT_BOMBCHU;INV_CONTENT(ITEM_BOMBCHU)=ITEM_NONE;
+    auto sandWithoutExplosives=[] {
+        INV_CONTENT(ITEM_MASK_BLAST)=ITEM_NONE;
+        const bool result=NativeSandRockRule();
+        INV_CONTENT(ITEM_MASK_BLAST)=ITEM_MASK_BLAST;
+        return result;
+    };
+    RANDO_EVENTS[RE_ACCESS_BUGS]=true;
+    auto& info=gSaveContext.save.shipSaveInfo.rando;
+    info.randoInf[RANDO_INF_OBTAINED_SWIM/16]|=1<<(RANDO_INF_OBTAINED_SWIM%16);
+    gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]=1;
+    gSaveContext.save.saveInfo.equips.equipment|=EQUIP_VALUE_SHIELD_HERO<<gEquipShifts[EQUIP_TYPE_SHIELD];
+    INV_CONTENT(ITEM_MASK_FIERCE_DEITY)=ITEM_NONE;
+    for(const auto& current:masks)for(const auto& owned:masks) {
+        for(const auto& mask:masks)INV_CONTENT(mask.item)=ITEM_NONE;
+        gSaveContext.save.playerForm=current.form;
+        REQUIRE(!CanReturnToHuman());REQUIRE(!NativeObservatorySoilRule());REQUIRE(!NativeWaterRockRule());
+        REQUIRE(sandWithoutExplosives()==(current.form==PLAYER_FORM_GORON));
+        REQUIRE(gPlayerFormItemRestrictions[current.form][owned.item]);
+        REQUIRE(!gPlayerFormItemRestrictions[PLAYER_FORM_FIERCE_DEITY][owned.item]);
+        INV_CONTENT(owned.item)=owned.item;
+        player.transformation=current.form;
+        player.currentMask=GET_MASK_FROM_IA(current.action);player.itemAction=owned.action;
+        NativeMaskTransition(&player,&play);
+        if(current.form!=owned.form) {
+            REQUIRE(observedTransformation==owned.form);
+            player.transformation=owned.form;
+            REQUIRE(gPlayerFormItemRestrictions[owned.form][owned.item]);
+            NativeMaskTransition(&player,&play);
+        }
+        REQUIRE(observedTransformation==PLAYER_FORM_HUMAN);
+        REQUIRE(CanReturnToHuman());REQUIRE(NativeObservatorySoilRule());REQUIRE(NativeWaterRockRule());
+        REQUIRE(sandWithoutExplosives());
+    }
+    gSaveContext.save.playerForm=PLAYER_FORM_FIERCE_DEITY;
+    for(const auto& owned:masks) {
+        for(const auto& mask:masks)INV_CONTENT(mask.item)=ITEM_NONE;
+        INV_CONTENT(owned.item)=owned.item;
+        REQUIRE(!CanReturnToHuman());REQUIRE(!NativeObservatorySoilRule());REQUIRE(!NativeWaterRockRule());
+        // Its independent inherited Goron-mask alternative is outside the
+        // Human capability; do not relabel that separate route as Human.
+        if(owned.item!=ITEM_MASK_GORON)REQUIRE(!sandWithoutExplosives());
+    }
+    INV_CONTENT(ITEM_MASK_FIERCE_DEITY)=ITEM_MASK_FIERCE_DEITY;
+    REQUIRE(gPlayerFormItemRestrictions[PLAYER_FORM_FIERCE_DEITY][ITEM_MASK_FIERCE_DEITY]);
+    REQUIRE(CanReturnToHuman());
+    player.transformation=PLAYER_FORM_FIERCE_DEITY;player.currentMask=PLAYER_MASK_FIERCE_DEITY;
+    player.itemAction=PLAYER_IA_MASK_FIERCE_DEITY;NativeMaskTransition(&player,&play);
+    REQUIRE(observedTransformation==PLAYER_FORM_HUMAN);
+    for(const auto& mask:masks)INV_CONTENT(mask.item)=ITEM_NONE;
+    INV_CONTENT(ITEM_MASK_FIERCE_DEITY)=ITEM_NONE;
+    gSaveContext.save.playerForm=PLAYER_FORM_HUMAN;
+    REQUIRE(CanReturnToHuman());REQUIRE(NativeObservatorySoilRule());REQUIRE(NativeWaterRockRule());REQUIRE(sandWithoutExplosives());
+    // Every independent physical prerequisite remains necessary.
+    INV_CONTENT(ITEM_BOTTLE)=ITEM_NONE;REQUIRE(!NativeObservatorySoilRule());INV_CONTENT(ITEM_BOTTLE)=ITEM_BOTTLE;
+    RANDO_EVENTS[RE_ACCESS_BUGS]=false;REQUIRE(!NativeObservatorySoilRule());RANDO_EVENTS[RE_ACCESS_BUGS]=true;
+    gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]=0;REQUIRE(!NativeWaterRockRule());
+    gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]=1;
+    gSaveContext.save.playerForm=PLAYER_FORM_GORON;INV_CONTENT(ITEM_MASK_DEKU)=ITEM_MASK_DEKU;
+    REQUIRE(!CAN_BE_HUMAN); // Inherited generic policy is deliberately unchanged.
+}
 int main() {
     TestOracleMappingAfterPreview();
     TestLoadedSaveMappingAfterGeneration();
@@ -288,6 +360,7 @@ int main() {
             }
         }
     }
+    TestHumanEnvironmentAccess(player,play);
     // A different owned transformation mask also supplies a native route back
     // to Human: Goron -> Deku -> Human. Use the actual player transition branch
     // and real item restriction table, not a model of transformation behavior.

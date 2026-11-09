@@ -14,12 +14,14 @@ with tempfile.TemporaryDirectory(prefix='mirror-shuffle-pool-') as td:
     placement.write_text('#include "Rando/Logic/Logic.h"\nnamespace Rando::Logic {\n' + '\n'.join(
         helpers[name] for name in ['DungeonItemToDungeon', 'DungeonItemPlacementOption', 'StaysAtVanillaCheck', 'IsSongLocationItem']) + '\n}\n')
     flags = ['-std=c++20', '-O1', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-DCONTROLLERBUTTONS_T=uint32_t',
-             '-include', str(ROOT / 'tests/dungeon_rewards/headless.h')]
+             '-include', str(ROOT / 'tests/dungeon_rewards/headless.h'),
+             '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections']
     for path in ['', 'mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets', 'libultraship/include', 'combo']:
         flags += ['-isystem', str(ROOT / path)]
     binary = build / 'pool'
     result = subprocess.run([os.environ.get('CXX', 'c++'), *flags, str(ROOT / 'tests/magic_mirror_shuffle/pool_test.cpp'),
-        str(ROOT / 'mm/2s2h/Rando/Logic/GeneratePools.cpp'), str(placement), '-o', str(binary)], capture_output=True, text=True)
+        str(ROOT / 'mm/2s2h/Rando/Logic/GeneratePools.cpp'), str(ROOT / 'mm/2s2h/Rando/SongEvents.cpp'),
+        str(placement), '-o', str(binary)], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
     subprocess.run([str(binary)], check=True)

@@ -41,7 +41,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_DOGGY_RACETRACK] = RandoRegion{ .sceneId = SCENE_F01_B,
         .checks = {
-            CHECK(RC_DOGGY_RACETRACK_SOIL, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_DOGGY_RACETRACK_SOIL, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
 
             // TODO: Trick: Jumpslash to clip through (similar to Clock Town Straw).
             // Zora can just climb up, adding it to logic for now but if someone wants to make it a trick later feel free.
@@ -193,10 +193,10 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ROMANI_RANCH] = RandoRegion{ .sceneId = SCENE_F01,
         .checks = {
-            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_1, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
-            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_2, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
-            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_3, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
-            CHECK(RC_ROMANI_RANCH_SOIL_DAY_1, (CAN_BE_HUMAN && HAS_BOTTLE && CAN_ACCESS(BUGS)) && FIRST_DAY()),
+            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_1, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
+            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_2, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
+            CHECK(RC_ROMANI_RANCH_SOIL_DAYS_2_3_ITEM_3, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS)) && (SECOND_DAY() || FINAL_DAY())),
+            CHECK(RC_ROMANI_RANCH_SOIL_DAY_1, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS)) && FIRST_DAY()),
 
             // TODO: Time logic is wrong for entrance rando
             CHECK(RC_ROMANI_RANCH_ALIENS, CanKillEnemy(ACTOR_EN_INVADEPOH) && IS_NIGHT1() && CAN_BE_GORON && HAS_ITEM(ITEM_POWDER_KEG)),

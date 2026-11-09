@@ -63,7 +63,8 @@ def main():
             'MM_DumpRandoSettings', 'MM_RestoreRandoSettings', 'MM_DumpRandoStaticData')))
         flags = ['-std=c++20', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DGBI_FLOAT_MTX=1', '-DGBI_S32_VTX=1',
                  '-include', str(ROOT / 'tests/dungeon_rewards/headless.h'), '-I' + str(build),
-                 '-I' + str(ROOT), '-I' + str(ROOT / 'combo')]
+                 '-I' + str(ROOT), '-I' + str(ROOT / 'combo'),
+                 '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections']
         for path in ('mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets',
                      'libultraship/include'):
             flags += ['-isystem', str(ROOT / path)]
@@ -76,6 +77,7 @@ def main():
         subprocess.run([os.environ.get('CXX', 'c++'), *flags,
                         str(Path(__file__).with_name('native_test.cpp')),
                         str(ROOT / 'mm/2s2h/Rando/Logic/GeneratePools.cpp'),
+                        str(ROOT / 'mm/2s2h/Rando/SongEvents.cpp'),
                         str(ROOT / 'mm/2s2h/Rando/Logic/PlacementConstraints.cpp'),
                         '-o', str(binary)], check=True)
         subprocess.run([str(binary), *(['--observe'] if args.observe else []),

@@ -84,12 +84,7 @@ bool CanPlay(unsigned event) {
         return false;
     // These native listeners accept only their required playable form.
     if (event >= 4 && event <= 7) {
-        // Native Goron/Zora/Deku can don another owned transformation mask,
-        // then remove it to become Human without owning their original mask.
-        const bool canReturnToHuman =
-            CAN_BE_HUMAN ||
-            (!IS_DEITY && (HAS_ITEM(ITEM_MASK_DEKU) || HAS_ITEM(ITEM_MASK_GORON) || HAS_ITEM(ITEM_MASK_ZORA)));
-        if (!canReturnToHuman)
+        if (!Rando::Logic::CanReturnToHuman())
             return false;
     }
     if (event == 10 && !CAN_BE_GORON)

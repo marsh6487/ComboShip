@@ -8,6 +8,43 @@ import native_boss_key_regression as native
 
 
 class NativeOutputValidatorTests(unittest.TestCase):
+    def wallet_sample(self, enabled):
+        items = native.item_rows()
+        progressive, child = items['RI_PROGRESSIVE_WALLET'], items['RI_WALLET_CHILD']
+        count = 2 + int(enabled)
+        placements = {'wallet:' + str(i): progressive + ' (MM)' for i in range(count)}
+        data = {'items': [{'token': token, 'name': items[token]} for token in
+                          ('RI_PROGRESSIVE_WALLET', 'RI_WALLET_CHILD')],
+                'pool': [{'name': progressive} for _ in range(count)], 'fixed': []}
+        settings = {'gRando.Options.RO_SHUFFLE_CHILD_WALLET': int(enabled),
+                    'gRando.Options.RO_SHUFFLE_TYCOON_WALLET': 0, 'gRando.StartingItems': []}
+        return placements, data, settings, progressive, child
+
+    def test_native_child_wallet_uses_two_or_three_progressive_items(self):
+        for enabled in (False, True):
+            placements, data, settings, _, child = self.wallet_sample(enabled)
+            self.assertEqual(native.validate_mm_wallets(enabled, placements, data, settings),
+                             {'progressiveWallets': 2 + int(enabled), 'concreteChildWallets': 0})
+            self.assertNotIn(child, native.feature_catalogue()['parity'])
+        self.assertEqual(len(native.feature_catalogue()['parity']), 12)
+
+    def test_wallet_validator_rejects_missing_extra_duplicates_and_phantom_fixed_child(self):
+        placements, data, settings, progressive, child = self.wallet_sample(True)
+        for bad in ({k:v for k,v in placements.items() if k != 'wallet:2'},
+                    {**placements, 'duplicate': progressive}, {**placements, 'phantom': child}):
+            with self.assertRaises(AssertionError): native.validate_mm_wallets(True, bad, data, settings)
+        for supply in ([{'name': progressive}] * 2, [{'name': progressive}] * 4,
+                       data['pool'] + [{'name': child}]):
+            bad = {**data, 'pool': supply}
+            with self.assertRaises(AssertionError): native.validate_mm_wallets(True, placements, bad, settings)
+        bad = {**data, 'fixed': [{'check': 'phantom', 'item': child}]}
+        with self.assertRaises(AssertionError): native.validate_mm_wallets(True, placements, bad, settings)
+        for key, value in (('gRando.Options.RO_SHUFFLE_CHILD_WALLET', 0),
+                           ('gRando.Options.RO_SHUFFLE_TYCOON_WALLET', 1),
+                           ('gRando.StartingItems', ['RI_WALLET_CHILD'])):
+            with self.assertRaises(AssertionError):
+                native.validate_mm_wallets(True, placements, data, {**settings, key:value})
+
     def sample(self, game):
         table = native.scenes(game)
         placements = {}; rows = {}
@@ -87,6 +124,27 @@ class NativeOutputValidatorTests(unittest.TestCase):
             candidate={**filled}
             if prices is not None:candidate['prices']=prices
             with self.assertRaises(AssertionError):native.mm_replay(object(),candidate,{})
+
+    def test_enabled_child_wallet_requires_progressive_supply_credited_by_replay(self):
+        class Boundary:
+            def call(self, *args, **kwargs): pass
+            def bind(self, name, *args, **kwargs):
+                return {'Combo_MM_Rando_Reset': lambda: None,
+                        'Combo_MM_Rando_SetOwnedItems': lambda _: None,
+                        'Combo_MM_Rando_GetReachableChecks': lambda: b'["goal", "wallet"]',
+                        'Combo_MM_Rando_Restore': lambda: None}[name]
+        _, _, settings, progressive, _ = self.wallet_sample(True)
+        data = {'checkMetadata': {'goal': {'sourceName': 'RC_MOON_MAJORA_POT_01'}},
+                'items': [{'token': 'RI_PROGRESSIVE_WALLET', 'name': progressive, 'advancement': True}]}
+        for obtained in (False, True):
+            placements = {'goal': 'junk', **({'wallet': progressive} if obtained else {})}
+            filled = {'finalSeed': 1, 'prices': {key: 0 for key in placements}, 'placements': placements,
+                      'checks': {key: {'shuffled': True} for key in placements}, 'settings': settings}
+            if obtained:
+                self.assertEqual(native.mm_replay(Boundary(), filled, data)['nativeProgressiveWalletsCollected'], 1)
+            else:
+                with self.assertRaisesRegex(AssertionError, 'never granted progressive Child Wallet'):
+                    native.mm_replay(Boundary(), filled, data)
 
     def test_native_environment_identity_set_respects_solo_acquisition_routes(self):
         catalog = native.feature_catalogue()
