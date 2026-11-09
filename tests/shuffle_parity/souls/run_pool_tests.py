@@ -31,7 +31,7 @@ def main():
                              'namespace Rando::Logic {\n' + helpers + '\n}\n')
         flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DGBI_FLOAT_MTX', '-DGBI_S32_VTX', '-DCONTROLLERBUTTONS_T=uint32_t', '-include',
                  str(ROOT / 'tests/shuffle_parity/souls/headless.h'), '-I' + str(build)]
-        for path in ('mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets',
+        for path in ('.', 'mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets',
                      'libultraship/include', 'combo', 'combo/menu'):
             flags += ['-isystem', str(ROOT / path)]
         # Re-adding the compiler's system root with -isystem moves it before
@@ -45,6 +45,7 @@ def main():
                             *(['-DCOMBO_BUILD'] if mode == 'combo' else []),
                             str(ROOT / 'tests/shuffle_parity/souls/pool_test.cpp'),
                             str(ROOT / 'mm/2s2h/Rando/Logic/GeneratePools.cpp'),
+                            str(ROOT / 'mm/2s2h/Rando/SongEvents.cpp'),
                             str(ROOT / 'mm/2s2h/Rando/StaticData/Items.cpp'),
                             str(ROOT / 'mm/2s2h/Rando/StaticData/Options.cpp'),
                             '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',

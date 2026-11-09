@@ -12,9 +12,11 @@ restriction is removed. All six workers are active; no implementation is queued.
 Controller owns shared integration, identifiers, cross-feature review and pushes.
 
 Current controller checkout: `/workspace/scratch/c690840d9328/ComboShip`.
-Public checkpoint: `e360328d03d6d30e38151035a2d5a8d92994d975`.
-The source below is integrated locally through reviewed production fixes `d3c5aa17`;
-publication of this combined tree is the next controller action. Source
+Public full-source checkpoint: `af7891b6c7383ab1655262d8913933ab20b6800d`
+(tree3979ee578e674442801a6f5ac78d568f267915e4, localb6ac6346).
+The source below is integrated locally through reviewed production fixes `d3c5aa17`, with post-publication fixture repairs;
+The full source is published on the existing draft. Current CI repair changes
+close real test dependencies and Castle formatting; no feature is deferred. Source
 implementation and configured gameplay acceptance remain separate.
 
 A host rollback removed the original later worker trees. All larger features
@@ -54,7 +56,32 @@ checkpoint before the next publication or long build.
 | Dual-game Own Dungeon, Stone Tower normal/inverted, foreign placement | ci_native/controller | Required actual native matrix implements both simultaneous policies, rings, exclusions, negative circular replay | Earlier controlled fixture alone is not completion; latest native generation proof pending |
 | CI/regression failure closure | controller/ci_native | Meaningful assertions and normal diagnostics retained; fixture real dependencies closed | Native heldNEI/sword/env/firstdrop/retained suites now pass; formatted-song fixture closure repaired93ead007; integrated native regression sweep active |
 | IDs/save/default compatibility | ci_native/controller | Existing IDs preserved, appended clocks then doors then environment; mirrored FCI tables retained | Compiled36568 prior IDs,360 OoT and93 MM CVar/defaults unchanged both guards; FCI_MAX465 <=512; native historical JSON extents/tails pass;37889186 |
-| Durable checkpoints/PR89 publication | controller | R1/R2 source and individual reconstruction milestones saved with exact restoration; draft/unmerged maintained | Next complete combined checkpoint and incremental candidate publication pending current review repairs |
+| Durable checkpoints/PR89 publication | controller | R1/R2 source and individual reconstruction milestones saved with exact restoration; draft/unmerged maintained | Full R4source independently restored and published; libfile_9d1eaddca38c819194b2cc96dd1f27e4, SHAdc0a48a8770d1979cd09b1609b14cd176e10369a064e18bd966ca4b33fee3304; next fixture checkpoint/push in progress |
+
+## Current integrated regression evidence
+
+Frozen integrated4542544e (tree7b7b4e7cd43db2871fdea37111a1da7794dd8d62)
+passes native27/39 door/Castle/legacy/ER/save/exclusions both guards and18 scoped
+complete syntax checks. Firstdrops/hints/native+foreignGI/replay pass20 command
+rows, including4096 native layout/runtime/pool/hash controls and sanitizers.
+Environment actual211/279 lifecycle, access, eligibility, pools/exclusions and
+all50 complete translation-unit checks pass after real owning-header closure.
+All21 soul suites and9 sanitizer suites pass both guards after9 test-only
+real-song dependency, namespace/schema and format-extraction repairs. Those
+fixture repairs are integrated. No assertion or diagnostic policy was weakened.
+The latest combined MM song runtime/solver/JSON/oracle/message suite passes both
+guards with sanitizers, including5 real Keeta world predicates. Native UI/Vanilla
+generator/save/import controls pass both guards; independent lottery/tracker
+follow-up approval confirms preserved receipts and exact active totals.
+
+Public af7891b6 run42638388589 stopped at a whitespace-only Castle gate diff in
+clang-format before starting native builds. The exact repository formatter was
+then executed over all2251 local source units: only that file changed. Its
+idempotent formatting check and all33 CI policy tests pass. Next CI includes
+required actual door, full environmental and menu/Vanilla compatibility suites.
+The separate Windows preflight42638388511 remains active and is not markedPASS.
+Latest-tree Linux/Windows links and actual complete seed-generation matrices
+are still required; component checks do not replace them.
 
 ## Active work and genuine verification limits
 

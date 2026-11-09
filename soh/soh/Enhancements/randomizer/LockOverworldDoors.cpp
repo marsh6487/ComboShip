@@ -14,11 +14,10 @@ u8 Randomizer_GetSettingValue(RandomizerSettingKey key);
 int Randomizer_RustyCastleGateEnabled(PlayState* play) {
     return play && play->sceneNum == SCENE_HYRULE_CASTLE && IS_RANDO &&
            Rando::RustyDoorKeys::CastleGateUsesKey(Randomizer_GetSettingValue(RSK_LOCK_OVERWORLD_DOORS),
-                                                 Randomizer_GetSettingValue(RSK_RUSTY_DOOR_KEY_VERSION));
+                                                   Randomizer_GetSettingValue(RSK_RUSTY_DOOR_KEY_VERSION));
 }
 int Randomizer_RustyCastleGateLocked(PlayState* play) {
-    return Randomizer_RustyCastleGateEnabled(play) &&
-           !Flags_GetRandomizerInf(RAND_INF_RUSTY_KEY_HYRULE_CASTLE) &&
+    return Randomizer_RustyCastleGateEnabled(play) && !Flags_GetRandomizerInf(RAND_INF_RUSTY_KEY_HYRULE_CASTLE) &&
            !Flags_GetRandomizerInf(RAND_INF_HAS_SKELETON_KEY);
 }
 // The current physical scene/index is preserved independently of any shuffled exit target.

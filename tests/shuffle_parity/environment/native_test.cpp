@@ -3,6 +3,7 @@
 #undef main
 #include "2s2h/CustomItem/CustomItem.h"
 #include "Rando/MMEnvironment.h"
+#include "Rando/VanillaCompatibility.h"
 #include "rando/SongEvents.h"
 #include <cstdarg>
 #include <functional>

@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix="soul-save-") as temporary:
             os.environ.get("CXX", "c++"), "-std=c++20", "-O1", "-w", "-DF3DEX_GBI_2",
             *(["-DCOMBO_BUILD"] if mode == "combo" else []),
             "-DCONTROLLERBUTTONS_T=uint32_t", "-DGBI_FLOAT_MTX", "-DGBI_S32_VTX", "-DFMT_HEADER_ONLY",
-            *["-I" + str(ROOT / path) for path in ("mm", "mm/2s2h", "mm/include", "mm/include/PR",
+            *["-I" + str(ROOT / path) for path in (".", "mm", "mm/2s2h", "mm/include", "mm/include/PR",
                                                  "mm/src", "mm/assets", "libultraship/include", "combo")],
             str(ROOT / "tests/shuffle_parity/souls/save_test.cpp"), "-o", str(binary)
         ], capture_output=True, text=True)

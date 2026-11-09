@@ -3,6 +3,7 @@
 from pathlib import Path
 import os,re,subprocess,tempfile
 from runtime_fixture import prepare_runtime
+from song_fixture import mm_song_selection
 ROOT=Path(__file__).resolve().parents[3]
 def body(path,signature):
  s=(ROOT/path).read_text();a=s.index(signature);e=s.index('{',a)+1;d=1
@@ -22,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix='souls-mm-blockers-') as tmp:
  def enum(path,end):
   s=(ROOT/path).read_text();b=s.index('} '+end+';')+len('} '+end+';');a=s.rfind('typedef enum {',0,b);return s[a:b]
  giant='mm/src/overlays/actors/ovl_En_Dai/z_en_dai.c';guard='mm/src/overlays/actors/ovl_En_Bombers2/z_en_bombers2.c'
- (t/'mm_blockers.inc').write_text(enum(giant,'EnDaiAnimation')+'\n'+enum(guard,'EnBombersAnimation')+'\n'+body(giant,'void func_80B3EEDC(')+'\n'+body(giant,'void EnDai_Update(Actor* thisx, PlayState* play) {')+'\n'+body(guard,'void EnBombers2_Update(Actor* thisx, PlayState* play) {'))
+ bits=(ROOT/'mm/src/code/z_inventory.c').read_text();a=bits.index('u32 gBitFlags[');b=bits.index('};',a)+2
+ (t/'mm_blockers.inc').write_text('extern "C" {\n'+bits[a:b]+'\n}\n'+mm_song_selection()+'\n'+enum(giant,'EnDaiAnimation')+'\n'+enum(guard,'EnBombersAnimation')+'\n'+body(giant,'void func_80B3EEDC(')+'\n'+body(giant,'void EnDai_Update(Actor* thisx, PlayState* play) {')+'\n'+body(guard,'void EnBombers2_Update(Actor* thisx, PlayState* play) {'))
  source=(ROOT/giant).read_text();a=source.index("static Vec3f D_80B3FBF0");b=source.index(";",a)+1
  extra=body('mm/src/code/z_actor.c','void Flags_SetWeekEventReg(')+'\n'+body('mm/src/code/z_actor.c','void Flags_ClearWeekEventReg(')+'\n'+source[a:b]+"\n"+body(giant,"void EnDai_Init(Actor* thisx, PlayState* play) {")+"\n"
  source=(ROOT/guard).read_text();a=source.index("static ColliderCylinderInit sCylinderInit");b=source.index("};",a)+2

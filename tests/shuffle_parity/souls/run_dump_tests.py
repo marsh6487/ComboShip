@@ -9,6 +9,7 @@ b=s.index('// ComboShip: MM reachability oracle',a)
 function=s[a:b]
 tail=function[function.rindex('    cached = nlohmann::json{'):]
 # Execute the actual native option expression, not a hand-written policy copy.
+metadata=function[function.index('    nlohmann::json checkMetadata ='):function.index('    // ComboShip: the two hint options')]
 options=function[function.rindex('    nlohmann::json startingSouls ='):function.rindex('    cached = nlohmann::json{')]
 def body(source, signature):
  a=source.index(signature);b=source.index('{',a);depth=1;e=b+1
@@ -27,6 +28,11 @@ cpp='''#include <nlohmann/json.hpp>
 extern "C" { SaveContext gSaveContext{}; }
 std::vector<RandoItemId> configured,granted;
 static void GiveItemForOracle(RandoItemId item){granted.push_back(item);}
+namespace Rando::StaticData {
+std::map<RandoCheckId,RandoStaticCheck> Checks;
+const std::string& GetCheckDisplayName(RandoCheckId){static std::string name="Native fixture check";return name;}
+std::string GetLocationNameForHint(RandoCheckId,bool){return "Native fixture location";}
+}
 namespace Rando {
 std::vector<RandoItemId> GetStartingItemsFromConfig(){return configured;}
 std::vector<RandoItemId> GetComputedStartingItems(RandoSaveInfo&){return {};}
@@ -40,7 +46,7 @@ static const char* Success(){
 static std::string cached;
 auto& saveInfo=gSaveContext.save.shipSaveInfo.rando;
 nlohmann::json checks,pool,fixed,items,prices,locationHints,options,junkPool;
-'''+options+'\n'+tail+'''
+'''+metadata+options+'\n'+tail+'''
 int main(){
  const RandoOptionId ids[]={RO_SHUFFLE_ENEMY_SOULS,RO_SHUFFLE_NPC_SOULS,RO_SHUFFLE_ANIMAL_SOULS,RO_SHUFFLE_MISC_SOULS};
  for(unsigned enabled=0;enabled<16;++enabled){

@@ -3,6 +3,7 @@
 from pathlib import Path
 import os,re,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[3]
+from song_fixture import mm_solver
 logic=(ROOT/'mm/2s2h/Rando/Logic/Logic.h').read_text()
 def body(s,signature):
  a=s.index(signature);e=s.index('{',a)+1;d=1
@@ -32,13 +33,18 @@ hideout=next(x[-1] for x in calls(central,'EXIT') if x[0]=='ENTRANCE(CURIOSITY_S
 bomber=next(x[-1] for x in calls(central,'EXIT') if x[0]=='ENTRANCE(ASTRAL_OBSERVATORY, 0)')
 cpp='''#include "mm/2s2h/Rando/SoulShuffle.h"
 #include "mm/include/z64item.h"
+#include "mm/include/z64save.h"
+#include "mm/include/z64ocarina.h"
+#include "combo/rando/SongEvents.h"
 #include "soh/tests/test_require.h"
 #include <set>
 #include <functional>
+SaveContext gSaveContext{};
 unsigned options[RO_MAX]{};std::set<int> owned;bool events[RE_MAX]{};
+bool song=true;
 #define RANDO_SAVE_OPTIONS options
 #define RANDO_EVENTS events
-bool Flags_GetRandoInf(RandoInf f){return owned.count(f);}
+bool Flags_GetRandoInf(RandoInf f){return (f>=RANDO_INF_OBTAINED_OCARINA_BUTTON_A&&f<=RANDO_INF_OBTAINED_OCARINA_BUTTON_C_UP)?song:owned.count(f);}
 void Own(RandoItemId i,bool on=true){auto*s=Rando::SoulShuffle::Find(i);REQUIRE(s);if(on)owned.insert(s->flag);else owned.erase(s->flag);}
 '''+body(logic,'enum TimeSlice')+''';
 int now=TIME_DAY1_AM_08_00;unsigned clocks=63;bool clockSetting=true;
@@ -49,9 +55,10 @@ bool SettingClocks(){return clockSetting;}bool OwnsHalfDayForMode(int i){return 
 for line in logic.splitlines():
  if line.startswith(('#define CLOCK_DAY','#define CLOCK_NIGHT','#define IS_DAY1(', '#define IS_DAY2(', '#define IS_DAY3(', '#define IS_NIGHT1(', '#define IS_NIGHT2(', '#define IS_NIGHT3(', '#define BEFORE(', '#define BETWEEN(')):cpp+=line+'\n'
 cpp+=body(logic,'inline bool ClockFilter(')+'\n'+body(logic,'inline bool SoulItemRequirement(')+'\n'+body(logic,'inline bool SoulEventRequirement(')+'\n'+body(logic,'inline bool TradingPostSoulRequirement(')+'\n'
-save=(ROOT/'mm/include/z64save.h').read_text();b=save.index('} DungeonSceneIndex;')+len('} DungeonSceneIndex;');a=save.rfind('typedef enum {',0,b)
-nativeDungeonEnum=save[a:b]
-cpp+='''bool capability=true,fire=false,song=true,stick=true,afford=true;
+nativeDungeonEnum='' # Provided by the real native SaveContext header above.
+cpp+='''bool capability=true,fire=false,stick=true,afford=true,learnedSong=true;
+#define CAN_BE_HUMAN capability
+#define IS_DEITY false
 #define CAN_BE_DEKU capability
 #define CAN_BE_GORON capability
 #define CAN_BE_ZORA capability
@@ -59,14 +66,14 @@ cpp+='''bool capability=true,fire=false,song=true,stick=true,afford=true;
 #define CAN_USE_MAGIC_ARROW(x) fire
 #define CAN_PLAY_SONG(x) song
 #define HAS_ITEM(x) stick
-#define CHECK_QUEST_ITEM(x) capability
+#define CHECK_QUEST_ITEM(x) learnedSong
 #define CAN_AFFORD(x) afford
 #define CAN_USE_PROJECTILE capability
 #define HAS_BOTTLE capability
 #define CAN_ACCESS(x) capability
 unsigned maskCount=20,remainsCount=4;
 unsigned MoonMaskCount(){return maskCount;}unsigned RemainsCount(){return remainsCount;}
-'''+nativeDungeonEnum+'\n'+body(logic,'inline bool CanAccessDungeon(')+'''
+'''+nativeDungeonEnum+'\nnamespace SE=ComboRando::SongEvents;\n'+mm_solver()+body(logic,'inline bool CanAccessDungeon(')+'''
 std::function<bool()> moonRoutes[]={
 '''+',\n'.join('[]{return '+e+';}' for e in moonRoutes)+'};\nstd::function<bool()> shop[]={\n'+',\n'.join('[]{return '+e+';}' for e in shop)+'};\n'
 for name,expr in [('Meet',meet),('Sirloin',sirloin),('Princess',princess),('Hideout',hideout),('Bomber',bomber)]:
@@ -97,10 +104,11 @@ for(int mode:{RO_ACCESS_DUNGEONS_FORM_AND_SONG,RO_ACCESS_DUNGEONS_FORM_OR_SONG,R
  capability=false;song=true;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE)==(mode==RO_ACCESS_DUNGEONS_FORM_OR_SONG||mode==RO_ACCESS_DUNGEONS_SONG_ONLY));
  capability=true;song=false;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE)==(mode==RO_ACCESS_DUNGEONS_FORM_OR_SONG||mode==RO_ACCESS_DUNGEONS_FORM_ONLY));
 }
+owned.clear();Own(RI_SOUL_NPC_BIGGORON);options[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_SONG_ONLY;learnedSong=false;song=true;REQUIRE(!CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));learnedSong=true;song=false;REQUIRE(!CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));song=true;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));
 owned.clear();options[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_OPEN;song=capability=stick=false;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));
 puts("PASS actual native route predicates: 45 TradingPost slices, 9 Moon NPC routes, Sirloin alternative, Princess and Postman/Kafei/Bomber controls");}
 '''
 with tempfile.TemporaryDirectory(prefix='souls-routes-') as t:
  t=Path(t);src=t/'routes.cpp';src.write_text(cpp)
  for mode in ('original','combo'):
-  exe=t/mode;subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(src),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
+  exe=t/mode;subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX','-DCONTROLLERBUTTONS_T=uint32_t','-I'+str(ROOT),*['-I'+str(ROOT/p) for p in ['mm','mm/include','mm/include/PR','mm/2s2h','libultraship/include']],*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(src),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)

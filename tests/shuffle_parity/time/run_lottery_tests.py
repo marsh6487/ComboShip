@@ -17,7 +17,8 @@ with tempfile.TemporaryDirectory(prefix='lottery-fixtures-') as td:
  actor=(ROOT/'mm/2s2h/Rando/ActorBehavior/EnKujiya.cpp').read_text()
  (build/'lottery_callbacks.inc').write_text(actor[actor.index('static RandoCheckId CurrentLotteryCheck'):])
  json=(ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text();a=json.index('inline void to_json(json& j, const RandoSaveCheck&');b=json.index('inline void to_json(json& j, const Vec3f&',a)
- (build/'lottery_json.inc').write_text('#include "combo/rando/SongEvents.h"\nusing json=nlohmann::json;\n'+json[a:b])
+ # The retained native deserializer also applies the real Vanilla save policy.
+ (build/'lottery_json.inc').write_text('#include "Rando/VanillaCompatibility.h"\nusing json=nlohmann::json;\n'+json[a:b])
  central=(ROOT/'mm/2s2h/Rando/Logic/Regions/Central.cpp').read_text();a=central.index('    Regions[RR_LOTTERY_SHOP]');b=central.index('    Regions[RR_MAYOR_RESIDENCE]',a)
  (build/'lottery_region.inc').write_text(central[a:b])
  # Reuse the production pool runner, adding only generated fixture includes.

@@ -3,6 +3,7 @@
 from pathlib import Path
 import os,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[3]
+from song_fixture import oot_support
 s=(ROOT/'mm/2s2h/Rando/Logic/Logic.h').read_text()
 a=s.index('#define EVENT(');b=s.index('#define EXIT(',a)
 helper=''
@@ -50,6 +51,7 @@ with tempfile.TemporaryDirectory(prefix='soul-events-') as t:
 access=(ROOT/'soh/soh/Enhancements/randomizer/location_access.h').read_text()
 a=access.index('#define EVENT_ACCESS(');b=access.index('class EventAccess',a)
 source='''#include "soh/soh/Enhancements/randomizer/SoulShuffle.h"
+#include "combo/rando/SongEvents.h"
 #include "soh/tests/test_require.h"
 #include <set>
 #include <string>
@@ -58,6 +60,7 @@ struct Logic {
  std::set<RandomizerGet> items;
  bool HasItem(RandomizerGet item){return (Rando::SoulShuffle::Find(item)&&!enabled)||items.count(item);}
  bool CanUse(RandomizerGet item){return items.count(item);}
+ bool CanPlaySongEvent(unsigned);
  bool CanJumpslash(){return jumpslash;}
  bool BunnyHood(){return bunny;}
 } state;auto*logic=&state;
@@ -66,7 +69,7 @@ int GetCheckPrice(RandomizerCheck){return price;}
 int GetWalletCapacity(){return capacity;}
 std::string CleanConditionString(const char*s){return s;}
 struct EventAccess {LogicVal id;const char*name;bool(*condition)();std::string text;};
-'''+access[a:b]+'\nEventAccess events[]={\n'
+'''+oot_support()+access[a:b]+'\nEventAccess events[]={\n'
 for file,region,event in [('haunted_wasteland','RR_HAUNTED_WASTELAND','LOGIC_CARPET_MERCHANT'),
                           ('kakariko','RR_KAK_WINDMILL_LOWER','LOGIC_DRAIN_WELL'),
                           ('market','RR_MARKET_BOMBCHU_BOWLING','LOGIC_COULD_PLAY_BOWLING')]:
