@@ -17,6 +17,9 @@
 - Glitchless never assumes a disabled trick; all runtime restrictions need corresponding reachability requirements.
 - Excluded checks never receive required progression.
 - Checkpoints may be WIP but must identify unimplemented/failed/untested paths; no master or merge.
+- Every new shuffle and completed item-pool control uses the existing What's New accent: gold for new controls,
+  cyan for updated controls. Register its real CVar and use a presentation scope for direct widgets; preserve IDs,
+  layout, disabled states and the global accent toggle. Add remaining families as their actual settings land.
 - Only one delegated implementation worker at a time; explicit file ownership. Independent research may run concurrently. Controller edits separate owned files.
 
 ## Review Focus

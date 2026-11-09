@@ -18,6 +18,22 @@ inline constexpr Entry Catalog[] = {
 #undef SOUL_MM
 #undef SOUL
 };
+// Exact native identities exported for configured starting shared souls.
+inline constexpr const char* SharedName(RandoItemId item) {
+    struct SharedEntry {
+        RandoItemId item;
+        const char* name;
+    };
+    constexpr SharedEntry entries[] = {
+#define SHARED_SOUL(category, oot, mm, ootName, mmName) { RI_SOUL_##category##_##mm, mmName },
+#include "../../../combo/rando/SharedSoulCatalog.inc"
+#undef SHARED_SOUL
+    };
+    for (const auto& entry : entries)
+        if (entry.item == item)
+            return entry.name;
+    return nullptr;
+}
 inline constexpr const Entry* Find(RandoItemId item) {
     for (const auto& soul : Catalog)
         if (soul.item == item)

@@ -66,6 +66,10 @@
 
 void DrawOotSlateRuneFlame(uint8_t r, uint8_t g, uint8_t b);
 
+#define COMBO_MM_KEY_RING_HOST_MM
+#include "../ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_MM
+
 namespace {
 
 struct ComboForeignDrawInfoOOT {
@@ -1472,6 +1476,10 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             if (!ComboBottleContents_Draw(gPlayState, ComboBottleContents_Profile(info->dls[0]))) {
                 MM_DrawForeignSimple(info);
             }
+            break;
+        case CW_DRAW_KIND_MM_KEY_RING:
+            ComboMmKeyRing::Draw(gPlayState, static_cast<int>(info->ops[0].b), info->dls[0], info->dls[1], info->dls[2],
+                                 info->primColorOpa, info->primColorXlu, info->envColor);
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5)

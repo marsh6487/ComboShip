@@ -23,6 +23,30 @@ static int spawnReachesAllocation=0;
 int main() {
     PlayState play{}; Actor actor{};
     gSaveContext.ship.quest.id=QUEST_RANDOMIZER;
+
+    struct Shop { int scene; unsigned params; RandomizerGet soul; };
+    Shop shops[]={
+#define SOUL_SHOP(scene,params,soul) {scene,params,soul},
+#include "soh/Enhancements/randomizer/SoulShuffleShops.inc"
+#undef SOUL_SHOP
+    };
+    for(const auto& shop:shops) {
+        play.sceneNum=shop.scene;
+        optionValues[RSK_SHUFFLE_NPC_SOULS]=0;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_OSSAN,shop.params));
+        optionValues[RSK_SHUFFLE_NPC_SOULS]=1;
+        REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_OSSAN,shop.params));
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_OSSAN,15));
+        play.sceneNum=0x7FFF;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_OSSAN,shop.params));
+        play.sceneNum=shop.scene;
+        Own(shop.soul,true);
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_OSSAN,shop.params));
+        const auto* soul=Rando::SoulShuffle::Find(shop.soul);
+        gSaveContext.ship.randomizerInf[soul->flag/16]&=~(1u<<(soul->flag%16));
+    }
+    optionValues[RSK_SHUFFLE_NPC_SOULS]=0;
+    play.sceneNum=0;
     REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));
     optionValues[RSK_SHUFFLE_ANIMAL_SOULS]=1;
     REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));

@@ -490,8 +490,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             continue;
         effectiveSharedMask |= (1u << i);
     }
+    try {
+        effectiveSharedMask |=
+            EffectiveSharedSoulMask(sharedMask, nlohmann::json::parse(sohDumpJson), nlohmann::json::parse(mmDumpJson));
+    } catch (...) {} // Old/malformed dump fields leave categories disabled.
     const auto sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
-    const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask);
+    const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask, sohDumpJson, mmDumpJson);
     size_t dedupedCopies = 0;
     for (const auto& group : sharedGroups) {
         size_t target = 0, fixedCopies = 0;
@@ -509,7 +513,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                     fixedCopies += p.item.game == n.game && p.item.name == n.name;
             }
         }
-        size_t remaining = target > fixedCopies ? target - fixedCopies : 0;
+        size_t remaining = !group.starting && target > fixedCopies ? target - fixedCopies : 0;
         for (const auto& n : group.names) {
             for (auto* pool : { &advItems, &junkItems }) {
                 pool->erase(std::remove_if(pool->begin(), pool->end(),

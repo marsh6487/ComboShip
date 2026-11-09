@@ -34,6 +34,11 @@ extern "C" int Randomizer_SoulCanSpawnNonEnemy(PlayState* play, int actorId, uns
     }
     RandomizerGet item = RG_NONE;
     switch (actorId) {
+        case ACTOR_EN_OSSAN:
+#define SOUL_SHOP(scene, role, soul) if (play->sceneNum == scene && params == role) item = soul;
+#include "SoulShuffleShops.inc"
+#undef SOUL_SHOP
+            break;
         case ACTOR_EN_NIW:
         case ACTOR_EN_NWC: item = RG_SOUL_ANIMAL_CUCCO; break;
         case ACTOR_EN_COW: item = RG_SOUL_ANIMAL_COW; break;

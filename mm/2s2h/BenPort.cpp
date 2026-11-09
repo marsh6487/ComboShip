@@ -4774,11 +4774,28 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         junkPool.push_back(Rando::StaticData::GetItemDisplayName(id));
     }
 
+    nlohmann::json startingSouls = nlohmann::json::array();
+    // Configured starts are stored/truncated by the same native save helper as
+    // the oracle. Computed enemy souls occur only when that family is disabled.
+    for (RandoItemId item : Rando::GetStartingItemsFromSave(saveInfo))
+        if (const char* name = Rando::SoulShuffle::SharedName(item))
+            startingSouls.push_back(name);
+    nlohmann::json soulOptions = { { "enemy", saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_SOULS] != 0 },
+                                   { "npc", saveInfo.randoSaveOptions[RO_SHUFFLE_NPC_SOULS] != 0 },
+                                   { "animal", saveInfo.randoSaveOptions[RO_SHUFFLE_ANIMAL_SOULS] != 0 },
+                                   { "misc", saveInfo.randoSaveOptions[RO_SHUFFLE_MISC_SOULS] != 0 } };
+
     cached = nlohmann::json{
-        { "checks", std::move(checks) },   { "pool", std::move(pool) },
-        { "fixed", std::move(fixed) },     { "items", std::move(items) },
-        { "prices", std::move(prices) },   { "locationHints", std::move(locationHints) },
-        { "options", std::move(options) }, { "junkPool", std::move(junkPool) }
+        { "startingSouls", std::move(startingSouls) },
+        { "soulOptions", std::move(soulOptions) },
+        { "checks", std::move(checks) },
+        { "pool", std::move(pool) },
+        { "fixed", std::move(fixed) },
+        { "items", std::move(items) },
+        { "prices", std::move(prices) },
+        { "locationHints", std::move(locationHints) },
+        { "options", std::move(options) },
+        { "junkPool", std::move(junkPool) }
     }.dump();
     return cached.c_str();
 }
@@ -5260,6 +5277,9 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
     {
         auto startingItems = Rando::GetStartingItemsFromConfig();
         Rando::SetStartingItemsInSave(gSaveContext.save.shipSaveInfo.rando, startingItems);
+        // Match GrantStartingItems: the persisted native array is bounded and
+        // cleared by SetStartingItemsInSave, unlike the original config vector.
+        startingItems = Rando::GetStartingItemsFromSave(gSaveContext.save.shipSaveInfo.rando);
         auto computed = Rando::GetComputedStartingItems(gSaveContext.save.shipSaveInfo.rando);
         startingItems.insert(startingItems.end(), computed.begin(), computed.end());
         for (RandoItemId si : startingItems) {

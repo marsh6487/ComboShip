@@ -1,3 +1,4 @@
+#include "../Rando/SoulShuffleShared.h"
 #include "FleetSharedItems.h"
 #include "../../../combo/ComboGameMode.h"
 #include "../../../combo/vanilla/ComboVanillaMode.h"
@@ -121,6 +122,8 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
             peer(nullptr);
         return;
     }
+    if (MM_ShareSoulReceipt(nativeId))
+        return;
     // Share the concrete native tier even in RPG mode. Returning without a
     // floor update left a foreign magic pickup dormant until the next switch.
     if (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC) {
@@ -173,6 +176,11 @@ static void PullFromPeerWhenReady() {
     }
     FleetSharedReceiveGuard receiveGuard;
     FleetSync_ApplySharedState(sExtract());
+    static FnExtractSharedState extractSouls = nullptr;
+    if (!extractSouls)
+        extractSouls = reinterpret_cast<FnExtractSharedState>(Combo_ResolveSym("soh", "SOH_ExtractSharedSoulState"));
+    if (extractSouls)
+        MM_ApplySharedSoulState(extractSouls());
     SPDLOG_INFO("[FleetShared] pulled OoT's shared state into MM");
 }
 

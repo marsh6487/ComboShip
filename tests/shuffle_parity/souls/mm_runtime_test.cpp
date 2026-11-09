@@ -14,6 +14,30 @@ static int spawnReachesAllocation=0;
 int main(){
     PlayState play{};
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+
+    struct Shop { int scene; unsigned params; RandoItemId soul; };
+    Shop shops[]={
+#define SOUL_SHOP(scene,params,soul) {scene,params,soul},
+#include "Rando/SoulShuffleShops.inc"
+#undef SOUL_SHOP
+    };
+    for(const auto& shop:shops) {
+        play.sceneId=shop.scene;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=0;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_SOB1,shop.params));
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=1;
+        REQUIRE(!MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_SOB1,shop.params));
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_SOB1,15));
+        play.sceneId=0x7FFF;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_SOB1,shop.params));
+        play.sceneId=shop.scene;
+        Own(shop.soul);
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_SOB1,shop.params));
+        const auto* soul=Rando::SoulShuffle::Find(shop.soul);
+        gSaveContext.save.shipSaveInfo.rando.randoInf[soul->flag/16]&=~(1u<<(soul->flag%16));
+    }
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=0;
+    play.sceneId=0;
     REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));
     RANDO_SAVE_OPTIONS[RO_SHUFFLE_ANIMAL_SOULS]=1;
     for(int id:{ACTOR_EN_NIW,ACTOR_EN_NWC,ACTOR_EN_COW,ACTOR_EN_DG,ACTOR_EN_RACEDOG,ACTOR_EN_BUTTE})

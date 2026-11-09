@@ -12,6 +12,11 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
 FILES = (
+    'soh/soh/Enhancements/randomizer/SoulShuffleShared.cpp',
+    'mm/2s2h/Rando/SoulShuffleShared.cpp',
+    'soh/soh/FleetShipCombo/FleetSharedItems.cpp',
+    'mm/2s2h/FleetShipCombo/FleetSharedItems.cpp',
+    'soh/soh/OTRGlobals.cpp',
     "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
     "soh/soh/Enhancements/randomizer/location_access/overworld/kakariko.cpp",
     "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
@@ -37,7 +42,7 @@ args = parser.parse_args()
 entries = json.loads(args.database.read_text())
 for file in args.only or FILES:
     template = file
-    if file.endswith('/SoulShuffleRuntime.cpp') and not any(e['file'].endswith('/'+file) for e in entries):
+    if file.endswith(('/SoulShuffleRuntime.cpp', '/SoulShuffleShared.cpp')) and not any(e['file'].endswith('/'+file) for e in entries):
         template = ('mm/2s2h/Rando/StaticData/Items.cpp' if file.startswith('mm/')
                     else 'soh/soh/Enhancements/randomizer/logic.cpp')
     entry = next(e for e in entries if e['file'].endswith('/' + template))

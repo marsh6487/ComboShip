@@ -79,5 +79,20 @@ int main() {
         for(int id=RI_SOUL_ENEMY_ALIEN;id<=RI_SOUL_ENEMY_WOLFOS;++id)
             REQUIRE(std::count(items.begin(),items.end(),(RandoItemId)id)==0);
     }
+    {
+      RandoSaveInfo save{};
+      for (auto option : {RO_SHUFFLE_ENEMY_SOULS, RO_SHUFFLE_NPC_SOULS,
+                          RO_SHUFFLE_ANIMAL_SOULS, RO_SHUFFLE_MISC_SOULS})
+        save.randoSaveOptions[option] = 1;
+      startingItems = {RI_SOUL_ENEMY_WALLMASTER, RI_SOUL_NPC_BANKER,
+                       RI_SOUL_ANIMAL_CUCCO, RI_SOUL_MISC_GS};
+      std::vector<RandoCheckId> checks;
+      std::vector<RandoItemId> items;
+      Logic::GeneratePools(save, checks, items);
+      for (auto soul : startingItems)
+        REQUIRE(std::count(items.begin(), items.end(), soul) == 0);
+      REQUIRE(std::count(items.begin(), items.end(), RI_SOUL_NPC_ANJU) == 1);
+      startingItems.clear();
+    }
     puts("PASS complete native MM GeneratePools: all eight family combinations, each single copy, defaults absent");
 }

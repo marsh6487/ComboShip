@@ -1877,6 +1877,16 @@
     "suite": "items",
     "origin": "gate",
     "native_abi": "explicit",
+    "name": "Native MM key-ring pools, grants, cycle saves and both receiving-host renderers",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_render_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
     "name": "Native MM confined boss keys, exclusions, self-locks and failed-dump rejection",
     "run": "python3 -B tests/shuffle_parity/boss_keys/run_tests.py --sanitize",
     "env": {

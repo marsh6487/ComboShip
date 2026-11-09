@@ -159,6 +159,7 @@ void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry);
 // MM per-dungeon items (one shared MM get-item model per type; RG name distinguishes the dungeon)
 void Randomizer_DrawMmSmallKey(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawMmKeyRing(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmDungeonMap(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmBossKey(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmCompass(PlayState* play, GetItemEntry* getItemEntry);

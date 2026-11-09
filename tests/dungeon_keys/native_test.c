@@ -22,7 +22,9 @@ static int ResourceMgr_IsModAsset(const char *path) {
   assert(!"Unexpected selected bottle resource");
   return 0;
 }
-static int ResourceMgr_FileExists(const char *path) {
+u8 ResourceMgr_FileExists(const char *path) {
+  if (!strcmp(path, "__OTR__objects/object_keyring/gKeyringRingDL"))
+    return !testRingMissing;
   if (strstr(path, "objects/combo_dungeon_keys/")) {
     assert(strncmp(path, "__OTR__objects/combo_dungeon_keys/",
                    strlen("__OTR__objects/combo_dungeon_keys/")) == 0);
@@ -36,6 +38,7 @@ static int ResourceMgr_FileExists(const char *path) {
   return !testFairyGlassMissing;
 }
 int testSpinRed = 17;
+int testRingMissing = 0, testRingAlt = 0;
 bool testAlt = true;
 bool testFairyEmptyMod = false;
 bool testFairyGlassMissing = false;
@@ -78,6 +81,8 @@ void TestGrayColor(Gfx *p, u8 r, u8 g, u8 b, u8 a) {
 }
 bool ResourceMgr_IsAltAssetsEnabled(void) { return testAlt; }
 u8 ResourceMgr_FileAltExists(const char *p) {
+  if (!strcmp(p, "__OTR__objects/object_keyring/gKeyringRingDL"))
+    return testRingAlt;
   assert(strncmp(p, "__OTR__objects/combo_dungeon_keys/",
                  strlen("__OTR__objects/combo_dungeon_keys/")) == 0);
   return (testKeyAltMask & (strstr(p, "EmblemDL") ? 2 : 1)) != 0;

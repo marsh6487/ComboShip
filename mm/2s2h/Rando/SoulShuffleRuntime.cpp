@@ -13,6 +13,11 @@ extern "C" int MM_SoulCanSpawnNonEnemy(PlayState* play, int actorId, unsigned in
     }
     RandoItemId item = RI_UNKNOWN;
     switch (actorId) {
+        case ACTOR_EN_SOB1:
+#define SOUL_SHOP(scene, role, soul) if (play->sceneId == scene && (params & 0xF) == role) item = soul;
+#include "SoulShuffleShops.inc"
+#undef SOUL_SHOP
+            break;
         case ACTOR_EN_NIW:
         case ACTOR_EN_NWC: item = RI_SOUL_ANIMAL_CUCCO; break;
         case ACTOR_EN_COW: item = RI_SOUL_ANIMAL_COW; break;

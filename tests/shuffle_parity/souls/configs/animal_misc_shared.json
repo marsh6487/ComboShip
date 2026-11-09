@@ -1,0 +1,23 @@
+{
+  "oot": {
+    "settings": {
+      "gRandoSettings.ShuffleEnemySouls": 0,
+      "gRandoSettings.ShuffleNpcSouls": 0,
+      "gRandoSettings.ShuffleAnimalSouls": 1,
+      "gRandoSettings.ShuffleMiscSouls": 1
+    },
+    "enabledTricks": []
+  },
+  "mm": {
+    "settings": {
+      "gRando.Options.RO_SHUFFLE_ENEMY_SOULS": 0,
+      "gRando.Options.RO_SHUFFLE_NPC_SOULS": 0,
+      "gRando.Options.RO_SHUFFLE_ANIMAL_SOULS": 1,
+      "gRando.Options.RO_SHUFFLE_MISC_SOULS": 1
+    }
+  },
+  "sharedItems": [
+    "sharedSoulsAnimal",
+    "sharedSoulsMisc"
+  ]
+}

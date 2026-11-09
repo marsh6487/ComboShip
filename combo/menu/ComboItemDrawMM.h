@@ -172,13 +172,16 @@ static int32_t MM_FillKeyRingDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     const int owner = DungeonItem_GetOwner(id);
     const char *metalPath, *emblemPath;
     Color_RGBA8 metal, emblem;
-    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem))
+    const char* ringPath = "__OTR__objects/object_keyring/gKeyringRingDL";
+    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem) ||
+        (!ResourceMgr_FileExists(ringPath) &&
+         !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(ringPath))))
         return CW_DRAW_NOT_READY;
     out->drawKind = CW_DRAW_KIND_MM_KEY_RING;
     out->dlistCount = 3;
     out->dlists[0] = metalPath;
     out->dlists[1] = emblemPath;
-    out->dlists[2] = "__OTR__objects/object_keyring/gKeyringRingDL";
+    out->dlists[2] = ringPath;
     out->xluStartIndex = -1;
     out->stateDependent = 2;
     out->opCount = 1;

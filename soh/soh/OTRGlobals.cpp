@@ -5,6 +5,7 @@ extern "C" void Partners_Reset(void);
 #endif
 
 #include "rando/MagicMirrorShuffle.h"
+#include "Enhancements/randomizer/SoulShuffle.h"
 #include "../../combo/ComboGameMode.h"
 #include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
@@ -4469,6 +4470,9 @@ extern "C" COMBO_EXPORT uint32_t SOH_ReadComboSharedCVars(void) {
             mask |= (1u << i);
         }
     }
+    for (const auto& category : ComboRando::SharedSoulCategories)
+        if (CVarGetInteger(category.cvar, 0))
+            mask |= category.bit;
     return mask;
 }
 
@@ -5715,6 +5719,8 @@ extern "C" COMBO_EXPORT int SOH_ApplyEntranceOverridesForCombo(const char* json)
 extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
     static std::string cached;
 
+    nlohmann::json startingSouls = nlohmann::json::array();
+    nlohmann::json soulOptions = nlohmann::json::object();
     nlohmann::json checks = nlohmann::json::array();
     nlohmann::json pool = nlohmann::json::array();
     nlohmann::json fixed = nlohmann::json::array();
@@ -5874,6 +5880,14 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         // ComboShip: read by AssignTrapDisguises to name every foreign trap.
         accessibility["iceTrapNames"] = static_cast<int>(ctx->GetOption(RSK_ICE_TRAP_NAMES).Get());
 
+        GenerateStartingInventory();
+        for (RandomizerGet item : StartingInventory)
+            if (const char* name = Rando::SoulShuffle::SharedName(item))
+                startingSouls.push_back(name);
+        soulOptions = { { "enemy", ctx->GetOption(RSK_SHUFFLE_ENEMY_SOULS).Get() != 0 },
+                        { "npc", ctx->GetOption(RSK_SHUFFLE_NPC_SOULS).Get() != 0 },
+                        { "animal", ctx->GetOption(RSK_SHUFFLE_ANIMAL_SOULS).Get() != 0 },
+                        { "misc", ctx->GetOption(RSK_SHUFFLE_MISC_SOULS).Get() != 0 } };
         usedPool = true;
 #else
         // Non-combo (unused outside ComboShip): old vanilla-per-check emission.
@@ -5954,6 +5968,8 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         { "items", std::move(items) },
         { "prices", std::move(prices) },
         { "iceTrapModels", std::move(iceTrapModels) },
+        { "startingSouls", std::move(startingSouls) },
+        { "soulOptions", std::move(soulOptions) },
         { "accessibility", std::move(accessibility) }
     }.dump();
     return cached.c_str();

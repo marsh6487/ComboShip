@@ -16,6 +16,7 @@
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 #include "2s2h/BenGui/CosmeticEditor.h"
+#include "../../../combo/ComboMmKeyRingDraw.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorItem.h"
 #endif
@@ -357,6 +358,23 @@ void DrawSmallKey(RandoItemId randoItemId) {
     gSPDisplayList(POLY_OPA_DISP++, emblemDLs[slot]);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+}
+
+void DrawKeyRing(RandoItemId id) {
+    const int owner = DungeonItem_GetOwner(id);
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metal, emblem;
+    const char* ringPath = "__OTR__objects/object_keyring/gKeyringRingDL";
+    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem) ||
+        (!ResourceMgr_FileExists(ringPath) &&
+         !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(ringPath)))) {
+        if (NeiGi_CanDrawLayers(gPlayState, 1, 32, 2))
+            GetItem_Draw(gPlayState, GID_KEY_SMALL);
+        return;
+    }
+    const uint8_t metalRgba[] = { metal.r, metal.g, metal.b, metal.a };
+    const uint8_t emblemRgba[] = { emblem.r, emblem.g, emblem.b, emblem.a };
+    ComboMmKeyRing::Draw(gPlayState, owner, metalPath, emblemPath, ringPath, metalRgba, emblemRgba, metalRgba);
 }
 
 void DrawBossKey(RandoItemId randoItemId) {
@@ -3197,6 +3215,10 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     // Legacy callbacks retain the concrete award's geometry and matching effect fit.
     MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup);
 #endif
+    if (DungeonItem_GetKeyRingCount(randoItemId) > 0) {
+        DrawKeyRing(randoItemId);
+        return;
+    }
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
         GetItem_DrawDungeonItem(gPlayState, Rando::StaticData::Items[randoItemId].drawId, dungeonOwner)) {

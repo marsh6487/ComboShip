@@ -1,4 +1,4 @@
-# MM key rings — WIP native foundation
+# MM key rings — WIP integration and recovery
 
 Four append-only native MM rings replace the selected dungeon's complete small-
 key supply: Woodfall 1, Snowhead 3, Great Bay 1, Stone Tower 4. A default-off
@@ -42,14 +42,42 @@ C++ preinclude used for a C helper, header search paths) were corrected before
 recording final results. ASan/UBSan disables leak detection due managed ptrace;
 no leak-check result is claimed.
 
-Still unfinished: the per-key native GI renderer and dispatch, pickup/shop
-callbacks, UI exposure, complete production object checks, real linked seeded
-Own Dungeon/exclusion/self-lock checks and configured gameplay. The default-off
-option remains unexposed while these gates finish. No full Glitchless or visual
-acceptance is claimed by this foundation checkpoint.
+The renderer and native/foreign receiving-host callbacks now use the exact
+bundled MM metal/emblem meshes and existing main ring. Counts are1/3/1/4;
+separate native metal and emblem colors remain live. There is a thin static-
+lifetime procedural connector per key. Missing ring resources return NOT_READY
+for retry; native unavailable-resource fallbacks receive their own arena check.
+Ready rings denied arena space do not enter an unsafe fallback.
+
+Default-off per-dungeon controls are under Small-Key Rings. Vanilla placement
+disables controls without clearing selections. They retain one saved option
+identity and its existing bitmask values.
+
+The execution workspace reverted after the original renderer commit
+`3b546721c6774513503770457e283b710c3d9ddd` was created but before its recovery
+package was saved. That complete commit/tree is not claimed restored. The core
+`combo/ComboMmKeyRingDraw.h` was recovered byte-for-byte, SHA-256
+`6a36ea41c4e9ac49efef8467be5e48facaff4b645d2f8e88c7f166664d180887`.
+Callbacks, UI and regression fixtures were reconstructed and tested anew.
+
+Fresh receiving-host tests execute actual native matrix, graph and setup bodies,
+real GBI and structures, with controlled GPU/resource/matrix-allocation services.
+Both hosts pass ASan/UBSan: counts, palettes, authored scale, fan anchors, seams,
+nondegenerate connector triangles, pose/material restore, scarce arena, safe
+fallbacks, missing resources, late module availability and Alt retry. Real MM
+export -> OoT cache/latch tests also pass live palette edits and missing-ring retry.
+
+Still unfinished: fresh complete production object checks, full native builds,
+real linked seeded Own Dungeon/exclusion/self-lock validation and configured
+gameplay. No full Glitchless or visual acceptance is claimed.
 
 The user additionally requested OoT-style visual treatment using the authored
 MM key meshes, live metal/emblem palettes and visibly correct key counts. Exact
 bundled meshes are retained; an offline triangle/attachment study established
-a compact thin connector and 40-degree fan without modifying the assets. This
-geometry proposal is separate from native material/camera/runtime verification.
+a compact thin connector without modifying the assets. Independent review before
+the workspace reset checked the actual quantized24-segment/four-sided connector.
+Stone Tower's broader heads intersect at40degrees; its final spacing is47degrees,
+with a recorded0.2154-unit full projected-mesh gap. Other dungeons use40degrees.
+The reviewed core renderer's exact hash is preserved above. Scratch geometry
+reports were lost in the reset; fresh CPU tests do not substitute for native
+material, lighting, camera or GPU gameplay verification.

@@ -233,3 +233,230 @@ and collision immunity are unchanged. Catalog/grant/pool foundations are present
 coverage, safe role-aware actor lifecycle, shared receipts/reconciliation, native
 full builds, deterministic combined fills, room clears, schedules and configured
 runtime proof are not yet complete.
+
+## Recovered native shop milestone — 2026-11-09
+
+The transient executor lost the prior isolated worktree and commits `64eb6d72`
+and `662fd1bf`. This is a behavior reconstruction of the nine-path shop milestone,
+not a claim of byte-for-byte recovery. It starts from independently restored WIP4
+commit `a5d58c11232a9c4650791ceb04b0b344c69560fb`, tree
+`e45b9ef56a0577f711adf23b71a8754152aa3e47`.
+
+Explicit positive scene/role manifests classify seven OoT EnOssan placements and
+three MM EnSob1 placements. Unknown/custom scenes and unrelated shop roles remain
+independent. The two OoT bazaar locations share their native scene/role. Added
+requirements cover 64 OoT shelves and nine MM shelves, bringing explicit totals
+to 290 OoT and 117 MM checks. Trading Post schedule alternatives and the mixed
+Bomb Shop/Curiosity fourth slot remain pending; they are not guessed here.
+
+Fresh recovery verification used GCC 14 and headers under
+`/workspace/scratch/3fea646b81e1/deps`:
+
+- `CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14 python3 tests/shuffle_parity/souls/run_runtime_tests.py`
+- `CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14 python3 tests/shuffle_parity/souls/run_mm_runtime_tests.py`
+- `CXX=g++-14 python3 tests/shuffle_parity/souls/run_dependency_tests.py`
+
+Both native runtime fixtures first failed the actual missing-soul spawn assertion,
+then passed original/Combo modes after implementation. They cover all positive
+placements, owned/off states, unknown scenes and unknown roles, plus the existing
+animal/enemy/vanilla controls. Direct-check fixtures execute actual native stored
+predicate boundaries for every manifest row. Existing MM header warnings remain.
+The prior full CMake environment was lost; no fresh compile-database check or
+configured game runtime is claimed. Broad NPC and shared reconstruction remain
+incomplete. Existing stable IDs and MM key-ring foundations are unchanged.
+
+## Recovered shared-soul milestone — 2026-11-09
+
+Recovered shops are commit `3f2f7f59154a061645786fc75b24e3ae3bace559`, tree
+`bbab7195b5b26135132175fafa88100e0aab1ceb`; the controller independently restored
+and durably preserved that tree. The lost shared commit
+`662fd1bf2d73d7661e2e970083ae67160573fa14` is reconstructed here from the retained
+implementation record and current native source. This is behavior reconstruction,
+not byte-identical recovery of that unavailable commit.
+
+Four independent category bits (17–20) and saved keys are restored without
+changing the 17 scalar upgrade families or any existing native item/flag/option
+IDs. Effective category sharing requires explicit boolean `soulOptions` from both
+real native dumps; absent/old/malformed fields disable it. Both dump exporters
+read prepared native options. Hidden shared CVars are read but menus remain hidden.
+
+The explicit catalog has 26 enemy, 36 NPC, four animal and two miscellaneous
+edges. These form 66 components because MM Wallmaster and Skulltula each merge two
+OoT souls. The native graph joins legacy foreign aliases, prefers native OoT
+representations and caps soul oracle credits at one. The actual combined fill
+uses effective categories before deduplication. Unshared unique souls remain
+native items. Flying Pot is not invented as an MM native soul.
+
+Both complete native SoulShuffleShared translation units use actual SaveContext,
+saved family settings, slot/mode guards and actual soul ownership flags. New
+native flags use the catalog; only the established contiguous MM enemy block
+uses its existing flag conversion. Runtime and fill use the same shared groups.
+Receipts grant merged siblings and peers, avoid recursively granting a source
+whose native flag has not yet been set, and suppress old FC fallthrough only for
+a handled foreign alias. The explicit 24-row legacy-ID manifest avoids numeric
+alias assumptions and preserves published FC IDs. Deferred native Fleet pulls
+reconcile matching-slot snapshots under existing receive guards; old/malformed
+state and incompatible effective masks do nothing. Peer exports retry resolution
+when absent. Existing save-direct native grant functions retain their receive
+and persistence behavior.
+
+Fresh verification (GCC 14, `CPATH=/workspace/scratch/3fea646b81e1/deps`):
+
+- `CXX=g++-14 python3 tests/shuffle_parity/souls/run_shared_tests.py` passed two
+  production graph tests, 32 real-header combined-fill cases (four categories,
+  both starting games, enabled/disabled peer controls, original/Combo builds),
+  and four complete native adapter builds. The initial saved-key parser failed
+  before restoration, then passed. A separate `--runtime-only` run also passed.
+- Native tests cover every catalog edge, saved flags, category-off, masks,
+  vanilla/single-game guards, source-before-flag behavior, idempotent grants,
+  stale slots, absent/malformed JSON and unknown names. The full actual OoT
+  FleetShared_OnNativeObtained body is extracted and executed for the legacy
+  Wallmaster path, proving two local merged souls, one peer identity, no duplicate
+  old-FC fallthrough, receive-depth protection and the unchanged disabled-category
+  FC path. Native name/ID/count source audits pass.
+
+These are production header/TU fixtures. Full native grant persistence and
+cross-module lifecycle are test boundaries; peer symbol lookup uses real dlsym
+with a fixture export. Combined-fill oracle callbacks expose reachable fixture
+sources, not the full native region graphs. No fresh full native CMake build,
+dual-module save/reload, gameplay scene/schedule proof or actual headless CLI seed
+is claimed after executor loss. The compile-db runner now includes both adapters,
+both Fleet TUs and OoT dump TU for a recovered build environment.
+
+Three hidden-option smoke configurations are restored under
+`tests/shuffle_parity/souls/configs/`. Once modules are available, start with
+`comborando --settings tests/shuffle_parity/souls/configs/enemy_shared.json --master-seed 20261108 --count 1 --starting-game oot`,
+then MM start and spoiler replay with configured tricks only. All-shared remains
+a diagnostic configuration until NPC dependencies are complete; enabling all
+tricks is not acceptance. The complete NPC implementation remains pending. No
+broad NPC behavior was added during this recovery task.
+
+The existing scalar/FC/display/requiredness, launcher slot/cross-delivery and
+plando regression suite also passed freshly with
+`CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14 python3 scripts/diagnostics/run_combo_shared_test.py --json-include /workspace/scratch/3fea646b81e1/deps`.
+Its negative-control invalid-layout diagnostic is expected. Recovered
+clang-format 14 formatted new C++ files and modified ranges of existing C++ files;
+`git diff --check` passes. Native source audits were repeated after formatting.
+
+## Direct receipt slot/category handshake repair — 2026-11-09
+
+Shared recovery checkpoint: `1edd71162f29e9366d78cc2eed4c27a1880d0bc3`.
+Review found that direct peer receipts carried only a name, so a failed dormant
+save load could leave another valid slot resident and receive/save the new slot's
+soul. Snapshot reconciliation's slot guard did not protect that separate path.
+
+The new `SOH/MM_GrantSharedSoulForSlot(name, sourceSlot, sourceMask)` export requires
+the resident slot to match and the soul's category to be enabled on both sides.
+The export name changes deliberately: an older module lacks the new symbol and
+safely receives nothing rather than misinterpreting a changed ABI. Internal local
+merged grants stay local. Rejected/unavailable peer delivery leaves the normal
+source soul flag as the durable reconciliation source; a later matching-slot
+pull applies it idempotently. No volatile item queue crosses save slots.
+
+Fresh `run_shared_tests.py --runtime-only` first reproduced RED on the actual
+native GrantPeer/dlsym route with a different resident peer slot. After repair,
+all four original/Combo native builds pass. Every mapped soul exercises mismatched
+peer slot, wrong peer category, matching-slot grant, the actual native receiver
+export with wrong source slot/category, duplicate delivery and deferred snapshot
+recovery after the peer loads the matching slot. Tests use real native local
+SaveContext and the production shared runtime for the peer boundary; they do not
+claim a dual-DLL gameplay/save reload. Existing receive-depth and legacy FC
+fallthrough checks remain green. Source/header formatting and diff checks pass.
+
+## MM successful dump schema repair — 2026-11-09
+
+Slot/category receipt repair: `ef60d7ed5d89d3415a5058e85a0271570416271b`.
+Review caught a reconstruction error: soulOptions had been inserted into MM's
+confinement-error serialization rather than its normal successful dump. Manual
+combined-fill fixture dumps therefore passed while a real successful MM export
+would disable every shared category. The option object is now serialized only
+on the actual normal-success path.
+
+`CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14 python3 tests/shuffle_parity/souls/run_dump_tests.py`
+first failed on `result.contains("soulOptions")` with the real successful native
+serialization body, then passed original/Combo builds across all 16 saved option
+combinations. It executes the actual option expressions and successful return
+block with native RandoSaveInfo; unrelated generated pool/check arrays are fixture
+boundaries. This verifies the returned schema/value boundary, not full pool
+preparation or a linked native module. Error dumps remain errors and carry no
+misleading effective-sharing metadata.
+
+## Native starting-soul ownership and oracle bounds — 2026-11-09
+
+Successful MM dump repair: `961fedfe26a3f8ae0b30cb70d0038ba2fdb1681c`.
+Native MM configured starting souls are removed from its generated pool and
+preloaded only into its own oracle. The shared fill previously had no starting
+ownership metadata, so it could keep a redundant OoT copy and omit immediate
+shared-peer access. Dumps now export exact native `startingSouls` names. MM reads
+the saved/truncated starting array; computed enemy soul starts occur only when
+the enemy family is disabled, so cannot enable shared categories. OoT refreshes
+its native StartingInventory before exporting recognized names, including known
+legacy aliases. No new starting-inventory setting or native ID is introduced.
+
+Shared connected components retain this starting ownership. Fill deduplication
+removes remaining free copies of already-owned components; oracle views credit
+all member identities from the first query. The same metadata reaches normal
+playthrough, requiredness replay and the dedicated target search. Unknown/malformed
+names and disabled categories do not invent ownership; merged Wallmaster/Floormaster
+components credit both identities exactly once.
+
+A related review verified native runtime GrantStartingItems reads the bounded
+saved array, while the headless MM reset used the original unlimited config
+vector after saving it. The oracle now reads back the saved list before adding
+computed starts, matching runtime truncation and cleared reused tails.
+
+Fresh verification:
+
+- `run_shared_tests.py` passed both graph modes, all native adapter modes and
+  48 combined-fill cases including each category starting in either game.
+  Starting-copy/sphere-zero tests first failed before the baseline integration.
+  Focused original/Combo fill reruns additionally prove requiredness explicitly
+  classifies an unrelated advancement as unnecessary using the starting baseline.
+- `run_dump_tests.py` passes actual MM successful serialization, exact native
+  saved-list getter/setter and oracle starting-grant block, plus OoT's actual
+  starting export block in both modes. The overflow test failed before repair:
+  a soul beyond native capacity was granted to the oracle. Green covers the last
+  admitted item, rejected overflow, and a reused long-to-short saved list.
+- `run_pool_tests.py --json-include /workspace/scratch/3fea646b81e1/deps` passes
+  complete native MM pool generation in both modes, including configured starts
+  from all four categories being removed and an unrelated soul remaining once.
+- Existing `scripts/diagnostics/run_combo_shared_test.py --json-include /workspace/scratch/3fea646b81e1/deps`
+  passes the scalar/FC, playthrough/requiredness, launcher and plando suites.
+
+Commands used `CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14`.
+Fixture setup initially needed the normal OoT include paths and the exact
+ConvertItem two-argument signature; those compilation issues were corrected
+before behavioral RED/GREEN. Pool generation and native saved-array bodies are
+real; other oracle abilities, configured-item input, item conversion and effects
+are fixture boundaries. This is not a full native-region seed or configured
+save/gameplay proof. Formatting and diff checks pass. The separately identified
+MM direct-receipt legacy fallthrough repair remains the next bounded change.
+
+## MM callback legacy fallthrough repair — 2026-11-09
+
+Starting ownership/oracle bounds checkpoint:
+`6edfa013025c4610efd981f3afac64d96d069b8b`.
+A full MM callback test identified a second stale-slot path: after guarded native
+soul fanout rejected the peer, FleetShared_OnNativeObtained continued to its old
+unqualified FC peer grant. Earlier native-adapter tests and the full OoT callback
+fixture did not execute that MM continuation.
+
+The runtime now reports any active shared component as handled, preventing the
+second peer grant. This does not skip native FC accounting: MM GiveItem already
+records obtained/applied FC counters before invoking the callback, and that
+production body is unchanged. Category-off and unmapped items preserve their
+existing legacy behavior. Matching-slot native soul delivery and later native
+registry reconciliation remain available.
+
+`CPATH=/workspace/scratch/3fea646b81e1/deps CXX=g++-14 python3 tests/shuffle_parity/souls/run_shared_tests.py --runtime-only`
+first reproduced RED in the full actual MM Fleet callback after a stale-slot
+rejection; all four original/Combo fixtures then passed. Both full Fleet callback
+bodies are now extracted from production. MM controls cover stale peer slot,
+wrong peer category, matching Wallmaster delivering both OoT identities, receive
+depth, and the unchanged category-off FC route. The source audit checks FC counter
+updates precede the callback. The fixture initially redeclared an existing RPG
+enum, which was corrected before the behavioral test. Native save-direct effects
+and peer save storage remain test boundaries; no dual-module gameplay proof is
+claimed. The known review issues for direct slot/category receipts, successful MM
+dump metadata, configured starting ownership and oracle overflow are addressed.
+Broad NPC/world parity and full configured runtime validation remain unfinished.

@@ -3,6 +3,7 @@
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "draw.h"
 #include "NeiGiRender.h"
+#include <ship/resource/Resource.h>
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include <ship/resource/CrossRMRegistry.h>
@@ -275,6 +276,10 @@ extern "C" void Randomizer_DrawBossKey(PlayState* play, GetItemEntry* getItemEnt
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
+
+#define COMBO_MM_KEY_RING_HOST_OOT
+#include "../../../../combo/ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_OOT
 
 // The key ring holds one key mesh repeated around the ring, so a slot is just a rotation about the
 // ring's axis. Slot 0 is where gKeyringKeyDL sits; fractional slots let an even count straddle it.
@@ -4221,6 +4226,49 @@ void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry) {
 //   Boss Key    : GetItem_DrawOpa0Xlu1 (DL0 opaque body, DL1 xlu gem)
 //   Compass     : GetItem_DrawCompass  (DL0 opaque body, DL1 xlu glass — same shape)
 // =============================================================================
+void Randomizer_DrawMmKeyRing(PlayState* play, GetItemEntry* getItemEntry) {
+#ifdef COMBO_BUILD
+    int owner = -1;
+    switch (getItemEntry->drawItemId) {
+        case RG_MM_KEY_RING_WOODFALL:
+            owner = 0;
+            break;
+        case RG_MM_KEY_RING_SNOWHEAD:
+            owner = 1;
+            break;
+        case RG_MM_KEY_RING_GREAT_BAY:
+            owner = 2;
+            break;
+        case RG_MM_KEY_RING_STONE_TOWER:
+            owner = 3;
+            break;
+        default:
+            break;
+    }
+    static const char* names[] = { "RI_WOODFALL_KEY_RING", "RI_SNOWHEAD_KEY_RING", "RI_GREAT_BAY_KEY_RING",
+                                   "RI_STONE_TOWER_KEY_RING" };
+    static Fn_GetItemDrawInfo describe = nullptr;
+    if (!describe)
+        describe = reinterpret_cast<Fn_GetItemDrawInfo>(Combo_ResolveSym("2ship", "MM_GetItemDrawInfo"));
+    CwItemDrawInfo recipe{};
+    if (owner >= 0 && describe && describe(names[owner], &recipe) == 1 && CwValidMmKeyRingRecipe(&recipe)) {
+        const char* paths[3]{};
+        for (int i = 0; i < 3; ++i) {
+            if (!recipe.dlists[i] || std::strncmp(recipe.dlists[i], "__OTR__", 7) != 0)
+                break;
+            paths[i] = ComboInternRoutedPath(std::string("__OTR__@mm:") + (recipe.dlists[i] + 7));
+        }
+        if (paths[2]) {
+            ComboMmKeyRing::Draw(play, owner, paths[0], paths[1], paths[2], recipe.primColorOpa, recipe.primColorXlu,
+                                 recipe.envColor);
+            return;
+        }
+    }
+#endif
+    if (NeiGi_CanDrawLayers(play, 1, 32, 2))
+        Randomizer_DrawMmSmallKey(play, getItemEntry);
+}
+
 void Randomizer_DrawMmSmallKey(PlayState* play, GetItemEntry* getItemEntry) {
     if (!MmAssets_IsAvailable())
         return;

@@ -1,5 +1,6 @@
 #include "Rando/Rando.h"
 #include "Rando/MagicHints.h"
+#include "Rando/KeyRings.h"
 #include "../../../combo/gui/WhatsNew.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
@@ -498,6 +499,8 @@ static void PoolCountSuffix(int count) {
 
 static bool CheckPoolCheckbox(const char* label, RandoOptionId optionId, RandoCheckType checkType, const char* tooltip,
                               int countOverride = -1) {
+    WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[optionId].cvar, label,
+                                     CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
     bool changed =
         CVarCheckbox(label, Rando::StaticData::Options[optionId].cvar, CheckboxOptions({ { .tooltip = tooltip } }));
     if (countOverride >= 0) {
@@ -982,6 +985,8 @@ static bool ItemPoolCheckbox(const char* label, RandoOptionId optionId, const ch
     if (disabledReason == nullptr && IncompatibleWithLogicSetting(optionId)) {
         disabledReason = "Incompatible with current Logic Setting";
     }
+    WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[optionId].cvar, label,
+                                     CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, disabledReason != nullptr);
     bool changed = CVarCheckbox(
         label, Rando::StaticData::Options[optionId].cvar,
         CheckboxOptions(
@@ -1224,6 +1229,35 @@ static void DrawItemPoolTab() {
             "Vanilla - Small keys stay on the checks that hold them in the vanilla game, and none are added to "
             "the item pool.\n\n"
             "Start With - You begin with every dungeon's small keys, and none are added to the item pool."));
+    ImGui::SeparatorText("Small-Key Rings");
+    const char* ringLabels[] = { "Woodfall Key Ring (1 key)", "Snowhead Key Ring (3 keys)",
+                                 "Great Bay Key Ring (1 key)", "Stone Tower Key Ring (4 keys)" };
+    const bool vanillaKeys = CVarGetInteger(Rando::StaticData::Options[RO_PLACEMENT_SMALL_KEYS].cvar,
+                                            RO_DUNGEON_ITEM_ANYWHERE) == RO_DUNGEON_ITEM_VANILLA;
+    const char* ringCvar = Rando::StaticData::Options[RO_SHUFFLE_KEY_RINGS].cvar;
+    int32_t selectedRings = CVarGetInteger(ringCvar, RO_GENERIC_OFF);
+    bool ringsChanged = false;
+    for (size_t i = 0; i < std::size(Rando::KeyRings::Catalog); ++i) {
+        const auto& ring = Rando::KeyRings::Catalog[i];
+        bool selected = (selectedRings & ring.selection) != 0;
+        WhatsNew::Scope releaseHighlight(ringCvar, ringLabels[i], CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         vanillaKeys);
+        if (Checkbox(ringLabels[i], &selected,
+                     CheckboxOptions({ { .tooltip = "Replaces this dungeon's small keys with one ring. Receiving "
+                                                    "the ring grants every small key for that dungeon. Uses the "
+                                                    "Small Keys placement above; Start With starts with the ring.",
+                                         .disabled = vanillaKeys,
+                                         .disabledTooltip = "Choose a Small Keys placement other than Vanilla to "
+                                                            "use key rings. Your selections are retained." } }))) {
+            selectedRings = selected ? selectedRings | ring.selection : selectedRings & ~ring.selection;
+            ringsChanged = true;
+        }
+    }
+    if (ringsChanged) {
+        CVarSetInteger(ringCvar, selectedRings);
+        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+    ImGui::SeparatorText("Other Dungeon Items");
     UIWidgets::CVarCombobox(
         "Boss Keys", Rando::StaticData::Options[RO_PLACEMENT_BOSS_KEYS].cvar, &dungeonItemPlacementOptions,
         UIWidgets::ComboboxOptions().Tooltip(

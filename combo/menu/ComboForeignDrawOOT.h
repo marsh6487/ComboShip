@@ -45,6 +45,10 @@
 #include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
 #include "ComboSwordGiAssetSelection.h"
 
+#define COMBO_MM_KEY_RING_HOST_OOT
+#include "../ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_OOT
+
 namespace {
 struct ComboForeignDrawInfo {
     bool ok = false;
@@ -1163,6 +1167,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             if (!ComboBottleContents_Draw(play, ComboBottleContents_Profile(info->dls[0]))) {
                 OOT_DrawForeignSimple(play, info);
             }
+            break;
+        case CW_DRAW_KIND_MM_KEY_RING:
+            ComboMmKeyRing::Draw(play, static_cast<int>(info->ops[0].b), info->dls[0], info->dls[1], info->dls[2],
+                                 info->primColorOpa, info->primColorXlu, info->envColor);
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5) {

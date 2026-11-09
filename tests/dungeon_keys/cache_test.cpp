@@ -296,6 +296,21 @@ int main() {
            strstr(resolved->dls[0], "__OTR__@mm:"));
     ComboLatchForeignDraw(100 + owner);
     assert(ComboResolveForeignDrawInfo(100 + owner)->appearanceDependent);
+    testChanged = testEmblemChanged = 1;
+    const auto* editedRing = ComboResolveForeignDrawInfo(100 + owner);
+    assert(editedRing && editedRing->primColorOpa[0] == 10 + owner &&
+           editedRing->primColorXlu[0] == 210 + owner && editedRing->envColor[0] == 10 + owner);
+    testChanged = testEmblemChanged = 0;
+    testRingMissing = 1;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == CW_DRAW_NOT_READY);
+    assert(!ComboResolveForeignDrawInfo(100 + owner));
+    testRingAlt = 1;
+    testAlt = false;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == CW_DRAW_NOT_READY);
+    testAlt = true;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == 1);
+    assert(ComboResolveForeignDrawInfo(100 + owner));
+    testRingMissing = testRingAlt = 0;
   }
   for (int d = 0; d < 4; d++)
     for (int k = 0; k < 4; k++) {

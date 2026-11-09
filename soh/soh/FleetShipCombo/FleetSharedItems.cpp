@@ -1,3 +1,4 @@
+#include "../Enhancements/randomizer/SoulShuffleShared.h"
 #include "../../../combo/ComboGameMode.h"
 #include "FleetSharedItems.h"
 #include "../../../combo/vanilla/ComboVanillaMode.h"
@@ -78,6 +79,8 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
             peer(nullptr);
         return;
     }
+    if (SOH_ShareSoulReceipt(nativeId))
+        return;
     // Native magic is an absolute capacity floor. A progressive peer grant can
     // infer another tier from RPG-derived flags or a repeated delivery.
     if (nativeId == RG_MAGIC_SINGLE || nativeId == RG_MAGIC_DOUBLE) {
@@ -140,6 +143,11 @@ static void PullFromPeerWhenReady() {
     }
     FleetSharedReceiveGuard receiveGuard;
     FleetSync_ApplySharedState(sExtract());
+    static FnExtractSharedState extractSouls = nullptr;
+    if (!extractSouls)
+        extractSouls = reinterpret_cast<FnExtractSharedState>(Combo_ResolveSym("2ship", "MM_ExtractSharedSoulState"));
+    if (extractSouls)
+        SOH_ApplySharedSoulState(extractSouls());
     SPDLOG_INFO("[FleetShared] pulled MM's shared state into OoT");
 }
 

@@ -352,6 +352,9 @@ inline bool IsSharedItem(GameId game, const std::string& name, uint32_t mask, co
             ((game == GAME_OOT && name == def.ootName) || (game == GAME_MM && def.mmHasItem && name == def.mmName)))
             return true;
     }
+    for (const auto& p : SharedSoulPairs)
+        if ((mask & p.bit) && name == (game == GAME_OOT ? p.ootName : p.mmName))
+            return true;
     return false;
 }
 
@@ -482,13 +485,17 @@ struct CwSharedGroup {
     bool nei = false; // NEI progressive chains can exceed the native families' tier caps.
     size_t mmTierCap = std::numeric_limits<size_t>::max();
     bool nativeFamily = false;
+    bool soul = false;
+    bool starting = false;
 };
 
 // A native mask and its NEI imported representation can meet at the SAME MM item. Join those
 // edges before trimming or crediting; walking edges separately would count that pickup twice.
-inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwSharedPair>& pairs, uint32_t mask) {
+inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwSharedPair>& pairs, uint32_t mask,
+                                                        const std::string& ootDump = "",
+                                                        const std::string& mmDump = "") {
     std::vector<CwSharedGroup> groups;
-    auto connect = [&](const std::string& oot, const std::string& mm, bool nei, size_t cap) {
+    auto connect = [&](const std::string& oot, const std::string& mm, bool nei, size_t cap, bool soul = false) {
         size_t oi = groups.size(), mi = groups.size();
         for (size_t i = 0; i < groups.size(); ++i)
             for (const auto& n : groups[i].names) {
@@ -499,7 +506,7 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
             }
         const size_t missing = groups.size();
         if (oi == missing && mi == missing) {
-            groups.push_back({ { { GAME_OOT, oot }, { GAME_MM, mm } }, nei, cap, !nei });
+            groups.push_back({ { { GAME_OOT, oot }, { GAME_MM, mm } }, nei, cap, !nei, soul });
             return;
         }
         size_t at = oi != missing ? oi : mi;
@@ -510,11 +517,13 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
         if (oi != missing && mi != missing && oi != mi) {
             groups[oi].names.insert(groups[oi].names.end(), groups[mi].names.begin(), groups[mi].names.end());
             groups[oi].nei = groups[oi].nei || groups[mi].nei;
+            groups[oi].soul = groups[oi].soul || groups[mi].soul;
             groups[oi].nativeFamily = groups[oi].nativeFamily || groups[mi].nativeFamily;
             groups[oi].mmTierCap = std::max(groups[oi].mmTierCap, groups[mi].mmTierCap);
             groups.erase(groups.begin() + mi);
             at = oi - (mi < oi ? 1 : 0);
         }
+        groups[at].soul = groups[at].soul || soul;
         groups[at].nei = groups[at].nei || nei;
         groups[at].nativeFamily = groups[at].nativeFamily || !nei;
         groups[at].mmTierCap = std::max(groups[at].mmTierCap, cap);
@@ -533,6 +542,35 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
             if (n != group.names.end())
                 std::rotate(group.names.begin(), n, n + 1);
         }
+    }
+    for (const auto& pair : SharedSoulPairs) {
+        if (!(mask & pair.bit))
+            continue;
+        connect(pair.ootName, pair.mmName, false, 1, true);
+        for (auto& group : groups) {
+            auto n = std::find_if(group.names.begin(), group.names.end(),
+                                  [&](const CwSharedName& n) { return n.game == GAME_OOT && n.name == pair.ootName; });
+            if (n != group.names.end())
+                std::rotate(group.names.begin(), n, n + 1);
+        }
+    }
+    // Configured native starts are absent from the native pool. Keep their
+    // ownership in the shared graph so every fill/replay query sees the peer.
+    const std::string* dumps[] = { &ootDump, &mmDump };
+    for (GameId game : { GAME_OOT, GAME_MM }) {
+        std::set<std::string> starts;
+        try {
+            auto dump = nlohmann::json::parse(*dumps[game]);
+            if (dump.contains("startingSouls") && dump["startingSouls"].is_array())
+                for (const auto& name : dump["startingSouls"])
+                    if (name.is_string())
+                        starts.insert(name.get<std::string>());
+        } catch (...) {} // Old/malformed metadata cannot invent ownership.
+        for (auto& group : groups)
+            if (group.soul)
+                for (const auto& name : group.names)
+                    if (name.game == game && starts.count(name.name))
+                        group.starting = true;
     }
     return groups;
 }
@@ -556,6 +594,8 @@ inline void SharedOwnedViews(const std::vector<CwSharedGroup>& groups, const std
         for (const auto& n : group.names) {
             copies += counts[n.game][n.name];
         }
+        if (group.soul)
+            copies = group.starting ? 1 : std::min<size_t>(copies, 1);
         for (const auto& n : group.names) {
             auto& seen = n.game == GAME_OOT ? ootSeen : mmSeen;
             const size_t native = counts[n.game][n.name];

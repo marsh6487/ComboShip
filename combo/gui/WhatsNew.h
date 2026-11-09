@@ -19,6 +19,21 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRandoSettings.ShuffleEnemySouls", Kind::New, "Shuffle enemy souls in OoT." },
+    { "gRandoSettings.ShuffleNpcSouls", Kind::New, "Shuffle NPC souls in OoT." },
+    { "gRandoSettings.ShuffleAnimalSouls", Kind::New, "Shuffle animal souls in OoT." },
+    { "gRandoSettings.ShuffleMiscSouls", Kind::New, "Shuffle miscellaneous souls in OoT." },
+    { "gRando.Options.RO_SHUFFLE_ENEMY_SOULS", Kind::Updated,
+      "Native MM enemy souls also support shared-soul progression and cross-game ownership." },
+    { "gRando.Options.RO_SHUFFLE_NPC_SOULS", Kind::New, "Shuffle NPC souls in MM." },
+    { "gRando.Options.RO_SHUFFLE_ANIMAL_SOULS", Kind::New, "Shuffle animal souls in MM." },
+    { "gRando.Options.RO_SHUFFLE_MISC_SOULS", Kind::New, "Shuffle miscellaneous souls in MM." },
+    { "gRando.Options.RO_SHUFFLE_KEY_RINGS", Kind::New,
+      "Choose MM dungeon key rings with the complete key supply and counted dungeon-specific models." },
+    { "gCombo.Rando.Shared.SoulsEnemy", Kind::New, "Share matching enemy souls between the two games." },
+    { "gCombo.Rando.Shared.SoulsNpc", Kind::New, "Share matching NPC souls between the two games." },
+    { "gCombo.Rando.Shared.SoulsAnimal", Kind::New, "Share matching animal souls between the two games." },
+    { "gCombo.Rando.Shared.SoulsMisc", Kind::New, "Share matching miscellaneous souls between the two games." },
     { "gEnhancements.HideNonTransformationMasks", Kind::New,
       "Hide worn non-transformation masks in both games while keeping their effects active." },
     { "gEnhancements.TrueHiddenUI", Kind::New,
