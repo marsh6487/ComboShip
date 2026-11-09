@@ -166,9 +166,22 @@ RandoItemId ConvertItem(RandoItemId item, RandoCheckId) {
     parts.append("default: std::abort(); } }\n")
     parts.append(block(draw, "void Rando::DrawItem(").replace("void Rando::DrawItem(", "void DrawItem("))
     start = draw.index("    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;")
-    preamble = draw[start:draw.index("    const int dungeonOwner", start)]
-    # Outer COMBO_BUILD begins outside the fragment; preserve inner trace guard.
-    preamble = "".join(preamble.rsplit("#endif", 1))
+    # This fixture selects only the authored/legacy sword preamble. Its outer
+    # COMBO_BUILD starts before the fragment; retain nested guards verbatim and
+    # stop at that block's actual end, before unrelated native dungeon routing.
+    depth = 1
+    lines = []
+    for line in draw[start:].splitlines(keepends=True):
+        if re.match(r"\s*#\s*if(?:def|ndef|\s)", line):
+            depth += 1
+        elif re.match(r"\s*#\s*endif\b", line):
+            depth -= 1
+            if depth == 0:
+                break
+        lines.append(line)
+    if depth != 0:
+        raise ValueError("Missing authored sword COMBO_BUILD preamble boundary")
+    preamble = "".join(lines)
     parts.append("void DrawResolvedItem(RandoItemId randoItemId, RandoCheckId, Actor* actor) {\n" + preamble)
     parts.append("switch (randoItemId) {\n")
     for name in ("RI_GREAT_FAIRY_SWORD", "RI_OOT_BIGGORON_SWORD"):

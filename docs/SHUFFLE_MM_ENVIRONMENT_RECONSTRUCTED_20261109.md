@@ -10,7 +10,7 @@ Small rock, bombable/red boulder and icicle rewards use positive native break ho
 
 Uncollected one-shot sources renew without clearing shared switches. Soil never treats an old switch or source initialization as a fresh interaction. After a physical drop expires in the same room, a fresh three-bug completion rearms only a source already in native DoNothing through the native Wait setup; active cutscene/timer states remain untouched. Scene/room changes discard pending coordinates and fresh-soil evidence.
 
-Native actor parameter class guards match the pinned donor generator (icicle modes0/3; small EnIshi; native rock-ring child type2). Native large boulders require explosives; red boulders retain two Goron blows or powder-keg behavior. Full per-placement authored parameter bytes/geometry remain unavailable, so these source/class checks are not a configured placement-geometry proof.
+Native actor parameter class guards match the pinned donor generator (icicle modes0/3; small EnIshi; native rock-ring child type2). Native large boulders require explosives; red boulders retain two Goron blows or powder-keg behavior. The R20 audit below now independently verifies these classes against the privately supplied MM quest archive, including actual authored actor parameters and positions. Player traversal remains separate from archive data validation.
 
 ## Conditional underwater sources
 
@@ -22,7 +22,7 @@ Actual pool enumeration, menu counts and exclusion availability use the same pol
 
 The Twin Islands Rock1/2/3 donor area named Near Ramp Grotto is actually outdoor spring SCENE_17SETUGEN2. They now belong to native RR_PATH_TO_GORON_VILLAGE, with the spring clear condition, rather than the interior ramp grotto. The donor generation recipe and manifest were corrected. A separate review owns the independent physical-scene/region audit.
 
-Five Keeta rock-wall CHECKs currently retain native Sonata wake access. After the independently reconstructed song-event implementation is integrated, these and existing upper-graveyard ingress must call the same Rando::SongEvents::CanPlay(8) oracle used by physical activation. This integration cannot compile against M1 alone because that oracle is not present in M1.
+R20 integrates the five Keeta rock-wall CHECKs and upper-graveyard ingress with the same Rando::SongEvents::CanPlay(8) oracle used by physical activation. The original M1 reconstruction preceded that oracle.
 
 ## Fresh verification
 
@@ -34,10 +34,33 @@ Five Keeta rock-wall CHECKs currently retain native Sonata wake access. After th
 - audit_catalog.py PASS counts, unique identities, exact native CHECK ownership and the project's full old persisted-ID assertion contract.
 - audit_icicle_access.py --sanitize with the pinned donor PASS original+Combo native mode/collision behavior.
 
-Full native seeded Glitchless fills, complete executable link, configured gameplay and exact authored-geometry audit remain separate unrun gates. No accepted-master promotion or gameplay acceptance is claimed.
+At the original reconstruction checkpoint, full native seeded Glitchless fills, complete executable link, configured gameplay and authored-geometry validation were separate unrun gates. Later controller build/fill evidence is recorded separately. The R20 archive validation below closes the missing authored placement-data audit; it does not claim configured gameplay or player navigation acceptance.
 
 ## Recovery
 
 Every bounded reconstruction commit was immediately saved as a source-only cumulative ZIP in Library, including binary patch from persisted e360328d, all changed files, checksums and restore instructions. Applying each patch through an independent index reproduced the recorded exact target tree. Earlier reconstruction checkpoints:27faadfb,42288e75,93f1ecf5. The final evidence checkpoint and its Library identity are recorded in the controller handoff.
 
 The targeted native ImGui release-control test also PASS (`WhatsNewTests.test_real_imgui_and_native_controls`), covering input, disabled/layout/hover behavior and style restoration with the global accent toggle.
+
+
+## R20 authored placement-data audit
+
+Source under audit: `1d5188e2f47ffb38d29102b4219d50b457b76867` (tree `918b3b99`). The existing user-supplied `mm.o2r` was recovered privately. Its SHA-256 is `f10167e5682d74cc8da0137c524b1521f4e7ff47438b8888b63db6c7c6dc8d59`. No archive, scene bytes, actor lists, coordinate dumps or asset-derived logs are distributed with this source-only audit.
+
+`tests/shuffle_parity/environment/audit_authored_placements.py` decodes the actual resource format implemented by native `SceneFactory`, `SetActorListFactory`, `SetRoomListFactory`, `SetAlternateHeadersFactory` and `CollisionHeaderFactory`. It follows serialized room/header paths and scene-layer alternatives, rather than guessing resource names or treating donor XML as actor data. Every decoded resource is consumed exactly, with type/version, bounds and vertex-index validation. The following all passed:
+
+- All **279** catalog aliases resolve to the exact expected native actor identity at the authored scene/setup/room/list index, covering all **211** checks. Alias counts are 191 rock, 26 boulder, 7 red boulder, 25 icicle and 30 soil; repeated setup aliases and soil slices explain the difference from check counts.
+- The actual production `MMEnvironment::Identify`, `MatchesParams` and `NormalizeSetup` compile against every privately decoded placement in **both original and Combo guards**. Authored icicle modes are 0/3, small-rock size flags are valid, and all rock-ring parents are type 2 with slices 0–7. Soil type/cardinality matches every slice.
+- Native required object resources are present through the actual room object lists or scene sub-keep. All 30 soil aliases have exactly one same-switch native bean, at the **identical position**, with a bug-accepting bean type and compatible half-day flags. The four day-restricted ranch rewards match the existing Day 1 / Days 2–3 native CHECK predicates. Dynamic ring positions use the native eight-child radius/angle formula.
+- **51** actual scene/room resources and **18** static collision resources were decoded. **277/279** source positions are inside static collision bounds; the two exceptions are the authored Deku Palace bombable walls, which use their own native collider and do not require floor snapping. **270/279** aliases have a static floor projection below their authored position. The other nine are five native levitating cliff rocks, those two bombable walls, and two Great Bay clear-state rocks whose uncleared setup positions lie below the floor. Both clear-state checks have a valid floor in setup 1 and already require Great Bay Temple clear. Thus no required check depends solely on an invalid floor-snapping alias.
+- Every one of the **30** conditional Iron Boots checks has an authored underwater witness in the actual room-matched, enabled water boxes. This validates the source-policy classification without inventing an acquisition route.
+- Synthetic decoder controls reject a wrong actor, invalid small-rock/icicle/ring parameter class, invalid ring slice, missing required object, unsupported resource version, truncated payload and trailing bytes. Alternate-header controls follow serialized paths and preserve native null-header fallback.
+
+Reproduce privately with the matching quest archive and native header dependencies:
+
+```sh
+python3 -B tests/shuffle_parity/environment/test_authored_placement_decoder.py
+python3 -B tests/shuffle_parity/environment/audit_authored_placements.py --archive /private/path/mm.o2r --native-checks
+```
+
+There is **no remaining unavailable-input blocker for authored actor identities, parameters, positions, source/bean proximity or static collision data** in this archive. No production mismatch was found. Static projection is a data check, not the native dynamic collision engine, line-of-sight solver, player route search, or a configured in-game break/pickup demonstration. Prior source ownership checks associate every check with its registered native region and physical scene; this archive audit independently confirms those physical source identities. Full physical player access through moving geometry and regional barriers, plus visual/GPU acceptance, remain separate runtime proof obligations.

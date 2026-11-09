@@ -11,6 +11,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_windows_native_cli_link_is_required_without_optional_validator_upload(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build.yml").read_text())["jobs"]["build"]["steps"]
+        builds = [(i, step) for i, step in enumerate(steps) if step.get("name") == "Build comborando"]
+        self.assertEqual(len(builds), 1)
+        position, build = builds[0]
+        self.assertNotIn("if", build, "optional validator upload must not skip the native Windows CLI link")
+        self.assertNotIn("continue-on-error", build)
+        self.assertIn("--target comborando", build["run"])
+        for game in ("soh", "2ship"):
+            native = next(i for i, step in enumerate(steps) if step.get("name") == f"Build {game}")
+            self.assertLess(native, position)
+        package = next(i for i, step in enumerate(steps) if step.get("name", "").startswith("Package"))
+        self.assertLess(position, package)
+        upload = next(step for step in steps if step.get("with", {}).get("name") == "comborando-windows")
+        self.assertEqual(upload["if"], "inputs.validator")
+
     def test_cumulative_native_ikana_and_silver_repairs_are_required(self):
         tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
         required = (

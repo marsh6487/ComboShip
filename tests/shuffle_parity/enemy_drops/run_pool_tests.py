@@ -6,7 +6,7 @@ are isolated boundaries; Location, ItemLocation, OptionValue and all algorithms
 being checked are production code. This is not a full seeded solver fixture.
 """
 from pathlib import Path
-import os,re,subprocess,tempfile
+import os,re,shlex,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[3];r=ROOT/'soh/soh/Enhancements/randomizer'
 def function(source,signature):
  start=source.index(signature);end=source.index('\n}',start)+2
@@ -359,11 +359,18 @@ with tempfile.TemporaryDirectory(prefix='oot-first-drop-pool-') as t:
   pkg=subprocess.run(['pkg-config','--atleast-version=1.91','imgui'],capture_output=True,text=True)
   if pkg.returncode!=0:
    raise RuntimeError('Set IMGUI_DIR to the pinned ImGui v1.91.9b-docking checkout')
-  import shlex
   flags+=shlex.split(subprocess.check_output(['pkg-config','--cflags','imgui'],text=True))
+ # Distro spdlog uses external compiled fmt; consume its actual compile/link
+ # contract. Pinned header-only toolkits instead instantiate the real fmt code.
+ logging_libs=[]
+ if subprocess.run(['pkg-config','--exists','spdlog']).returncode==0:
+  flags+=shlex.split(subprocess.check_output(['pkg-config','--cflags','spdlog'],text=True))
+  logging_libs=shlex.split(subprocess.check_output(['pkg-config','--libs','spdlog'],text=True))
+ else:
+  flags+=['-DFMT_HEADER_ONLY']
  for mode in ('original','combo'):
   exe=t/mode
-  subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),str(r/'EnemyFirstDrops.cpp'),str(r/'location.cpp'),str(r/'randomizerEnumStrings.cpp'),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-o',str(exe)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),str(r/'EnemyFirstDrops.cpp'),str(r/'location.cpp'),str(r/'randomizerEnumStrings.cpp'),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections',*logging_libs,'-o',str(exe)],check=True)
   subprocess.run([str(exe)],check=True)
 
 # Exercise the actual native settings identity body alongside pool policy.

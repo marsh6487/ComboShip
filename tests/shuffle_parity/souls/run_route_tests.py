@@ -73,13 +73,17 @@ cpp+='''bool capability=true,fire=false,stick=true,afford=true,learnedSong=true;
 #define CAN_ACCESS(x) capability
 unsigned maskCount=20,remainsCount=4;
 unsigned MoonMaskCount(){return maskCount;}unsigned RemainsCount(){return remainsCount;}
-'''+nativeDungeonEnum+'\nnamespace SE=ComboRando::SongEvents;\n'+mm_solver()+body(logic,'inline bool CanAccessDungeon(')+'''
+'''+nativeDungeonEnum+'\nnamespace SE=ComboRando::SongEvents;\nnamespace Rando::Logic {\n'+body(logic,'inline bool CanReturnToHuman(')+'\n}\n'+mm_solver()+body(logic,'inline bool CanAccessDungeon(')+'''
 std::function<bool()> moonRoutes[]={
 '''+',\n'.join('[]{return '+e+';}' for e in moonRoutes)+'};\nstd::function<bool()> shop[]={\n'+',\n'.join('[]{return '+e+';}' for e in shop)+'};\n'
 for name,expr in [('Meet',meet),('Sirloin',sirloin),('Princess',princess),('Hideout',hideout),('Bomber',bomber)]:
  if name in ['Meet','Princess']:expr=f'SoulEventRequirement(RE_{"MEET_KAFEI" if name=="Meet" else "RETURN_DEKU_PRINCESS"}) && ({expr})'
  cpp+=f'bool {name}(){{return {expr};}}\n'
 cpp+='''int main(){options[RO_SHUFFLE_NPC_SOULS]=1;
+// Exercise the extracted helper with the fixture's existing capability/item boundaries.
+capability=stick=false;REQUIRE(!Rando::Logic::CanReturnToHuman());
+stick=true;REQUIRE(Rando::Logic::CanReturnToHuman());
+capability=true;stick=false;REQUIRE(Rando::Logic::CanReturnToHuman());stick=true;
 // Exhaust every native solver slice against each shift ownership combination.
 for(now=0;now<=TIME_NIGHT3_AM_05_00;++now)for(int bits=0;bits<4;++bits){
  owned.clear();if(bits&1)Own(RI_SOUL_NPC_FISHING_POND_OWNER);if(bits&2)Own(RI_SOUL_NPC_ROOFTOP_MAN);

@@ -1,4 +1,6 @@
-# Native OoT first enemy-type drops — exposed source candidate, native seed proof pending
+# Native OoT first enemy-type drops — implemented source and native seed proof
+
+Current R20 source1d5188e2/tree918b3b99 passes all12 actual native Vanilla/MQ/mixed graph, solo fill/replay and combined fill/replay cases with genuine configured quests. See `SHUFFLE_R20_NATIVE_GENERATION_20261109.md` for hashes, case counts and retained evidence. The older implementation checkpoints below are preserved as history; live configured gameplay remains separate.
 
 The complete catalogue now has **43 native enemy families and 204 source-audited witness regions**. Physical eligibility is per seed: **38–43 checks**, with 43 in all-Vanilla and 40 in all-MQ. No fictitious Root witness is used. The candidate exposes the default-off option in the actual Shuffle Items menu and generation settings group; RandomizeAllSettings includes it. Source and focused native fixtures are not a completed full-graph seed or configured gameplay acceptance claim. Integration/publication must retain the native seed gate below.
 

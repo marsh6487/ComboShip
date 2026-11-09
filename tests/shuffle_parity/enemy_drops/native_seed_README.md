@@ -1,6 +1,6 @@
 # Actual native first-drop seed regression
 
-This runner loads the **built game module**, calls its native pool and graph oracle exports, and runs the **real comborando combined fill plus playthrough replay**. No replacement graph or fake module is supplied. It is a prepared integration runner, not a locally verified native seed result: the current workspace has no built game DLLs/driver.
+This runner loads the **built game module**, calls its native pool and graph oracle exports, and runs the **real comborando combined fill plus playthrough replay**. No replacement graph or fake module is supplied. R20 public `1d5188e2` (tree `918b3b99`) has passed actual native Vanilla Off/On/On-excluded graph, standalone fill/replay and combined fill/replay in CI using the fully linked runtime. See `docs/SHUFFLE_R20_NATIVE_GENERATION_20261109.md` for exact hashes/artifacts. All9 additional genuine configured MQ/mixed cases now pass with identical R20 module hashes; the complete12-case matrix is verified. Graphical asset compatibility and live gameplay remain separate.
 
 ```sh
 python3 tests/shuffle_parity/enemy_drops/native_seed_regression.py \
@@ -25,9 +25,9 @@ The runner requires a **fresh, nonexistent --output path** and refuses existing 
 
 ## Native execution status
 
-Standalone native generation is implemented through `SOH_FillSoloRandoSeed` and `MM_FillSoloRandoSeed`. The MM entrypoint shares exact file-create initialization/generation phases and preserves live save/play/seed/receipt state; its separate native oracle replay is required by the boss-key integration matrix. The required Linux job executes explicit Vanilla Off/On/excluded first-drop cases. The default twelve-case V/MQ/mixed matrix still requires genuine configured quest archives. No expanded linked native case is claimed passing before its successful generated manifest; no placeholder assets or replacement graph are allowed.
+Standalone native generation is implemented through `SOH_FillSoloRandoSeed` and `MM_FillSoloRandoSeed`. The MM entrypoint shares exact file-create initialization/generation phases and preserves live save/play/seed/receipt state; its separate native oracle replay is required by the boss-key integration matrix. The required Linux job executes explicit Vanilla Off/On/excluded first-drop cases. The default twelve-case V/MQ/mixed matrix requires genuine configured quest archives. All12 R20 manifests now pass after privately recovering and validating the original and MQ inputs. No placeholder assets or replacement graph are used.
 
-The ctypes native-loading path and actual output validation still need to execute against configured build artifacts in CI. Local checks cover Python syntax, source-schema configuration derivation, explicit missing-module failure, and native_seed_scaffolding_test.py: fresh-only output rejection, stale-asset isolation, actual CLI normalization rejection for existing/dangling output paths, complete staged native-module hashes including versioned `.so` dependencies, inherited SHIP_HOME override, exact source junk IDs/categories, and health/trap negative controls. These are not native graph/fill evidence.
+The ctypes native-loading path and actual output validation have executed successfully against the exact R20 CI build artifacts for the three Vanilla cases. Additional local scaffolding checks cover Python syntax, source-schema configuration derivation, explicit missing-module failure, and native_seed_scaffolding_test.py: fresh-only output rejection, stale-asset isolation, actual CLI normalization rejection for existing/dangling output paths, complete staged native-module hashes including versioned `.so` dependencies, inherited SHIP_HOME override, exact source junk IDs/categories, and health/trap negative controls. These are not native graph/fill evidence.
 
 ```sh
 python3 tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py

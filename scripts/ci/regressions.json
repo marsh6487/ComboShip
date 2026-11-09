@@ -1988,7 +1988,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM environmental checks: all physical families, receipts, access and exclusions",
-    "run": "python3 -B tests/shuffle_parity/environment/csmc/run_palette_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/audit_catalog.py\npython3 -B tests/shuffle_parity/environment/audit_physical_ownership.py\npython3 -B tests/shuffle_parity/environment/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/run_exclusion_tests.py",
+    "run": "python3 -B tests/shuffle_parity/environment/csmc/run_palette_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/audit_catalog.py\npython3 -B tests/shuffle_parity/environment/audit_physical_ownership.py\npython3 -B tests/shuffle_parity/environment/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/run_exclusion_tests.py\npython3 -B tests/shuffle_parity/environment/test_authored_placement_decoder.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }

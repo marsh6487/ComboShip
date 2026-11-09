@@ -60,7 +60,12 @@ for signature in ('extern "C" uint8_t Bottle_NetOwned','extern "C" void Bottle_S
     native+=function(bottles,signature)+'\n'
 for signature in ('u8 TwilightUpgrade_IsFullyObtained','void TwilightUpgrade_Grant'):
     native+=function(twilight,signature)+'\n'
-items=re.search(r'u8 gItemSlots\[77\] = \{.*?\n\};',(ROOT/'mm/src/code/z_inventory.c').read_text(),re.S)[0]
+inventory_source=(ROOT/'mm/src/code/z_inventory.c').read_text()
+items=re.search(r'u8 gItemSlots\[77\] = \{.*?\n\};',inventory_source,re.S)[0]
+# The real wallet prerequisite expands CUR_UPG_VALUE; keep its native masks and
+# shifts alongside the already extracted native inventory-slot table.
+for declaration in ('u32 gUpgradeMasks[]', 'u8 gUpgradeShifts[]'):
+    items+='\n'+re.search(re.escape(declaration)+r' = \{.*?\n\};',inventory_source,re.S)[0]
 fixture=(ROOT/'tests/combo_vanilla/mm_rewards_adapter_test.cpp').read_text()
 fixture=fixture.replace('/* ITEM_SLOTS */',items).replace('/* NATIVE_GRANTS */',native)
 fixture=fixture.replace('/* ADAPTER_FUNCTIONS */',production)

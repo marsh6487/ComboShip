@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -47,6 +48,14 @@ with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
         flags += ['-isystem',str(args.json_include.resolve())]
     if args.sanitize:
         flags += ['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
+    # Shared UI fixtures exercise real logging through native generation/import
+    # bodies. Distro spdlog needs its external fmt compile/link dependencies.
+    logging_libs = []
+    if subprocess.run(['pkg-config','--exists','spdlog']).returncode == 0:
+        flags += shlex.split(subprocess.check_output(['pkg-config','--cflags','spdlog'],text=True))
+        logging_libs = shlex.split(subprocess.check_output(['pkg-config','--libs','spdlog'],text=True))
+    else:
+        flags += ['-DFMT_HEADER_ONLY']
     for combo in (False,True):
         binary = build / ('combo' if combo else 'original')
         native = build / ('services-combo.o' if combo else 'services-original.o')
@@ -57,6 +66,6 @@ with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
                         str(args.fixture.resolve()),
                         *[str(ROOT / ('mm/2s2h/Rando/'+p)) for p in ('Logic/GeneratePools.cpp',
                             'SongEvents.cpp','Logic/PlacementConstraints.cpp','StaticData/Items.cpp','StaticData/Options.cpp')],
-                        str(native),'-o',str(binary)],check=True)
+                        str(native),*logging_libs,'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,timeout=90,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
         print('PASS native MM pool fixture', args.fixture.parent.name, 'Combo' if combo else 'original',flush=True)

@@ -27,6 +27,12 @@ void CollisionCheck_ApplyDamage(PlayState *, CollisionCheckContext *,
 void CollisionCheck_ApplyDamage(PlayState *, CollisionCheckContext *,
                                 Collider *, ColliderInfo *);
 #endif
+#ifdef SWORD_FINISH_SOUL_GATE
+// Configuration is a service seam; eligibility, native actor mapping and saved
+// ownership reads execute the production C++ gate and actual C flag getter.
+static u8 soulOptions[RSK_MAX];
+u8 Randomizer_GetSettingValue(RandomizerSettingKey key) { return soulOptions[key]; }
+#endif
 static int finishSoundCount;
 static u16 finishSound;
 static int finishStopCount;
@@ -151,6 +157,9 @@ static void World(void) {
   setup();
   static int scene;
   play.sceneNum = ++scene;
+#endif
+#ifdef SWORD_FINISH_SOUL_GATE
+  memset(soulOptions, 0, sizeof(soulOptions));
 #endif
   CollisionCheck_InitContext(&play, &play.colChkCtx);
   gfx.polyOpa.p = opa;
@@ -520,8 +529,41 @@ static void ImmuneElementKeepsFatalSwordDamage(void) {
   }
 #endif
 }
+#ifdef SWORD_FINISH_SOUL_GATE
+static void SoulGatePreservesDamage(void) {
+  World();
+  Actor actor = {0};
+  actor.id = ACTOR_EN_TEST;
+  actor.category = ACTORCAT_ENEMY;
+  actor.update = LiveUpdate;
+  actor.colChkInfo.health = 3;
+  actor.colChkInfo.damage = 2;
+  gSaveContext.ship.quest.id = QUEST_RANDOMIZER;
+  soulOptions[RSK_SHUFFLE_ENEMY_SOULS] = 1;
+  REQUIRE(Actor_ApplyDamage(&actor) == 3 && Effects() == 0);
+  // A different saved soul must not authorize this actor.
+  gSaveContext.ship.randomizerInf[RAND_INF_SOUL_ENEMY_KEESE >> 4] |=
+      1u << (RAND_INF_SOUL_ENEMY_KEESE & 0xF);
+  REQUIRE(Actor_ApplyDamage(&actor) == 3 && Effects() == 0);
+  gSaveContext.ship.randomizerInf[RAND_INF_SOUL_ENEMY_STALFOS >> 4] |=
+      1u << (RAND_INF_SOUL_ENEMY_STALFOS & 0xF);
+  REQUIRE(Actor_ApplyDamage(&actor) == 1);
+  gSaveContext.ship.randomizerInf[RAND_INF_SOUL_ENEMY_STALFOS >> 4] = 0;
+  actor.colChkInfo.health = 3;
+  soulOptions[RSK_SHUFFLE_ENEMY_SOULS] = 0;
+  REQUIRE(Actor_ApplyDamage(&actor) == 1);
+  actor.colChkInfo.health = 3;
+  soulOptions[RSK_SHUFFLE_ENEMY_SOULS] = 1;
+  gSaveContext.ship.quest.id = QUEST_NORMAL;
+  REQUIRE(Actor_ApplyDamage(&actor) == 1);
+  puts("PASS real soul damage gate: blocked/wrong saved soul, owned, off and native quest");
+}
+#endif
 #ifndef SWORD_FINISH_ADAPTER_TEST
 int main(void) {
+#ifdef SWORD_FINISH_SOUL_GATE
+  SoulGatePreservesDamage();
+#endif
   IceImpactEachAcceptedHitAndDismemberedDeath();
   MixedIceImpactPreservesAmbiguousDeathAttribution();
   AcceptedIceMaterialProvenance();

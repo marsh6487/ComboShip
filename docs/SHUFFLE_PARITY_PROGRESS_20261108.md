@@ -13,6 +13,51 @@ regression review/repair and native verification; no production task is deferred
 Controller owns shared integration, identifiers, cross-feature review and pushes.
 
 Current controller checkout: `/workspace/scratch/c690840d9328/ComboShip`.
+Current published production R20: `1d5188e2f47ffb38d29102b4219d50b457b76867`,
+local `ef9e2973`, exact tree `918b3b99d7785837f7db262d3d046d6ab924c2e7`.
+All requested production features are integrated and independently reviewed.
+The fully linked R20 runtime now passes all eight actual native solo/combined
+profiles and independent replays, both in CI and a separate five-stream local
+repeat. This includes16 native solo fills/replays, eight combined fills/replays,
+dual-game Own Dungeon keys, Stone Tower normal/inverted, exclusions, Rusty keys,
+MM parity, all parity and all new shuffles Off. The real circular negative and
+overfull-budget rejection pass. CI also passes all three native first-drop
+Vanilla graph/solo/combined cases. Nine genuine configured MQ/mixed cases now
+pass the same full native graph/solo/combined pipeline with identical module
+hashes, closing all12 quest profiles and660 own-soul negative graph controls. See `SHUFFLE_R20_NATIVE_GENERATION_20261109.md`
+for exact hashes, profile counts, retained artifacts and proof boundaries.
+
+R20 Linux all targets/resources/smokes/native seeds/AppImage pass. Windows both
+game DLLs, LUS/UI, launcher, resources, ZIP packaging, staging, upload and cache
+post-steps completed successfully in job129372410102. Its Windows CLI target was
+intentionally skipped by the old optional-upload policy; it is not marked passed.
+Integrated e2ec306f now requires that native CLI build/link on every Windows run,
+retaining the optional upload condition. All35 CI-policy controls pass, including
+old-policy RED/new-policy GREEN; the next published CI must execute that link.
+Fast source checks, equipment and entrances pass.
+Four remaining regression groups exposed real legacy fixture dependency issues;
+root integrated minimal fixes8835cbe7/981bca64/885c022f/df4cbfae/772f33ab/0a17e418,
+with exact failed rows passing real GCC13/SDK and meaningful assertions retained.
+WORLD's five-row suffix passes including all90 complete production TU/mode
+checks; RENDER's11-row suffix and exact fairy ABI row pass; SYSTEMS final full
+four-command UI row passes all8 original/Combo executions. All67 ITEMS rows now have passing evidence across the original CI prefix and
+coordinated exact-row local closures:15 original CI rows, repaired MM-first gate,
+24 following rows,12 middle rows,13 tail rows and2 full rings/capacity rows.
+All51 rows after the gate pass, including the final318 in both guards. WORLD57,
+RENDER81, SYSTEMS47, equipment61 and entrances11 similarly retain passing
+prefix/closure evidence (324 registered rows total). This distributed evidence
+is explicitly separate from a fresh full CI run on the cumulative final tree.
+Fixture closures also include exact native C bit flags/form-return helpers,
+actual soul-damage gate, strict393-old-ID plus approved-tail Mirror registry and
+dirty omitted-tail save checks, native wallet arrays and precise sword preamble
+boundaries. No assertions or diagnostic policy were weakened. Independent
+reviews approve the source/registry/legacy-save boundaries. No production work
+is deferred. Both useful native builds have finished; publish the cumulative
+source checkpoint and require fresh full CI.
+
+The R11 and older notes below are historical evidence, superseded by R20 for
+native full-generation closure. Their failed/unrun results remain recorded.
+
 R11 fully built verification baseline: `3eb1649eebd24fb9b7994c788cb268b52f7932f8`
 (tree `900fd9e2c024110a26fb6cb1d5336de30745f6ef`, local `c9fdb3a7`).
 Source recovery: `libfile_7940811012f081919f0b7199154c161b`, SHA256
@@ -47,7 +92,7 @@ runtime and the complete eight-profile rerun remain required.
 
 | Active closure | Owner | Current evidence / state |
 | --- | --- | --- |
-| Native MM confined item handoff | ci_native/controller | Integrated596d8b60/5b0f921c; actual stranded ring/boss-key RED/GREEN, eight malformed-schema negatives and shared song/remains regression controls PASS; full new-module build required |
+| Native MM confined item handoff | ci_native/controller | Integrated596d8b60/5b0f921c; actual stranded ring/boss-key RED/GREEN, eight malformed-schema negatives and shared song/remains regression controls PASS; full R20 new-module link and eight-profile native fill/replay PASS |
 | Canonical progressive wallet counts | firstdrops/controller | Integrated6751e3d8; actual FC pair plus both native pools enforce exact owner retention/max supply;13 negative/positive controls and six complete combined profiles PASS |
 | Child Wallet native receipt/handoff review | song_clock/controller | Closed:768 actual-source native save/order/delivery/sync scenarios PASS under ASan/UBSan, final base/Adult/Giant capacity500 and stable FC counters; no production defect found. Registered wallet_receipts/run_tests.py retains transport/render/persistence boundaries explicitly |
 | Circular-key negative control | door_keys/controller | Integrated84c6f5f7; full actual OWN profile including native three-cycle rejection PASS |
@@ -92,8 +137,8 @@ checkpoint before the next publication or long build.
 | Requirement | Owner | Production source state | Evidence / next action |
 | --- | --- | --- | --- |
 | OoT enemy/NPC/animal/misc and MM NPC/animal/misc souls | souls | Integrated native roles, actor behavior, room completion, scripted rewards, schedules, shops, quests and physical blockers; decorative roles preserved | 130 OoT / 213 MM rules; 391 / 200 check dependencies; 23 / 37 quest events; 21 suites, 9 sanitizer suites, 76 complete TU checks; final source83f2547a |
-| Shared soul mapping/pools/grants/saves/reset/controls | souls | Integrated68 semantic counterpart edges, pool deduplication and host controls | Native ownership/grant/category/alias checks; source44bc3904/83f2547a; actual allParity native MM component full fill/original oracle PASS; fresh linked combined proof pending |
-| OoT first enemy-type drops, V/MQ, defeat paths, persistent rewards | firstdrops | Integrated43 families/204 witnesses, actual menu, runtime special deaths and layout-aware pools/exclusions; Skull Kid native trade-chain witness repaired | All4096 layout masks, runtime/pool/hash both guards;16a6aac0; R8 actual linked Vanilla Off/On/On-excluded graph, solo/combined fill and independent replay PASS; R11 rerun pending |
+| Shared soul mapping/pools/grants/saves/reset/controls | souls | Integrated68 semantic counterpart edges, pool deduplication and host controls | Native ownership/grant/category/alias checks; source44bc3904/83f2547a; actual R20 allParity both-solo plus combined native fill/original replay PASS |
+| OoT first enemy-type drops, V/MQ, defeat paths, persistent rewards | firstdrops | Integrated43 families/204 witnesses, actual menu, runtime special deaths and layout-aware pools/exclusions; Skull Kid native trade-chain witness repaired | All4096 layout masks, runtime/pool/hash both guards;16a6aac0; R8 actual linked Vanilla Off/On/On-excluded graph, solo/combined fill and independent replay PASS; R20 actual native all12 Vanilla/MQ/mixed Off/On/On-excluded graph/solo/combined PASS; genuine original/MQ inputs verified privately |
 | Soul/firstdrop colored hints and translations | souls/firstdrops | Encoded source and reward colors with resets;147 soul names and43 enemy sources EN/FR/DE; host settings preserved | Native147 composed clue checks;44bc3904; no rendered gameplay claim |
 | Native/foreign soul GIs | firstdrops | Owning host boss-flame paths/materials, palettes, scrolling and compatible override paths integrated | 95 OoT +59 MM actual native/foreign callbacks; recovered source verified |
 | Rusty overworld-door keys | door_keys | All27 OoT /39 MM identities, pools, grants, saves, native interactions and matching exits integrated; Castle actual gate and guard payment now bound | M8b600e996 integrated319c60a1; missing/wrong/right/Skeleton/age/form/off/nativeER/legacy24 tests; scene-changing returns free to prevent ER traps |
@@ -101,22 +146,22 @@ checkpoint before the next publication or long build.
 | Actual song-event shuffle in both games | song_clock |18 OoT /13 MM persisted native events, solver, forms/age/instruments, spoilers/import/plando integrated | Native adapters/world checks both guards; review repairs integrated342dfc94/89985404: native learned-song dispatch and actual alternate-mask Human capability |
 | OoT Clock/start time/ownership/day-night/travel | song_clock | Default-off deterministic start lock, grants/save/time transitions/native Sun undead stun integrated | Native tests; review repair integrated342dfc94; actual native tracker/recognition/ownership tests pass both guards |
 | Song mapping lifecycle | song_clock | Native event mapping shared by saved runtime and solver | Preview and native-save-load provenance fixes integratedcc7e3176/180735d3; actual RED/GREEN native lifecycle tests pass both guards |
-| MM rocks/boulders/red boulders/icicles/soil | environment |211 checks/279 physical aliases across36 native regions integrated; real break/bug receipt/retry/cycle safeguards | Full native lifecycle/pools/exclusions and all actual region scene assignments pass; source0efb6489/69f32cc4; solo default181 excludes30 unreachable IronBoot rocks, combined211 |
-| MM environmental contents-category cues | environment/controller | Integrated native markers, generic gold Off/resolved colors On, actual native/foreign categories, all66 Rusty key cues, shared OoT palette and cyan existing control | d61aa0ab/e565ca98/f7894ae2; root ASan/UBSan all211/279 and66 export-to-foreign controls PASS both guards; full new target link pending |
+| MM rocks/boulders/red boulders/icicles/soil | environment |211 checks/279 physical aliases across36 native regions integrated; real break/bug receipt/retry/cycle safeguards | Native lifecycle/pools/exclusions and R20 full seeds PASS; actual private quest audit all279 actor IDs/params/setup/room/index/object/ring/soil/proximity/half-day and30 underwater witnesses PASS,51 scene/room +18 collision resources, no production mismatch; fa97a674/53e4816f integrated d48faa48/4a827334, root6 decoder/policy negative groups PASS. Solo181, combined211 |
+| MM environmental contents-category cues | environment/controller | Integrated native markers, generic gold Off/resolved colors On, actual native/foreign categories, all66 Rusty key cues, shared OoT palette and cyan existing control | d61aa0ab/e565ca98/f7894ae2; root ASan/UBSan all211/279 and66 export-to-foreign controls PASS both guards; R20 full native target link PASS; GPU appearance separate |
 | MM Stick/Nut Bags, Child Wallet, six Infinite endpoints | song_clock/ci_native | All native grant/receipt/save/HUD/ownership endpoints retained | Fresh retained integrated64start cases and complete TU checks pass at45f4970a plus fixture closure1a890529 |
-| Four counted MM key rings1/3/1/4 | song_clock/ci_native | Native pools/grants/save/reset and native/foreign rendering retained | All16 choices and actual dungeon behavior pass retained integrated tests; full dual Own Dungeon seeds pending |
+| Four counted MM key rings1/3/1/4 | song_clock/ci_native | Native pools/grants/save/reset and native/foreign rendering retained | All16 choices and actual dungeon behavior pass retained integrated tests; R20 full simultaneous dual Own Dungeon seeds/replays PASS |
 | Three MM lottery-night rewards | song_clock | Native separate-night checks, tickets, receipts and cycle behavior retained | Actual native lottery suite passes frozen45f4970a plus dependency closure |
 | MM Saria/Desired Progressive Magic and seven RPG families | song_clock | Native source locations and current ownership retained | Actual registered Saria/Desired suite and complete TUs pass frozen45f4970a plus closure |
 | Native form instruments/MM soundbanks in OoT; FD ocarina | song_clock | Recovered native controller/audio routing retained; native MM behavior preserved | Actual controller,20audio scenarios, bank/mixer/PCM tests pass frozen45f4970a; no live audio acceptance claim |
 | Menus/pool organization/gold-cyan/global toggle | environment/controller | Actual controls exposed, exact existing CVar IDs, highlights and disabled behavior; pool/exclusion metrics refresh on all new settings including shared controls | Real ImGui input/native pool/cache tests both guards;556d7b6c; Vanilla policy and inactive lottery/tracker receipt repairs integrated621975da/d3c5aa17; independent original/Combo review active |
-| Exclusions/categories/locations/imports/generation | feature owners | Native catalog categories and saved/imported exclusion application integrated | Native environmental/firstdrop/door pool tests; real all-feature native matrix required |
-| Native solo/combined validation adapters | ci_native | Actual SOH and MM fill/replay entrypoints, native pool budget rejection, full seed dump metadata, original/Combo guards integrated | Review repairs integrated3f6e456a/89ff751a/cc4b07c7; actual RED/GREEN transaction/health/replay tests pass; latest linked proof required |
-| Full Linux/Windows targets/link | ci_native/controller | Required workflow builds all native modules and stages runtime | R11 full Linux all targets/resources/two smokes and full Windows native/UI/ZIP PASS in42660346227; R19 confinement/marker follow-up needs fresh native build |
-| Native graph/fill/replay, Glitchless, solo/combined | ci_native/controller | Required8-case actual native matrix plus firstdrop Vanilla cases implemented | R11 all16 native solo fills/replays and firstdrop3 PASS; six complete combined profiles PASS under strict corrected validator. MM-parity/all-parity exposed native adapter defect, repaired source and actual component gen/original replay PASS; new integrated full8 required |
-| Dual-game Own Dungeon, Stone Tower normal/inverted, foreign placement | ci_native/controller | Required actual native matrix implements both simultaneous policies, rings, exclusions, negative circular replay | Actual fully linked R11 OWN/OWN-excluded/Stone-normal/Stone-inverted complete solo+combined generation/replay PASS with physical keys and real foreign placements; native three-cycle negative PASS; new confined-adapter module rerun required |
-| CI/regression failure closure | controller/ci_native | Meaningful assertions and normal diagnostics retained; fixture real dependencies closed | Final R11 exposes three real legacy extraction compile failures (receipt Rusty imports, Grace Rusty stamping, BlackMarket song session statics); firstdrops/souls own bounded closures. No diagnostic/assertion weakening |
+| Exclusions/categories/locations/imports/generation | feature owners | Native catalog categories and saved/imported exclusion application integrated | Native environmental/firstdrop/door pool tests and R20 actual all8-profile native matrix PASS, including all-parity and exclusions |
+| Native solo/combined validation adapters | ci_native | Actual SOH and MM fill/replay entrypoints, native pool budget rejection, full seed dump metadata, original/Combo guards integrated | Review repairs integrated3f6e456a/89ff751a/cc4b07c7; actual RED/GREEN transaction/health/replay tests pass; R20 latest linked proof PASS all8 profiles |
+| Full Linux/Windows targets/link | ci_native/controller | Required workflow builds all native modules and stages runtime | R11 full Linux all targets/resources/two smokes and full Windows native/UI/ZIP PASS in42660346227; R20 Linux full native/AppImage PASS; Windows both game DLLs/launcher/ZIP PASS, optional CLI SKIPPED in original run; e2ec makes actual native Windows CLI link mandatory in next CI |
+| Native graph/fill/replay, Glitchless, solo/combined | ci_native/controller | Required8-case actual native matrix plus firstdrop Vanilla cases implemented | R11 all16 native solo fills/replays and firstdrop3 PASS; six complete combined profiles PASS under strict corrected validator. MM-parity/all-parity exposed native adapter defect, repaired source and actual component gen/original replay PASS; R20 new integrated full8 actual native matrix PASS in CI and independent local repeat |
+| Dual-game Own Dungeon, Stone Tower normal/inverted, foreign placement | ci_native/controller | Required actual native matrix implements both simultaneous policies, rings, exclusions, negative circular replay | Actual fully linked R11 OWN/OWN-excluded/Stone-normal/Stone-inverted complete solo+combined generation/replay PASS with physical keys and real foreign placements; native three-cycle negative PASS; R20 new confined-adapter full matrix rerun PASS |
+| CI/regression failure closure | controller/ci_native | Meaningful assertions and normal diagnostics retained; fixture real dependencies closed | R20 four groups exposed legacy fixture dependencies; all known minimal closures integrated, exact failed rows PASS; WORLD/RENDER/SYSTEMS suffixes and ITEMS middle/rings/capacity rows PASS, all67 ITEMS rows have passing prefix/closure evidence; fresh cumulative CI required; independent reviews preserve assertions/diagnostics |
 | IDs/save/default compatibility | ci_native/controller | Existing IDs preserved, appended clocks then doors then environment; mirrored FCI tables retained | Compiled36568 prior IDs,360 OoT and93 MM CVar/defaults unchanged both guards; FCI_MAX465 <=512; native historical JSON extents/tails pass;37889186 |
-| Durable checkpoints/PR89 publication | controller | R1/R2 source and individual reconstruction milestones saved with exact restoration; draft/unmerged maintained | R11 independently restored and published as3eb1649e/tree900fd9e2; libfile_7940811012f081919f0b7199154c161b, SHAc86f65c5f41a94da05158ac01668e15364d0e5d9ceb9fb27e67dea1355a42873; follow-up source preserves active native builds |
+| Durable checkpoints/PR89 publication | controller | R1/R2 source and individual reconstruction milestones saved with exact restoration; draft/unmerged maintained | R20 independently restored/published1d5188e2/tree918b3b99; libfile_4aee0e138af081918edd72b78fe4b7b7, SHAa46f1929e3b6da486e014ef2afcc0d13dbe6836b83b74862800a6090a3fecb9a; fixture closures checkpoint next |
 
 ## Current integrated regression evidence
 

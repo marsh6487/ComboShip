@@ -117,6 +117,17 @@ def main():
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'
     with tempfile.TemporaryDirectory(prefix='fairy-bottle-test-') as temporary:
         build = Path(temporary)
+        # These TU-local declarations have no standalone owner header. Keep
+        # their complete production definitions instead of a fixture field copy.
+        foreign_info = re.findall(r'^struct ComboForeignDrawInfo \{.*?^\};',
+                                  (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text(), re.M | re.S)
+        if len(foreign_info) != 1:
+            raise RuntimeError('Expected one owning foreign draw-info definition')
+        (build / 'fairy_draw_info.inc').write_text(foreign_info[0] + '\n')
+        gbi = (ROOT / 'libultraship/include/libultraship/libultra/gbi.h').read_text()
+        vertex_start = gbi.index('typedef struct {', gbi.index('Vertex (set up for use with colors)'))
+        vertex_end = gbi.index('} Vtx;', vertex_start) + len('} Vtx;')
+        (build / 'fairy_vertex.inc').write_text(gbi[vertex_start:vertex_end] + '\n')
         (build / 'fairy_production.inc').write_text(bodies)
         (build / 'fairy_asset_commands.inc').write_text(packaged_glass_commands())
         for host in ('oot', 'mm'):

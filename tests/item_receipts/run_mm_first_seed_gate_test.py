@@ -25,6 +25,8 @@ otr = (ROOT / "soh/soh/OTRGlobals.cpp").read_text()
 menu = subprocess.check_output(["git", "show", args.baseline + ":combo/gui/ComboMenu.cpp"], cwd=ROOT, text=True) \
     if args.baseline else (ROOT / "combo/gui/ComboMenu.cpp").read_text()
 source = (ROOT / "tests/item_receipts/mm_first_seed_gate_test.cpp").read_text()
+has_shared_change = "static void ApplySharedRandoOptionChange(" in menu
+source = "#define FIXTURE_HAS_SHARED_OPTION_CHANGE " + str(int(has_shared_change)) + "\n" + source
 # Keep the panel's actual release-highlight helper. These additional ImGui
 # observers cover presentation only; the fixture's disabled/button behavior
 # and the complete production generation/reload gates remain unchanged.
@@ -56,6 +58,9 @@ source = source.replace("/* ACTUAL_PLANDO_PANEL */",
                         block_from(menu, menu.index("void DrawComboPlandoPanel()")))
 source = source.replace("/* ACTUAL_COMBO_PANEL */",
                         block_from(menu, menu.index("void ComboMenu::DrawComboPanel()")))
+source = source.replace("/* ACTUAL_SHARED_OPTION_CHANGE */",
+                        block_from(menu, menu.index("static void ApplySharedRandoOptionChange("))
+                        if has_shared_change else "")
 with tempfile.TemporaryDirectory(prefix="mm-first-seed-gate-") as directory:
     build = Path(directory)
     cpp = build / "gate.cpp"
@@ -67,5 +72,6 @@ with tempfile.TemporaryDirectory(prefix="mm-first-seed-gate-") as directory:
         if args.sanitizers else []
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     *sanitizer_flags,
-                    *includes, str(cpp), "-o", str(binary)], cwd=ROOT, check=True)
+                    *includes, str(cpp), str(ROOT / "combo/gui/ComboMenuModel.cpp"),
+                    "-rdynamic", "-ldl", "-o", str(binary)], cwd=ROOT, check=True)
     sys.exit(subprocess.run([str(binary)], cwd=ROOT).returncode)

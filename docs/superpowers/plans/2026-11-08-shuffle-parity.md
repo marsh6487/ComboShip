@@ -41,8 +41,15 @@ The two full-feature combined profiles exposed native random confined-item
 preplacements behind their own locks. Source repair596d8b60/5b0f921c exports native
 allowed-check sets and places confined items with the combined assumed fill,
 preserving fixed-source sharing policy. Actual native component generation and
-independent original-driver replay pass for both full-feature profiles; a new
-fully linked integrated runtime and complete eight-case rerun remain required.
+independent original-driver replay pass for both full-feature profiles. Fully linked
+R20 public1d5188e2/tree918b3b99 now passes the complete eight-case native matrix
+in CI and an independent five-stream local repeat:16 actual standalone native
+fills/replays and8 combined fills/original-driver replays. All3 native first-drop
+Vanilla cases pass. Linux all targets/resources/smokes/AppImage and Windows bothgames/UI/launcher/ZIP
+pass. Cumulative fixture closures now have passing evidence for all324 registered
+rows. Fresh cumulative CI, including mandatory actual Windows CLI link, remains
+required; original optional CLI step was skipped, not passed. See the exact
+hashes and evidence in docs/SHUFFLE_R20_NATIVE_GENERATION_20261109.md.
 Independent review of the complete production delta through2eab526b found no
 material issue; the separate fixed-source sharing review also approved the repair.
 
@@ -55,9 +62,10 @@ The existing CSMC CVar/default and global accent toggle remain unchanged.
 
 - [x] Complete environmental contents-category markers, native/foreign item
   categories, option/lifecycle controls and native rendering compilation.
-- [ ] Finish fresh Linux/Windows builds of the repaired integrated source and
-  correct any actual failures (R11 platform builds already passed).
-- [ ] Complete all eight freshly linked native parity profiles, including both
+- [x] Finish fresh R20 Linux all-target link/resources/smokes/native seeds/AppImage.
+- [ ] Finish fresh R20 Windows games/driver/launcher/ZIP and cumulative fixture-fix
+  full CI, correcting actual failures without diagnostic or assertion weakening.
+- [x] Complete all eight freshly linked native parity profiles, including both
   games Own Dungeon together and Stone Tower normal/inverted physical ownership.
 - [ ] Publish the verified follow-up source/checkpoint and final evidence record.
 
@@ -76,7 +84,7 @@ The existing CSMC CVar/default and global accent toggle remain unchanged.
 **Interfaces:** Existing native option serialization and combined fill functions. No new public ABI.
 - [x] Capture actual native settings -> restricted placement -> combined fill behavior with a deterministic failing scenario if the reported leak exists; add a negative control if it does not.
 - [x] Correct the smallest actual boundary, preserving Anywhere/Start With/Vanilla semantics.
-- [ ] Run seeded Own Dungeon combinations for both games and assert every boss key's physical owning dungeon; include Stone Tower/inverted routing and exclusions.
+- [x] Run seeded Own Dungeon combinations for both games and assert every boss key's physical owning dungeon; include Stone Tower/inverted routing and exclusions.
 - [x] Commit owned files and report exact commands, seeds, coverage and unresolved paths.
 
 ### Task 2: MM Saria/Desired Items parity
@@ -101,7 +109,8 @@ The existing CSMC CVar/default and global accent toggle remain unchanged.
 **Interfaces:** Soul-aware OoT enemy-kill reachability from Task 3 and native check ownership.
 - [x] Write failing native normal-death/special-death and one-check-per-enemy-type tests.
 - [x] Add real checks, correct scene/age routes and exclusion groups; distinguish unloads from death, make duplicate callbacks idempotent, preserve existing MM behavior.
-- [ ] Run actual native callbacks and seeded fills, including soul self-lock and disabled-option controls; commit.
+- [x] Run actual native callbacks and Vanilla seeded fills, including soul self-lock and disabled-option controls; commit.
+- [x] Recover/validate genuine original and MQ archives privately and run complete native MQ/mixed first-drop generation: all12 Vanilla/MQ/mixed cases pass exact R20 modules, including660 own-soul negatives; layout fixtures are separate.
 
 ### Task 5: MM capacities, infinite upgrades and UI
 **Files:** MM option/item/pool/grant/remove/save/logic adapters, `Rando/Menu.cpp`, shared wallet policy; `tests/shuffle_parity/capacities/`.
@@ -137,7 +146,7 @@ The existing CSMC CVar/default and global accent toggle remain unchanged.
 **Interfaces:** Stable actor-placement identity; native check ownership; one source of category/location labels.
 - [x] Failing real actor tests for rock, boulder/red-boulder, icicle and soil interactions.
 - [x] Add precise identities, item spawns, correct item/form/scene access and persisted exclusions; avoid duplicate rewards across respawns/resets.
-- [ ] Run native actor tests and seeded fills with each family, all families, exclusions and default-off; commit.
+- [x] Run native actor tests for each family and seeded fills with all families, exclusions and default-off; commit.
 
 ### Task 10: Lottery nights and OoT clock
 **Files:** MM `EnKujiya.cpp` and region/check/option/spoiler/exclusion paths; focused OoT clock runtime/item/solver adapters; `tests/shuffle_parity/time/`.
@@ -157,7 +166,7 @@ The existing CSMC CVar/default and global accent toggle remain unchanged.
 ### Task 12: Integrated verification and publication
 **Files:** Existing CI manifest/routing, source recovery docs/packages, feature-specific native fixtures.
 - [x] Register all meaningful regressions and run affected complete command groups plus CI policy tests.
-- [ ] Run seeded combined and solo Glitchless fills with restrictions, exclusions and all newly enabled gates; check circular dependencies and accurate hints.
+- [x] Run seeded combined and solo Glitchless fills with restrictions, exclusions and all newly enabled gates; check circular dependencies and native hint controls. Configured rendered acceptance remains separate.
 - [ ] Compile affected production units/full targets where possible; publish WIP versus verified status honestly.
 - [x] Obtain an independent review, correct material findings with failing regressions, and publish the dedicated draft PR/checkpoints with exact source trees.
 - [ ] Deliver durable recovery artifacts and a concise remaining runtime test record; never merge/promote master.

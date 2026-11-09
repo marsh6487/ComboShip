@@ -32,7 +32,45 @@ for prefix, end, addition in [('RC', 'RC_MAX', 'RC_LOST_WOODS_MAGIC_MIRROR_STUMP
 old_fc = subprocess.check_output(['git', 'show', BASE + ':soh/soh/FleetShipCombo/FleetComboItems.h'], cwd=ROOT, text=True)
 new_fc = (ROOT / 'soh/soh/FleetShipCombo/FleetComboItems.h').read_text()
 ids = lambda text: re.findall(r'X\((FCI_\w+),', text)
-assert ids(new_fc) == ids(old_fc) + ['FCI_MAGIC_MIRROR']
+# Mirror retains its original append ordinal. Later authorized features also
+# append identities, so validate their entire tail against independent native
+# catalogues rather than requiring the Mirror to remain the last item forever.
+rusty = re.findall(r'^RUSTY_KEY\((OOT|MM),\s*(\w+),',
+                   (ROOT / 'combo/rando/RustyDoorKeyCatalog.inc').read_text(), re.M)
+assert sum(game == 'OOT' for game, _ in rusty) == 27
+assert sum(game == 'MM' for game, _ in rusty) == 39
+extensions = [f'FCI_MM_KEY_RING_{dungeon}' for dungeon in
+              ('WOODFALL', 'SNOWHEAD', 'GREAT_BAY', 'STONE_TOWER')]
+extensions += ['FCI_OOT_CLOCK']
+extensions += [f'FCI_{game}_RUSTY_KEY_{key}' for game, key in rusty]
+
+def check_combo_registry(current):
+    assert len(current) == len(set(current)), 'duplicate serialized combo identity'
+    assert current == old_ids + ['FCI_MAGIC_MIRROR'] + extensions, 'combo ordinal or authorized tail changed'
+
+old_ids = ids(old_fc)
+assert len(old_ids) == 393, 'pinned pre-Mirror registry changed'
+current_ids = ids(new_fc)
+check_combo_registry(current_ids)
+# The broader append contract still rejects shifts, removal, excess identities,
+# duplicate identities and incorrect game ownership in the appended catalogue.
+for mutation in (
+    current_ids[1:],
+    current_ids[1:2] + current_ids[:1] + current_ids[2:],
+    current_ids[:394] + [current_ids[395], current_ids[394]] + current_ids[396:],
+    current_ids + ['FCI_UNAUTHORIZED'],
+    current_ids + [current_ids[-1]],
+    current_ids[:len(old_ids)] + extensions + ['FCI_MAGIC_MIRROR'],
+    current_ids[:-1],
+    current_ids[:len(old_ids) + 6] + ['FCI_MM_RUSTY_KEY_TREASURE_CHEST_GAME'] +
+        current_ids[len(old_ids) + 7:],
+):
+    try:
+        check_combo_registry(mutation)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError('combo registry mutation was accepted')
 
 assert 'RI_OOT_NEI_MAGIC_MIRROR,' in mm
 assert 'RO_SHUFFLE_MAGIC_MIRROR,' in mm
