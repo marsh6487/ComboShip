@@ -106,10 +106,13 @@ struct {
 
 namespace OotRelay {
 int sReceiveDepth = 0;
+// This fixture exercises scalar magic, not a soul-component receipt.
+bool SOH_ShareSoulReceipt(int) { return false; }
 /* OOT_RELAY */
 } // namespace OotRelay
 namespace MmRelay {
 int sReceiveDepth = 0;
+bool MM_ShareSoulReceipt(int) { return false; }
 /* MM_RELAY */
 } // namespace MmRelay
 

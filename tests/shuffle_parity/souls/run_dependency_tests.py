@@ -50,6 +50,35 @@ namespace Rando { struct Context { Option option; static Context*GetInstance(){s
             text+='struct Pair {RandomizerCheck check;std::vector<RandomizerGet> souls;};\n'
             text+='#define SOUL_CHECK(c,...) {c,{__VA_ARGS__}},\nPair pairs[]={\n#include "'+manifest+'"\n};\n#undef SOUL_CHECK\n'
             test='''
+            state.options={RSK_SHUFFLE_NPC_SOULS};
+            for(auto p:std::vector<Pair>{
+                {RC_KAK_TRADE_ODD_MUSHROOM,{RG_SOUL_NPC_OLD_HAG}},
+                {RC_KAK_GRANNYS_SHOP,{RG_SOUL_NPC_OLD_HAG}},
+                {RC_LH_LAB_DIVE,{RG_SOUL_NPC_SCIENTIST}},
+                {RC_LH_TRADE_FROG,{RG_SOUL_NPC_SCIENTIST}},
+                {RC_ZR_MAGIC_BEAN_SALESMAN,{RG_SOUL_NPC_BEAN_SALESMAN}},
+                {RC_WASTELAND_BOMBCHU_SALESMAN,{RG_SOUL_NPC_CARPET_MAN}},
+                {RC_SONG_FROM_WINDMILL,{RG_SOUL_NPC_GURU_GURU}}}){
+                state.owned={RG_SOUL_NPC_CITIZEN};assert(!state.CanAccessSoulCheck(p.check));
+                state.owned.insert(p.souls[0]);assert(state.CanAccessSoulCheck(p.check));
+            }
+            state.owned.clear();
+            for(auto c:{RC_KAK_WINDMILL_FREESTANDING_POH,RC_HW_CARPET_SALESMAN_ARROW_SIGN,RC_WASTELAND_CHEST})
+                assert(state.CanAccessSoulCheck(c));
+            state.options={RSK_SHUFFLE_ANIMAL_SOULS,RSK_SHUFFLE_NPC_SOULS};
+            assert(!state.CanAccessSoulCheck(RC_LW_TRADE_COJIRO));
+            state.owned={RG_SOUL_NPC_GROG};assert(state.CanAccessSoulCheck(RC_LW_TRADE_COJIRO));
+            state.owned.clear();assert(state.CanAccessSoulCheck(RC_LW_TRADE_ODD_POTION));
+            state.owned={RG_SOUL_ANIMAL_DOG};assert(!state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
+            state.owned.insert(RG_SOUL_NPC_DOG_LADY);assert(state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
+            state.owned.erase(RG_SOUL_ANIMAL_DOG);assert(!state.CanAccessSoulCheck(RC_MARKET_LOST_DOG));
+            state.owned={RG_SOUL_NPC_CITIZEN};
+            for(auto c:{RC_MK_BEGGAR_BUGS,RC_MK_BEGGAR_FISH,RC_MK_BEGGAR_BLUE_FIRE,
+                        RC_KAK_BEGGAR_BUGS,RC_KAK_BEGGAR_FISH,RC_KAK_BEGGAR_BLUE_FIRE}){
+                assert(!state.CanAccessSoulCheck(c));state.owned.insert(RG_SOUL_NPC_BANKER);
+                assert(state.CanAccessSoulCheck(c));state.owned.erase(RG_SOUL_NPC_BANKER);
+            }
+            state.owned.clear();assert(state.CanAccessSoulCheck(RC_MK_LOST_DOG_HOUSE_CRATE));
             state.options={RSK_SHUFFLE_ANIMAL_SOULS,RSK_SHUFFLE_NPC_SOULS};
             state.owned={RG_SOUL_ANIMAL_CUCCO};
             assert(!state.CanAccessSoulCheck(RC_KAK_ANJU_AS_CHILD));

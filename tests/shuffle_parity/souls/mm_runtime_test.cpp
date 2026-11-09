@@ -83,6 +83,45 @@ int main(){
         const auto* soul=Rando::SoulShuffle::Find(shop.soul);
         gSaveContext.save.shipSaveInfo.rando.randoInf[soul->flag/16]&=~(1u<<(soul->flag%16));
     }
+    struct NpcRole { int actor; int scene; unsigned params; RandoItemId soul; };
+    const NpcRole roles[] = {
+        {ACTOR_EN_GINKO_MAN, SCENE_ICHIBA, 0xFFFF, RI_SOUL_NPC_BANKER},
+        {ACTOR_EN_GURUGURU, SCENE_ALLEY, 1, RI_SOUL_NPC_GURU_GURU},
+        {ACTOR_EN_GURUGURU, SCENE_YADOYA, 0, RI_SOUL_NPC_GURU_GURU},
+        {ACTOR_EN_NB, SCENE_YADOYA, 0xFFFF, RI_SOUL_NPC_OLD_HAG},
+        {ACTOR_EN_NB, SCENE_OMOYA, 0xFFFF, RI_SOUL_NPC_OLD_HAG},
+        {ACTOR_EN_KENDO_JS, SCENE_DOUJOU, 0xFE00, RI_SOUL_NPC_CARPET_MAN},
+        {ACTOR_EN_KENDO_JS, SCENE_DOUJOU, 0xFE01, RI_SOUL_NPC_CARPET_MAN},
+    };
+    for (const auto& role : roles) {
+        play.sceneId = role.scene;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 0;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(!MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Actor_SpawnAsChildAndCutscene(&play.actorCtx, &play, role.actor, 0, 0, 0,
+                                     0, 0, 0, (s16)role.params, 0, 0, nullptr);
+        REQUIRE(spawnReachesAllocation == 0);
+        gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+        gSaveContext.gameMode = GAMEMODE_END_CREDITS;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        gSaveContext.gameMode = GAMEMODE_NORMAL;
+        Own(role.soul);
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Actor_SpawnAsChildAndCutscene(&play.actorCtx, &play, role.actor, 0, 0, 0,
+                                     0, 0, 0, (s16)role.params, 0, 0, nullptr);
+        REQUIRE(spawnReachesAllocation == 1);
+        spawnReachesAllocation = 0;
+        Own(role.soul, false);
+        if (role.actor == ACTOR_EN_GURUGURU || role.actor == ACTOR_EN_KENDO_JS) {
+            REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, 2));
+            REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, 0xFF));
+        }
+        play.sceneId = 0x7FFF;
+        REQUIRE(MM_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+    }
     RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=0;
     play.sceneId=0;
     REQUIRE(MM_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));

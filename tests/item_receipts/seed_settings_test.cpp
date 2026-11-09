@@ -236,7 +236,11 @@ int main(int argc, char** argv) {
     static_assert(RSK_HYLIAS_GRACE == RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1);
     static_assert(RSK_HYLIAS_GRACE_REWARDS + 1 == RSK_ROD_OF_SEASONS);
     static_assert(RSK_STARTING_ROD_OF_SEASONS + 1 == RSK_SHUFFLE_MAGIC_MIRROR);
-    static_assert(RSK_SHUFFLE_MAGIC_MIRROR + 1 == RSK_MAX);
+    static_assert(RSK_SHUFFLE_MAGIC_MIRROR + 1 == RSK_SHUFFLE_ENEMY_SOULS);
+    static_assert(RSK_SHUFFLE_ENEMY_SOULS + 1 == RSK_SHUFFLE_NPC_SOULS);
+    static_assert(RSK_SHUFFLE_NPC_SOULS + 1 == RSK_SHUFFLE_ANIMAL_SOULS);
+    static_assert(RSK_SHUFFLE_ANIMAL_SOULS + 1 == RSK_SHUFFLE_MISC_SOULS);
+    static_assert(RSK_SHUFFLE_MISC_SOULS + 1 == RSK_MAX);
 
     auto& seasons = settings->GetOption(RSK_ROD_OF_SEASONS);
     auto& startingRod = settings->GetOption(RSK_STARTING_ROD_OF_SEASONS);

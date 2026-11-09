@@ -523,3 +523,177 @@ checks pass. The controller subsequently assigned MM Logic.h formatting to this
 cluster as well; its dry-run/Werror check passes. The controller owns the separate
 OoT enemy-header formatting repair. Native tests were rerun after the cluster's initial formatting and passed;
 no unrelated suite was rerun solely for final whitespace normalization.
+
+### Native NPC cluster 2: OoT Grog, Dog Lady and Banker (2026-11-09)
+
+This bounded cluster adds positive actor/scene/role rows and eight reward
+requirements without changing item IDs, grants, pools, settings or shared
+receipts. Grog's adult `EnHs` placement in Lost Woods and separate child
+`EnHs2` placement in Kakariko use Grog Soul. Only Cojiro's reward belongs to
+Grog; Fado's Odd Potion trade remains independent. `EnHs_Init` overwrites its
+params from age, so incoming params do not identify an alternate native role.
+`EnHs2` is the separate dialogue-only child actor.
+
+Dog Lady is `EnHy` type 0 in Dog Lady House, Market Day and Kakariko Guest House.
+The lost-dog check requires both Dog and Dog Lady souls. The bottle buyer is
+`EnHy` type 5 in Market Day and Kakariko, mapped to the catalog's Banker Soul;
+all six bugs/fish/blue-fire sales require Banker. Native role extraction uses
+`params & 0x7F`, retaining path bits and avoiding donor mask aliasing for invalid
+roles 0x40/0x45. Other citizens, unknown placements and generic viewers remain
+unfiltered by these rows. This cluster does not hide Mido, King Zora or guards;
+those physical blockers need a separate monotonic-reachability audit.
+
+Evidence: `z_en_hs.c:59` initializes the age role and `:157` sets the Cojiro
+check's randomizer flag. `hook_handlers.cpp:2038` documents and implements the
+Cojiro/Fado shuffled-trade spawn alternatives. `z_en_hs2.c` identifies the child
+counterpart and implements dialogue without a reward or progression switch.
+`z_en_hy.c:432` distinguishes Dog Lady's scene dialogue, `:681` offers the dog
+reward, `:746` restricts bottle sales to type 5 and `:832` preserves native
+scene/time spawn rules. `ShuffleBeggar.cpp:123` binds the six checks to Market
+and Kakariko; its location params are synthetic text IDs, not actor roles.
+`market.cpp:234` and `lost_woods.cpp:24` retain their existing native age/time,
+language and trade-item predicates through the common check adapter.
+
+Verification commands (fixture env from `recovered-tooling/fixture-env.sh`):
+
+- `python3 tests/shuffle_parity/souls/run_runtime_tests.py`: RED without the new
+  rows (actual native optional-spawn gate accepted missing Grog), then GREEN
+  under original and Combo guards. Literal cases cover all seven added rows,
+  missing/owned/off, the actual preallocation prefix, path/sign bits, unrelated
+  roles and unknown scenes. Existing enemy, shop and animal cases also pass.
+- `python3 tests/shuffle_parity/souls/run_dependency_tests.py`: RED without the
+  new rows (actual native Cojiro predicate accepted missing Grog), then GREEN
+  under both games/guards. Cojiro/Fado separation, Dog and Dog Lady conjunction,
+  Banker versus Citizen, six sales, independent crate, every manifest-required
+  soul independently absent, options off, native No Logic and existing native
+  condition preservation all pass. Manifests now contain 299 OoT/117 MM checks.
+
+The whole runtime TU and whole OoT logic TU are also checked with recovered
+CMake native flags and isolated source paths. Configured native gameplay,
+night/day scene transitions, seeded native region traversal and user acceptance
+remain unverified. Remaining NPC families are still WIP and controls stay hidden.
+
+Cluster 2 checkpoint: `e945d243feaa9e82806faf13d8a0c24d6b39d3b4`, tree
+`131658276a396365417a8763a600118b59c727f3`; integrated by the controller as
+`f75aa59aa8d96885837183d5eb95a20936f6f786`. Controller confirmed independent
+restoration of its durable cumulative source checkpoint before cluster 3 edits.
+
+### Native NPC cluster 3: OoT merchants and song teacher (2026-11-09)
+
+Adds five positive native actor/scene mappings: Old Hag (`EnDs`, Granny's
+Potion Shop), Scientist (`EnMk`, Lakeside Laboratory), Bean Salesman (`EnMs`,
+Zora's River), Carpet Man (`EnJs`, Haunted Wasteland), and Guru Guru (`EnFu`,
+Windmill/Dampe's Grave scene). Their native source does not interpret incoming
+params as distinct NPC roles. Missing souls are rejected before allocation;
+vanilla, credits and unknown placements preserve existing behavior.
+
+Seven corresponding direct checks now require the matching soul: Odd Mushroom
+trade and Granny's purchase, lab dive and frog trade, beans, Carpet purchase,
+and Song of Storms teaching. The source-qualified Haunted Wasteland
+`LOGIC_CARPET_MERCHANT` event also requires Carpet Man: real `Logic::BombchuRefill`
+consumes this event. Its existing wallet/price and jumpslash/hover/Bunny Hood
+alternatives remain. Guru Guru is not added to child `LOGIC_DRAIN_WELL`, the
+windmill heart piece, or physical routes. Nearby laboratory/Wasteland props,
+Carpet sign and independently planted bean routes are unaffected.
+
+Native evidence: `z_en_ds.c:96/179` offers the two Granny rewards;
+`z_en_mk.c:102/205` offers eyedrops and the diving heart piece;
+`z_en_ms.c:136` offers beans; `z_en_js.c:134` offers Bombchus and its Init creates
+its own carpet child. `z_en_jsjutan.c:155` only seeks Scientist/Bean Salesman
+peers in the Lon Lon Ranch credits scene, which the positive placements and
+credits guard leave unaffected. `z_en_fu.c:157/183` owns learning/receiving
+Storms; `z_en_okarina_tag.c:250` independently triggers child well draining.
+No new actor initialization or destructor shortcuts were introduced.
+
+Fresh RED→GREEN verification with the recovered fixture environment:
+
+- `python3 tests/shuffle_parity/souls/run_runtime_tests.py`: missing Old Hag
+  initially reached the native spawn path; after mappings, all five new host
+  cases and existing roles pass original/Combo. Each literal role checks saved
+  option off, absent/owned flag, native preallocation, vanilla, credits and
+  unknown placement controls.
+- `python3 tests/shuffle_parity/souls/run_dependency_tests.py`: Granny initially
+  remained reachable with only Citizen Soul; seven literal host/check pairs now
+  reject unrelated ownership and accept their actual soul. All 306 OoT/117 MM
+  manifest cases and independent prop conditions pass under both guards.
+- `python3 tests/shuffle_parity/souls/run_event_tests.py`: actual source-qualified
+  Carpet event initially allowed missing Carpet Soul. Actual `EVENT_ACCESS`
+  lambdas now pass missing/owned/off, wallet, price and all existing route
+  alternatives. The native child-well expression passes with Storms and no
+  Guru Guru, fails for adult or missing song. Existing MM event fixtures pass.
+- `run_native_compile.py --database ../build-cmake-recovered/compile_commands.json`
+  with `--only` for OoT `SoulShuffleRuntime.cpp`, `logic.cpp` and
+  `location_access/overworld/haunted_wasteland.cpp`: all three complete production
+  TUs pass native CMake flags in the isolated checkout. The changed region also
+  passes clang-format 14 `--dry-run --Werror`; `git diff --check` passes.
+
+No configured-game scene/credits run or native seeded fill was performed for
+this cluster. Most remaining NPC families still need runtime/solver parity;
+controls remain hidden. Mido/King Zora/guards and their source events remain a
+separate audit, retaining conservative access capability without negative-soul
+shortcuts or invented movement save mutations.
+
+Cluster 3 checkpoint: `cf3cfe25ef765c048b9c4f4f572700550c0792c8`, tree
+`1b92f59e2af3879d28b944e81f13f62d7323868c`, delivered to the controller for its
+independent cumulative source preservation. The following MM change remains a
+separate bounded commit and changes no shared registry/capacity files.
+
+### Native NPC cluster 4: MM scheduled town hosts (2026-11-09)
+
+Adds six positive actor/scene/role rows covering Banker, Guru Guru, Old Hag and
+Carpet Man. Banker is `EnGinkoMan` in West Clock Town. Guru Guru's ordinary
+night role is params 1 in Laundry Pool and day role params 0 in Stock Pot Inn;
+the special hidden/cutscene params 2 variant and unknown placements remain
+unfiltered. Old Hag is `EnNb` in Stock Pot Inn and Ranch House, the two scenes
+explicitly named by her native schedule. Carpet Man maps to `EnKendoJs`, the
+Swordsman's School teacher/scared-night roles selected by low byte 0/1; upper
+path-index bits are preserved. No actor Init cancellation was introduced.
+
+Seven native checks now require these souls: three bank rewards, Bremen Mask,
+two Granny stories, and the swordsman heart piece. Existing wallet, clock/time,
+All-Night Mask and sword predicates remain in the actual region definitions.
+Ambient swordsman pots and inn chests remain independent. The MM Bean Salesman
+is deliberately not included here: his vanilla refill/first-bean behavior
+needs a separate event audit rather than inventing a randomized check.
+
+Source audit: `z_en_ginko_man.c:559` dispatches bank rewards;
+`z_en_guruguru.c:86/94` distinguishes params 0/1/2 and its native time roles,
+`:311` owns Bremen's week-event flag. `z_en_nb.c:42` explicitly schedules
+`SCENE_YADOYA`/`SCENE_OMOYA`, and its story scripts own both reward flags.
+`z_en_kendo_js.h:11` defines the role/path extraction; `z_en_kendo_js.c:110`
+handles the closing/scared role and `:755` spawns the practice-log children.
+`EnMaruta` checks its parent before host access. The teacher's absence cannot
+create a practice reward through those unspawned children.
+
+The Granny peer audit is source evidence, not a simulated schedule proof:
+`EnAn`'s lunch binder at `z_en_an.c:2757` checks the found actor and update
+pointer. `EnAn_FollowSchedule:3699` reevaluates the schedule and retries a new
+result, so a missing lunch participant is not a permanent state flag. Actual
+Anju movement, later conversations and scene transitions remain runtime-unverified.
+
+Fresh commands with recovered fixture/native environments:
+
+- `python3 tests/shuffle_parity/souls/run_mm_runtime_tests.py`: RED missing
+  Banker accepted by actual preallocation path; GREEN original/Combo for seven
+  literal role cases (six rows, both Kendo roles), saved option/flag, signed
+  path bits, vanilla/credits, hidden/unknown roles and unknown scenes. Existing
+  Grog/chick/native animal and shop cases pass. Existing native
+  `DUNGEON_KEY_COUNT` comma-subscript deprecation warnings remain unchanged.
+- `python3 tests/shuffle_parity/souls/run_npc_check_tests.py` (new CI command):
+  RED first actual bank CHECK accepted missing soul; GREEN under both guards.
+  This runs all seven actual `Central.cpp` CHECK bodies, the actual saved soul
+  adapter and native clock/time macros. Boundary fixtures supply one reachable
+  timeslice and specific inventory capabilities. Tests cover missing/owned/off,
+  unrelated Citizen Soul, bank wallet levels, Guru day/night/clock ownership,
+  Granny mask/story/day/clock requirements, swordsman sword/closing boundaries,
+  and unrelated pots/chests. It does not execute full region traversal or native
+  NPC schedule engines.
+- `python3 tests/shuffle_parity/souls/run_dependency_tests.py`: all 306 OoT/124 MM
+  manifest cases pass both guards, including independent required-soul removal.
+- `run_native_compile.py` with recovered CMake database and `--only` MM
+  `SoulShuffleRuntime.cpp` and `Logic/Regions/Central.cpp`: both entire native
+  production TUs pass `-fsyntax-only`, with isolated text PCH/header paths.
+
+No full module link, configured runtime scene/credits test or seeded native
+oracle fill was added by this cluster. Remaining NPC families and their world
+source/physical dependencies remain WIP; controls stay hidden.

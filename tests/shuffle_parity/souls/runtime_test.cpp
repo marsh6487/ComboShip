@@ -45,6 +45,51 @@ int main() {
         const auto* soul=Rando::SoulShuffle::Find(shop.soul);
         gSaveContext.ship.randomizerInf[soul->flag/16]&=~(1u<<(soul->flag%16));
     }
+    // Literal native role cases: deleting a gate, using the donor's 0x3F
+    // mask, or matching a different EnHy role must fail these controls.
+    struct NpcRole { int actor; int scene; unsigned params; RandomizerGet soul; };
+    const NpcRole roles[] = {
+        {ACTOR_EN_DS, SCENE_POTION_SHOP_GRANNY, 0xFFFF, RG_SOUL_NPC_OLD_HAG},
+        {ACTOR_EN_MK, SCENE_LAKESIDE_LABORATORY, 0xFFFF, RG_SOUL_NPC_SCIENTIST},
+        {ACTOR_EN_MS, SCENE_ZORAS_RIVER, 0xFFFF, RG_SOUL_NPC_BEAN_SALESMAN},
+        {ACTOR_EN_JS, SCENE_HAUNTED_WASTELAND, 0xFFFF, RG_SOUL_NPC_CARPET_MAN},
+        {ACTOR_EN_FU, SCENE_WINDMILL_AND_DAMPES_GRAVE, 0xFFFF, RG_SOUL_NPC_GURU_GURU},
+        {ACTOR_EN_HS, SCENE_LOST_WOODS, 0xFFFF, RG_SOUL_NPC_GROG},
+        {ACTOR_EN_HS2, SCENE_KAKARIKO_VILLAGE, 0xFFFF, RG_SOUL_NPC_GROG},
+        {ACTOR_EN_HY, SCENE_DOG_LADY_HOUSE, 0, RG_SOUL_NPC_DOG_LADY},
+        {ACTOR_EN_HY, SCENE_MARKET_DAY, 0x780, RG_SOUL_NPC_DOG_LADY},
+        {ACTOR_EN_HY, SCENE_KAKARIKO_CENTER_GUEST_HOUSE, 0x8000, RG_SOUL_NPC_DOG_LADY},
+        {ACTOR_EN_HY, SCENE_MARKET_DAY, 5, RG_SOUL_NPC_BANKER},
+        {ACTOR_EN_HY, SCENE_KAKARIKO_VILLAGE, 0x785, RG_SOUL_NPC_BANKER},
+    };
+    for (const auto& role : roles) {
+        play.sceneNum = role.scene;
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 0;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        optionValues[RSK_SHUFFLE_NPC_SOULS] = 1;
+        REQUIRE(!Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        gSaveContext.ship.quest.id = QUEST_NORMAL;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        gSaveContext.ship.quest.id = QUEST_RANDOMIZER;
+        gSaveContext.gameMode = GAMEMODE_END_CREDITS;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        gSaveContext.gameMode = GAMEMODE_NORMAL;
+        Actor_Spawn(&play.actorCtx, &play, role.actor, 0, 0, 0, 0, 0, 0, role.params);
+        REQUIRE(spawnReachesAllocation == 0);
+        Own(role.soul, true);
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+        Actor_Spawn(&play.actorCtx, &play, role.actor, 0, 0, 0, 0, 0, 0, role.params);
+        REQUIRE(spawnReachesAllocation == 1);
+        spawnReachesAllocation = 0;
+        Own(role.soul, false);
+        if (role.actor == ACTOR_EN_HY) {
+            REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 7));
+            REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 0x40));
+            REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, 0x45));
+        }
+        play.sceneNum = SCENE_HYRULE_CASTLE;
+        REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play, role.actor, role.params));
+    }
     optionValues[RSK_SHUFFLE_NPC_SOULS]=0;
     play.sceneNum=0;
     REQUIRE(Randomizer_SoulCanSpawnNonEnemy(&play,ACTOR_EN_COW,0));

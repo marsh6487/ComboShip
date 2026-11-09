@@ -13,6 +13,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[3]
 FILES = (
+    "soh/soh/Enhancements/randomizer/location_access/overworld/haunted_wasteland.cpp",
     "mm/2s2h/Rando/Logic/Regions/MilkRoad.cpp",
     'soh/soh/Enhancements/randomizer/SoulShuffleShared.cpp',
     'mm/2s2h/Rando/SoulShuffleShared.cpp',

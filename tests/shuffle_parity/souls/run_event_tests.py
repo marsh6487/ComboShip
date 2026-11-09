@@ -44,3 +44,54 @@ with tempfile.TemporaryDirectory(prefix='soul-events-') as t:
   exe=t/mode
   subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(src),'-o',str(exe)],check=True)
   subprocess.run([str(exe)],check=True)
+
+# OoT event rows are source-qualified rather than global event-ID gates: root
+# setting shortcuts must never inherit an NPC requirement accidentally.
+access=(ROOT/'soh/soh/Enhancements/randomizer/location_access.h').read_text()
+a=access.index('#define EVENT_ACCESS(');b=access.index('class EventAccess',a)
+source='''#include "soh/soh/Enhancements/randomizer/SoulShuffle.h"
+#include "soh/tests/test_require.h"
+#include <set>
+#include <string>
+struct Logic {
+ bool IsChild=true,enabled=true,jumpslash=true,bunny=false;
+ std::set<RandomizerGet> items;
+ bool HasItem(RandomizerGet item){return (Rando::SoulShuffle::Find(item)&&!enabled)||items.count(item);}
+ bool CanUse(RandomizerGet item){return items.count(item);}
+ bool CanJumpslash(){return jumpslash;}
+ bool BunnyHood(){return bunny;}
+} state;auto*logic=&state;
+int price=200,capacity=200;
+int GetCheckPrice(RandomizerCheck){return price;}
+int GetWalletCapacity(){return capacity;}
+std::string CleanConditionString(const char*s){return s;}
+struct EventAccess {LogicVal id;const char*name;bool(*condition)();std::string text;};
+'''+access[a:b]+'\nEventAccess events[]={\n'
+for file,region,event in [('haunted_wasteland','RR_HAUNTED_WASTELAND','LOGIC_CARPET_MERCHANT'),
+                          ('kakariko','RR_KAK_WINDMILL_LOWER','LOGIC_DRAIN_WELL')]:
+ text=(ROOT/f'soh/soh/Enhancements/randomizer/location_access/overworld/{file}.cpp').read_text()
+ start=text.index('areaTable['+region+']');end=text.find('areaTable[',start+1)
+ line=next(l for l in text[start:end].splitlines() if 'EVENT_ACCESS('+event+',' in l)
+ source+=line+'\n'
+source+='''};
+int main(){
+ state.items={RG_ADULT_WALLET};REQUIRE(!events[0].condition());
+ state.items.insert(RG_SOUL_NPC_CARPET_MAN);REQUIRE(events[0].condition());
+ capacity=199;REQUIRE(!events[0].condition());capacity=200;
+ state.items.erase(RG_ADULT_WALLET);REQUIRE(!events[0].condition());state.items.insert(RG_ADULT_WALLET);
+ state.jumpslash=false;REQUIRE(!events[0].condition());
+ state.items.insert(RG_HOVER_BOOTS);REQUIRE(events[0].condition());state.items.erase(RG_HOVER_BOOTS);
+ state.bunny=true;REQUIRE(events[0].condition());state.bunny=false;state.jumpslash=true;
+ state.items.erase(RG_SOUL_NPC_CARPET_MAN);state.enabled=false;REQUIRE(events[0].condition());
+ state.enabled=true;state.items={RG_SONG_OF_STORMS};REQUIRE(events[1].condition());
+ state.IsChild=false;REQUIRE(!events[1].condition());state.IsChild=true;
+ state.items.clear();REQUIRE(!events[1].condition());
+ puts("PASS actual OoT stored events: Carpet refill soul/price/route controls and independent child well drain");
+}
+'''
+with tempfile.TemporaryDirectory(prefix='soul-oot-events-') as t:
+ t=Path(t);cpp=t/'events.cpp';cpp.write_text(source)
+ for mode in ('original','combo'):
+  exe=t/mode
+  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),*(['-DCOMBO_BUILD'] if mode=='combo' else []),str(cpp),'-o',str(exe)],check=True)
+  subprocess.run([str(exe)],check=True)

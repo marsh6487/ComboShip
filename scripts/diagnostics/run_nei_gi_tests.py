@@ -150,6 +150,11 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
 #include <unordered_set>
 #include "ComboMaskShimmer.h"
 #include "ComboCollectibleShimmerDraw.h"
+// This fixture dispatches NEI/song/arrow presentations. Counted key-ring
+// geometry and both host callbacks execute in shuffle_parity/key_rings.
+namespace ComboMmKeyRing {
+template<class... Args> bool Draw(Args...) { assert(false && "unexpected key-ring dispatch"); return false; }
+}
 extern "C" { PlayState* gPlayState = &Fixture::play; }
 bool ownerAlt = false;
 extern "C" int32_t OOT_NeiAltAssetsEnabled(void) { return ownerAlt; }
@@ -268,9 +273,11 @@ void Matrix_RotateYS(s16, u8) {}
 void func_800B8118(Actor*,PlayState*,int) {}
 void func_800B8050(Actor*,PlayState*,int) {}
 int DungeonItem_GetOwner(RandoItemId) {return -1;}
+int DungeonItem_GetKeyRingCount(RandoItemId) {return 0;}
 bool GetItem_DrawDungeonItem(PlayState*,s16,int) {assert(false);return false;}
 int mmShopLegacyDraws;
 namespace Rando {
+void DrawKeyRing(RandoItemId) {assert(false && "unexpected native key ring");}
 void DrawItem(RandoItemId,RandoCheckId,Actor*);
 void DrawResolvedItem(RandoItemId,RandoCheckId,Actor*);
 RandoItemId ConvertItem(RandoItemId item,RandoCheckId) {return item;}
