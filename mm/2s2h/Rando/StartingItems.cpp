@@ -1,5 +1,6 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando.h"
+#include "KeyRings.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "2s2h/ShipUtils.h"
 #include <libultraship/libultraship.h>
@@ -35,10 +36,12 @@ std::vector<RandoItemId> GetComputedStartingItems(RandoSaveInfo& randoSaveInfo) 
     }
 
     if (randoSaveInfo.randoSaveOptions[RO_PLACEMENT_SMALL_KEYS] == RO_DUNGEON_ITEM_START_WITH) {
-        startingItems.insert(startingItems.end(), 1, RI_WOODFALL_SMALL_KEY);
-        startingItems.insert(startingItems.end(), 3, RI_SNOWHEAD_SMALL_KEY);
-        startingItems.insert(startingItems.end(), 1, RI_GREAT_BAY_SMALL_KEY);
-        startingItems.insert(startingItems.end(), 4, RI_STONE_TOWER_SMALL_KEY);
+        for (const auto& ring : KeyRings::Catalog) {
+            if (KeyRings::Selected(randoSaveInfo, ring))
+                startingItems.push_back(ring.ring);
+            else
+                startingItems.insert(startingItems.end(), ring.count, ring.smallKey);
+        }
     }
 
     if (randoSaveInfo.randoSaveOptions[RO_PLACEMENT_BOSS_KEYS] == RO_DUNGEON_ITEM_START_WITH) {

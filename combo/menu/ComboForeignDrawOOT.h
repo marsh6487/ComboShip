@@ -147,6 +147,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MM_KEY_RING && !CwValidMmKeyRingRecipe(&raw))
+        return ComboForeignResolve::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
         return ComboForeignResolve::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";

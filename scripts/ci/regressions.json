@@ -1913,8 +1913,8 @@
   {
     "suite": "systems",
     "origin": "gate",
-    "name": "Link age voice mixer sanitizer and publication stress",
-    "run": "c++ -std=c++20 -pthread -I. -fsanitize=address,undefined -fno-pie -no-pie tests/link_voice/mixer_test.cpp -o \"$RUNNER_TEMP/age-voice-mixer\"\n\"$RUNNER_TEMP/age-voice-mixer\"",
+    "name": "Link age voice dispatch, fallback, and mixer regression",
+    "run": "c++ -std=c++20 -pthread -I. -fsanitize=address,undefined -fno-pie -no-pie tests/link_voice/mixer_test.cpp -o \"$RUNNER_TEMP/age-voice-mixer\"\n\"$RUNNER_TEMP/age-voice-mixer\"\npython3 -B tests/link_voice/run_tests.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }

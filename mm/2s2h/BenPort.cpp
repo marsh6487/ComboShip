@@ -1,4 +1,5 @@
 #include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -4589,8 +4590,8 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         for (RandoItemId id : itemPool) {
             if (!Rando::Logic::IsItemAllowedAtCheck(id, RC_UNKNOWN)) {
                 cached = nlohmann::json{
-                    { "error", "MM confined item has no remaining native check: " +
-                                   Rando::StaticData::GetItemDisplayName(id) },
+                    { "error",
+                      "MM confined item has no remaining native check: " + Rando::StaticData::GetItemDisplayName(id) },
                     { "checks", nlohmann::json::array() },
                     { "pool", nlohmann::json::array() },
                     { "fixed", nlohmann::json::array() }
@@ -4818,6 +4819,12 @@ static void GiveItemForOracle(RandoItemId ri) {
     // Soul catalog mm_oracle end
 
     switch (ri) {
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            Rando::KeyRings::Give(ri);
+            break;
         case RI_JUNK:
         case RI_NONE:
         case RI_TRAP:

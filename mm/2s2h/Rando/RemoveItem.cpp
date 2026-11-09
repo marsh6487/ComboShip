@@ -1,4 +1,5 @@
 #include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -19,6 +20,12 @@ void Rando::RemoveItem(RandoItemId randoItemId) {
     // Soul catalog mm_remove end
 
     switch (randoItemId) {
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            KeyRings::Remove(randoItemId);
+            break;
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             CLEAR_WEEKEVENTREG(WEEKEVENTREG_08_80);
             break;

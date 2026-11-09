@@ -1024,6 +1024,20 @@ void DrawMarket() {
         if (!stock || !stock->actor.update)
             continue;
         Actor& display = stock->actor;
+        // This manual world-end draw bypasses Actor_Draw. Bind its native scene
+        // lights for every stock actor; lit GI materials cannot inherit the
+        // previous actor's or lock seal's lighting state.
+        Lights* lights = LightContext_NewLights(&play->lightCtx, play->state.gfxCtx);
+        if ((display.flags & ACTOR_FLAG_UCODE_POINT_LIGHT_ENABLED) &&
+            (play->roomCtx.curRoom.enablePosLights || MREG(93) != 0)) {
+            lights->enablePosLights = true;
+        }
+        Lights_BindAll(lights, play->lightCtx.listHead,
+                       (display.flags & (ACTOR_FLAG_UCODE_POINT_LIGHT_ENABLED | ACTOR_FLAG_IGNORE_LEGACY_POINT_LIGHTS))
+                           ? nullptr
+                           : &display.world.pos,
+                       play);
+        Lights_Draw(lights, play->state.gfxCtx);
         Matrix_Push();
         Matrix_Translate(display.world.pos.x, display.world.pos.y, display.world.pos.z, MTXMODE_NEW);
         Matrix_RotateYS(stock->rotY + play->gameplayFrames * 100 + slot * 4096, MTXMODE_APPLY);

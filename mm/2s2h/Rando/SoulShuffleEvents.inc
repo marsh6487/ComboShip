@@ -1,0 +1,3 @@
+// Native event sources: Central.cpp telescope scrub; BeneathTheWell.cpp cow.
+SOUL_EVENT(RE_TERMINA_FIELD_SCRUB_ENTERED_GROTTO, RI_SOUL_MISC_BUSINESS_SCRUB)
+SOUL_EVENT(RE_ACCESS_MILK_REFILL, RI_SOUL_ANIMAL_COW)

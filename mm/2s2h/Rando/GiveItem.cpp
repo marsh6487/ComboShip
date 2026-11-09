@@ -1,4 +1,5 @@
 #include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -153,12 +154,13 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             });
         }
     }
-    // Soul catalog mm_give begin
-    if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
-        Flags_SetRandoInf(soul->flag);
-    }
-    // Soul catalog mm_give end
-    else switch (randoItemId) {
+    switch (randoItemId) {
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            KeyRings::Give(randoItemId);
+            break;
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             SET_WEEKEVENTREG(WEEKEVENTREG_08_80);
             break;
@@ -1423,15 +1425,23 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Bottle_GiveBottle(ITEM_BOTTLE_LETTER_RUTO);
             break;
         default: {
-            // CheckQueue marks the check obtained right after this returns, so a missing arm eats
-            // the item in silence.
-            ItemId itemId = Rando::StaticData::Items[randoItemId].itemId;
-            if (itemId == ITEM_NONE) {
-                SPDLOG_ERROR("[Rando] GiveItem has no behaviour for {} ({}); check marked, nothing given.",
-                             Rando::StaticData::Items[randoItemId].spoilerName, (int)randoItemId);
+            // Soul catalog mm_give begin
+            if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
+                Flags_SetRandoInf(soul->flag);
+            }
+            // Soul catalog mm_give end
+            else {
+                // CheckQueue marks the check obtained right after this returns, so a missing arm eats
+                // the item in silence.
+                ItemId itemId = Rando::StaticData::Items[randoItemId].itemId;
+                if (itemId == ITEM_NONE) {
+                    SPDLOG_ERROR("[Rando] GiveItem has no behaviour for {} ({}); check marked, nothing given.",
+                                 Rando::StaticData::Items[randoItemId].spoilerName, (int)randoItemId);
+                    break;
+                }
+                Item_Give(gPlayState, itemId);
                 break;
             }
-            Item_Give(gPlayState, itemId);
             break;
         }
     }

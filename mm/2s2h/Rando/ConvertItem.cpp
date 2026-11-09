@@ -1,4 +1,5 @@
 #include "Rando/Rando.h"
+#include "Rando/KeyRings.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
@@ -237,6 +238,9 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         hasObtainedCheck = RANDO_SAVE_CHECKS[randoCheckId].obtained;
     }
 
+    if (const auto* ring = KeyRings::Find(randoItemId))
+        return !hasObtainedCheck && !KeyRings::Owned(*ring);
+
     u8 vanillaCantObtain = false;
     if (Rando::StaticData::Items[randoItemId].itemId != ITEM_NONE &&
         Rando::StaticData::Items[randoItemId].getItemId != GI_NONE) {
@@ -409,6 +413,10 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         case RI_MAGIC_JAR_BIG:
             return gSaveContext.save.saveInfo.playerData.isMagicAcquired;
         // TODO: These should be based on a persistent setting
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
         case RI_WOODFALL_SMALL_KEY:
         case RI_SNOWHEAD_SMALL_KEY:
         case RI_GREAT_BAY_SMALL_KEY:

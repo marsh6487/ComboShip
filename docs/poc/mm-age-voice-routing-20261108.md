@@ -1,5 +1,11 @@
 # MM child/adult voice integration candidate
 
+November 8 follow-up: `mm-adult-voice-followup-20261108.md` records the logged
+PR87 source mismatch, real Marin/native-loader checks, removal of the remaining
+automatic adult pitch fallback, and new provider-selection diagnostics. The
+current source no longer applies the historical `0.85` approximation even if
+both adult providers are unavailable.
+
 The optional paired Marin archive now selects child or adult recordings using
 `AdultLink_IsActive()`, the same Time Gate state used by adult rendering. Without
 that archive, young human Link retains native MM playback and adult human Link

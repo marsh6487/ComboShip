@@ -39,6 +39,8 @@ class Logic {
     bool CanUse(RandomizerGet itemName);
     bool HasProjectile(HasProjectileAge age);
     bool HasItem(RandomizerGet itemName);
+    bool CanAccessSoulCheck(RandomizerCheck check);
+    bool CanUseCucco();
     bool ItemUseAllowed(RandomizerGet itemName);
     bool BAllowed();
     bool SmallKeys(SceneID scene, uint8_t requiredAmount);

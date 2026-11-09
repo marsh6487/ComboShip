@@ -1,3 +1,4 @@
+#include "Rando/SoulShuffle.h"
 #ifndef RANDO_LOGIC_H
 #define RANDO_LOGIC_H
 
@@ -271,9 +272,14 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define HAS_ENOUGH_SKULLTULA_TOKENS(sceneId) \
     (Inventory_GetSkullTokenCount(sceneId) >= RANDO_SAVE_OPTIONS[RO_SKULLTULA_TOKENS_REQUIRED])
 
+inline bool SoulEventRequirement(RandoEvent event) {
+    const auto* soul = Rando::SoulShuffle::Find(Rando::SoulShuffle::EventItem(event));
+    return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+}
+
 #define EVENT(randoEvent, condition)         \
     {                                        \
-        randoEvent, [] { return condition; } \
+        randoEvent, [] { return SoulEventRequirement(randoEvent) && (condition); } \
     }
 #define EXIT(toEntrance, fromEntrance, condition)                           \
     {                                                                       \
@@ -287,10 +293,15 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
             [] { return condition; }, LogicString(#condition) \
         }                                                     \
     }
+inline bool SoulCheckRequirement(RandoCheckId check) {
+    const auto* soul = Rando::SoulShuffle::Find(Rando::SoulShuffle::CheckItem(check));
+    return !soul || !RANDO_SAVE_OPTIONS[soul->option] || Flags_GetRandoInf(soul->flag);
+}
+
 #define CHECK(check, condition)                               \
     {                                                         \
         check, {                                              \
-            [] { return condition; }, LogicString(#condition) \
+            [] { return SoulCheckRequirement(check) && (condition); }, LogicString(#condition) \
         }                                                     \
     }
 // STAY macro for region time restrictions - defines when player can stay in a region over time

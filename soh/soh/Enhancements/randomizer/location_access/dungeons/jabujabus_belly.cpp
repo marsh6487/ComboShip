@@ -289,7 +289,7 @@ void RegionTable_Init_JabuJabusBelly() {
     }, {
         //Exits
         ENTRANCE(RR_JABU_JABUS_BELLY_ENTRYWAY,     true),
-        ENTRANCE(RR_JABU_JABUS_BELLY_MQ_LIFT_ROOM, AnyAgeTime([]{return logic->CanUse(RG_FAIRY_SLINGSHOT);})),
+        ENTRANCE(RR_JABU_JABUS_BELLY_MQ_LIFT_ROOM, logic->HasItem(RG_SOUL_ANIMAL_COW) && AnyAgeTime([]{return logic->CanUse(RG_FAIRY_SLINGSHOT);})),
     });
 
     areaTable[RR_JABU_JABUS_BELLY_MQ_LIFT_ROOM] = Region("Jabu Jabus Belly MQ Lift Room", SCENE_JABU_JABU, {

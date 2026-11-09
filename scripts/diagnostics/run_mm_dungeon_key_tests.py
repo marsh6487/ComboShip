@@ -45,7 +45,7 @@ parts = {
     'SPIN': function((ROOT / 'mm/2s2h/Rando/SpinAttackGi.h').read_text(), 'MM_FillSpinAttackGi'),
     'OWNER': owner,
     'OPS': '\n'.join(function(mm, n) for n in ['MM_Op', 'MM_OpV', 'MM_OpColor', 'MM_OpDL']),
-    'CROSS': '\n'.join(function(mm, n) for n in ['MM_FillDungeonKeyModelInfo', 'MM_FillDungeonTintInfo']),
+    'CROSS': '\n'.join(function(mm, n) for n in ['MM_FillDungeonKeyModelInfo', 'MM_FillKeyRingDrawInfo', 'MM_FillDungeonTintInfo']),
     'OWNER_SWORD': '\n'.join(function(owner_sword,n) for n in ['CwSimple','CwCustomGi','CwAltSwordGi']),
     'OWNER_MASTER_CASE': master_case,
     'PRODUCER': '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',

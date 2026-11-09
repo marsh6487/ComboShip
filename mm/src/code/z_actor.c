@@ -1,3 +1,4 @@
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "../../../combo/encounters/NativeCustomEnemies.h"
 #include "din_fire_sword.h"
 /*
@@ -4067,6 +4068,10 @@ ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
 
 Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s16 index, f32 x, f32 y, f32 z, s16 rotX,
                                      s16 rotY, s16 rotZ, s32 params, u32 csId, u32 halfDaysBits, Actor* parent) {
+    // Optional actors are rejected before overlay load/allocation/init. Never run an uninitialized destructor.
+    if (!MM_SoulCanSpawnNonEnemy(play, index, (u16)params)) {
+        return NULL;
+    }
     s32 pad;
     Actor* actor;
     ActorProfile* profile;

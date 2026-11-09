@@ -81,6 +81,7 @@ typedef enum {
     CW_DRAW_KIND_BOTTLE_CONTENTS = 40,      /* shared casing; dl0 marker selects mushroom/princess/gold dust */
     CW_DRAW_KIND_SILVER_RUPEE = 41,         /* OPA seg8 = segTexPath (owner RM), dl0; optional grayscale */
     CW_DRAW_KIND_MAGIC_MIRROR = 42,         /* receiving host draws authored procedural Mirror + leaves */
+    CW_DRAW_KIND_MM_KEY_RING = 43,          /* metal/emblem/ring paths; op[0].a=count, .b=MM dungeon */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -194,6 +195,15 @@ typedef struct {
     const char* segTexPath;
 } CwItemDrawInfo;
 
+#include "../ComboMmKeyRingPolicy.h"
+static inline int32_t CwValidMmKeyRingRecipe(const CwItemDrawInfo* info) {
+    if (info == NULL || info->drawKind != CW_DRAW_KIND_MM_KEY_RING || info->dlistCount != 3 || info->opCount != 1 ||
+        info->ops[0].op != CW_OP_END || !(info->ops[0].b >= 0.0f && info->ops[0].b <= 3.0f))
+        return 0;
+    const int owner = (int)info->ops[0].b;
+    return info->ops[0].b == (float)owner && info->ops[0].a == (float)ComboMmKeyRing_KeyCount(owner);
+}
+
 typedef struct {
     const char* path;      /* owning archive's process-lifetime texture path */
     int32_t width, height; /* logical pixels, independent of high-resolution replacements */
@@ -255,6 +265,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_MAGIC_SPELL:
         case CW_DRAW_KIND_MM_FAIRY_BOTTLE:
         case CW_DRAW_KIND_OOT_MORPHA_SOUL:
+        case CW_DRAW_KIND_MM_KEY_RING:
             return 3;
         case CW_DRAW_KIND_MIRROR_SHIELD:
         case CW_DRAW_KIND_BLUE_FIRE:

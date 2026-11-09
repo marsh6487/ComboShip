@@ -12,6 +12,16 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
 FILES = (
+    "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "soh/soh/Enhancements/randomizer/location_access/overworld/kakariko.cpp",
+    "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "soh/soh/Enhancements/randomizer/location_access/dungeons/jabujabus_belly.cpp",
+    "mm/2s2h/Rando/Logic/Regions/Central.cpp",
+    "mm/2s2h/Rando/Logic/Regions/BeneathTheWell.cpp",
+    "soh/src/overlays/actors/ovl_player_actor/z_player.c",
+    'mm/src/code/z_actor.c', 'mm/2s2h/Rando/SoulShuffleRuntime.cpp',
+    'soh/src/code/z_actor.c', 'soh/src/code/z_collision_check.c',
+    'soh/soh/Enhancements/randomizer/SoulShuffleRuntime.cpp',
     'mm/2s2h/Rando/StaticData/Items.cpp', 'mm/2s2h/Rando/StaticData/Options.cpp',
     'mm/2s2h/Rando/GiveItem.cpp', 'mm/2s2h/Rando/RemoveItem.cpp',
     'mm/2s2h/Rando/Logic/GeneratePools.cpp',
@@ -26,8 +36,12 @@ parser.add_argument('--only', action='append', choices=FILES)
 args = parser.parse_args()
 entries = json.loads(args.database.read_text())
 for file in args.only or FILES:
-    entry = next(e for e in entries if e['file'].endswith('/' + file))
-    source_root = entry['file'][:-len(file)-1]
+    template = file
+    if file.endswith('/SoulShuffleRuntime.cpp') and not any(e['file'].endswith('/'+file) for e in entries):
+        template = ('mm/2s2h/Rando/StaticData/Items.cpp' if file.startswith('mm/')
+                    else 'soh/soh/Enhancements/randomizer/logic.cpp')
+    entry = next(e for e in entries if e['file'].endswith('/' + template))
+    source_root = entry['file'][:-len(template)-1]
     command = shlex.split(entry['command'])
     rewritten = []
     i = 0
@@ -37,7 +51,10 @@ for file in args.only or FILES:
             i += 2
             continue
         if argument not in ('-MD', '-MMD', '-c'):
-            rewritten.append(argument.replace(source_root, str(ROOT)))
+            if argument == entry['file']:
+                rewritten.append(str(ROOT / file))
+            else:
+                rewritten.append(argument.replace(source_root, str(ROOT)))
         i += 1
     result = subprocess.run([*rewritten, '-fsyntax-only', '-O0'], cwd=entry['directory'],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

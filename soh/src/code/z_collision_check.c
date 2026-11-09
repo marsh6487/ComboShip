@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "global.h"
 #include "din_fire_sword.h"
 #include "vt.h"
@@ -2963,6 +2964,9 @@ void CollisionCheck_AC(PlayState* play, CollisionCheckContext* colChkCtx, Collid
 
         if (colAC != NULL && colAC->acFlags & AC_ON) {
             if (colAC->actor != NULL && colAC->actor->update == NULL) {
+                continue;
+            }
+            if (!Randomizer_SoulCanDamageActor(play, colAC->actor)) {
                 continue;
             }
             if ((colAC->acFlags & colAT->atFlags & AC_TYPE_ALL) && (colAT != colAC)) {

@@ -1,4 +1,5 @@
 #include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
 #include "../../../../combo/NeiGracePolicy.h"
@@ -540,6 +541,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // consumes its normal supply rather than being silently re-added afterward.
     EnsureCommandMelodyInPool(itemPool);
 
+    KeyRings::TransformPool(saveInfo, itemPool);
+
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
         auto it = std::find(itemPool.begin(), itemPool.end(), startingItem);
@@ -581,7 +584,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }
-            if (itemPool[i] == RI_SKELETON_KEY) {
+            if (itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i])) {
                 continue;
             }
             if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&

@@ -9,6 +9,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <vector>
 #include <random>
+#include <spdlog/spdlog.h>
 #include "z64.h"
 #include "variables.h"
 #include "mods/forms/custom_forms.h"
@@ -18,11 +19,15 @@
 namespace {
 using Clips = std::vector<std::vector<int16_t>>;
 std::array<std::array<Clips, 32>, 2> banks;
+std::array<std::array<std::vector<std::string>, 32>, 2> clipPaths;
 std::array<std::array<size_t, 32>, 2> variants{}, selectedVariant{};
 // Same private PRNG/variant-selection approach as OoT's VoicePack_PlayIfMatch.
 std::mt19937 voiceRng{ 0x53767069 };
 LinkVoiceMixer mixer;
 bool attempted = false, available = false, used = false;
+bool warnedNativeUnavailable = false;
+std::array<bool, 2> loggedSelection{}, loggedEditor{};
+std::array<float, 2> loggedPitch{};
 const void* playerPosition = nullptr;
 std::array<std::array<uint32_t, 32>, 2> lastFrame = [] {
     std::array<std::array<uint32_t, 32>, 2> result;
@@ -63,39 +68,67 @@ void Load() {
     attempted = true;
     // Keep the existing optional pack resource namespace for archive compatibility.
     auto file = manager->GetArchiveManager()->LoadFile("custom/din_voice/voices.json");
-    if (!file || !file->Buffer)
+    if (!file || !file->Buffer) {
+        SPDLOG_INFO("[LinkVoice] optional PCM manifest unavailable: custom/din_voice/voices.json; "
+                    "adult requests will try native OoT recordings");
         return;
+    }
+    unsigned loadingAge = 0, loadingAction = 0;
+    std::string loadingPath = "custom/din_voice/voices.json";
     try {
         auto manifest = nlohmann::json::parse(file->Buffer->begin(), file->Buffer->end());
-        if (manifest.at("version") != 1 || manifest.at("rate") != 32000)
+        if (manifest.at("version") != 1 || manifest.at("rate") != 32000) {
+            SPDLOG_WARN("[LinkVoice] optional PCM pack rejected: expected version=1 and rate=32000");
             return;
+        }
         // Publish only a complete validated cache; no partial age bank can become active.
         decltype(banks) loaded;
+        decltype(clipPaths) loadedPaths;
         for (unsigned age = 0; age < 2; ++age) {
+            loadingAge = age;
+            loadingAction = 0;
+            loadingPath = "custom/din_voice/voices.json";
             const auto& bank = manifest.at(age ? "adult" : "child");
             for (unsigned action = 0; action < 32; ++action) {
+                loadingAction = action;
+                loadingPath = "custom/din_voice/voices.json";
                 for (const auto& path : bank.at(std::to_string(action))) {
                     std::string name = path.get<std::string>();
-                    if (name.rfind("custom/din_voice/pcm/", 0) != 0)
+                    loadingPath = name;
+                    if (name.rfind("custom/din_voice/pcm/", 0) != 0) {
+                        SPDLOG_WARN("[LinkVoice] optional PCM pack rejected: invalid resource path {}", name);
                         return;
+                    }
                     auto pcm = manager->GetArchiveManager()->LoadFile(name);
-                    if (!pcm || !pcm->Buffer || pcm->Buffer->empty() || pcm->Buffer->size() % 2)
+                    if (!pcm || !pcm->Buffer || pcm->Buffer->empty() || pcm->Buffer->size() % 2) {
+                        SPDLOG_WARN("[LinkVoice] optional PCM pack rejected: missing, empty or malformed PCM {} "
+                                    "(age={} action=0x{:02X})",
+                                    name, age ? "adult" : "child", action);
                         return;
+                    }
                     std::vector<int16_t> samples;
                     samples.reserve(pcm->Buffer->size() / 2);
                     for (size_t i = 0; i < pcm->Buffer->size(); i += 2)
                         samples.push_back(static_cast<int16_t>(static_cast<uint8_t>((*pcm->Buffer)[i]) |
                                                                (static_cast<uint8_t>((*pcm->Buffer)[i + 1]) << 8)));
                     loaded[age][action].push_back(std::move(samples));
+                    loadedPaths[age][action].push_back(std::move(name));
                 }
-                if (loaded[age][action].empty())
+                if (loaded[age][action].empty()) {
+                    SPDLOG_WARN("[LinkVoice] optional PCM pack rejected: no variants for age={} action=0x{:02X}",
+                                age ? "adult" : "child", action);
                     return;
+                }
             }
         }
         banks = std::move(loaded);
+        clipPaths = std::move(loadedPaths);
         available = true;
-    } catch (const nlohmann::json::exception&) {
+        SPDLOG_INFO("[LinkVoice] optional PCM pack ready: childActions=32 adultActions=32 rate=32000");
+    } catch (const nlohmann::json::exception& error) {
         // A missing/bad optional pack leaves native soundfont routing available.
+        SPDLOG_WARN("[LinkVoice] optional PCM pack rejected: age={} action=0x{:02X} resource={} error={}",
+                    loadingAge ? "adult" : "child", loadingAction, loadingPath, error.what());
     }
 }
 } // namespace
@@ -123,6 +156,7 @@ extern "C" uint8_t LinkVoice_TryPlay(uint16_t sfxId, const void* position) {
     lastFrame[age][action] = gPlayState->gameplayFrames;
     const int16_t* samples = nullptr;
     uint32_t frames = 0;
+    const char* clipPath = "native OoT action recipe";
     if (available) {
         const auto& choices = banks[age][action];
         ++variants[age][action];
@@ -131,22 +165,38 @@ extern "C" uint8_t LinkVoice_TryPlay(uint16_t sfxId, const void* position) {
         const auto& pcm = choices[selected];
         samples = pcm.data();
         frames = static_cast<uint32_t>(pcm.size());
+        clipPath = clipPaths[age][action][selected].c_str();
     } else {
         ++variants[age][action];
         samples = OotAdultVoice_GetClip(action, voiceRng(), &frames);
-        if (!samples || !frames)
+        if (!samples || !frames) {
+            if (!warnedNativeUnavailable) {
+                warnedNativeUnavailable = true;
+                SPDLOG_WARN("[LinkVoice] adult native provider unavailable; returning to native MM soundfont "
+                            "without automatic pitch reduction");
+            }
             return 0;
+        }
     }
     used = true;
     mixer.SetVolume(ReadVolume());
     // Preserve each donor's recorded pitch. Only the explicit audio-editor slider
-    // changes it; MM's automatic adult 0.85 multiplier does not apply to these clips.
-    float pitch = CVarGetInteger("gAudioEditor.LinkVoiceFreqMultiplier.Enable", 0)
-                      ? CVarGetFloat("gAudioEditor.LinkVoiceFreqMultiplier.Scale", 1.0f)
-                      : 1.0f;
+    // changes it; adult mode never requests an automatic pitch reduction.
+    const bool editor = CVarGetInteger("gAudioEditor.LinkVoiceFreqMultiplier.Enable", 0) != 0;
+    float pitch = editor ? CVarGetFloat("gAudioEditor.LinkVoiceFreqMultiplier.Scale", 1.0f) : 1.0f;
     if (!std::isfinite(pitch) || pitch <= 0)
         pitch = 1;
-    mixer.Play(samples, frames, 1.0f, std::clamp(pitch, 0.4f, 2.5f), sfxId, renewable);
+    pitch = std::clamp(pitch, 0.4f, 2.5f);
+    // Log once per age or explicit pitch change, never from the audio thread.
+    if (!loggedSelection[age] || loggedPitch[age] != pitch || loggedEditor[age] != editor) {
+        loggedSelection[age] = true;
+        loggedPitch[age] = pitch;
+        loggedEditor[age] = editor;
+        SPDLOG_INFO("[LinkVoice] age={} source={} action=0x{:02X} clip={} frames={} pitch={:.3f} editor={}",
+                    age ? "adult" : "child", available ? "optional-pcm" : "oot-native", action, clipPath, frames, pitch,
+                    editor);
+    }
+    mixer.Play(samples, frames, 1.0f, pitch, sfxId, renewable);
     // Dropping a fifth overlapping voice must not leak a native male fallback.
     return 1;
 }

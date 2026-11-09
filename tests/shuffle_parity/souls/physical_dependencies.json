@@ -1,0 +1,107 @@
+[
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "source": "RR_GERUDO_VALLEY",
+    "kind": "ENTRANCE",
+    "target": "RR_GV_UPPER_STREAM",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "source": "RR_GERUDO_VALLEY",
+    "kind": "ENTRANCE",
+    "target": "RR_GV_CRATE_LEDGE",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "source": "RR_GERUDO_VALLEY",
+    "kind": "ENTRANCE",
+    "target": "RR_GV_FORTRESS_SIDE",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "source": "RR_GERUDO_VALLEY",
+    "kind": "ENTRANCE",
+    "target": "RR_GV_WATERFALL_ALCOVE",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/gerudo_valley.cpp",
+    "source": "RR_GERUDO_VALLEY",
+    "kind": "ENTRANCE",
+    "target": "RR_GV_LOWER_STREAM",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/kakariko.cpp",
+    "source": "RR_KAKARIKO_VILLAGE",
+    "kind": "LOCATION",
+    "target": "RC_KAK_SILVER_BOULDER",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/kakariko.cpp",
+    "source": "RR_KAKARIKO_VILLAGE",
+    "kind": "ENTRANCE",
+    "target": "RR_KAK_IMPAS_LEDGE",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/kakariko.cpp",
+    "source": "RR_KAKARIKO_VILLAGE",
+    "kind": "ENTRANCE",
+    "target": "RR_KAK_BACKYARD",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZORAS_RIVER",
+    "kind": "LOCATION",
+    "target": "RC_ZR_NEAR_DOMAIN_FREESTANDING_POH",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZORAS_RIVER",
+    "kind": "ENTRANCE",
+    "target": "RR_ZR_FRONT",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZORAS_RIVER",
+    "kind": "ENTRANCE",
+    "target": "RR_ZR_ATOP_LADDER",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZORAS_RIVER",
+    "kind": "ENTRANCE",
+    "target": "RR_ZR_PILLAR",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZORAS_RIVER",
+    "kind": "ENTRANCE",
+    "target": "RR_ZR_BEHIND_WATERFALL",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/overworld/zoras_river.cpp",
+    "source": "RR_ZR_ATOP_LADDER",
+    "kind": "ENTRANCE",
+    "target": "RR_ZR_PILLAR",
+    "soul": "RG_SOUL_ANIMAL_CUCCO"
+  },
+  {
+    "file": "soh/soh/Enhancements/randomizer/location_access/dungeons/jabujabus_belly.cpp",
+    "source": "RR_JABU_JABUS_BELLY_MQ_BEGINNING",
+    "kind": "ENTRANCE",
+    "target": "RR_JABU_JABUS_BELLY_MQ_LIFT_ROOM",
+    "soul": "RG_SOUL_ANIMAL_COW"
+  }
+]

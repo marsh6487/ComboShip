@@ -72,6 +72,9 @@ int ResourceMgr_IsIkanaShieldGiAvailable() {
     return 1;
 }
 int MM_FillDungeonKeyModelInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
+// Key-ring recipes are exercised by the native dungeon-key exporter fixture.
+// This shield/cane fixture keeps unrelated item families outside its boundary.
+int MM_FillKeyRingDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillDungeonTintInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
 int MM_FillSpinAttackGi(CwItemDrawInfo*){return 0;}
 int MM_FillSongDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}

@@ -17,6 +17,7 @@ namespace StaticData {
 
 // clang-format off
 std::map<RandoOptionId, RandoStaticOption> Options = {
+    RO(RO_SHUFFLE_KEY_RINGS, RO_GENERIC_OFF),
     RO(RO_SHUFFLE_NPC_SOULS, RO_GENERIC_OFF),
     RO(RO_SHUFFLE_ANIMAL_SOULS, RO_GENERIC_OFF),
     RO(RO_SHUFFLE_MISC_SOULS, RO_GENERIC_OFF),

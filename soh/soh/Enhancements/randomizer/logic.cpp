@@ -1,3 +1,4 @@
+#include "SoulShuffleEnemy.h"
 #include "SoulShuffle.h"
 #include "rando/CrossEntranceBoss.h"
 #include <spdlog/spdlog.h>
@@ -34,6 +35,19 @@ extern "C" {
 unsigned char TradeAdult_IsOwnedIndex(int index);
 }
 namespace Rando {
+
+bool Logic::CanUseCucco() {
+    return HasItem(RG_POWER_BRACELET) && HasItem(RG_SOUL_ANIMAL_CUCCO);
+}
+
+bool Logic::CanAccessSoulCheck(RandomizerCheck check) {
+    switch (check) {
+#define SOUL_CHECK(check, item) case check: return HasItem(item);
+#include "SoulShuffleChecks.inc"
+#undef SOUL_CHECK
+        default: return true;
+    }
+}
 
 bool Logic::HasItem(RandomizerGet itemName) {
     // Soul catalog oot_has begin
@@ -1008,6 +1022,10 @@ bool Logic::CanDoGlitch(GlitchType glitch) {
 // ammo capacity
 bool Logic::CanKillEnemy(RandomizerEnemy enemy, EnemyDistance distance, bool wallOrFloor, uint8_t quantity, bool timer,
                          bool inWater) {
+    const auto soul = SoulShuffle::EnemyForLogic(enemy);
+    if (soul != RG_NONE && !HasItem(soul)) {
+        return false;
+    }
     bool killed = false;
     switch (enemy) {
         case RE_GERUDO_GUARD:
@@ -1566,12 +1584,13 @@ bool Logic::CanBreakMudWalls() {
 }
 
 bool Logic::CanGetDekuBabaSticks() {
-    return CanUseSword() || CanUse(RG_BOOMERANG);
+    return HasItem(RG_SOUL_ENEMY_DEKU_BABA) && (CanUseSword() || CanUse(RG_BOOMERANG));
 }
 
 bool Logic::CanGetDekuBabaNuts() {
-    return CanJumpslash() || CanUse(RG_FAIRY_SLINGSHOT) || CanUse(RG_FAIRY_BOW) || HasExplosives() ||
-           CanUse(RG_DINS_FIRE) || (CanUse(RG_MM_MASK_DEKU) && CanUse(RG_MAGIC_SINGLE));
+    return HasItem(RG_SOUL_ENEMY_DEKU_BABA) &&
+           (CanJumpslash() || CanUse(RG_FAIRY_SLINGSHOT) || CanUse(RG_FAIRY_BOW) || HasExplosives() ||
+            CanUse(RG_DINS_FIRE) || (CanUse(RG_MM_MASK_DEKU) && CanUse(RG_MAGIC_SINGLE)));
 }
 
 bool Logic::CanHitEyeTargets() {

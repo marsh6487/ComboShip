@@ -852,7 +852,15 @@
       "Season: Winter", "Season: Winter")                                                                              \
     /* Standalone Mirror identity. Appended: FCI ordinals are serialized. */                                           \
     X(FCI_MAGIC_MIRROR, 1, FCI_F_NONE, RG_MAGIC_MIRROR, RI_OOT_NEI_MAGIC_MIRROR, "Magic Mirror", "Magic Mirror",       \
-      "Magic Mirror")
+      "Magic Mirror")                                                                                                  \
+    X(FCI_MM_KEY_RING_WOODFALL, 1, FCI_F_NONE, RG_MM_KEY_RING_WOODFALL, RI_WOODFALL_KEY_RING, "Woodfall Key Ring",     \
+      "Woodfall Key Ring", "Woodfall Key Ring")                                                                        \
+    X(FCI_MM_KEY_RING_SNOWHEAD, 1, FCI_F_NONE, RG_MM_KEY_RING_SNOWHEAD, RI_SNOWHEAD_KEY_RING, "Snowhead Key Ring",     \
+      "Snowhead Key Ring", "Snowhead Key Ring")                                                                        \
+    X(FCI_MM_KEY_RING_GREAT_BAY, 1, FCI_F_NONE, RG_MM_KEY_RING_GREAT_BAY, RI_GREAT_BAY_KEY_RING, "Great Bay Key Ring", \
+      "Great Bay Key Ring", "Great Bay Key Ring")                                                                      \
+    X(FCI_MM_KEY_RING_STONE_TOWER, 1, FCI_F_NONE, RG_MM_KEY_RING_STONE_TOWER, RI_STONE_TOWER_KEY_RING,                 \
+      "Stone Tower Key Ring", "Stone Tower Key Ring", "Stone Tower Key Ring")
 
 // -----------------------------------------------------------------------------
 // Enum estable de items combo (generado por la lista; APPEND-ONLY)

@@ -437,7 +437,8 @@ void BuildFcRestrictions() {
             if (ri.rfind("RI_OOT_", 0) == 0) {
                 continue; // OoT-origin: handled by OoT's own options below
             }
-            bool isSmall = ri.size() > 10 && ri.compare(ri.size() - 10, 10, "_SMALL_KEY") == 0;
+            bool isSmall = (ri.size() > 10 && ri.compare(ri.size() - 10, 10, "_SMALL_KEY") == 0) ||
+                           (ri.size() > 9 && ri.compare(ri.size() - 9, 9, "_KEY_RING") == 0);
             bool isBoss = ri.size() > 9 && ri.compare(ri.size() - 9, 9, "_BOSS_KEY") == 0;
             bool isFairy = ri.size() > 12 && ri.compare(ri.size() - 12, 12, "_STRAY_FAIRY") == 0 &&
                            ri != "RI_CLOCK_TOWN_STRAY_FAIRY"; // not a dungeon item

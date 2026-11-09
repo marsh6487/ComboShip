@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "../../../combo/encounters/NativeCustomEnemies.h"
 #include "ui_visibility.h"
 #include "rando/CrossEntranceBoss.h"
@@ -2893,7 +2894,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                     if (actor->colorFilterTimer != 0) {
                         actor->colorFilterTimer--;
                     }
-                    if (GameInteractor_ShouldActorUpdate(actor)) {
+                    if (GameInteractor_ShouldActorUpdate(actor) && Randomizer_SoulShouldUpdateActor(play, actor)) {
                         FrameTimingSpan actorSpan = FrameTiming_BeginSpan();
                         char actorTimingName[48];
                         if (actorSpan.epoch != 0) {
@@ -3714,6 +3715,10 @@ int gMapLoading = 0;
 
 Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 posX, f32 posY, f32 posZ, s16 rotX,
                    s16 rotY, s16 rotZ, s16 params) {
+    // Reject optional soul actors before allocation/init; no uninitialized destructor can run.
+    if (!Randomizer_SoulCanSpawnNonEnemy(play, actorId, (u16)params)) {
+        return NULL;
+    }
     Actor* actor;
     s32 objBankIndex;
     u32 temp;
@@ -5231,6 +5236,10 @@ u8 func_800355E4(PlayState* play, Collider* collider) {
 }
 
 u8 Actor_ApplyDamage(Actor* actor) {
+    // Direct equipment damage also reaches this function without AC dispatch.
+    if (!Randomizer_SoulCanDamageActor(gPlayState, actor)) {
+        return actor->colChkInfo.health;
+    }
     u8 swordFinishHealth = actor->colChkInfo.health;
     if (actor->colChkInfo.damage >= actor->colChkInfo.health) {
         actor->colChkInfo.health = 0;

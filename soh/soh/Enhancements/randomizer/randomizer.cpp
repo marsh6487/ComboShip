@@ -2565,6 +2565,10 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             break;
         // MM per-dungeon items (small key / boss key / map / compass) — model + message only, no OoT
         // inventory slot; give is a no-op.
+        case RG_MM_KEY_RING_WOODFALL:
+        case RG_MM_KEY_RING_SNOWHEAD:
+        case RG_MM_KEY_RING_GREAT_BAY:
+        case RG_MM_KEY_RING_STONE_TOWER:
         case RG_MM_SMALL_KEY_WOODFALL:
         case RG_MM_SMALL_KEY_SNOWHEAD:
         case RG_MM_SMALL_KEY_GREAT_BAY:

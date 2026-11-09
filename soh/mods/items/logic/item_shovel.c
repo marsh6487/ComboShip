@@ -11,6 +11,7 @@
  */
 
 #include "z64.h"
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 #include "item_shovel.h"
 #include "../custom_items.h"
 #include "../helpers/equip_helper.h"
@@ -63,7 +64,7 @@ void ShovelHole_Update(Actor* thisx, PlayState* play) {
                     canDamage = 1;
                     break;
             }
-            if (canDamage && dist < SHOVEL_HOLE_RADIUS) {
+            if (canDamage && dist < SHOVEL_HOLE_RADIUS && Randomizer_SoulCanDamageActor(play, actor)) {
                 if (actor->colChkInfo.health > 0) {
                     actor->colChkInfo.health -= 16;
                     if (actor->colChkInfo.health <= 0) {

@@ -165,6 +165,34 @@ static int32_t MM_FillDungeonKeyModelInfo(RandoItemId id, s16 drawId, CwItemDraw
 
 // All four vanilla GI families and retained replacements use the same palette-only
 // helpers as native MM. Compass glass remains untinted; an edited boss gem is separate.
+static int32_t MM_FillKeyRingDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    const int count = DungeonItem_GetKeyRingCount(id);
+    if (count == 0)
+        return 0;
+    const int owner = DungeonItem_GetOwner(id);
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metal, emblem;
+    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem))
+        return CW_DRAW_NOT_READY;
+    out->drawKind = CW_DRAW_KIND_MM_KEY_RING;
+    out->dlistCount = 3;
+    out->dlists[0] = metalPath;
+    out->dlists[1] = emblemPath;
+    out->dlists[2] = "__OTR__objects/object_keyring/gKeyringRingDL";
+    out->xluStartIndex = -1;
+    out->stateDependent = 2;
+    out->opCount = 1;
+    out->ops[0].op = CW_OP_END;
+    out->ops[0].a = static_cast<float>(count);
+    out->ops[0].b = static_cast<float>(owner);
+    const uint8_t metalRgba[] = { metal.r, metal.g, metal.b, metal.a };
+    const uint8_t emblemRgba[] = { emblem.r, emblem.g, emblem.b, emblem.a };
+    std::memcpy(out->primColorOpa, metalRgba, 4);
+    std::memcpy(out->primColorXlu, emblemRgba, 4);
+    std::memcpy(out->envColor, metalRgba, 4);
+    return 1;
+}
+
 static int32_t MM_FillDungeonTintInfo(RandoItemId id, s16 drawId, CwItemDrawInfo* out) {
     const int owner = DungeonItem_GetOwner(id);
     Color_RGBA8 c, emblem;
@@ -1259,6 +1287,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         out->itemShimmer = MM_OotBottleShimmerColor(id, out->itemShimmerColor);
         return 1;
     }
+    const int32_t keyRing = MM_FillKeyRingDrawInfo(id, out);
+    if (keyRing != 0)
+        return keyRing;
     if (MM_FillDungeonKeyModelInfo(id, (s16)it->second.drawId, out) ||
         MM_FillDungeonTintInfo(id, (s16)it->second.drawId, out)) {
         return 1;
