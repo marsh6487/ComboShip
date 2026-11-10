@@ -2455,9 +2455,11 @@ void Settings::CreateOptions() {
                                                                       &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                                                   },
                                                                   WidgetContainerType::SECTION);
-    mOptionGroups[RSG_MENU_COLUMN_ADDITIONAL_ITEMS] = OptionGroup::SubGroup(
-        "", { &mOptionGroups[RSG_MENU_SECTION_SOULS], &mOptionGroups[RSG_MENU_SECTION_ADDITIONAL_ITEMS] },
-        WidgetContainerType::COLUMN);
+    mOptionGroups[RSG_MENU_COLUMN_ADDITIONAL_ITEMS] =
+        OptionGroup::SubGroup("",
+                              std::vector<OptionGroup*>{ &mOptionGroups[RSG_MENU_SECTION_SOULS],
+                                                         &mOptionGroups[RSG_MENU_SECTION_ADDITIONAL_ITEMS] },
+                              WidgetContainerType::COLUMN);
     mOptionGroups[RSG_MENU_SIDEBAR_SHUFFLES] =
         OptionGroup::SubGroup("Shuffles",
                               {
