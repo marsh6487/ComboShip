@@ -963,7 +963,7 @@ void Menu::DrawElement() {
     }
     ImGui::EndChild();
 
-    ImGui::PushFont(OTRGlobals::Instance->fontMonoLarger);
+    ImGui::PushFont(OTRGlobals::Instance->fontStandardLarger);
     pos = ImVec2{ sectionCenterX + (sidebarWidth / 2), topY } + style.ItemSpacing * 2;
     window->DrawList->AddRectFilled(pos, pos + ImVec2{ 4, sectionHeight - style.FramePadding.y * 2 },
                                     ImGui::GetColorU32({ 255, 255, 255, 255 }), true, style.WindowRounding);
@@ -1105,7 +1105,7 @@ void Menu::DrawContent(const std::set<std::string>& onlyPaths, const std::set<st
     cfg.headerCvar = "gSettings.Menu.ActiveHeader";
     cfg.defaultHeader = "Settings";
     cfg.headerFont = OTRGlobals::Instance->fontStandardLargest;
-    cfg.contentFont = OTRGlobals::Instance->fontMonoLarger; // mirrors MM DrawElement's content font
+    cfg.contentFont = OTRGlobals::Instance->fontStandardLarger; // matches SoH's standard settings font
     ComboMenuDraw::DrawContent<BenDrawHooks>(cfg, menuThemeIndex, menuOrder, menuEntries, onlyPaths, skipPaths);
 }
 

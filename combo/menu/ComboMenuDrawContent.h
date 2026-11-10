@@ -39,7 +39,7 @@ struct Config {
     const char* headerCvar;    // CVar storing the active header label
     const char* defaultHeader; // fallback header label (both games: "Settings")
     ImFont* headerFont;        // pushed for the header row + sidebar (fontStandardLargest)
-    ImFont* contentFont;       // pushed for the content columns (MM: fontMonoLarger); nullptr = none
+    ImFont* contentFont;       // pushed for the content columns; nullptr = inherit the caller's font
 };
 
 // The caller (the game's Menu::DrawContent) has already done its per-frame setup: the
@@ -240,7 +240,7 @@ inline void DrawContent(const Config& cfg, TTheme themeIndex, const std::vector<
     ImGui::PopFont(); // pop headerFont — content area uses content/default font (matches DrawElement)
 
     if (cfg.contentFont) {
-        ImGui::PushFont(cfg.contentFont); // MM: fontMonoLarger for content (mirrors MM DrawElement)
+        ImGui::PushFont(cfg.contentFont); // use the caller's content font (mirrors its DrawElement)
     }
 
     // Vertical divider between sidebar and content columns.
