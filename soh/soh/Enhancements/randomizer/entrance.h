@@ -130,12 +130,16 @@ using EntrancePools = std::map<EntranceType, std::vector<Entrance*>>;
 
 class EntranceShuffler {
   public:
+    using WorldValidator = bool (*)();
+
     EntranceShuffler();
     std::array<EntranceOverride, ENTRANCE_OVERRIDES_MAX_COUNT> entranceOverrides;
     std::vector<std::list<Entrance*>> playthroughEntrances;
     bool HasNoRandomEntrances();
     void SetNoRandomEntrances(bool noRandomEntrances);
-    int ShuffleAllEntrances();
+    // Optional constraints participate in the existing tentative-placement rollback search.
+    // The validator is scoped to this shuffle; ordinary native callers leave it null.
+    int ShuffleAllEntrances(WorldValidator additionalWorldValidator = nullptr);
     void CreateEntranceOverrides();
     void UnshuffleAllEntrances();
     void ParseJson(const nlohmann::json& spoilerFileJson);
@@ -144,6 +148,7 @@ class EntranceShuffler {
     static const Entrance* GetEntranceByIndex(int16_t index);
 
   private:
+    bool ValidateWorld(Entrance* entrancePlaced);
     std::vector<Entrance*> AssumeEntrancePool(std::vector<Entrance*>& entrancePool);
     bool ShuffleOneWayPriorityEntrances(std::map<std::string, PriorityEntrance>& oneWayPriorities,
                                         EntrancePools oneWayEntrancePools, EntrancePools oneWayTargetEntrancePools,
@@ -160,6 +165,7 @@ class EntranceShuffler {
     int mTotalRandomizableEntrances = 0;
     int mCurNumRandomizedEntrances = 0;
     bool mEntranceShuffleFailure = false;
+    WorldValidator mAdditionalWorldValidator = nullptr;
 };
 } // namespace Rando
 

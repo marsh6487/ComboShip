@@ -316,9 +316,11 @@ int main(int argc, char** argv) {
             return 2;
         }
         nlohmann::json crossSeed;
+        nlohmann::json recordedForcedOot = nlohmann::json::object();
         try {
             crossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(spoiler);
-            ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed);
+            if (ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed))
+                recordedForcedOot = ComboRando::CrossDungeon::RecordedForcedOot(spoiler);
         } catch (const std::exception& e) {
             std::cerr << "[playthrough] invalid cross-dungeon seed: " << e.what() << "\n";
             return 2;
@@ -408,6 +410,12 @@ int main(int argc, char** argv) {
             try {
                 ComboRando::ParseStaticDataDump(sohDump, "OOT replay");
                 ComboRando::ParseStaticDataDump(mmDump, "MM replay");
+                if (ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed)) {
+                    // Read before PrepContext resets native placements. This only checks that
+                    // the regenerated supply matches; the saved seed supplies the actual starts.
+                    const std::string preparedForced = SOH_GetForced ? SOH_GetForced(masterSeed) : "";
+                    ComboRando::CrossDungeon::ValidateRecordedForcedOot(preparedForced, recordedForcedOot, sohDump);
+                }
             } catch (const std::exception& e) {
                 std::cerr << "[playthrough] native preparation failed: " << e.what() << "\n";
                 entranceRestoreFailed = true;
@@ -443,7 +451,7 @@ int main(int argc, char** argv) {
             }
             try {
                 ComboRando::CrossDungeon::ValidateSavedStructure(crossDungeons, crossSeed, sohDump, mmDump, oot, mmO,
-                                                                 mmStart);
+                                                                 mmStart, recordedForcedOot.dump());
             } catch (const std::exception& e) {
                 std::cerr << "[playthrough] cross-dungeon replay rejected: " << e.what() << "\n";
                 entranceRestoreFailed = true;
@@ -613,6 +621,7 @@ int main(int argc, char** argv) {
     std::optional<nlohmann::json> settingsCrossSeed;
     std::optional<nlohmann::json> settingsBlackMarket;
     std::optional<nlohmann::json> settingsOotEntrances;
+    std::optional<nlohmann::json> settingsForcedOot;
     nlohmann::json settingsOotLayouts = nlohmann::json::object();
     if (!settingsFile.empty()) {
         if (!SOH_RestoreSettings || !MM_RestoreSettings) {
@@ -626,7 +635,8 @@ int main(int argc, char** argv) {
                 settingsBlackMarket = sj["blackMarketOptions"];
             }
             settingsCrossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(sj);
-            ComboRando::CrossDungeon::Coordinator::Enabled(*settingsCrossSeed);
+            if (ComboRando::CrossDungeon::Coordinator::Enabled(*settingsCrossSeed))
+                settingsForcedOot = ComboRando::CrossDungeon::RecordedForcedOot(sj);
             if (sj.contains("entrances") && sj.at("entrances").contains("oot"))
                 settingsOotEntrances = sj.at("entrances").at("oot");
             if (sj.contains("sharedItems"))
@@ -789,12 +799,15 @@ int main(int argc, char** argv) {
             }
             try {
                 if (replayCrossMap) {
+                    ComboRando::CrossDungeon::ValidateRecordedForcedOot(forced, *settingsForcedOot, sohDump);
+                    forced = settingsForcedOot->dump();
                     ComboRando::CrossDungeon::ValidateSavedStructure(crossDungeons, *settingsCrossSeed, sohDump, mmDump,
-                                                                     oot, mmO, mmStart);
+                                                                     oot, mmO, mmStart, forced);
                     crossDungeonSeed = *settingsCrossSeed;
                 } else {
                     crossDungeonSeed = ComboRando::CrossDungeon::GenerateValidatedSeed(
-                        crossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, oot, mmO, mmStart);
+                        crossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, oot, mmO, mmStart,
+                        ComboRando::CrossDungeon::kStructuralLayoutAttempts, nullptr, forced);
                 }
             } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
                 r.error = e.what();

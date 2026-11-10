@@ -1,6 +1,7 @@
 #include "combo/rando/CrossDungeonGeneration.h"
 #include <cassert>
 #include <iostream>
+#include <tuple>
 
 using namespace ComboRando;
 using namespace ComboRando::CrossDungeon;
@@ -15,6 +16,7 @@ static int hostCalls = 0, queries = 0, runtimeCalls = 0;
 static int lastQueryGame = 0;
 static ComboGenProgress cancelledProgress;
 static bool cancelOnQuery = false;
+static bool pocketGraph = false;
 static const char *Catalogue(int game) {
   static std::string raw[2];
   ++hostCalls;
@@ -46,6 +48,31 @@ static const char *Checks(int game) {
   ++queries;
   Json checks = Json::array({"Native check", "Inventory gate"});
   const auto &owned = lastOwned[game];
+  if (pocketGraph) {
+    const auto has = [&](const char *item) {
+      return std::count(owned.begin(), owned.end(), item) > 0;
+    };
+    const bool stones = has("Kokiri's Emerald") && has("Goron's Ruby") &&
+                        has("Zora's Sapphire");
+    if (game == 0 && stones) {
+      checks.push_back("Song from Ocarina");
+      if (has("Song of Time"))
+        checks.push_back("Adult song");
+      // The native path is reachable as a child after learning the warp song.
+      // The swapped map moves its mouth to an adult-only foreign ingress.
+      const bool childRoute =
+          installed[0].is_null() || installed[0].at("permutation").at(0) == 0;
+      if (has("Bolero of Fire") && childRoute) {
+        checks.push_back("Well check");
+        checks.push_back("Well key 1");
+        checks.push_back("Well key 2");
+        if (std::count(owned.begin(), owned.end(), "Small Key") >= 2)
+          checks.push_back("Well locked check");
+      }
+    }
+    raw[game] = checks.dump();
+    return raw[game].c_str();
+  }
   const bool song = std::count(owned.begin(), owned.end(), "Saria's Song") > 0;
   const bool fixedSongLock = game == 0 && !installed[game].is_null() &&
                              (rejectEveryMap || installed[game] == rejected);
@@ -98,6 +125,179 @@ static void CheckCancellation(Coordinator &coordinator, OracleFns &oot,
   assert(coordinator.LogicSeed() == previous && installed[0] == previous &&
          installed[1] == previous);
   assert(accesses[0]["arrivals"].empty() && accesses[1]["arrivals"].empty());
+}
+
+static void CheckForcedPocket(Coordinator &coordinator, OracleFns &oot,
+                              OracleFns &mm) {
+  pocketGraph = true;
+  coordinator.InstallLogic(nullptr);
+  coordinator.ConfigureOracles(oot, mm);
+  const Json native = {
+      {"checks", Json::array({{{"name", "Native check"}},
+                              {{"name", "Well check"}},
+                              {{"name", "Well locked check"}}})},
+      {"pool", Json::array({{{"name", "Goron's Ruby"}}})},
+      {"fixed",
+       Json::array({{{"check", "Native boss"},
+                     {"item", "Zora's Sapphire"},
+                     {"allowedChecks", Json::array({"Native boss"})}},
+                    {{"check", "Song from Ocarina"}, {"item", "Song of Time"}},
+                    {{"check", "Adult song"}, {"item", "Bolero of Fire"}},
+                    {{"check", "Well key 1"}, {"item", "Small Key"}},
+                    {{"check", "Well key 2"}, {"item", "Small Key"}}})},
+      {"items", Json::array({{{"name", "Kokiri's Emerald"}},
+                             {{"name", "Goron's Ruby"}},
+                             {{"name", "Zora's Sapphire"}},
+                             {{"name", "Progressive Hookshot"}},
+                             {{"name", "Song of Time"}},
+                             {{"name", "Bolero of Fire"}},
+                             {{"name", "Small Key"}}})}};
+  const Json other = {{"checks", Json::array({{{"name", "Native check"}}})},
+                      {"pool", Json::array()},
+                      {"fixed", Json::array()}};
+  const std::string forced =
+      Json({{"Link's Pocket", {{"item", "Kokiri's Emerald"}}}}).dump();
+  StructureProbe missingPocket(native.dump(), other.dump(), oot, mm, true);
+  assert(!missingPocket.ootRequired.count("Well check"));
+  StructureProbe withPocket(native.dump(), other.dump(), oot, mm, true, nullptr,
+                            forced);
+  assert(withPocket.ootRequired.count("Well check") &&
+         withPocket.ootRequired.count("Well locked check") &&
+         "the exact forced stone must open the native baseline before cross "
+         "routing is judged");
+  for (const char *physical : {"Song of Time", "Bolero of Fire", "Small Key"})
+    assert(std::count(withPocket.ootOwned.begin(), withPocket.ootOwned.end(),
+                      physical) == 0 &&
+           "fixed keys and songs must still be collected at their physical "
+           "checks");
+  assert(std::count(withPocket.ootOwned.begin(), withPocket.ootOwned.end(),
+                    "Kokiri's Emerald") == 1);
+  const auto valid = Encode(dungeons, {0, 1});
+  const auto ageLocked = Encode(dungeons, {1, 0});
+  ValidateSavedStructure(coordinator, valid, native.dump(), other.dump(), oot,
+                         mm, true, forced);
+  bool rejectedAgeLock = false;
+  try {
+    ValidateSavedStructure(coordinator, ageLocked, native.dump(), other.dump(),
+                           oot, mm, true, forced);
+  } catch (const std::invalid_argument &error) {
+    rejectedAgeLock =
+        std::string(error.what()).find("Well") != std::string::npos;
+  }
+  assert(rejectedAgeLock && coordinator.LogicSeed() == valid);
+  uint64_t badFirstSeed = 0;
+  while (badFirstSeed < 100 &&
+         GenerateSeed(dungeons, badFirstSeed) != ageLocked)
+    ++badFirstSeed;
+  assert(badFirstSeed < 100);
+  const auto generated =
+      GenerateValidatedSeed(coordinator, true, badFirstSeed, native.dump(),
+                            other.dump(), oot, mm, true, 16, nullptr, forced);
+  assert(generated == valid &&
+         "generation must reject the adult-only Well route");
+
+  // A forced item reserves an already-assumed source copy, including movable
+  // fixed rewards; only genuinely missing native copies increase the count.
+  for (const auto &[poolCopies, forcedCopies, expected] :
+       {std::tuple{1, 2, 2}, std::tuple{2, 1, 2}, std::tuple{0, 2, 2}}) {
+    auto counts = native;
+    counts["pool"] = Json::array();
+    for (int i = 0; i < poolCopies; ++i)
+      counts["pool"].push_back({{"name", "Progressive Hookshot"}});
+    Json starts = Json::object();
+    for (int i = 0; i < forcedCopies; ++i)
+      starts["Start " + std::to_string(i)] = {{"item", "Progressive Hookshot"}};
+    coordinator.InstallLogic(nullptr);
+    coordinator.ConfigureOracles(oot, mm);
+    StructureProbe copies(counts.dump(), other.dump(), oot, mm, true, nullptr,
+                          starts.dump());
+    assert(std::count(copies.ootOwned.begin(), copies.ootOwned.end(),
+                      "Progressive Hookshot") == expected);
+  }
+  const Json reserved = {{"Start", {{"item", "Zora's Sapphire"}}},
+                         {"Category only", {{"category", "advancement"}}}};
+  StructureProbe movable(native.dump(), other.dump(), oot, mm, true, nullptr,
+                         reserved.dump());
+  assert(std::count(movable.ootOwned.begin(), movable.ootOwned.end(),
+                    "Zora's Sapphire") == 1);
+  assert(movable.ootOwned.size() == 2 &&
+         "category-only forces draw from the already-assumed pool");
+  bool unknownRejected = false;
+  try {
+    StructureProbe unknown(
+        native.dump(), other.dump(), oot, mm, true, nullptr,
+        R"({"Link's Pocket":{"item":"Invented progression"}})");
+  } catch (const std::invalid_argument &) {
+    unknownRejected = true;
+  }
+  assert(unknownRejected &&
+         "a forced name outside native metadata must not create progression");
+
+  const auto rejects = [](const auto &operation) {
+    try {
+      operation();
+    } catch (const std::invalid_argument &) {
+      return true;
+    }
+    return false;
+  };
+  const Json starts =
+      Json::array({{{"checkGame", "oot"}, {"checkName", "Link's Pocket"}},
+                   {{"checkGame", "oot"}, {"checkName", "Link's Pocket"}}});
+  const Json recorded = {{"oot",
+                          {{"Link's Pocket", "Kokiri's Emerald (OOT)"},
+                           {"Song from Ocarina", "Song of Time"}}},
+                         {"startKnown", starts}};
+  const auto recordedForce = RecordedForcedOot(recorded);
+  assert(recordedForce == Json::parse(forced) &&
+         "recorded starts resolve item values and duplicate check identities "
+         "only once");
+  auto legacy = Json{{"oot", {{"placements", recorded.at("oot")}}}};
+  assert(RecordedForcedOot(legacy) == recordedForce);
+  legacy["startKnown"] = Json::array();
+  assert(RecordedForcedOot(legacy).empty() &&
+         "explicitly empty recorded starts must not fall back to a fresh or "
+         "legacy Pocket");
+  auto metadata = recorded;
+  metadata["oot"]["Link's Pocket"] = "Display-only item";
+  metadata["foreign"] = Json::array({{{"checkGame", "oot"},
+                                      {"checkName", "Link's Pocket"},
+                                      {"itemGame", "oot"},
+                                      {"itemName", "Kokiri's Emerald"}}});
+  assert(RecordedForcedOot(metadata) == recordedForce);
+  metadata["foreign"][0]["itemGame"] = "mm";
+  assert(rejects([&] { RecordedForcedOot(metadata); }) &&
+         "a recorded MM item must not become free OoT progression");
+  auto missing = recorded;
+  missing["oot"].erase("Link's Pocket");
+  assert(rejects([&] { RecordedForcedOot(missing); }));
+  ValidateRecordedForcedOot(forced, recordedForce, native.dump());
+  assert(rejects([&] {
+           ValidateRecordedForcedOot(
+               R"({"Link's Pocket":{"item":"Goron's Ruby"}})", recordedForce,
+               native.dump());
+         }) &&
+         "replay must not replace a recorded stone with a newly selected "
+         "native reward");
+  assert(rejects([&] {
+    ValidateRecordedForcedOot(forced, Json::object(), native.dump());
+  }));
+  const std::string category =
+      R"({"Link's Pocket":{"category":"advancement"}})";
+  const Json poolStart = {{"Link's Pocket", {{"item", "Goron's Ruby"}}}};
+  ValidateRecordedForcedOot(category, poolStart, native.dump());
+  assert(rejects([&] {
+           ValidateRecordedForcedOot(category, recordedForce, native.dump());
+         }) &&
+         "a category-only replay must reserve a current pool copy, not create "
+         "a known but absent item");
+  auto junk = native;
+  junk["pool"][0]["advancement"] = false;
+  assert(rejects(
+      [&] { ValidateRecordedForcedOot(category, poolStart, junk.dump()); }));
+  ValidateRecordedForcedOot(R"({"Link's Pocket":{"category":"any"}})",
+                            poolStart, junk.dump());
+  pocketGraph = false;
 }
 
 int main() {
@@ -193,5 +393,7 @@ int main() {
          runtimeCalls == 0);
   rejectEveryMap = false;
   CheckCancellation(coordinator, oot, mm, dump);
-  std::cout << "cross-dungeon structural generation and cancellation: PASS\n";
+  CheckForcedPocket(coordinator, oot, mm);
+  std::cout << "cross-dungeon structural generation, recorded forced starts, "
+               "and cancellation: PASS\n";
 }

@@ -63,7 +63,15 @@ python3 -B tests/shared_progression_logic/native_sweep.py \
   --jobs 3 --timeout 300
 ```
 
-On Linux, the runtime directory must contain `libsoh.so` and `lib2ship.so`, plus their ordinary runtime dependencies. The CI workflow uses `_packages/stage` after the native runtime staging step. For a local environment that needs additional bundled dependencies, repeat `--library-dir /path/to/libraries` as needed. Each native run has a fresh process, writable directory, local executable, and empty `comboship.json`; runtime libraries and assets are linked, and existing saves/configuration/log directories are not copied.
+On Linux, the runtime directory must contain `libsoh.so` and `lib2ship.so`, plus their ordinary runtime dependencies. The CI workflow uses `_packages/stage` after the native runtime staging step. For a local environment that needs additional bundled dependencies, repeat `--library-dir /path/to/libraries` as needed. Each native run has a fresh process, writable directory, and local executable. `SHIP_HOME` points explicitly to that directory, which starts without a `comboship.json`; the native first-run settings restore creates it. Runtime libraries and assets are linked, and existing saves/configuration/log directories are not copied.
+
+### Native array-setting restoration gate
+
+Before any fill cases start, `native_settings_restore.py` loads the actual SoH and MM modules in an isolated directory prepared by the same `prepare_work` function as the cases. It calls both native headless initializers, settings restorers, and settings dump exports. The requested MM `gRando.StartingItems` and `gRando.ExcludedChecks` arrays must survive the round trip. Starting items retain exact order and multiplicity; excluded checks may be reordered by native check ID but must retain their names and multiplicity. The check is deduplicated by the requested array pair across the selected public cases. Both current base fixtures request empty arrays, so the default 64-run matrix needs one such native preflight.
+
+This gate covers a configuration setup failure found during native verification: writing an artificial `{"CVars":{}}` config caused native JSON flattening to produce `CVars:null`. The native block writer then could not restore MM's array settings, and an empty requested starting kit silently became the default kit. A genuinely absent config follows the supported native first-run path. This is why the harness does not synthesize an empty config object.
+
+Each preflight has a 30-second process limit and retains its input, command, native stdout and stderr, restored settings, result, and hashes under `settings-preflight/`. `settings-preflight.json` records the requested arrays and the cases covered by each probe. Any mismatch, native failure, timeout, or missing verdict fails the sweep before fill cases start; the summary records zero completed fill cases and cannot report `PASS`. This focused gate verifies the two array settings, not every scalar setting or saved-seed behavior.
 
 Useful smaller invocations:
 
@@ -76,13 +84,13 @@ python3 -B tests/shared_progression_logic/native_sweep.py \
   --case mixed-native-nei --seed 20261109
 ```
 
-`--case` and `--seed` can be repeated. The output directory must be new so stale evidence cannot satisfy a run. The manifest records fixture, driver, and module hashes, requested settings, starts, entrance flags, seed inputs, and the accessibility contract for each case. Each case/seed directory retains its settings, command, native log, and result. Results distinguish `PASS`, `FAIL`, `TIMEOUT`, and `BLOCKED`; every nonpassing result makes the sweep fail. A timeout never becomes a pass, even if a partial log contains a success line. `results.json` is updated as runs finish, and `summary.json` records the final verdict. Native generation may use its ordinary deterministic retries; the result records successful resolved seeds separately from the requested base seed.
+`--case` and `--seed` can be repeated. The output directory must be new so stale evidence cannot satisfy a run. The manifest records fixture, harness, driver, and module hashes, requested settings, preflight groups, starts, entrance flags, seed inputs, and the accessibility contract for each case. Each case/seed directory retains its settings, command, native log, and result; command provenance records the isolated `SHIP_HOME` and initial config absence. Results distinguish `PASS`, `FAIL`, `TIMEOUT`, and `BLOCKED`; every nonpassing result makes the sweep fail. A timeout never becomes a pass, even if a partial log contains a success line. `results.json` is updated as runs finish, and `summary.json` records the final verdict. Native generation may use its ordinary deterministic retries; the result records successful resolved seeds separately from the requested base seed.
 
 Cancellation or the outer CI step timeout can interrupt the sweep before a final summary is written. Partial logs, unfinished `RUNNING` entries, or a missing summary are incomplete evidence and do not establish a pass.
 
 ### What a native sweep pass proves
 
-A pass requires a successful native process exit, exactly one completed seed and one `1/1` PASS summary, acknowledgment of `--fill-only`, and the generator's final validation from empty inventory. The fill still enforces its configured accessibility rules. OoT No Logic permits OoT-only advancement off logic while retaining MM progression obligations; the both-No-Logic case is recorded as fill/inventory coverage rather than logical beatability proof.
+A pass requires every native array-setting preflight to pass, followed by a successful native process exit for every case, exactly one completed seed and one `1/1` PASS summary, acknowledgment of `--fill-only`, and the generator's final validation from empty inventory. The fill still enforces its configured accessibility rules. OoT No Logic permits OoT-only advancement off logic while retaining MM progression obligations; the both-No-Logic case is recorded as fill/inventory coverage rather than logical beatability proof.
 
 `--fill-only` skips optional hint analysis and consolidated spoiler writing. The sweep therefore does not establish hint correctness, output/save serialization, independent spoiler replay, or in-game behavior. Those require their separate gates. The fast synthetic regression above additionally checks forward replay for its focused shared-item graphs.
 

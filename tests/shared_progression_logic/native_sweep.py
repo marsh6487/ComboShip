@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Run isolated native combined-fill cases against public exact-build CI fixtures.
 
-Each configuration runs in a fresh process and writable directory with an empty
-comboship.json. Only libraries and assets are linked from --runtime-dir; its
-configuration, logs and saves are never used. --driver must support --fill-only.
+Each configuration runs in a fresh process and writable directory without an
+existing config. SHIP_HOME points to that directory. Only libraries and assets
+are linked from --runtime-dir; its configuration, logs and saves are never used.
+Native array-setting restoration must pass before cases run. --driver must
+support --fill-only.
 The two public fixture snapshots contain no uploaded user settings or game logs.
 
 PASS means native fill plus its empty-inventory validation completed. Hints,
@@ -30,6 +32,8 @@ DEFAULT_SEEDS = (20261109, 20261110)
 NATIVE_TRIO = ("bows", "magic", "lightArrows")
 SHARED_SOULS = ("sharedSoulsEnemy", "sharedSoulsNpc", "sharedSoulsAnimal", "sharedSoulsMisc")
 CROSS_FLAGS = ("dungeon", "boss", "expanded", "interior", "grotto", "shop", "door")
+MM_ARRAY_KEYS = ("gRando.StartingItems", "gRando.ExcludedChecks")
+SETTINGS_PREFLIGHT_TIMEOUT = 30
 CROSS_CLI = {
     "dungeon": "--cross-dungeon-entrances", "boss": "--cross-boss-entrances",
     "expanded": "--expanded-dungeon-pool", "interior": "--cross-interior-entrances",
@@ -211,16 +215,110 @@ def prepare_work(runtime, driver, work, library_dirs):
     executable = work / ("comborando.exe" if os.name == "nt" else "comborando")
     # A local executable also keeps executable-relative config discovery isolated.
     shutil.copy2(driver, executable)
-    write_json(work / "comboship.json", {"CVars": {}})
+    # Native first-run restore creates its own config. An artificial {CVars:{}}
+    # flattens to CVars:null, blocking SetBlock from restoring MM array settings.
     env = os.environ.copy()
-    for name in ("SHIP_HOME", "APPIMAGE", "APPDIR", "LD_PRELOAD"):
+    for name in ("APPIMAGE", "APPDIR", "LD_PRELOAD"):
         env.pop(name, None)
+    env["SHIP_HOME"] = str(work)
     for key in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
         paths = [str(path) for path in (work, work / "lib", work / "lib64", *library_dirs)]
         if env.get(key):
             paths.append(env[key])
         env[key] = os.pathsep.join(paths)
     return executable, env
+
+
+def work_provenance(work, env):
+    config = work / "comboship.json"
+    initial = {"present": config.exists()}
+    if config.exists():
+        initial["sha256"] = sha256(config)
+    return {"cwd": str(work), "SHIP_HOME": env.get("SHIP_HOME"),
+            "clearedEnvironment": ["APPIMAGE", "APPDIR", "LD_PRELOAD"],
+            "libraryPath": env["LD_LIBRARY_PATH"], "initialConfig": initial}
+
+
+def settings_preflight_groups(cases):
+    groups = {}
+    for case in cases:
+        settings = load_settings(case)
+        arrays = {key: settings["mm"]["settings"].get(key) for key in MM_ARRAY_KEYS}
+        key = json.dumps(arrays, sort_keys=True)
+        if key not in groups:
+            groups[key] = {"name": "arrays-" + str(len(groups) + 1), "requestedArrays": arrays,
+                           "representativeSettings": settings, "cases": [], "fixtures": []}
+        groups[key]["cases"].append(case["name"])
+        if case["fixture"] not in groups[key]["fixtures"]:
+            groups[key]["fixtures"].append(case["fixture"])
+    return list(groups.values())
+
+
+def run_settings_preflight(groups, runtime, driver, output, library_dirs, input_hashes):
+    """Run each distinct requested array pair through the actual native exports."""
+    worker = Path(__file__).resolve().with_name("native_settings_restore.py")
+    results = []
+    for group in groups:
+        folder = output / "settings-preflight" / group["name"]
+        started = time.monotonic()
+        result = {key: group[key] for key in ("name", "cases", "fixtures", "requestedArrays")}
+        result.update(status="BLOCKED", exitCode=None, timedOut=False, inputSha256=input_hashes,
+                      workerSha256=sha256(worker))
+        try:
+            folder.mkdir(parents=True, exist_ok=False)
+            settings_path = folder / "settings.json"
+            write_json(settings_path, group["representativeSettings"])
+            result["settingsSha256"] = sha256(settings_path)
+            work = folder / "runtime"
+            _, env = prepare_work(runtime, driver, work, library_dirs)
+            proof_path = folder / "native-result.json"
+            command = [sys.executable, "-B", str(worker), "--runtime", str(work), "--settings", str(settings_path),
+                       "--output", str(proof_path)]
+            for path in library_dirs:
+                command += ["--library-dir", str(path)]
+            write_json(folder / "command.json", {"argv": command, "timeoutSeconds": SETTINGS_PREFLIGHT_TIMEOUT,
+                                                 **work_provenance(work, env)})
+            result["status"] = "RUNNING"
+            write_json(folder / "result.json", result)
+            with (folder / "stdout.log").open("wb") as stdout, (folder / "stderr.log").open("wb") as stderr:
+                process = subprocess.Popen(command, cwd=work, env=env, stdout=stdout, stderr=stderr,
+                                           start_new_session=(os.name == "posix"))
+                try:
+                    result["exitCode"] = process.wait(timeout=SETTINGS_PREFLIGHT_TIMEOUT)
+                except subprocess.TimeoutExpired:
+                    result["timedOut"] = True
+                    if os.name == "posix":
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    else:
+                        process.kill()
+                    result["exitCode"] = process.wait()
+            proof = json.loads(proof_path.read_text(encoding="utf-8")) if proof_path.is_file() else {}
+            result["nativeResult"] = proof
+            if result["timedOut"]:
+                result.update(status="TIMEOUT", reason="Native settings restoration exceeded its bounded timeout")
+            elif result["exitCode"] == 0 and proof.get("status") == "PASS" and not proof.get("mismatches") and \
+                    proof.get("requestedArrays") == group["requestedArrays"]:
+                result.update(status="PASS", reason="Native MM starting items and excluded checks match their request")
+            else:
+                result.update(status="FAIL", reason=proof.get("reason", "Native settings restoration did not pass"))
+        except Exception as error:
+            result.update(status="BLOCKED", reason=type(error).__name__ + ": " + str(error))
+        result["evidenceSha256"] = {name: sha256(folder / name)
+                                     for name in ("stdout.log", "stderr.log", "native-result.json", "restored-settings.json")
+                                     if (folder / name).is_file()}
+        result["elapsedSeconds"] = round(time.monotonic() - started, 3)
+        if folder.is_dir():
+            write_json(folder / "result.json", result)
+        results.append(result)
+        print("SETTINGS PREFLIGHT " + group["name"] + " " + result["status"], flush=True)
+        write_json(output / "settings-preflight.json", {"status": "RUNNING", "results": results})
+    summary = {"status": "PASS" if results and all(row["status"] == "PASS" for row in results) else "FAIL",
+               "distinctArraySets": len(groups), "results": results}
+    write_json(output / "settings-preflight.json", summary)
+    return summary
 
 
 def run_case(case, seed, runtime, driver, output, timeout, library_dirs):
@@ -242,10 +340,8 @@ def run_case(case, seed, runtime, driver, output, timeout, library_dirs):
         for key, flag in CROSS_CLI.items():
             command += [flag, str(case["crossEntrances"][key])]
         result["command"] = command
-        write_json(folder / "command.json", {"argv": command, "cwd": str(work), "timeoutSeconds": timeout,
-                                             "clearedEnvironment": ["SHIP_HOME", "APPIMAGE", "APPDIR", "LD_PRELOAD"],
-                                             "libraryPath": env["LD_LIBRARY_PATH"],
-                                             "initialCVars": {}})
+        write_json(folder / "command.json", {"argv": command, "timeoutSeconds": timeout,
+                                             **work_provenance(work, env)})
         result["status"] = "RUNNING"
         write_json(folder / "result.json", result)
         log_path = folder / "native.log"
@@ -338,6 +434,7 @@ def main():
     for name in required + (("libultraship.so",) if (runtime / "libultraship.so").is_file() else ()):
         input_hashes[name] = sha256(runtime / name)
     fixtures = {name: sha256(CONFIG_DIR / name) for name in sorted({case["fixture"] for case in cases})}
+    preflight_groups = settings_preflight_groups(cases)
     planned = [(case, seed) for case in cases for seed in seeds]
     manifest = {"schemaVersion": 1, "createdUtc": datetime.now(timezone.utc).isoformat(),
                 "runtimeDirectory": str(runtime), "driver": str(driver), "inputSha256": input_hashes,
@@ -345,7 +442,12 @@ def main():
                 "fixtureSha256": fixtures, "seeds": seeds, "jobs": args.jobs, "timeoutSeconds": args.timeout,
                 "runCount": len(planned), "configurations": cases,
                 "coverageTags": sorted({tag for case in cases for tag in case["tags"]}),
-                "passContract": "Exit 0, exactly one 1/1 native PASS summary and native empty-inventory validation success",
+                "settingsPreflight": {"timeoutSeconds": SETTINGS_PREFLIGHT_TIMEOUT,
+                                      "groups": [{key: group[key] for key in ("name", "cases", "fixtures", "requestedArrays")}
+                                                 for group in preflight_groups]},
+                "harnessSha256": {name: sha256(Path(__file__).resolve().with_name(name))
+                                  for name in ("native_sweep.py", "native_settings_restore.py")},
+                "passContract": "Native MM array restoration preflight PASS; then exit 0, exactly one 1/1 native PASS summary and native empty-inventory validation success for every case",
                 "limits": ["Bounded settings interaction coverage, not exhaustive",
                            "Fill only: optional hints, output writing, independent replay and gameplay are separate",
                            "OoT No Logic permits OoT-only advancement off logic; MM remains constrained",
@@ -355,6 +457,19 @@ def main():
     write_json(output / "coverage-manifest.json", manifest)
     results = []
     sweep_started = time.monotonic()
+    preflight = run_settings_preflight(preflight_groups, runtime, driver, output, library_dirs, input_hashes)
+    if preflight["status"] != "PASS":
+        counts = {status: 0 for status in ("PASS", "FAIL", "TIMEOUT", "BLOCKED")}
+        write_json(output / "results.json", {"completed": 0, "planned": len(planned), "counts": counts,
+                                             "results": [], "settingsPreflight": preflight["status"]})
+        write_json(output / "summary.json", {"status": "FAIL", "stage": "settings-preflight",
+                                             "settingsPreflight": preflight["status"],
+                                             "elapsedSeconds": round(time.monotonic() - sweep_started, 3),
+                                             "planned": len(planned), "completed": 0, "counts": counts,
+                                             "reason": "Native settings restore preflight failed; no fill cases started"})
+        print("SWEEP FAIL: native settings restore preflight failed; no fill cases started", flush=True)
+        print("Evidence: " + str(output))
+        return 1
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = [executor.submit(run_case, case, seed, runtime, driver, output, args.timeout, library_dirs)
                    for case, seed in planned]
@@ -369,8 +484,10 @@ def main():
             write_json(output / "results.json", {"completed": len(results), "planned": len(planned),
                                                  "counts": counts, "results": ordered})
     elapsed = round(time.monotonic() - sweep_started, 3)
-    success = len(results) == len(planned) and all(result["status"] == "PASS" for result in results)
+    success = (preflight["status"] == "PASS" and len(results) == len(planned) and
+               all(result["status"] == "PASS" for result in results))
     summary = {"status": "PASS" if success else "FAIL", "elapsedSeconds": elapsed,
+               "settingsPreflight": preflight["status"],
                "planned": len(planned), "completed": len(results), "counts": counts,
                "nonpassing": [{key: result.get(key) for key in ("case", "baseSeed", "status", "reason", "exitCode")}
                               for result in ordered if result["status"] != "PASS"]}

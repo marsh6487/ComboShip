@@ -2092,7 +2092,7 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
         try {
             crossDungeonSeed = ComboRando::CrossDungeon::GenerateValidatedSeed(
                 g_CrossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, ootOracle, mmOracle, mmStart,
-                ComboRando::CrossDungeon::kStructuralLayoutAttempts, progress);
+                ComboRando::CrossDungeon::kStructuralLayoutAttempts, progress, forcedOot);
         } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
             lastFillError = e.what();
             std::cout << "[ComboShip] RunComboFill: " << lastFillError << "\n";
@@ -2507,8 +2507,9 @@ static int RunComboGenTest(int numSeeds, uint32_t seedBase) {
                 continue; // a different masterSeed yields a different layout — reroll, like RunComboFill
             }
             try {
-                ComboRando::CrossDungeon::GenerateValidatedSeed(g_CrossDungeons, crossDungeonEnabled, seed, sohDump,
-                                                                mmDump, ootOracle, mmOracle, mmStart);
+                ComboRando::CrossDungeon::GenerateValidatedSeed(
+                    g_CrossDungeons, crossDungeonEnabled, seed, sohDump, mmDump, ootOracle, mmOracle, mmStart,
+                    ComboRando::CrossDungeon::kStructuralLayoutAttempts, nullptr, forcedOot);
             } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
                 result.error = e.what();
                 if (mmStart && startCfg == 2)
@@ -2626,8 +2627,9 @@ static void RunComboPlaythrough(const std::string& inputSeed) {
             continue;
         }
         try {
-            ComboRando::CrossDungeon::GenerateValidatedSeed(g_CrossDungeons, crossDungeonEnabled, masterSeed, sohDump,
-                                                            mmDump, ootOracle, mmOracle, mmStart);
+            ComboRando::CrossDungeon::GenerateValidatedSeed(
+                g_CrossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, ootOracle, mmOracle, mmStart,
+                ComboRando::CrossDungeon::kStructuralLayoutAttempts, nullptr, forcedOot);
         } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
             fill.error = e.what();
             if (mmStart && startCfg == 2)

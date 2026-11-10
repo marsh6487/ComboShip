@@ -5140,6 +5140,7 @@ static uint8_t sComboPreparedQuestAssets = 0;
 struct ComboRewardTopologySnapshot {
     std::vector<Rando::ItemLocation> fixedLocations;
     std::vector<RandomizerCheck> allowedChecks;
+    std::vector<RandomizerCheck> requiredChecks;
     std::vector<RandomizerGet> rewards;
     std::vector<RandomizerGet> freeAdvancement;
 };
@@ -5703,8 +5704,11 @@ static bool Combo_HasNativeRewardTopology() {
     for (int i = 0; i < RC_MAX; ++i)
         *ctx->GetItemLocation(static_cast<RandomizerCheck>(i)) = snapshot.fixedLocations[i];
 
-    return ComboRando::HasNativeRewardPlacement(snapshot.rewards.size(), [&](uint16_t collectedMask) -> size_t {
+    const auto search = [&](uint16_t collectedMask, const std::vector<RandomizerCheck>& targets) {
         ctx->GetLogic()->Reset();
+        // Captured ItemLocations can carry visitation from the confined fill.
+        // Clear it for every subset, including occupied vanilla reward checks.
+        ctx->LocationReset();
         for (RandomizerGet item : snapshot.freeAdvancement)
             Rando::StaticData::RetrieveItem(item).ApplyEffect();
         for (size_t i = 0; i < snapshot.rewards.size(); ++i)
@@ -5712,13 +5716,27 @@ static bool Combo_HasNativeRewardTopology() {
                 Rando::StaticData::RetrieveItem(snapshot.rewards[i]).ApplyEffect();
         // ReachabilitySearch applies starting inventory and collects fixed items only
         // at reachable checks. Every movable reward slot remains physically empty.
-        const auto reachable = ReachabilitySearch(snapshot.allowedChecks);
-        return std::count_if(reachable.begin(), reachable.end(), [&](RandomizerCheck rc) {
-            return ctx->GetItemLocation(rc)->GetPlacedRandomizerGet() == RG_NONE &&
-                   std::find(snapshot.allowedChecks.begin(), snapshot.allowedChecks.end(), rc) !=
-                       snapshot.allowedChecks.end();
-        });
-    });
+        ReachabilitySearch(targets);
+    };
+    if (!ComboRando::HasNativeRewardPlacement(snapshot.rewards.size(), [&](uint16_t collectedMask) -> size_t {
+            search(collectedMask, snapshot.allowedChecks);
+            return std::count_if(snapshot.allowedChecks.begin(), snapshot.allowedChecks.end(), [&](RandomizerCheck rc) {
+                const auto* location = ctx->GetItemLocation(rc);
+                return location->GetPlacedRandomizerGet() == RG_NONE && location->IsAddedToPool();
+            });
+        }))
+        return false;
+
+    if (snapshot.requiredChecks.empty())
+        return true; // Beatable-only/No Logic retain their existing reward-domain contract.
+    // Only after a complete movable-reward order is proven may its full inventory
+    // be used for ALR. Vanilla rewards never enter this mask: they remain physical.
+    const auto completeMask = static_cast<uint16_t>((1u << snapshot.rewards.size()) - 1u);
+    search(completeMask, snapshot.requiredChecks);
+    // The returned placement list contains only empty checks. Native visitation
+    // also records reached occupied checks, including fixed vanilla boss rewards.
+    return std::all_of(snapshot.requiredChecks.begin(), snapshot.requiredChecks.end(),
+                       [&](RandomizerCheck rc) { return ctx->GetItemLocation(rc)->IsAddedToPool(); });
 }
 #endif
 
@@ -5753,7 +5771,16 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
             // Temp shop items (worst-case shopsanity) for world validation, as Fill() does.
             SohUtils::AppendVector(itemPool, GetMinVanillaShopItems(8));
             Random_Init(seed + retry);
+#ifdef COMBO_BUILD
+            // Reject a reward dead end while the native shuffler can still roll back the
+            // tentative edge and try another target, rather than discarding whole layouts.
+            // Assumed targets are still present during this search; the final check below
+            // also validates the completed graph after blue-warp routing and SetAreas.
+            int ret = ctx->GetEntranceShuffler()->ShuffleAllEntrances(
+                sComboRewardTopology ? Combo_HasNativeRewardTopology : nullptr);
+#else
             int ret = ctx->GetEntranceShuffler()->ShuffleAllEntrances();
+#endif
             std::erase_if(itemPool, [](const auto item) {
                 return Rando::StaticData::RetrieveItem(item).GetItemType() == ITEMTYPE_SHOP;
             });
@@ -5765,9 +5792,9 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
 #ifdef COMBO_BUILD
             if (!Combo_HasNativeRewardTopology()) {
                 ++rewardTopologyFailures;
-                SPDLOG_WARN("[ComboShip] SOH_ShuffleEntrancesForCombo: no legal End-of-Dungeon reward placement "
-                            "on this layout (retry {}, {} rewards, {} eligible boss checks)",
-                            retry, sComboRewardTopology->rewards.size(), sComboRewardTopology->allowedChecks.size());
+                SPDLOG_WARN("[ComboShip] SOH_ShuffleEntrancesForCombo: reward/fixed-progression constraints "
+                            "rejected this layout (retry {}, {} movable rewards, {} required checks)",
+                            retry, sComboRewardTopology->rewards.size(), sComboRewardTopology->requiredChecks.size());
                 continue;
             }
 #endif
@@ -5778,7 +5805,7 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
             return 1;
         }
         SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: no valid layout after 5 retries "
-                     "({} rejected for impossible dungeon reward placement)",
+                     "({} completed layouts failed final reward/fixed-progression validation)",
                      rewardTopologyFailures);
     } catch (const std::exception& e) {
         SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: {}", e.what());
@@ -5926,7 +5953,13 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         // checks, instead of freezing the vanilla-graph preplacement. The Pocket
         // reward stays with SOH_GetForcedPlacements; it is outside this catalogue.
         std::set<RandomizerCheck> movableRewardChecks;
+        std::set<RandomizerCheck> requiredTopologyChecks;
         nlohmann::json rewardAllowedChecks = nlohmann::json::array();
+        const bool validateRewardAlr =
+            ctx->GetOption(RSK_SHUFFLE_ENTRANCES) && ctx->GetOption(RSK_NO_LOGIC).Is(RO_GENERIC_OFF) &&
+            ctx->GetOption(RSK_ALL_CHECKS_REACHABLE) &&
+            (ctx->GetOption(RSK_SHUFFLE_DUNGEON_REWARDS).Is(RO_DUNGEON_REWARDS_VANILLA) ||
+             ctx->GetOption(RSK_SHUFFLE_DUNGEON_REWARDS).Is(RO_DUNGEON_REWARDS_END_OF_DUNGEON));
         if (ctx->GetOption(RSK_SHUFFLE_ENTRANCES) &&
             ctx->GetOption(RSK_SHUFFLE_DUNGEON_REWARDS).Is(RO_DUNGEON_REWARDS_END_OF_DUNGEON)) {
             for (RandomizerCheck rc : Rando::StaticData::dungeonRewardLocations) {
@@ -5977,6 +6010,9 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                                       { "advancement", comboIsAdv(placed) },
                                       { "major", isMajor(placed) },
                                       { "hintable", ctx->GetItemLocation(rc)->IsHintable() } });
+                    if (validateRewardAlr &&
+                        Rando::StaticData::RetrieveItem(placed).GetItemType() == ITEMTYPE_DUNGEONREWARD)
+                        requiredTopologyChecks.insert(rc);
                     if (movableRewardChecks.contains(rc)) {
                         fixed.back()["validate"] = true;
                         fixed.back()["allowedChecks"] = rewardAllowedChecks;
@@ -5988,6 +6024,8 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                 // item — red ice / icicles / fountain fairies have NO vanilla item (the item exists only
                 // when shuffled) and were being wrongly dropped, leaving them unfilled ("No Item").
                 checks.push_back({ { "name", name } });
+                if (validateRewardAlr)
+                    requiredTopologyChecks.insert(rc);
             }
         }
 
@@ -6048,9 +6086,10 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                         { "npc", ctx->GetOption(RSK_SHUFFLE_NPC_SOULS).Get() != 0 },
                         { "animal", ctx->GetOption(RSK_SHUFFLE_ANIMAL_SOULS).Get() != 0 },
                         { "misc", ctx->GetOption(RSK_SHUFFLE_MISC_SOULS).Get() != 0 } };
-        if (!movableRewardChecks.empty()) {
+        if (!movableRewardChecks.empty() || !requiredTopologyChecks.empty()) {
             ComboRewardTopologySnapshot snapshot;
             snapshot.allowedChecks.assign(movableRewardChecks.begin(), movableRewardChecks.end());
+            snapshot.requiredChecks.assign(requiredTopologyChecks.begin(), requiredTopologyChecks.end());
             snapshot.fixedLocations.reserve(RC_MAX);
             for (int i = 0; i < RC_MAX; ++i)
                 snapshot.fixedLocations.push_back(*ctx->GetItemLocation(static_cast<RandomizerCheck>(i)));
@@ -6062,7 +6101,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                     location.RefPlacedItem() = RG_NONE;
                 }
             }
-            if (!snapshot.rewards.empty()) {
+            if (!snapshot.rewards.empty() || !snapshot.requiredChecks.empty()) {
                 // Use the exact exported free advancement multiset, including any pool
                 // padding. Fixed native keys/songs are collected in place, never assumed.
                 for (const auto& item : pool) {

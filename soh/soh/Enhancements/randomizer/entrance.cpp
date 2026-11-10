@@ -842,7 +842,7 @@ static bool EntranceUnreachableAs(Entrance* entrance, uint8_t age, std::vector<E
     return true;
 }
 
-static bool ValidateWorld(Entrance* entrancePlaced) {
+bool EntranceShuffler::ValidateWorld(Entrance* entrancePlaced) {
     auto ctx = Rando::Context::GetInstance();
     SPDLOG_DEBUG("Validating world");
 
@@ -944,6 +944,13 @@ static bool ValidateWorld(Entrance* entrancePlaced) {
         }
 
         SPDLOG_DEBUG("All Checks NOT REACHABLE");
+        return false;
+    }
+    // Run extra constraints only after the native checks have consumed their search state.
+    // A rejection uses the same rollback and target alternatives as any native validation failure.
+    if (mAdditionalWorldValidator != nullptr && !mAdditionalWorldValidator()) {
+        SPDLOG_DEBUG("Additional world validation rejected {}",
+                     entrancePlaced != nullptr ? entrancePlaced->GetName() : "the final entrance graph");
         return false;
     }
     return true;
@@ -1242,7 +1249,16 @@ void EntranceShuffler::ShuffleEntrancePool(std::vector<Entrance*>& entrancePool,
     }
 }
 
-int EntranceShuffler::ShuffleAllEntrances() {
+int EntranceShuffler::ShuffleAllEntrances(WorldValidator additionalWorldValidator) {
+    struct RestoreWorldValidator {
+        WorldValidator& active;
+        WorldValidator previous;
+        ~RestoreWorldValidator() {
+            active = previous;
+        }
+    } restoreValidator{ mAdditionalWorldValidator, mAdditionalWorldValidator };
+    mAdditionalWorldValidator = additionalWorldValidator;
+
     auto ctx = Rando::Context::GetInstance();
 
     mTotalRandomizableEntrances = 0;
