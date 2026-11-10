@@ -1455,6 +1455,20 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM adult Link item framing, receipt placement and draw ownership",
+    "run": "python3 -B tests/adult_mm_item_presentation/run_tests.py\npython3 -B tests/adult_mm_item_presentation/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Unified trade selection migration, mask separation and equipment bindings",
+    "run": "python3 -B tests/unified_trade_slots/run_tests.py\npython3 -B tests/unified_trade_slots/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "name": "OoT transformation cosmetics and Zora barrier regressions",
     "run": "python3 -B tests/oot_zora/run_presentation_tests.py\npython3 scripts/diagnostics/run_oot_custom_cosmetics_tests.py\npython3 scripts/diagnostics/run_zora_barrier_cosmetics_tests.py"
   },

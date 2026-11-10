@@ -2317,6 +2317,20 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
             switchedInventoryPage = true;
         }
 
+#ifdef COMBO_BUILD
+        if (IS_RANDO && ExtInv_GetCurrentPage() == 0) {
+            // Normalize completed native/editor grants before navigation and
+            // same-frame equip cache item/slot identity, including page return.
+            RitoMask_MigrateLegacy();
+            if (pauseCtx->cursorSpecialPos == 0) {
+                cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
+                if (cursorItem == ITEM_NONE)
+                    cursorItem = PAUSE_ITEM_NONE;
+                pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
+            }
+        }
+#endif
+
         if (pauseCtx->cursorSpecialPos == 0) {
             pauseCtx->cursorColorSet = 4;
 

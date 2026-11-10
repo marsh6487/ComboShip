@@ -14682,10 +14682,14 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     // mode is ON and oot.o2r is loaded, so it cleanly falls back to vanilla Link when unavailable.
     {
         extern s32 AdultLink_ShouldHide(void);
+        extern s32 AdultLink_UsesAdultItemPresentation(const Player* player);
         extern void AdultLink_Draw(PlayState * play, Player * player);
         if (AdultLink_ShouldHide()) {
             DinFireSword_BeginPlayerDraw(play, this);
             AdultLink_Draw(play, this);
+            if (AdultLink_UsesAdultItemPresentation(this) && this->getItemDrawIdPlusOne > GID_NONE + 1) {
+                Player_DrawGetItem(play, this);
+            }
             DinFireSword_DrawAfterPlayer(play, this);
             return;
         }

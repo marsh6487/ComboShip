@@ -1609,6 +1609,11 @@ uint8_t Seasons_SeasonNeighbor(uint8_t season, int32_t dir) {
 }
 
 uint8_t ExtInv_GetItemSlot(uint16_t itemId) {
+#ifdef COMBO_BUILD
+    if (IS_RANDO && itemId >= ITEM_WEIRD_EGG && itemId <= ITEM_LETTER_ZELDA) {
+        return SLOT_TRADE_ADULT;
+    }
+#endif
     if (itemId < 52) {
         return gItemSlots[itemId];
     }

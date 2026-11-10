@@ -371,19 +371,34 @@ void FoldNativesIntoRegistry() {
         nei->comboObtained[FC_OOT_BOOTS_IRON] = 1;
     if (equip & (1 << 14))
         nei->comboObtained[FC_OOT_BOOTS_HOVER] = 1;
-    // Child trade chain: flag at least the currently-held trade item.
-    uint8_t trade = gSaveContext.inventory.items[SLOT_TRADE_CHILD];
-    if (trade >= 0x21 && trade <= 0x23) {
-        nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + (trade - 0x21)] = 1;
-    } else if (trade >= 0x2D && trade <= 0x37) {
-        nei->comboObtained[FC_OOT_TRADE_POCKET_EGG + (trade - 0x2D)] = 1;
-    } else if (trade >= 0x24 && trade <= 0x2B) {
-        // Child-trade MASKS (Keaton..Mask of Truth). They fell in the gap between the two ranges
-        // above, and ootMasksOwned itself was echo-only — nothing ever authored it — so a mask
-        // earned in OoT never reached MM's OoT-mask wheel. Bit order = MM's sOotMaskIconPaths
-        // (Keaton 0 .. Truth 7), which is exactly the item-id order. 2026-08-07, Skijer's NEI
-        nei->ootMasksOwned |= (uint16_t)(1u << (trade - 0x24));
+    // Keep native and normalized unified selections visible to the registry.
+    // Migration may preserve another selected trade, leaving child ownership
+    // only in the unified bitset, so fold those three bits as well.
+    const uint8_t tradeSlots[] = { SLOT_TRADE_CHILD, SLOT_TRADE_ADULT };
+    unsigned tradeSlotCount = 1;
+#ifdef COMBO_BUILD
+    if (IS_RANDO)
+        tradeSlotCount = 2;
+#endif
+    for (unsigned slotIndex = 0; slotIndex < tradeSlotCount; ++slotIndex) {
+        const uint8_t slot = tradeSlots[slotIndex];
+        const uint8_t trade = gSaveContext.inventory.items[slot];
+        if (trade >= 0x21 && trade <= 0x23) {
+            nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + (trade - 0x21)] = 1;
+        } else if (trade >= 0x2D && trade <= 0x37) {
+            nei->comboObtained[FC_OOT_TRADE_POCKET_EGG + (trade - 0x2D)] = 1;
+        } else if (trade >= 0x24 && trade <= 0x2B) {
+            nei->ootMasksOwned |= (uint16_t)(1u << (trade - 0x24));
+        }
     }
+#ifdef COMBO_BUILD
+    if (IS_RANDO) {
+        for (unsigned i = 0; i < 3; ++i) {
+            if (nei->tradeAdultOwned & (1u << (20 + i)))
+                nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + i] = 1;
+        }
+    }
+#endif
     // Triforce pool: keep registry counter as the max of both stores.
     uint8_t nativeTf = gSaveContext.ship.quest.data.randomizer.triforcePiecesCollected;
     if (nativeTf > nei->comboTriforce) {

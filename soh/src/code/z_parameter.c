@@ -1573,6 +1573,16 @@ void Rando_Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.equips.buttonItems[i] <= ITEM_POE)) ||
                     ((gSaveContext.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                      (gSaveContext.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
+#ifdef COMBO_BUILD
+                    // A migrated child trade may be equipped independently of
+                    // the current unified-wheel selection. Keep its item ID.
+                    if (IS_RANDO && i > 0 && gSaveContext.equips.buttonItems[i] >= ITEM_WEIRD_EGG &&
+                        gSaveContext.equips.buttonItems[i] <= ITEM_LETTER_ZELDA &&
+                        gSaveContext.equips.cButtonSlots[i - 1] == SLOT_TRADE_ADULT &&
+                        TradeAdult_IsOwnedItem(gSaveContext.equips.buttonItems[i])) {
+                        continue;
+                    }
+#endif
                     if (GameInteractor_Should(VB_SET_BUTTON_ITEM_FROM_C_BUTTON_SLOT, true, i)) {
                         gSaveContext.equips.buttonItems[i] =
                             gSaveContext.inventory.items[gSaveContext.equips.cButtonSlots[i - 1]];
@@ -1613,6 +1623,16 @@ void Rando_Inventory_SwapAgeEquipment(void) {
                      (gSaveContext.equips.buttonItems[i] <= ITEM_POE)) ||
                     ((gSaveContext.equips.buttonItems[i] >= ITEM_WEIRD_EGG) &&
                      (gSaveContext.equips.buttonItems[i] <= ITEM_CLAIM_CHECK))) {
+#ifdef COMBO_BUILD
+                    // A migrated child trade may be equipped independently of
+                    // the current unified-wheel selection. Keep its item ID.
+                    if (IS_RANDO && i > 0 && gSaveContext.equips.buttonItems[i] >= ITEM_WEIRD_EGG &&
+                        gSaveContext.equips.buttonItems[i] <= ITEM_LETTER_ZELDA &&
+                        gSaveContext.equips.cButtonSlots[i - 1] == SLOT_TRADE_ADULT &&
+                        TradeAdult_IsOwnedItem(gSaveContext.equips.buttonItems[i])) {
+                        continue;
+                    }
+#endif
                     gSaveContext.equips.buttonItems[i] =
                         gSaveContext.inventory.items[gSaveContext.equips.cButtonSlots[i - 1]];
                 }
@@ -2916,7 +2936,29 @@ bool Inventory_HatchWeirdEgg(PlayState* play) {
 
     Flags_UnsetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG);
     Flags_SetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_CHICKEN);
+#ifdef COMBO_BUILD
+    // This is the actual native hatch, so the unified wheel must also know
+    // about Cucco before an immediate age switch restores independently bound
+    // trade items. Historical Egg ownership remains unchanged.
+    TradeAdult_GiveItem(ITEM_CHICKEN);
     Inventory_ReplaceItem(play, ITEM_WEIRD_EGG, ITEM_CHICKEN);
+    // These bindings previously picked up Cucco from the child slot on age
+    // restore. The migrated slot can hold another trade; repair all three
+    // banks so saving the outgoing live equips cannot restore an old Egg.
+    ItemEquips* hatchEquips[] = { &gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips };
+    for (s16 age = 0; age < ARRAY_COUNT(hatchEquips); ++age) {
+        for (s16 i = 1; i < ARRAY_COUNT(hatchEquips[age]->buttonItems); ++i) {
+            if (hatchEquips[age]->buttonItems[i] == ITEM_WEIRD_EGG &&
+                hatchEquips[age]->cButtonSlots[i - 1] == SLOT_TRADE_ADULT && TradeAdult_IsOwnedItem(ITEM_WEIRD_EGG)) {
+                hatchEquips[age]->buttonItems[i] = ITEM_CHICKEN;
+                if (age == 0)
+                    Interface_LoadItemIcon1(play, i);
+            }
+        }
+    }
+#else
+    Inventory_ReplaceItem(play, ITEM_WEIRD_EGG, ITEM_CHICKEN);
+#endif
     return 1;
 }
 

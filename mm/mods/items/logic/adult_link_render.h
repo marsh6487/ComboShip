@@ -34,6 +34,13 @@ s32 AdultLink_IsActive(void);
 // Read-only fit query for the local overlay's ready human rig; peers use their native rig.
 s32 AdultLink_UsesAdultPresentation(const Player* player);
 
+// Receipt/camera framing only: ordinary local adult rig, including alternate adult assets (Din).
+// Custom forms and higher-priority replacement renderers retain their own presentation.
+s32 AdultLink_UsesAdultItemPresentation(const Player* player);
+// World-space size and translation of that rig; call only after the eligibility query.
+f32 AdultLink_GetItemPresentationHeight(void);
+f32 AdultLink_GetItemPresentationYOffset(void);
+
 // 1 if we should DRAW adult Link and HIDE vanilla Link this frame (active AND the OoT model is
 // loaded/ready). Returns 0 when oot.o2r isn't available so the game falls back to vanilla Link.
 s32 AdultLink_ShouldHide(void);

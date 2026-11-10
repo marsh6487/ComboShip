@@ -776,6 +776,23 @@ extern "C" s32 AdultLink_UsesAdultPresentation(const Player* player) {
            (AdultLink_IsActive() || CustomForms_ActiveForm() != CUSTOM_FORM_NONE);
 }
 
+// Read-only visibility queries owned by the higher-priority Player_Draw renderers.
+extern "C" u8 Sm64Mario_ShouldHideLink(void);
+extern "C" u8 WolfLinkForm_IsSelected(void);
+
+extern "C" s32 AdultLink_UsesAdultItemPresentation(const Player* player) {
+    return AdultLink_UsesAdultPresentation(player) && CustomForms_ActiveForm() == CUSTOM_FORM_NONE &&
+           !Sm64Mario_ShouldHideLink() && !WolfLinkForm_IsSelected();
+}
+
+extern "C" f32 AdultLink_GetItemPresentationHeight(void) {
+    return 68.0f * (CVarGetFloat("gAdultLink.Scale", ADULT_LINK_SCALE_DEFAULT) / ADULT_LINK_SCALE_DEFAULT);
+}
+
+extern "C" f32 AdultLink_GetItemPresentationYOffset(void) {
+    return CVarGetFloat("gAdultLink.YOffset", 0.0f);
+}
+
 extern "C" void AdultLink_Toggle(void) {
     NeiSaveData* n = Nei_Save();
     n->timeGateAdultMode = n->timeGateAdultMode ? 0 : 1;
