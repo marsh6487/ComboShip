@@ -3,6 +3,9 @@
 namespace SOH {
 TextureAnimation::~TextureAnimation() {
     for (auto& a : anims) {
+        // A checked reader/allocation may fail before this entry acquires params.
+        if (a.params == nullptr)
+            continue;
         switch ((TextureAnimationParamsType)a.type) {
             case TextureAnimationParamsType::SingleScroll:
                 // a.params is a void* and must be allocated and freed with malloc/free

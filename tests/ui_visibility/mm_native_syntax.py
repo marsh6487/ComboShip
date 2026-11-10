@@ -34,7 +34,7 @@ SOURCES = [
 dependencies = Path(os.environ.get('UI_VISIBILITY_DEPS','/usr/include'))
 extra_includes = [p for name in ['NLOHMANN_JSON_INCLUDE','IMGUI_DIR','COMBO_NEI_FIXTURE_CPATH']
                   for p in os.environ.get(name,'').split(os.pathsep) if p]
-includes = ['mm/include','mm/include/PR','mm/src','mm/assets','mm','mm/mods','mm/2s2h',
+includes = ['','mm/include','mm/include/PR','mm/src','mm/assets','mm','mm/mods','mm/2s2h',
             'libultraship/include','libultraship/src','combo','combo/menu','combo/gui']
 flags = ['-DF3DEX_GBI_2','-DCONTROLLERBUTTONS_T=uint32_t','-DLOG_LEVEL_GAME_PRINTS=0','-DNDEBUG',
          '-DNON_EQUIVALENT','-DNON_MATCHING','-DIMGUI_DEFINE_MATH_OPERATORS','-DFMT_HEADER_ONLY']

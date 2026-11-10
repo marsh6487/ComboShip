@@ -30,9 +30,12 @@ blocks = [function(inventory, name) for name in [
     'uint8_t Wand_RandoMode(void)', 'uint8_t BombArrows_RandoMode(void)']]
 blocks += [function('soh/mods/extended_equipment.c', 'u8 ExtEquip_IsEnabled(void)')]
 blocks += [function(forms, name) for name in [
+    'extern "C" uint8_t RitoMask_IsOwned(void)',
     'extern "C" u8 RitoItem_FormEnabled(void)',
-    'static bool GateOn(const CustomFormDef* def)', 'static const CustomFormDef* RitoRow()',
-    'extern "C" void RitoItem_NoteCellItem(s32 item)', 'extern "C" void RitoItem_SyncCell(void)']]
+    'static bool GateOn(const CustomFormDef* def)',
+    'extern "C" void RitoItem_NoteCellItem(s32 item)',
+    'extern "C" void RitoMask_MigrateLegacy(void)',
+    'extern "C" void RitoItem_SyncCell(void)']]
 blocks += [function('soh/soh/Enhancements/randomizer/RocsFeatherCycle.c', name) for name in [
     'void VanillaRocsFeather_Grant(void)', 'static uint8_t VanillaRocsOtherItem(void)', 'uint8_t Enhancement_GetNextNayrusItem()',
     'uint8_t Enhancement_GetPrevNayrusItem()']]

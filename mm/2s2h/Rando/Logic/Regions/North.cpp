@@ -10,7 +10,7 @@ using namespace Rando::Logic;
 static RegisterShipInitFunc initFunc([]() {
     Regions[RR_GORON_GRAVEYARD] = RandoRegion{ .sceneId = SCENE_GORON_HAKA,
         .checks = {
-            CHECK(RC_GORON_GRAVEYARD_DARMANI, CAN_PLAY_SONG(HEALING) && HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH))
+            CHECK(RC_GORON_GRAVEYARD_DARMANI, Rando::SongEvents::CanPlay(4) && HAS_MAGIC && HAS_ITEM(ITEM_LENS_OF_TRUTH))
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 3),      ENTRANCE(GORON_GRAVERYARD, 0), true),
@@ -22,7 +22,24 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_GORON_SHRINE] = RandoRegion{ .sceneId = SCENE_16GORON_HOUSE,
         .checks = {
-            CHECK(RC_GORON_SHRINE_FULL_LULLABY, CAN_BE_GORON && (CAN_PLAY_SONG(LULLABY) || CAN_PLAY_SONG(LULLABY_INTRO))),
+            CHECK(RC_GORON_SHRINE_ROCK_01, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_02, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_03, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_04, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_05, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_06, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_07, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_08, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_09, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_10, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_11, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_12, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_13, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_14, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_15, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GORON_SHRINE_ROCK_16, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
+            CHECK(RC_GORON_SHRINE_FULL_LULLABY, CAN_BE_GORON && (Rando::SongEvents::CanPlay(10) || (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_SONG_EVENTS] && CAN_PLAY_SONG(LULLABY_INTRO)))),
             CHECK(RC_GORON_SHRINE_POT_01, true),
             CHECK(RC_GORON_SHRINE_POT_02, true),
             CHECK(RC_GORON_SHRINE_POT_03, true),
@@ -41,7 +58,7 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .events = {
             // Can either play the song for the Goron child to light torches then use sticks, or shoot the chandelier with fire arrows to skip needing the song(or I guess the small torches themselves, same result)
-            EVENT(RE_SPAWN_SIRLOIN, ((CAN_PLAY_SONG(LULLABY) && HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))) && CAN_BE_GORON && HAS_MAGIC),
+            EVENT(RE_SPAWN_SIRLOIN, ((SoulItemRequirement(RI_SOUL_NPC_GORON_CHILD) && CAN_PLAY_SONG(LULLABY) && HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))) && CAN_BE_GORON && HAS_MAGIC),
         },
     };
     Regions[RR_GORON_RACETRACK] = RandoRegion{ .sceneId = SCENE_GORONRACE,
@@ -156,6 +173,10 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_LONE_PEAK_SHRINE] = RandoRegion{ .name = "Lone Peak", .sceneId = SCENE_KAKUSIANA,
         // Lone Peak Shrine behaves differently from Grottos despite sharing a map. Seems okay to add here.
         .checks = {
+            CHECK(RC_LONE_PEAK_SHRINE_LARGE_BOULDER_1, CAN_USE_EXPLOSIVE),
+            CHECK(RC_LONE_PEAK_SHRINE_LARGE_BOULDER_2, CAN_USE_EXPLOSIVE),
+            CHECK(RC_LONE_PEAK_SHRINE_LARGE_BOULDER_3, CAN_USE_EXPLOSIVE),
+
             CHECK(RC_LONE_PEAK_SHRINE_BOULDER_CHEST, CAN_USE_EXPLOSIVE),
             CHECK(RC_LONE_PEAK_SHRINE_INVISIBLE_CHEST, HAS_ITEM(ITEM_LENS_OF_TRUTH) && HAS_MAGIC),
             CHECK(RC_LONE_PEAK_SHRINE_LENS_CHEST, true),
@@ -226,6 +247,17 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_MOUNTAIN_VILLAGE] = RandoRegion{ .sceneId = SCENE_10YUKIYAMANOMURA,
         .checks = {
+            CHECK(RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_1, CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_2, CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_3, CAN_BE_GORON && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE]) && (CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_HOOKSHOT))),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_CLIFF_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE]) && (CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_HOOKSHOT))),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_GROUND_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_GROUND_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_GROUND_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_GROUND_4, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_MOUNTAIN_VILLAGE_ROCK_GROUND_5, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+
             CHECK(RC_MOUNTAIN_VILLAGE_SPRING_KEATON_GRASS_01, Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
             CHECK(RC_MOUNTAIN_VILLAGE_SPRING_KEATON_GRASS_02, Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
             CHECK(RC_MOUNTAIN_VILLAGE_SPRING_KEATON_GRASS_03, Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
@@ -321,6 +353,12 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_PATH_TO_GORON_VILLAGE_HOT_SPRING_GROTTO] = RandoRegion{ .name = "Path to Goron Village Hot Spring Grotto", .sceneId = SCENE_KAKUSIANA,
         .checks = {
+            CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_1, CAN_USE_EXPLOSIVE),
+            CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_2, CAN_USE_EXPLOSIVE),
+            CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_3, CAN_USE_EXPLOSIVE),
+            CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_4, CAN_USE_EXPLOSIVE),
+            CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_LARGE_BOULDER_5, CAN_USE_EXPLOSIVE),
+
             CHECK(RC_TWIN_ISLANDS_FROZEN_GROTTO_CHEST, CAN_USE_EXPLOSIVE),
         },
         .exits = { //     TO                                         FROM
@@ -332,6 +370,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_PATH_TO_GORON_VILLAGE_RAMP_GROTTO] = RandoRegion{ .name = "Path to Goron Village Ramp Grotto", .sceneId = SCENE_KAKUSIANA,
         .checks = {
+
             CHECK(RC_TWIN_ISLANDS_RAMP_GROTTO_CHEST, true),
             CHECK(RC_TWIN_ISLANDS_RAMP_GROTTO_GRASS_01, true),
             CHECK(RC_TWIN_ISLANDS_RAMP_GROTTO_GRASS_02, true),
@@ -355,6 +394,10 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_PATH_TO_GORON_VILLAGE] = RandoRegion{ .sceneId = SCENE_17SETUGEN,
         .checks = {
+            CHECK(RC_TWIN_ISLANDS_ROCK_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_TWIN_ISLANDS_ROCK_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_TWIN_ISLANDS_ROCK_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+
             // TODO : Add Spring only checks.
             CHECK(RC_PATH_TO_GORON_VILLAGE_LULLABY_INTRO, CAN_BE_GORON && (CAN_USE_MAGIC_ARROW(FIRE) || (CAN_ACCESS(HOT_SPRING_WATER) && HAS_BOTTLE))),
             CHECK(RC_TWIN_ISLANDS_TINGLE_MAP_01,          CAN_USE_PROJECTILE && CAN_AFFORD(RC_TWIN_ISLANDS_TINGLE_MAP_01)),

@@ -24,6 +24,8 @@
 #ifndef COMBO_FOREIGN_DRAW_MM_H
 #define COMBO_FOREIGN_DRAW_MM_H
 #include "ComboMagicMirrorForeign.h"
+#include "ComboSoulModelSettings.h"
+#include "../NeiClockGI.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawMM.h is TU-glue: include the host engine headers before it"
@@ -65,6 +67,10 @@
 #include "ComboSwordGiAssetSelection.h"
 
 void DrawOotSlateRuneFlame(uint8_t r, uint8_t g, uint8_t b);
+
+#define COMBO_MM_KEY_RING_HOST_MM
+#include "../ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_MM
 
 namespace {
 
@@ -190,6 +196,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         return ComboForeignResolveOOT::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MM_KEY_RING && !CwValidMmKeyRingRecipe(&raw))
+        return ComboForeignResolveOOT::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
         return ComboForeignResolveOOT::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
@@ -304,6 +312,7 @@ struct ComboForeignDrawCacheOOT {
     std::unordered_map<int32_t, ComboForeignDrawInfoOOT> map;
     std::unordered_map<int32_t, std::string> receiptNames;
     std::unordered_map<int32_t, std::string> swordReceiptNames;
+    unsigned soulPresentation = ~0u;
     int slot = -1;
     uint64_t gen = (uint64_t)-1;
 };
@@ -318,6 +327,19 @@ inline ComboForeignDrawCacheOOT& ComboForeignDrawCacheOOTGet() {
         c.swordReceiptNames.clear();
         c.slot = slot;
         c.gen = gen;
+    }
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    const unsigned presentation = ComboSoulModels::PreferenceMask() | (owner && owner->IsAltAssetsEnabled() ? 4u : 0u);
+    if (presentation != c.soulPresentation) {
+        for (auto it = c.map.begin(); it != c.map.end();) {
+            const auto& entry = it->second;
+            if (!entry.ok || entry.drawKind == CW_DRAW_KIND_SHUFFLED_SOUL ||
+                entry.drawKind == CW_DRAW_KIND_MM_SOUL_FLAME || (entry.animOk && entry.anim.fallbackTokenPath))
+                it = c.map.erase(it);
+            else
+                ++it;
+        }
+        c.soulPresentation = presentation;
     }
     return c;
 }
@@ -843,6 +865,19 @@ inline void MM_DrawForeignMusicNote(const ComboForeignDrawInfoOOT* info) {
     CLOSE_DISPS(gfxCtx);
 }
 
+// The token remains OoT-owned; use the host's unchanged boss-native flame.
+inline void MM_DrawForeignShuffledSoul(const ComboForeignDrawInfoOOT* info) {
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MM_FOREIGN_PIN_OPA();
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[0]);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(gPlayState, info->primColorXlu, translate, scale);
+}
+
 // OoT's simpler boss souls use MM's native flame plus the owner-routed generic skull.
 inline void MM_DrawForeignBossSoul(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
@@ -1127,6 +1162,9 @@ inline void MM_DrawForeignBronzeScale(const ComboForeignDrawInfoOOT* info) {
 // Rotating custom OoT models. The two alpha values express independent, optional
 // grayscale (OPA) and weapon-flame (XLU) colors; the flame never tints the model.
 inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool shop = false, bool drawFlame = true) {
+    const bool clockGlass = NeiClockGi::CanDrawForeign(gPlayState, info->count, info->dls);
+    if (!clockGlass && !NeiGi_CanDrawLayers(gPlayState, 4, 32, 32))
+        return;
     if (drawFlame && info->primColorXlu[3])
         DrawOotSlateRuneFlame(info->primColorXlu[0], info->primColorXlu[1], info->primColorXlu[2]);
     Matrix_Push();
@@ -1178,8 +1216,12 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
             Gfx_SetupDL25_Xlu(gfxCtx);
             MM_FOREIGN_PIN_XLU();
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-            for (int i = begin; i < end; ++i)
+            for (int i = begin; i < end; ++i) {
+                if (!clockGlass && NeiClockGi::TextureForGlass(info->dls[i]))
+                    continue;
+                NeiClockGi::PrepareGlass(POLY_XLU_DISP, gPlayState->gameplayFrames, info->dls[i]);
                 gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[i]);
+            }
         } else {
             Gfx_SetupDL25_Opa(gfxCtx);
             MM_FOREIGN_PIN_OPA();
@@ -1310,7 +1352,15 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
     // ComboShip: animated class — combo-owned skeletal draw (any failure -> sentinel, never blank).
     if (info->animOk) {
         if (!ComboForeignAnim_Draw(&info->anim, "oot", gPlayState)) {
-            GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
+            if (CfaIsOtrPath(info->anim.fallbackTokenPath)) {
+                ComboForeignDrawInfoOOT fallback{};
+                fallback.dls[0] =
+                    ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (info->anim.fallbackTokenPath + 7));
+                std::memcpy(fallback.primColorXlu, info->anim.fallbackFlameColor, 4);
+                MM_DrawForeignShuffledSoul(&fallback);
+            } else {
+                GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
+            }
         }
         return;
     }
@@ -1445,6 +1495,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         case CW_DRAW_KIND_MUSIC_NOTE:
             MM_DrawForeignMusicNote(info);
             break;
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
+            MM_DrawForeignShuffledSoul(info);
+            break;
         case CW_DRAW_KIND_BOSS_SOUL:
             MM_DrawForeignBossSoul(info);
             break;
@@ -1470,6 +1523,10 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             if (!ComboBottleContents_Draw(gPlayState, ComboBottleContents_Profile(info->dls[0]))) {
                 MM_DrawForeignSimple(info);
             }
+            break;
+        case CW_DRAW_KIND_MM_KEY_RING:
+            ComboMmKeyRing::Draw(gPlayState, static_cast<int>(info->ops[0].b), info->dls[0], info->dls[1], info->dls[2],
+                                 info->primColorOpa, info->primColorXlu, info->envColor);
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5)

@@ -45,7 +45,16 @@ room_state = source[source.index("BlackMarketRoomMagic::Resources sRoomMagicReso
 body = room_state + "\n" + receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
-fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace("/* PRODUCTION */", body)
+# The native infinite-wallet debit guard reads the engine's upgrade bitfields.
+# Preserve the actual tables rather than mirroring their values in the fixture.
+inventory_source = (ROOT / "mm/src/code/z_inventory.c").read_text()
+upgrade_tables = []
+for declaration in ("u32 gUpgradeMasks[] = {", "u8 gUpgradeShifts[] = {"):
+    begin = inventory_source.index(declaration)
+    end = inventory_source.index("};", begin) + 2
+    upgrade_tables.append(inventory_source[begin:end])
+fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace(
+    "/* PRODUCTION */", "\n".join(upgrade_tables) + "\n" + body)
 player_source = (ROOT / "mm/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 hook_start = player_source.index("        s32 marketDoor = ComboBlackMarket_TryDoorEntrance(")
 hook_end = player_source.index("#endif", hook_start)

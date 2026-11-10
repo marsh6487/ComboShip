@@ -343,6 +343,7 @@ typedef struct NeiSaveData {
     uint8_t ultrashotOwned;
     uint8_t ritoMaskOwned;
     uint8_t ootWeaponUpgradesOwned; // only Hammer Axe (bit 0), True Master Sword (bit 3)
+    uint8_t ritoMaskSelected;       // Solo MM's Bremen/Rito selector; ownership remains independent
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

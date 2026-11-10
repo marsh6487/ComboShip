@@ -5,6 +5,7 @@
  */
 
 #include "z_obj_swprize.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
@@ -58,7 +59,9 @@ void func_80C253D0(ObjSwprize* this, PlayState* play) {
 
     if (type == 2) {
         for (i = 0; i < 3; i++) {
-            collectible = Item_DropCollectible(play, &thisx->world.pos, temp_s0);
+            collectible = GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, thisx, i)
+                              ? Item_DropCollectible(play, &thisx->world.pos, temp_s0)
+                              : NULL;
             if (collectible != NULL) {
                 if (sp78.y < 0.98f) {
                     collectible->velocity.y = (sp78.y + 1.0f) * 4.0f;
@@ -70,7 +73,10 @@ void func_80C253D0(ObjSwprize* this, PlayState* play) {
             }
         }
     } else {
-        collectible = Item_DropCollectible(play, &thisx->world.pos, temp_s0);
+        i = 0;
+        collectible = GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, thisx, i)
+                          ? Item_DropCollectible(play, &thisx->world.pos, temp_s0)
+                          : NULL;
         if ((collectible != NULL) && (sp78.y < 0.98f)) {
             collectible->velocity.y = (sp78.y + 1.0f) * 4.0f;
             collectible->speed = (2.0f * (1.0f - fabsf(sp78.y))) + 2.0f;
@@ -82,7 +88,8 @@ void func_80C253D0(ObjSwprize* this, PlayState* play) {
 void ObjSwprize_Init(Actor* thisx, PlayState* play) {
     ObjSwprize* this = (ObjSwprize*)thisx;
 
-    if (Flags_GetSwitch(play, OBJ_SWPRIZE_GET_SWITCH_FLAG(&this->actor))) {
+    if (GameInteractor_Should(VB_ENVIRONMENT_SOURCE_USED,
+                              Flags_GetSwitch(play, OBJ_SWPRIZE_GET_SWITCH_FLAG(&this->actor)), &this->actor)) {
         ObjSwprize_SetupDoNothing(this);
     } else {
         func_80C25640(this);
@@ -97,7 +104,8 @@ void func_80C25640(ObjSwprize* this) {
 }
 
 void func_80C25654(ObjSwprize* this, PlayState* play) {
-    if (Flags_GetSwitch(play, OBJ_SWPRIZE_GET_SWITCH_FLAG(&this->actor))) {
+    if (GameInteractor_Should(VB_ENVIRONMENT_SOIL_TRIGGER,
+                              Flags_GetSwitch(play, OBJ_SWPRIZE_GET_SWITCH_FLAG(&this->actor)), &this->actor)) {
         func_80C25698(this);
     }
 }

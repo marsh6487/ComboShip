@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_zog.c
  * Overlay: ovl_En_Zog
@@ -665,7 +666,8 @@ void func_80B9451C(EnZog* this, PlayState* play) {
         this->unk_300 = 2;
         this->actionFunc = func_80B94470;
     } else if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (this->actor.xzDistToPlayer < 120.0f)) {
-        if ((play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING) && (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
+        if ((play->msgCtx.lastPlayedSong == SongEvents_MmSong(7, OCARINA_SONG_HEALING)) &&
+            (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
             func_80B93BA8(this, 2);
             this->actionFunc = func_80B943C0;
             this->actor.shape.shadowDraw = NULL;
@@ -753,7 +755,8 @@ void func_80B948A8(EnZog* this, PlayState* play) {
         this->unk_300 = 2;
         this->actionFunc = func_80B946FC;
     } else if ((play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) && (this->actor.xzDistToPlayer < 120.0f)) {
-        if ((play->msgCtx.lastPlayedSong == OCARINA_SONG_HEALING) && (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
+        if ((play->msgCtx.lastPlayedSong == SongEvents_MmSong(7, OCARINA_SONG_HEALING)) &&
+            (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)) {
             func_80B93BA8(this, 2);
             this->actionFunc = func_80B943C0;
             this->actor.shape.shadowDraw = NULL;

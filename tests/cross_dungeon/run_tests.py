@@ -34,7 +34,7 @@ for name in ['mm_boss_warp_behavior_test.py', 'cross_boss_host_behavior_test.py'
              'transition_fade_behavior_test.py', 'interior_settings_behavior_test.py',
              'boss_recovery_behavior_test.py', 'shop_catalogue_behavior_test.py',
              'shop_native_pool_behavior_test.py', 'shop_return_behavior_test.py',
-             'shop_cli_options_behavior_test.py']:
+             'shop_cli_options_behavior_test.py', 'replay_dump_error_behavior_test.py']:
     subprocess.run([sys.executable, str(root / 'tests/cross_dungeon' / name)] +
                    (['--sanitize'] if args.sanitize else []), check=True)
 subprocess.run([sys.executable, str(root / 'tests/cross_dungeon/affordability_behavior_test.py')], check=True)

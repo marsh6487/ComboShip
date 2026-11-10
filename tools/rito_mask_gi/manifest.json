@@ -1,0 +1,120 @@
+{
+  "root": "__OTR__objects/nei_gi_redesign/rito_mask/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.1999969482421875,
+  "orientation": "front +Z; crest +Y; no local roll",
+  "triangles": 768,
+  "vertices": 2304,
+  "bounds_native": [
+    [
+      -114,
+      -124,
+      -52
+    ],
+    [
+      114,
+      125,
+      51
+    ]
+  ],
+  "bounds_after_internal_matrix": [
+    [
+      -22.799652099609375,
+      -24.79962158203125,
+      -10.39984130859375
+    ],
+    [
+      22.799652099609375,
+      24.999618530273438,
+      10.199844360351562
+    ]
+  ],
+  "rotation_width": 48.73527998484729,
+  "source_center_offset": [
+    0,
+    20,
+    42
+  ],
+  "components": [
+    {
+      "name": "left_eye_shell",
+      "first_triangle": 0,
+      "triangles": 168
+    },
+    {
+      "name": "left_eye_rim",
+      "first_triangle": 168,
+      "triangles": 112
+    },
+    {
+      "name": "right_eye_shell",
+      "first_triangle": 280,
+      "triangles": 168
+    },
+    {
+      "name": "right_eye_rim",
+      "first_triangle": 448,
+      "triangles": 112
+    },
+    {
+      "name": "crest_0",
+      "first_triangle": 560,
+      "triangles": 20
+    },
+    {
+      "name": "crest_1",
+      "first_triangle": 580,
+      "triangles": 20
+    },
+    {
+      "name": "crest_2",
+      "first_triangle": 600,
+      "triangles": 20
+    },
+    {
+      "name": "crest_3",
+      "first_triangle": 620,
+      "triangles": 20
+    },
+    {
+      "name": "crest_4",
+      "first_triangle": 640,
+      "triangles": 20
+    },
+    {
+      "name": "ivory_forehead",
+      "first_triangle": 660,
+      "triangles": 20
+    },
+    {
+      "name": "hooked_gold_beak",
+      "first_triangle": 680,
+      "triangles": 48
+    },
+    {
+      "name": "temple_mount_-1",
+      "first_triangle": 728,
+      "triangles": 20
+    },
+    {
+      "name": "temple_mount_1",
+      "first_triangle": 748,
+      "triangles": 20
+    }
+  ],
+  "runtime_tested": false,
+  "sha256": {
+    "gi_dl": "b6b514c0f0011306c74d06505e227b12bb6b6b6c93cb9d8295687fa8485ce260",
+    "gold_tex": "9d678b1c5ca338e57d76e35cb08ca8dde21cd07df5b9e4edf85fb6c2b11802ea",
+    "goldedge_tex": "03fb1e3a636276fa77a58b8117d0fcd2b48dbd889c1810747e062611c5cf88eb",
+    "ivory_tex": "0ceef3b69188108c10bcdefbc70c842cbdc54b2f25999ae7748adab00b9e0e87",
+    "ivoryedge_tex": "90219de1d972bf8aca49df558bcfae07e7b50617eb113bfaeebb6a49aa9b1020",
+    "lining_tex": "6e23edf1e4e2fc0fb6597c7c65abce784925249e5fa5d90d3a35ce1256c48d74",
+    "mesh_opa_vtx": "c21296b442b2db506ad95c563b625239be9793f022ea1a0bdd8e53f7f1554e5a",
+    "scale_mtx": "40ec1d88386bc55e777a2997b6daa61c89828dbbab526d43f689207bc716dbe8"
+  },
+  "preserved_icon_sha256": {
+    "textures/icon_item_custom/gItemIconRitoMaskTex.rgba32.png": "d58fbfebf5038c2c25a97647d2763846063ac750d9a15f83ca32fea50ab10c03",
+    "textures/item_name_custom/gRitoMaskNameTex.ia4.png": "630cf0e93c6de8f93b3603e2ec97c294959b1e79561801c7baef5a68c3b7a0bd"
+  }
+}

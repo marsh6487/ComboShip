@@ -169,12 +169,15 @@ int main() {
 
 with tempfile.TemporaryDirectory(prefix='portal-save-') as directory:
     cpp=Path(directory)/'test.cpp'; binary=Path(directory)/'test'; cpp.write_text(source)
-    includes=['mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']
+    includes=['.','mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']
     command=[os.environ.get('CXX','c++'),'-std=c++20','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2',
              '-DFMT_HEADER_ONLY','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
              *['-I'+str(ROOT/path) for path in includes]]
     if args.sanitize:
         command+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-no-pie']
-    result=subprocess.run([*command,str(cpp),'-o',str(binary)],capture_output=True,text=True)
+    # The real SaveContext JSON converters serialize and validate Solo MM
+    # entrance layouts; link their production codec instead of replacing it.
+    result=subprocess.run([*command,str(cpp),str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp'),
+                           '-o',str(binary)],capture_output=True,text=True)
     if result.returncode: raise SystemExit(result.stderr[:6500])
     subprocess.run([str(binary)],check=True,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))

@@ -47,6 +47,13 @@ static void Init() { Nei_InitNewSave(); }
                 manager = (ROOT / 'soh/soh/SaveManager.cpp').read_text()
                 source += '#include "z64.h"\n#include "mods/nei_save.h"\n'
                 source += 'static NeiSaveData gNeiSave{};\n'
+                source += '#include "macros.h"\n'
+                source += 'SaveContext gSaveContext{};\n' + callbacks['Nei_Save'] + '\n'
+                # Native loading also repairs legacy Rito inventory cells and button slots.
+                rito = functions((ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
+                                 .replace('extern "C" ', ''))
+                for name in ('RitoMask_IsOwned', 'RitoItem_NoteCellItem', 'RitoMask_MigrateLegacy'):
+                    source += rito[name] + '\n'
                 source += '''
 void Bottle_WheelResetTracking() {}
 void TradeItems_SyncWrite() {}
@@ -90,7 +97,7 @@ static void Init() { NeiSave_Init(false); }
             cpp.write_text(source)
             roots = [ROOT / host / path for path in ('', 'include', 'include/PR', 'src', 'assets',
                                                      '2s2h' if host == 'mm' else 'soh')]
-            roots += [ROOT / path for path in ('libultraship/include', 'combo')]
+            roots += [ROOT / path for path in ('libultraship/include', 'combo', '')]
             command = [os.environ.get('CXX', 'c++'), '-std=c++20', '-w', '-DF3DEX_GBI_2',
                        '-DFMT_HEADER_ONLY', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                        *['-I' + str(path) for path in roots + includes], str(cpp), '-o', str(binary)]

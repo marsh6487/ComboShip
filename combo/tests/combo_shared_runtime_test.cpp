@@ -34,6 +34,10 @@ static auto MM_RaiseSharedTier = raiseMm;
 static void (*SOH_GetCurrentPlayerName)(unsigned char*) = nullptr;
 static void (*MM_SetCheckPrices)(const char*) = nullptr;
 static nlohmann::json mmSettings = { { "menuSetting", 9 } }, settingsAtSave;
+static int ritoPreference = 0;
+static int readRitoPreference() {
+    return ritoPreference;
+}
 static const char* dumpSettings() {
     static std::string snapshot;
     snapshot = mmSettings.dump();
@@ -135,6 +139,30 @@ int main() {
     check(Combo_WriteMMSaveForSlot(1, seed) && g_MmSaveInMemorySlot == 1, "successful MM creation binds the real slot");
     check(settingsAtSave == seed["mm"]["settings"] && mmSettings == userSettings,
           "successful MM creation must use seed settings and restore the user's menu");
+    SOH_ReadComboRitoMaskPreference = readRitoPreference;
+    SOH_ReadComboMagicMirrorPreference = [] { return 1; };
+    check(Combo_UserRandoSettingsSnapshot(nullptr).empty(), "preference readers must preserve an absent native dump");
+    for (int preference : { 0, 1 }) {
+        ritoPreference = preference;
+        auto expectedSettings = userSettings;
+        expectedSettings[ComboRando::RitoMaskSettings::SharedCvar] = preference;
+        expectedSettings[ComboRando::MagicMirrorSettings::SharedCvar] = 1;
+        auto preferenceSeed = seed;
+        preferenceSeed["mm"]["settings"][ComboRando::RitoMaskSettings::SharedCvar] = 1 - preference;
+        for (int result : { -1, 0 }) {
+            mmSettings = userSettings;
+            saveResult = result;
+            check(Combo_WriteMMSaveForSlot(1, preferenceSeed) == (result == 0),
+                  "Rito preference restoration must preserve native save success and failure");
+            check(settingsAtSave == preferenceSeed["mm"]["settings"],
+                  "MM save creation must use frozen seed settings when the Rito menu choice differs");
+            check(mmSettings == expectedSettings,
+                  "MM save creation must restore the current Rito choice and independent Mirror preference");
+        }
+    }
+    SOH_ReadComboRitoMaskPreference = nullptr;
+    SOH_ReadComboMagicMirrorPreference = nullptr;
+    mmSettings = userSettings;
     check(runtimeCalls == 0, "legacy MM creation must require no cross-dungeon host exports");
     g_CrossDungeons.hosts[0].SetRuntimeSeed = [](const char* raw) { return setRuntimeSeed(0, raw); };
     g_CrossDungeons.hosts[1].SetRuntimeSeed = [](const char* raw) { return setRuntimeSeed(1, raw); };

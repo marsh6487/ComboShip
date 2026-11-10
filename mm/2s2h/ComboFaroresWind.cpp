@@ -2,6 +2,7 @@
 #include "global.h"
 #include "mods/nei_save.h"
 #include "ComboExport.h"
+#include "ComboGameMode.h"
 #include "gameplay/ComboFaroresWind.h"
 
 extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void);
@@ -69,6 +70,12 @@ static void PublishNativePoint(bool captureCheckpoint) {
 }
 
 extern "C" void ComboFw_PublishPoint(void) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        if (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
+            gSaveContext.save.shipSaveInfo.rando.soloEntrances.faroresWindCheckpoint =
+                Nei_Save()->fwSet ? Combo_MM_SaveCrossDungeonCheckpoint() : -1;
+        return;
+    }
     PublishNativePoint(true);
 }
 
@@ -119,11 +126,28 @@ extern "C" void ComboFw_SyncPoint(void) {
 }
 
 extern "C" void ComboFw_ClearPoint(void) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        if (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
+            gSaveContext.save.shipSaveInfo.rando.soloEntrances.faroresWindCheckpoint = -1;
+        return;
+    }
     if (sFwCallbacks.write)
         sFwCallbacks.write(gSaveContext.fileNum, nullptr);
 }
 
 extern "C" int ComboFw_RequestReturn(void) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        if (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO && Nei_Save()->fwSet) {
+            // Native Solo recall restores its captured physical point below in
+            // the player code. Restore only its entrance ownership here, so a
+            // later boss death cannot use the arena visited since the cast.
+            // A legacy point has no captured ownership and safely clears it.
+            Combo_MM_RestoreCrossDungeonCheckpoint(
+                gSaveContext.save.shipSaveInfo.rando.soloEntrances.faroresWindCheckpoint);
+            sFwValidateRoom = true;
+        }
+        return 0;
+    }
     ComboFwPoint p{};
     int result = ReadPoint(&p);
     if (result < 0)

@@ -832,8 +832,11 @@ static void SpringXluMaterialRegression() {
     __gSPDisplayList(cursor++, sAutumnLeafGeometry);
     XluMaterialState state;
     unsigned petalMeshes = 0, layerSetups = 0, followingMeshes = 0;
+    uintptr_t springTexture = 0;
     for (const Gfx *command = commands; command < cursor; ++command) {
       state.Apply(*command);
+      if ((command->words.w0 >> 24) == G_SETTIMG)
+        springTexture = command->words.w1;
       if ((command->words.w0 >> 24) != G_DL)
         continue;
       if (command >= gfx.polyXlu.p) {
@@ -844,7 +847,9 @@ static void SpringXluMaterialRegression() {
         ++layerSetups;
       } else if (command->words.w1 == (uintptr_t)sSpringPetalGeometry ||
                  command->words.w1 == (uintptr_t)sSpringBlossomGeometry) {
-        assert(!state.TextureOn() && !state.SameMaterial(standard));
+        assert(state.TextureOn() && !state.SameMaterial(standard));
+        assert(springTexture == (command->words.w1 == (uintptr_t)sSpringBlossomGeometry
+                   ? (uintptr_t)sSpringBlossomTexture : (uintptr_t)sSpringPetalTexture));
         ++petalMeshes;
       }
     }

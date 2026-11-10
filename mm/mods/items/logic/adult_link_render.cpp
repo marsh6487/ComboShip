@@ -849,6 +849,8 @@ extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
 
     f32 scale = CVarGetFloat("gAdultLink.Scale", ADULT_LINK_SCALE_DEFAULT);
     f32 yOff = CVarGetFloat("gAdultLink.YOffset", 0.0f);
+    if (CustomForms_ActiveForm() == CUSTOM_FORM_RITO)
+        yOff += player->actor.shape.yOffset * scale;
 
     Matrix_Translate(player->actor.world.pos.x, player->actor.world.pos.y + yOff, player->actor.world.pos.z,
                      MTXMODE_NEW);

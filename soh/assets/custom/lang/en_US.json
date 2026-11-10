@@ -542,6 +542,10 @@
                 "name": "Shuffle Bushes",
                 "description": "Bushes in Hyrule Field & Zora's Fountain will contain randomized items when first walked through."
             },
+            "shuffle_enemy_drops": {
+                "name": "Shuffle Enemy First Drops",
+                "description": "The first confirmed defeat of each enemy type drops one randomized reward. All variants of a type share a check. Global Enemy Drop checks appear in the Hyrule Field exclusion group and have no owning dungeon."
+            },
             "shuffle_icicles": {
                 "name": "Shuffle Icicles",
                 "description": [

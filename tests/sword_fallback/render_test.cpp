@@ -8,12 +8,14 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_set>
 extern "C" {
 #include "functions.h"
 #include "macros.h"
 #include "z64.h"
 }
 #include "ComboItemDrawABI.h"
+#include "ComboNeiGiResourceOwner.h"
 #include "ComboCollectibleShimmerDraw.h"
 extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState*, const uint8_t[4], const char*) {
   assert(false && "sword fixture unexpectedly selected collectible shimmer");
@@ -152,6 +154,7 @@ extern "C" Color_RGBA8 CosmeticEditor_GetChangedColor(u8,u8,u8,u8,const char* id
 }
 #endif
 extern "C" bool NeiGi_CanDrawLayers(PlayState*,size_t,size_t,size_t) {return true;}
+#include "clock_foreign.inc"
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* owner,const char* path) {
   assert(!strcmp(owner,"oot"));
   if(!strncmp(path,"__OTR__@oot:",12))path+=12;
@@ -191,6 +194,7 @@ UNUSED_HANDLER(OOT_DrawForeignPoes)
 UNUSED_HANDLER(OOT_DrawForeignFairyBottle)
 UNUSED_HANDLER(OOT_DrawForeignMagicSpell)
 UNUSED_HANDLER(OOT_DrawForeignSoulFlame)
+UNUSED_HANDLER(OOT_DrawForeignShuffledSoul)
 UNUSED_HANDLER(OOT_DrawForeignOps)
 static constexpr int kMaxMatEntries=8;
 template<class...Args>void ComboForeignTexAnim_Run(Args...){assert(false);}

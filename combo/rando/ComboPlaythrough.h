@@ -66,8 +66,8 @@ inline std::vector<CwPlacedItem> ParseSpoilerPlacements(const std::string& spoil
     auto loadAdv = [&](GameId g, const std::string& dumpJson) {
         if (dumpJson.empty())
             return;
+        const auto d = ParseStaticDataDump(dumpJson, g == GAME_OOT ? "OOT replay metadata" : "MM replay metadata");
         try {
-            auto d = nlohmann::json::parse(dumpJson);
             for (auto& it : d.value("pool", nlohmann::json::array())) {
                 bool adv = it.value("advancement", true);
                 advByName[g][it.value("name", "")] |= adv;
@@ -298,8 +298,9 @@ inline RequirednessResult PareDownPlaythrough(const std::string& spoilerJson, co
                                               const std::string& sharedPairsJson = "") {
     RequirednessResult result;
     auto placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
-    const auto sharedGroups = BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
-                                                    SharedMaskForSpoiler(spoilerJson, sharedMask));
+    const auto sharedGroups =
+        BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
+                              SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
 
     auto checkKey = [](const CwPlacedItem& p) {
         return std::string(p.checkGame == GAME_OOT ? "oot:" : "mm:") + p.check;
@@ -475,8 +476,9 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
 
     using Placed = CwPlacedItem;
     std::vector<Placed> placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
-    const auto sharedGroups = BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
-                                                    SharedMaskForSpoiler(spoilerJson, sharedMask));
+    const auto sharedGroups =
+        BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
+                              SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
 
     auto queryReachable = QueryReachable;
 
@@ -677,7 +679,7 @@ inline nlohmann::json FindSariaMagicSphere(const std::string& spoilerJson, const
                                            uint32_t sharedMask, const std::string& sharedPairsJson) {
     const auto placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
     const auto groups = BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
-                                              SharedMaskForSpoiler(spoilerJson, sharedMask));
+                                              SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
     std::vector<std::string> ownedOot, ownedMm, ootSeen, mmSeen;
     std::unordered_set<std::string> collected;
     bool portalOpen = !portalGated || mmStart;

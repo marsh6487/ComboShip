@@ -26,6 +26,14 @@ std::array<std::string, RC_MAX> CheckNames = std::array<std::string, RC_MAX>();
 
 // clang-format off
 std::map<RandoCheckId, RandoStaticCheck> Checks = {
+#define MM_ICICLE(id, scene, room, index, region) RC(id, RCTYPE_ICICLE, scene, FLAG_NONE, 0, RI_JUNK),
+#include "Rando/MMEnvironmentIcicles.inc"
+#undef MM_ICICLE
+#define MM_ENVIRONMENT_CHECK(id, type, scene, region) RC(id, type, scene, FLAG_NONE, 0, RI_JUNK),
+#include "Rando/MMEnvironmentChecks.inc"
+#undef MM_ENVIRONMENT_CHECK
+    RC(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2, RCTYPE_NPC, SCENE_TAKARAKUJI, FLAG_NONE, 0, RI_RUPEE_PURPLE),
+    RC(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3, RCTYPE_NPC, SCENE_TAKARAKUJI, FLAG_NONE, 0, RI_RUPEE_PURPLE),
     RC(RC_LOST_WOODS_MAGIC_MIRROR_STUMP, RCTYPE_NPC, SCENE_LOST_WOODS, FLAG_NONE, 0, RI_OOT_NEI_MAGIC_MIRROR),
     RC(RC_UNKNOWN,                                                       RCTYPE_UNKNOWN,          SCENE_MAX,                      FLAG_NONE,                   0x00,                                                                RI_UNKNOWN),
 
@@ -2837,7 +2845,10 @@ std::string GetLocationNameForHint(RandoCheckId randoCheckId, bool exact) {
     }
 
     if (check.randoCheckType == RCTYPE_ENEMY_DROP) {
-        return "within a fomidable foe";
+        // Keep a species-specific source in native hints and the combo location
+        // export. The leading "in " also composes with native "is hidden" and
+        // is stripped by the combined area's existing preposition handling.
+        return "in the first " + convertEnumToReadableName(check.name, "RC_ENEMY_DROP_") + " drop";
     }
 
     if (checkLocationHints.contains(randoCheckId)) {

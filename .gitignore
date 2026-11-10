@@ -176,3 +176,23 @@ x64/
 /tools/magic_mirror/reflection/ART_PROVENANCE.md
 
 /tools/temple_sages/assets/ART_PROVENANCE.md
+
+# Public candidates omit animated previews and Git history packages.
+# Native game animation and material resources remain tracked.
+*.gif
+*.apng
+*.mp4
+*.m4v
+*.mpeg
+*.mpg
+*.webm
+*.mov
+*.mkv
+*.avi
+*.wmv
+*.flv
+*.ogv
+*.3gp
+*.mxf
+*.bundle
+/docs/poc/checkpoints/ComboShip-Grotto-Return-Source-Checkpoint-d7672cc.zip

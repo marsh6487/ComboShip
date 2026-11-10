@@ -14,6 +14,17 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#include "../NeiClockGI.h"
+#define COMBO_DOOR_KEY_HOST_MM
+#include "../ComboDoorKeyGi.h"
+#undef COMBO_DOOR_KEY_HOST_MM
+#include "ComboSoulModelSettings.h"
+#include "../../mm/2s2h/resource/type/Skeleton.h"
+#include "../../mm/2s2h/resource/type/Animation.h"
+#include "../../mm/2s2h/resource/type/PlayerAnimation.h"
+#include "ComboSoulResourceValidation.h"
+#include "2s2h/Rando/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #define COMBO_COLLECTIBLE_SHIMMER_HOST_MM
 #include "ComboCollectibleShimmerHost.h"
 #undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM
@@ -165,6 +176,37 @@ static int32_t MM_FillDungeonKeyModelInfo(RandoItemId id, s16 drawId, CwItemDraw
 
 // All four vanilla GI families and retained replacements use the same palette-only
 // helpers as native MM. Compass glass remains untinted; an edited boss gem is separate.
+static int32_t MM_FillKeyRingDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    const int count = DungeonItem_GetKeyRingCount(id);
+    if (count == 0)
+        return 0;
+    const int owner = DungeonItem_GetOwner(id);
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metal, emblem;
+    const char* ringPath = "__OTR__objects/object_keyring/gKeyringRingDL";
+    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem) ||
+        (!ResourceMgr_FileExists(ringPath) &&
+         !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(ringPath))))
+        return CW_DRAW_NOT_READY;
+    out->drawKind = CW_DRAW_KIND_MM_KEY_RING;
+    out->dlistCount = 3;
+    out->dlists[0] = metalPath;
+    out->dlists[1] = emblemPath;
+    out->dlists[2] = ringPath;
+    out->xluStartIndex = -1;
+    out->stateDependent = 2;
+    out->opCount = 1;
+    out->ops[0].op = CW_OP_END;
+    out->ops[0].a = static_cast<float>(count);
+    out->ops[0].b = static_cast<float>(owner);
+    const uint8_t metalRgba[] = { metal.r, metal.g, metal.b, metal.a };
+    const uint8_t emblemRgba[] = { emblem.r, emblem.g, emblem.b, emblem.a };
+    std::memcpy(out->primColorOpa, metalRgba, 4);
+    std::memcpy(out->primColorXlu, emblemRgba, 4);
+    std::memcpy(out->envColor, metalRgba, 4);
+    return 1;
+}
+
 static int32_t MM_FillDungeonTintInfo(RandoItemId id, s16 drawId, CwItemDrawInfo* out) {
     const int owner = DungeonItem_GetOwner(id);
     Color_RGBA8 c, emblem;
@@ -339,6 +381,8 @@ static int32_t MM_FillOpsDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
 
 // Items MM draws as one plain scaled OPA or XLU display list (no table row, no extra GPU state).
 static int32_t MM_FillSimpleDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    if (ComboDoorKeyGi::Describe(ComboDoorKeyGi::ItemOrigin(id), out, true))
+        return 1;
     const char* dl;
     bool xlu;
     float scale = 0.0f;
@@ -486,10 +530,12 @@ static int32_t MM_FillEnemySoulDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         default:
             return 0;
     }
-    out->drawKind = CW_DRAW_KIND_MM_SOUL_FLAME;
-    out->dlistCount = 1;
-    out->dlists[0] = gameplay_keep_DL_01ACF0;
-    out->xluStartIndex = 0;
+    out->drawKind = CW_DRAW_KIND_SHUFFLED_SOUL;
+    out->stateDependent = 2;
+    out->dlistCount = 2;
+    out->dlists[0] = gGiSkulltulaTokenDL;
+    out->dlists[1] = gameplay_keep_DL_01ACF0;
+    out->xluStartIndex = 1;
     out->primColorXlu[0] = rgb[0];
     out->primColorXlu[1] = rgb[1];
     out->primColorXlu[2] = rgb[2];
@@ -675,6 +721,8 @@ static void MM_AnimSoulFlame(CwItemAnimDrawInfo* out, const uint8_t rgb[3], floa
     out->flameSeg.yMask2 = 0x7F;
 }
 
+#include "ComboSoulMiniMM.h"
+
 // Native MM boss models whose draw routines fit the existing skeletal ABI. Canonical
 // paths are loaded through MM's RM, including its own Alt selection and vanilla fallback.
 // Native Goht/Gyorg/Odolwa use this same recipe to avoid a rig cached across Alt changes.
@@ -751,17 +799,19 @@ static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
     return 1;
 }
 
-// The 8 enemy souls with no entry in the table above keep the flame-only stand-in: Bad Bat (9 wing
-// frame DLs, no skeleton), Boe / Chuchu / Freezard / Like Like (non-skeletal or matrix-array driven),
-// Dexihand (hand-built arm segment chain), Gomess (two texanims, one stepped) and Iron Knuckle
-// (segments bound to material DLs). Each needs GPU state this ABI deliberately cannot express.
+// All 47 enemies use canonical owner-authored skeletal or composite miniatures.
 static int32_t MM_FillEnemySoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
+    if (ComboSoulModels::SimplerEnemy())
+        return 0;
+    if (MM_FillSpecialEnemySoulAnim(id, out))
+        return 1;
     const MmSoulModel* m = MM_FindSoulModel(id);
     if (m == nullptr) {
         return 0;
     }
     out->opa = 1;
     out->hiddenLimb = -1;
+    MM_MiniFallback(out);
     out->skelPath = m->skel;
     out->animPath = m->anim;
     out->limbCount = m->limbCount;
@@ -911,7 +961,8 @@ static int32_t MM_FillMinifrogAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
 }
 
 static int32_t MM_FillAnimDrawInfo(RandoItemId id, CwItemAnimDrawInfo* out) {
-    if (MM_FillBossSoulAnim(id, out) || MM_FillEnemySoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
+    if (MM_FillBossSoulAnim(id, out) || MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) ||
+        MM_FillMinifrogAnim(id, out)) {
         return 1;
     }
     return 0;
@@ -1191,6 +1242,9 @@ static int32_t MM_FillCaneDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
 }
 
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    if (id == RI_OOT_CLOCK)
+        return NeiClockGi::Describe(out, NeiClockGi::OpaqueMM,
+                                    CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0);
     if (id == RI_OOT_NEI_MAGIC_MIRROR)
         return CwDescribeMagicMirror(out);
     bool progressiveConverted = false;
@@ -1259,6 +1313,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         out->itemShimmer = MM_OotBottleShimmerColor(id, out->itemShimmerColor);
         return 1;
     }
+    const int32_t keyRing = MM_FillKeyRingDrawInfo(id, out);
+    if (keyRing != 0)
+        return keyRing;
     if (MM_FillDungeonKeyModelInfo(id, (s16)it->second.drawId, out) ||
         MM_FillDungeonTintInfo(id, (s16)it->second.drawId, out)) {
         return 1;
@@ -1287,6 +1344,18 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     if (MM_FillSimpleDrawInfo(id, out)) {
         return 1; // flippers / ice trap / ocarina buttons / triforce shards
+    }
+    if (Rando::SoulShuffle::Find(id)) {
+        out->drawKind = CW_DRAW_KIND_SHUFFLED_SOUL;
+        out->stateDependent = 2;
+        out->dlistCount = 2;
+        out->dlists[0] = gGiSkulltulaTokenDL;
+        out->dlists[1] = gameplay_keep_DL_01ACF0;
+        out->xluStartIndex = 1;
+        out->xluSeg8TexScroll = 1; // safe plain fallback on a pre-kind-44 consumer
+        out->primColorXlu[0] = out->primColorXlu[1] = out->primColorXlu[2] = 155;
+        out->primColorXlu[3] = 255;
+        return 1;
     }
     if (MM_FillEnemySoulDrawInfo(id, out)) {
         return 1; // enemy souls: colored soul flame, no table row
@@ -1417,6 +1486,25 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
             out->stateDependent = MM_IsStateDependentDraw(id) ? 1 : 0;
         }
         return 1;
+    } catch (...) { return 0; }
+}
+
+// Inspect concrete resource classes only inside the owning MM module. The host
+// receives POD metadata rather than casting MM resources to a different C++ layout.
+extern "C" COMBO_MM_EXPORT int32_t MM_GetSoulResourceInfo(const char* path, int32_t kind, int32_t expectedJoints,
+                                                          CwSoulResourceInfo* out) {
+    try {
+        return ComboSoulValidateOwnedResource("mm", path, kind, expectedJoints, out);
+    } catch (...) { return 0; }
+}
+
+extern "C" COMBO_EXPORT int32_t MM_GetSoulMiniAnimDrawInfoById(int32_t itemId, CwItemAnimDrawInfo* out) {
+    try {
+        if (!out)
+            return 0;
+        *out = CwItemAnimDrawInfo{};
+        const auto id = static_cast<RandoItemId>(itemId);
+        return MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out);
     } catch (...) { return 0; }
 }
 

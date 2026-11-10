@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -10,7 +11,7 @@ void RegionTable_Init_Graveyard() {
         EVENT_ACCESS(LOGIC_PLANT_GRAVEYARD_BEAN, CanPlantBean(RG_GRAVEYARD_BEAN_SOUL)),
         EVENT_ACCESS(LOGIC_FAIRY_ACCESS,         (logic->AtDay && logic->CanUse(RG_STICKS)) || (logic->IsChild && logic->BeanPlanted(LOGIC_PLANT_GRAVEYARD_BEAN) && logic->CanUse(RG_SONG_OF_STORMS))),
         EVENT_ACCESS(LOGIC_BUG_ACCESS,           logic->HasItem(RG_POWER_BRACELET)),
-        EVENT_ACCESS(LOGIC_SOLD_SPOOKY_MASK,     logic->IsChild && logic->AtDay && logic->HasItem(RG_SPOOKY_MASK) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_SOLD_SPOOKY_MASK,     logic->HasItem(RG_SOUL_NPC_BOMBERS) && logic->IsChild && logic->AtDay && logic->HasItem(RG_SPOOKY_MASK) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_GRAVEYARD_FREESTANDING_POH,        (((logic->IsAdult && logic->BeanPlanted(LOGIC_PLANT_GRAVEYARD_BEAN)) || logic->CanUse(RG_LONGSHOT)) && logic->CanBreakCrates()) || (ctx->GetTrickOption(RT_GY_POH) && logic->CanUse(RG_BOOMERANG))),
@@ -43,7 +44,7 @@ void RegionTable_Init_Graveyard() {
     }, {
         //Exits
         ENTRANCE(RR_GRAVEYARD_SHIELD_GRAVE,       (logic->IsAdult || logic->AtNight) && logic->HasItem(RG_POWER_BRACELET)),
-        ENTRANCE(RR_GRAVEYARD_COMPOSERS_GRAVE,    logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_GRAVEYARD_COMPOSERS_GRAVE,    logic->CanPlaySongEvent(2)),
         ENTRANCE(RR_GRAVEYARD_HEART_PIECE_GRAVE,  (logic->IsAdult || logic->AtNight) && logic->HasItem(RG_POWER_BRACELET)),
         ENTRANCE(RR_GRAVEYARD_DAMPES_GRAVE,       logic->IsAdult && logic->HasItem(RG_POWER_BRACELET)),
         ENTRANCE(RR_GRAVEYARD_DAMPES_HOUSE,       logic->IsAdult && logic->HasItem(RG_DAMPES_HUT_KEY) /*|| logic->AtDampeTime*/), //TODO: This needs to be handled in ToD rework

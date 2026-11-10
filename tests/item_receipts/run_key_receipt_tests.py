@@ -98,13 +98,14 @@ with tempfile.TemporaryDirectory(prefix='key-receipts-') as directory:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
         '-fPIC', '-shared', '-fvisibility=hidden', *sanitize, '-I' + str(ROOT), '-I' + str(ROOT / 'combo/menu'),
         str(build / 'donor.cpp'), '-o', str(donor_library)], cwd=ROOT, check=True)
-    includes = ['-I' + str(ROOT / p) for p in ('mm/include', 'mm/include/PR', 'mm/src', 'mm', 'mm/2s2h',
+    includes = ['-I' + str(ROOT / p) for p in ('', 'mm/include', 'mm/include/PR', 'mm/src', 'mm', 'mm/2s2h',
         'mm/2s2h/Rando', 'mm/assets', 'libultraship/include', 'libultraship/src', 'combo', 'combo/menu')]
     flags = ['-DCOMBO_BUILD', '-DMM_BUILD_DLL', '-DF3DEX_GBI_2', '-DCONTROLLERBUTTONS_T=uint32_t',
         '-DNON_EQUIVALENT', '-DNON_MATCHING', *includes, '-I' + str(build)]
     binary = build / 'keys'
     result = subprocess.run([compiler, '-std=c++20', *sanitize, *flags, str(build / 'receiver.cpp'),
-        str(build / 'ItemReceiptText.cpp'), '-L' + str(build), '-lkey_donor', '-Wl,-rpath,' + str(build),
+        str(build / 'ItemReceiptText.cpp'), str(ROOT / 'mm/2s2h/Rando/SoloEntrances.cpp'),
+        '-L' + str(build), '-lkey_donor', '-Wl,-rpath,' + str(build),
         '-rdynamic', '-ldl', '-o', str(binary)], capture_output=True, text=True, cwd=ROOT)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)

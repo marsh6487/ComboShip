@@ -1,3 +1,4 @@
+#include "RustyDoorKeys.h"
 #include "../../../../combo/ComboGameMode.h"
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "../../../../combo/menu/ComboToolReceiptText.h"
@@ -782,6 +783,8 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerCheck(Randomizer
 }
 
 ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGet randoGet) {
+    if (randoGet == RG_RITO_MASK)
+        return RitoMask_IsOwned() ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
     // progressive open chest has a second copy that unlocks large chests
     if (randoGet == RG_OPEN_CHEST && GetRandoSettingValue(RSK_SHUFFLE_OPEN_CHEST) == RO_OPEN_CHEST_PROGRESSIVE) {
         return Flags_GetRandomizerInf(RAND_INF_CAN_OPEN_LARGE_CHEST) ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
@@ -1553,6 +1556,7 @@ std::thread randoThread;
 
 void GenerateRandomizerImgui(std::string seed = "") {
     auto ctx = Rando::Context::GetInstance();
+    Rando::RustyDoorKeys::PrepareNewGeneration();
     // RANDOTODO proper UI for selecting if a spoiler loaded should be used for settings
     Rando::Settings::GetInstance()->SetAllToContext();
 
@@ -2458,6 +2462,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_SHADOW_CRYSTAL:
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
+        case RG_RITO_MASK:
+            RitoMask_Grant();
+            break;
         case RG_MAGIC_MIRROR:
             TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
             break;
@@ -2565,6 +2572,49 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             break;
         // MM per-dungeon items (small key / boss key / map / compass) — model + message only, no OoT
         // inventory slot; give is a no-op.
+        case RG_MM_RUSTY_KEY_TOURIST_INFORMATION:
+        case RG_MM_RUSTY_KEY_POTION_SHOP:
+        case RG_MM_RUSTY_KEY_POST_OFFICE:
+        case RG_MM_RUSTY_KEY_SWORDSMAN_SCHOOL:
+        case RG_MM_RUSTY_KEY_LOTTERY:
+        case RG_MM_RUSTY_KEY_BOMB_SHOP:
+        case RG_MM_RUSTY_KEY_TRADING_POST:
+        case RG_MM_RUSTY_KEY_CURIOSITY_SHOP:
+        case RG_MM_RUSTY_KEY_KAFEI_HIDEOUT:
+        case RG_MM_RUSTY_KEY_TOWN_ARCHERY:
+        case RG_MM_RUSTY_KEY_SWAMP_ARCHERY:
+        case RG_MM_RUSTY_KEY_OBSERVATORY:
+        case RG_MM_RUSTY_KEY_BLACKSMITH:
+        case RG_MM_RUSTY_KEY_MUSIC_HOUSE:
+        case RG_MM_RUSTY_KEY_LABORATORY:
+        case RG_MM_RUSTY_KEY_BENEATH_GRAVEYARD:
+        case RG_MM_RUSTY_KEY_DAMPE_HOUSE:
+        case RG_MM_RUSTY_KEY_MAYOR_RESIDENCE:
+        case RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE:
+        case RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_SALON:
+        case RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI:
+        case RG_MM_RUSTY_KEY_TREASURE_CHEST_GAME:
+        case RG_MM_RUSTY_KEY_HONEY_DARLING:
+        case RG_MM_RUSTY_KEY_MILK_BAR:
+        case RG_MM_RUSTY_KEY_DOG_RACETRACK:
+        case RG_MM_RUSTY_KEY_CUCCO_SHACK:
+        case RG_MM_RUSTY_KEY_RANCH_HOUSE:
+        case RG_MM_RUSTY_KEY_RANCH_BARN:
+        case RG_MM_RUSTY_KEY_RANCH_HOUSE_ROOM:
+        case RG_MM_RUSTY_KEY_ZORA_SHOP:
+        case RG_MM_RUSTY_KEY_ZORA_JAPAS_ROOM:
+        case RG_MM_RUSTY_KEY_ZORA_TIJO_ROOM:
+        case RG_MM_RUSTY_KEY_ZORA_LULU_ROOM:
+        case RG_MM_RUSTY_KEY_ZORA_EVAN_ROOM:
+        case RG_MM_RUSTY_KEY_STOCK_POT_INN:
+        case RG_MM_RUSTY_KEY_STOCK_POT_INN_ROOF:
+        case RG_MM_RUSTY_KEY_GRANDMA_ROOM:
+        case RG_MM_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM:
+        case RG_MM_RUSTY_KEY_STOCK_POT_INN_DORMITORY:
+        case RG_MM_KEY_RING_WOODFALL:
+        case RG_MM_KEY_RING_SNOWHEAD:
+        case RG_MM_KEY_RING_GREAT_BAY:
+        case RG_MM_KEY_RING_STONE_TOWER:
         case RG_MM_SMALL_KEY_WOODFALL:
         case RG_MM_SMALL_KEY_SNOWHEAD:
         case RG_MM_SMALL_KEY_GREAT_BAY:

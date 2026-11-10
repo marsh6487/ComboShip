@@ -21,6 +21,7 @@ typedef enum CustomFormId {
     CUSTOM_FORM_KEATON,
     CUSTOM_FORM_GERUDO,
     CUSTOM_FORM_GARO,
+    CUSTOM_FORM_RITO,
     CUSTOM_FORM_MAX
 } CustomFormId;
 
@@ -69,6 +70,7 @@ void CustomForms_OnDeath(Player* player, PlayState* play);
 u8 CustomForms_BlocksShieldButton(void);
 u8 CustomForms_WantsClimbableSurface(void);
 u8 CustomForms_VoiceOverride(u16 sfxId, u16* outSfxId);
+u8 MmRitoAirRocsAllowed(Player* player);
 
 // Renderer seams (adult_link_render.cpp).
 Gfx* CustomForms_HandDL(Player* player, s32 limbIndex, u8* claimed);

@@ -18,18 +18,25 @@ for host, editor in [('soh', 'soh/Enhancements/debugger/debugSaveEditor.cpp'),
     inv = (ROOT / host / 'mods/extended_inventory.c').read_text()
     backend = '\n'.join(function(inv, name) for name in [
         'TravelTools_Heal', 'TravelTools_IsOwned', 'TravelTools_Grant', 'MagicMirror_IsOwned'])
+    rito_owner = inv if host == 'mm' else (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
+    backend = function(rito_owner, 'RitoMask_IsOwned') + '\n' + backend
     fixture = r'''
 #include "global.h"
 #include "mods/extended_inventory.h"
+#include "combo/ComboGameMode.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
 #include <initializer_list>
 SaveContext gSaveContext{};
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static NeiSaveData saved{};
 extern "C" NeiSaveData* Nei_Save() { return &saved; }
 extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) { return saved.ownedItems[slot - 24]; }
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { saved.ownedItems[slot - 24] = item; }
+// The Mirror editor must not grant or remove the unrelated Rito mask.
+extern "C" void RitoMask_Grant() { assert(false && "Mirror editor granted Rito"); }
+extern "C" void RitoMask_Remove() { assert(false && "Mirror editor removed Rito"); }
 extern "C" uint8_t Picto_IsOwned() { assert(false); return 0; }
 extern "C" uint8_t PowerKeg_IsOwned() { assert(false); return 0; }
 extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {}

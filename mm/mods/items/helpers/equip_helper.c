@@ -317,10 +317,10 @@ u8 ItemEquip_Update(ItemEquipState* state, ItemInputState* input, EquipCallback 
     return state->isEquipped;
 }
 
-// Chateau Romani. MM's own magic path (z_parameter.c) already honours this reg, so custom items
-// must read it too or they drain a meter the engine calls bottomless.
+// Use the same saved ownership policy as native magic consumption. Infinite
+// Magic does not manufacture Chateau Romani's time-cycle event flag.
 static u8 ItemMagic_IsInfinite(void) {
-    return CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) != 0;
+    return CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) != 0 || RandoCapacity_InfiniteMagic();
 }
 
 void ItemMagic_Consume(PlayState* play, s16 amount) {

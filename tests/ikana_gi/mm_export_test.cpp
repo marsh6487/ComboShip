@@ -5,9 +5,12 @@
 #include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
+#include "mm/2s2h/Rando/SoulShuffle.h"
 #include "mm/include/z64item.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "mm/assets/objects/object_gi_shield_3/object_gi_shield_3.h"
+#include "mm/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
+#include "mm/assets/objects/gameplay_keep/gameplay_keep.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -72,11 +75,18 @@ int ResourceMgr_IsIkanaShieldGiAvailable() {
     return 1;
 }
 int MM_FillDungeonKeyModelInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
+// Key-ring recipes are exercised by the native dungeon-key exporter fixture.
+// This shield/cane fixture keeps unrelated item families outside its boundary.
+int MM_FillKeyRingDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillDungeonTintInfo(RandoItemId,s16,CwItemDrawInfo*){return 0;}
 int MM_FillSpinAttackGi(CwItemDrawInfo*){return 0;}
 int MM_FillSongDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillOpsDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillSimpleDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
+int CVarGetInteger(const char* key,int fallback) {
+    assert(!std::strcmp(key,"gEnhancements.SkijerNEI.ItemEffects"));
+    return fallback;
+}
 int MM_FillEnemySoulDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillGidAliasDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_OotBottleShimmerColor(RandoItemId,u8*){return 0;}

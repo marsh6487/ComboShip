@@ -123,6 +123,7 @@ struct HintCandidate {
     // OOT: real clear/ambiguous/obscure; MM: {clear:{en:region,de:region,fr:region}}
     nlohmann::json locationHint = nlohmann::json::object();
     GameId itemGame;
+    std::string enemyDropName;                          // actual native first-type identity, absent for ordinary checks
     std::string itemKey;                                // raw item key (RG english name / RI_* spoiler name)
     nlohmann::json itemHint = nlohmann::json::object(); // same shape as locationHint
     nlohmann::json itemHintMask;                        // trap disguise's hint entry (null = none)
@@ -263,6 +264,8 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
     // OOT per-check hint info, keyed by check name.
     struct OotCheckInfo {
         std::string area;
+        std::string enemyDropName;
+        Tri enemyDropSource;
         bool dungeon = false, overworld = false, song = false;
         nlohmann::json locationHint;
     };
@@ -270,6 +273,8 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
     for (auto& c : hintDump.value("checks", nlohmann::json::array())) {
         OotCheckInfo info;
         info.area = c.value("area", "");
+        info.enemyDropName = c.value("enemyDropName", "");
+        info.enemyDropSource = FromJson(c.value("enemyDropSource", nlohmann::json::object()));
         info.dungeon = c.value("dungeon", false);
         info.overworld = c.value("overworld", false);
         info.song = c.value("song", false);
@@ -401,6 +406,7 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
             auto it = ootChecks.find(p.check);
             if (it != ootChecks.end()) {
                 c.areaKey = "oot:" + it->second.area;
+                c.enemyDropName = it->second.enemyDropName;
                 c.dungeon = it->second.dungeon;
                 c.overworld = it->second.overworld;
                 c.song = it->second.song;
@@ -471,6 +477,10 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
         auto ck = ootChecks.find(placed.check);
         if (ck == ootChecks.end())
             return std::nullopt;
+        if (!ck->second.enemyDropName.empty())
+            return ck->second.enemyDropSource.en.empty()
+                       ? EnglishOnly("the first " + ck->second.enemyDropName + " drop")
+                       : ck->second.enemyDropSource;
         return areaText("oot:" + ck->second.area);
     };
     auto itemAreaText = [&](const char* itemName, bool yourPocket = false) -> std::optional<Tri> {
@@ -819,10 +829,16 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
                 if (pick >= 0) {
                     usedKey = keys[pick];
                     const auto& cand = candidates[pick];
-                    msg = PickTemplate(tmpl(cand.dungeon ? "RHT_HOARDS" : "RHT_CAN_BE_FOUND_AT"), hintClarity, rng);
-                    ReplacePlaceholder(msg, 1,
-                                       PickTemplate(cand.itemHint, hintClarity, rng, MaskOrNull(cand.itemHintMask)));
-                    ReplacePlaceholder(msg, 2, areaText(cand.areaKey));
+                    if (!cand.enemyDropName.empty()) {
+                        msg = PickTemplate(cand.locationHint, hintClarity, rng);
+                        ReplacePlaceholder(
+                            msg, 1, PickTemplate(cand.itemHint, hintClarity, rng, MaskOrNull(cand.itemHintMask)));
+                    } else {
+                        msg = PickTemplate(tmpl(cand.dungeon ? "RHT_HOARDS" : "RHT_CAN_BE_FOUND_AT"), hintClarity, rng);
+                        ReplacePlaceholder(
+                            msg, 1, PickTemplate(cand.itemHint, hintClarity, rng, MaskOrNull(cand.itemHintMask)));
+                        ReplacePlaceholder(msg, 2, areaText(cand.areaKey));
+                    }
                     usedCheckKeys.insert(usedKey);
                     placed = true;
                 }
@@ -863,7 +879,10 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
             continue;
         Tri itemName = PickTemplate(c.itemHint, 2, rng, MaskOrNull(c.itemHintMask));
         Tri area = areaText(c.areaKey);
-        std::string text = itemName.en + " can be found " + (c.dungeon ? "hoarded in " : "at ") + area.en + " (OOT)";
+        std::string text = itemName.en + " can be found " +
+                           (!c.enemyDropName.empty() ? "at the first " + c.enemyDropName + " drop"
+                                                     : (c.dungeon ? "hoarded in " : "at ") + area.en) +
+                           " (OOT)";
         mmGossipPool.push_back({ { "weight", c.required ? 3 : 1 }, { "text", text } });
     }
 

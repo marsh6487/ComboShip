@@ -1,3 +1,7 @@
+#include <initializer_list>
+#include "SoulShuffleEnemy.h"
+#include "SoulShuffle.h"
+#include "RustyDoorKeys.h"
 #include "rando/CrossEntranceBoss.h"
 #include <spdlog/spdlog.h>
 
@@ -34,7 +38,37 @@ unsigned char TradeAdult_IsOwnedIndex(int index);
 }
 namespace Rando {
 
+bool Logic::CanUseCucco() {
+    return HasItem(RG_POWER_BRACELET) && HasItem(RG_SOUL_ANIMAL_CUCCO);
+}
+
+bool Logic::CanAccessSoulCheck(RandomizerCheck check) {
+    switch (check) {
+#define SOUL_CHECK(check, ...)                     \
+    case check:                                    \
+        for (RandomizerGet item : { __VA_ARGS__ }) \
+            if (!HasItem(item))                    \
+                return false;                      \
+        return true;
+#include "SoulShuffleChecks.inc"
+#undef SOUL_CHECK
+        default:
+            return true;
+    }
+}
+
 bool Logic::HasItem(RandomizerGet itemName) {
+    if (RustyDoorKeys::Find(itemName)) {
+        return RustyDoorKeys::CanUse(itemName, static_cast<bool>(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS)),
+                                     ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get(), HasItem(RG_SKELETON_KEY),
+                                     [this](RandomizerInf flag) { return CheckRandoInf(flag); });
+    }
+    // Soul catalog oot_has begin
+    if (const auto* soul = SoulShuffle::Find(itemName)) {
+        return !ctx->GetOption(soul->option) || CheckRandoInf(soul->flag);
+    }
+    // Soul catalog oot_has end
+
     switch (itemName) {
         case RG_FAIRY_OCARINA:
             return CheckInventory(ITEM_OCARINA_FAIRY, false);
@@ -209,6 +243,7 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_LOST_WOODS_BRIDGE_BEAN_SOUL:
         case RG_LOST_WOODS_BEAN_SOUL:
         case RG_ZORAS_RIVER_BEAN_SOUL:
+        case RG_CLOCK:
         case RG_SKELETON_KEY:
         case RG_RUTOS_LETTER:
             return CheckRandoInf(StaticData::RandoGetToRandInf.at(itemName));
@@ -374,6 +409,8 @@ bool Logic::HasItem(RandomizerGet itemName) {
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_CANE_OF_SOMARIA, true);
         case RG_DOMINION_ROD:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_DOMINION_ROD, true);
+        case RG_RITO_MASK:
+            return RitoMask_IsOwned();
         case RG_MAGIC_MIRROR:
             return MagicMirror_IsOwned();
         case RG_TIME_GATE:
@@ -1001,6 +1038,10 @@ bool Logic::CanDoGlitch(GlitchType glitch) {
 // ammo capacity
 bool Logic::CanKillEnemy(RandomizerEnemy enemy, EnemyDistance distance, bool wallOrFloor, uint8_t quantity, bool timer,
                          bool inWater) {
+    const auto soul = SoulShuffle::EnemyForLogic(enemy);
+    if (soul != RG_NONE && !HasItem(soul)) {
+        return false;
+    }
     bool killed = false;
     switch (enemy) {
         case RE_GERUDO_GUARD:
@@ -1559,12 +1600,13 @@ bool Logic::CanBreakMudWalls() {
 }
 
 bool Logic::CanGetDekuBabaSticks() {
-    return CanUseSword() || CanUse(RG_BOOMERANG);
+    return HasItem(RG_SOUL_ENEMY_DEKU_BABA) && (CanUseSword() || CanUse(RG_BOOMERANG));
 }
 
 bool Logic::CanGetDekuBabaNuts() {
-    return CanJumpslash() || CanUse(RG_FAIRY_SLINGSHOT) || CanUse(RG_FAIRY_BOW) || HasExplosives() ||
-           CanUse(RG_DINS_FIRE) || (CanUse(RG_MM_MASK_DEKU) && CanUse(RG_MAGIC_SINGLE));
+    return HasItem(RG_SOUL_ENEMY_DEKU_BABA) &&
+           (CanJumpslash() || CanUse(RG_FAIRY_SLINGSHOT) || CanUse(RG_FAIRY_BOW) || HasExplosives() ||
+            CanUse(RG_DINS_FIRE) || (CanUse(RG_MM_MASK_DEKU) && CanUse(RG_MAGIC_SINGLE)));
 }
 
 bool Logic::CanHitEyeTargets() {
@@ -1697,12 +1739,12 @@ bool Logic::WaterLevel(RandoWaterLevel level) {
             return Get(LOGIC_WATER_LOW) ||
                    // if we could get LOW from HIGH and HIGH from MID, then we can move to LOW from any water level
                    (Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) &&
-                    (Get(LOGIC_WATER_COULD_HIGH_FROM_MID) || Get(LOGIC_WATER_HIGH)) && CanUse(RG_ZELDAS_LULLABY));
+                    (Get(LOGIC_WATER_COULD_HIGH_FROM_MID) || Get(LOGIC_WATER_HIGH)) && CanPlaySongEvent(11));
         case WL_LOW_OR_MID:
             return Get(LOGIC_WATER_LOW) || Get(LOGIC_WATER_MIDDLE) ||
                    // The water level is either at HIGH, in which case we can set it to LOW, LOW, or MID, so we only
                    // have to check COULD_LOW and ZL
-                   ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_LOW)) && CanUse(RG_ZELDAS_LULLABY));
+                   ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_LOW)) && CanPlaySongEvent(11));
         case WL_MID:
             return Get(LOGIC_WATER_MIDDLE) ||
                    // LOGIC_WATER_COULD_MIDDLE is LOGIC_WATER_COULD_MIDDLE_FROM_LOW in practice, due to WL_LOW being a
@@ -1711,7 +1753,7 @@ bool Logic::WaterLevel(RandoWaterLevel level) {
                    // If we have COULD_MIDDLE, we know we could move to LOW from HIGH,
                    // we're either already MID, on LOW can set MID, or on HIGH so you can set LOW and thus MID.
                    ((Get(LOGIC_WATER_COULD_LOW_FROM_HIGH) || Get(LOGIC_WATER_COULD_LOW)) &&
-                    Get(LOGIC_WATER_COULD_MIDDLE) && CanUse(RG_ZELDAS_LULLABY));
+                    Get(LOGIC_WATER_COULD_MIDDLE) && CanPlaySongEvent(11));
         case WL_HIGH:
             // If we don't have ZL, we're stuck on high anyway, so we only need to check for if we can reset it to high
             return Get(LOGIC_WATER_HIGH) ||
@@ -2312,6 +2354,102 @@ std::map<RandomizerGet, uint32_t> Logic::RandoGetToEquipFlag = {
 };
 
 std::map<RandomizerGet, uint32_t> StaticData::RandoGetToRandInf = {
+    { RG_SOUL_ENEMY_STALFOS, RAND_INF_SOUL_ENEMY_STALFOS },
+    { RG_SOUL_ENEMY_OCTOROK, RAND_INF_SOUL_ENEMY_OCTOROK },
+    { RG_SOUL_ENEMY_WALLMASTER, RAND_INF_SOUL_ENEMY_WALLMASTER },
+    { RG_SOUL_ENEMY_DODONGO, RAND_INF_SOUL_ENEMY_DODONGO },
+    { RG_SOUL_ENEMY_KEESE, RAND_INF_SOUL_ENEMY_KEESE },
+    { RG_SOUL_ENEMY_TEKTITE, RAND_INF_SOUL_ENEMY_TEKTITE },
+    { RG_SOUL_ENEMY_LEEVER, RAND_INF_SOUL_ENEMY_LEEVER },
+    { RG_SOUL_ENEMY_PEAHAT, RAND_INF_SOUL_ENEMY_PEAHAT },
+    { RG_SOUL_ENEMY_LIZALFOS_DINOLFOS, RAND_INF_SOUL_ENEMY_LIZALFOS_DINOLFOS },
+    { RG_SOUL_ENEMY_GOHMA_LARVA, RAND_INF_SOUL_ENEMY_GOHMA_LARVA },
+    { RG_SOUL_ENEMY_SHABOM, RAND_INF_SOUL_ENEMY_SHABOM },
+    { RG_SOUL_ENEMY_BABY_DODONGO, RAND_INF_SOUL_ENEMY_BABY_DODONGO },
+    { RG_SOUL_ENEMY_DARK_LINK, RAND_INF_SOUL_ENEMY_DARK_LINK },
+    { RG_SOUL_ENEMY_BIRI_BARI, RAND_INF_SOUL_ENEMY_BIRI_BARI },
+    { RG_SOUL_ENEMY_TAILPASARN, RAND_INF_SOUL_ENEMY_TAILPASARN },
+    { RG_SOUL_ENEMY_PARASITE, RAND_INF_SOUL_ENEMY_PARASITE },
+    { RG_SOUL_ENEMY_SKULLTULA, RAND_INF_SOUL_ENEMY_SKULLTULA },
+    { RG_SOUL_ENEMY_TORCH_SLUG, RAND_INF_SOUL_ENEMY_TORCH_SLUG },
+    { RG_SOUL_ENEMY_MOBLIN, RAND_INF_SOUL_ENEMY_MOBLIN },
+    { RG_SOUL_ENEMY_ARMOS, RAND_INF_SOUL_ENEMY_ARMOS },
+    { RG_SOUL_ENEMY_DEKU_BABA, RAND_INF_SOUL_ENEMY_DEKU_BABA },
+    { RG_SOUL_ENEMY_DEKU_SCRUB, RAND_INF_SOUL_ENEMY_DEKU_SCRUB },
+    { RG_SOUL_ENEMY_BUBBLE, RAND_INF_SOUL_ENEMY_BUBBLE },
+    { RG_SOUL_ENEMY_BEAMOS, RAND_INF_SOUL_ENEMY_BEAMOS },
+    { RG_SOUL_ENEMY_FLOORMASTER, RAND_INF_SOUL_ENEMY_FLOORMASTER },
+    { RG_SOUL_ENEMY_POE, RAND_INF_SOUL_ENEMY_POE },
+    { RG_SOUL_ENEMY_REDEAD_GIBDO, RAND_INF_SOUL_ENEMY_REDEAD_GIBDO },
+    { RG_SOUL_ENEMY_SKULLWALLTULA, RAND_INF_SOUL_ENEMY_SKULLWALLTULA },
+    { RG_SOUL_ENEMY_FLARE_DANCER, RAND_INF_SOUL_ENEMY_FLARE_DANCER },
+    { RG_SOUL_ENEMY_DEAD_HAND, RAND_INF_SOUL_ENEMY_DEAD_HAND },
+    { RG_SOUL_ENEMY_SHELL_BLADE, RAND_INF_SOUL_ENEMY_SHELL_BLADE },
+    { RG_SOUL_ENEMY_LIKE_LIKE, RAND_INF_SOUL_ENEMY_LIKE_LIKE },
+    { RG_SOUL_ENEMY_SPIKE, RAND_INF_SOUL_ENEMY_SPIKE },
+    { RG_SOUL_ENEMY_ANUBIS, RAND_INF_SOUL_ENEMY_ANUBIS },
+    { RG_SOUL_ENEMY_IRON_KNUCKLE, RAND_INF_SOUL_ENEMY_IRON_KNUCKLE },
+    { RG_SOUL_ENEMY_SKULL_KID, RAND_INF_SOUL_ENEMY_SKULL_KID },
+    { RG_SOUL_ENEMY_FLYING_POT, RAND_INF_SOUL_ENEMY_FLYING_POT },
+    { RG_SOUL_ENEMY_FREEZARD, RAND_INF_SOUL_ENEMY_FREEZARD },
+    { RG_SOUL_ENEMY_STINGER, RAND_INF_SOUL_ENEMY_STINGER },
+    { RG_SOUL_ENEMY_WOLFOS, RAND_INF_SOUL_ENEMY_WOLFOS },
+    { RG_SOUL_ENEMY_STALCHILD, RAND_INF_SOUL_ENEMY_STALCHILD },
+    { RG_SOUL_ENEMY_GUAY, RAND_INF_SOUL_ENEMY_GUAY },
+    { RG_SOUL_ENEMY_THIEVES, RAND_INF_SOUL_ENEMY_THIEVES },
+    { RG_SOUL_NPC_SARIA, RAND_INF_SOUL_NPC_SARIA },
+    { RG_SOUL_NPC_DARUNIA, RAND_INF_SOUL_NPC_DARUNIA },
+    { RG_SOUL_NPC_RUTO, RAND_INF_SOUL_NPC_RUTO },
+    { RG_SOUL_NPC_KING_ZORA, RAND_INF_SOUL_NPC_KING_ZORA },
+    { RG_SOUL_NPC_ZELDA, RAND_INF_SOUL_NPC_ZELDA },
+    { RG_SOUL_NPC_SHEIK, RAND_INF_SOUL_NPC_SHEIK },
+    { RG_SOUL_NPC_ANJU, RAND_INF_SOUL_NPC_ANJU },
+    { RG_SOUL_NPC_CARPENTERS, RAND_INF_SOUL_NPC_CARPENTERS },
+    { RG_SOUL_NPC_GURU_GURU, RAND_INF_SOUL_NPC_GURU_GURU },
+    { RG_SOUL_NPC_MIDO, RAND_INF_SOUL_NPC_MIDO },
+    { RG_SOUL_NPC_KOKIRI, RAND_INF_SOUL_NPC_KOKIRI },
+    { RG_SOUL_NPC_KOKIRI_SHOPKEEPER, RAND_INF_SOUL_NPC_KOKIRI_SHOPKEEPER },
+    { RG_SOUL_NPC_HYLIAN_GUARD, RAND_INF_SOUL_NPC_HYLIAN_GUARD },
+    { RG_SOUL_NPC_CITIZEN, RAND_INF_SOUL_NPC_CITIZEN },
+    { RG_SOUL_NPC_MALON, RAND_INF_SOUL_NPC_MALON },
+    { RG_SOUL_NPC_TALON, RAND_INF_SOUL_NPC_TALON },
+    { RG_SOUL_NPC_FISHING_POND_OWNER, RAND_INF_SOUL_NPC_FISHING_POND_OWNER },
+    { RG_SOUL_NPC_GORON, RAND_INF_SOUL_NPC_GORON },
+    { RG_SOUL_NPC_MEDIGORON, RAND_INF_SOUL_NPC_MEDIGORON },
+    { RG_SOUL_NPC_BIGGORON, RAND_INF_SOUL_NPC_BIGGORON },
+    { RG_SOUL_NPC_GORON_CHILD, RAND_INF_SOUL_NPC_GORON_CHILD },
+    { RG_SOUL_NPC_GORON_SHOPKEEPER, RAND_INF_SOUL_NPC_GORON_SHOPKEEPER },
+    { RG_SOUL_NPC_ZORA, RAND_INF_SOUL_NPC_ZORA },
+    { RG_SOUL_NPC_ZORA_SHOPKEEPER, RAND_INF_SOUL_NPC_ZORA_SHOPKEEPER },
+    { RG_SOUL_NPC_BAZAAR_SHOPKEEPER, RAND_INF_SOUL_NPC_BAZAAR_SHOPKEEPER },
+    { RG_SOUL_NPC_BOMBCHU_SHOPKEEPER, RAND_INF_SOUL_NPC_BOMBCHU_SHOPKEEPER },
+    { RG_SOUL_NPC_POTION_SHOPKEEPER, RAND_INF_SOUL_NPC_POTION_SHOPKEEPER },
+    { RG_SOUL_NPC_BOMBCHU_BOWLING_LADY, RAND_INF_SOUL_NPC_BOMBCHU_BOWLING_LADY },
+    { RG_SOUL_NPC_CHEST_GAME_OWNER, RAND_INF_SOUL_NPC_CHEST_GAME_OWNER },
+    { RG_SOUL_NPC_SHOOTING_GALLERY_OWNER, RAND_INF_SOUL_NPC_SHOOTING_GALLERY_OWNER },
+    { RG_SOUL_NPC_DAMPE, RAND_INF_SOUL_NPC_DAMPE },
+    { RG_SOUL_NPC_BOMBERS, RAND_INF_SOUL_NPC_BOMBERS },
+    { RG_SOUL_NPC_POE_COLLECTOR, RAND_INF_SOUL_NPC_POE_COLLECTOR },
+    { RG_SOUL_NPC_COMPOSER_BROS, RAND_INF_SOUL_NPC_COMPOSER_BROS },
+    { RG_SOUL_NPC_HONEY_DARLING, RAND_INF_SOUL_NPC_HONEY_DARLING },
+    { RG_SOUL_NPC_ASTRONOMER, RAND_INF_SOUL_NPC_ASTRONOMER },
+    { RG_SOUL_NPC_ROOFTOP_MAN, RAND_INF_SOUL_NPC_ROOFTOP_MAN },
+    { RG_SOUL_NPC_BEAN_SALESMAN, RAND_INF_SOUL_NPC_BEAN_SALESMAN },
+    { RG_SOUL_NPC_SCIENTIST, RAND_INF_SOUL_NPC_SCIENTIST },
+    { RG_SOUL_NPC_GORMAN, RAND_INF_SOUL_NPC_GORMAN },
+    { RG_SOUL_NPC_GROG, RAND_INF_SOUL_NPC_GROG },
+    { RG_SOUL_NPC_DOG_LADY, RAND_INF_SOUL_NPC_DOG_LADY },
+    { RG_SOUL_NPC_CARPET_MAN, RAND_INF_SOUL_NPC_CARPET_MAN },
+    { RG_SOUL_NPC_OLD_HAG, RAND_INF_SOUL_NPC_OLD_HAG },
+    { RG_SOUL_NPC_BANKER, RAND_INF_SOUL_NPC_BANKER },
+    { RG_SOUL_NPC_THIEVES, RAND_INF_SOUL_NPC_THIEVES },
+    { RG_SOUL_ANIMAL_CUCCO, RAND_INF_SOUL_ANIMAL_CUCCO },
+    { RG_SOUL_ANIMAL_COW, RAND_INF_SOUL_ANIMAL_COW },
+    { RG_SOUL_ANIMAL_DOG, RAND_INF_SOUL_ANIMAL_DOG },
+    { RG_SOUL_ANIMAL_BUTTERFLY, RAND_INF_SOUL_ANIMAL_BUTTERFLY },
+    { RG_SOUL_MISC_GS, RAND_INF_SOUL_MISC_GS },
+    { RG_SOUL_MISC_BUSINESS_SCRUB, RAND_INF_SOUL_MISC_BUSINESS_SCRUB },
+
     { RG_BRONZE_SCALE, RAND_INF_CAN_SWIM },
     { RG_POWER_BRACELET, RAND_INF_CAN_GRAB },
     { RG_ZELDAS_LETTER, RAND_INF_ZELDAS_LETTER },
@@ -2370,6 +2508,7 @@ std::map<RandomizerGet, uint32_t> StaticData::RandoGetToRandInf = {
     { RG_ZORA_MASK, RAND_INF_CHILD_TRADES_HAS_MASK_ZORA },
     { RG_GERUDO_MASK, RAND_INF_CHILD_TRADES_HAS_MASK_GERUDO },
     { RG_MASK_OF_TRUTH, RAND_INF_CHILD_TRADES_HAS_MASK_TRUTH },
+    { RG_CLOCK, RAND_INF_CLOCK },
     { RG_SKELETON_KEY, RAND_INF_HAS_SKELETON_KEY },
     { RG_GREG_RUPEE, RAND_INF_GREG_FOUND },
     { RG_SPEAK_DEKU, RAND_INF_CAN_SPEAK_DEKU },
@@ -2381,6 +2520,9 @@ std::map<RandomizerGet, uint32_t> StaticData::RandoGetToRandInf = {
     { RG_FISHING_POLE, RAND_INF_FISHING_POLE_FOUND },
     { RG_SCARECROWS_SONG, RAND_INF_HAS_SCARECROWS_SONG },
     { RG_ROCS_FEATHER, RAND_INF_OBTAINED_ROCS_FEATHER },
+    { RG_RUSTY_KEY_HYRULE_CASTLE, RAND_INF_RUSTY_KEY_HYRULE_CASTLE },
+    { RG_RUSTY_KEY_RANCH_HOUSE_ROOM, RAND_INF_RUSTY_KEY_RANCH_HOUSE_ROOM },
+    { RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK, RAND_INF_RUSTY_KEY_ADULT_POTION_SHOP_BACK },
     { RG_GUARD_HOUSE_KEY, RAND_INF_GUARD_HOUSE_KEY_OBTAINED },
     { RG_MARKET_BAZAAR_KEY, RAND_INF_MARKET_BAZAAR_KEY_OBTAINED },
     { RG_MARKET_POTION_SHOP_KEY, RAND_INF_MARKET_POTION_SHOP_KEY_OBTAINED },
@@ -2547,6 +2689,17 @@ std::set<RandomizerGet> StaticData::allowBottleMaskTrade = { RG_KEATON_MASK,
 
 void Logic::ApplyItemEffect(Item& item, bool state) {
     auto randoGet = item.GetRandomizerGet();
+    if (const auto* key = RustyDoorKeys::Find(randoGet)) {
+        SetRandoInf(key->flag, state);
+        return;
+    }
+    // Soul catalog oot_effect begin
+    if (const auto* soul = SoulShuffle::Find(randoGet)) {
+        SetRandoInf(soul->flag, state);
+        return;
+    }
+    // Soul catalog oot_effect end
+
     if (item.GetGIEntry()->objectId == OBJECT_GI_STICK) {
         SetInventory(ITEM_STICK, (!state ? ITEM_NONE : ITEM_STICK));
     }
@@ -2898,6 +3051,7 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
                 case RG_MASK_OF_TRUTH:
                 case RG_GREG_RUPEE:
                 case RG_SPEAK_DEKU:
+                case RG_CLOCK:
                 case RG_SPEAK_GERUDO:
                 case RG_SPEAK_GORON:
                 case RG_SPEAK_HYLIAN:

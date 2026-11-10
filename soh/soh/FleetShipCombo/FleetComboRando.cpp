@@ -1,3 +1,5 @@
+#include "combo/rando/SongEvents.h"
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 // FleetComboRando.cpp — Generador del Combo Randomizer (Fases 2+3). Ver FleetComboRando.h.
 //
 // Flujo del thread de generación (GenerateCombo):
@@ -84,6 +86,7 @@ std::unordered_set<std::string>
     sMmManifestPool; // TODOS los nombres RI del pool MM (pre-dedupe FC) —
                      // para el filtro per-juego: un FC MM-native solo cruza si su RI está barajado en MM
 std::vector<std::string> sMmStarting;
+nlohmann::json sMmSongEvents;
 nlohmann::json sMmOptions;                           // { "RO_X": value }
 std::unordered_map<std::string, int> sMmCheckPrices; // 5.0.0: RC name -> shop price rolled by MM for this seed
 std::vector<std::string> sMmSkippedChecks;           // 5.0.0: excluded checks MM turned into skipped junk
@@ -242,6 +245,7 @@ void ParseManifest(const nlohmann::json& manifest) {
     sMmStarting.clear();
     sMmCheckAreas.clear();
     sMmOptions = nlohmann::json::object();
+    sMmSongEvents = nullptr;
 
     // set de nombres RI cubiertos por FC ambos-lados (para dedupe del pool MM)
     std::unordered_set<std::string> fcPeerNames;
@@ -336,6 +340,8 @@ void ParseManifest(const nlohmann::json& manifest) {
     for (auto& name : manifest["startingItems"]) {
         sMmStarting.push_back(name.get<std::string>());
     }
+    if (manifest.contains("songEvents"))
+        sMmSongEvents = manifest.at("songEvents");
     for (auto& opt : manifest["options"]) { // [name, cvar, value]
         sMmOptions[opt[0].get<std::string>()] = opt[2].get<int64_t>();
     }
@@ -437,7 +443,8 @@ void BuildFcRestrictions() {
             if (ri.rfind("RI_OOT_", 0) == 0) {
                 continue; // OoT-origin: handled by OoT's own options below
             }
-            bool isSmall = ri.size() > 10 && ri.compare(ri.size() - 10, 10, "_SMALL_KEY") == 0;
+            bool isSmall = (ri.size() > 10 && ri.compare(ri.size() - 10, 10, "_SMALL_KEY") == 0) ||
+                           (ri.size() > 9 && ri.compare(ri.size() - 9, 9, "_KEY_RING") == 0);
             bool isBoss = ri.size() > 9 && ri.compare(ri.size() - 9, 9, "_BOSS_KEY") == 0;
             bool isFairy = ri.size() > 12 && ri.compare(ri.size() - 12, 12, "_STRAY_FAIRY") == 0 &&
                            ri != "RI_CLOCK_TOWN_STRAY_FAIRY"; // not a dungeon item
@@ -1974,6 +1981,16 @@ void WriteMmSpoilerAndPrepare(const std::string& seedString) {
     // shows up hours later as checks handing out the wrong items.
     FleetShipCombo_SetComboSeed((uint32_t)ctx->GetSeed());
     spoiler["options"] = sMmOptions;
+    spoiler["songEvents"] = ComboRando::SongEvents::Generate(ComboRando::SongEvents::Game::Mm, ctx->GetSeed(),
+                                                             sMmOptions.value("RO_SHUFFLE_SONG_EVENTS", 0) != 0);
+    if (sMmSongEvents.is_array())
+        spoiler["songEvents"] = sMmSongEvents;
+    for (unsigned event = 0; event < 13; ++event) {
+        unsigned song = spoiler["songEvents"][event].get<unsigned>();
+        if (song < 20)
+            spoiler["songEventAssignments"][ComboRando::SongEvents::MmLabels[event]] =
+                ComboRando::SongEvents::SongLabels[song];
+    }
     spoiler["startingItems"] = sMmStarting;
     nlohmann::json checks = nlohmann::json::object();
     for (auto& [checkName, itemName] : sMmPlacements) {
@@ -2325,7 +2342,7 @@ void LoadFleetThread(std::string fileName, int slot, std::string name) {
                 std::ofstream out(ootFile);
                 out << fleet["oot"] << std::endl;
             }
-            Rando::Context::GetInstance()->ParseSpoiler(ootFile.c_str());
+            Rando::Context::GetInstance()->ParseSpoiler(ootFile.c_str(), true);
             CVarSetString("gGeneral.SpoilerLog", ("./Randomizer/_fleet_oot.json"));
         } else {
             throw std::runtime_error(".fleet has no OoT spoiler");
@@ -2466,6 +2483,7 @@ void GenerateCombo(std::string seedString) {
                   " cross FC items");
 
         auto ctx = Rando::Context::GetInstance();
+        Rando::RustyDoorKeys::PrepareNewGeneration();
         Rando::Settings::GetInstance()->SetAllToContext();
         // NOTHING IS FORCED ANY MORE.
         //

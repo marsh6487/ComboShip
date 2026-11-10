@@ -2,6 +2,7 @@
 // Archive decoding, heap allocation and the graphics interpreter are boundaries.
 #include "global.h"
 #include "din_fire_sword.h"
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_Obj_Hunsui/z_obj_hunsui.h"
 #include "objects/object_hunsui/object_hunsui.h"
@@ -17,6 +18,10 @@ static_assert(std::is_same_v<decltype(ObjHunsui::unk_174), f32>);
 static_assert(std::is_same_v<decltype(ObjHunsui::unk_178), f32>);
 static_assert(std::is_same_v<decltype(ObjHunsui::unk_172), u16>);
 static_assert(offsetof(ObjHunsui, dyna) == 0);
+
+// Souls are disabled in this native-water fixture. Keep the real C ABI;
+// dedicated soul fixtures exercise spawn eligibility.
+extern "C" int MM_SoulCanSpawnNonEnemy(PlayState*, int, unsigned int) { return true; }
 
 extern ActorProfile Obj_Hunsui_Profile;
 int currentActorListIndex = -1;

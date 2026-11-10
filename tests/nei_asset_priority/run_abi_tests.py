@@ -24,17 +24,19 @@ sources = {
     'OOT_NeiAltAssetsEnabled': 'soh/soh/ResourceManagerHelpers.cpp',
     'OOT_CopyWolfLinkResource': 'soh/soh/ResourceManagerHelpers.cpp',
     'MM_CopyWolfLinkResource': 'mm/2s2h/BenPort.cpp',
+    'MM_SetSoloEntranceRuntimeSeed': 'combo/rando/SoloEntranceMmRuntime.inc.h',
 }
 
 signatures = {}
 for name, path in sources.items():
     production = (ROOT / path).read_text(encoding='utf-8')
     match = re.search(r'extern "C"\s+(?:(?:#ifdef COMBO_BUILD\s+)?COMBO_EXPORT\s+(?:#endif\s+)?)?'
-                      r'(?:void|int|int32_t)\s+' + name + r'\([^)]*\)\s*\{', production)
+                      r'(?:void|int|int32_t)\s+' + name + r'\([^)]*\)\s*(?:try\s*)?\{', production)
     assert match, f'Missing production definition: {name}'
-    signatures[name] = match[0][:-1].strip()
+    signatures[name] = re.sub(r'\s+try$', '', match[0][:-1].strip())
 
 includes = '#include "combo/menu/ComboItemDrawABI.h"\n#include "combo/NeiWolfAsset.h"\n'
+includes += '#include "combo/rando/SoloEntranceMmRuntime.h"\n'
 
 with tempfile.TemporaryDirectory(prefix='nei-abi-') as temporary:
     directory = Path(temporary)

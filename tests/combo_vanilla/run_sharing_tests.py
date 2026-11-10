@@ -28,6 +28,8 @@ for game in ('soh', 'mm'):
         sync = sync_path.read_text()
         snippets = []
         if game == 'mm':
+            inventory = (ROOT / 'mm/mods/extended_inventory.c').read_text()
+            snippets.append(extract(inventory, 'void RitoMask_Grant('))
             conversions = (ROOT / 'mm/2s2h/BenJsonConversions.hpp').read_text()
             snippets += [extract(conversions, 'inline void to_json(json& j, const NeiSaveData& n)'),
                          extract(conversions, 'inline void from_json(const json& j, NeiSaveData& n)')]
@@ -36,7 +38,11 @@ for game in ('soh', 'mm'):
                          extract(native_nei, 'extern "C" uint8_t Nei_HookshotVariant(')]
         if game == 'soh':
             forms = (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
-            snippets.append(extract(forms, 'extern "C" void RitoItem_NoteCellItem('))
+            for signature in ('extern "C" uint8_t RitoMask_IsOwned(',
+                              'extern "C" void RitoItem_NoteCellItem(',
+                              'extern "C" void RitoMask_MigrateLegacy(',
+                              'extern "C" void RitoMask_Grant('):
+                snippets.append(extract(forms, signature))
             player = (ROOT / 'soh/mods/extended_player.c').read_text()
             snippets.append(extract(player, 'u8 Nei_ArmsHookVariant('))
             feather = (ROOT / 'soh/soh/Enhancements/randomizer/RocsFeatherCycle.c').read_text()
@@ -55,6 +61,14 @@ for game in ('soh', 'mm'):
             unused = '    (void)sh;\n' if 'Equips(' in signature else ''
             snippets.append(function[:pos] + guard + '\n' + unused + '    ++legacyCalls;\n}')
         shared = sync_path.with_name('FleetSharedItems.cpp').read_text()
+        # Keep the actual soul receipt/reconciliation wrappers and complete
+        # shared runtime. The fixture supplies only native flag/grant services.
+        soul_path = ROOT / ('soh/soh/Enhancements/randomizer/SoulShuffleShared.cpp' if game == 'soh'
+                            else 'mm/2s2h/Rando/SoulShuffleShared.cpp')
+        soul = soul_path.read_text()
+        prefix = 'SOH' if game == 'soh' else 'MM'
+        snippets += [extract(soul, 'extern "C" int ' + prefix + '_ShareSoulReceipt('),
+                     extract(soul, 'extern "C" void ' + prefix + '_ApplySharedSoulState(')]
         fanout = extract(shared, 'extern "C" void FleetShared_OnNativeObtained(')
         boundary = fanout.index('    // Share the concrete' if game == 'mm' else '    // Native magic')
         snippets.append(fanout[:boundary] + '    (void)nativeId; ++legacyFanouts;\n}')

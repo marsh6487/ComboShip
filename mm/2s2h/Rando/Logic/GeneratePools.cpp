@@ -1,5 +1,16 @@
+#include "Rando/SongEvents.h"
+#include "../../../../combo/rando/MagicMirrorSettings.h"
+#include "../../../../combo/rando/RitoMaskSettings.h"
+#include "Rando/VanillaCompatibility.h"
+#include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
+#include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
+#include "Rando/Lottery.h"
 #include <nlohmann/json.hpp>
 #include "Logic.h"
+#include "Rando/MMEnvironment.h"
 #include "../../../../combo/NeiGracePolicy.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo-only items)
@@ -27,7 +38,13 @@ static void EnsureCommandMelodyInPool(std::vector<RandoItemId>& itemPool) {
         itemPool.push_back(RI_OOT_SONG_COMMAND_MELODY);
 }
 
-void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool) {
+void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool,
+                   bool preserveSongMapping) {
+    VanillaCompatibility::NormalizeSavedState(saveInfo);
+    if (!preserveSongMapping) {
+        Rando::SongEvents::ClearImportedMapping();
+    }
+    Rando::SongEvents::Generate(saveInfo, !preserveSongMapping);
     const bool hasOotGameplay = Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive();
 #ifdef COMBO_BUILD
     // ComboShip (#136): the launcher owns the goal, so the hunt toggle follows it (the Majora soul-lock
@@ -43,14 +60,20 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 #endif
-    // Generation-only request from the OoT checkbox. Keep the UI CVars independent,
-    // but serialize the shared feature into the generated MM save/spoiler.
+    // Preview follows the live Combo preference. Generation/replay use the
+    // frozen setting snapshot, and must explicitly apply OFF as well as ON.
 #ifdef COMBO_BUILD
-    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0)) {
-        saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = RO_GENERIC_ON;
+    if (Combo_IsCombinedGame()) {
+        const int mirror = preserveSongMapping ? ComboRando::MagicMirrorSettings::Preview()
+                                               : CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+        saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = mirror ? RO_GENERIC_ON : RO_GENERIC_OFF;
+        const int rito = preserveSongMapping ? ComboRando::RitoMaskSettings::Preview()
+                                             : CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0);
+        saveInfo.randoSaveOptions[RO_SHUFFLE_RITO_MASK] = rito ? RO_GENERIC_ON : RO_GENERIC_OFF;
     }
 #endif
     std::vector<RandoItemId> startingItems = Rando::GetStartingItemsFromSave(saveInfo);
+    Wallets::NormalizeOptions(saveInfo, Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
     std::vector<RandoItemId> computedStartingItems = Rando::GetComputedStartingItems(saveInfo);
     startingItems.insert(startingItems.end(), computedStartingItems.begin(), computedStartingItems.end());
 
@@ -82,6 +105,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     for (auto& [randoRegionId, randoRegion] : Rando::Logic::Regions) {
         for (auto& [randoCheckId, _] : randoRegion.checks) {
             auto& randoStaticCheck = Rando::StaticData::Checks[randoCheckId];
+
+            if (!Lottery::IsEnabled(randoCheckId, saveInfo.randoSaveOptions[RO_SHUFFLE_LOTTERY_NIGHTS] != 0)) {
+                continue;
+            }
 
             // Initialize the check with it's vanilla item
             if (randoStaticCheck.randoCheckId != RC_UNKNOWN) {
@@ -167,6 +194,13 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
             if (randoStaticCheck.randoCheckType == RCTYPE_FREESTANDING &&
                 saveInfo.randoSaveOptions[RO_SHUFFLE_FREESTANDING_ITEMS] == RO_GENERIC_NO) {
+                continue;
+            }
+
+            if (!MMEnvironment::SourceEligibleForSeed(randoCheckId, hasOotGameplay, saveInfo))
+                continue;
+            const auto environmentOption = MMEnvironment::OptionForType(randoStaticCheck.randoCheckType);
+            if (environmentOption != RO_MAX && saveInfo.randoSaveOptions[environmentOption] == RO_GENERIC_NO) {
                 continue;
             }
 
@@ -421,6 +455,18 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 
+    // Native NPC, animal and miscellaneous souls are permanent single-copy majors.
+    for (const auto& soul : SoulShuffle::Catalog) {
+        if (saveInfo.randoSaveOptions[soul.option] == RO_GENERIC_YES) {
+            itemPool.push_back(soul.item);
+        }
+    }
+
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_RUSTY_KEYS]) {
+        for (const auto& key : RustyDoorKeys::Catalog)
+            itemPool.push_back(key.item);
+    }
+
     // Enemy Souls
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES) {
         for (int i = RI_SOUL_ENEMY_ALIEN; i <= RI_SOUL_ENEMY_WOLFOS; i++) {
@@ -473,6 +519,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     // Tycoon's Wallet
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET]) {
+        itemPool.push_back(RI_PROGRESSIVE_WALLET);
+    }
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES) {
         itemPool.push_back(RI_PROGRESSIVE_WALLET);
     }
@@ -532,8 +581,22 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // consumes its normal supply rather than being silently re-added afterward.
     EnsureCommandMelodyInPool(itemPool);
 
+    KeyRings::TransformPool(saveInfo, itemPool);
+    if (saveInfo.randoSaveOptions[RO_INFINITE_UPGRADES]) {
+        for (const auto& upgrade : InfiniteUpgrades::Catalog)
+            itemPool.push_back(upgrade.item);
+    }
+    // Base bags are separate entitlements from ammo and capacity upgrades.
+    // Insert before starting-inventory subtraction; never duplicate in Plentiful.
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_DEKU_STICK_BAG])
+        itemPool.push_back(RI_DEKU_STICK_BAG);
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_DEKU_NUT_BAG])
+        itemPool.push_back(RI_DEKU_NUT_BAG);
+
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
+        if (startingItem == RI_WALLET_CHILD && saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET])
+            startingItem = RI_PROGRESSIVE_WALLET;
         auto it = std::find(itemPool.begin(), itemPool.end(), startingItem);
         if (it != itemPool.end()) {
             itemPool.erase(it);
@@ -563,17 +626,23 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     // Plentiful
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_RITO_MASK] == RO_GENERIC_ON)
+        itemPool.push_back(RI_OOT_NEI_RITO_MASK);
+
     if (saveInfo.randoSaveOptions[RO_PLENTIFUL_ITEMS] == RO_GENERIC_YES) {
         std::vector<RandoItemId> plentifulItems;
         for (size_t i = 0; i < itemPool.size(); i++) {
             // The user can specify exactly how many pieces they want to shuffle, so skip those
-            if (itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR || itemPool[i] == RI_OOT_SONG_COMMAND_MELODY) {
+            if (itemPool[i] == RI_OOT_NEI_RITO_MASK || itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR ||
+                itemPool[i] == RI_OOT_SONG_COMMAND_MELODY) {
                 continue; // One physical Mirror / Command Melody in every density.
             }
             if (itemPool[i] == RI_TRIFORCE_PIECE) {
                 continue;
             }
-            if (itemPool[i] == RI_SKELETON_KEY) {
+            if (RustyDoorKeys::Find(itemPool[i]) || itemPool[i] == RI_SKELETON_KEY || KeyRings::Find(itemPool[i]) ||
+                InfiniteUpgrades::Find(itemPool[i]) || itemPool[i] == RI_DEKU_STICK_BAG ||
+                itemPool[i] == RI_DEKU_NUT_BAG) {
                 continue;
             }
             if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&

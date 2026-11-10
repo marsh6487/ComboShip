@@ -1,4 +1,5 @@
 #include "hint.h"
+#include "EnemyFirstDrops.h"
 #include "string"
 #include "SeedContext.h"
 #include "static_data.h"
@@ -282,6 +283,12 @@ const HintText Hint::GetHintText(size_t id) const {
             }
         case HINT_TYPE_ITEM_AREA:
             if (locations.size() > 0) {
+                // Global first-type checks have many physical witnesses. Name
+                // the enemy/action instead of an inherited witness hint area.
+                // ITEM_AREA inserts the item first, matching the [[1]] token.
+                if (StaticData::GetLocation(locations[0])->GetRCType() == RCTYPE_ENEMY_DROP) {
+                    return *StaticData::GetLocation(locations[0])->GetHint();
+                }
                 if (StaticData::GetLocation(locations[0])->IsDungeon()) {
                     return StaticData::hintTextTable[RHT_HOARDS];
                 } else {
@@ -615,6 +622,12 @@ const CustomMessage Hint::GetAreaName(uint8_t slot) const {
     // as a string and is returned verbatim. Skijer's NEI
     if (foreignAreas.size() > slot && !foreignAreas[slot].empty()) {
         return CustomMessage(foreignAreas[slot]);
+    }
+    if (slot < locations.size()) {
+        if (const auto* drop = EnemyFirstDrops::Find(locations[slot])) {
+            const auto source = EnemyFirstDrops::HintSource(*drop);
+            return CustomMessage(source.en, source.de, source.fr);
+        }
     }
     uint8_t nameNum = 0;
     if (areaNamesChosen.size() > slot) {

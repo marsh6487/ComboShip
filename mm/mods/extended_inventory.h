@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include "z64item.h"
 #include "../../combo/gameplay/MagicMirrorItem.h"
+#include "../../combo/ComboGameMode.h"
 #include "nei_save.h" // Skijer's NEI — custom-slot storage (24..71)
 
 // ─── Skijer's NEI — OoT-only item-name → MM compat aliases ───────────────────
@@ -80,6 +81,19 @@
 #define VSLOT_OOT_BOOMERANG 76
 #define VSLOT_OOT_MASKS 77
 #define VSLOT_HAMMER 78
+#define VSLOT_RITO_MASK 96
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+uint8_t RitoMask_IsOwned(void);
+void RitoMask_Grant(void);
+void RitoMask_Remove(void);
+uint16_t RitoMask_BremenCellItem(void);
+uint8_t RitoMask_UsesCornerWheel(void);
+#ifdef __cplusplus
+}
+#endif
 
 uint8_t ExtInv_GetOotSlotItem(int slot);
 void ExtInv_SetOotSlotItem(int slot, uint8_t itemId);
@@ -155,6 +169,15 @@ extern "C" {
 // they read from gSaveContext inventory.items — they just come back widened. Skijer's NEI
 static inline uint16_t ExtInv_GetSlotItem(int slot) {
     extern SaveContext gSaveContext;
+    if (slot >= VSLOT_RITO_MASK) {
+        return slot == VSLOT_RITO_MASK && Nei_Save()->ritoMaskOwned ? EXT_ITEM_RITO_MASK : ITEM_NONE;
+    }
+    if (slot == 55 && !Combo_IsCombinedGame() && Nei_Save()->ritoMaskOwned &&
+        (Nei_Save()->ritoMaskSelected || gSaveContext.save.saveInfo.inventory.items[SLOT_MASK_BREMEN] == ITEM_NONE))
+        return EXT_ITEM_RITO_MASK;
+    if (slot == VSLOT_OOT_MASKS && Combo_IsCombinedGame() && Nei_Save()->ritoMaskOwned &&
+        (Nei_Save()->ootMaskCursor == 8 || (Nei_Save()->ootMasksOwned & 0xFF) == 0))
+        return EXT_ITEM_RITO_MASK;
     if (slot >= 0 && slot < 24) {
         uint16_t item = gSaveContext.save.saveInfo.inventory.items[slot]; // 2ship: nested inventory
         // (The Pictograph Box used to be synthesized onto the Lens of Truth cell here, back when it
@@ -228,7 +251,15 @@ static inline uint16_t ExtInv_GetSlotItem(int slot) {
 static inline void ExtInv_SetSlotItem(int slot, uint16_t itemId) {
     ItemGrantAudit_Begin("MM extended-slot-write", itemId, slot, 1);
     extern SaveContext gSaveContext;
-    if (slot >= 0 && slot < 24) {
+    if (slot == 55 && itemId == EXT_ITEM_RITO_MASK) {
+        if (RitoMask_IsOwned())
+            Nei_Save()->ritoMaskSelected = 1;
+    } else if (slot == VSLOT_RITO_MASK) {
+        if (itemId == EXT_ITEM_RITO_MASK)
+            RitoMask_Grant();
+        else if (itemId == ITEM_NONE)
+            RitoMask_Remove();
+    } else if (slot >= 0 && slot < 24) {
         gSaveContext.save.saveInfo.inventory.items[slot] = (uint8_t)itemId; // 2ship: nested inventory
     } else if (slot >= 48 && slot < 72) {
         gSaveContext.save.saveInfo.inventory.items[slot - 24] = (uint8_t)itemId; // real MM mask slots

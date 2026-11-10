@@ -9,6 +9,7 @@
 extern "C" {
 #include "mods/nei_save.h"
 #include "mods/extended_inventory.h"
+#include "mods/ext_buttons/ext_buttons.h"
 void func_8082E1F0(Player* player, u16 sfxId);
 }
 
@@ -49,6 +50,12 @@ static const FormDef sForms[CUSTOM_FORM_MAX] = {
       "gForms.Garo",
       1,
       { 60.0f, 70.0f, 18.0f, 70, 18.0f, 60.0f, 2.0f, 1 } },
+    { "rito",
+      "objects/forms/rito/object_link_boy/",
+      -1,
+      "gForms.Rito",
+      1,
+      { 38.0f, 55.0f, 14.0f, 35, 12.0f, 55.0f, 1.0f, 1 } },
 };
 
 #define KEATON_ROOT_SCALE_ADULT 0.335f
@@ -67,6 +74,8 @@ extern "C" s32 CustomForms_ActiveForm(void) {
         return forced;
     }
     s32 worn = (s32)Nei_Save()->activeCustomForm - 1;
+    if (worn == CUSTOM_FORM_RITO && !RitoMask_IsOwned())
+        return CUSTOM_FORM_NONE;
     return (worn >= 0 && worn < CUSTOM_FORM_MAX) ? worn : CUSTOM_FORM_NONE;
 }
 
@@ -89,6 +98,9 @@ extern "C" f32 CustomForms_RootScale(void) {
     if (form == CUSTOM_FORM_GERUDO && !adult) {
         return GERUDO_ROOT_SCALE_CHILD;
     }
+    // The authored mesh uses MM Human root proportions, even on the adult mirror.
+    if (form == CUSTOM_FORM_RITO)
+        return adult ? 0.7036f : 1.0f;
     return 1.0f;
 }
 
@@ -236,6 +248,9 @@ static void CustomForms_ExitForm(Player* player, s32 form, PlayState* play) {
         case CUSTOM_FORM_GARO:
             GaroForm_Reset(player);
             break;
+        case CUSTOM_FORM_RITO:
+            RitoForm_Reset(player, play);
+            break;
         default:
             break;
     }
@@ -258,6 +273,9 @@ static void CustomForms_EnterForm(Player* player, s32 form, PlayState* play) {
             break;
         case CUSTOM_FORM_GARO:
             GaroForm_Reset(player);
+            break;
+        case CUSTOM_FORM_RITO:
+            RitoForm_Reset(player, play);
             break;
         default:
             break;
@@ -284,6 +302,14 @@ static void CustomForms_TrackTransition(Player* player, PlayState* play) {
 extern "C" void CustomForms_FilterInput(Player* player, Input* input) {
     sRawInput = *input;
     CustomForms_TrackTransition(player, gPlayState);
+    const u16 ritoButtons = ExtButton_GetInputMask(EXT_ITEM_RITO_MASK);
+    if ((sRawInput.press.button & ritoButtons) && RitoMask_IsOwned() && Forms_CanAct(player) &&
+        gPlayState->pauseCtx.state == PAUSE_STATE_OFF && gPlayState->msgCtx.msgMode == MSGMODE_NONE) {
+        CustomForms_UseItem(player, (ItemId)EXT_ITEM_RITO_MASK);
+        CustomForms_TrackTransition(player, gPlayState);
+        input->press.button &= ~ritoButtons;
+        input->cur.button &= ~ritoButtons;
+    }
     if (player->transformation != PLAYER_FORM_HUMAN) {
         return;
     }
@@ -296,6 +322,9 @@ extern "C" void CustomForms_FilterInput(Player* player, Input* input) {
             break;
         case CUSTOM_FORM_GARO:
             GaroForm_FilterInput(player, input);
+            break;
+        case CUSTOM_FORM_RITO:
+            RitoForm_FilterInput(player, input);
             break;
         default:
             break;
@@ -317,6 +346,8 @@ extern "C" void CustomForms_Update(Player* player, PlayState* play) {
     }
     player->actor.colChkInfo.mass = sForms[form].props.mass;
     player->actor.shape.yOffset = 0.0f;
+    if (form == CUSTOM_FORM_RITO)
+        player->actor.shape.yOffset = RitoForm_DrawOffset(player);
 
     switch (form) {
         case CUSTOM_FORM_KAFEI:
@@ -331,6 +362,9 @@ extern "C" void CustomForms_Update(Player* player, PlayState* play) {
         case CUSTOM_FORM_GARO:
             GaroForm_Update(player, play);
             break;
+        case CUSTOM_FORM_RITO:
+            RitoForm_Update(player, play);
+            break;
         default:
             break;
     }
@@ -344,6 +378,8 @@ extern "C" u8 CustomForms_OwnsPlayerAction(void) {
             return GerudoForm_OwnsAction();
         case CUSTOM_FORM_GARO:
             return GaroForm_OwnsAction();
+        case CUSTOM_FORM_RITO:
+            return RitoForm_OwnsAction();
         default:
             return 0;
     }
@@ -357,6 +393,7 @@ extern "C" u8 CustomForms_SuppressRoll(Player* player) {
             return GerudoForm_SuppressRoll(player);
         case CUSTOM_FORM_KEATON:
         case CUSTOM_FORM_GARO:
+        case CUSTOM_FORM_RITO:
             return 1;
         default:
             return 0;
@@ -431,6 +468,13 @@ extern "C" f32 CustomForms_ChargeRateMul(Player* player) {
 // The Gerudo Mask has no MM item id: it is a slot of NEI's OoT mask wheel, so its C-button press
 // arrives as the wheel placeholder and the cursor says which mask is showing.
 extern "C" u8 CustomForms_UseItem(Player* player, ItemId item) {
+    if ((s32)item == EXT_ITEM_RITO_MASK || (item == ITEM_OOT_MASK_PLACEHOLDER && OotMask_CursorIndex() == 8)) {
+        if (RitoMask_IsOwned() && CVarGetInteger(sForms[CUSTOM_FORM_RITO].cvarName, 1)) {
+            CustomForms_Toggle(CUSTOM_FORM_RITO);
+            func_8082E1F0(player, NA_SE_PL_CHANGE_ARMS);
+        }
+        return 1;
+    }
     if (item != ITEM_OOT_MASK_PLACEHOLDER || OotMask_CursorIndex() != OOT_MASK_WHEEL_GERUDO) {
         return 0;
     }
@@ -461,6 +505,8 @@ extern "C" void CustomForms_OnDeath(Player* player, PlayState* play) {
     if (CustomForms_ActiveForm() == CUSTOM_FORM_GARO) {
         GaroForm_OnDeath(player, play);
     }
+    if (CustomForms_ActiveForm() == CUSTOM_FORM_RITO)
+        RitoForm_Reset(player, play);
 }
 
 extern "C" u8 CustomForms_BlocksShieldButton(void) {
@@ -497,6 +543,13 @@ extern "C" u8 CustomForms_VoiceOverride(u16 sfxId, u16* outSfxId) {
 // ---- renderer seams -------------------------------------------------------------------------------
 extern "C" Gfx* CustomForms_HandDL(Player* player, s32 limbIndex, u8* claimed) {
     *claimed = 0;
+    if (CustomForms_ActiveForm() == CUSTOM_FORM_RITO) {
+        const char* path = limbIndex == PLAYER_LIMB_LEFT_HAND
+                               ? "objects/forms/rito/object_link_boy/gLinkAdultLeftHandNearDL"
+                               : "objects/forms/rito/object_link_boy/gLinkAdultRightHandNearDL";
+        *claimed = 1;
+        return ResourceMgr_LoadGfxByName(path);
+    }
     if (CustomForms_ActiveForm() != CUSTOM_FORM_GERUDO) {
         return NULL;
     }
@@ -508,7 +561,7 @@ extern "C" Gfx* CustomForms_HandDL(Player* player, s32 limbIndex, u8* claimed) {
 // Keaton and Gerudo carry none of Link's back equipment (the Gerudo's blades are in her hands).
 extern "C" u8 CustomForms_HidesSheath(Player* player) {
     s32 form = CustomForms_ActiveForm();
-    return form == CUSTOM_FORM_GERUDO || form == CUSTOM_FORM_KEATON;
+    return form == CUSTOM_FORM_GERUDO || form == CUSTOM_FORM_KEATON || form == CUSTOM_FORM_RITO;
 }
 
 extern "C" void CustomForms_PostLimb(PlayState* play, Player* player, s32 limbIndex) {
@@ -519,6 +572,9 @@ extern "C" void CustomForms_PostLimb(PlayState* play, Player* player, s32 limbIn
         case CUSTOM_FORM_GERUDO:
             GerudoForm_PostLimb(play, player, limbIndex);
             break;
+        case CUSTOM_FORM_RITO:
+            RitoForm_PostLimb(play, player, limbIndex);
+            break;
         default:
             break;
     }
@@ -528,6 +584,8 @@ extern "C" void CustomForms_DrawWorld(PlayState* play, Player* player) {
     if (CustomForms_ActiveForm() == CUSTOM_FORM_GARO) {
         GaroForm_DrawWorld(play, player);
     }
+    if (CustomForms_ActiveForm() == CUSTOM_FORM_RITO)
+        RitoForm_DrawWorld(play, player);
 }
 
 extern "C" void CustomForms_GaroPose(Player* player, Vec3s* garoJointTable, s32 garoLimbCount) {
@@ -589,11 +647,14 @@ void RegisterCustomForms() {
         }
     });
     COND_HOOK(OnPlayDestroy, true, []() {
+        RitoForm_ForgetContext();
         if (sLastForm != CUSTOM_FORM_NONE) {
             CustomForms_ExitForm(NULL, sLastForm, NULL);
             sLastForm = CUSTOM_FORM_NONE;
         }
     });
+    COND_HOOK(OnSceneInit, true, [](s8 sceneId, s8 spawnNum) { RitoForm_ForgetContext(); });
+    COND_HOOK(OnSaveLoad, true, [](s16 fileNum) { RitoForm_ForgetContext(); });
 }
 
 static RegisterShipInitFunc initFunc(RegisterCustomForms, {});

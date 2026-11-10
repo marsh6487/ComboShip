@@ -1,4 +1,8 @@
 #include "Rando/Rando.h"
+#include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
+#include "Rando/Bags.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
@@ -237,6 +241,20 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         hasObtainedCheck = RANDO_SAVE_CHECKS[randoCheckId].obtained;
     }
 
+    if (const auto* key = RustyDoorKeys::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(key->flag);
+    if (const auto* ring = KeyRings::Find(randoItemId))
+        return !hasObtainedCheck && !KeyRings::Owned(*ring);
+    if (const auto* bag = Bags::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(bag->flag);
+    if (const auto* upgrade = InfiniteUpgrades::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(upgrade->flag);
+    if (randoItemId == RI_WALLET_CHILD)
+        return !hasObtainedCheck && !RandoCapacity_HasWallet();
+
+    if (randoItemId == RI_OOT_NEI_RITO_MASK)
+        return !RitoMask_IsOwned();
+
     u8 vanillaCantObtain = false;
     if (Rando::StaticData::Items[randoItemId].itemId != ITEM_NONE &&
         Rando::StaticData::Items[randoItemId].getItemId != GI_NONE) {
@@ -409,6 +427,10 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         case RI_MAGIC_JAR_BIG:
             return gSaveContext.save.saveInfo.playerData.isMagicAcquired;
         // TODO: These should be based on a persistent setting
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
         case RI_WOODFALL_SMALL_KEY:
         case RI_SNOWHEAD_SMALL_KEY:
         case RI_GREAT_BAY_SMALL_KEY:
@@ -882,6 +904,9 @@ RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckI
                 assert(false);
                 return RI_JUNK;
             case RI_PROGRESSIVE_WALLET:
+                if (!RandoCapacity_HasWallet()) {
+                    return RI_WALLET_CHILD;
+                }
                 if (CUR_UPG_VALUE(UPG_WALLET) == 0) {
                     return RI_WALLET_ADULT;
                 } else if (CUR_UPG_VALUE(UPG_WALLET) == 1) {
@@ -990,5 +1015,8 @@ RandoItemType Rando::GetItemTypeForCheck(RandoItemId randoItemId, RandoCheckId r
         }
     }
 #endif
-    return Rando::StaticData::Items[Rando::ConvertItem(randoItemId, randoCheckId)].randoItemType;
+    const auto converted = Rando::ConvertItem(randoItemId, randoCheckId);
+    if (RustyDoorKeys::IsDoorKeyItem(converted))
+        return RITYPE_SMALL_KEY;
+    return Rando::StaticData::Items[converted].randoItemType;
 }

@@ -2,6 +2,9 @@
 // includes. Only config storage, pack availability and saving are fixtures.
 #include "gui/WhatsNew.h"
 #include "BlackMarketRoomMagic.h"
+#include "rando/SharedSouls.h"
+#include "rando/SharedItems.h"
+#include "gui/ComboMenuModel.h"
 #include <imgui_internal.h>
 #include <algorithm>
 #include <iostream>
@@ -32,6 +35,8 @@ std::vector<std::pair<std::string, int>> writes;
 std::vector<Row> rows;
 bool grannyAvailable = true;
 int saves = 0, failures = 0;
+bool sharedItemsMode = false, ootAvailable = true, mmAvailable = true;
+std::vector<std::pair<std::string,std::string>> applied;
 void Check(bool condition, const std::string& why) {
     if (!condition) {
         ++failures;
@@ -69,6 +74,16 @@ namespace BlackMarketVisual {
 constexpr const char* kSealsCvar = "gCombo.BlackMarket.AnimatedItemSeals";
 }
 namespace ComboRando {
+static void ApplyOot(const char* key) { Fixture::applied.emplace_back("oot",key); }
+static void ApplyMm(const char* key) { Fixture::applied.emplace_back("mm",key); }
+ComboMenuModel& ComboMenuModel::Get() {
+    static ComboMenuModel model;
+    model.mOot.applyCVarChange = Fixture::ootAvailable ? ApplyOot : nullptr;
+    model.mMm.applyCVarChange = Fixture::mmAvailable ? ApplyMm : nullptr;
+    return model;
+}
+void ComboMenuModel::EnsureLoaded() {}
+#include "shared_apply.inc"
 void ComboMenu_PushCheckbox(int) {}
 void ComboMenu_PopCheckbox() {}
 void ComboMenu_PushCombobox(int) {}
@@ -106,9 +121,14 @@ bool ObserveCombo(const char* label, int* current, const char* const items[], in
 namespace BlackMarketUI {
 #include "black_market_appearance.inc"
 }
+using ComboRando::ApplySharedRandoOptionChange;
 static void DrawGenerateControls() {
     [[maybe_unused]] const int goalTheme = 0;
 #include "generate_controls.inc"
+}
+static void DrawSharedItems() {
+    [[maybe_unused]] const int goalTheme = 0;
+#include "shared_items.inc"
 }
 #undef Combo
 #undef Checkbox
@@ -119,6 +139,7 @@ constexpr const char* labels[] = {
     "Cross-Game Interiors", "Cross-Game Shops", "Cross-Game Door Interiors", "Cross-Game Grottos and Graves",
     "Pricing##BlackMarket", "Dungeon Purchase Unlocks", "Regular Granny Interior", "Magical Room Materials",
     "Animated Item Seals",
+    "Shared Enemy Souls", "Shared NPC Souls", "Shared Animal Souls", "Shared Miscellaneous Souls",
 };
 constexpr const char* bossKey = "gCombo.Rando.CrossBossEntrances";
 const Row& Find(const FrameResult& frame, const char* label) {
@@ -142,7 +163,7 @@ FrameResult Frame(ImVec2 mouse = ImVec2(-100, -100), bool down = false) {
     rows.clear();
     const ImVec4 normal = ImGui::GetStyleColorVec4(ImGuiCol_Text);
     const int colors = GImGui->ColorStack.Size;
-    DrawGenerateControls();
+    if (sharedItemsMode) DrawSharedItems(); else DrawGenerateControls();
     Check(GImGui->ColorStack.Size == colors && SameColor(ImGui::GetStyleColorVec4(ImGuiCol_Text), normal),
           "production controls restore the real text/style stack");
     FrameResult result{rows};
@@ -170,6 +191,7 @@ void Seed(bool highlights, bool gated = false) {
         {"unrelated-sentinel", 73},
     };
     writes.clear();
+    applied.clear();
     saves = 0;
     grannyAvailable = !gated;
 }
@@ -260,6 +282,28 @@ void Probe() {
           "a real animated-seals click toggles the default-on value and schedules exactly one save");
     Check(config["unrelated-sentinel"] == 73, "native callbacks preserve unrelated settings");
 
+    for (size_t i = 0; i < std::size(ComboRando::SharedSoulCategories); ++i) {
+        Seed(true);
+        const auto& category = ComboRando::SharedSoulCategories[i];
+        const auto* label = labels[12 + i];
+        Check(CVarGetInteger(category.cvar, 0) == 0, "shared souls default off without writing config");
+        Click(label);
+        Check(writes == std::vector<std::pair<std::string, int>>{{category.cvar, 1}} &&
+                  config[category.cvar] == 1,
+              std::string(label) + " writes its actual category CVar exactly once");
+        Check(applied == std::vector<std::pair<std::string,std::string>>{{"oot",category.cvar},{"mm",category.cvar}},
+              std::string(label) + " dispatches exactly once to each available host");
+        writes.clear();
+        applied.clear();
+        Click(label);
+        Check(writes == std::vector<std::pair<std::string, int>>{{category.cvar, 0}} &&
+                  config[category.cvar] == 0,
+              std::string(label) + " can restore its disabled seed preference");
+        Check(applied == std::vector<std::pair<std::string,std::string>>{{"oot",category.cvar},{"mm",category.cvar}},
+              std::string(label) + " dispatches the restored preference to both hosts");
+    }
+
+
     Seed(true, true);
     config[BlackMarketGranny::kCvar] = 1;
     config[WhatsNew::kEnabledCvar] = 0;
@@ -274,6 +318,26 @@ void Probe() {
     Check(Find(Frame(), "Regular Granny Interior").disabled, "Granny becomes disabled after clearing its saved preference");
     Click("Regular Granny Interior");
     Check(writes.size() == 1 && saves == 1, "disabled Granny cannot be switched back on without its resources");
+
+    sharedItemsMode=true;
+    Seed(true); Frame(); Frame();
+    Check(writes.empty() && applied.empty(), "drawing shared items performs no CVar writes or host dispatch");
+    for(int i=0;i<ComboRando::SF_COUNT;++i) {
+        Seed(true);
+        const auto& family=ComboRando::SharedFamilyByIndex(i);
+        Click(family.label);
+        Check(writes==std::vector<std::pair<std::string,int>>{{family.cvar,1}} &&
+              applied==std::vector<std::pair<std::string,std::string>>{{"oot",family.cvar},{"mm",family.cvar}},
+              std::string(family.label)+" writes and dispatches its native preference to both hosts");
+    }
+    // The ABI is optional while either module is still initializing.
+    for(bool oot:{false,true}) for(bool mm:{false,true}) {
+        Seed(true); ootAvailable=oot; mmAvailable=mm;
+        const auto& family=ComboRando::SharedFamilyByIndex(0);
+        Click(family.label);
+        Check(applied.size()==size_t(oot)+size_t(mm), "shared option dispatch tolerates unavailable host callbacks");
+    }
+    sharedItemsMode=false; ootAvailable=mmAvailable=true;
 }
 } // namespace Fixture
 
@@ -294,5 +358,5 @@ int main() {
     ImGui::DestroyContext();
     if (Fixture::failures)
         return 1;
-    std::cout << "PASS real ImGui Generate/Black Market: 12 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, boss toggle, seals save and unavailable Granny reset\n";
+    std::cout << "PASS real ImGui Generate/Black Market/shared souls: 16 color-only accents, stable IDs/on-off geometry, no draw writes, gated input, saved soul preferences, boss toggle, seals save and unavailable Granny reset\n";
 }

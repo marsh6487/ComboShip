@@ -1,12 +1,17 @@
 // Native weather remains available to songs and the Rod of Seasons, independently of the Storm wand.
 #include "global.h"
 #include "din_fire_sword.h"
+#include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Okarina_Effect/z_en_okarina_effect.h"
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+
+// Souls are disabled in this native-weather fixture. Keep the real C ABI;
+// dedicated soul fixtures exercise spawn eligibility.
+extern "C" int MM_SoulCanSpawnNonEnemy(PlayState*, int, unsigned int) { return true; }
 
 extern ActorProfile En_Okarina_Effect_Profile;
 int currentActorListIndex = -1;

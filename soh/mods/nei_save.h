@@ -222,12 +222,9 @@ typedef struct NeiSaveData {
     uint32_t trirodEchoesLo; // learned echoes, rows 0..31
     uint32_t trirodEchoesHi; // learned echoes, rows 32..63
     uint8_t trirodSel;       // selected row (normalised to a learned one on use)
-    // Rito Mask — Skijer's NEI. The mask shares the Farore's Wind CELL, so the cell can
-    // only ever show one of the two and cannot answer "does this save own the other?".
-    // That is what this byte remembers. Appended at the END so older blobs stay readable.
-    //   bit0 RITO_FLAG_MASK_OWNED    — the Rito Mask has been granted to this file
-    //   bit1 RITO_FLAG_FARORES_OWNED — the spell was in the cell when the mask took it
-    //                                  over, so cycling back may hand it out again
+    // Rito Mask ownership; retain this field's offset for existing saves.
+    // bit0 = independently earned mask; bit1 = legacy Farore ownership for
+    // restoring the spell when migrating Rito to the corner mask wheel.
     uint8_t ritoMaskFlags;
     // Trirod v2 (2026-08-11): the echo table was REORDERED (rows deleted/merged), so
     // bits from a v1 save mean different echoes — anything below TRIROD_LAYOUT_VERSION

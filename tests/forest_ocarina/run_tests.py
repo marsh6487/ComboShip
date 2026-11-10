@@ -78,6 +78,8 @@ def build_source():
     manager = re.sub(r"^#include[^\n]*", "", (ROOT / "mm/src/code/z_eventmgr.c").read_text(), flags=re.M)
     native += manager
     message = (ROOT / "mm/src/code/z_message.c").read_text()
+    # Keep the actual native per-session reservation state used by the staff opener.
+    native += re.search(r"^static s16 sSongEventReservedSong\s*=\s*-1\s*;", message, re.M)[0] + "\n"
     for name in ("D_801D028C", "sOcarinaSongFlagsMap"):
         native += array(message, "u16 " + name + "[")
     native += "\n".join(functions(message, {"Message_DisplayOcarinaStaffImpl", "Message_DisplayOcarinaStaff"}).values())

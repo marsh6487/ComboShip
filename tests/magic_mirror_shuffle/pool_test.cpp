@@ -7,10 +7,13 @@ extern "C" {
 int gComboGameMode = COMBO_GAME_MM;
 int gMMComboGoalHunt = 0, gMMComboGoalRequired = 0, gMMComboGoalPieces = -1;
 int requestMirror = 0;
+int previewMirror = 0;
 bool startWithMelody = false;
 s32 Ship_Random(s32 min, s32) { return min; }
 int FleetCombo_UnifiedPoolActive() { return 0; }
 int32_t CVarGetInteger(const char *key, int32_t fallback) {
+  if (strcmp(key, "gCombo.Rando.ShuffleMagicMirror") == 0)
+    return previewMirror;
   return strcmp(key, "gRando.Generation.ShuffleMagicMirror") == 0
              ? requestMirror
              : fallback;
@@ -77,7 +80,7 @@ int main() {
             std::vector<RandoItemId> items;
             Logic::GeneratePools(*save, checks, items);
             REQUIRE(std::count(items.begin(), items.end(), RI_OOT_SONG_COMMAND_MELODY) == !startingSong);
-            const bool enabled = option || (mode == COMBO_GAME_BOTH && request);
+            const bool enabled = mode == COMBO_GAME_BOTH ? request : option;
             REQUIRE(save->randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] == enabled);
             REQUIRE(std::count(checks.begin(), checks.end(),
                                RC_LOST_WOODS_MAGIC_MIRROR_STUMP) == enabled);
@@ -85,9 +88,28 @@ int main() {
                                RI_OOT_NEI_MAGIC_MIRROR) == enabled);
             REQUIRE(checks.size() == offChecks.size() + enabled);
             REQUIRE(items.size() == offItems.size() + enabled);
+            // Live preview is authoritative even when the frozen generation
+            // value and native solo preference disagree with it.
+            previewMirror = !request;
+            auto preview = std::make_unique<RandoSaveInfo>(*control);
+            preview->randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = option;
+            std::vector<RandoCheckId> previewChecks;
+            std::vector<RandoItemId> previewItems;
+            Logic::GeneratePools(*preview, previewChecks, previewItems, true);
+            const bool previewEnabled =
+                mode == COMBO_GAME_BOTH ? previewMirror : option;
+            REQUIRE(preview->randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] ==
+                    previewEnabled);
+            REQUIRE(std::count(previewChecks.begin(), previewChecks.end(),
+                               RC_LOST_WOODS_MAGIC_MIRROR_STUMP) ==
+                    previewEnabled);
+            REQUIRE(std::count(previewItems.begin(), previewItems.end(),
+                               RI_OOT_NEI_MAGIC_MIRROR) == previewEnabled);
+            REQUIRE(requestMirror == request);
           }
       }
   }
   puts("PASS native MM generator: OFF/ON, NEI independent, Plentiful unique, "
-       "solo/combined +1/+1, OR request serialized");
+       "solo/combined +1/+1, authoritative shared OFF/ON and live preview "
+       "separate from frozen generation");
 }

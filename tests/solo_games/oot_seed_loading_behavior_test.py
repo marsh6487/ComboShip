@@ -29,10 +29,16 @@ void InvalidateSariaMagicHintLocation(){++sariaHintInvalidations;}
 struct Context {
  bool mSeedGenerated=true,mSpoilerLoaded=false;
  std::shared_ptr<ParseTarget> mEntranceShuffler=std::make_shared<ParseTarget>(),mDungeons=mEntranceShuffler,mTrials=mEntranceShuffler;
- int parsed=0;
+ int parsed=0,enemyDropExclusionRefreshes=0;
+ // Exclusion UI/layout refresh is a service boundary, like the ParseTarget adapters above.
+ // Count it so rejected/failed loads cannot silently execute the native-only refresh.
+ void UpdateEnemyDropExclusions(){++enemyDropExclusionRefreshes;}
  void ParseHashIconIndexesJson(const nlohmann::json&){++parsed;}
  void ParseItemLocationsJson(const nlohmann::json&){} void ParseTricksJson(const nlohmann::json&){} void ParseHintJson(const nlohmann::json&){}
- void ParseSpoiler(const char*);
+ uint32_t seed=0;int songMaps=0;
+ void SetSeed(uint32_t value){seed=value;}
+ void ImportSongEvents(const nlohmann::json&){++songMaps;}
+ void ParseSpoiler(const char*,bool allowComboEmbedded=false);
 };
 int nativeGenerations=0,comboGenerations=0;
 void Randomizer_GenerateRandomizer(){++nativeGenerations;}
@@ -44,11 +50,18 @@ int main(){
  Context ctx;ctx.ParseSpoiler("combo.json");
  assert(!ctx.mSpoilerLoaded && ctx.parsed==0 && "a remembered Combo file must never enter native parsing");
  assert(sariaHintInvalidations==1);
+ assert(ctx.enemyDropExclusionRefreshes==0);
  ctx.ParseSpoiler("native.json");assert(ctx.mSpoilerLoaded && !ctx.mSeedGenerated && ctx.parsed==1);
  assert(sariaHintInvalidations==2);
+ assert(ctx.enemyDropExclusionRefreshes==1);
  ctx.ParseSpoiler("missing.json");assert(sariaHintInvalidations==3);
+ assert(ctx.enemyDropExclusionRefreshes==1);
  GeneratePressed();assert(nativeGenerations==1 && comboGenerations==0);
  gComboGameMode=COMBO_GAME_BOTH;GeneratePressed();assert(nativeGenerations==1 && comboGenerations==1);
+ ctx.mSpoilerLoaded=false;ctx.ParseSpoiler("native.json");assert(!ctx.mSpoilerLoaded && ctx.parsed==1);
+ ctx.ParseSpoiler("native.json",true);assert(ctx.mSpoilerLoaded && ctx.parsed==2 && ctx.seed==123 && ctx.songMaps==2);
+ ctx.mSpoilerLoaded=false;ctx.ParseSpoiler("combo.json",true);assert(!ctx.mSpoilerLoaded && ctx.parsed==2);
+
 }
 '''
 with tempfile.TemporaryDirectory(prefix='oot-seed-loading-') as tmp:

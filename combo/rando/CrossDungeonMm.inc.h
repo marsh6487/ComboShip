@@ -3,6 +3,7 @@
 #include "ComboGameMode.h"
 #include "rando/CrossEntranceMmCatalogue.h"
 #include "rando/CrossEntranceTime.h"
+#include "Rando/SoloEntrances.h"
 namespace ComboCrossMm {
 using namespace ComboRando::CrossDungeon;
 static HostState state(1);
@@ -14,37 +15,7 @@ extern "C" int Combo_MM_CrossBossEnabled(void);
 #include "rando/CrossEntranceMmBoss.inc.h"
 namespace ComboCrossMm {
 static std::vector<Dungeon> Catalogue(const PoolOptions& options) {
-    std::vector<Dungeon> dungeons = { { "mm:woodfall",
-                                        { 1, ENTRANCE(WOODFALL_TEMPLE, 0) },
-                                        { 1, ENTRANCE(WOODFALL, 1) },
-                                        { 1, ENTRANCE(WOODFALL, 1) } },
-                                      { "mm:snowhead",
-                                        { 1, ENTRANCE(SNOWHEAD_TEMPLE, 0) },
-                                        { 1, ENTRANCE(SNOWHEAD, 1) },
-                                        { 1, ENTRANCE(SNOWHEAD, 1) } },
-                                      { "mm:greatbay",
-                                        { 1, ENTRANCE(GREAT_BAY_TEMPLE, 0) },
-                                        { 1, ENTRANCE(ZORA_CAPE, 7) },
-                                        { 1, ENTRANCE(ZORA_CAPE, 7) } },
-                                      { "mm:stonetower",
-                                        { 1, ENTRANCE(STONE_TOWER_TEMPLE, 0) },
-                                        { 1, ENTRANCE(STONE_TOWER, 2) },
-                                        { 1, ENTRANCE(STONE_TOWER, 2) } },
-                                      { "mm:inverted",
-                                        { 1, ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0) },
-                                        { 1, ENTRANCE(STONE_TOWER_INVERTED, 1) },
-                                        { 1, ENTRANCE(STONE_TOWER_INVERTED, 1) } } };
-    dungeons[0].escapeExits = { { 1, ENTRANCE(WOODFALL, 3) } };
-    dungeons[1].escapeExits = { { 1, ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7) } };
-    dungeons[2].escapeExits = { { 1, ENTRANCE(ZORA_CAPE, 9) } };
-    dungeons[4].escapeExits = { { 1, ENTRANCE(IKANA_CANYON, 15) } };
-    if (!options.dungeons)
-        dungeons.clear();
-    ComboCrossMmCatalogue::Append(dungeons, options);
-    if (options.bosses)
-        AppendBossCatalogue(dungeons);
-    Validate(dungeons);
-    return dungeons;
+    return ComboCrossMmCatalogue::Catalogue(options);
 }
 } // namespace ComboCrossMm
 extern "C" int Combo_MM_CrossDungeonEntranceFromRegion(int index, int region) {
@@ -104,6 +75,8 @@ extern "C" COMBO_EXPORT int MM_CanEnterCrossEntrance(int32_t index) {
                                                              false);
 }
 extern "C" int Combo_MM_CrossBossLogicEnabled(void) {
+    if (gComboGameMode == COMBO_GAME_MM)
+        return Rando::SoloEntrances::BossLogicEnabled();
     return Combo_IsCombinedGame() && ComboCrossMm::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
 extern "C" COMBO_EXPORT int MM_SetCrossDungeonSeed(const char* raw) {

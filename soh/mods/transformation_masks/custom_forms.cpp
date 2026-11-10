@@ -6,7 +6,7 @@
 #include "z64.h"
 #include "z64item.h"
 #include "functions.h"
-#include "variables.h" // gSaveContext (Farore's Wind cell contents)
+#include "variables.h" // gSaveContext (mask wheel and legacy spell migration)
 #include "macros.h"    // LINK_IS_ADULT (root-limb scale is age-dependent)
 #include "mods/o2r_loader/o2r_loader.h"
 #include "mods/extended_inventory.h"
@@ -88,7 +88,7 @@ extern "C" const CustomFormDef gCustomForms[] = {
     // sFormProps[MM_PLAYER_FORM_RITO].rootAnimScale. Keep the two values equal: the
     // MmForm draw path uses that one, and this one covers the few frames of the
     // cutscene fade where the model is already forced but the form is not ACTIVE yet.
-    // Trigger item shares the Farore's Wind cell (see ITEM_RITO_MASK).
+    // Trigger item is selected in the existing corner mask wheel (ITEM_RITO_MASK).
     { "rito", "Rito", CUSTOM_FORM_FULL, "gMods.RitoForm", 1, { ITEM_RITO_MASK, ITEM_NONE, ITEM_NONE }, 0.7036f },
 };
 extern "C" const s32 gCustomFormCount = (s32)(sizeof(gCustomForms) / sizeof(gCustomForms[0]));
@@ -120,14 +120,11 @@ extern "C" const CustomFormDef* CustomForms_ByItem(s32 itemId) {
 }
 
 extern "C" u8 RitoItem_FormEnabled(void) {
-    if (Combo_IsVanilla())
-        return (Nei_Save()->ritoMaskFlags & RITO_FLAG_MASK_OWNED) != 0;
-    return CVarGetInteger("gMods.RitoForm", 1) != 0;
+    return RitoMask_IsOwned() && (Combo_IsVanilla() || CVarGetInteger("gMods.RitoForm", 1) != 0);
 }
 
 static bool GateOn(const CustomFormDef* def) {
-    // Rito is earned by this paired file. Keep the user's global form option
-    // for their other files, including its legacy automatic mask behavior.
+    // A form preference never grants the independently owned mask.
     if (def->modelName != nullptr && std::strcmp(def->modelName, "rito") == 0)
         return RitoItem_FormEnabled();
     if (def->cvar == nullptr || def->cvar[0] == '\0')
@@ -355,83 +352,105 @@ extern "C" u8 CustomForms_TrySkinItem(PlayState* play, Player* player, s32 itemI
     return 1;
 }
 
-// ============================================================================
-// Rito Mask — sharing the Farore's Wind cell
-//
-// Same shape as Roc's Feather sharing the Nayru's Love cell (RocsFeatherCycle.c):
-// ONE inventory cell holds either item and the kaleido cycler (A on the cell,
-// stick left/right) flips between them. Nothing new is stored — the cell itself
-// is the state — so the pair is only offered to a save that owns Farore's Wind.
-// Using the mask goes through the normal item-use path: ExtPlayer_GetItemAction
-// aliases it to a mask action, and z_player.c's mask branch hands it to
-// CustomForms_TrySkinItem, which finds it in the "rito" row above.
-// ============================================================================
-
-static const CustomFormDef* RitoRow() {
-    const CustomFormDef* def = CustomForms_ByName("rito");
-    return (def != nullptr && GateOn(def)) ? def : nullptr;
+// Rito ownership is independent of the displayed mask. The corner wheel keeps
+// its original cell and the original masks' ownership; no inventory page grows.
+extern "C" uint8_t RitoMask_IsOwned(void) {
+    return (Nei_Save()->ritoMaskFlags & RITO_FLAG_MASK_OWNED) != 0;
 }
 
-// Ownership lives in the save (Nei_Save()->ritoMaskFlags) for one reason: the cell
-// shows ONE item, so it cannot answer "do you also own the other one?". Roc's Feather
-// solves the same problem with its two RAND_INF flags; this is the non-rando version.
-//
-// Called once per pause frame before the cycler runs (the adult-trade wheel does the
-// same at the top of KaleidoScope_HandleItemCycles). It only RECORDS: the mask is
-// reached by cycling a cell that already holds Farore's Wind, never by seeding.
-//
-// Record that this file owns whatever is sitting in the shared cell. Public because
-// the save editor overwrites that cell directly: dropping the mask onto a cell that
-// held Farore's Wind would otherwise erase the spell with nothing remembering it
-// existed, and the cycle could never give it back.
+// Also used by the editor before replacing a selected mask. The Farore bit is
+// retained only to repair legacy saves that used the spell's cell for Rito.
 extern "C" void RitoItem_NoteCellItem(s32 item) {
     NeiSaveData* nei = Nei_Save();
     if (item == ITEM_FARORES_WIND) {
         nei->ritoMaskFlags |= RITO_FLAG_FARORES_OWNED;
     } else if (item == ITEM_RITO_MASK) {
         nei->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
+    } else if (item >= ITEM_MASK_KEATON && item <= ITEM_MASK_TRUTH) {
+        nei->ootMasksOwned |= (uint16_t)(1u << (item - ITEM_MASK_KEATON));
     }
 }
 
-extern "C" void RitoItem_SyncCell(void) {
-    if (RitoRow() == nullptr) {
-        return;
-    }
-    NeiSaveData* nei = Nei_Save();
-    u8* cell = &gSaveContext.inventory.items[SLOT_FARORES_WIND];
-
-    RitoItem_NoteCellItem(*cell);
-    if (Combo_IsVanilla())
-        return;
-    // Enabling the form grants the mask, but it must NEVER put it in the cell: seeding an empty one
-    // fabricated the mask into a slot the randomizer owns (every seed opened the pause menu already
-    // holding it) and handed it out without the spell, against this file's own contract. Writing is
-    // the cycler's job — this stays a pure query, exactly like RocsFeatherCycle.c.
-    nei->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
+static uint8_t OotMaskWheel_OwnsItem(s32 item, uint8_t allowVanillaMasks) {
+    if (item == ITEM_RITO_MASK)
+        return RitoMask_IsOwned();
+    if (item < ITEM_WEIRD_EGG || item > ITEM_MASK_TRUTH)
+        return 0;
+    if (gSaveContext.inventory.items[SLOT_TRADE_CHILD] == item)
+        return 1;
+    if (item >= ITEM_MASK_KEATON &&
+        (allowVanillaMasks || (Nei_Save()->ootMasksOwned & (1u << (item - ITEM_MASK_KEATON)))))
+        return 1;
+    return IS_RANDO && Flags_GetRandomizerInf(
+                           static_cast<RandomizerInf>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + item - ITEM_WEIRD_EGG));
 }
 
-// The item this cell can flip to, or ITEM_NONE when there is nothing to cycle.
-// Both directions of a two-item cycle are the same answer, which is why the
-// kaleido call passes it as prev AND next.
-extern "C" s32 RitoItem_OtherItem(void) {
-    if (RitoRow() == nullptr) {
-        return ITEM_NONE;
-    }
-    const u8 flags = Nei_Save()->ritoMaskFlags;
-    u8 cur = gSaveContext.inventory.items[SLOT_FARORES_WIND];
-    if (cur == ITEM_FARORES_WIND) {
-        return (flags & RITO_FLAG_MASK_OWNED) ? ITEM_RITO_MASK : ITEM_NONE;
-    }
-    if (cur == ITEM_RITO_MASK) {
-        // Only offer the spell back to a save that actually had it — otherwise the
-        // shared cell would hand out a Farore's Wind nobody ever earned.
-        return (flags & RITO_FLAG_FARORES_OWNED) ? ITEM_FARORES_WIND : ITEM_NONE;
+extern "C" uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanillaMasks) {
+    const int nativeCount = ITEM_MASK_TRUTH - ITEM_WEIRD_EGG + 1;
+    const int count = nativeCount + 1;
+    const int current = gSaveContext.inventory.items[SLOT_TRADE_CHILD];
+    int index = current == ITEM_RITO_MASK ? nativeCount : current - ITEM_WEIRD_EGG;
+    if (index < 0 || index >= count)
+        index = direction > 0 ? count - 1 : 0;
+    for (int step = 0; step < count; ++step) {
+        index = (index + count + (direction > 0 ? 1 : -1)) % count;
+        const int item = index == nativeCount ? ITEM_RITO_MASK : ITEM_WEIRD_EGG + index;
+        if (OotMaskWheel_OwnsItem(item, allowVanillaMasks))
+            return (uint8_t)item;
     }
     return ITEM_NONE;
 }
 
-extern "C" u8 RitoItem_CanCycle(void) {
-    return RitoItem_OtherItem() != ITEM_NONE;
+extern "C" void RitoMask_MigrateLegacy(void) {
+    uint8_t& spell = gSaveContext.inventory.items[SLOT_FARORES_WIND];
+    RitoItem_NoteCellItem(spell);
+    if (spell == ITEM_RITO_MASK)
+        spell = (Nei_Save()->ritoMaskFlags & RITO_FLAG_FARORES_OWNED) ? ITEM_FARORES_WIND : ITEM_NONE;
+
+    uint8_t& mask = gSaveContext.inventory.items[SLOT_TRADE_CHILD];
+    RitoItem_NoteCellItem(mask);
+    if (mask == ITEM_NONE && RitoMask_IsOwned())
+        mask = ITEM_RITO_MASK;
+
+    // Age switches restore their own equips; repair those saved bindings too.
+    ItemEquips* const equips[] = { &gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips };
+    for (ItemEquips* equip : equips) {
+        for (unsigned button = 1; button < ARRAY_COUNT(equip->buttonItems); ++button) {
+            if (equip->buttonItems[button] == ITEM_RITO_MASK)
+                equip->cButtonSlots[button - 1] = SLOT_TRADE_CHILD;
+        }
+    }
+}
+
+extern "C" void RitoMask_Grant(void) {
+    Nei_Save()->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
+    RitoMask_MigrateLegacy();
+}
+
+extern "C" void RitoMask_Remove(void) {
+    MmForm_OnRitoMaskRemoved();
+    RitoItem_NoteCellItem(gSaveContext.inventory.items[SLOT_TRADE_CHILD]);
+    Nei_Save()->ritoMaskFlags &= (uint8_t)~RITO_FLAG_MASK_OWNED;
+    if (gSaveContext.inventory.items[SLOT_FARORES_WIND] == ITEM_RITO_MASK)
+        gSaveContext.inventory.items[SLOT_FARORES_WIND] =
+            (Nei_Save()->ritoMaskFlags & RITO_FLAG_FARORES_OWNED) ? ITEM_FARORES_WIND : ITEM_NONE;
+    if (gSaveContext.inventory.items[SLOT_TRADE_CHILD] == ITEM_RITO_MASK)
+        gSaveContext.inventory.items[SLOT_TRADE_CHILD] = OotMaskWheel_Neighbor(1, 0);
+    ItemEquips* const equips[] = { &gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips };
+    for (ItemEquips* equip : equips) {
+        for (unsigned button = 0; button < ARRAY_COUNT(equip->buttonItems); ++button) {
+            if (equip->buttonItems[button] == ITEM_RITO_MASK) {
+                equip->buttonItems[button] = ITEM_NONE;
+                if (button > 0)
+                    equip->cButtonSlots[button - 1] = SLOT_NONE;
+            }
+        }
+    }
+}
+
+extern "C" void RitoItem_SyncCell(void) {
+    // Migration records existing items only. Opening pause never awards Rito.
+    RitoMask_MigrateLegacy();
 }
 
 extern "C" void CustomForms_ClearSkin(void) {

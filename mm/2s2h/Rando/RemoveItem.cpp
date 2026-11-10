@@ -1,3 +1,9 @@
+#include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
+#include "Rando/Bags.h"
+#include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
@@ -5,12 +11,37 @@
 extern "C" {
 #include "variables.h"
 #include "functions.h"
+#include "mods/extended_inventory.h"
 }
 
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
+    if (InfiniteUpgrades::Remove(randoItemId))
+        return;
+    if (Bags::Remove(randoItemId))
+        return;
+    if (Wallets::Remove(randoItemId))
+        return;
+    if (RustyDoorKeys::Remove(randoItemId))
+        return;
+    // Soul catalog mm_remove begin
+    if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
+        Flags_ClearRandoInf(soul->flag);
+        return;
+    }
+    // Soul catalog mm_remove end
+
     switch (randoItemId) {
+        case RI_OOT_NEI_RITO_MASK:
+            RitoMask_Remove();
+            break;
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            KeyRings::Remove(randoItemId);
+            break;
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             CLEAR_WEEKEVENTREG(WEEKEVENTREG_08_80);
             break;
@@ -147,6 +178,8 @@ void Rando::RemoveItem(RandoItemId randoItemId) {
                 RemoveItem(RI_WALLET_GIANT);
             } else if (CUR_UPG_VALUE(UPG_WALLET) >= 1) {
                 RemoveItem(RI_WALLET_ADULT);
+            } else {
+                Wallets::Remove(RI_WALLET_CHILD);
             }
             break;
         case RI_SWORD_KOKIRI:

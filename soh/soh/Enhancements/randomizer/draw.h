@@ -14,6 +14,7 @@ void Randomizer_DrawKeyRing(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawBossKey(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawBeanSprout(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawBossSoul(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawShuffledSoul(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawDoubleDefense(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMasterSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawTriforcePiece(PlayState* play, GetItemEntry getItemEntry);
@@ -80,6 +81,7 @@ void Randomizer_DrawCryonis(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawPokeball(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMinishCap(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawRitoMask(PlayState* play, GetItemEntry* getItemEntry);
 // Bottle Randomizer Net (RG_NET) — soh.o2r object_nei_net held model as the get-item
 void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry);
 
@@ -156,9 +158,11 @@ void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry);
 // MM time items (6 clock halves): static Clock Town clock-tower face from mm.o2r object_obj_tokeidai,
 // day variants at face rotation 0xC000, night variants with sun/moon panel flipped 0x8000
+void Randomizer_DrawClock(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry);
 // MM per-dungeon items (one shared MM get-item model per type; RG name distinguishes the dungeon)
 void Randomizer_DrawMmSmallKey(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawMmKeyRing(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmDungeonMap(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmBossKey(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmCompass(PlayState* play, GetItemEntry* getItemEntry);

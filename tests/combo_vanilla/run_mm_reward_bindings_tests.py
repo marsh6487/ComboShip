@@ -39,6 +39,11 @@ native='''#define NEI_CANE_SKILL_MAX 6
 #define CANE_SKILL_SLOT(skill) ((skill)%3)
 #define CANE_SKILL_PACCI_STONE 4
 #define BC_ITEM_BOTTLE 0x12
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+// Fixed Vanilla rewards must not grant or remove the unrelated Rito mask.
+extern "C" void RitoMask_Grant() { assert(false && "Vanilla reward granted Rito"); }
+extern "C" void RitoMask_Remove() { assert(false && "Vanilla reward removed Rito"); }
 '''
 for signature in ('extern "C" NeiSaveData* Nei_Save', 'extern "C" uint16_t Nei_GetOwnedItem',
                   'extern "C" void Nei_SetOwnedItem', 'extern "C" uint8_t Nei_CaneHasSkill',
@@ -46,6 +51,7 @@ for signature in ('extern "C" NeiSaveData* Nei_Save', 'extern "C" uint16_t Nei_G
                   'extern "C" void Nei_CaneSetType', 'static uint8_t Nei_SomariaSummonOwned',
                   'extern "C" void Nei_CaneSetSkillSlot'):
     native+=function(nei,signature)+'\n'
+native+=function(inventory,'uint8_t RitoMask_IsOwned')+'\n'
 native+='extern "C" '+function(cane,'u8 Cane_GiveSkill')+'\n'
 for signature in ('uint8_t Wand_RandoMode','void Wand_GrantMode','void Slate_GrantRune',
                   'void Seasons_GrantSeason','void TravelTools_Heal','void TravelTools_Grant',
@@ -60,7 +66,12 @@ for signature in ('extern "C" uint8_t Bottle_NetOwned','extern "C" void Bottle_S
     native+=function(bottles,signature)+'\n'
 for signature in ('u8 TwilightUpgrade_IsFullyObtained','void TwilightUpgrade_Grant'):
     native+=function(twilight,signature)+'\n'
-items=re.search(r'u8 gItemSlots\[77\] = \{.*?\n\};',(ROOT/'mm/src/code/z_inventory.c').read_text(),re.S)[0]
+inventory_source=(ROOT/'mm/src/code/z_inventory.c').read_text()
+items=re.search(r'u8 gItemSlots\[77\] = \{.*?\n\};',inventory_source,re.S)[0]
+# The real wallet prerequisite expands CUR_UPG_VALUE; keep its native masks and
+# shifts alongside the already extracted native inventory-slot table.
+for declaration in ('u32 gUpgradeMasks[]', 'u8 gUpgradeShifts[]'):
+    items+='\n'+re.search(re.escape(declaration)+r' = \{.*?\n\};',inventory_source,re.S)[0]
 fixture=(ROOT/'tests/combo_vanilla/mm_rewards_adapter_test.cpp').read_text()
 fixture=fixture.replace('/* ITEM_SLOTS */',items).replace('/* NATIVE_GRANTS */',native)
 fixture=fixture.replace('/* ADAPTER_FUNCTIONS */',production)

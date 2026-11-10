@@ -305,7 +305,12 @@ void LoadAvailableWindows() {
         .name = "Masks",
         .columns = 6,
         .scale = 1.0f,
-        .items = GetItemsFromRange(TRACKER_ITEM_SLOT, SLOT_MASK_POSTMAN, SLOT_MASK_FIERCE_DEITY),
+        .items =
+            [] {
+                auto masks = GetItemsFromRange(TRACKER_ITEM_SLOT, SLOT_MASK_POSTMAN, SLOT_MASK_FIERCE_DEITY);
+                masks.push_back({ TRACKER_ITEM_RANDO, RI_OOT_NEI_RITO_MASK });
+                return masks;
+            }(),
     });
 
     itemTrackerGroupsAvailable.push_back(TrackerGroup{

@@ -1,4 +1,8 @@
 #include "2s2h/Rando/Logic/Logic.h"
+#include "2s2h/Rando/KeyRings.h"
+#include "2s2h/Rando/Wallets.h"
+#include "2s2h/Rando/InfiniteUpgrades.h"
+#include "2s2h/Rando/Lottery.h"
 #include "2s2h/Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include <libultraship/bridge/consolevariablebridge.h>

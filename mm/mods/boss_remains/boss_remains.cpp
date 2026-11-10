@@ -534,8 +534,10 @@ static void BossRemains_GyorgWhirlpoolTick(PlayState* play, Player* player) {
     // TickSummons, which clears sGyorgWhirlpoolActive when magic hits 0).
     if (++sGyorgWhirlpoolDrain >= kGyorgWhirlpoolDrainRate) {
         sGyorgWhirlpoolDrain = 0;
-        if (gSaveContext.save.saveInfo.playerData.magic > 0) {
-            gSaveContext.save.saveInfo.playerData.magic--;
+        if (RandoCapacity_CanSpendMagic(1)) {
+            if (!RandoCapacity_InfiniteMagic()) {
+                gSaveContext.save.saveInfo.playerData.magic--;
+            }
         }
     }
 
@@ -649,12 +651,13 @@ static void BossRemains_TickSummons(PlayState* play, Player* player) {
     switch (idx) {
         case 0: // Odolwa — friendly beetles on SHIELD (R) + B. Costs magic (like the sword-moth beam).
             if (CHECK_BTN_ALL(in->cur.button, BTN_R) && CHECK_BTN_ALL(in->press.button, BTN_B) &&
-                gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
-                (gSaveContext.save.saveInfo.playerData.magic >= 6)) {
+                gSaveContext.save.saveInfo.playerData.isMagicAcquired && (RandoCapacity_CanSpendMagic(6))) {
                 // Deduct magic DIRECTLY, not via Magic_Consume: its magicState machine collides with
                 // the spell system (blocks casting) and only consumes when magicState is idle (so it
                 // charged inconsistently). We already gated on magic >= 6 above, so this can't go negative.
-                gSaveContext.save.saveInfo.playerData.magic -= 6;
+                if (!RandoCapacity_InfiniteMagic()) {
+                    gSaveContext.save.saveInfo.playerData.magic -= 6;
+                }
                 for (s32 i = 0; i < 6; i++) {
                     Vec3f p = player->actor.world.pos;
                     p.x += Rand_CenteredFloat(70.0f);
@@ -687,7 +690,7 @@ static void BossRemains_TickSummons(PlayState* play, Player* player) {
             // front of Link; the longer you charge the FARTHER and HARDER the bolt (anti-spam). Release to fire.
             {
                 bool canCast = gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
-                               (gSaveContext.save.saveInfo.playerData.magic >= kGohtThunderMagicCost);
+                               (RandoCapacity_CanSpendMagic(kGohtThunderMagicCost));
                 bool holding = CHECK_BTN_ALL(in->cur.button, BTN_B) && !CHECK_BTN_ALL(in->cur.button, BTN_R);
 
                 if (holding && canCast) {
@@ -702,7 +705,9 @@ static void BossRemains_TickSummons(PlayState* play, Player* player) {
                     if (sGohtThunderCharging && (sGohtThunderCharge >= kGohtThunderChargeMin) && canCast) {
                         // Deduct magic DIRECTLY (not Magic_Consume — its magicState machine blocks the ocarina/
                         // spell system; same reason Odolwa's beetle deducts directly). Gated on magic >= cost.
-                        gSaveContext.save.saveInfo.playerData.magic -= kGohtThunderMagicCost;
+                        if (!RandoCapacity_InfiniteMagic()) {
+                            gSaveContext.save.saveInfo.playerData.magic -= kGohtThunderMagicCost;
+                        }
 
                         f32 t = (f32)sGohtThunderCharge / (f32)kGohtThunderChargeMax; // 0..1
                         s16 ttl = kGohtThunderTtlMin + (s16)(t * (kGohtThunderTtlMax - kGohtThunderTtlMin));
@@ -736,8 +741,7 @@ static void BossRemains_TickSummons(PlayState* play, Player* player) {
                 if (CHECK_BTN_ALL(in->press.button, BTN_R)) {
                     BossRemains_GyorgSummonFish(play, player);
                 }
-                sGyorgWhirlpoolActive =
-                    CHECK_BTN_ALL(in->cur.button, BTN_B) && (gSaveContext.save.saveInfo.playerData.magic > 0);
+                sGyorgWhirlpoolActive = CHECK_BTN_ALL(in->cur.button, BTN_B) && (RandoCapacity_CanSpendMagic(1));
             } else {
                 sGyorgWhirlpoolActive = false;
                 // On land: R + B = fish.
@@ -781,12 +785,14 @@ extern "C" void BossRemains_OdolwaSwordMoth(PlayState* play, Player* player) {
         return;
     }
     if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired ||
-        (gSaveContext.save.saveInfo.playerData.magic < kOdolwaMothMagicCost)) {
+        (!RandoCapacity_CanSpendMagic(kOdolwaMothMagicCost))) {
         return;
     }
     // Direct deduction (see the R+B beetle note): Magic_Consume's state machine fights the spell
     // system and only fires when idle. We gated on magic >= cost above, so this stays >= 0.
-    gSaveContext.save.saveInfo.playerData.magic -= kOdolwaMothMagicCost;
+    if (!RandoCapacity_InfiniteMagic()) {
+        gSaveContext.save.saveInfo.playerData.magic -= kOdolwaMothMagicCost;
+    }
 
     Vec3f pos = player->bodyPartsPos[PLAYER_BODYPART_WAIST];
     s16 yaw = Actor_WorldYawTowardActor(&player->actor, player->focusActor); // straight at the locked target
@@ -1029,7 +1035,7 @@ extern "C" void BossRemains_GohtPostAction(PlayState* play, Player* player) {
         // MAGIC-POWERED PART (1:1 with Pegasus_StateRunning): only WITH magic does the charge get its
         // light goron-punch contact damage, and only then does it drain. Out of magic the charge keeps
         // running at full speed — it just stops hurting things (and the cone stops drawing).
-        if (gSaveContext.save.saveInfo.playerData.magic > 0) {
+        if (RandoCapacity_CanSpendMagic(1)) {
             if (!sGohtChargeColReady) {
                 Collider_InitCylinder(play, &sGohtChargeCollider);
                 Collider_SetCylinder(play, &sGohtChargeCollider, &player->actor, &sGohtChargeColliderInit);
@@ -1041,7 +1047,9 @@ extern "C" void BossRemains_GohtPostAction(PlayState* play, Player* player) {
             sGohtChargeMagicTick++;
             if (sGohtChargeMagicTick >= kGohtChargeMagicInterval) {
                 sGohtChargeMagicTick = 0;
-                gSaveContext.save.saveInfo.playerData.magic--;
+                if (!RandoCapacity_InfiniteMagic()) {
+                    gSaveContext.save.saveInfo.playerData.magic--;
+                }
                 if (gSaveContext.save.saveInfo.playerData.magic < 0) {
                     gSaveContext.save.saveInfo.playerData.magic = 0;
                 }
@@ -1174,7 +1182,7 @@ extern "C" void BossRemains_DrawGohtCone(Player* player, PlayState* play) {
     }
     // Magic powers the cone (Pegasus_Draw bails the same way at magic <= 0): out of magic the bull still
     // charges, it just loses the aura.
-    if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
+    if (!RandoCapacity_CanSpendMagic(1)) {
         return;
     }
 

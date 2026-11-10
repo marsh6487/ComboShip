@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -7,8 +8,8 @@ void RegionTable_Init_LonLonRanch() {
     // clang-format off
     areaTable[RR_LON_LON_RANCH] = Region("Lon Lon Ranch", SCENE_LON_LON_RANCH, {
         //Events
-        EVENT_ACCESS(LOGIC_FREED_EPONA, logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_EPONAS_SONG) && logic->IsAdult && logic->AtDay),
-        EVENT_ACCESS(LOGIC_LINKS_COW,   logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_EPONAS_SONG) && logic->IsAdult && logic->AtDay),
+        EVENT_ACCESS(LOGIC_FREED_EPONA, logic->HasItem(RG_SOUL_NPC_GORMAN) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_EPONAS_SONG) && logic->IsAdult && logic->AtDay),
+        EVENT_ACCESS(LOGIC_LINKS_COW,   logic->HasItem(RG_SOUL_NPC_MALON) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_EPONAS_SONG) && logic->IsAdult && logic->AtDay),
     }, {
         //Locations
         LOCATION(RC_SONG_FROM_MALON,        logic->IsChild && logic->Get(LOGIC_MALON_RETURNED_FROM_CASTLE) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->HasItem(RG_FAIRY_OCARINA) && logic->AtDay),
@@ -39,12 +40,10 @@ void RegionTable_Init_LonLonRanch() {
     areaTable[RR_LLR_TALONS_HOUSE] = Region("LLR Talons House", SCENE_LON_LON_BUILDINGS, {}, {
         //Locations
         LOCATION(RC_LLR_TALONS_CHICKENS,    logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->IsChild && logic->AtDay && logic->Get(LOGIC_TALON_RETURNED_FROM_CASTLE) && logic->HasItem(RG_POWER_BRACELET)),
-        LOCATION(RC_LLR_TALONS_HOUSE_POT_1, logic->CanBreakPots()),
-        LOCATION(RC_LLR_TALONS_HOUSE_POT_2, logic->CanBreakPots()),
-        LOCATION(RC_LLR_TALONS_HOUSE_POT_3, logic->CanBreakPots()),
     }, {
         //Exits
         ENTRANCE(RR_LON_LON_RANCH, true),
+        ENTRANCE(RR_LLR_RUSTY_BEDROOM, logic->HasItem(RG_RUSTY_KEY_RANCH_HOUSE_ROOM)),
     });
 
     areaTable[RR_LLR_STABLES] = Region("LLR Stables", SCENE_STABLE, {}, {
@@ -75,6 +74,14 @@ void RegionTable_Init_LonLonRanch() {
     }, {
         //Exits
         ENTRANCE(RR_LON_LON_RANCH, true),
+    });
+
+    areaTable[RR_LLR_RUSTY_BEDROOM] = Region("LLR Malon's Bedroom", SCENE_LON_LON_BUILDINGS, {}, {
+        LOCATION(RC_LLR_TALONS_HOUSE_POT_1, logic->CanBreakPots()),
+        LOCATION(RC_LLR_TALONS_HOUSE_POT_2, logic->CanBreakPots()),
+        LOCATION(RC_LLR_TALONS_HOUSE_POT_3, logic->CanBreakPots()),
+    }, {
+        ENTRANCE(RR_LLR_TALONS_HOUSE, logic->HasItem(RG_RUSTY_KEY_RANCH_HOUSE_ROOM)),
     });
 
     // clang-format on

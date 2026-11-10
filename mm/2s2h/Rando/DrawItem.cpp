@@ -1,16 +1,21 @@
 #include "ComboIkanaShieldResources.h"
 #include "Rando/Rando.h"
+#include "Rando/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "Rando/DungeonItemVisuals.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/ShipInit.hpp"
+#include "libultraship/bridge/consolevariablebridge.h"
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
 #include "Rando/NeiResourceRouting.h"
+#include "Rando/NeiGiPresentation.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
 #include "ComboRewardGi.h"
+#include "../../../combo/NeiClockGI.h"
 #include "ComboItemIconOwnership.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
@@ -49,6 +54,13 @@ uint16_t Nei_GetOwnedItem(uint8_t slot); // mods/nei_save.cpp — Roc chain leve
 extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
 
+// The shared ring renderer's debug OPEN_DISPS paths need the native graph
+// declarations above even when there is no Release/PCH to supply them.
+#include "../../../combo/ComboMmKeyRingDraw.h"
+#define COMBO_DOOR_KEY_HOST_MM
+#include "../../../combo/ComboDoorKeyGi.h"
+#undef COMBO_DOOR_KEY_HOST_MM
+
 #define COMBO_SPIN_GI_HOST_MM
 #include "ComboSpinAttackGi.h"
 #undef COMBO_SPIN_GI_HOST_MM
@@ -86,6 +98,20 @@ extern "C" int32_t ComboDrawNativeMmBossSoul(RandoItemId id) {
     if (MM_GetItemAnimDrawInfo(name.c_str(), &info) != 1) {
         return 0;
     }
+    Matrix_Push();
+    const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
+    Matrix_Pop();
+    return drawn;
+}
+
+extern "C" int32_t MM_GetSoulMiniAnimDrawInfoById(int32_t id, CwItemAnimDrawInfo* out);
+
+static int32_t ComboDrawNativeMmSoul(RandoItemId id) {
+    if (!gPlayState)
+        return 0;
+    CwItemAnimDrawInfo info{};
+    if (MM_GetSoulMiniAnimDrawInfoById(id, &info) != 1)
+        return 0;
     Matrix_Push();
     const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
     Matrix_Pop();
@@ -359,6 +385,44 @@ void DrawSmallKey(RandoItemId randoItemId) {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+// Returns false only when an older archive needs the existing native fallback.
+static bool DrawDoorKey(RandoItemId item) {
+    const char* path = ComboDoorKeyGi::SelectedPath(ComboDoorKeyGi::ItemOrigin(item));
+    if (!path)
+        return false;
+    if (!NeiGi_CanDrawLayers(gPlayState, 1, 32, 2))
+        return true;
+    Matrix_Push();
+    Matrix_RotateZF(ComboDoorKeyGi::RollRadians, MTXMODE_APPLY);
+    Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)path);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+    Matrix_Pop();
+    return true;
+}
+
+void DrawKeyRing(RandoItemId id) {
+    const int owner = DungeonItem_GetOwner(id);
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metal, emblem;
+    const char* ringPath = "__OTR__objects/object_keyring/gKeyringRingDL";
+    if (!GetItem_GetDungeonKeyModel(GID_KEY_SMALL, owner, &metalPath, &emblemPath, &metal, &emblem) ||
+        (!ResourceMgr_FileExists(ringPath) &&
+         !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(ringPath)))) {
+        if (NeiGi_CanDrawLayers(gPlayState, 1, 32, 2))
+            GetItem_Draw(gPlayState, GID_KEY_SMALL);
+        return;
+    }
+    const uint8_t metalRgba[] = { metal.r, metal.g, metal.b, metal.a };
+    const uint8_t emblemRgba[] = { emblem.r, emblem.g, emblem.b, emblem.a };
+    ComboMmKeyRing::Draw(gPlayState, owner, metalPath, emblemPath, ringPath, metalRgba, emblemRgba, metalRgba);
+}
+
 void DrawBossKey(RandoItemId randoItemId) {
     int slot;
     switch (randoItemId) {
@@ -574,7 +638,34 @@ std::unordered_map<RandoItemId, std::function<void()>> soulDrawMap = {
 };
 // clang-format on
 
+// Added souls share their owner-authored miniature; the retained token and flame also serve simpler mode.
+void DrawShuffledSoul(RandoItemId id = RI_UNKNOWN) {
+#ifdef COMBO_BUILD
+    if (ComboDrawNativeMmSoul(id))
+        return;
+#endif
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiSkulltulaTokenDL);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const uint8_t color[3] = { 155, 155, 155 };
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(gPlayState, color, translate, scale);
+}
+
 void DrawSoul(RandoItemId randoItemId) {
+#ifdef COMBO_BUILD
+    // Existing bosses retain their own native/boss-preference paths below.
+    // Enemy identities occupy this explicit native range in the unchanged enum.
+    if (randoItemId >= RI_SOUL_ENEMY_ALIEN && randoItemId <= RI_SOUL_ENEMY_WOLFOS) {
+        if (ComboDrawNativeMmSoul(randoItemId))
+            return;
+        DrawShuffledSoul();
+        return;
+    }
+#endif
     auto it = soulDrawMap.find(randoItemId);
     if (it != soulDrawMap.end()) {
         it->second();
@@ -3101,6 +3192,10 @@ void DrawOotSlateRune(RandoItemId randoItemId) {
     DrawOotNeiSheikahSlate();
 }
 
+static void DrawOotClock() {
+    NeiClockGi::Draw(gPlayState, CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0, "mm");
+}
+
 void DrawOotNeiPhantomHourglass() {
     static Gfx* real = NULL;
     static u8 tried = 0;
@@ -3197,6 +3292,12 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     // Legacy callbacks retain the concrete award's geometry and matching effect fit.
     MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup);
 #endif
+    if (DrawDoorKey(randoItemId))
+        return;
+    if (DungeonItem_GetKeyRingCount(randoItemId) > 0) {
+        DrawKeyRing(randoItemId);
+        return;
+    }
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
         GetItem_DrawDungeonItem(gPlayState, Rando::StaticData::Items[randoItemId].drawId, dungeonOwner)) {
@@ -3282,6 +3383,9 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_OWL_WOODFALL:
         case RI_OWL_ZORA_CAPE:
             DrawOwlStatue();
+            break;
+        case RI_OOT_CLOCK:
+            DrawOotClock();
             break;
         case RI_TIME_DAY_1:
         case RI_TIME_NIGHT_1:
@@ -3834,6 +3938,9 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_OOT_NEI_SWITCH_HOOK:
             DrawOotNeiSwitchHook();
             break;
+        case RI_OOT_NEI_RITO_MASK:
+            MM_TryDrawNeiGi(RI_OOT_NEI_RITO_MASK);
+            break;
         case RI_OOT_NEI_MAGIC_MIRROR:
 #ifdef COMBO_BUILD
             MagicMirror_DrawGI(gPlayState);
@@ -3966,6 +4073,10 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             break;
         }
         default:
+            if (Rando::SoulShuffle::Find(randoItemId)) {
+                DrawShuffledSoul(randoItemId);
+                break;
+            }
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             break;
     }

@@ -1,0 +1,113 @@
+{
+  "entrypoint": "objects/object_nei_clock/gNeiClockDL",
+  "glass": true,
+  "glass_texture_setup": "objects/object_nei_clock/gNeiClockGlassTexDL",
+  "glass_entrypoint": "objects/object_nei_clock/gNeiClockGlassDL",
+  "bounds_native": [
+    [
+      -403,
+      -403,
+      -112
+    ],
+    [
+      403,
+      601,
+      170
+    ]
+  ],
+  "draw_scale": 0.04,
+  "unique_triangles": 2652,
+  "submitted_triangles": 4188,
+  "material_triangles": {
+    "Brass": 1536,
+    "Blue": 728,
+    "Ivory": 172,
+    "Dark": 96,
+    "Glass": 120
+  },
+  "body": {
+    "baseline_commit": "5cd05ecf71a05e80030a199a58974a1184641ed3",
+    "resource_count": 14,
+    "bounds_native": [
+      [
+        -403,
+        -403,
+        -112
+      ],
+      [
+        403,
+        601,
+        147
+      ]
+    ],
+    "unique_triangles": 2532,
+    "submitted_triangles": 4068,
+    "material_triangles": {
+      "Brass": 1536,
+      "Blue": 728,
+      "Ivory": 172,
+      "Dark": 96
+    }
+  },
+  "glass_contract": {
+    "native_radius": 335,
+    "edge_z": 106,
+    "center_z": 170,
+    "texture_dimensions": [
+      32,
+      32
+    ],
+    "max_texture_alpha": 70,
+    "texture_setup_then": "runtime tile 0 SetTileSizeLerp, then glass_entrypoint",
+    "scroll_offset_units": "quarter texel",
+    "scroll_phase": "uint32(gameplayFrames) & 127",
+    "scroll_next_phase": "phase + 1",
+    "period_gameplay_ticks": 128,
+    "dynamic_segments": [],
+    "render_mode": "G_RM_AA_ZB_XLU_SURF2",
+    "depth_write": false,
+    "back_cull": true
+  },
+  "dependencies": [
+    "objects/object_nei_clock/gNeiClockBlueGeoDL",
+    "objects/object_nei_clock/gNeiClockBlueTex",
+    "objects/object_nei_clock/gNeiClockBlueVtx",
+    "objects/object_nei_clock/gNeiClockBrassGeoDL",
+    "objects/object_nei_clock/gNeiClockBrassTex",
+    "objects/object_nei_clock/gNeiClockBrassVtx",
+    "objects/object_nei_clock/gNeiClockDL",
+    "objects/object_nei_clock/gNeiClockDarkGeoDL",
+    "objects/object_nei_clock/gNeiClockDarkTex",
+    "objects/object_nei_clock/gNeiClockDarkVtx",
+    "objects/object_nei_clock/gNeiClockGlassDL",
+    "objects/object_nei_clock/gNeiClockGlassGeoDL",
+    "objects/object_nei_clock/gNeiClockGlassTex",
+    "objects/object_nei_clock/gNeiClockGlassTexDL",
+    "objects/object_nei_clock/gNeiClockGlassVtx",
+    "objects/object_nei_clock/gNeiClockIvoryGeoDL",
+    "objects/object_nei_clock/gNeiClockIvoryTex",
+    "objects/object_nei_clock/gNeiClockIvoryVtx",
+    "objects/object_nei_clock/gNeiClockReflectionTex"
+  ],
+  "sha256": {
+    "gNeiClockBlueGeoDL": "73f66699fd99aae9629c244bfc0365a2fcb23215f4f7c1416bcc18e5a6183eb9",
+    "gNeiClockBlueTex": "b21448855ab0943cd83419e4868b85bb18097041544957112251067f9ccc0446",
+    "gNeiClockBlueVtx": "6f674e9ff1a2fd544590f22f482aeaf3e7a1ee2b14f02740f759d91f4b4a36c3",
+    "gNeiClockBrassGeoDL": "fd7f96c20db6324d78a1c1b920bbd58340e6c1499b5d886bed85d80ce89364d2",
+    "gNeiClockBrassTex": "a58f38c45bd3344fa2d346c3196419d106186f395bacdf4559b3379c48724388",
+    "gNeiClockBrassVtx": "9cb1e827c8b984e0246bdb513105d46a31181a1d4c42e1ffe3e68f309b20da26",
+    "gNeiClockDL": "cb64dbe6fca92553cd4eaa41816131e7ac9cfd5bdc5d15ce3be2488519b32909",
+    "gNeiClockDarkGeoDL": "9181c00590ee27b6f3dfbc8712694a217d1c1ae56756be2538d7447a21627de4",
+    "gNeiClockDarkTex": "00decc87dbf6ff9712dcda06bd706eebfda803b639ef90d5d90ae386cc7671a8",
+    "gNeiClockDarkVtx": "34daafba6bddc9722011d6d18c018232dcef3ffb04ce17ebd94a5ff42218a849",
+    "gNeiClockGlassDL": "d2fcef6305dadd1c57a422d8e40d14abf2e761b2f585d573dae6c3cea810a9c7",
+    "gNeiClockGlassGeoDL": "80c1c125b2808c1d7ffa2fd3f232e72bcbe49e37bb89fe7827fef421eb16bffc",
+    "gNeiClockGlassTex": "e12e3773a13f2ce9664cd41445d7e7c321ce36f27c75628b267eaf8d81dc372d",
+    "gNeiClockGlassTexDL": "81c8bb5c74cf3de2d05c5e77a7655cbf0f7808a57b8db62c324b86b89982db53",
+    "gNeiClockGlassVtx": "e3ff4f12d7bcfb6185c8329419dfe1d835a8a84708ce249079c1cd370aff375c",
+    "gNeiClockIvoryGeoDL": "5e919fa7ead0c464639c4828b81d8cbfbca61c6fc0a20c27977907aa5b0f2397",
+    "gNeiClockIvoryTex": "4deff79d08b5ebd014ff8722a68d7bc83ff1f4015b5100903e84b13f160b4e69",
+    "gNeiClockIvoryVtx": "d247918e094cfaa7e8ca516d97e09e2cef44de056c257f3b1a9c36947dcc2158",
+    "gNeiClockReflectionTex": "85c0d96b8b627ebb8a22444b6ca293152623055a06ba777d400a0a13782f48d9"
+  }
+}

@@ -131,6 +131,7 @@ const Presentation kPresentations[] = {
     { Randomizer_DrawCanePacciUpgrade, nullptr, nullptr, 1.f, Kind::Pacci, {} },
     { Randomizer_DrawCanePacciUltrahand, nullptr, nullptr, 1.f, Kind::Pacci, {} },
     { Randomizer_DrawPokeball, nullptr, nullptr, 1.f, Kind::Pokeball, {} },
+    { Randomizer_DrawRitoMask, GI_PATH("rito_mask"), nullptr, 1.f, Kind::Gold, {}, {}, 0, true, -1 },
     { Randomizer_DrawMarioMask, GI_PATH("mario_mask"), nullptr, 1.f, Kind::MarioMask, {}, {}, 0, true, -1 },
     { nullptr, GI_PATH("cojiro"), nullptr, 1.f, Kind::Neutral, {}, {}, 0, false, GID_COJIRO },
     { Randomizer_DrawMinishCap, GI_PATH("minish_cap"), nullptr, .5f, Kind::Neutral, {} },
@@ -893,7 +894,7 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
 
 static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy,
                               float particleScale = 1.f) {
-    if (legacy && item.draw == Randomizer_DrawMarioMask)
+    if (legacy && (item.draw == Randomizer_DrawMarioMask || item.draw == Randomizer_DrawRitoMask))
         return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);

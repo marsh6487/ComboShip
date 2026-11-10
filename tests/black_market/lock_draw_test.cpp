@@ -34,6 +34,40 @@ static EnOssan nativeShop;
 static std::array<EnGirlA, 8> nativeStock;
 static EnOssan* sNativeShop = &nativeShop;
 static PlayState* sNativeShopPlay;
+static std::array<Lights, 32> shelfLights;
+static int lightCreates, lightBinds, lightSubmissions, debugPositionLights;
+static Actor* boundActor;
+static bool boundAtActor;
+extern "C" Lights* LightContext_NewLights(LightContext* context, GraphicsContext* gfx) {
+    assert(context == &play.lightCtx && gfx == &graphics);
+    assert(lightCreates < int(shelfLights.size()));
+    auto& lights = shelfLights[lightCreates++];
+    lights = {};
+    lights.l.a.l.col[0] = context->ambientColor[0];
+    lights.l.a.l.col[1] = context->ambientColor[1];
+    lights.l.a.l.col[2] = context->ambientColor[2];
+    return &lights;
+}
+extern "C" void Lights_BindAll(Lights* lights, LightNode* head, Vec3f* position, PlayState* state) {
+    assert(state == &play && head == play.lightCtx.listHead);
+    boundActor = nullptr;
+    for (int slot = 0; slot < 8; ++slot) {
+        auto& actor = nativeStock[slot].actor;
+        if (position == &actor.world.pos) boundActor = &actor;
+    }
+    boundAtActor = position != nullptr;
+    assert(!position || boundActor);
+    assert(lights == &shelfLights[lightCreates - 1]);
+    ++lightBinds;
+}
+extern "C" void Lights_Draw(Lights* lights, GraphicsContext* gfx) {
+    assert(gfx == &graphics && lightBinds == lightCreates);
+    assert(lights == &shelfLights[lightCreates - 1]);
+    assert(lights->l.a.l.col[0] == 123 && lights->l.a.l.col[1] == 91 && lights->l.a.l.col[2] == 44);
+    ++lightSubmissions;
+}
+#undef MREG
+#define MREG(index) debugPositionLights
 #endif
 static constexpr Vec3f kShelves[8] = {
     {72,64,48},{72,104,48},{120,64,48},{120,104,48},
@@ -95,6 +129,13 @@ void DrawOffer(PlayState*, const Item& item) { SubmitOffer(item); }
 namespace ComboBlackMarketItems { int Id(const Item& item) { return int(&item - Catalog().data()); } }
 namespace Rando { void DrawResolvedItem(int id, int, Actor* actor) {
 #ifndef OOT_LOCK_TEST
+    assert(lightSubmissions == draws + soldOutDraws + 1 &&
+           "each shelf model needs fresh scene lighting before its draw, including after a lock seal");
+    const bool ucode = (actor->flags & ACTOR_FLAG_UCODE_POINT_LIGHT_ENABLED) != 0;
+    assert(shelfLights[lightCreates - 1].enablePosLights ==
+           (ucode && (play.roomCtx.curRoom.enablePosLights || debugPositionLights)));
+    const bool legacy = !(actor->flags & (ACTOR_FLAG_UCODE_POINT_LIGHT_ENABLED | ACTOR_FLAG_IGNORE_LEGACY_POINT_LIGHTS));
+    assert(boundAtActor == legacy && (!legacy || boundActor == actor));
     bool owned = false;
     for (int slot = 0; slot < 8; ++slot)
         owned |= actor == &nativeStock[slot].actor && Offer(slot) && ComboBlackMarketItems::Id(*Offer(slot)) == id;
@@ -171,6 +212,11 @@ void Reset() {
     sTalking = seals = true; sTitlePending = sGrannyActive = false;
 #ifndef OOT_LOCK_TEST
     nativeShop = {}; nativeStock = {}; sNativeShopPlay = &play;
+    lightCreates = lightBinds = lightSubmissions = debugPositionLights = 0;
+    boundActor = nullptr; boundAtActor = false;
+    play.lightCtx.ambientColor[0] = 123;
+    play.lightCtx.ambientColor[1] = 91;
+    play.lightCtx.ambientColor[2] = 44;
     for (int i = 0; i < 8; ++i) {
         nativeShop.items[i] = &nativeStock[i];
         nativeStock[i].actor.world.pos = kShelves[i];
@@ -321,6 +367,16 @@ int main() {
     Reset(); sGrannyActive = true; DrawMarket(); assert(interiorEffects == 0 && "Granny owns its existing flame/smoke path");
     Reset(); play.state.running = false; DrawMarket(); assert(draws == 0 && allocations == 0);
 #ifndef OOT_LOCK_TEST
+    for (int flags : {0, int(ACTOR_FLAG_UCODE_POINT_LIGHT_ENABLED), int(ACTOR_FLAG_IGNORE_LEGACY_POINT_LIGHTS)}) {
+        for (bool positional : {false, true}) for (bool debug : {false, true}) {
+            Reset(); allOffers = true; seals = false;
+            play.roomCtx.curRoom.enablePosLights = positional;
+            debugPositionLights = debug;
+            for (auto& stock : nativeStock) stock.actor.flags = flags;
+            DrawMarket();
+            assert(draws == 8 && lightCreates == 8 && lightBinds == 8 && lightSubmissions == 8);
+        }
+    }
     Reset();
     nativeStock[3].actor.world.pos = {123.25f, 77.5f, -99.0f};
     nativeStock[3].actor.scale = {.27f,.27f,.27f};

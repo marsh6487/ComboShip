@@ -8,7 +8,7 @@ import tempfile
 import sys
 
 from run_mm_din_fire_tests import FLAGS as MM_FLAGS
-from run_time_pedestal_tests import functions
+from run_time_pedestal_tests import functions, block_from
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/elemental_swords"))
@@ -42,9 +42,21 @@ def main():
                         "-o", str(core)], cwd=ROOT, check=True)
         subprocess.run([str(core)], check=True)
         for host in ("soh", "mm"):
-            native = functions((ROOT / host / "src/code/z_actor.c").read_text(), ["Actor_Kill", "Actor_ApplyDamage", "Enemy_StartFinishingBlow"])
-            (directory / "finish_native.inc").write_text("\n".join(native[name] for name in
-                ("Actor_Kill", "Actor_ApplyDamage", "Enemy_StartFinishingBlow")))
+            actor_source = (ROOT / host / "src/code/z_actor.c").read_text()
+            native_names = ["Actor_Kill", "Actor_ApplyDamage", "Enemy_StartFinishingBlow"]
+            soul_gate = host == "soh" and "Randomizer_SoulCanDamageActor(" in actor_source
+            if soul_gate:
+                native_names.append("Flags_GetRandomizerInf")
+                runtime = (ROOT / "soh/soh/Enhancements/randomizer/SoulShuffleRuntime.cpp").read_text()
+                body = block_from(runtime, runtime.index('extern "C" int Randomizer_SoulCanDamageActor('))
+                (directory / "finish_soul.cpp").write_text(
+                    '#include "global.h"\n'
+                    '#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"\n'
+                    '#include "soh/Enhancements/randomizer/SoulShuffle.h"\n'
+                    '#include "soh/Enhancements/randomizer/SoulShuffleEnemy.h"\n'
+                    'extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey);\n' + body + '\n')
+            native = functions(actor_source, native_names)
+            (directory / "finish_native.inc").write_text("\n".join(native[name] for name in native_names))
             collision_names = (["NEI_PlayerDamageBoostActive", "CollisionCheck_ApplyDamage", "CollisionCheck_GetSwordDamage"] if host == "soh" else
                 ["CollisionCheck_InitContext", "CollisionCheck_DestroyContext", "CollisionCheck_ClearContext",
                  "CollisionCheck_GetElementATDamage", "CollisionCheck_GetDamageAndEffectOnElementAC",
@@ -81,6 +93,18 @@ def main():
                 if args.sanitize:
                     flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                               "-fno-omit-frame-pointer", "-fno-pie", "-no-pie", "-fno-sanitize=shift-base"]
+                soul_objects = []
+                if soul_gate:
+                    flags += ["-DSWORD_FINISH_SOUL_GATE"]
+                    soul_object = directory / ("soul-combo.o" if combo else "soul-solo.o")
+                    # Compile the exact C++ gate with the same native ABI/host
+                    # definitions. C-only language flags have no C++ meaning.
+                    cpp_flags = [flag for flag in flags if not flag.startswith("-std=") and
+                                 flag != "-Werror=implicit-function-declaration"]
+                    subprocess.run([os.environ.get("CXX", "c++"), "-std=gnu++20", *cpp_flags,
+                                    "-c", str(directory / "finish_soul.cpp"), "-o", str(soul_object)],
+                                   cwd=ROOT, check=True)
+                    soul_objects = [str(soul_object)]
                 binary = directory / (host + ("-combo" if combo else "-solo"))
                 subprocess.run([os.environ.get("CC", "cc"), *flags,
                                 "tests/elemental_swords/finish_override_render.c",
@@ -90,19 +114,19 @@ def main():
                 host_binary = str(binary) + "-finish"
                 subprocess.run([os.environ.get("CC", "cc"), *flags,
                                 "tests/elemental_swords/finish_host_test.c", f"{host}/src/code/din_fire_sword.c",
-                                str(collision_source), "-Wl,--gc-sections", "-lm", "-o", host_binary],
+                                str(collision_source), *soul_objects, "-Wl,--gc-sections", "-lm", "-o", host_binary],
                                cwd=ROOT, check=True)
                 subprocess.run([host_binary], check=True)
                 adapter_binary = str(binary) + "-adapters"
                 subprocess.run([os.environ.get("CC", "cc"), *flags,
                                 "tests/elemental_swords/finish_adapters_test.c", f"{host}/src/code/din_fire_sword.c",
-                                str(collision_source), "-Wl,--gc-sections", "-lm", "-o", adapter_binary],
+                                str(collision_source), *soul_objects, "-Wl,--gc-sections", "-lm", "-o", adapter_binary],
                                cwd=ROOT, check=True)
                 subprocess.run([adapter_binary], check=True)
                 draw_binary = str(binary) + "-draw"
                 subprocess.run([os.environ.get("CC", "cc"), *flags,
                                 "tests/elemental_swords/finish_draw_test.c", f"{host}/src/code/din_fire_sword.c",
-                                str(collision_source), "-Wl,--gc-sections", "-lm", "-o", draw_binary], cwd=ROOT, check=True)
+                                str(collision_source), *soul_objects, "-Wl,--gc-sections", "-lm", "-o", draw_binary], cwd=ROOT, check=True)
                 subprocess.run([draw_binary], check=True)
                 for source in ("elemental_sword_finish", "din_fire_sword", "z_actor", "z_collision_check"):
                     subprocess.run([os.environ.get("CC", "cc"), *flags, "-c", f"{host}/src/code/{source}.c",

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <stdexcept>
 #include <vector>
 #include <set>
 #include <unordered_map>
@@ -19,6 +20,7 @@
 #include <functional>
 #include <nlohmann/json.hpp>
 #include "gui/ComboGenProgress.h"
+#include "NativeRandoDump.h"
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
 #include "CrossDungeonReachability.h"
@@ -90,8 +92,9 @@ enum class OotAccess { ALL_REACHABLE, BEATABLE_ONLY, NO_LOGIC };
 // Maps the OOT dump's "accessibility" block to a mode: No Logic wins; else ALR-off => BEATABLE_ONLY;
 // else ALL_REACHABLE. Missing/old dumps default to ALL_REACHABLE (unchanged behavior).
 inline OotAccess OotAccessFromDump(const std::string& sohDumpJson) {
+    const auto dump = ParseOptionalStaticDataDump(sohDumpJson, "OOT");
     try {
-        auto a = nlohmann::json::parse(sohDumpJson).value("accessibility", nlohmann::json::object());
+        auto a = dump.value("accessibility", nlohmann::json::object());
         if (a.value("noLogic", false))
             return OotAccess::NO_LOGIC;
         if (!a.value("allLocationsReachable", true))
@@ -283,13 +286,18 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     std::vector<std::string> mmJunkNames;
     std::vector<CwCheck> allChecks;
     std::vector<CwPlacement> lockedPlacements; // confined pre-placements (own-dungeon keys, etc.)
+    std::unordered_set<std::string> validateLockedChecks;
+    // Native-confined randomized items are solved within these exact eligible
+    // check sets, rather than freezing the adapter's random preplacement.
+    std::unordered_map<std::string, std::unordered_set<std::string>> confinedChecks;
+    auto itemKey = [](const CwItem& item) { return std::string(item.game == GAME_OOT ? "oot:" : "mm:") + item.name; };
 
     // Set when a dump carries pool[] but no category — a stale DLL, which would otherwise surface as an
     // unbalanceable pool ("no discardable junk") instead of the rebuild it actually needs.
     std::string missingCategory;
 
     auto parsePool = [&](Game game, const std::string& dumpJson) {
-        auto d = nlohmann::json::parse(dumpJson);
+        auto d = ParseStaticDataDump(dumpJson, game == GAME_OOT ? "OOT" : "MM");
 
         // Fillable checks (name only; the pool below feeds the items).
         for (auto& c : d.value("checks", nlohmann::json::array())) {
@@ -340,13 +348,44 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             std::string item = f.value("item", "");
             if (check.empty() || item.empty())
                 continue;
+            if (f.contains("allowedChecks")) {
+                if (!f.value("validate", false) || !f.at("allowedChecks").is_array() || f.at("allowedChecks").empty())
+                    throw std::runtime_error("invalid native confined check set for " + item);
+                CwItem movable{ game, item, f.value("advancement", true) };
+                if (!movable.advancement)
+                    throw std::runtime_error("native confined item must use logical fill: " + item);
+                std::unordered_set<std::string> allowed;
+                for (const auto& name : f.at("allowedChecks")) {
+                    const auto value = name.get<std::string>();
+                    if (value.empty() || !allowed.insert(value).second)
+                        throw std::runtime_error("invalid native confined candidate for " + item);
+                }
+                if (!allowed.count(check))
+                    throw std::runtime_error("native confined preplacement outside its allowed checks: " + item);
+                auto [entry, inserted] = confinedChecks.emplace(itemKey(movable), allowed);
+                if (!inserted && entry->second != allowed)
+                    throw std::runtime_error("inconsistent native confinement for duplicate item: " + item);
+                allChecks.push_back({ game, check });
+                advItems.push_back(movable);
+                continue;
+            }
             lockedPlacements.push_back({ { game, check }, { game, item, f.value("advancement", true) } });
+            if (f.value("validate", false))
+                validateLockedChecks.insert(std::string(game == GAME_OOT ? "oot:" : "mm:") + check);
         }
     };
 
     try {
         parsePool(GAME_OOT, sohDumpJson);
         parsePool(GAME_MM, mmDumpJson);
+        std::unordered_set<std::string> eligible;
+        for (const auto& check : allChecks)
+            if (!eligible.insert(std::string(check.game == GAME_OOT ? "oot:" : "mm:") + check.name).second)
+                throw std::runtime_error("duplicate native fillable check: " + check.name);
+        for (const auto& [item, allowed] : confinedChecks)
+            for (const auto& check : allowed)
+                if (!eligible.count(item.substr(0, item.find(':') + 1) + check))
+                    throw std::runtime_error("native confined candidate is not an eligible check: " + check);
     } catch (const std::exception& e) {
         result.error = std::string("Pool parse error: ") + e.what();
         return result;
@@ -449,7 +488,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         size_t count = 0;
         for (const auto* pool : { &advItems, &junkItems })
             for (const auto& item : *pool)
-                count += item.game == game && item.name == name;
+                count +=
+                    item.game == game && item.name == name && (includeLocked || !confinedChecks.count(itemKey(item)));
         for (const auto* fixed : { &lockedPlacements, &forcedPlacements }) {
             if (fixed == &lockedPlacements && !includeLocked)
                 continue;
@@ -477,8 +517,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             continue;
         effectiveSharedMask |= (1u << i);
     }
+    try {
+        effectiveSharedMask |=
+            EffectiveSharedSoulMask(sharedMask, nlohmann::json::parse(sohDumpJson), nlohmann::json::parse(mmDumpJson));
+    } catch (...) {} // Old/malformed dump fields leave categories disabled.
     const auto sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
-    const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask);
+    const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask, sohDumpJson, mmDumpJson);
     size_t dedupedCopies = 0;
     for (const auto& group : sharedGroups) {
         size_t target = 0, fixedCopies = 0;
@@ -487,6 +531,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             // the native OOT source count (upstream's MM trim policy).
             if (group.nei || n.game == GAME_OOT)
                 target = std::max(target, countNamed(n.game, n.name, group.nativeFamily));
+            // Movable native confinement still has the old fixed-source sharing
+            // policy. Its coordinate is solved later, but sharing cannot remove
+            // the required native dungeon/song item or transfer its restriction.
+            if (group.nativeFamily)
+                for (const auto& item : advItems)
+                    fixedCopies += item.game == n.game && item.name == n.name && confinedChecks.count(itemKey(item));
             for (const auto* fixed : { &lockedPlacements, &forcedPlacements }) {
                 // NEI alone preserves its pool-only rule. Only an enabled native family may use
                 // nonshuffled fixed sources to remove copies from the peer's shuffled pool.
@@ -496,12 +546,13 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                     fixedCopies += p.item.game == n.game && p.item.name == n.name;
             }
         }
-        size_t remaining = target > fixedCopies ? target - fixedCopies : 0;
+        size_t remaining = !group.starting && target > fixedCopies ? target - fixedCopies : 0;
         for (const auto& n : group.names) {
             for (auto* pool : { &advItems, &junkItems }) {
                 pool->erase(std::remove_if(pool->begin(), pool->end(),
                                            [&](const CwItem& item) {
-                                               if (item.game != n.game || item.name != n.name)
+                                               if (item.game != n.game || item.name != n.name ||
+                                                   confinedChecks.count(itemKey(item)))
                                                    return false;
                                                if (remaining > 0) {
                                                    --remaining;
@@ -624,9 +675,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // OOT and MM check names are distinct namespaces; key fill bookkeeping by game+name.
     auto checkKey = [](const CwCheck& c) { return std::string(c.game == GAME_OOT ? "oot:" : "mm:") + c.name; };
 
-    // Locked (fixed) checks are each game's OWN vanilla/confined placements, already guaranteed
-    // reachable by that game's own fill; the cross-fill neither shuffles nor re-validates them (the
-    // oracles under-model some — e.g. vanilla GS spots — so they'd falsely fail validation).
+    // Legacy fixed checks keep their native coordinates. Explicit randomized
+    // validation remains active; newly tagged confinement is solved above instead.
     std::unordered_set<std::string> lockedCheckKeys;
     for (const auto& lp : lockedPlacements)
         lockedCheckKeys.insert(checkKey(lp.check));
@@ -923,13 +973,17 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<CwItem> toPlace;
         if (ootAccess == OotAccess::NO_LOGIC) {
             for (const auto& it : advRest)
-                if (it.game == GAME_MM)
+                if (it.game == GAME_MM || confinedChecks.count(itemKey(it)))
                     toPlace.push_back(it);
         } else {
             toPlace = advRest;
         }
         std::vector<CwItem> relaxedToJunk; // OOT adv stranded off-path under BEATABLE_ONLY dead-ends
         cwShuffle(toPlace, rng);
+        // Reserve physical dungeon/song capacity before unconstrained items can
+        // consume it. Each confined item still has to be reachable without itself.
+        std::stable_partition(toPlace.begin(), toPlace.end(),
+                              [&](const CwItem& item) { return !confinedChecks.count(itemKey(item)); });
         std::vector<std::string> ootRemaining, mmRemaining;
         for (const auto& it : toPlace)
             (it.game == GAME_OOT ? ootRemaining : mmRemaining).push_back(it.name);
@@ -956,6 +1010,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                 return result;
             }
             size_t k = std::min({ batchCap, std::max<size_t>(1, toPlace.size() / 4), toPlace.size() });
+            if (confinedChecks.count(itemKey(toPlace.back())))
+                k = 1; // different native groups must not share a batch candidate set
+            else
+                while (k > 1 && std::any_of(toPlace.end() - k, toPlace.end(),
+                                            [&](const CwItem& item) { return confinedChecks.count(itemKey(item)); }))
+                    --k;
 
             std::vector<CwItem> batch;
             batch.reserve(k);
@@ -974,15 +1034,21 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                 if (filledChecks.count(checkKey(allChecks[ci])))
                     continue;
                 const auto& reach = allChecks[ci].game == GAME_OOT ? ootReachable : mmReachable;
-                if (reach.count(allChecks[ci].name))
-                    candidates.push_back(ci);
+                if (!reach.count(allChecks[ci].name))
+                    continue;
+                const auto confined = confinedChecks.find(itemKey(batch.front()));
+                if (confined != confinedChecks.end() &&
+                    (allChecks[ci].game != batch.front().game || !confined->second.count(allChecks[ci].name)))
+                    continue;
+                candidates.push_back(ci);
             }
 
             if (candidates.size() < batch.size()) {
                 // BEATABLE_ONLY: a single OOT advancement item with no reachable check may strand
                 // off-path — move it to the junk fast-fill and continue (already removed from
                 // toPlace/ootRemaining above). MM items and ALL_REACHABLE always retry instead.
-                if (batch.size() == 1 && ootAccess == OotAccess::BEATABLE_ONLY && batch.front().game == GAME_OOT) {
+                if (batch.size() == 1 && ootAccess == OotAccess::BEATABLE_ONLY && batch.front().game == GAME_OOT &&
+                    !confinedChecks.count(itemKey(batch.front()))) {
                     relaxedToJunk.push_back(batch.front());
                     continue;
                 }
@@ -1024,7 +1090,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<CwItem> fastFillItems = junkItems;
         if (ootAccess == OotAccess::NO_LOGIC) {
             for (const auto& it : advRest)
-                if (it.game == GAME_OOT)
+                if (it.game == GAME_OOT && !confinedChecks.count(itemKey(it)))
                     fastFillItems.push_back(it);
         }
         fastFillItems.insert(fastFillItems.end(), relaxedToJunk.begin(), relaxedToJunk.end());
@@ -1130,15 +1196,21 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         // the relaxed modes (it was placed off-logic on purpose).
         size_t mmAdvUnreachable = 0, ootAdvUnreachable = 0, junkUnreachable = 0, junkUnreachableOot = 0;
         for (const auto& p : placements) {
-            // Locked placements are the game's own guaranteed-reachable vanilla/confined items — not
-            // the cross-fill's responsibility, and the oracles under-model some. Don't validate them.
-            if (lockedCheckKeys.count(checkKey(p.check)))
+            // Randomly confined native items still need a from-scratch check:
+            // MM's preplacement picks a physical dungeon spot without testing
+            // whether its key is behind that same lock. Keep legacy vanilla and
+            // other fixed placements exempt unless the native adapter opts in.
+            const auto key = checkKey(p.check);
+            if (lockedCheckKeys.count(key) && !validateLockedChecks.count(key))
                 continue;
             const auto& reach = p.check.game == GAME_OOT ? ootFinal : mmFinal;
             if (reach.count(p.check.name))
                 continue;
             if (p.item.advancement) {
                 (p.item.game == GAME_MM ? mmAdvUnreachable : ootAdvUnreachable)++;
+                std::cerr << "[ComboShip] unreachable advancement: item=" << static_cast<int>(p.item.game) << ":"
+                          << p.item.name << " check=" << static_cast<int>(p.check.game) << ":" << p.check.name
+                          << " nativeFixed=" << lockedCheckKeys.count(key) << "\n";
             } else {
                 ++junkUnreachable;
                 if (p.check.game == GAME_OOT)
@@ -1178,8 +1250,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                                               : " goal=UNBEATABLE(ganon=" + std::to_string(ootWin) +
                                                     " majora=" + std::to_string(mmWin) + ")";
             lastPassError = "validation failed — mmAdvUnreachable=" + std::to_string(mmAdvUnreachable) +
-                            " ootAdvUnreachable=" + std::to_string(ootAdvUnreachable) + goalStr +
-                            (mmAdvUnreachable > 0 ? " (MM items stranded: the portal closed mid-fill)" : "");
+                            " ootAdvUnreachable=" + std::to_string(ootAdvUnreachable) + goalStr;
             std::cerr << "[ComboShip] CrossWorldCombinedFill: validation failed — mmAdvUnreachable=" << mmAdvUnreachable
                       << " ootAdvUnreachable=" << ootAdvUnreachable << goalStr << " (pass " << pass << ", " << passMs()
                       << " ms) — retrying\n";
@@ -1342,14 +1413,19 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
 inline std::string CrossWorldGenerateSpoiler(const std::string& sohDumpJson, const std::string& mmDumpJson,
                                              uint32_t masterSeed) {
+    const auto ootDump = ParseStaticDataDump(sohDumpJson, "OOT");
+    const auto mmDump = ParseStaticDataDump(mmDumpJson, "MM");
+    for (const auto* dump : { &ootDump, &mmDump })
+        for (const auto& row : dump->value("fixed", nlohmann::json::array()))
+            if (row.contains("allowedChecks"))
+                throw std::runtime_error("native confined items require the logical combined solver");
     nlohmann::json spoiler;
     spoiler["masterSeed"] = masterSeed;
     spoiler["mode"] = "no-logic native-only (phase1)";
 
-    auto doGame = [&](const char* key, const std::string& dumpJson, uint32_t seed) {
+    auto doGame = [&](const char* key, const nlohmann::json& d, uint32_t seed) {
         nlohmann::json out = nlohmann::json::object();
         try {
-            auto d = nlohmann::json::parse(dumpJson);
             std::vector<std::string> checkNames, poolItems;
             for (auto& c : d.value("checks", nlohmann::json::array())) {
                 std::string n = c.value("name", std::string{});
@@ -1391,8 +1467,8 @@ inline std::string CrossWorldGenerateSpoiler(const std::string& sohDumpJson, con
         spoiler[key] = out;
     };
 
-    doGame("oot", sohDumpJson, masterSeed ^ 0x4F4F5400u);
-    doGame("mm", mmDumpJson, masterSeed ^ 0x4D4D0000u);
+    doGame("oot", ootDump, masterSeed ^ 0x4F4F5400u);
+    doGame("mm", mmDump, masterSeed ^ 0x4D4D0000u);
 
     return spoiler.dump(2);
 }

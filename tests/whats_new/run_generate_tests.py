@@ -45,17 +45,24 @@ def main():
     panel = read("combo/gui/ComboMenu.cpp")
     start = panel.index('ImGui::SeparatorText("Entrances");', panel.index("void ComboMenu::DrawComboPanel("))
     entrances = panel[start:panel.index("// Shared Items", start)]
+    start = panel.index('ImGui::SeparatorText("Shared Souls");')
+    shared_souls = panel[start:panel.index("// Cosmetics", start)]
+    start = panel.index('ImGui::SeparatorText("Shared Items");')
+    shared_items = panel[start:panel.index('ImGui::SeparatorText("Shared Souls");', start)]
+    shared_apply = block(panel, 'static void ApplySharedRandoOptionChange(')
     appearance = block(read("combo/gui/BlackMarketAppearance.h"), "inline void DrawAppearance()")
     with tempfile.TemporaryDirectory(prefix="generate-release-") as temporary:
         directory = Path(temporary)
-        (directory / "generate_controls.inc").write_text(entrances)
+        (directory / "generate_controls.inc").write_text(entrances + shared_souls)
+        (directory / "shared_items.inc").write_text(shared_items)
+        (directory / "shared_apply.inc").write_text(shared_apply)
         (directory / "black_market_appearance.inc").write_text(appearance)
         binary = directory / "generate"
         sanitizers = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
                       "-fno-pie", "-no-pie"] if os.environ.get("SANITIZE") else []
         command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-Wall", "-Wextra", "-Werror",
                    *sanitizers, "-DIMGUI_DEFINE_MATH_OPERATORS=", "-DF3DEX_GBI_2",
-                   "-I" + str(ROOT / "combo"), "-I" + str(ROOT / "libultraship/include"),
+                   "-I" + str(ROOT / "combo"), "-I" + str(ROOT / "combo/menu"), "-I" + str(ROOT / "libultraship/include"),
                    "-I" + str(imgui), "-I" + str(directory),
                    str(ROOT / "tests/whats_new/generate_test.cpp")]
         command += [str(imgui / name) for name in ("imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp")]

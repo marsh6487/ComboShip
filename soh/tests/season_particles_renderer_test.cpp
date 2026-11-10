@@ -216,11 +216,22 @@ static size_t Draw(PlayState& play) {
     uint32_t otherHigh = 0, otherLow = 0;
     const Gfx shade = gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE);
     Gfx lastCombine{};
+    const char* springTexture = nullptr;
     auto inspect = [&](auto&& self, const Gfx* p) -> void {
         const unsigned opcode = p->words.w0 >> 24;
         if (opcode == G_DL && p->words.w1 == reinterpret_cast<uintptr_t>(sSetupDL[SETUPDL_25])) {
             for (const auto& command : sSetupDL[SETUPDL_25])
                 self(self, &command);
+        }
+        if (season == SEASON_SPRING && opcode == G_SETTIMG) {
+            springTexture = reinterpret_cast<const char*>(p->words.w1);
+            assert(std::strncmp(springTexture, "__OTR__objects/object_spring_blossoms/", 36) == 0);
+        }
+        if (season == SEASON_SPRING && opcode == G_DL &&
+            p->words.w1 != reinterpret_cast<uintptr_t>(sSetupDL[SETUPDL_25])) {
+            assert(texture && springTexture);
+            assert((otherHigh & (3u << G_MDSFT_CYCLETYPE)) == G_CYC_2CYCLE);
+            assert((otherLow & Z_CMP) && !(otherLow & Z_UPD));
         }
         if (opcode == G_SETCOMBINE)
             lastCombine = *p;
@@ -498,7 +509,7 @@ int main() {
     auto petalList = displayLists[0];
     play.view.eye.x += 50000;
     play.view.lookAt.x += 50000;
-    assert(Draw(play) == 0); // A paused, fully culled untextured layer emits no setup or restoration.
+    assert(Draw(play) == 0); // A paused, fully culled spring layer emits no setup or restoration.
     play.view.eye.x -= 50000;
     play.view.lookAt.x -= 50000;
     Draw(play);
@@ -523,10 +534,13 @@ int main() {
     // A smaller detached petal accompanies each intact blossom, using the
     // same bounded owner and its existing motion and interpolation epochs.
     assert(displayLists[0] != displayLists[1]);
-    bool curved = false;
+    bool curved = false, textured = false;
     for (unsigned i = 0; i < petalVertexCount; ++i)
         curved |= petalVertices[i].v.ob[2] != 0;
-    assert(curved);
+    for (unsigned i = 0; i < petalVertexCount; ++i)
+        textured |= petalVertices[i].v.tc[0] != 0 || petalVertices[i].v.tc[1] != 0;
+    assert(curved && textured);
+    assert(allocatedVertices == 0); // Static UV/geometry and native cached texture resources only.
     play.pauseCtx.state = 0;
     season = 3;
     Draw(play);

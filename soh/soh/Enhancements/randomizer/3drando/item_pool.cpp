@@ -1,3 +1,5 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
+#include "../SoulShuffle.h"
 #include <algorithm>
 
 #include "item_pool.hpp"
@@ -484,6 +486,10 @@ bool GenerateItemPool() {
         AddFixedItemToPool(RG_SKELETON_KEY, 1);
     }
 
+    // Optional utility reward: one copy in every density, independent of other masks/NEI.
+    if (ctx->GetOption(RSK_SHUFFLE_RITO_MASK))
+        AddFixedItemToPool(RG_RITO_MASK, 1);
+
     if (ctx->GetOption(RSK_SHUFFLE_MASKS)) {
         // Cross-game masks remain one shared pool identity. Respect native starting
         // masks for copies that are still supplied by the OoT pool.
@@ -829,6 +835,10 @@ bool GenerateItemPool() {
     bool bushesActive = (bool)ctx->GetOption(RSK_SHUFFLE_BUSHES);
     PlaceItemsForType(RCTYPE_BUSH, bushesActive, false);
 
+    // Each global first-type check contributes one filler slot, in solo and unified pools.
+    if (ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS))
+        PlaceItemsForType(RCTYPE_ENEMY_DROP, true, false);
+
     // Shuffle Wonder Items
     bool overworldWonderItemsActive = ctx->GetOption(RSK_SHUFFLE_WONDER_ITEMS).Is(RO_SHUFFLE_WONDER_ITEMS_OVERWORLD) ||
                                ctx->GetOption(RSK_SHUFFLE_WONDER_ITEMS).Is(RO_SHUFFLE_WONDER_ITEMS_ALL);
@@ -963,6 +973,15 @@ bool GenerateItemPool() {
         AddFixedItemToPool(RG_GOLD_SKULLTULA_TOKEN, tokensToAdd - ctx->GetOption(RSK_STARTING_SKULLTULA_TOKEN).Get());
     }
 
+    // Soul catalog oot_pool begin
+    // Soul families add exactly one progression copy, including plentiful pools.
+    for (const auto& soul : Rando::SoulShuffle::Catalog) {
+        if (ctx->GetOption(soul.option)) {
+            AddItemToPool(soul.item, 1, 1, 1, 1);
+        }
+    }
+    // Soul catalog oot_pool end
+
     if (ctx->GetOption(RSK_SHUFFLE_BOSS_SOULS)) {
         AddItemToPool(RG_GOHMA_SOUL, 2, 1, 1, 1);
         AddItemToPool(RG_KING_DODONGO_SOUL, 2, 1, 1, 1);
@@ -1019,9 +1038,16 @@ bool GenerateItemPool() {
     }
 
     // Keys
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK)) AddFixedItemToPool(RG_CLOCK);
     if (ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS)) {
         // only 1 is added to the ice trap pool, to avoid the pool being filled with them.
         // a random one is chosen in Rando::Traps::GetTrapTrickModel
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_HYRULE_CASTLE, 2, 1, 1, 1, false);
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_RANCH_HOUSE_ROOM, 2, 1, 1, 1, false);
+        if (Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get()))
+            AddItemToPool(RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK, 2, 1, 1, 1, false);
         AddItemToPool(RG_GUARD_HOUSE_KEY, 2, 1, 1, 1);
         AddItemToPool(RG_MARKET_BAZAAR_KEY, 2, 1, 1, 1, false);
         AddItemToPool(RG_MARKET_POTION_SHOP_KEY, 2, 1, 1, 1, false);

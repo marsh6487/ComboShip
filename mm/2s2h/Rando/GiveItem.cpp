@@ -1,3 +1,10 @@
+#include <optional>
+#include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
+#include "Rando/Bags.h"
+#include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
@@ -75,16 +82,21 @@ extern "C" void (*gMMComboSharedChanged)(int game, int fileNum);
 extern "C" int Combo_MM_BombchuBagShared(void);
 #endif
 
+thread_local bool Rando::gItemGrantSimulation = false;
+
 void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
-    ItemGrantAudit::Scope itemGrantAuditScope("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
+    std::optional<ItemGrantAudit::Scope> itemGrantAuditScope;
+    if (!gItemGrantSimulation) {
+        itemGrantAuditScope.emplace("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
+    }
     // FleetShipCombo cross-item record: on obtaining ANY FC-shared item, bump its fcId-indexed count
     // (comboObtainedFc, synced to OoT) and the local shadow (comboAppliedFc, since it's granted here).
     // Re-entrancy guard: GiveItem recurses for progressives/ConvertItem and RI_TRIFORCE_PIECE ->
     // RI_SOUL_BOSS_MAJORA — only the OUTERMOST call records so a single pickup counts once.
-    static int sGiveDepth = 0;
+    static thread_local int sGiveDepth = 0;
     struct DepthGuard {
         DepthGuard() {
-            if (sGiveDepth == 0) {
+            if (sGiveDepth == 0 && !gItemGrantSimulation) {
                 gRandoPickupSerial++; // outermost call only — progressives recurse through here
             }
             sGiveDepth++;
@@ -94,7 +106,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     } _dg;
 #ifdef COMBO_BUILD
-    if (sGiveDepth == 1) {
+    if (sGiveDepth == 1 && !gItemGrantSimulation) {
         SPDLOG_INFO("[ItemGrantAudit] MM native grant: file={} seed={} item={} check={} dormant={} suppressed={}",
                     (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, (int)randoItemId,
                     (int)randoCheckId, (int)Rando::gComboDormantGive, (int)gFcCombo_SuppressRecord);
@@ -133,14 +145,16 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
                 nei->comboAppliedFc[fc]++;
             }
         }
-        FleetShared_OnNativeObtained((int)recordId); // ComboShip: hand OoT its half of a shared item
+        if (!gItemGrantSimulation) {
+            FleetShared_OnNativeObtained((int)recordId); // Real acquisition: hand OoT its half.
+        }
         // "You found X" corner toast — parity with SoH's EnItem00 pickup notification
         // (soh hook_handlers.cpp ~1330). Outermost call only = one toast per pickup (recursion for
         // progressives/ConvertItem stays silent), and cross-sync deficit grants (SuppressRecord) stay
         // silent too, matching OoT where FC arrivals don't toast.
         // A dormant cross-grant is presented and notified by the finder. Queuing its
         // toast here would replay it only when the player switches back to MM.
-        if (
+        if (!gItemGrantSimulation &&
 #ifdef COMBO_BUILD
             !Rando::gComboDormantGive &&
 #endif
@@ -153,6 +167,27 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         }
     }
     switch (randoItemId) {
+        case RI_INFINITE_BOW:
+        case RI_INFINITE_BOMB_BAG:
+        case RI_INFINITE_STICKS:
+        case RI_INFINITE_NUTS:
+        case RI_INFINITE_MAGIC:
+        case RI_INFINITE_WALLET:
+            InfiniteUpgrades::Give(randoItemId);
+            break;
+        case RI_WALLET_CHILD:
+            Wallets::Give(randoItemId);
+            break;
+        case RI_DEKU_STICK_BAG:
+        case RI_DEKU_NUT_BAG:
+            Bags::Give(randoItemId);
+            break;
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            KeyRings::Give(randoItemId);
+            break;
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             SET_WEEKEVENTREG(WEEKEVENTREG_08_80);
             break;
@@ -251,7 +286,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             // ComboShip (#136): combo owns the goal — the launcher sums both games' counts and decides.
             // Works for dormant grants too; it dispatches the silent finalize instead of the ending.
             if (Combo_IsCombinedGame()) {
-                if (gMMComboTriforceProgress != NULL) {
+                if (!gItemGrantSimulation && gMMComboTriforceProgress != NULL) {
                     gMMComboTriforceProgress(1, gSaveContext.fileNum);
                 }
                 break;
@@ -263,12 +298,14 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
                 if (!Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA)) {
                     Rando::GiveItem(RI_SOUL_BOSS_MAJORA);
                 }
-                GameInteractor_ExecuteOnGameCompletion();
-                GameInteractor::Instance->events.emplace_back(
-                    GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
-                                       .cutsceneIndex = 0xFFF7,
-                                       .transitionTrigger = TRANS_TRIGGER_START,
-                                       .transitionType = TRANS_TYPE_FADE_BLACK });
+                if (!gItemGrantSimulation) {
+                    GameInteractor_ExecuteOnGameCompletion();
+                    GameInteractor::Instance->events.emplace_back(
+                        GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
+                                           .cutsceneIndex = 0xFFF7,
+                                           .transitionTrigger = TRANS_TRIGGER_START,
+                                           .transitionType = TRANS_TYPE_FADE_BLACK });
+                }
             }
             break;
         // Technically these should never be used, but leaving them here just in case
@@ -640,6 +677,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Flags_SetRandoInf(RANDO_INF_OBTAINED_SWIM);
             break;
         case RI_TRAP:
+            if (gItemGrantSimulation) {
+                break; // Trap placement remains intact; hypothetical grants never offer traps.
+            }
 #ifdef COMBO_BUILD
             // ComboShip: traps need a live play state; dormant defers to Traps.cpp drain.
             if (Rando::gComboDormantGive) {
@@ -1116,6 +1156,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_NEI_DEKU_LEAF:
             ExtInv_GiveItem(SLOT_DEKU_LEAF, ITEM_DEKU_LEAF);
             break;
+        case RI_OOT_NEI_RITO_MASK:
+            RitoMask_Grant();
+            break;
         case RI_OOT_NEI_MAGIC_MIRROR:
             TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
             break;
@@ -1301,25 +1344,10 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             }
             break;
         }
-        // Deku stick / nut capacity, the same shape as the bomb bag above: bump the native upgrade
-        // level and top the ammo up to the new capacity. The FC row is a 2-level chain (v1 has no
-        // bag-gate), so level 1 of the native upgrade is assumed and these take it to 2 and then 3 —
-        // sticks 20 -> 30, nuts 30 -> 40. Also makes sure the slot itself is owned, since MM's logic
-        // gates on HAS_ITEM(ITEM_DEKU_STICK/NUT) and a capacity with no stick is useless.
-        case RI_OOT_PROGRESSIVE_STICK_CAPACITY: {
-            uint8_t lvl = CUR_UPG_VALUE(UPG_DEKU_STICKS);
-            Inventory_ChangeUpgrade(UPG_DEKU_STICKS, lvl < 3 ? lvl + 1 : 3);
-            INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
-            AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
+        case RI_OOT_PROGRESSIVE_STICK_CAPACITY:
+        case RI_OOT_PROGRESSIVE_NUT_CAPACITY:
+            Bags::GiveCapacity(randoItemId);
             break;
-        }
-        case RI_OOT_PROGRESSIVE_NUT_CAPACITY: {
-            uint8_t lvl = CUR_UPG_VALUE(UPG_DEKU_NUTS);
-            Inventory_ChangeUpgrade(UPG_DEKU_NUTS, lvl < 3 ? lvl + 1 : 3);
-            INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
-            AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
-            break;
-        }
         case RI_OOT_ROCS_FEATHER:
             // SoH's OTHER feather (RG_ROCS_FEATHER): the SHIP-VANILLA one, which lives in the Nayru's
             // Love cell and cycles with it. Nothing to do with Skijer's feather in SLOT_ROCS — the two
@@ -1406,6 +1434,33 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_SPEAK_GORON:
         case RI_OOT_SPEAK_HYLIAN:
         case RI_OOT_SPEAK_KOKIRI:
+        case RI_OOT_RUSTY_KEY_TREASURE_CHEST_GAME:
+        case RI_OOT_RUSTY_KEY_GUARD_HOUSE:
+        case RI_OOT_RUSTY_KEY_HYRULE_CASTLE:
+        case RI_OOT_RUSTY_KEY_DOG_LADY_HOUSE:
+        case RI_OOT_RUSTY_KEY_BACK_ALLEY_HOUSE:
+        case RI_OOT_RUSTY_KEY_BOMBCHU_SHOP:
+        case RI_OOT_RUSTY_KEY_MASK_SHOP:
+        case RI_OOT_RUSTY_KEY_CHILD_BAZAAR:
+        case RI_OOT_RUSTY_KEY_CHILD_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_CHILD_SHOOTING_GALLERY:
+        case RI_OOT_RUSTY_KEY_BOMBCHU_BOWLING:
+        case RI_OOT_RUSTY_KEY_LABORATORY:
+        case RI_OOT_RUSTY_KEY_FISHING_POND:
+        case RI_OOT_RUSTY_KEY_SILO:
+        case RI_OOT_RUSTY_KEY_RANCH_STABLE:
+        case RI_OOT_RUSTY_KEY_RANCH_HOUSE:
+        case RI_OOT_RUSTY_KEY_RANCH_HOUSE_ROOM:
+        case RI_OOT_RUSTY_KEY_GRAVEYARD:
+        case RI_OOT_RUSTY_KEY_WINDMILL:
+        case RI_OOT_RUSTY_KEY_IMPA_HOUSE:
+        case RI_OOT_RUSTY_KEY_CARPENTER_HOUSE:
+        case RI_OOT_RUSTY_KEY_GRANNY_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_ADULT_SHOOTING_GALLERY:
+        case RI_OOT_RUSTY_KEY_SKULLTULA_HOUSE:
+        case RI_OOT_RUSTY_KEY_ADULT_BAZAAR:
+        case RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP:
+        case RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP_BACK:
         case RI_OOT_SPEAK_ZORA:
         case RI_OOT_GS_TOKEN:
         case RI_JUNK:
@@ -1417,21 +1472,31 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Bottle_GiveBottle(ITEM_BOTTLE_LETTER_RUTO);
             break;
         default: {
-            // CheckQueue marks the check obtained right after this returns, so a missing arm eats
-            // the item in silence.
-            ItemId itemId = Rando::StaticData::Items[randoItemId].itemId;
-            if (itemId == ITEM_NONE) {
-                SPDLOG_ERROR("[Rando] GiveItem has no behaviour for {} ({}); check marked, nothing given.",
-                             Rando::StaticData::Items[randoItemId].spoilerName, (int)randoItemId);
+            if (RustyDoorKeys::Give(randoItemId))
+                break;
+            // Soul catalog mm_give begin
+            if (const auto* soul = Rando::SoulShuffle::Find(randoItemId)) {
+                Flags_SetRandoInf(soul->flag);
+            }
+            // Soul catalog mm_give end
+            else {
+                // CheckQueue marks the check obtained right after this returns, so a missing arm eats
+                // the item in silence.
+                ItemId itemId = Rando::StaticData::Items[randoItemId].itemId;
+                if (itemId == ITEM_NONE) {
+                    SPDLOG_ERROR("[Rando] GiveItem has no behaviour for {} ({}); check marked, nothing given.",
+                                 Rando::StaticData::Items[randoItemId].spoilerName, (int)randoItemId);
+                    break;
+                }
+                Item_Give(gPlayState, itemId);
                 break;
             }
-            Item_Give(gPlayState, itemId);
             break;
         }
     }
 #ifdef COMBO_BUILD
     // ComboShip: Shared Items — single exit poke, mirrors the #136 Triforce poke above.
-    if (Combo_IsCombinedGame() && gMMComboSharedChanged != NULL) {
+    if (!gItemGrantSimulation && Combo_IsCombinedGame() && gMMComboSharedChanged != NULL) {
         gMMComboSharedChanged(1, gSaveContext.fileNum);
     }
 #endif

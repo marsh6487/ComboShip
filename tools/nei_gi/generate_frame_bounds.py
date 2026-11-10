@@ -22,7 +22,7 @@ effects = {
     'cane_of_somaria':'Somaria', 'cane_of_byrna':'CaneBlue', 'four_sword':'FourSword',
     'kokiri_sword':'KokiriSword', 'mm_kokiri_sword':'MmKokiriSword', 'razor_sword':'RazorSword',
     'gilded_sword':'GildedSword', 'master_sword':'MasterSword', 'true_master_sword':'SwordAura',
-    'biggoron_sword':'BiggoronSword', 'giants_knife':'GiantsKnife', 'great_fairy_sword':'GreatFairySword', 'mario_mask':'MarioMask',
+    'biggoron_sword':'BiggoronSword', 'giants_knife':'GiantsKnife', 'great_fairy_sword':'GreatFairySword', 'mario_mask':'MarioMask', 'rito_mask':'Gold',
 }
 preferred = {
     'fire_rod':'kRodShopFit', 'ice_rod':'kRodShopFit', 'light_rod':'kRodShopFit',
@@ -35,7 +35,7 @@ preferred = {
     'great_fairy_sword':'kGreatFairySwordShopFit',
     'room_key':'{ .65f, 8.f }',
 }
-plain = {'whip','deku_leaf','mogma_mitts','gust_jar','beetle','spinner','minish_cap','lantern','mario_mask','cojiro'}
+plain = {'whip','deku_leaf','mogma_mitts','gust_jar','beetle','spinner','minish_cap','lantern','mario_mask','rito_mask','cojiro'}
 
 def number(value):
     return f'{value:.9f}f'
@@ -63,7 +63,7 @@ def row(directory):
 
 def generate():
     bundled=sorted(d for d in ASSETS.iterdir() if d.is_dir())
-    assert len(bundled)==63
+    assert len(bundled)==64
     optional=OPTIONAL/'cojiro'
     rows=[row(d) for d in bundled]
     if optional.exists():

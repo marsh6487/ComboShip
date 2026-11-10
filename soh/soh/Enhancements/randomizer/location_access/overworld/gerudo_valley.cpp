@@ -29,15 +29,15 @@ void RegionTable_Init_GerudoValley() {
     }, {
         //Exits
         ENTRANCE(RR_HYRULE_FIELD,          true),
-        ENTRANCE(RR_GV_UPPER_STREAM,       (logic->IsChild && logic->HasItem(RG_POWER_BRACELET)) || logic->TakeDamage()),
+        ENTRANCE(RR_GV_UPPER_STREAM,       (logic->IsChild && logic->CanUseCucco()) || logic->TakeDamage()),
         ENTRANCE(RR_GV_UPPER_STREAM_WATER, true),
-        ENTRANCE(RR_GV_CRATE_LEDGE,        (logic->IsChild && logic->HasItem(RG_POWER_BRACELET)) || logic->CanUse(RG_LONGSHOT)),
+        ENTRANCE(RR_GV_CRATE_LEDGE,        (logic->IsChild && logic->CanUseCucco()) || logic->CanUse(RG_LONGSHOT)),
         ENTRANCE(RR_GV_GROTTO_LEDGE,       true),
         //Bunnyhovers needs to aim for the sides of the bridge
         ENTRANCE(RR_GV_FORTRESS_SIDE,      (logic->IsAdult && (logic->SummonEpona() || logic->CanUse(RG_LONGSHOT) || ctx->GetOption(RSK_GERUDO_FORTRESS).Is(RO_GF_CARPENTERS_FREE) || logic->Get(LOGIC_TH_RESCUED_ALL_CARPENTERS))) || logic->CanRecoilHover(RECOIL_HAMMER) || (logic->BunnyHovers() && logic->HasItem(RG_CLIMB)) ||
-                                           ((logic->IsChild || ctx->GetTrickOption(RT_GV_HOOKSHOT_BRIDGE)) && logic->CanUse(RG_HOOKSHOT)) || (logic->IsChild && ctx->GetTrickOption(RT_GV_CHILD_CUCCO_JUMP) && logic->HasItem(RG_POWER_BRACELET) && logic->CanJumpslash())),
-        ENTRANCE(RR_GV_WATERFALL_ALCOVE,   logic->IsChild && logic->HasItem(RG_POWER_BRACELET)),
-        ENTRANCE(RR_GV_LOWER_STREAM,       logic->IsChild && logic->HasItem(RG_POWER_BRACELET)),
+                                           ((logic->IsChild || ctx->GetTrickOption(RT_GV_HOOKSHOT_BRIDGE)) && logic->CanUse(RG_HOOKSHOT)) || (logic->IsChild && ctx->GetTrickOption(RT_GV_CHILD_CUCCO_JUMP) && logic->CanUseCucco() && logic->CanJumpslash())),
+        ENTRANCE(RR_GV_WATERFALL_ALCOVE,   logic->IsChild && logic->CanUseCucco()),
+        ENTRANCE(RR_GV_LOWER_STREAM,       logic->IsChild && logic->CanUseCucco()),
     });
 
     areaTable[RR_GV_UPPER_STREAM] = Region("GV Upper Stream", SCENE_GERUDO_VALLEY, {

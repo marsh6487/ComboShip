@@ -1,0 +1,54 @@
+<DisplayList Version="0">
+  <PipeSync />
+  <LoadTextureBlock Path="objects/combo_door_keys/OverworldKeyPatinaTex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1" />
+  <LoadVertices Path="objects/combo_door_keys/OverworldKeyPatinaVtx" VertexBufferIndex="0" VertexOffset="0" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/combo_door_keys/OverworldKeyPatinaVtx" VertexBufferIndex="0" VertexOffset="30" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/combo_door_keys/OverworldKeyPatinaVtx" VertexBufferIndex="0" VertexOffset="60" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/combo_door_keys/OverworldKeyPatinaVtx" VertexBufferIndex="0" VertexOffset="90" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/combo_door_keys/OverworldKeyPatinaVtx" VertexBufferIndex="0" VertexOffset="120" Count="12" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <EndDisplayList />
+</DisplayList>

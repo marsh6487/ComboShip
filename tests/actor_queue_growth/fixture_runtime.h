@@ -3,6 +3,9 @@ typedef struct Actor {
     CollisionCheckInfo colChkInfo;
 } Actor;
 typedef struct PlayState { CollisionCheckContext colChkCtx; } PlayState;
+/* Queue ownership/contact tests assume damage is allowed. The actual saved
+ * soul-policy bridge and immunity path are covered by shuffle_parity/souls. */
+static bool Randomizer_SoulCanDamageActor(PlayState* play, Actor* actor) { return true; }
 typedef s32 (*ColChkResetFunc)(PlayState*, Collider*);
 typedef void (*ColChkVsFunc)(PlayState*, CollisionCheckContext*, Collider*, Collider*);
 typedef void (*ColChkApplyFunc)(PlayState*, CollisionCheckContext*, Collider*);

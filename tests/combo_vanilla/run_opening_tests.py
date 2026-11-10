@@ -36,6 +36,15 @@ direct = function(mm, 'extern "C" COMBO_EXPORT void MM_GrantSharedItem(')
 loader = function(mm, 'extern "C" int Combo_LoadMMSaveFile(')
 forest = (ROOT / 'mm/2s2h/Enhancements/Gameplay/ComboOpeningForest.h').read_text()
 normalize = function(forest, 'static inline void ComboOpeningForest_NormalizeEntry(')
+souls = (ROOT / 'mm/2s2h/Rando/SoulShuffleShared.cpp').read_text()
+soul_apply = function(souls, 'extern "C" void MM_ApplySharedSoulState(')
+soul_mask = function(souls, 'static uint32_t Mask(')
+soul_grant = function(souls, 'static void GrantNative(')
+option_types = (ROOT / 'mm/2s2h/Rando/Types.h').read_text()
+option_end = option_types.index('} RandoOptionId;') + len('} RandoOptionId;')
+option_begin = option_types.rfind('typedef enum {', 0, option_end)
+option_enum = option_types[option_begin:option_end]
+
 choose = (ROOT / 'soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c').read_text()
 ui = function(choose, 'void FileChoose_UpdateRandomizerMenu(').replace('this->', 'ui->').replace('FileChooseContext* this =', 'FileChooseContext* ui =').replace('(this,', '(ui,').replace('(this);', '(ui);')
 code = r'''
@@ -51,7 +60,8 @@ enum { SOUTH_CLOCK_TOWN=1, CUTSCENE=2, PLAYER_FORM_HUMAN=4, PLAYER_FORM_DEKU=3 }
 struct SceneFlags { int chest=1,switch0=2,switch1=3,clearedRoom=4,collectible=5; };
 struct SaveContext {
     struct { int entrance=987,cutsceneIndex=0xFFF3,day=2,time=123,playerForm=PLAYER_FORM_DEKU,isFirstCycle=0,isOwlSave=0;
-        struct { int pauseSaveEntrance=-1,saveType=0; } shipSaveInfo;
+        struct { int pauseSaveEntrance=-1,saveType=0;
+            struct { unsigned randoSaveOptions[RO_MAX]{}; } rando; } shipSaveInfo;
         struct { struct { unsigned threeDayResetCount=0; int magicLevel=2; } playerData;
             SceneFlags permanentSceneFlags[2]; } saveInfo;
     } save;
@@ -61,6 +71,7 @@ struct SaveContext {
 static int owlCalls=0;
 void Combo_ApplyOwlSaveOpen(int resolve) { ++owlCalls; if(resolve)gSaveContext.save.entrance=777; }
 '''
+code = code.replace('struct SceneFlags {', option_enum + '\nstruct SceneFlags {', 1)
 code += adapter
 code += r'''
 using uint8_t=unsigned char;
@@ -106,7 +117,9 @@ void SOH_OpenComboRandoSettings(){}
 '''
 code += ui
 code += r'''
-#define COMBO_EXPORT
+#include "mm/2s2h/Rando/SoulShuffleShared.h"
+#include "mm/2s2h/FleetShipCombo/FleetSharedItems.h"
+#include "combo/rando/SharedSoulRuntime.h"
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_WARN(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
@@ -148,14 +161,35 @@ code += r'''
 static PlayState play;
 static PlayState* gPlayState=&play;
 static int delivered=0,granted=0;
-struct FleetSharedReceiveGuard { ~FleetSharedReceiveGuard(){} };
+static int receiveDepth=0,soulGrants=0,gMMComboSharedMask=0;
+static std::set<std::string> ownedSouls;
+static std::string soulSnapshot="{}";
+extern "C" void FleetShared_BeginReceive(){++receiveDepth;}
+extern "C" void FleetShared_EndReceive(){assert(receiveDepth>0);--receiveDepth;}
 using FnExtractSharedState=const char* (*)();
 const char* Extract(){return "{}";}
-void* Combo_ResolveSym(const char*,const char*){return reinterpret_cast<void*>(&Extract);}
+const char* ExtractSouls(){return soulSnapshot.c_str();}
+void* Combo_ResolveSym(const char*,const char* symbol){
+    return std::string(symbol)=="SOH_ExtractSharedSoulState" ? reinterpret_cast<void*>(&ExtractSouls) :
+                                                          reinterpret_cast<void*>(&Extract);
+}
 void FleetSync_ApplySharedState(const char*){++delivered;}
 void FleetShared_RequestPullFromPeer(){sPullPending=true;}
-void GrantMmItemByName(const char*,void*){++granted;}
+void GrantMmItemByName(const char* name,void*){
+    ++granted;
+    for(const auto& pair:ComboRando::SharedSoulPairs) if(std::string(name)==pair.mmName){
+        assert(receiveDepth>0); ownedSouls.insert(name); ++soulGrants; break;
+    }
+}
+#define IS_RANDO (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
+#define RANDO_SAVE_OPTIONS gSaveContext.save.shipSaveInfo.rando.randoSaveOptions
 '''
+code += direct[:direct.index('{')].rstrip() + ';\n'
+code += '\nstruct NativeSharedAdapter {\n'
+code += 'static ComboRando::GameId Game(){return ComboRando::GAME_MM;}\n'
+code += 'static int Slot(){return gSaveContext.fileNum;}\n' + soul_mask + '\n' + soul_grant
+code += 'static bool Owned(const std::string& name){return ownedSouls.contains(name); }\n};\n'
+code += 'using Runtime=ComboRando::SharedSoulRuntime<NativeSharedAdapter>;\n' + soul_apply + '\n'
 code += pull + '\n' + direct
 code += r'''
 constexpr int ENTR_SCENE_OPENING_DUNGEON=6,CLOCK_TOWER_INTERIOR=7,GAMEMODE_NORMAL=0;
@@ -270,6 +304,27 @@ int main() {
             assert(gSaveContext.save.cutsceneIndex==0&&gSaveContext.cutsceneTrigger==0);
         }
     }
+    assert(soulGrants==0 && ownedSouls.empty() && receiveDepth==0);
+    // Actual shared-soul wrapper/runtime and native saved-mask predicate. The
+    // existing native grant boundary records the exact target under receive guard.
+    const auto* pair=&ComboRando::SharedSoulPairs[0];
+    for(const auto& candidate:ComboRando::SharedSoulPairs) if(candidate.bit==ComboRando::SS_NPC){pair=&candidate;break;}
+    gSaveContext=SaveContext{};gSaveContext.fileNum=0;
+    gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=1;gMMComboSharedMask=ComboRando::SS_NPC;
+    soulSnapshot=nlohmann::json{{"slot",0},{"mask",uint32_t(ComboRando::SS_NPC)},{"owned",{pair->ootName}}}.dump();
+    for(int blocked=0;blocked<4;++blocked){
+        vanilla=blocked==0;combined=blocked!=1;
+        gSaveContext.save.saveInfo.playerData.threeDayResetCount=blocked==0?0:1;
+        gSaveContext.fileNum=blocked==2?3:0;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=blocked==3?0:1;
+        sPullPending=true;PullFromPeerWhenReady();assert(soulGrants==0&&receiveDepth==0);
+    }
+    vanilla=false;combined=true;gSaveContext.fileNum=0;
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_NPC_SOULS]=1;
+    sPullPending=true;PullFromPeerWhenReady();
+    assert(soulGrants>0&&ownedSouls.contains(pair->mmName)&&receiveDepth==0);
+    const int once=soulGrants;sPullPending=true;PullFromPeerWhenReady();assert(soulGrants==once);
     std::cout << "PASS actual native Start/mode selection and seed guards, combined MM boot/resume and intro/Deku/owl state, failed-load refusal, deferred sharing, seeded/solo controls\n";
 }
 '''

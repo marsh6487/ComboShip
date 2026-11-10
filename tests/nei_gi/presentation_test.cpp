@@ -1,6 +1,7 @@
 // Exercise the real renderer. Only the game/graphics boundary is replaced.
 #include "overlays/actors/ovl_En_GirlA/z_en_girla.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.cpp"
+#include "ComboNeiGiResourceOwner.h"
 #include "variables.h"
 #include <cassert>
 #include <cstdlib>
@@ -364,6 +365,7 @@ ORIGINAL(Randomizer_DrawMagnesis)
 ORIGINAL(Randomizer_DrawStasis)
 ORIGINAL(Randomizer_DrawLantern)
 ORIGINAL(Randomizer_DrawMarioMask)
+ORIGINAL(Randomizer_DrawRitoMask)
 ORIGINAL(Randomizer_DrawPokeball)
 ORIGINAL(Randomizer_DrawCryonis)
 ORIGINAL(Randomizer_DrawElementalWand)
@@ -1928,13 +1930,13 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
-  // Exercise the shared production draw for all 63 serialized models at the
+  // Exercise the shared production draw for all 64 serialized models at the
   // actual pickup/shop/freestanding caller scales and both owner routes.
   struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
   const FrameFixture frames[] = {
 #include "nei_all_frame_bounds.inc"
   };
-  assert(std::size(frames)==63);
+  assert(std::size(frames)==64);
   for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:","@oot-gi-base:"}) for(int route:{0,1,2}) {
     Reset();
     const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";

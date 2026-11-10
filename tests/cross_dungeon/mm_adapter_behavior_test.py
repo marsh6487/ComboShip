@@ -40,7 +40,9 @@ constants=constants.replace('int respawnFlag=0;', 'int gameMode=0,fileNum=0,next
 transitions=(ROOT/'mm/include/z64transition.h').read_text()
 fade_black=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_FADE_BLACK,',transitions).group(1)
 constants+='\nconstexpr int TRANS_TYPE_FADE_BLACK='+fade_black+';\n'
-constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; bool isOwlSave=false; struct { int pauseSaveEntrance=-1; } shipSaveInfo; } save;')
+instant=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_INSTANT,',transitions).group(1)
+constants+='\nconstexpr int TRANS_TYPE_INSTANT='+instant+';\n'
+constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; bool isOwlSave=false; struct { int pauseSaveEntrance=-1,saveType=1; struct { struct { int version=0; } soloEntrances; } rando; } shipSaveInfo; } save;')
 scenes=(ROOT/'mm/include/tables/scene_table.h').read_text()
 for value,name in re.findall(r'/\*\s*(0x[0-9a-fA-F]+)\s*\*/\s*DEFINE_SCENE\([^,]+,\s*(SCENE_\w+)',scenes):
     if name!='SCENE_KAKUSIANA':constants+=f'\nconstexpr int {name}={value};'
@@ -61,12 +63,21 @@ using s32=int32_t;
 ''' .replace('using s32=int32_t;','#include <cstdint>\nusing s32=int32_t;')+constants+'''
 #include "combo/rando/CrossDungeonState.h"
 #include "combo/rando/CrossEntranceMmCatalogue.h"
+#include "combo/rando/SoloEntranceMmOverworld.h"
 #include "combo/rando/CrossEntranceMmGrottos.inc.h"
 #include "combo/rando/CrossEntranceTime.h"
 #include "combo/rando/CrossEntranceBoss.h"
 constexpr int GAMEMODE_NORMAL=0,ONE_WAY_EXIT=-1;
 bool canPlayTime=false,clockShuffle=false;uint8_t rawClocks=0;
 #define CAN_PLAY_SONG(song) (canPlayTime)
+#define IS_RANDO (gSaveContext.save.shipSaveInfo.saveType==1)
+namespace Rando { thread_local bool gItemGrantSimulation=false; }
+namespace Rando::SoloEntrances {
+int LogicalClear(int,int nativeValue) {
+    assert(false && "combined adapter must not query Solo logical clears");
+    return nativeValue;
+}
+}
 namespace Rando::Logic {
 struct Exit { int returnEntrance; std::function<bool()> condition=[] {return true;}; };
 struct Region { int sceneId=0;std::map<int,Exit> exits;std::set<int> oneWayEntrances; };
@@ -88,6 +99,7 @@ void ReturnPeer(int){}
 void (*gComboReturnCallback)(int)=ReturnPeer;
 void* Combo_ResolveSym(const char*,const char*){return reinterpret_cast<void*>(QueuePeer);}
 extern "C" int Combo_MM_GiantsEscape(int32_t*,int32_t*,int){return 0;}
+#include "tests/cross_dungeon/mm_solo_runtime_stubs.inc"
 '''+runtime+'''
 namespace ComboCrossMm {
 using namespace ComboRando::CrossDungeon;

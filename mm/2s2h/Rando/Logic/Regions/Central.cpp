@@ -9,6 +9,10 @@ using namespace Rando::Logic;
 static RegisterShipInitFunc initFunc([]() {
     Regions[RR_ASTRAL_OBSERVATORY_OUTSIDE] = RandoRegion{ .name = "Outside Astral Observatory", .sceneId = SCENE_00KEIKOKU,
         .checks = {
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_1, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_2, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+            CHECK(RC_TERMINA_FIELD_SOIL_OBSERVATORY_ITEM_3, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS))),
+
             CHECK(RC_ASTRAL_OBSERVATORY_MOON_TEAR, true),
         },
         .exits = { //     TO                                         FROM
@@ -80,7 +84,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_CLOCK_TOWER_ROOF_POT_04, true),
         },
         .exits = { //     TO                                         FROM
-            EXIT(ENTRANCE(THE_MOON, 0),                              ONE_WAY_EXIT, CAN_PLAY_SONG(OATH) && MeetsMoonRequirements()),
+            EXIT(ENTRANCE(THE_MOON, 0),                              ONE_WAY_EXIT, Rando::SongEvents::CanPlay(12) && MeetsMoonRequirements()),
         },
         .oneWayEntrances = {
             ENTRANCE(CLOCK_TOWER_ROOFTOP, 0), // From clock tower platform
@@ -108,7 +112,7 @@ static RegisterShipInitFunc initFunc([]() {
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 7),                ENTRANCE(EAST_CLOCK_TOWN, 0), true),
             EXIT(ENTRANCE(SOUTH_CLOCK_TOWN, 7),             ENTRANCE(EAST_CLOCK_TOWN, 1), true), // To lower
-            EXIT(ENTRANCE(ASTRAL_OBSERVATORY, 0),           ENTRANCE(EAST_CLOCK_TOWN, 2), CAN_USE_PROJECTILE),
+            EXIT(ENTRANCE(ASTRAL_OBSERVATORY, 0),           ENTRANCE(EAST_CLOCK_TOWN, 2), SoulItemRequirement(RI_SOUL_NPC_BOMBERS) && CAN_USE_PROJECTILE),
             EXIT(ENTRANCE(SOUTH_CLOCK_TOWN, 2),             ENTRANCE(EAST_CLOCK_TOWN, 3), true), // To upper
             EXIT(ENTRANCE(TREASURE_CHEST_SHOP, 0),          ENTRANCE(EAST_CLOCK_TOWN, 4), BEFORE(TIME_NIGHT1_PM_10_00) || BETWEEN(TIME_DAY2_AM_06_00, TIME_NIGHT2_PM_10_00) || BETWEEN(TIME_DAY3_AM_06_00, TIME_NIGHT3_PM_10_00)),
             EXIT(ENTRANCE(NORTH_CLOCK_TOWN, 1),             ENTRANCE(EAST_CLOCK_TOWN, 5), true),
@@ -117,10 +121,10 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(TOWN_SHOOTING_GALLERY, 0),        ENTRANCE(EAST_CLOCK_TOWN, 8), BEFORE(TIME_NIGHT1_PM_10_00) || BETWEEN(TIME_DAY2_AM_06_00, TIME_NIGHT2_PM_10_00) || BETWEEN(TIME_DAY3_AM_06_00, TIME_NIGHT3_PM_10_00)),
             EXIT(ENTRANCE(STOCK_POT_INN, 0),                ENTRANCE(EAST_CLOCK_TOWN, 9), HAS_ITEM(ITEM_ROOM_KEY) || BETWEEN(TIME_DAY1_AM_08_00, TIME_NIGHT1_PM_08_00) || BETWEEN(TIME_DAY2_AM_08_00, TIME_NIGHT2_PM_08_00) || AFTER(TIME_DAY3_AM_08_00)),
             EXIT(ENTRANCE(STOCK_POT_INN, 1),                ENTRANCE(EAST_CLOCK_TOWN, 10), CAN_BE_DEKU), // To upstairs
-            EXIT(ENTRANCE(MILK_BAR, 0),                     ENTRANCE(EAST_CLOCK_TOWN, 11), (BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_09_00) || 
-                                                                                            BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_09_00) || 
-                                                                                            BETWEEN(TIME_DAY3_AM_10_00, TIME_NIGHT3_PM_09_00)) || 
-                                                                                            (HAS_ITEM(ITEM_MASK_ROMANI) && (BETWEEN(TIME_NIGHT1_PM_10_00, TIME_NIGHT1_AM_05_00) || 
+            EXIT(ENTRANCE(MILK_BAR, 0),                     ENTRANCE(EAST_CLOCK_TOWN, 11), (BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_09_00) ||
+                                                                                            BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_09_00) ||
+                                                                                            BETWEEN(TIME_DAY3_AM_10_00, TIME_NIGHT3_PM_09_00)) ||
+                                                                                            (HAS_ITEM(ITEM_MASK_ROMANI) && (BETWEEN(TIME_NIGHT1_PM_10_00, TIME_NIGHT1_AM_05_00) ||
                                                                                             BETWEEN(TIME_NIGHT2_PM_10_00, TIME_NIGHT2_AM_05_00) ||
                                                                                             AFTER(TIME_NIGHT3_PM_10_00)))),
         },
@@ -152,7 +156,7 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(SOUTH_CLOCK_TOWN, 6),             ENTRANCE(LAUNDRY_POOL, 0), true),
-            EXIT(ENTRANCE(CURIOSITY_SHOP, 1),               ENTRANCE(LAUNDRY_POOL, 1), (RANDO_EVENTS[RE_MAIL_LETTER_TO_KAFEI] && BETWEEN(TIME_DAY2_PM_04_00, TIME_NIGHT2_PM_10_00)) || (RANDO_EVENTS[RE_MEET_KAFEI] && BETWEEN(TIME_DAY3_PM_01_00, TIME_NIGHT3_PM_10_00))),
+            EXIT(ENTRANCE(CURIOSITY_SHOP, 1),               ENTRANCE(LAUNDRY_POOL, 1), (SoulItemRequirement(RI_SOUL_NPC_KAFEI) && SoulItemRequirement(RI_SOUL_NPC_CITIZEN) && RANDO_EVENTS[RE_MAIL_LETTER_TO_KAFEI] && BETWEEN(TIME_DAY2_PM_04_00, TIME_NIGHT2_PM_10_00)) || (RANDO_EVENTS[RE_MEET_KAFEI] && BETWEEN(TIME_DAY3_PM_01_00, TIME_NIGHT3_PM_10_00))),
         },
     };
     Regions[RR_CLOCK_TOWN_NORTH] = RandoRegion{ .sceneId = SCENE_BACKTOWN,
@@ -207,7 +211,7 @@ static RegisterShipInitFunc initFunc([]() {
             EVENT(RE_BOMBERS_WEST_DAY2, RANDO_EVENTS[RE_HIDE_SEEK_DAY2]),
             EVENT(RE_BOMBERS_WEST_DAY3, RANDO_EVENTS[RE_HIDE_SEEK_DAY3]),
             // Bomber code event
-            EVENT(RE_BOMBER_CODE, 
+            EVENT(RE_BOMBER_CODE,
                 (RANDO_EVENTS[RE_BOMBERS_NORTH_DAY1] && RANDO_EVENTS[RE_BOMBERS_WEST_DAY1] && RANDO_EVENTS[RE_BOMBERS_EAST_DAY1]) ||
                 (RANDO_EVENTS[RE_BOMBERS_NORTH_DAY2] && RANDO_EVENTS[RE_BOMBERS_WEST_DAY2] && RANDO_EVENTS[RE_BOMBERS_EAST_DAY2]) ||
                 (RANDO_EVENTS[RE_BOMBERS_NORTH_DAY3] && RANDO_EVENTS[RE_BOMBERS_WEST_DAY3] && RANDO_EVENTS[RE_BOMBERS_EAST_DAY3])),
@@ -275,7 +279,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(LAUNDRY_POOL, 1),                 ENTRANCE(CURIOSITY_SHOP, 1), true)
         },
         .events = {
-            EVENT(RE_MEET_KAFEI, RANDO_EVENTS[RE_MAIL_LETTER_TO_KAFEI] && BETWEEN(TIME_DAY2_PM_04_00, TIME_NIGHT2_PM_10_00)),
+            EVENT(RE_MEET_KAFEI, SoulItemRequirement(RI_SOUL_NPC_CITIZEN) && RANDO_EVENTS[RE_MAIL_LETTER_TO_KAFEI] && BETWEEN(TIME_DAY2_PM_04_00, TIME_NIGHT2_PM_10_00)),
         },
         .timeStayRestrictions = {
             STAY(TIME_NIGHT2_PM_10_00, false),
@@ -309,22 +313,13 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_INN] = RandoRegion{ .sceneId = SCENE_YADOYA,
         .checks = {
-            CHECK(RC_STOCK_POT_INN_COUPLES_MASK, HAS_ITEM(ITEM_MASK_KAFEIS_MASK) && RANDO_EVENTS[RE_DELIVER_PENDANT] && RANDO_EVENTS[RE_RETRIEVE_SUN_MASK] && AFTER(TIME_NIGHT3_AM_04_00)),
-            CHECK(RC_STOCK_POT_INN_GRANDMA_LONG_STORY, HAS_ITEM(ITEM_MASK_ALL_NIGHT) && 
-                ((BEFORE(TIME_DAY1_PM_04_00) && CLOCK_NIGHT1()) || BETWEEN(TIME_DAY2_AM_06_00, TIME_DAY2_PM_04_00) ||
-                 (IS_DAY1() && (CLOCK_NIGHT1() || CLOCK_DAY2() || CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())) ||
-                 (IS_DAY2() && (CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())))),
-            CHECK(RC_STOCK_POT_INN_GRANDMA_SHORT_STORY, HAS_ITEM(ITEM_MASK_ALL_NIGHT) && 
-                ((IS_DAY1() && (CLOCK_DAY2() || CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())) ||
-                 (IS_DAY2() && (CLOCK_DAY3() || CLOCK_NIGHT3())))),
             CHECK(RC_STOCK_POT_INN_GUEST_ROOM_CHEST, Flags_GetRandoInf(RANDO_INF_OBTAINED_ROOM_KEY)),
             CHECK(RC_STOCK_POT_INN_LETTER_TO_KAFEI, HAS_ITEM(ITEM_MASK_KAFEIS_MASK) && RANDO_EVENTS[RE_ANJU_MIDNIGHT_MEETING]),
             CHECK(RC_STOCK_POT_INN_ROOM_KEY, BETWEEN(TIME_DAY1_PM_01_45, TIME_DAY1_PM_04_00)),
-            CHECK(RC_STOCK_POT_INN_STAFF_ROOM_CHEST, IS_NIGHT3()),
-            CHECK(RC_STOCK_POT_INN_TOILET_HAND, 
+            CHECK(RC_STOCK_POT_INN_TOILET_HAND,
                 (Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_LAND) || Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_SWAMP) ||
                 Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_MOUNTAIN) || Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_OCEAN) ||
-                Flags_GetRandoInf(RANDO_INF_OBTAINED_LETTER_TO_MAMA) || Flags_GetRandoInf(RANDO_INF_OBTAINED_LETTER_TO_KAFEI)) && 
+                Flags_GetRandoInf(RANDO_INF_OBTAINED_LETTER_TO_MAMA) || Flags_GetRandoInf(RANDO_INF_OBTAINED_LETTER_TO_KAFEI)) &&
                 MIDNIGHT()
             ),
             CHECK(RC_STOCK_POT_INN_WONDER_ITEM_01, CAN_BE_ZORA && HAS_MAGIC),
@@ -334,6 +329,11 @@ static RegisterShipInitFunc initFunc([]() {
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(EAST_CLOCK_TOWN, 9),              ENTRANCE(STOCK_POT_INN, 0), true), // From ground floor
             EXIT(ENTRANCE(EAST_CLOCK_TOWN, 10),             ENTRANCE(STOCK_POT_INN, 1), true), // From upstairs
+        },
+        .connections = {
+            CONNECTION(RR_RUSTY_INN_GRANDMA, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_GRANDMA_ROOM) && (true)),
+            CONNECTION(RR_RUSTY_INN_STAFF, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM) && (IS_NIGHT3())),
+            CONNECTION(RR_RUSTY_INN_DORMITORY, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_STOCK_POT_INN_DORMITORY) && (true)),
         },
         .events = {
             EVENT(RE_ACCESS_FISH, true),
@@ -351,22 +351,47 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_LOTTERY_SHOP] = RandoRegion{ .sceneId = SCENE_TAKARAKUJI,
         .checks = {
-            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY, 
-                  (IS_DAY1() && CLOCK_NIGHT1()) || 
-                  (IS_DAY2() && CLOCK_NIGHT2()) || 
-                  (IS_DAY3() && CLOCK_NIGHT3())),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY,
+                  (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                   ((IS_DAY1() && CLOCK_NIGHT1()) || (IS_DAY2() && CLOCK_NIGHT2()) ||
+                    (IS_DAY3() && CLOCK_NIGHT3()))) ||
+                  (RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_1] &&
+                   BETWEEN(TIME_NIGHT1_PM_06_00, TIME_NIGHT1_PM_11_00))),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2,
+                  RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_2] &&
+                  BETWEEN(TIME_NIGHT2_PM_06_00, TIME_NIGHT2_PM_11_00)),
+            CHECK(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3,
+                  RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] && RANDO_EVENTS[RE_LOTTERY_TICKET_DAY_3] &&
+                  BETWEEN(TIME_NIGHT3_PM_06_00, TIME_NIGHT3_PM_11_00)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(WEST_CLOCK_TOWN, 8),              ENTRANCE(LOTTERY_SHOP, 0), true),
         },
+        // These positive events mean the ticket can be bought on that exact day.
+        // Reward access is evaluated separately at its actual evening time.
+        .events = {
+            EVENT(RE_LOTTERY_TICKET_DAY_1, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY) && IS_DAY1()),
+            EVENT(RE_LOTTERY_TICKET_DAY_2, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2) && IS_DAY2()),
+            EVENT(RE_LOTTERY_TICKET_DAY_3, RANDO_SAVE_OPTIONS[RO_SHUFFLE_LOTTERY_NIGHTS] &&
+                  WalletCheckRequirement(RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_3) && IS_DAY3()),
+        },
+        .timeStayRestrictions = {
+            STAY(TIME_NIGHT1_PM_11_00, false),
+            STAY(TIME_NIGHT2_PM_11_00, false),
+            STAY(TIME_NIGHT3_PM_11_00, false),
+        },
     };
     Regions[RR_MAYOR_RESIDENCE] = RandoRegion{ .sceneId = SCENE_SONCHONOIE,
         .checks = {
-            CHECK(RC_MAYORS_OFFICE_PIECE_OF_HEART, HAS_ITEM(ITEM_MASK_COUPLE) && (BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_08_00) || BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_08_00) || BETWEEN(TIME_DAY3_AM_10_00, TIME_NIGHT3_PM_06_00))),
-            CHECK(RC_MAYORS_OFFICE_KAFEIS_MASK, BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_08_00) || BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_08_00))
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(EAST_CLOCK_TOWN, 7),              ENTRANCE(MAYORS_RESIDENCE, 0), true),
+        },
+        .connections = {
+            CONNECTION(RR_RUSTY_MAYOR_OFFICE, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE) && (true)),
+            CONNECTION(RR_RUSTY_MAYOR_SALON, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_SALON) && (true)),
         },
     };
     Regions[RR_MILK_BAR] = RandoRegion{ .sceneId = SCENE_MILK_BAR,
@@ -451,9 +476,9 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(NORTH_CLOCK_TOWN, 4),             ENTRANCE(DEKU_SCRUB_PLAYGROUND, 0), true),
         },
         .events = {
-            EVENT(RE_DEKU_PLAYGROUND_1, CAN_BE_DEKU && FIRST_DAY()),
-            EVENT(RE_DEKU_PLAYGROUND_2, CAN_BE_DEKU && SECOND_DAY()),
-            EVENT(RE_DEKU_PLAYGROUND_3, CAN_BE_DEKU && FINAL_DAY()),
+            EVENT(RE_DEKU_PLAYGROUND_1, CAN_BE_DEKU && FIRST_DAY() && CAN_PAY_FEE(10)),
+            EVENT(RE_DEKU_PLAYGROUND_2, CAN_BE_DEKU && SECOND_DAY() && CAN_PAY_FEE(10)),
+            EVENT(RE_DEKU_PLAYGROUND_3, CAN_BE_DEKU && FINAL_DAY() && CAN_PAY_FEE(10)),
         },
     };
     Regions[RR_TOWN_SHOOTING_GALLERY] = RandoRegion{ .sceneId = SCENE_SYATEKI_MIZU,
@@ -473,18 +498,18 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_TRADING_POST] = RandoRegion{ .sceneId = SCENE_8ITEMSHOP,
         .checks = {
             CHECK(RC_CLOCK_TOWN_WEST_TRADING_POST_POT, true), // Note : Goron has to sidehop to get up.
-            CHECK(RC_TRADING_POST_SHOP_ITEM_01, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_01)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_02, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_02)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_03, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_03)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_04, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_04)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_05, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_05)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_06, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_06)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_07, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_07)),
-            CHECK(RC_TRADING_POST_SHOP_ITEM_08, CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_08)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_01, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_01)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_02, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_02)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_03, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_03)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_04, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_04)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_05, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_05)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_06, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_06)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_07, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_07)),
+            CHECK(RC_TRADING_POST_SHOP_ITEM_08, TradingPostSoulRequirement() && CAN_AFFORD(RC_TRADING_POST_SHOP_ITEM_08)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(WEST_CLOCK_TOWN, 5),              ENTRANCE(TRADING_POST, 0), true),
-        
+
         },
         .timeStayRestrictions = {
             // Logic break at night
@@ -506,5 +531,44 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(EAST_CLOCK_TOWN, 4),              ENTRANCE(TREASURE_CHEST_SHOP, 0), true),
         },
     };
+    Regions[RR_RUSTY_MAYOR_OFFICE] = RandoRegion{ .name = "Mayor Office", .sceneId = SCENE_SONCHONOIE,
+        .checks = {
+            CHECK(RC_MAYORS_OFFICE_PIECE_OF_HEART, HAS_ITEM(ITEM_MASK_COUPLE) && (BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_08_00) || BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_08_00) || BETWEEN(TIME_DAY3_AM_10_00, TIME_NIGHT3_PM_06_00))),
+        },
+        .connections = { CONNECTION(RR_MAYOR_RESIDENCE, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE)) },
+    };
+    Regions[RR_RUSTY_MAYOR_SALON] = RandoRegion{ .name = "Mayor Salon", .sceneId = SCENE_SONCHONOIE,
+        .checks = {
+            CHECK(RC_MAYORS_OFFICE_KAFEIS_MASK, BETWEEN(TIME_DAY1_AM_10_00, TIME_NIGHT1_PM_08_00) || BETWEEN(TIME_DAY2_AM_10_00, TIME_NIGHT2_PM_08_00)),
+        },
+        .connections = { CONNECTION(RR_MAYOR_RESIDENCE, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_SALON)) },
+    };
+    Regions[RR_RUSTY_INN_GRANDMA] = RandoRegion{ .name = "Inn Grandma", .sceneId = SCENE_YADOYA,
+        .checks = {
+            CHECK(RC_STOCK_POT_INN_GRANDMA_LONG_STORY, HAS_ITEM(ITEM_MASK_ALL_NIGHT) &&
+                ((BEFORE(TIME_DAY1_PM_04_00) && CLOCK_NIGHT1()) || BETWEEN(TIME_DAY2_AM_06_00, TIME_DAY2_PM_04_00) ||
+                 (IS_DAY1() && (CLOCK_NIGHT1() || CLOCK_DAY2() || CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())) ||
+                 (IS_DAY2() && (CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())))),
+            CHECK(RC_STOCK_POT_INN_GRANDMA_SHORT_STORY, HAS_ITEM(ITEM_MASK_ALL_NIGHT) &&
+                ((IS_DAY1() && (CLOCK_DAY2() || CLOCK_NIGHT2() || CLOCK_DAY3() || CLOCK_NIGHT3())) ||
+                 (IS_DAY2() && (CLOCK_DAY3() || CLOCK_NIGHT3())))),
+        },
+        .connections = { CONNECTION(RR_INN, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_GRANDMA_ROOM)) },
+    };
+    Regions[RR_RUSTY_INN_STAFF] = RandoRegion{ .name = "Inn Staff", .sceneId = SCENE_YADOYA,
+        .checks = {
+            CHECK(RC_STOCK_POT_INN_STAFF_ROOM_CHEST, IS_NIGHT3()),
+            CHECK(RC_STOCK_POT_INN_COUPLES_MASK, HAS_ITEM(ITEM_MASK_KAFEIS_MASK) && RANDO_EVENTS[RE_DELIVER_PENDANT] && RANDO_EVENTS[RE_RETRIEVE_SUN_MASK] && AFTER(TIME_NIGHT3_AM_04_00)),
+        },
+        .connections = { CONNECTION(RR_INN, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM)) },
+    };
+    Regions[RR_RUSTY_MAYOR_BEDROOM] = RandoRegion{ .name = "Mayor Residence Bedroom", .sceneId = SCENE_SONCHONOIE,
+        .connections = { CONNECTION(RR_RUSTY_MAYOR_SALON, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI)) },
+    };
+    Regions[RR_RUSTY_INN_DORMITORY] = RandoRegion{ .name = "Inn Dormitory", .sceneId = SCENE_YADOYA,
+        .connections = { CONNECTION(RR_INN, Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_STOCK_POT_INN_DORMITORY)) },
+    };
+    Regions[RR_RUSTY_MAYOR_SALON].connections[RR_RUSTY_MAYOR_BEDROOM] = {
+        [] { return Rando::RustyDoorKeys::CanUse(RI_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI); }, "Mayor bedroom rusty key" };
 }, RANDO_LOGIC_INIT_PATHS);
 // clang-format on

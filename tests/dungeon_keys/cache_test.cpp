@@ -11,13 +11,20 @@
 extern "C" {
 #include "fixture_api.h"
 }
+/* PRODUCTION_SOUL_SETTINGS */
 #define COMBO_EXPORT
 namespace Ship {
 static bool ownerActive=false;
-struct CrossRMRegistry { static int Get(const char* game) { assert(!strcmp(game,"mm")); return 1; } };
+struct FixtureResourceManager {
+ bool IsAltAssetsEnabled() const { return ResourceMgr_IsAltAssetsEnabled(); }
+};
+static FixtureResourceManager mmOwner;
+struct CrossRMRegistry {
+ static FixtureResourceManager* Get(const char* game) { assert(!strcmp(game,"mm")); return &mmOwner; }
+};
 struct ResourceManagerScope {
  bool previous=ownerActive;
- ResourceManagerScope(int) { ownerActive=true; }
+ ResourceManagerScope(FixtureResourceManager* owner) { assert(owner==&mmOwner); ownerActive=true; }
  ~ResourceManagerScope() { ownerActive=previous; }
 };
 }
@@ -260,6 +267,58 @@ int main() {
   for (int d = 0; d < 4; d++)
     for (int k = 0; k < 4; k++)
       Rando::StaticData::Items[itemIds[d][k]] = {k, names[d][k]};
+  const RandoItemId ringIds[] = {RI_WOODFALL_KEY_RING, RI_SNOWHEAD_KEY_RING,
+                                 RI_GREAT_BAY_KEY_RING,
+                                 RI_STONE_TOWER_KEY_RING};
+  const char *ringNames[] = {"Woodfall Key Ring", "Snowhead Key Ring",
+                             "Great Bay Key Ring", "Stone Tower Key Ring"};
+  const int ringCounts[] = {1, 3, 1, 4};
+  for (int owner = 0; owner < 4; ++owner) {
+    Rando::StaticData::Items[ringIds[owner]] = {GID_KEY_SMALL,
+                                                ringNames[owner]};
+    CwItemDrawInfo recipe{};
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == 1);
+    assert(recipe.drawKind == CW_DRAW_KIND_MM_KEY_RING);
+    assert(CwValidMmKeyRingRecipe(&recipe) &&
+           CwMinDlistsForKind(recipe.drawKind) == 3);
+    assert(recipe.ops[0].a == ringCounts[owner] && recipe.ops[0].b == owner);
+    assert(recipe.stateDependent == 2 &&
+           strstr(recipe.dlists[0], "SmallKeyMetalDL") &&
+           strstr(recipe.dlists[1], "SmallKeyEmblemDL") &&
+           strstr(recipe.dlists[2], "gKeyringRingDL"));
+    auto bad = recipe;
+    bad.dlistCount = 2;
+    assert(!CwValidMmKeyRingRecipe(&bad));
+    bad = recipe;
+    bad.ops[0].a = 0;
+    assert(!CwValidMmKeyRingRecipe(&bad));
+    bad = recipe;
+    bad.ops[0].b = 1.5f;
+    assert(!CwValidMmKeyRingRecipe(&bad));
+    foreign.itemName = ringNames[owner];
+    ++generation;
+    const auto *resolved = ComboResolveForeignDrawInfo(100 + owner);
+    assert(resolved && resolved->drawKind == CW_DRAW_KIND_MM_KEY_RING &&
+           resolved->count == 3 && resolved->appearanceDependent &&
+           strstr(resolved->dls[0], "__OTR__@mm:"));
+    ComboLatchForeignDraw(100 + owner);
+    assert(ComboResolveForeignDrawInfo(100 + owner)->appearanceDependent);
+    testChanged = testEmblemChanged = 1;
+    const auto* editedRing = ComboResolveForeignDrawInfo(100 + owner);
+    assert(editedRing && editedRing->primColorOpa[0] == 10 + owner &&
+           editedRing->primColorXlu[0] == 210 + owner && editedRing->envColor[0] == 10 + owner);
+    testChanged = testEmblemChanged = 0;
+    testRingMissing = 1;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == CW_DRAW_NOT_READY);
+    assert(!ComboResolveForeignDrawInfo(100 + owner));
+    testRingAlt = 1;
+    testAlt = false;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == CW_DRAW_NOT_READY);
+    testAlt = true;
+    assert(MM_GetItemDrawInfo(ringNames[owner], &recipe) == 1);
+    assert(ComboResolveForeignDrawInfo(100 + owner));
+    testRingMissing = testRingAlt = 0;
+  }
   for (int d = 0; d < 4; d++)
     for (int k = 0; k < 4; k++) {
       const int rc = d * 4 + k;

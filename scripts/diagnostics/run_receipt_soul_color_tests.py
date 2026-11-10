@@ -42,7 +42,7 @@ def main():
             test.write_text(fixture)
             flags = ['-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-DCONTROLLERBUTTONS_T=uint32_t', '-DLOG_LEVEL_GAME_PRINTS=0',
                      '-DNON_EQUIVALENT', '-DNON_MATCHING', '-Wno-incompatible-pointer-types', '-Wno-int-conversion']
-            includes = (f'{game}/include', f'{game}/include/PR', f'{game}/src', game, f'{game}/assets',
+            includes = ('', f'{game}/include', f'{game}/include/PR', f'{game}/src', game, f'{game}/assets',
                         f'{game}/2s2h' if game == 'mm' else 'soh/soh', 'libultraship/include', 'libultraship/src', 'combo', 'combo/menu')
             flags += ['-I' + str(ROOT / path) for path in includes]
             flags += ['-DMM_BUILD_DLL', '-DRECEIPT_MM'] if game == 'mm' else ['-DSOH_BUILD_DLL']

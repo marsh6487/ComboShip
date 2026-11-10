@@ -317,10 +317,7 @@ static bool GrantNative(const Reward& reward) {
                     nei->quartzOwned = 1;
                     break;
                 case Upgrade::RitoMask:
-                    RitoItem_NoteCellItem(gSaveContext.inventory.items[SLOT_FARORES_WIND]);
-                    nei->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
-                    if (gSaveContext.inventory.items[SLOT_FARORES_WIND] == ITEM_NONE)
-                        gSaveContext.inventory.items[SLOT_FARORES_WIND] = ITEM_RITO_MASK;
+                    RitoMask_Grant();
                     break;
                 case Upgrade::SeparateRocsFeather:
                     VanillaRocsFeather_Grant();
@@ -450,11 +447,8 @@ static RandomizerGet PresentationId(const Reward& reward) {
                     return RG_QUARTZ_OF_MOTION;
                 case Upgrade::SeparateRocsFeather:
                     return RG_ROCS_FEATHER;
-                // Rito has no randomizer row. Its isolated receipt uses an
-                // inert row only for native animation; custom art/text and the
-                // token-checked explicit grant below own its real identity.
                 case Upgrade::RitoMask:
-                    return RG_CLAWSHOT;
+                    return RG_RITO_MASK;
                 default:
                     return RG_NONE;
             }
@@ -462,36 +456,6 @@ static RandomizerGet PresentationId(const Reward& reward) {
             return RG_NONE;
     }
     return RG_NONE;
-}
-
-static void DrawRitoReceipt(PlayState* play, GetItemEntry*) {
-    const auto* icon = ExtInv_GetItemIcon(ITEM_RITO_MASK);
-    if (!icon)
-        return;
-    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, 4 * sizeof(Vtx)));
-    if (!vertices)
-        return;
-    for (unsigned i = 0; i < 4; ++i) {
-        auto& v = vertices[i];
-        v = {};
-        v.v.ob[0] = (i == 0 || i == 3) ? -16 : 16;
-        v.v.ob[1] = i < 2 ? 16 : -16;
-        v.v.tc[0] = (i == 0 || i == 3) ? 0 : 1024;
-        v.v.tc[1] = i < 2 ? 0 : 1024;
-        v.v.cn[0] = v.v.cn[1] = v.v.cn[2] = v.v.cn[3] = 255;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, const_cast<char*>(__FILE__), __LINE__),
-              G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH);
-    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_DECALRGBA, G_CC_DECALRGBA);
-    gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPLoadTextureBlock(POLY_OPA_DISP++, icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP, 5, 5,
-                        G_TX_NOLOD, G_TX_NOLOD);
-    gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(vertices), 4, 0);
-    gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static bool BuildEntry(const Reward& reward, GetItemEntry& entry) {
@@ -506,8 +470,6 @@ static bool BuildEntry(const Reward& reward, GetItemEntry& entry) {
     entry.getItemFrom = ITEM_FROM_FREESTANDING;
     entry.comboForeignCheck = 0;
     entry.comboMarketReceipt = 0;
-    if (reward.kind == RewardKind::Upgrade && reward.payload == static_cast<u16>(Upgrade::RitoMask))
-        entry.drawFunc = DrawRitoReceipt;
     return true;
 }
 

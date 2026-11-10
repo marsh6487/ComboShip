@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "rando/CrossEntranceBoss.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
@@ -135,7 +136,7 @@ void RegionTable_Init_LakeHylia() {
         LOCATION(RC_LH_LAB_RIGHT_RUPEE, logic->HasItem(RG_GOLDEN_SCALE)),
     }, {
         //Exits
-        ENTRANCE(RR_LAKE_HYLIA,        true),
+        ENTRANCE(RR_LAKE_HYLIA, true),
         ENTRANCE(RR_LH_LAB_UNDERWATER, logic->CanUse(RG_IRON_BOOTS)),
     });
 

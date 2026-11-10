@@ -9,7 +9,9 @@
  * Included by ext_equip_behavior.c (unity build).
  */
 
-// No extra includes — unity-built from ext_equip_behavior.c
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
+
+// Unity-built from ext_equip_behavior.c
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -77,6 +79,9 @@ void Ikana_OnShieldBlock(Player* player, PlayState* play) {
 
     Actor* attacker = player->shieldQuad.base.ac;
     if (attacker == NULL || attacker == &player->actor)
+        return;
+
+    if (!Randomizer_SoulCanDamageActor(play, attacker))
         return;
 
     // Drain HP from the attacker

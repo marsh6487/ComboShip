@@ -37,6 +37,7 @@ extern int testFairyBundledMod, testKeyAltMask;
 extern int testSpinRed;
 extern int testColors, testChanged, testEmblemChanged, testMissing,
     testLoadFail;
+extern int testRingMissing, testRingAlt;
 extern int testCount, testDepth, testScales, testSetup5;
 extern Gfx testCommands[512];
 extern Gfx *testOpa, *testXlu;
@@ -52,6 +53,7 @@ void TestGray(Gfx *, bool);
 void TestGrayColor(Gfx *, u8, u8, u8, u8);
 bool ResourceMgr_IsAltAssetsEnabled(void);
 u8 ResourceMgr_FileAltExists(const char *);
+u8 ResourceMgr_FileExists(const char *);
 Gfx *ResourceMgr_LoadGfxByName(const char *);
 int CVarGetInteger(const char *, int);
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8, u8, u8, u8, const char *);

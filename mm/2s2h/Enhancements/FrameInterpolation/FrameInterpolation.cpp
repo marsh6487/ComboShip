@@ -497,6 +497,10 @@ void FrameInterpolation_RecordCloseChild(void) {
     current_path.pop_back();
 }
 
+#define COMBO_SOUL_RECORDER_MM
+#include "../../../../combo/menu/ComboFrameInterpolationTransaction.h"
+#undef COMBO_SOUL_RECORDER_MM
+
 void FrameInterpolation_DontInterpolateCamera(void) {
     camera_epoch = previous_camera_epoch + 1;
 }

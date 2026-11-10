@@ -2,6 +2,12 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "name": "Native OoT form instruments, note gestures and independent song voices",
+    "run": "python3 -B tests/form_instruments/button_state_test.py\npython3 -B tests/form_instruments/run_controller_tests.py\npython3 -B tests/form_instruments/run_audio_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "native_abi": "explicit",
     "name": "Native companions, Command Melody acquisition and custom encounter lifecycle",
     "run": "NLOHMANN_JSON_INCLUDE=\"${NLOHMANN_JSON_INCLUDE:-/usr/include}\" python3 -B -m unittest discover -s tests/partners -v\npython3 -B -m unittest discover -s tests/custom_encounters -v"
@@ -1327,6 +1333,13 @@
   },
   {
     "suite": "entrances",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native Solo MM saved entrance pools, overworld, mixed routes and decoupled returns",
+    "run": "python3 -B tests/solo_mm_entrances/run_tests.py"
+  },
+  {
+    "suite": "entrances",
     "origin": "nei",
     "name": "tests/farores_wind/run_tests.py",
     "run": "python3 -B tests/farores_wind/run_tests.py"
@@ -1372,6 +1385,12 @@
     "origin": "gate",
     "name": "Foreign soul replacement skeletons and limb matrices",
     "run": "python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py\npython3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py --sanitize\npython3 -B scripts/diagnostics/run_barinade_syntax_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Enemy and NPC soul catalogs, live preferences and both-host rendering",
+    "run": "python3 -B tests/soul_mini_models/run_tests.py --sanitize"
   },
   {
     "suite": "equipment",
@@ -1584,10 +1603,17 @@
     "run": "python3 -B tests/magic_mirror_shuffle/registry_test.py\npython3 -B tests/magic_mirror_shuffle/run_pool_tests.py\npython3 -B tests/magic_mirror_shuffle/run_grant_tests.py\npython3 -B tests/magic_mirror_shuffle/run_save_tests.py\npython3 -B tests/magic_mirror_shuffle/run_foreign_tests.py"
   },
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native Rito Mask optional pools stable IDs shared controls grants and authored GI",
+    "run": "python3 -B tests/rito_mask_rando/run_tests.py\npython3 -B tests/rito_mask_oot/run_tests.py\npython3 -B tests/rito_mask_oot/run_animation_tests.py\npython3 -B tests/rito_mask_mm/run_inventory_tests.py\npython3 -B tests/rito_mask_mm/run_form_tests.py\npython3 -B tests/rito_mask_mm/run_controller_tests.py\npython3 -B tests/rito_mask_mm/run_lifecycle_tests.py\npython3 -B tests/rito_mask_mm/run_save_tests.py\npython3 -B tests/rito_mask_mm/run_editor_tests.py\npython3 -B tests/rito_mask/gi_assets_test.py"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Magic Mirror combined route logic policy snapshots and queue invalidation",
-    "run": "python3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
+    "run": "python3 -B tests/magic_mirror_shuffle/run_shared_settings_tests.py --sanitize\npython3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
   },
   {
     "suite": "systems",
@@ -1858,6 +1884,46 @@
     }
   },
   {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM desired-item catalogues, RPG wishes and saved hint priorities",
+    "run": "python3 -B tests/shuffle_parity/hints/run_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM key-ring pools, grants, cycle saves and both receiving-host renderers",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_render_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM bags, wallet and infinite upgrades: pools, runtime, starts, saves and foreign receipts",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize\npython3 -B tests/shuffle_parity/wallet_receipts/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-integration --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM confined boss keys, exclusions, self-locks and failed-dump rejection",
+    "run": "python3 -B tests/shuffle_parity/boss_keys/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/boss_keys/mm_oracle_baseline_test.py\npython3 -B tests/shuffle_parity/boss_keys/headless_services_test.py\npython3 -B tests/shuffle_parity/boss_keys/run_mm_solo_entrypoint_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_boss_validator_test.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
     "suite": "render",
     "origin": "gate",
     "name": "OoT native form eye pixels and render helper",
@@ -1887,10 +1953,148 @@
   {
     "suite": "systems",
     "origin": "gate",
-    "name": "Link age voice mixer sanitizer and publication stress",
-    "run": "c++ -std=c++20 -pthread -I. -fsanitize=address,undefined -fno-pie -no-pie tests/link_voice/mixer_test.cpp -o \"$RUNNER_TEMP/age-voice-mixer\"\n\"$RUNNER_TEMP/age-voice-mixer\"",
+    "name": "Link age voice dispatch, fallback, and mixer regression",
+    "run": "c++ -std=c++20 -pthread -I. -fsanitize=address,undefined -fno-pie -no-pie tests/link_voice/mixer_test.cpp -o \"$RUNNER_TEMP/age-voice-mixer\"\n\"$RUNNER_TEMP/age-voice-mixer\"\npython3 -B tests/link_voice/run_tests.py",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native OoT first enemy-type drops: defeats, saved redelivery, souls, pools and exclusions",
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/enemy_drops/run_logic_tests.py\npython3 -B tests/shuffle_parity/enemy_drops/run_pool_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM separate lottery nights: tickets, clocks, rewards, saves and exclusions",
+    "run": "python3 -B tests/shuffle_parity/time/run_lottery_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Pinned STB acquisition: failed responses, verified cache and native declarations",
+    "run": "python3 -B tests/ci_stb_download/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native item-table bounds and stable key-ring IDs in both build modes",
+    "run": "python3 -B tests/shuffle_parity/item_table_bounds/run_tests.py\npython3 -B tests/shuffle_parity/item_table_bounds/run_tests.py --combo",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "All native soul item hint identities, translations and seed source clues",
+    "run": "python3 -B tests/shuffle_parity/souls/run_hint_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM environmental checks: all physical families, receipts, access and exclusions",
+    "run": "python3 -B tests/shuffle_parity/environment/csmc/run_palette_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/audit_catalog.py\npython3 -B tests/shuffle_parity/environment/audit_physical_ownership.py\npython3 -B tests/shuffle_parity/environment/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/environment/run_exclusion_tests.py\npython3 -B tests/shuffle_parity/environment/test_authored_placement_decoder.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM first-drop hints name enemy species in Saria, Desired and combined clues",
+    "run": "python3 -B tests/shuffle_parity/hints/run_mm_first_drop_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "Native seed harness isolation and exact junk validation (scaffolding only)",
+    "run": "python3 -B tests/shuffle_parity/enemy_drops/native_seed_scaffolding_test.py\npython3 -B tests/shuffle_parity/enemy_drops/run_solo_entrypoint_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_boss_validator_test.py\npython3 -B tests/shuffle_parity/boss_keys/native_snapshot_contract_test.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/boss_keys/native_simulation_guard_test.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native soul runtime, actor, world, ownership and route regression matrices",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_blocker_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_catalog_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_dependency_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_direct_damage_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_dump_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_enemy_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_event_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_menu_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_mm_runtime_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_npc_check_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_physical_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_pool_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_route_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_runtime_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_save_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_scripted_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_shared_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_special_damage_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_world_event_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/souls/run_world_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native song event adapters, clocks and complete affected production unit syntax",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_oot_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/song_events/run_syntax.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native 27/39 rusty door-key sources, legacy saves, Castle and shuffled returns",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/door_keys/run_oot_tests.py\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/door_keys/run_tests.py --sanitize\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/door_keys/run_legacy_tests.py --sanitize\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/door_keys/run_save_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native shuffle controls, pool refresh and Vanilla generation/import/tracker compatibility",
+    "run": "CPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/ui_refresh/run_tests.py --sanitize --fixture tests/shuffle_parity/ui_refresh/native_test.cpp\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/ui_refresh/run_tests.py --sanitize --fixture tests/shuffle_parity/ui_refresh/vanilla_test.cpp\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/ui_refresh/run_tests.py --sanitize --fixture tests/shuffle_parity/ui_refresh/import_test.cpp\nCPATH=\"${COMBO_NEI_FIXTURE_CPATH:-}${CPATH:+:$CPATH}\" python3 -B tests/shuffle_parity/ui_refresh/run_tests.py --sanitize --fixture tests/shuffle_parity/ui_refresh/tracker_test.cpp",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Authored MM Rusty and OoT overworld key assets, origins, native draws and foreign recipes",
+    "run": "python3 -B tests/authored_door_keys/asset_test.py\npython3 -B tests/authored_door_keys/run_routing_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native authored-scene static collision capacity, complete chains and real arena",
+    "run": "python3 -B tests/black_market/run_collision_pool_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Authored Clock resources, native and foreign routes, shimmer and effects-off",
+    "run": "python3 -B tools/authored_clock/build.py --check\npython3 -B tools/authored_clock/verify.py\npython3 -B tests/authored_clock/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Spring blossom texture factories, identical hosts and owned-texture fade combiner",
+    "run": "python3 -B tools/spring_blossoms/pack_textures.py --check\npython3 -B tests/seasons/run_spring_texture_tests.py\npython3 -B tests/seasons/run_spring_combiner_tests.py"
   }
 ]

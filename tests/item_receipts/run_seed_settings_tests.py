@@ -60,7 +60,7 @@ def main():
         "void OptionValue::Set(uint8_t val)", "OptionValue::operator bool() const",
         "uint8_t Option::GetValueFromText", "void Option::SetContextIndex",
         "const std::string& Option::GetName() const", "const std::string& Option::GetDescription() const",
-        "OptionCategory Option::GetCategory() const",
+        "OptionCategory Option::GetCategory() const", "RandomizerSettingKey Option::GetKey() const",
         "uint8_t Option::GetOptionIndex() const",
         "size_t Option::GetOptionCount() const",
         "uint8_t Option::GetMenuOptionDefault() const", "const std::string& Option::GetCVarName() const")]
@@ -119,7 +119,7 @@ def main():
                       "std::shared_ptr<Trials> Context::GetTrials()", "bool Context::IsSeedGenerated()",
                       "void Context::SetSeedGenerated", "bool Context::IsSpoilerLoaded()", "void Context::SetSpoilerLoaded"):
         functions.append(extract(context, signature))
-    for signature in ("void Context::SetSeedString", "void Context::SetSeed("):
+    for signature in ("void Context::SetSeedString", "void Context::SetSeed(", "uint32_t Context::GetSeed("):
         functions.append(extract(context, signature))
     if args.mq_layouts:
         functions.append(extract(context, "DungeonInfo* Context::GetDungeonFromScene"))
@@ -223,6 +223,7 @@ def main():
                     ROOT / "soh/assets", ROOT / "libultraship/include", ROOT / "combo", ROOT / "combo/menu")]
         sources = [ROOT / "tests/item_receipts/seed_settings_test.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/dungeon.cpp",
+                   ROOT / "soh/soh/Enhancements/randomizer/SongEvents.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/trial.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/location.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/randomizerEnumStrings.cpp",

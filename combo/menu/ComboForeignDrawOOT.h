@@ -1,3 +1,4 @@
+#include "ComboNeiGiResourceOwner.h"
 /* combo/menu/ComboForeignDrawOOT.h — ComboShip: cross-game foreign-item rendering, OOT (host) side.
  * The exact mirror of combo/menu/ComboForeignDrawMM.h in the opposite direction: an OOT check holding
  * RG_COMBO_FOREIGN actually holds an MM item, so we render the REAL MM model by asking 2ship.dll
@@ -18,6 +19,8 @@
 #ifndef COMBO_FOREIGN_DRAW_OOT_H
 #define COMBO_FOREIGN_DRAW_OOT_H
 #include "ComboMagicMirrorForeign.h"
+#include "ComboSoulModelSettings.h"
+#include "../NeiClockGI.h"
 
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
@@ -39,11 +42,16 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboSoulGiFlameOOT.h"
 #include "ComboCollectibleShimmerDraw.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
 #include "ComboSwordGiAssetSelection.h"
+
+#define COMBO_MM_KEY_RING_HOST_OOT
+#include "../ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_OOT
 
 namespace {
 struct ComboForeignDrawInfo {
@@ -147,6 +155,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::Unknown; // unknown item or non-portable draw func -> sentinel
     }
 
+    if (raw.drawKind == CW_DRAW_KIND_MM_KEY_RING && !CwValidMmKeyRingRecipe(&raw))
+        return ComboForeignResolve::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
         return ComboForeignResolve::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
@@ -221,6 +231,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
 // grant-time latch below so both observe the same sweep.
 struct ComboForeignDrawCache {
     std::unordered_map<int32_t, ComboForeignDrawInfo> map;
+    unsigned soulPresentation = ~0u;
     int slot = -1;
     uint64_t gen = (uint64_t)-1;
 };
@@ -233,6 +244,19 @@ inline ComboForeignDrawCache& ComboForeignDrawCacheGet() {
         c.map.clear();
         c.slot = slot;
         c.gen = gen;
+    }
+    const auto owner = Ship::CrossRMRegistry::Get("mm");
+    const unsigned presentation = ComboSoulModels::PreferenceMask() | (owner && owner->IsAltAssetsEnabled() ? 4u : 0u);
+    if (presentation != c.soulPresentation) {
+        for (auto it = c.map.begin(); it != c.map.end();) {
+            const auto& entry = it->second;
+            if (!entry.ok || entry.drawKind == CW_DRAW_KIND_SHUFFLED_SOUL ||
+                entry.drawKind == CW_DRAW_KIND_MM_SOUL_FLAME || (entry.animOk && entry.anim.fallbackTokenPath))
+                it = c.map.erase(it);
+            else
+                ++it;
+        }
+        c.soulPresentation = presentation;
     }
     return c;
 }
@@ -633,6 +657,20 @@ inline void OOT_DrawForeignSoulFlame(PlayState* play, const ComboForeignDrawInfo
     OOT_RestoreForeignSegs(play, segs, 1);
 }
 
+// Added MM souls keep the MM-owned token; the flame belongs to the receiving
+// host so its existing boss-soul Alt texture pack applies independently.
+inline void OOT_DrawForeignShuffledSoul(PlayState* play, const ComboForeignDrawInfo* info) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    OOT_FOREIGN_PIN_OPA();
+    COMBO_FOREIGN_MTX(POLY_OPA_DISP++);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[0]);
+    CLOSE_DISPS(play->state.gfxCtx);
+    ComboSoulGi_DrawOotFlame(play, info->primColorXlu);
+    int32_t segments[] = { 8 };
+    OOT_RestoreForeignSegs(play, segments, 1);
+}
+
 // Same independent weapon flame as MM's DrawOotSlateRuneFlame. Its resource
 // belongs to OoT, and its scroll/billboard use the active host frame and pose.
 inline void OOT_DrawForeignWeaponFlame(PlayState* play, const uint8_t color[4]) {
@@ -703,6 +741,9 @@ inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawIn
 // spin, hand-local transforms, split passes and independent optional flame.
 inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info, bool shop = false,
                                     bool drawFlame = true) {
+    const bool clockGlass = NeiClockGi::CanDrawForeign(play, info->count, info->dls);
+    if (!clockGlass && !NeiGi_CanDrawLayers(play, 4, 32, 32))
+        return;
     if (drawFlame)
         OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
     Matrix_Push();
@@ -755,8 +796,12 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
             OOT_FOREIGN_PIN_XLU();
             gSPGrayscale(POLY_XLU_DISP++, false);
             COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
-            for (int i = begin; i < end; ++i)
+            for (int i = begin; i < end; ++i) {
+                if (!clockGlass && NeiClockGi::TextureForGlass(info->dls[i]))
+                    continue;
+                NeiClockGi::PrepareGlass(POLY_XLU_DISP, play->gameplayFrames, info->dls[i]);
                 gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, info->dls[i], 0, G_DL_PUSH);
+            }
         } else {
             Gfx_SetupDL_25Opa(play->state.gfxCtx);
             OOT_FOREIGN_PIN_OPA();
@@ -1044,7 +1089,15 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     // ComboShip: animated class — combo-owned skeletal draw (any failure -> sentinel, never blank).
     if (info->animOk) {
         if (!ComboForeignAnim_Draw(&info->anim, "mm", play)) {
-            GetItem_Draw(play, getItemEntry->gid);
+            if (CfaIsOtrPath(info->anim.fallbackTokenPath)) {
+                ComboForeignDrawInfo fallback{};
+                fallback.dls[0] =
+                    ComboInternRoutedPath(std::string("__OTR__@mm:") + (info->anim.fallbackTokenPath + 7));
+                std::memcpy(fallback.primColorXlu, info->anim.fallbackFlameColor, 4);
+                OOT_DrawForeignShuffledSoul(play, &fallback);
+            } else {
+                GetItem_Draw(play, getItemEntry->gid);
+            }
         }
         return;
     }
@@ -1103,8 +1156,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         case CW_DRAW_KIND_NEI_GI:
             NeiGi_DrawPresentation(play, info->dls[0], info->xluStart == 1 && info->count > 1 ? info->dls[1] : nullptr,
                                    info->scale, info->neiEffect, info->neiEffectCenter,
-                                   info->itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot",
-                                   shop, 0, info->neiShimmer - 1);
+                                   info->itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0),
+                                   CwNeiGiResourceOwner(info->dls[0]), shop, 0, info->neiShimmer - 1);
             break;
         case CW_DRAW_KIND_MAGIC_SPELL:
             if (!NeiGi_DrawElementalSpell(play, info->neiEffect, 1, shop))
@@ -1151,6 +1204,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
                 return; // the native fallback includes its pink hex overlay
             }
             break;
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
+            OOT_DrawForeignShuffledSoul(play, info);
+            break;
         case CW_DRAW_KIND_MM_SOUL_FLAME:
             OOT_DrawForeignSoulFlame(play, info);
             break;
@@ -1161,6 +1217,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             if (!ComboBottleContents_Draw(play, ComboBottleContents_Profile(info->dls[0]))) {
                 OOT_DrawForeignSimple(play, info);
             }
+            break;
+        case CW_DRAW_KIND_MM_KEY_RING:
+            ComboMmKeyRing::Draw(play, static_cast<int>(info->ops[0].b), info->dls[0], info->dls[1], info->dls[2],
+                                 info->primColorOpa, info->primColorXlu, info->envColor);
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5) {

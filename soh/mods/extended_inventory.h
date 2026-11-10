@@ -20,6 +20,13 @@
 extern "C" {
 #endif
 
+// Rito is independently owned and selected in the existing corner mask wheel.
+uint8_t RitoMask_IsOwned(void);
+void RitoMask_Grant(void);
+void RitoMask_Remove(void);
+void RitoMask_MigrateLegacy(void);
+uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanillaMasks);
+
 // Skijer's NEI — layout of the UNIFIED trade wheel (trade_items.c / sTradeAdultItems).
 // SLOT_TRADE_ADULT is a grid over every non-mask trade item the player owns, in this bit order
 // (the order is also the tradeAdultOwned bit layout in nei_save.h, so entries may only be APPENDED):
@@ -41,6 +48,9 @@ static inline uint16_t ExtInv_GetSlotItem(int slot) {
     extern SaveContext gSaveContext;
     if (slot >= 0 && slot < 24) {
         uint16_t item = gSaveContext.inventory.items[slot];
+        if (slot == SLOT_TRADE_CHILD && item == ITEM_NONE && RitoMask_IsOwned()) {
+            return ITEM_RITO_MASK;
+        }
         // Pictograph Box shares the Lens of Truth slot: when owned, the slot is selectable AND
         // equippable even without the real Lens (the in-game C-button routes to the pictobox, and the
         // icon swaps via ExtInv_GetItemIcon). Without this, an empty Lens slot can't be equipped at all.

@@ -110,7 +110,7 @@ constexpr u16 MM_NA_SE_PL_PUT_OUT_ITEM=0x0877,MM_NA_SE_IT_SET_TRANSFORM_MASK=0x1
 #define CHECK_BTN_ANY(a,b) ((a)&(b))
 #define MMFORM_IS_ZORA_SWIM() 0
 #define ZORA_SWIM_THRESHOLD 20
-struct {int state=0;MmPlayerTransformation currentForm=MM_PLAYER_FORM_HUMAN,targetForm=MM_PLAYER_FORM_DEKU;s16 cutsceneTimer=0,cutscenePhase=0,flashAlpha=0;u8 skeletonLoaded=0;SkelAnime formSkelAnime;LinkAnimationHeader* idleAnim=nullptr;} gFormState;
+struct {int state=0;MmPlayerTransformation currentForm=MM_PLAYER_FORM_HUMAN,targetForm=MM_PLAYER_FORM_DEKU;s16 cutsceneTimer=0,cutscenePhase=0,flashAlpha=0;u8 skeletonLoaded=0,gakkiActive=0;SkelAnime formSkelAnime;LinkAnimationHeader* idleAnim=nullptr;} gFormState;
 static u8 sForceInstantTransform=0;
 static Player player;static PlayState play;static PlayState* gPlayState=&play;
 static int frame=0,cameraClears=0,lightClears=0,loads=0;
@@ -139,6 +139,9 @@ static void MmForm_UpdateNativeMaskLighting(Player*,PlayState*) {}
 static void Player_SetBootData(PlayState*,Player*) {}
 static void MmForm_ApplyFormProperties(Player*,MmPlayerTransformation) {}
 static void MmForm_RestoreOotState(Player*) {}
+// Independent instrument voices have their own production-controller tests.
+static void MmForm_GakkiVoiceOff() {}
+static void FormJingle_Stop() {}
 static void MmForm_EnterSwimIdle(Player*,PlayState*) {}
 static s16 Animation_GetLastFrame(LinkAnimationHeader* a) {return a->frames-1;}
 static void LinkAnimation_Change(PlayState*,SkelAnime* s,LinkAnimationHeader* a,f32 speed,f32 start,f32 end,u8 mode,f32) {s->animation=a;s->curFrame=start;s->playSpeed=speed;s->startFrame=start;s->endFrame=end;s->mode=mode;}

@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_gk.c
  * Overlay: ovl_En_Gk
@@ -297,7 +298,7 @@ s32 func_80B50854(EnGk* this, PlayState* play) {
     }
 
     if ((player->transformation == PLAYER_FORM_GORON) && (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-        (play->msgCtx.lastPlayedSong == OCARINA_SONG_GORON_LULLABY)) {
+        (play->msgCtx.lastPlayedSong == SongEvents_MmSong(10, OCARINA_SONG_GORON_LULLABY))) {
         Flags_SetSwitch(play, ENGK_GET_SWITCH_FLAG(&this->actor));
         this->animIndex = ENGK_ANIM_3;
         Actor_ChangeAnimationByInfo(&this->skelAnime, sAnimationInfo, ENGK_ANIM_3);
@@ -550,7 +551,7 @@ void func_80B51410(EnGk* this, PlayState* play) {
 
     if (this->actor.xzDistToPlayer < 100.0f) {
         if ((player->transformation == PLAYER_FORM_GORON) && (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) &&
-            (play->msgCtx.lastPlayedSong == OCARINA_SONG_GORON_LULLABY_INTRO)) {
+            (play->msgCtx.lastPlayedSong == SongEvents_MmSong(10, OCARINA_SONG_GORON_LULLABY_INTRO))) {
             this->unk_1E4 |= 0x20;
         }
 

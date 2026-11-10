@@ -37,7 +37,7 @@ def main():
     source = (ROOT / 'tests/mask_transformations/routing_test.cpp').read_text()
     source = source.replace('/* PRODUCTION_FORM_ENUM */', '\n'.join(enums))
     source = source.replace('/* PRODUCTION_SHADOW_CRYSTAL_ID */', crystal.group(0))
-    actual = [function(forms, 'RitoItem_FormEnabled')]
+    actual = [function(forms, 'RitoMask_IsOwned'), function(forms, 'RitoItem_FormEnabled')]
     actual += [function(form, name) for name in ('MmForm_MaskIdToForm', 'MmForm_GetMaskType', 'MmForm_IsEnabled',
                                               'MmForm_FleetApplyForm')]
     actual += [function(routing, name) for name in ('TransformMasks_GetMaskType', 'TransformMasks_IsEnabled',

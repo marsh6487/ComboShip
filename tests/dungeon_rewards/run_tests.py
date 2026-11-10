@@ -30,7 +30,8 @@ def main():
         placement.write_text('#include "Rando/Logic/Logic.h"\n#include "Rando/StaticData/StaticData.h"\n'
                              'namespace Rando::Logic {\n' + helpers + '\n}\n')
         flags = ['-std=c++20', '-DF3DEX_GBI_2', '-include',
-                 str(ROOT / 'tests/dungeon_rewards/headless.h'), '-I' + str(build)]
+                 str(ROOT / 'tests/dungeon_rewards/headless.h'), '-I' + str(ROOT), '-I' + str(build),
+                 '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections']
         for path in ('mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets',
                      'libultraship/include'):
             flags += ['-isystem', str(ROOT / path)]
@@ -45,6 +46,7 @@ def main():
                             *(['-DCOMBO_BUILD'] if mode == 'combo' else []),
                             str(ROOT / 'tests/dungeon_rewards/pool_test.cpp'),
                             str(ROOT / 'mm/2s2h/Rando/Logic/GeneratePools.cpp'),
+                            str(ROOT / 'mm/2s2h/Rando/SongEvents.cpp'),
                             str(placement),
                             '-o', str(binary)], check=True)
             failures += subprocess.run([str(binary)], timeout=10).returncode != 0

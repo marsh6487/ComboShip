@@ -4085,9 +4085,9 @@ int32_t BenMenu::DrawWidgetByIndex(int32_t i, int32_t width) {
     bool hasCvar = (w->cVar && w->cVar[0]);
     int32_t beforeI = hasCvar ? CVarGetInteger(w->cVar, 0) : 0;
     float beforeF = hasCvar ? CVarGetFloat(w->cVar, 0.0f) : 0.0f;
-    // MM's content area uses fontMonoLarger (mirrors MM DrawElement); push it so delegation matches
-    // regardless of comboui's active font.
-    ImFont* contentFont = OTRGlobals::Instance ? OTRGlobals::Instance->fontMonoLarger : nullptr;
+    // Use the same standard settings font as SoH and MM DrawElement, even when comboui
+    // delegates a widget while another font is active.
+    ImFont* contentFont = OTRGlobals::Instance ? OTRGlobals::Instance->fontStandardLarger : nullptr;
     if (contentFont) {
         ImGui::PushFont(contentFont);
     }

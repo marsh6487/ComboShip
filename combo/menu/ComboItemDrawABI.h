@@ -81,6 +81,8 @@ typedef enum {
     CW_DRAW_KIND_BOTTLE_CONTENTS = 40,      /* shared casing; dl0 marker selects mushroom/princess/gold dust */
     CW_DRAW_KIND_SILVER_RUPEE = 41,         /* OPA seg8 = segTexPath (owner RM), dl0; optional grayscale */
     CW_DRAW_KIND_MAGIC_MIRROR = 42,         /* receiving host draws authored procedural Mirror + leaves */
+    CW_DRAW_KIND_MM_KEY_RING = 43,          /* metal/emblem/ring paths; op[0].a=count, .b=MM dungeon */
+    CW_DRAW_KIND_SHUFFLED_SOUL = 44,        /* native token body dl0 + receiving-host boss flame, owner root dl1 */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -194,6 +196,15 @@ typedef struct {
     const char* segTexPath;
 } CwItemDrawInfo;
 
+#include "../ComboMmKeyRingPolicy.h"
+static inline int32_t CwValidMmKeyRingRecipe(const CwItemDrawInfo* info) {
+    if (info == NULL || info->drawKind != CW_DRAW_KIND_MM_KEY_RING || info->dlistCount != 3 || info->opCount != 1 ||
+        info->ops[0].op != CW_OP_END || !(info->ops[0].b >= 0.0f && info->ops[0].b <= 3.0f))
+        return 0;
+    const int owner = (int)info->ops[0].b;
+    return info->ops[0].b == (float)owner && info->ops[0].a == (float)ComboMmKeyRing_KeyCount(owner);
+}
+
 typedef struct {
     const char* path;      /* owning archive's process-lifetime texture path */
     int32_t width, height; /* logical pixels, independent of high-resolution replacements */
@@ -255,11 +266,13 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_MAGIC_SPELL:
         case CW_DRAW_KIND_MM_FAIRY_BOTTLE:
         case CW_DRAW_KIND_OOT_MORPHA_SOUL:
+        case CW_DRAW_KIND_MM_KEY_RING:
             return 3;
         case CW_DRAW_KIND_MIRROR_SHIELD:
         case CW_DRAW_KIND_BLUE_FIRE:
         case CW_DRAW_KIND_JEWEL:
         case CW_DRAW_KIND_SKULL_TOKEN:
+        case CW_DRAW_KIND_SHUFFLED_SOUL:
         case CW_DRAW_KIND_BOSS_SOUL:
         case CW_DRAW_KIND_DOUBLE_DEFENSE:
         case CW_DRAW_KIND_BRONZE_SCALE:
@@ -332,6 +345,43 @@ typedef enum {
     CW_ANIM_PROFILE_MM_TWINMOLD,
 } CwAnimProceduralProfile;
 
+/* Bounded owner-authored composite geometry. All transforms are relative to the
+ * model root; a zero scale component means 1. Rotation uses signed binary angles.
+ * Palettes are fully initialized before any mesh is emitted. */
+#define CW_ANIM_MAX_PARTS 16
+#define CW_ANIM_MAX_MATRICES 16
+typedef struct {
+    float translate[3];
+    int16_t rotate[3];
+    float scale[3];
+} CwAnimTransform;
+typedef enum {
+    CW_ANIM_MATERIAL_DEFAULT = 0,
+    CW_ANIM_MATERIAL_FREEZARD = 1,
+} CwAnimMaterialProfile;
+typedef struct {
+    const char* dlPath;
+    const char* alternateDlPath; /* selected when (host frames & frameMask) != 0 */
+    uint32_t frameMask;
+    int32_t xlu;
+    int32_t billboard;
+    int32_t beforeSkeleton;
+    CwAnimTransform transform;
+    int32_t hasPrimColor;
+    uint8_t primColor[4];
+    int32_t primLodFrac;
+    int32_t hasEnvColor;
+    uint8_t envColor[4];
+    int32_t materialProfile;
+    int32_t frameCount; /* optional 1..9 cyclic frame list; overrides dlPath */
+    const char* framePaths[9];
+} CwAnimPart;
+typedef struct {
+    int32_t segment; /* 8..13 */
+    int32_t onOpa, onXlu;
+    uint8_t prim[4], env[4];
+} CwAnimColorSegment;
+
 /* ComboShip: animated variant — the owner describes a skeletal item and ComboForeignAnim.h loads it
  * via the owner's RM and drives the host's SkelAnime. APPEND-ONLY (POD C ABI, two DLLs). */
 typedef struct {
@@ -381,7 +431,48 @@ typedef struct {
     int32_t freezeLastFrame;          /* 1 = initialize the selected animation at its last frame, once mode */
     /* Native final model material pass, submitted on OPA after the skeleton under the owner RM. */
     const char* postModelDlPath;
+    /* Native static/composite soul models. A null skeleton/animation pair is valid
+     * only with parts; opa=1 selects this composite-capable render path even when
+     * individual parts use XLU. Palette entries are model-root-relative. */
+    int32_t partCount;
+    CwAnimPart parts[CW_ANIM_MAX_PARTS];
+    int32_t matrixCount;
+    int32_t matrixSegment; /* 8..13; zero means 13 */
+    CwAnimTransform matrices[CW_ANIM_MAX_MATRICES];
+    const char* texAnimPath2;
+    int32_t texAnimStep; /* zero = live gameplay frame; positive = fixed frame + 1 */
+    int32_t texAnimStep2;
+    float skeletonTranslate[3]; /* affects skeleton only, after beforeSkeleton parts */
+    int32_t bindPose;           /* explicit static standard/flex skeleton; animPath must be null */
+    int32_t colorSegmentCount;
+    CwAnimColorSegment colorSegments[6];
+    const char* fallbackTokenPath; /* owner token; host renders its established soul flame */
+    uint8_t fallbackFlameColor[4];
+    int32_t fixedPoseCount;
+    int16_t fixedPose[128][3];
+    uint64_t hiddenLimbMask;
+    const char* posePath; /* native OPAM first frame, bindPose only; no game animation task */
 } CwItemAnimDrawInfo;
+/* Owning-DLL resource validation. Concrete resource classes are not a cross-game
+ * ABI: in particular the two Skeleton classes have different vector layouts. */
+typedef enum {
+    CW_SOUL_RESOURCE_SKELETON = 1,
+    CW_SOUL_RESOURCE_ANIMATION = 2,
+    CW_SOUL_RESOURCE_PLAYER_POSE = 3,
+} CwSoulResourceKind;
+typedef struct {
+    const void* rawPointer;
+    int32_t elementCount; /* skeleton bones, animation joints, or pose Vec3s */
+    int32_t skeletonType;
+    int32_t dListCount;
+} CwSoulResourceInfo;
+typedef int32_t (*Fn_GetSoulResourceInfo)(const char* path, int32_t kind, int32_t expectedJoints,
+                                          CwSoulResourceInfo* out);
+COMBO_OOT_EXPORT int32_t OOT_GetSoulResourceInfo(const char* path, int32_t kind, int32_t expectedJoints,
+                                                 CwSoulResourceInfo* out);
+COMBO_MM_EXPORT int32_t MM_GetSoulResourceInfo(const char* path, int32_t kind, int32_t expectedJoints,
+                                               CwSoulResourceInfo* out);
+
 typedef int32_t (*Fn_GetItemAnimDrawInfo)(const char* itemName, CwItemAnimDrawInfo* out);
 
 #ifdef __cplusplus

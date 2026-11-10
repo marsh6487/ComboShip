@@ -18,9 +18,51 @@
 #include "transformation_masks/transformation_masks.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "items/logic/weapon_upgrades.h" // NEI weapon-upgrade icon overrides
+#include "forms/custom_forms.h"
+#include "ext_buttons/ext_buttons.h"
 extern void* gItemIcons[];
 extern uint8_t gItemSlots[];
 static ExtendedInventoryState sExtInvState = { .currentPage = 0, .pageSwitchTimer = 0 };
+
+uint8_t RitoMask_IsOwned(void) {
+    return Nei_Save()->ritoMaskOwned != 0;
+}
+
+uint8_t RitoMask_UsesCornerWheel(void) {
+    return Combo_IsCombinedGame();
+}
+
+uint16_t RitoMask_BremenCellItem(void) {
+    return ExtInv_GetSlotItem(SLOT_MM_MASK_BREMEN);
+}
+
+void RitoMask_Grant(void) {
+    Nei_Save()->ritoMaskOwned = 1;
+}
+
+void RitoMask_Remove(void) {
+    const uint8_t wasActive = CustomForms_ActiveForm() == CUSTOM_FORM_RITO;
+    Nei_Save()->ritoMaskOwned = 0;
+    Nei_Save()->ritoMaskSelected = 0;
+    if (wasActive || Nei_Save()->activeCustomForm == CUSTOM_FORM_RITO + 1) {
+        CustomForms_Deactivate();
+    }
+    for (int form = 0; form < 4; ++form) {
+        for (int btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+            if (ExtButton_GetItem(form, btn) == EXT_ITEM_RITO_MASK) {
+                ExtButton_ClearItem(form, btn);
+                C_SLOT_EQUIP(form, btn) = SLOT_NONE;
+            }
+        }
+        for (int btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+            if (ExtButton_GetDpadItem(form, btn) == EXT_ITEM_RITO_MASK) {
+                ExtButton_SetDpadItem(form, btn, ITEM_NONE);
+                DPAD_SLOT_EQUIP(form, btn) = SLOT_NONE;
+            }
+        }
+    }
+    ExtInv_ClampPage();
+}
 
 // Page 2 item layout (slots 24-47)
 // Note: ITEM_ROCS_FEATHER_SKIJER at slot 24 is progressive - becomes ITEM_ROCS_CAPE when upgraded (shares slot)
@@ -320,7 +362,7 @@ uint8_t ExtInv_GetOotSlotItem(int slot) {
 // NOTE OoT's own naming is inconsistent: Keaton/BunnyHood/Goron/Zora/MaskOfTruth read
 // "gItemIcon<Name>Tex" but Skull/Spooky/Gerudo read "gItemIconMask<Name>Tex". Verified against
 // soh/assets, not guessed. Skijer 2026-07-30
-#define OOT_MASK_COUNT 8
+#define OOT_MASK_COUNT 9
 static const char* sOotMaskIconPaths[OOT_MASK_COUNT] = {
     "__OTR__textures/icon_item_static/gItemIconKeatonMaskTex",  // 0 Keaton Mask
     "__OTR__textures/icon_item_static/gItemIconMaskSkullTex",   // 1 Skull Mask
@@ -330,17 +372,27 @@ static const char* sOotMaskIconPaths[OOT_MASK_COUNT] = {
     "__OTR__textures/icon_item_static/gItemIconZoraMaskTex",    // 5 Zora Mask
     "__OTR__textures/icon_item_static/gItemIconMaskGerudoTex",  // 6 Gerudo Mask
     "__OTR__textures/icon_item_static/gItemIconMaskOfTruthTex", // 7 Mask of Truth
+    "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex",    // 8 independent Combo Rito Mask
 };
 
 uint8_t OotMask_IsOwnedIndex(int index) {
     if (index < 0 || index >= OOT_MASK_COUNT) {
         return 0;
     }
+    if (index == 8)
+        return RitoMask_UsesCornerWheel() && RitoMask_IsOwned();
     return (Nei_Save()->ootMasksOwned & (1u << index)) != 0;
 }
 
 void OotMask_SetOwnedIndex(int index, uint8_t on) {
     if (index < 0 || index >= OOT_MASK_COUNT) {
+        return;
+    }
+    if (index == 8) {
+        if (on)
+            RitoMask_Grant();
+        else
+            RitoMask_Remove();
         return;
     }
     if (on) {
@@ -417,6 +469,8 @@ uint8_t OotMask_NeighborCellItem(int dir) {
 
 const char* OotMask_IconPath(int index) {
     extern unsigned char OotAssets_Available(void);
+    if (index == 8 && RitoMask_UsesCornerWheel())
+        return sOotMaskIconPaths[index];
     if (index < 0 || index >= OOT_MASK_COUNT || !OotAssets_Available()) {
         return NULL;
     }
@@ -649,6 +703,8 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
     // 2026-08-06 page-2 additions — EXT (u16) ids; their IA4 name textures come from the
     // generate_names.py pipeline. Path strings, resolved by the RSP like every custom name.
     switch (itemId) {
+        case EXT_ITEM_RITO_MASK:
+            return (void*)"__OTR__textures/item_name_custom/gRitoMaskNameTex";
         case EXT_ITEM_SHEIKAH_SLATE:
             if (Slate_RuneCount() != 0) {
                 return Slate_RuneNameTex(Slate_GetRune());
@@ -685,6 +741,8 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
 
     // OoT child-trade mask wheel: 8 masks behind one placeholder id, name from the index cursor.
     if (itemId == ITEM_OOT_MASK_PLACEHOLDER) {
+        if (OotMask_CursorIndex() == 8)
+            return (void*)"__OTR__textures/item_name_custom/gRitoMaskNameTex";
         static const char* kOotMaskNames[] = {
             "__OTR__textures/item_name_static/gKeatonMaskItemNameENGTex",
             "__OTR__textures/item_name_static/gSkullMaskItemNameENGTex",
@@ -965,6 +1023,8 @@ void* ExtInv_GetItemIcon(uint16_t itemId) {
             return (void*)"__OTR__textures/icon_item_custom/gItemIconShadowCrystalTex";
         case EXT_ITEM_ROD_OF_SEASONS:
             return (void*)"__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsTex";
+        case EXT_ITEM_RITO_MASK:
+            return (void*)"__OTR__textures/icon_item_custom/gItemIconRitoMaskTex";
         // Spiritual Stones (companion quest icons, 24x24 — same idiom as the medallions above).
         case EXT_ITEM_SPIRITUAL_STONE_KOKIRI:
             return (void*)"__OTR__textures/icon_item_24_static/gQuestIconKokiriEmeraldTex";
@@ -2003,6 +2063,8 @@ void Seasons_SetSeason(uint8_t season) {
 }
 
 uint8_t ExtInv_GetItemSlot(uint16_t itemId) {
+    if (itemId == EXT_ITEM_RITO_MASK)
+        return VSLOT_RITO_MASK;
     if (itemId < 52) {
         return gItemSlots[itemId];
     }

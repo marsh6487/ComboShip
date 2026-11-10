@@ -97,7 +97,7 @@ def production(host, grant_ref=None):
         parts += [extract(flags, name) for name in ("Flags_GetRandoInf", "Flags_SetRandoInf")]
         parts.append("#define SOUL_RI_TO_RANDO_INF(randoItemId) "
                      "((randoItemId - RI_SOUL_BOSS_GOHT) + RANDO_INF_OBTAINED_SOUL_OF_BOSS_GOHT)\n"
-                     "static PlayState* gPlayState = nullptr;\n"
+                     "PlayState* gPlayState = nullptr;\n"
                      "void Interface_LoadItemIconImpl(PlayState*, u8) {}\n"
                      "void Interface_Dpad_LoadItemIconImpl(PlayState*, u8) {}\n")
         # Execute MM's native trade-slot writer, including equipped-button updates.
@@ -105,22 +105,29 @@ def production(host, grant_ref=None):
         parts.append("u8 Item_Give(PlayState* play, u8 item) { u8 i, temp;\n" +
                      native_trade + "\nassert(false); return ITEM_NONE; }\n")
         rows = source_at("mm/2s2h/Rando/StaticData/Items.cpp")
+        # Real KeyRings/Wallets policy headers bring the native catalogue
+        # declaration into scope. Define that map with its actual item type,
+        # filling only the trade metadata read by this probe.
         metadata = []
         for ri in ("MOONS_TEAR", "DEED_LAND", "DEED_SWAMP", "DEED_MOUNTAIN", "DEED_OCEAN",
                    "ROOM_KEY", "LETTER_TO_MAMA", "LETTER_TO_KAFEI", "PENDANT_OF_MEMORIES"):
             row = re.search(r"RI\(RI_" + ri + r",[^\n]+", rows).group()
             item = re.search(r"\bITEM_[A-Z0-9_]+\b", row).group()
-            metadata.append("{RI_" + ri + ", {" + item + "}}")
-        parts.append("namespace Rando::StaticData { struct Item { u8 itemId; };\n"
-                     "static std::map<RandoItemId, Item> Items = {" + ",".join(metadata) + "}; }\n")
-        record = between(grant, "    if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0)",
-                         "        FleetShared_OnNativeObtained((int)recordId)") + "\n}\n"
+            metadata.append("{RI_" + ri + ", {.itemId = " + item + "}}")
+        parts.append("namespace Rando::StaticData {\n"
+                     "std::map<RandoItemId, RandoStaticItem> Items = {" + ",".join(metadata) + "}; }\n")
+        record = block(grant, "    if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0)")
+        # Retain the complete native ownership/record-ID section. Peer delivery
+        # and presentation remain outside this fixture's documented boundary;
+        # remove their complete source blocks, including any simulation guards.
+        record = record.replace(block(record, "        if (!gItemGrantSimulation) {"), "", 1)
+        record = record.replace(block(record, "        if (!gItemGrantSimulation &&\n"), "", 1)
         cases = between(grant, "        case RI_SOUL_BOSS_GOHT:", "        case RI_FROG_BLUE:")
         cases += between(grant, "        case RI_MOONS_TEAR:", "        case RI_POWDER_KEG:")
         parts.append("static int gFcCombo_SuppressRecord = 0;\n"
-                     "namespace Rando {\nstatic void GiveItem(RandoItemId randoItemId) { int sGiveDepth = 1;\n" +
+                     "namespace Rando {\nvoid GiveItem(RandoItemId randoItemId, RandoCheckId) { int sGiveDepth = 1;\n" +
                      record + "\nswitch (randoItemId) {\n" + cases + "\ndefault: break; }\n}\n"
-                     "static RandoItemId ConvertItem(RandoItemId item) { return item; }\n}\n")
+                     "RandoItemId ConvertItem(RandoItemId item, RandoCheckId) { return item; }\n}\n")
         parts.append("#define FS_TRACE(...) ((void)0)\n"
                      "namespace spdlog { struct Logger { void flush() {} };\n"
                      "static Logger* default_logger() { static Logger logger; return &logger; } }\n")
@@ -155,8 +162,10 @@ def main():
             fleet_dir = "mm/2s2h/FleetShipCombo" if host == "mm" else "soh/soh/FleetShipCombo"
             # Reuse the existing native save fixture's helpers and declarations.
             common = source_at("tests/nei_shared_slot/save_test.cpp").split("static void CheckEquipmentLayoutInitialization()")[0]
+            # Load the native scene declarations before nei_oot_compat's legacy
+            # macros, as the full Rando policy headers also include z64.h.
             common = common.replace('#include "z64animation.h"', '#include "z64animation.h"\n'
-                                    '#include "z64interface.h"\n#include "z64player.h"')
+                                    '#include "z64.h"\n')
             cpp = host_build / "test.cpp"
             # Run the legacy shared-item controls in explicit seeded mode while
             # retaining the real mode query and first-cycle policy in extracted code.
@@ -164,13 +173,14 @@ def main():
                     '#include "combo/vanilla/ComboVanillaPolicy.h"\n'
                     'extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }\n')
             cpp.write_text(common + '\n' + mode + '#include <unordered_map>\n#include "' + fleet_dir + '/FleetComboItems.h"\n' +
-                           ('#include "soh/Enhancements/randomizer/randomizerEnums.h"\n' if host == "soh" else "") +
+                           ('#include "soh/Enhancements/randomizer/randomizerEnums.h"\n' if host == "soh" else
+                            '#include "Rando/KeyRings.h"\n#include "Rando/Wallets.h"\n') +
                            '#include "moons_production.inc"\n' + source_at("tests/moons_tear/test.cpp"))
             (host_build / "nei_save_production.inc").write_text(production_for(host, None))
             (host_build / "moons_production.inc").write_text(production(host, args.grant_ref))
             (host_build / "BS_thread_pool.hpp").write_text("#pragma once\nnamespace BS { class thread_pool; }\n")
             includes = ["-I" + str(p) for p in (host_build, ROOT, ROOT / host, ROOT / host / "include",
-                        ROOT / host / "include/PR", ROOT / host / "2s2h", ROOT / host / "assets",
+                        ROOT / host / "include/PR", ROOT / host / "2s2h", ROOT / host / "assets", ROOT / host / "src",
                         ROOT / "libultraship/include", ROOT / "combo")]
             flags = ["-std=c++20", "-O1", "-g", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                      "-DLOG_LEVEL_GAME_PRINTS=0", "-DHOST_MM=" + str(int(host == "mm"))]

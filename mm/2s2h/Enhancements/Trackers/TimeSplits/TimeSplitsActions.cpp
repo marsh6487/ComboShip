@@ -1,4 +1,5 @@
 #include "Timesplits.h"
+#include "2s2h/Rando/Rando.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -230,6 +231,9 @@ void UpdateSplitStatusBySceneId(uint32_t sceneId) {
 }
 
 void UpdateSplitStatusById(uint32_t itemId) {
+    if (Rando::gItemGrantSimulation) {
+        return; // Hypothetical inventory never advances a live split.
+    }
     uint32_t activeIndex = GetCurrentActiveSplit(splitList);
 
     if (activeIndex == -1) {

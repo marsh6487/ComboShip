@@ -1,3 +1,5 @@
+#include "combo/rando/MagicMirrorSettingsSnapshot.h"
+
 #include "2s2h/Rando/Rando.h"
 #include "NeiGracePolicy.h"
 #include "NeiSeasonsPolicy.h"
@@ -22,6 +24,7 @@
 
 #define COMBO_EXPORT
 #define CVAR_RANDOMIZER_SETTING(s) "gRandoSettings." s
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static nlohmann::json config = nlohmann::json::object();
 static int appliedMode, appliedRewards, creationResult, g_MmSaveInMemorySlot = -1;
 

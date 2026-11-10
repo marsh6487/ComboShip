@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_icicle.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "objects/object_icicle/object_icicle.h"
 
 #define FLAGS 0x00000000
@@ -67,7 +68,7 @@ void BgIcicle_Init(Actor* thisx, PlayState* play) {
 
     Actor_ProcessInitChain(thisx, sInitChain);
     DynaPolyActor_Init(&this->dyna, 0);
-    DynaPolyActor_LoadMesh(play, &this->dyna, &gIcicleCol);
+    DynaPolyActor_LoadMesh(play, &this->dyna, (CollisionHeader*)gIcicleCol);
 
     Collider_InitAndSetCylinder(play, &this->collider, thisx, &sCylinderInit);
     Collider_UpdateCylinder(thisx, &this->collider);
@@ -94,7 +95,7 @@ void BgIcicle_Destroy(Actor* thisx, PlayState* play) {
     Collider_DestroyCylinder(play, &this->collider);
 }
 
-void BgIcicle_Break(BgIcicle* this, PlayState* play, f32 arg2) {
+s32 BgIcicle_Break(BgIcicle* this, PlayState* play, f32 arg2) {
     static Vec3f sAccel = { 0.0f, -1.0f, 0.0f };
     static Color_RGBA8 sPrimColor = { 170, 255, 255, 255 };
     static Color_RGBA8 sEnvColor = { 0, 50, 100, 255 };
@@ -119,6 +120,7 @@ void BgIcicle_Break(BgIcicle* this, PlayState* play, f32 arg2) {
                                 30);
         }
     }
+    return GameInteractor_Should(VB_ICICLE_DROP_COLLECTIBLE, true, &this->dyna.actor);
 }
 
 void BgIcicle_DoNothing(BgIcicle* this, PlayState* play) {
@@ -201,15 +203,14 @@ void BgIcicle_UpdateAttacked(BgIcicle* this, PlayState* play) {
         this->collider.base.acFlags &= ~AC_HIT;
 
         if (this->dyna.actor.params == ICICLE_STALAGMITE_RANDOM_DROP) {
-            BgIcicle_Break(this, play, 50.0f);
-
-            if (this->unk_160 != 0xFF) {
+            if (BgIcicle_Break(this, play, 50.0f) && this->unk_160 != 0xFF) {
                 Item_DropCollectibleRandom(play, NULL, &this->dyna.actor.world.pos, this->unk_160 << 4);
             }
         } else if (this->dyna.actor.params == ICICLE_STALAGMITE_FIXED_DROP) {
             dropItem00Id = func_800A8150(this->unk_160);
-            BgIcicle_Break(this, play, 50.0f);
-            Item_DropCollectible(play, &this->dyna.actor.world.pos, (this->unk_161 << 8) | dropItem00Id);
+            if (BgIcicle_Break(this, play, 50.0f)) {
+                Item_DropCollectible(play, &this->dyna.actor.world.pos, (this->unk_161 << 8) | dropItem00Id);
+            }
         } else {
             if (this->dyna.actor.params == ICICLE_STALACTITE_REGROW) {
                 BgIcicle_Break(this, play, 40.0f);
@@ -240,5 +241,5 @@ void BgIcicle_Update(Actor* thisx, PlayState* play) {
 }
 
 void BgIcicle_Draw(Actor* thisx, PlayState* play) {
-    Gfx_DrawDListOpa(play, gIcicleDL);
+    Gfx_DrawDListOpa(play, (Gfx*)gIcicleDL);
 }

@@ -1,3 +1,4 @@
+#include "EnemyFirstDrops.h"
 #include <array>
 #include <string>
 #include <sstream>
@@ -109,6 +110,7 @@ bool showOverworldWonderItems;
 bool showDungeonWonderItems;
 bool showBeggar;
 bool showIcicles;
+bool showEnemyDrops;
 bool showRedIce;
 bool showFrogSongRupees;
 bool showFountainFairies;
@@ -1885,6 +1887,7 @@ void LoadSettings() {
         }
         showBeggar = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_BEGGAR);
         showIcicles = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_ICICLES);
+        showEnemyDrops = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_ENEMY_DROPS);
         showRedIce = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_RED_ICE);
     } else { // Vanilla
         showOverworldTokens = true;
@@ -1906,6 +1909,7 @@ void LoadSettings() {
         showDungeonSigns = false;
         showBeggar = false;
         showIcicles = false;
+        showEnemyDrops = false;
         showRedIce = false;
     }
 
@@ -2036,6 +2040,9 @@ bool IsCheckShuffled(RandomizerCheck rc) {
                 (showOverworldWonderItems && RandomizerCheckObjects::AreaIsOverworld(loc->GetArea())) ||
                 (showDungeonWonderItems && RandomizerCheckObjects::AreaIsDungeon(loc->GetArea()))) &&
                (loc->GetRCType() != RCTYPE_ICICLE || showIcicles) &&
+               (loc->GetRCType() != RCTYPE_ENEMY_DROP ||
+                (showEnemyDrops && Rando::EnemyFirstDrops::IsAvailable(rc, Rando::EnemyFirstDrops::SeedUsesMQ) &&
+                 Rando::EnemyFirstDrops::HasSeededCheck(rc))) &&
                (loc->GetRCType() != RCTYPE_RED_ICE || showRedIce) &&
                (loc->GetRCType() != RCTYPE_FISH || Rando::Fishsanity::GetFishLocationIncluded(loc)) &&
                (loc->GetRCType() != RCTYPE_FREESTANDING ||

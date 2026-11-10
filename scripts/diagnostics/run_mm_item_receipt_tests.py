@@ -303,15 +303,16 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                     str(ROOT / 'tests/item_receipts/codec_test.cpp'), '-o', str(codec)], check=True)
     subprocess.run([str(codec)], check=True)
 
-    host = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
-    cache = host[host.index('struct ComboForeignDrawCacheOOT {'):host.index('} // namespace')]
-    latch = (ROOT / 'tests/item_receipts/latch_test.cpp').read_text().replace('/* FOREIGN_CACHE */', cache)
-    tu = tmp / 'latch.cpp'
-    tu.write_text(latch)
-    exe = tmp / 'latch'
-    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), *extra,
-                    str(tu), '-o', str(exe)], check=True)
-    subprocess.run([str(exe)], check=True)
+    if '--catalog-only' not in sys.argv:
+        host = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
+        cache = host[host.index('struct ComboForeignDrawCacheOOT {'):host.index('} // namespace')]
+        latch = (ROOT / 'tests/item_receipts/latch_test.cpp').read_text().replace('/* FOREIGN_CACHE */', cache)
+        tu = tmp / 'latch.cpp'
+        tu.write_text(latch)
+        exe = tmp / 'latch'
+        subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), *extra,
+                        str(tu), '-o', str(exe)], check=True)
+        subprocess.run([str(exe)], check=True)
 
     # Compile the real MM builder with actual item/FC/vanilla-GI catalog data.
     items = (ROOT / 'mm/2s2h/Rando/StaticData/Items.cpp').read_text()
@@ -602,6 +603,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([str(integrated), str(generated_routes)], check=True)
 
     information = (ROOT / 'tests/item_receipts/information_test.cpp').read_text()
+    # This source-slice fixture has no engine host. Use the verbatim seed-policy
+    # contract from the owner header; importing z64 would replace its unrelated
+    # altar/font service boundaries. ResetImportedCatalog remains the real template.
+    rusty = (ROOT / 'soh/soh/Enhancements/randomizer/RustyDoorKeys.h').read_text()
+    rusty_policy = rusty[rusty.index('inline constexpr const char* CatalogVersionCVar'):
+                         rusty.index('inline RandomizerGet LegacySourceItem(')]
+    information = information.replace('namespace Rando {',
+        'namespace Rando::RustyDoorKeys {\n' + rusty_policy + '\n}\nnamespace Rando {', 1)
     hint = (ROOT / 'soh/soh/Enhancements/randomizer/hint.cpp').read_text()
     save = (ROOT / 'soh/soh/SaveManager.cpp').read_text()
     save_header = (ROOT / 'soh/soh/SaveManager.h').read_text()
@@ -635,7 +644,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tu.write_text(information)
     exe = tmp / 'information'
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
-                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+                    '-I', str(ROOT), '-I', str(ROOT / 'libultraship/include'), str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
 
     tracker = (ROOT / 'tests/item_receipts/tracker_test.cpp').read_text()

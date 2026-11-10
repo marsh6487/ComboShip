@@ -3536,6 +3536,10 @@ RANDO_ENUM_ITEM(RC_GANONS_CASTLE_MQ_WATER_TRIAL_SECOND_DOOR_RED_ICE_5)
 
 // Append-only: Magic Mirror standalone shuffle.
 RANDO_ENUM_ITEM(RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+// Native first enemy-type drops, append only.
+#define ENEMY_FIRST_DROP(key, name) RANDO_ENUM_ITEM(RC_ENEMY_DROP_##key)
+#include "../EnemyFirstDropsCatalog.inc"
+#undef ENEMY_FIRST_DROP
 RANDO_ENUM_ITEM(RC_MAX)
 RANDO_ENUM_END(RandomizerCheck)
 

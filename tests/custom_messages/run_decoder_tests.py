@@ -73,6 +73,7 @@ with tempfile.TemporaryDirectory(prefix="mm-custom-message-") as directory:
                     str(ROOT / "mm/2s2h/Rando/ItemReceiptText.cpp"), "-o", str(receipt_obj)], check=True)
     binary = folder / "decoder"
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *flags, str(cpp),
+                    str(ROOT / "mm/2s2h/Rando/SoloEntrances.cpp"),
                     *units, str(receipt_obj), "-Wl,--gc-sections", "-ldl", "-no-pie", "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True, timeout=10,
                    env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})

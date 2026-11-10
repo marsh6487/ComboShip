@@ -12,7 +12,7 @@
 #include "mods/ext_buttons/ext_buttons.h" // Skijer's NEI — C-equipping u16 EXT items
 #include "mods/nei_save.h"                // Skijer's NEI
 #include "mods/transformation_masks/transformation_masks.h"
-#include "mods/transformation_masks/custom_forms.h" // Skijer's NEI — Rito Mask shares the Farore's Wind cell
+#include "mods/transformation_masks/custom_forms.h" // Rito Mask ownership and existing corner mask wheel
 #include "mods/extended_inventory.c"
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h"         // Skijer's NEI — bottle randomizer wheels (A/B)
@@ -2048,22 +2048,15 @@ static void Bottle_WheelHandle(PlayState* play, u8 wheel, u8 kaleidoSlot) {
 }
 
 void KaleidoScope_HandleItemCycles(PlayState* play) {
-    // handle the mask select — only on the vanilla item page (0); on pages 1/2 the cell holds a
-    // custom item / MM mask, so the wheel must not respond there (same as the bottle wheels).
-    // CanMaskSelect() includes randomizer saves, so their wheel stays usable on page 0.
-    if (ExtInv_GetCurrentPage() == 0)
-        KaleidoScope_HandleItemCycleExtras(play, SLOT_TRADE_CHILD, CanMaskSelect(),
-                                           IS_RANDO ? Randomizer_GetPrevChildTradeItem()
-                                                    : (INV_CONTENT(ITEM_TRADE_CHILD) <= ITEM_MASK_KEATON ||
-                                                               INV_CONTENT(ITEM_TRADE_CHILD) > ITEM_MASK_TRUTH
-                                                           ? ITEM_MASK_TRUTH
-                                                           : INV_CONTENT(ITEM_TRADE_CHILD) - 1),
-                                           IS_RANDO ? Randomizer_GetNextChildTradeItem()
-                                                    : (INV_CONTENT(ITEM_TRADE_CHILD) >= ITEM_MASK_TRUTH ||
-                                                               INV_CONTENT(ITEM_TRADE_CHILD) < ITEM_MASK_KEATON
-                                                           ? ITEM_MASK_KEATON
-                                                           : INV_CONTENT(ITEM_TRADE_CHILD) + 1),
-                                           true);
+    // Bottom-right mask wheel: keep the existing 24-cell inventory layout.
+    if (ExtInv_GetCurrentPage() == 0) {
+        // Preserve a held child-trade item before the mask selection replaces it.
+        TradeAdult_FoldCurrent(ExtInv_GetSlotItem(SLOT_TRADE_CHILD));
+        RitoItem_SyncCell();
+        const u8 legacyMasks = !IS_RANDO && CanMaskSelect();
+        KaleidoScope_HandleItemCycleExtras(play, SLOT_TRADE_CHILD, true, OotMaskWheel_Neighbor(-1, legacyMasks),
+                                           OotMaskWheel_Neighbor(1, legacyMasks), true);
+    }
 
     // handle the adult trade select
     // Adult-trade wheel: the shared linear cycle wheel, fed with EVERY owned trade item — a held
@@ -2102,14 +2095,6 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
     // Handle Nayru's Love/Roc's Feather
     KaleidoScope_HandleItemCycleExtras(play, SLOT_NAYRUS_LOVE, Randomizer_GetSettingValue(RSK_ROCS_FEATHER),
                                        Enhancement_GetPrevNayrusItem(), Enhancement_GetNextNayrusItem(), true);
-
-    // Handle Farore's Wind/Rito Mask — same idea, page 0 only (on pages 1/2 that
-    // grid position is a different item entirely). Skijer's NEI
-    if (ExtInv_GetCurrentPage() == 0) {
-        RitoItem_SyncCell(); // records what this file owns, seeds an empty cell
-        KaleidoScope_HandleItemCycleExtras(play, SLOT_FARORES_WIND, RitoItem_CanCycle(), RitoItem_OtherItem(),
-                                           RitoItem_OtherItem(), true);
-    }
 
     // Handle Gust Jar element cycle
     GustJar_HandleElementCycle(play);
@@ -2159,21 +2144,11 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
 }
 
 void KaleidoScope_DrawItemCycles(PlayState* play) {
-    // draw the mask select
-    // mask-select overlay only on the vanilla item page (0) — pages 1/2 show custom items / masks. Skijer's NEI
-    // CanMaskSelect() includes randomizer saves, as in the input handler above.
-    if (ExtInv_GetCurrentPage() == 0)
-        KaleidoScope_DrawItemCycleExtras(play, SLOT_TRADE_CHILD, CanMaskSelect(),
-                                         IS_RANDO ? Randomizer_GetPrevChildTradeItem()
-                                                  : (INV_CONTENT(ITEM_TRADE_CHILD) <= ITEM_MASK_KEATON ||
-                                                             INV_CONTENT(ITEM_TRADE_CHILD) > ITEM_MASK_TRUTH
-                                                         ? ITEM_MASK_TRUTH
-                                                         : INV_CONTENT(ITEM_TRADE_CHILD) - 1),
-                                         IS_RANDO ? Randomizer_GetNextChildTradeItem()
-                                                  : (INV_CONTENT(ITEM_TRADE_CHILD) >= ITEM_MASK_TRUTH ||
-                                                             INV_CONTENT(ITEM_TRADE_CHILD) < ITEM_MASK_KEATON
-                                                         ? ITEM_MASK_KEATON
-                                                         : INV_CONTENT(ITEM_TRADE_CHILD) + 1));
+    if (ExtInv_GetCurrentPage() == 0) {
+        const u8 legacyMasks = !IS_RANDO && CanMaskSelect();
+        KaleidoScope_DrawItemCycleExtras(play, SLOT_TRADE_CHILD, true, OotMaskWheel_Neighbor(-1, legacyMasks),
+                                         OotMaskWheel_Neighbor(1, legacyMasks));
+    }
 
     // draw the adult trade select — only on the vanilla item page (0), like the mask select above. Skijer's NEI
     if (ExtInv_GetCurrentPage() == 0) {
@@ -2197,12 +2172,6 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
     // Draw Nayru's Love/Roc's Feather
     KaleidoScope_DrawItemCycleExtras(play, SLOT_NAYRUS_LOVE, Randomizer_GetSettingValue(RSK_ROCS_FEATHER),
                                      Enhancement_GetPrevNayrusItem(), Enhancement_GetNextNayrusItem());
-
-    // Draw Farore's Wind/Rito Mask (see HandleItemCycles — page 0 only). Skijer's NEI
-    if (ExtInv_GetCurrentPage() == 0) {
-        KaleidoScope_DrawItemCycleExtras(play, SLOT_FARORES_WIND, RitoItem_CanCycle(), RitoItem_OtherItem(),
-                                         RitoItem_OtherItem());
-    }
 
     // Draw Gust Jar element indicator
     GustJar_DrawElementCycle(play);

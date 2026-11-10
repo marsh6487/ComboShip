@@ -1,3 +1,4 @@
+#include "combo/rando/SongEvents.h"
 #include "spoiler_log.hpp"
 
 #include "../dungeon.h"
@@ -300,6 +301,11 @@ void SpoilerLog_Write() {
     jsonData["git_commit"] = (char*)gGitCommitHash;
     jsonData["seed"] = ctx->GetSeedString();
     jsonData["finalSeed"] = ctx->GetSeed();
+    jsonData["songEvents"] = ctx->ExportSongEvents();
+    for (unsigned event = 0; event < ctx->songEvents.size(); ++event)
+        if (ctx->songEvents[event] < 20)
+            jsonData["songEventAssignments"][ComboRando::SongEvents::OotLabels[event]] =
+                ComboRando::SongEvents::SongLabels[ctx->songEvents[event]];
 
     // Write Hash
     int index = 0;

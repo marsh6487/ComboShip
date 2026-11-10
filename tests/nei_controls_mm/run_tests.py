@@ -22,17 +22,22 @@ PREFIX = r'''
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "mods/extended_equipment.h"
 #include "mods/extended_inventory.h"
+#include "ComboGameMode.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
 #include <initializer_list>
 SaveContext gSaveContext{};
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 u8 gItemSlots[77]{};
 static NeiSaveData nei{};
 extern "C" NeiSaveData* Nei_Save() { return &nei; }
 extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) { return nei.ownedItems[slot - 24]; }
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { nei.ownedItems[slot - 24] = item; }
+// Button and Lens-cell controls must not change unrelated Rito ownership.
+extern "C" void RitoMask_Grant() { assert(false && "NEI controls granted Rito"); }
+extern "C" void RitoMask_Remove() { assert(false && "NEI controls removed Rito"); }
 uint8_t ExtInv_GetOotSlotItem(int) { return ITEM_NONE; }
 void ExtInv_SetOotSlotItem(int, uint8_t) {}
 #ifdef COMBO_BUILD
@@ -249,6 +254,7 @@ def main():
     item=read('mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c')
     buttons=read('mm/mods/ext_buttons/ext_buttons.cpp')
     code=PREFIX+claim_definition(read)+'\nextern "C" {\n'+buttons[buttons.index('u16 ExtButton_GetItem'):buttons.rindex('} // extern')]+ '\n}\n'
+    code+=function(read('mm/mods/extended_inventory.c'),'RitoMask_IsOwned')+'\n'
     equipment=read('mm/mods/extended_equipment.c')
     for name in ('ExtEquip_GetButtonItemId','ExtEquip_IsButtonItem','ExtEquip_GetLegacyButtonItem'):
         if name+'(' in equipment:code+=function(equipment,name)+'\n'

@@ -139,9 +139,8 @@ static void DrawFalling(PlayState* play, int season, const SoHSeasonParticles::V
             SetParticleMaterial(gfxCtx);
             material = true;
             if (season == 0) {
-                gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-                gDPSetCombineLERP(POLY_XLU_DISP++, SHADE, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, SHADE, 0, PRIMITIVE, 0,
-                                  0, 0, 0, PRIMITIVE);
+                // Spring binds its own textured material below for every mesh.
+                // The layer cleanup restores the native XLU cycle/combiner.
             } else if (season == 3) {
                 gSPSegment(POLY_XLU_DISP++, 0x08, reinterpret_cast<uintptr_t>(gDust5Tex));
             }
@@ -158,6 +157,7 @@ static void DrawFalling(PlayState* play, int season, const SoHSeasonParticles::V
             const float scale = (0.035f + (i & 7) * 0.002f) * (1 + p.band * 0.7f);
             Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
             if (season == 0) {
+                POLY_XLU_DISP = NeiSpringBlossoms_SetMaterial(POLY_XLU_DISP, static_cast<unsigned>(i));
                 const auto* color = NeiSpringBlossoms_Color(static_cast<unsigned>(i));
                 const float motionFrame = (p.rotation - i * 1300) / 180;
                 const float flutter = 0.65f + std::sin(motionFrame * 0.045f + i * 2.4f) * 0.25f;

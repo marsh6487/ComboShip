@@ -2611,6 +2611,15 @@ typedef enum {
 
     // An aimable item may enter and remain in its aiming state while the player is airborne.
     VB_PLAYER_ALLOW_MIDAIR_AIM,
+
+    // BgIcicle really broke (not actor unload). false replaces its native collectible. args: Actor*.
+    VB_ICICLE_DROP_COLLECTIBLE,
+    // Positive break/reward evidence; Actor*, int slice.
+    VB_ENVIRONMENT_DROP_COLLECTIBLE,
+    VB_ENVIRONMENT_SOURCE_USED,
+    VB_ENVIRONMENT_SOIL_USED,
+    VB_ENVIRONMENT_SOIL_BURROW,
+    VB_ENVIRONMENT_SOIL_TRIGGER,
 } GIVanillaBehavior;
 
 #endif

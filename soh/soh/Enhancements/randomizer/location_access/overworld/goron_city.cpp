@@ -13,10 +13,10 @@ void RegionTable_Init_GoronCity() {
         EVENT_ACCESS(LOGIC_GORON_CITY_CHILD_FIRE,                  logic->IsChild && logic->HasMagicFire()),
         EVENT_ACCESS(LOGIC_GORON_CITY_WOODS_WARP_OPEN,             logic->CanDetonateUprightBombFlower() || logic->CanUse(RG_MEGATON_HAMMER) ||
                                                                    (logic->IsChild && logic->Get(LOGIC_GORON_CITY_CHILD_FIRE) && logic->CanUse(RG_STICKS))),
-        EVENT_ACCESS(LOGIC_GORON_CITY_DARUNIAS_DOOR_OPEN_CHILD,    logic->IsChild && logic->CanUse(RG_ZELDAS_LULLABY)),
+        EVENT_ACCESS(LOGIC_GORON_CITY_DARUNIAS_DOOR_OPEN_CHILD,    logic->IsChild && logic->CanPlaySongEvent(4)),
         // bottle animation causes similar complications as stopping goron with Din's Fire, only put in logic when both din's & blue fire tricks enabled
         // RANDOTODO Strength for this is a trick in N64, should it be here? Should bunny put it in default logic?
-        EVENT_ACCESS(LOGIC_GORON_CITY_STOP_ROLLING_GORON_AS_ADULT, logic->IsAdult && logic->HasItem(RG_SPEAK_GORON) && (logic->HasStrength(1) || logic->HasExplosives() || logic->CanUse(RG_FAIRY_BOW) ||
+        EVENT_ACCESS(LOGIC_GORON_CITY_STOP_ROLLING_GORON_AS_ADULT, logic->HasItem(RG_SOUL_NPC_GORON_CHILD) && logic->IsAdult && logic->HasItem(RG_SPEAK_GORON) && (logic->HasStrength(1) || logic->HasExplosives() || logic->CanUse(RG_FAIRY_BOW) ||
                                                                                    (ctx->GetTrickOption(RT_GC_LINK_GORON_DINS) && (logic->HasMagicFire() || (ctx->GetTrickOption(RT_BLUE_FIRE_MUD_WALLS) && logic->CanUse(RG_BOTTLE_WITH_BLUE_FIRE)))))),
     }, {
         //Locations
@@ -102,7 +102,7 @@ void RegionTable_Init_GoronCity() {
 
     areaTable[RR_GC_MEDIGORON] = Region("GC Medigoron", SCENE_GORON_CITY, {
         //Events
-        EVENT_ACCESS(LOGIC_MEDIGORON, logic->IsAdult && logic->HasItem(RG_ADULT_WALLET) && GetCheckPrice(RC_GC_MEDIGORON) <= GetWalletCapacity() && logic->HasItem(RG_SPEAK_GORON)),
+        EVENT_ACCESS(LOGIC_MEDIGORON, logic->HasItem(RG_SOUL_NPC_MEDIGORON) && logic->IsAdult && logic->HasItem(RG_ADULT_WALLET) && GetCheckPrice(RC_GC_MEDIGORON) <= GetWalletCapacity() && logic->HasItem(RG_SPEAK_GORON)),
     }, {
         //Locations
         LOCATION(RC_GC_MEDIGORON,                        logic->IsAdult && logic->HasItem(RG_SPEAK_GORON) && GetCheckPrice() <= GetWalletCapacity()),

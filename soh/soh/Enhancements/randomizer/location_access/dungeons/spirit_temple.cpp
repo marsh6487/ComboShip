@@ -159,7 +159,7 @@ void RegionTable_Init_SpiritTemple() {
     areaTable[RR_SPIRIT_TEMPLE_SAND_PIT] = Region("Spirit Temple Sand Pit", SCENE_SPIRIT_TEMPLE, {}, {
         //Locations
         //bunnyhovers works as adult if you run against the wall, but it's unintuitive
-        LOCATION(RC_SPIRIT_TEMPLE_COMPASS_CHEST, logic->CanUse(RG_ZELDAS_LULLABY) && (logic->CanUse(RG_HOOKSHOT) || logic->CanRecoilHover(RECOIL_HAMMER)) && logic->CanOpenLargeChest()),
+        LOCATION(RC_SPIRIT_TEMPLE_COMPASS_CHEST, logic->CanPlaySongEvent(14) && (logic->CanUse(RG_HOOKSHOT) || logic->CanRecoilHover(RECOIL_HAMMER)) && logic->CanOpenLargeChest()),
     }, {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_ADULT_SIDE_HUB, true),
@@ -395,15 +395,15 @@ void RegionTable_Init_SpiritTemple() {
         //Both reloading a save and using FW reload the temp flags and despawn the chest.
         //In addition to being obtuse however there is no reliable, itemless way to die in this room, as the only enemies that can be reached with no items are pots that do 1 hit, break and likely give you a heart to replace it
         //because of all of this, it would be a trick
-        LOCATION(RC_SPIRIT_TEMPLE_STATUE_ROOM_HAND_CHEST,      SpiritShared(RR_SPIRIT_TEMPLE_INNER_LEFT_HAND, []{return logic->CanUse(RG_ZELDAS_LULLABY) && (logic->HasItem(RG_CLIMB) || logic->CanUse(RG_HOOKSHOT)) && logic->HasItem(RG_OPEN_CHEST);})),
-        LOCATION(RC_SPIRIT_TEMPLE_STATUE_ROOM_NORTHEAST_CHEST, SpiritShared(RR_SPIRIT_TEMPLE_INNER_LEFT_HAND, []{return logic->CanUse(RG_ZELDAS_LULLABY) && logic->HasItem(RG_OPEN_CHEST) &&
+        LOCATION(RC_SPIRIT_TEMPLE_STATUE_ROOM_HAND_CHEST,      SpiritShared(RR_SPIRIT_TEMPLE_INNER_LEFT_HAND, []{return logic->CanPlaySongEvent(13) && (logic->HasItem(RG_CLIMB) || logic->CanUse(RG_HOOKSHOT)) && logic->HasItem(RG_OPEN_CHEST);})),
+        LOCATION(RC_SPIRIT_TEMPLE_STATUE_ROOM_NORTHEAST_CHEST, SpiritShared(RR_SPIRIT_TEMPLE_INNER_LEFT_HAND, []{return logic->CanPlaySongEvent(13) && logic->HasItem(RG_OPEN_CHEST) &&
                                                                                                                                                                ((logic->IsAdult && (ctx->GetTrickOption(RT_SPIRIT_STATUE_JUMP) || logic->BunnyHood())) || logic->CanUse(RG_HOOKSHOT) || logic->CanUse(RG_HOVER_BOOTS));})),}, {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_STATUE_ROOM,       true),
         ENTRANCE(RR_SPIRIT_TEMPLE_STATUE_ROOM_ADULT, logic->CanUse(RG_HOVER_BOOTS) || logic->BunnyHood() || logic->CanUse(RG_HOOKSHOT)),
         //Assumes RR_SPIRIT_TEMPLE_STATUE_ROOM_ADULT access via RR_SPIRIT_TEMPLE_STATUE_ROOM
         ENTRANCE(RR_SPIRIT_TEMPLE_SHORTCUT_SWITCH,   (logic->IsAdult && (ctx->GetTrickOption(RT_SPIRIT_STATUE_JUMP) || logic->BunnyHood())) ||
-                                                     (logic->CanUse(RG_ZELDAS_LULLABY) && logic->CanUse(RG_HOOKSHOT))),
+                                                     (logic->CanPlaySongEvent(13) && logic->CanUse(RG_HOOKSHOT))),
     });
 
     areaTable[RR_SPIRIT_TEMPLE_SHORTCUT_SWITCH] = Region("Spirit Temple Shortcut Switch", SCENE_SPIRIT_TEMPLE, {
@@ -506,7 +506,7 @@ void RegionTable_Init_SpiritTemple() {
     areaTable[RR_SPIRIT_TEMPLE_4F_CENTRAL] = Region("Spirit Temple 4F Central", SCENE_SPIRIT_TEMPLE, {}, {}, {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_BIG_WALL_UPPER,  true),
-        ENTRANCE(RR_SPIRIT_TEMPLE_FAKE_DOORS_ROOM, logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_SPIRIT_TEMPLE_FAKE_DOORS_ROOM, logic->CanPlaySongEvent(15)),
         ENTRANCE(RR_SPIRIT_TEMPLE_BIG_MIRROR_ROOM, true),
     });
 
@@ -920,7 +920,7 @@ void RegionTable_Init_SpiritTemple() {
 
     areaTable[RR_SPIRIT_TEMPLE_MQ_INNER_LEFT_HAND] = Region("Spirit Temple MQ Inner Left Hand", SCENE_SPIRIT_TEMPLE, {}, {
         //Locations
-        LOCATION(RC_SPIRIT_TEMPLE_MQ_STATUE_ROOM_LULLABY_CHEST, logic->CanUse(RG_ZELDAS_LULLABY) && logic->CanBreakCrates() && logic->HasItem(RG_OPEN_CHEST)),
+        LOCATION(RC_SPIRIT_TEMPLE_MQ_STATUE_ROOM_LULLABY_CHEST, logic->CanPlaySongEvent(13) && logic->CanBreakCrates() && logic->HasItem(RG_OPEN_CHEST)),
     }, {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_MQ_STATUE_ROOM,       true),
@@ -983,13 +983,13 @@ void RegionTable_Init_SpiritTemple() {
         LOCATION(RC_SPIRIT_TEMPLE_MQ_GS_LEEVER_ROOM,    logic->CanGetEnemyDrop(RE_GOLD_SKULLTULA, ED_BOOMERANG)),
     }, {
         //Exits
-        ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BEHIND_GEYSER, logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BEHIND_GEYSER, logic->CanPlaySongEvent(13)),
     });
 
     areaTable[RR_SPIRIT_TEMPLE_MQ_SYMPHONY_ROOM_UPPER] = Region("Spirit Temple MQ Symphony Room Upper", SCENE_SPIRIT_TEMPLE, {
         //Events
         EVENT_ACCESS(LOGIC_SPIRIT_MQ_SYMPHONY_ROOM_DOOR, logic->CanUse(RG_MEGATON_HAMMER) && logic->CanUse(RG_SONG_OF_TIME) && logic->CanUse(RG_EPONAS_SONG) &&
-                                                         logic->CanUse(RG_SUNS_SONG) && logic->CanUse(RG_SONG_OF_STORMS) && logic->CanUse(RG_ZELDAS_LULLABY)),
+                                                         logic->CanUse(RG_SUNS_SONG) && logic->CanUse(RG_SONG_OF_STORMS) && logic->CanPlaySongEvent(13)),
     }, {}, {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BEHIND_GEYSER,       logic->SmallKeys(SCENE_SPIRIT_TEMPLE, 7)),
@@ -1124,7 +1124,7 @@ void RegionTable_Init_SpiritTemple() {
         //Exits
         ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BIG_WALL_UPPER,  true),
         ENTRANCE(RR_SPIRIT_TEMPLE_MQ_9_THRONES_ROOM,  logic->SmallKeys(SCENE_SPIRIT_TEMPLE, 7)),
-        ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BIG_MIRROR_ROOM, logic->CanUse(RG_ZELDAS_LULLABY)),
+        ENTRANCE(RR_SPIRIT_TEMPLE_MQ_BIG_MIRROR_ROOM, logic->CanPlaySongEvent(13)),
     });
 
     areaTable[RR_SPIRIT_TEMPLE_MQ_9_THRONES_ROOM] = Region("Spirit Temple MQ 9 Thrones Room", SCENE_SPIRIT_TEMPLE, {}, {

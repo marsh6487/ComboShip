@@ -426,7 +426,7 @@ void RegionTable_Init_GanonsCastle() {
 
     areaTable[RR_GANONS_CASTLE_LIGHT_TRIAL_TRIFORCE_ROOM] = Region("Ganon's Castle Light Trial Triforce Room", SCENE_INSIDE_GANONS_CASTLE, {}, {
         //Locations
-        LOCATION(RC_GANONS_CASTLE_LIGHT_TRIAL_LULLABY_CHEST, logic->CanUse(RG_ZELDAS_LULLABY) && logic->HasItem(RG_OPEN_CHEST)),
+        LOCATION(RC_GANONS_CASTLE_LIGHT_TRIAL_LULLABY_CHEST, logic->CanPlaySongEvent(17) && logic->HasItem(RG_OPEN_CHEST)),
     }, {
         //Exits
         ENTRANCE(RR_GANONS_CASTLE_LIGHT_TRIAL_CHESTS_ROOM,  true),
@@ -898,7 +898,7 @@ void RegionTable_Init_GanonsCastle() {
 
     areaTable[RR_GANONS_CASTLE_MQ_LIGHT_TRIAL_TRIFORCE_ROOM] = Region("Ganon's Castle MQ Light Trial Triforce Room", SCENE_INSIDE_GANONS_CASTLE, {}, {
         //Locations
-        LOCATION(RC_GANONS_CASTLE_MQ_LIGHT_TRIAL_LULLABY_CHEST, logic->CanUse(RG_ZELDAS_LULLABY) && logic->HasItem(RG_OPEN_CHEST)),
+        LOCATION(RC_GANONS_CASTLE_MQ_LIGHT_TRIAL_LULLABY_CHEST, logic->CanPlaySongEvent(17) && logic->HasItem(RG_OPEN_CHEST)),
     }, {
         //Exits
         ENTRANCE(RR_GANONS_CASTLE_MQ_LIGHT_TRIAL_DINOLFOS_ROOM,      true),

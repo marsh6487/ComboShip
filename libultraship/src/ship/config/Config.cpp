@@ -148,6 +148,11 @@ void Config::SetBlock(const std::string& key, nlohmann::json block) {
     if (!TryUnflatten(gjson)) {
         return;
     }
+    // An empty flattened configuration unflattens to null. It has no existing
+    // subtree to protect, so the first block write must create the root object.
+    if (gjson.is_null()) {
+        gjson = nlohmann::json::object();
+    }
     if (key.find(".") != std::string::npos) {
         nlohmann::json* gjson2 = &gjson;
         std::vector<std::string> dots = StringHelper::Split(key, ".");

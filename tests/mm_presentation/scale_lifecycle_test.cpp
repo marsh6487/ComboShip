@@ -173,6 +173,9 @@ void* Combo_ResolveSym(const char* module, const char* symbol) {
   assert(std::strcmp(symbol, "SOH_ApplySharedMagicFloor") == 0);
   return reinterpret_cast<void*>(ApplyNativeMagicFloor);
 }
+// Scalar magic/swim lifecycle boundary. Actual soul-component receipts have
+// separate native saved-slot/category tests in shuffle_parity/souls.
+bool MM_ShareSoulReceipt(int) { return false; }
 /* SHARE_SWIM */
 namespace ComboRando {
 constexpr int GAME_MM = 1, GAME_OOT = 0;

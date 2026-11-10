@@ -12,8 +12,8 @@ different framing, so their pixel sizes do not determine relative in-game size.
 ## Previews
 
 - [Three before/after pairs at one common scale](swords_reference_before_after_scale.png)
-- [Gilded, Master and True Master rotating](swords_reference_group_2.gif)
-- [All nine swords rotating](swords_reference.gif)
+- Gilded, Master and True Master rotating (animated preview omitted from publication)
+- All nine swords rotating (animated preview omitted from publication)
 - [All models guard-aligned, with effects off](swords_reference_measured_scale.png)
 
 Master has a long straight blade, a narrow ricasso, distinct shoulders and a

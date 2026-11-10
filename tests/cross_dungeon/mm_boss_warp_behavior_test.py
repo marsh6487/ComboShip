@@ -34,6 +34,7 @@ prefix = r'''
 #define COMBO_BUILD 1
 #include "combo/ComboGameMode.h"
 #include "combo/rando/CrossDungeonRuntime.h"
+#include "tests/cross_dungeon/mm_solo_runtime_stubs.inc"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <cassert>
 #include <cstdarg>

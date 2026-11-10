@@ -15,6 +15,16 @@ using NeiGi::Kind;
 /* ITEM_IDS */
 bool ootAlt=true,mmAlt=false,legacyMod=false,mmLegacyMod=false;
 bool dinFireSword=false;
+namespace Ship {
+struct ResourceManager { bool IsAltAssetsEnabled() const { return ootAlt; } };
+struct CrossRMRegistry {
+    static ResourceManager* Get(const char* game) {
+        assert(!std::strcmp(game,"oot"));
+        static ResourceManager owner;
+        return &owner;
+    }
+};
+}
 bool ResourceMgr_IsAltAssetsEnabled(){return mmAlt;}
 int32_t OOT_NeiAltAssetsEnabled(){return ootAlt;}
 int CVarGetInteger(const char* key,int){return !strcmp(key,"DinFireSword")&&dinFireSword;}

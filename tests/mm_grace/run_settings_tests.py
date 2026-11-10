@@ -1,5 +1,6 @@
 """Execute the real combo seed normalize/restore/save-application paths."""
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,25 @@ otr = source("soh/soh/OTRGlobals.cpp")
 settings = source("soh/soh/Enhancements/randomizer/settings.cpp")
 option = source("soh/soh/Enhancements/randomizer/option.cpp")
 extract = lambda text, signature: block_from(text, text.index(signature))
-parts = ["namespace Rando {\n" + extract(settings, "std::shared_ptr<Settings> Settings::GetInstance()") + "\n" +
+# MM's actual z64 types are already included. Project the verbatim host-neutral
+# seed-policy section of the real OoT owner header, without mixing engine ABIs.
+parts = ['#include "combo/rando/RitoMaskSettingsSnapshot.h"']
+if any('RustyDoorKeys::' in body for body in soh.values()):
+    # The historical --baseline predates this owner header entirely.
+    rusty = source("soh/soh/Enhancements/randomizer/RustyDoorKeys.h")
+    rusty_policy = rusty[rusty.index('inline constexpr const char* CatalogVersionCVar'):
+                         rusty.index('inline RandomizerGet LegacySourceItem(')]
+    parts.append("namespace Rando::RustyDoorKeys {\n" + rusty_policy + "\n" +
+                 extract(source("soh/soh/Enhancements/randomizer/LockOverworldDoors.cpp"), "void PrepareNewGeneration()") + "\n}")
+launcher = source("combo/ComboShip.cpp")
+if 'static std::string Combo_UserRandoSettingsSnapshot(' in launcher:
+    rito_preference = re.search(r'^static int \(\*SOH_ReadComboRitoMaskPreference\)\(void\) = nullptr;', launcher, re.M)
+    if rito_preference:  # The historical --baseline predates this preference.
+        parts.append(rito_preference[0])
+    parts += [re.search(r'^typedef const char\* \(\*FnDumpData\)\(void\);', launcher, re.M)[0],
+              re.search(r'^static int \(\*SOH_ReadComboMagicMirrorPreference\)\(void\) = nullptr;', launcher, re.M)[0],
+              extract(launcher, 'static std::string Combo_UserRandoSettingsSnapshot(')]
+parts += ["namespace Rando {\n" + extract(settings, "std::shared_ptr<Settings> Settings::GetInstance()") + "\n" +
          extract(settings, "const std::array<Option, RSK_MAX>& Settings::GetAllOptions() const") + "\n" +
          extract(option, "const std::string& Option::GetCVarName() const") + "\n}",
          functions(otr)["Combo_ClearNumericExclusions"],

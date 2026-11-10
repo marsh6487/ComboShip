@@ -21,6 +21,9 @@ with tempfile.TemporaryDirectory(prefix='market-exit-door-') as temporary:
             'void EnDoor_Destroy(Actor* thisx, PlayState* play) {',
             'void EnDoor_Idle(EnDoor* this, PlayState* play) {', 's32 EnDoor_OverrideLimbDraw(')]
         fixture = (ROOT / 'tests/black_market/exit_door_actor_test.cpp').read_text()
+        flag_signature = 's32 Flags_GetRandomizerInf(' if host == 'soh' else 's32 Flags_GetRandoInf('
+        flag = block_from(actor, actor.index(flag_signature))
+        fixture = fixture.replace('/* NATIVE RUSTY FLAG ACCESS */', 'extern \"C\" {\n' + flag + '\n}\n')
         if host == 'soh':
             # Native Actor_Spawn consumes this side channel before actor Init;
             # keep its actual declaration/write/reset alongside the extracted
@@ -36,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='market-exit-door-') as temporary:
         fixture = fixture.replace('/* NATIVE FUNCTIONS */', re.sub(r'\bthis\b', 'current', '\n'.join(bodies)))
         cpp = Path(temporary) / (host + '.cpp'); cpp.write_text(fixture)
         binary = Path(temporary) / host
-        includes = [host, host + '/include', host + '/include/PR', host + '/src', host + '/assets',
+        includes = ['.', host, host + '/include', host + '/include/PR', host + '/src', host + '/assets',
                     host + ('/2s2h' if host == 'mm' else '/soh'), 'libultraship/include', 'combo']
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-w', '-DCOMBO_BUILD', '-DF3DEX_GBI_2',
                         *(['-DEXIT_DOOR_OOT'] if host == 'soh' else []), '-g',

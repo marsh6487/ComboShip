@@ -39,6 +39,8 @@
 #include <string>
 
 #include "rando/CrossWorldRando.h"
+#include "rando/MagicMirrorSettingsJson.h"
+#include "rando/RitoMaskSettingsJson.h"
 #include "rando/ComboPlaythrough.h"
 #include "rando/CrossForeign.h" // BuildForeignArray (foreign enrichment parity with RunComboFill)
 #include "rando/CrossHints.h"
@@ -313,6 +315,8 @@ int main(int argc, char** argv) {
         }
         auto ootSettings = spoiler.value("oot", nlohmann::json::object()).value("settings", nlohmann::json::object());
         auto mmSettings = spoiler.value("mm", nlohmann::json::object()).value("settings", nlohmann::json::object());
+        ComboRando::MagicMirrorSettings::NormalizeSnapshots(ootSettings, mmSettings);
+        ComboRando::RitoMaskSettings::NormalizeSnapshots(ootSettings, mmSettings);
         // Flat placement map that RunPlaythrough consumes.
         nlohmann::json flat;
         flat["oot"] = spoiler.value("oot", nlohmann::json::object()).value("placements", nlohmann::json::object());
@@ -391,6 +395,14 @@ int main(int argc, char** argv) {
             // oracle still gates on (OOT vanilla shop items, MM boss remains when not shuffled) live in
             // the dump's fixed[]. Merge them in so those gates (e.g. MM RemainsCount for the Moon) resolve.
             std::string sohDump = SOH_Dump(), mmDump = MM_Dump();
+            try {
+                ComboRando::ParseStaticDataDump(sohDump, "OOT replay");
+                ComboRando::ParseStaticDataDump(mmDump, "MM replay");
+            } catch (const std::exception& e) {
+                std::cerr << "[playthrough] native preparation failed: " << e.what() << "\n";
+                entranceRestoreFailed = true;
+                return ComboRando::PlaythroughResult{};
+            }
             const std::string sharedPairs = SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "";
             affordabilitySharedGroups =
                 ComboRando::BuildSharedItemGroups(ComboRando::ResolveSharedPairs(sharedPairs, mmDump), sharedMask);
@@ -529,7 +541,7 @@ int main(int argc, char** argv) {
         nlohmann::json pt1 = nlohmann::json::array();
         auto r1 = runPass(false, &pt1);
         if (entranceRestoreFailed) {
-            std::cerr << "[playthrough] could not restore the seed's entrance layout — no verdict\n";
+            std::cerr << "[playthrough] native replay setup failed — no verdict\n";
             return 2;
         }
         if (r1.beatable) {
@@ -546,6 +558,10 @@ int main(int argc, char** argv) {
         std::cout << "[playthrough] Pass 1 stuck (" << blocked(r1) << ") — retrying with ALL tricks\n";
         nlohmann::json pt2 = nlohmann::json::array();
         auto r2 = runPass(true, &pt2);
+        if (entranceRestoreFailed) {
+            std::cerr << "[playthrough] native replay setup failed — no verdict\n";
+            return 2;
+        }
         if (r2.beatable) {
             std::cout << "[playthrough] RESULT: beatable ONLY with tricks beyond the seed's settings (sphere "
                       << r2.beatableSphere << "). With the seed's tricks, Pass 1 got stuck: " << blocked(r1) << ".\n";
@@ -608,10 +624,14 @@ int main(int argc, char** argv) {
             const auto& oot = sj.contains("oot") ? sj["oot"] : sj;
             const auto& mm = sj.contains("mm") ? sj["mm"] : sj;
             settingsOotLayouts = ComboRando::OotDungeonLayoutSnapshot(oot);
+            auto ootSnapshot = oot.value("settings", nlohmann::json::object());
+            auto mmSnapshot = mm.value("settings", nlohmann::json::object());
+            ComboRando::MagicMirrorSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
+            ComboRando::RitoMaskSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
             if (oot.contains("settings"))
-                SOH_RestoreSettings(oot["settings"].dump().c_str());
+                SOH_RestoreSettings(ootSnapshot.dump().c_str());
             if (mm.contains("settings"))
-                MM_RestoreSettings(mm["settings"].dump().c_str());
+                MM_RestoreSettings(mmSnapshot.dump().c_str());
             if (SOH_SetEnabledTricks && oot.contains("enabledTricks"))
                 SOH_SetEnabledTricks(oot["enabledTricks"].dump().c_str());
             std::cout << "[comborando] restored settings from '" << settingsFile << "'\n";

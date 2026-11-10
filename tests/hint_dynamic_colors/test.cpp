@@ -84,12 +84,14 @@ const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId) { return nullptr; 
 }
 #endif
 namespace Rando {
-// These color cases place concrete tiers. Progressive conversion is covered by
-// tests/magic_hints; fail here if a case unexpectedly crosses that boundary.
-RandoItemId ConvertItem(RandoItemId, RandoCheckId) {
-    assert(false && "unexpected progressive conversion in concrete-item color fixture");
-    return RI_NONE;
+// These cases place concrete tiers; the full native converter is exercised by
+// tests/shuffle_parity/hints. Keep its concrete-item identity boundary explicit.
+RandoItemId ConvertItem(RandoItemId item, RandoCheckId) {
+    assert(item == RI_OOT_NEI_SHOVEL || item == RI_BOW || item == RI_BOMB_BAG_20 ||
+           item == RI_MASK_DEKU);
+    return item;
 }
+std::vector<HintTarget> GetCrossWorldHintTargets(bool) { return {}; }
 std::string GetHintLocationText(RandoItemId item, RandoCheckId check, bool) {
     locationReads.emplace_back(item, check);
     return "at Gerudo Fortress (OOT)";

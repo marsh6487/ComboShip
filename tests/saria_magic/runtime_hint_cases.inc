@@ -93,11 +93,21 @@ extern "C" void SariaFixture_VerifyRuntimeControls(void) {
     assert(loadedEn.find("Hyrule Field") != std::string::npos && revealed == 1);
     ResetHintStorage();
     ctx->placements[1].item = ctx->placements[2].item = RG_MAGIC_STAT_UPGRADE;
-    sEarlySariaMagicCheck = 1;
+    sEarlySariaMagicCheck = static_cast<RandomizerCheck>(1);
     sEarlySariaMagicSeed = ctx->GetSeed();
     sSariaMagicReachabilityVerified = true;
     Open(TEXT_SARIA_SFM);
     assert(loadedEn.find("Kokiri Forest") != std::string::npos);
+    // Real appended first-drop identities must resolve through the native
+    // source catalog, rather than an ordinary area or a fixture Find stub.
+    ResetHintStorage();
+    ctx->placements[RC_ENEMY_DROP_KEESE].item = RG_MAGIC_STAT_UPGRADE;
+    Open(TEXT_SARIA_SFM);
+    assert(ctx->hint.GetHintMessage(MF_RAW, 0).GetEnglish(MF_RAW).find("the first Keese drop") != std::string::npos);
+    assert(loadedEn.find("Keese") != std::string::npos);
+    assert(loadedDe.find("Fledermaus") != std::string::npos);
+    assert(loadedFr.find("Chauve-souris") != std::string::npos);
+    assert(revealed == 1 && ctx->added == 1 && rando_state == rng);
     SariaFixture_SetOptions(0, 0);
     ResetHintStorage();
     assert(registered.empty() && !EnsureSariaMagicHint() && ctx->added == 0);

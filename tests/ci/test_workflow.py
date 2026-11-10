@@ -11,6 +11,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_windows_native_cli_link_is_required_without_optional_validator_upload(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build.yml").read_text())["jobs"]["build"]["steps"]
+        builds = [(i, step) for i, step in enumerate(steps) if step.get("name") == "Build comborando"]
+        self.assertEqual(len(builds), 1)
+        position, build = builds[0]
+        self.assertNotIn("if", build, "optional validator upload must not skip the native Windows CLI link")
+        self.assertNotIn("continue-on-error", build)
+        self.assertIn("--target comborando", build["run"])
+        for game in ("soh", "2ship"):
+            native = next(i for i, step in enumerate(steps) if step.get("name") == f"Build {game}")
+            self.assertLess(native, position)
+        package = next(i for i, step in enumerate(steps) if step.get("name", "").startswith("Package"))
+        self.assertLess(position, package)
+        upload = next(step for step in steps if step.get("with", {}).get("name") == "comborando-windows")
+        self.assertEqual(upload["if"], "inputs.validator")
+
     def test_cumulative_native_ikana_and_silver_repairs_are_required(self):
         tasks = json.loads((ROOT / "scripts/ci/regressions.json").read_text())
         required = (
@@ -75,6 +91,40 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(checks["uses"], "./.github/workflows/ci-check.yml")
         self.assertEqual(checks["with"]["check"], "${{ matrix.check }}")
         self.assertCountEqual(workflow["jobs"]["gate"]["needs"], ["preflight", "checks"])
+
+    def test_built_linux_runtime_survives_appimage_failure(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build-linux.yml").read_text())["jobs"]["build"]["steps"]
+        upload = next(i for i, step in enumerate(steps) if step.get("with", {}).get("name") == "ComboShip-linux")
+        package = next(i for i, step in enumerate(steps) if "Stage Linux package" in step.get("name", ""))
+        self.assertLess(upload, package)
+        self.assertTrue(any("--stage-only" in step.get("run", "") for step in steps[:upload]))
+
+    def test_real_native_first_drop_seed_evidence_is_required_and_retained(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build-linux.yml").read_text())["jobs"]["build"]["steps"]
+        native = [step for step in steps
+                  if "tests/shuffle_parity/enemy_drops/native_seed_regression.py" in step.get("run", "")]
+        self.assertEqual(len(native), 1)
+        self.assertNotIn("continue-on-error", native[0])
+        self.assertIn("!cancelled()", native[0]["if"])
+        self.assertIn("steps.native_runtime.outcome == 'success'", native[0]["if"])
+        self.assertIn("--case vanilla-on-excluded", native[0]["run"])
+        self.assertIn("--case vanilla-off", native[0]["run"])
+        evidence = next(step for step in steps if step.get("with", {}).get("name") == "native-first-drops-linux")
+        self.assertEqual(evidence["if"], "always()")
+
+    def test_full_native_parity_matrix_is_required_and_retained(self):
+        steps = yaml.safe_load((ROOT / ".github/workflows/build-linux.yml").read_text())["jobs"]["build"]["steps"]
+        native = [step for step in steps if "native_boss_key_regression.py" in step.get("run", "")]
+        self.assertEqual(len(native), 1)
+        self.assertNotIn("continue-on-error", native[0])
+        self.assertIn("!cancelled()", native[0]["if"])
+        self.assertIn("steps.native_runtime.outcome == 'success'", native[0]["if"])
+        self.assertNotIn("--case", native[0]["run"])
+        self.assertIn("--runtime-dir", native[0]["run"])
+        for name in ("native-first-drops-linux", "native-boss-keys-linux"):
+            evidence = next(step for step in steps if step.get("with", {}).get("name") == name)
+            self.assertEqual(evidence["if"], "always()")
+            self.assertIn("runtime/**", evidence["with"]["path"])
 
     def test_component_dispatch_preserves_builds_and_single_regression_group(self):
         dispatch = yaml.safe_load((ROOT / ".github/workflows/ci-check.yml").read_text())["jobs"]

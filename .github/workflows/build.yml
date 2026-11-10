@@ -13,8 +13,8 @@ on:
       release_zip:
         type: boolean
         default: false
-      # comborando + its runtime DLLs (~60MB). validate-seed.yml only ever fetches this from the
-      # latest successful develop run, so building/uploading it on a PR is dead weight.
+      # Optional upload of comborando + its runtime DLLs (~60MB) for validate-seed.yml,
+      # which fetches the latest successful develop run. The CLI always builds on PRs.
       validator:
         type: boolean
         default: false
@@ -179,11 +179,9 @@ jobs:
             Write-Host "::error title=Windows 2Ship build diagnostic::$diagnostic"
             exit $mmBuildExitCode
           }
-      # Headless seed validator (pulls libultraship/soh/2ship as deps, already built above). Uploaded
-      # below so validate-seed.yml can download it from develop instead of doing its own build.
-      # Nothing else depends on it, so it is skipped unless a caller asks for the validator.
+      # Always link the headless CLI against the native game DLLs built above.
+      # inputs.validator controls only its optional upload for validate-seed.yml.
       - name: Build comborando
-        if: inputs.validator
         run: cmake --build build/x64 --target comborando --config Release
       - name: Build ComboShip
         shell: pwsh

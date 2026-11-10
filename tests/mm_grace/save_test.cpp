@@ -1,15 +1,27 @@
 #include "2s2h/BenJsonConversions.hpp"
+#include "ComboGameMode.h"
 #include "tests/test_require.h"
 #include <cstdio>
+
+// Native storage and the combined session identity used by the linked codec.
+extern "C" {
+SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+}
 
 int main() {
     RandoSaveInfo original{};
     for (unsigned i = 0; i < RO_MAX; ++i) original.randoSaveOptions[i] = i * 17;
+    const auto songs = ComboRando::SongEvents::Defaults(ComboRando::SongEvents::Game::Mm);
+    std::copy(songs.begin(), songs.end(), original.songEvents);
     original.randoSaveOptions[RO_HYLIAS_GRACE] = RO_GRACE_GATED;
     original.randoSaveOptions[RO_HYLIAS_GRACE_REWARDS] = 7;
     json current = original;
     RandoSaveInfo restored{};
     current.get_to(restored);
+    REQUIRE(std::equal(songs.begin(), songs.end(), restored.songEvents));
     REQUIRE(restored.randoSaveOptions[RO_HYLIAS_GRACE] == RO_GRACE_GATED);
     REQUIRE(restored.randoSaveOptions[RO_HYLIAS_GRACE_REWARDS] == 7);
     json legacy = current;

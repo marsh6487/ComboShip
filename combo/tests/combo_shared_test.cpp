@@ -8,6 +8,7 @@
 #include <functional>
 #include <iostream>
 #include <stdexcept>
+#include <tuple>
 
 using namespace ComboRando;
 using json = nlohmann::json;
@@ -301,11 +302,55 @@ static void ganondorfHint() {
     check(found, "Ganondorf hint survives NEI progressive Master Sword");
 }
 #endif
+#ifndef COMBO_SHARED_BASELINE
+static void confinedSharedSources() {
+    for (auto [name, token, family] : { std::tuple{ "Epona's Song", "RI_SONG_EPONA", SF_EPONAS_SONG },
+                                        std::tuple{ "Song of Storms", "RI_SONG_STORMS", SF_SONG_OF_STORMS },
+                                        std::tuple{ "Song of Time", "RI_SONG_TIME", SF_COUNT },
+                                        std::tuple{ "Odolwa's Remains", "RI_REMAINS_ODOLWA", SF_COUNT },
+                                        std::tuple{ "Goht's Remains", "RI_REMAINS_GOHT", SF_COUNT },
+                                        std::tuple{ "Gyorg's Remains", "RI_REMAINS_GYORG", SF_COUNT },
+                                        std::tuple{ "Twinmold's Remains", "RI_REMAINS_TWINMOLD", SF_COUNT } }) {
+        for (bool nativeFamily : { false, true }) {
+            if (nativeFamily && family == SF_COUNT)
+                continue;
+            auto o = emptyDump(), m = emptyDump();
+            add(o, name, 1);
+            add(o, "Junk", 1, false);
+            add(m, "Junk", 1, false);
+            m["items"].push_back({ { "name", name }, { "token", token } });
+            m["fixed"] = json::array({ { { "item", name },
+                                         { "check", "Native confined check" },
+                                         { "validate", true },
+                                         { "allowedChecks", { "Native confined check" } } } });
+            configure(o, m, name, 1, name, 1);
+            checks[1].push_back("Native confined check");
+            const auto pairs = json::array({ { { "oot", name }, { "mm", token }, { "chain", 1 } } }).dump();
+            auto r =
+                CrossWorldCombinedFill(o.dump(), m.dump(), 20261109, oot, mm, nullptr, "", OotAccess::ALL_REACHABLE, {},
+                                       GAME_OOT, pairs, nativeFamily ? (1u << family) : 0);
+            check(r.success, "confined shared native source fills successfully");
+            if (!r.success)
+                continue;
+            auto placements = json::parse(r.spoilerJson);
+            check(placements["mm"]["Native confined check"] == name,
+                  "shared dedup preserves native confined song/remains source");
+            check(countPlaced(r, GAME_MM, name) == 1 && countPlaced(r, GAME_OOT, name) == (nativeFamily ? 0 : 1),
+                  "confined sharing keeps exact prior fixed-source supply policy");
+            auto replay = RunPlaythrough(r.spoilerJson, oot, mm, "confined_shared", nullptr, nullptr, o.dump(),
+                                         m.dump(), true, false, {}, false, nativeFamily ? (1u << family) : 0, pairs);
+            check(replay.beatable && replay.beatableSphere > 0,
+                  "confined shared source is collected before independent replay wins");
+        }
+    }
+}
+#endif
 int main() {
     forwardAndRequiredness();
     parsedNamesAndDisplay();
 #ifndef COMBO_SHARED_BASELINE
     fillAndCredit();
+    confinedSharedSources();
     ganondorfHint();
 #endif
     if (failures) {

@@ -1,3 +1,13 @@
+#include "Rando/SongEvents.h"
+#include "../../combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "../../combo/rando/RitoMaskSettingsSnapshot.h"
+#include "Rando/SoulShuffle.h"
+#include "Rando/KeyRings.h"
+#include "Rando/RustyDoorKeys.h"
+#include "Rando/Bags.h"
+#include "Rando/Wallets.h"
+#include "Rando/InfiniteUpgrades.h"
+#include "Rando/Logic/SeedGeneration.h"
 extern "C" void Partners_Reset(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
@@ -8,6 +18,7 @@ extern "C" void Partners_Reset(void);
 #include "BenPort.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "Rando/Logic/HeadlessRegisters.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
@@ -354,6 +365,7 @@ static std::shared_ptr<Ship::ResourceManager> sMMResourceManager;
 
 #ifdef COMBO_BUILD
 #include "rando/CrossDungeonMmRuntime.inc.h"
+#include "rando/SoloEntranceMmRuntime.inc.h"
 #endif
 
 extern "C" char** cameraStrings;
@@ -1651,6 +1663,15 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
+    if (gComboGameMode == COMBO_GAME_MM) {
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(
+            [](s8 sceneId, s8) { Combo_MM_SoloEntranceObserveScene(sceneId); });
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(Combo_MM_SoloEntranceOnPlayDestroy);
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::BeforeEndOfCycleSave>(
+            []() { Combo_MM_SoloEntranceRestoreCheckpoint(-1); });
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::BeforeMoonCrash>(
+            []() { Combo_MM_SoloEntranceRestoreCheckpoint(-1); });
+    }
     if (Combo_IsCombinedGame()) {
         // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
         // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
@@ -3793,6 +3814,7 @@ extern "C" int Controller_ShouldRumble(size_t slot) {
 // ComboShip exports — 2ship.dll side
 // ============================================================
 
+#ifdef COMBO_BUILD
 static std::unique_ptr<Ship::ArchiveManager> gMMArchiveManager;
 
 // Opens mm.o2r + 2ship.o2r into a MM-private ArchiveManager (no context, no window).
@@ -3964,11 +3986,15 @@ extern "C" COMBO_EXPORT void MM_InitRandoHeadless(void) {
     if (inited)
         return;
     inited = true;
+    // Native flag/item dispatch owns this real lightweight service headlessly.
+    if (!GameInteractor::Instance) {
+        GameInteractor::Instance = new GameInteractor();
+    }
+    Rando::Headless::EnsureRegisterEditor(gRegEditor);
     ShipInit::Init("RANDO_LOGIC"); // OwnRMScope("mm") no-ops headlessly (no "mm" RM registered)
     Rando::StaticData::PopulateCheckNames();
 }
 
-#ifdef COMBO_BUILD
 // Defined in mm/src/code/main.c: re-enters ONLY MM's game loop (no heap/thread re-init).
 extern "C" void MM_RunGameLoop(void);
 // Defined in mm/src/code/graph.c: resets the frame state machine so MM_RunGameLoop restarts the
@@ -4140,8 +4166,12 @@ extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placem
         for (auto& [id, opt] : Rando::StaticData::Options) {
             options[opt.name] = (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
         }
-        if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
-            options[Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].name] = RO_GENERIC_ON;
+        if (Combo_IsCombinedGame())
+            options[Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].name] =
+                CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF;
+        if (Combo_IsCombinedGame())
+            options[Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].name] =
+                CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF;
         // ComboShip (#136): combo owns the goal and MM's own toggle is hidden, so the CVar loop above
         // would save hunt=off — leaving Majora killable pre-completion and the tracker row missing.
         options[Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].name] =
@@ -4440,6 +4470,15 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoSettings(void) {
     }
     j["gRando.StartingItems"] = si;
     j["gRando.Generation.ShuffleMagicMirror"] = CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::MagicMirrorSettings::SharedCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+        j[ComboRando::MagicMirrorSettings::MmCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+    }
+    j["gRando.Generation.ShuffleRitoMask"] = CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::RitoMaskSettings::SharedCvar] = j["gRando.Generation.ShuffleRitoMask"];
+        j[ComboRando::RitoMaskSettings::MmCvar] = j["gRando.Generation.ShuffleRitoMask"];
+    }
     cached = j.dump();
     return cached.c_str();
 }
@@ -4452,8 +4491,16 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         return;
     try {
         auto j = nlohmann::json::parse(json);
-        CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", RO_GENERIC_OFF);
+        if (!Combo_IsCombinedGame())
+            CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", RO_GENERIC_OFF);
+        if (!Combo_IsCombinedGame())
+            CVarSetInteger("gRando.Options.RO_SHUFFLE_RITO_MASK", RO_GENERIC_OFF);
         CVarSetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+        CVarSetInteger("gRando.Generation.ShuffleRitoMask", 0);
+        if (Combo_IsCombinedGame())
+            ComboRando::MagicMirrorSettings::RestoreSnapshot(j);
+        if (Combo_IsCombinedGame())
+            ComboRando::RitoMaskSettings::RestoreSnapshot(j);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
@@ -4569,7 +4616,49 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
 
     // Confine own-dungeon items via MM's own logic (writes RANDO_SAVE_CHECKS, shrinks both pools).
     std::vector<RandoCheckId> checkPoolBefore = checkPool;
-    Rando::Logic::PreplaceConfinedItems(checkPool, itemPool);
+    std::map<RandoItemId, nlohmann::json> confinedChecks;
+    {
+        // Native confinement reads the live save macros, while generation above
+        // uses a new settings snapshot. A cold/stale live save must not turn
+        // Own Dungeon into Anywhere. Borrow only the rando state transactionally;
+        // keep the generated placements locally and restore even if a fill throws.
+        struct RestoreRandoState {
+            RandoSaveInfo previous = gSaveContext.save.shipSaveInfo.rando;
+            ~RestoreRandoState() {
+                gSaveContext.save.shipSaveInfo.rando = previous;
+            }
+        } restore;
+        gSaveContext.save.shipSaveInfo.rando = saveInfo;
+        // Export native confinement over the original eligible pool, before random
+        // preplacement removes checks. The combined solver must choose these
+        // coordinates with logic: a random native spot can be behind its own key.
+        for (RandoItemId item : itemPool) {
+            if (Rando::Logic::RandoItemIdToConfinementGroup(item) < 0 || confinedChecks.count(item))
+                continue;
+            auto& allowed = confinedChecks[item];
+            allowed = nlohmann::json::array();
+            for (RandoCheckId check : checkPoolBefore)
+                if (Rando::Logic::IsItemAllowedAtCheck(item, check))
+                    allowed.push_back(Rando::StaticData::GetCheckDisplayName(check));
+        }
+        Rando::Logic::PreplaceConfinedItems(checkPool, itemPool);
+        // Exclusions can exhaust a confinement group. Native fills retain the
+        // restriction on residual items; the cross fill has no group metadata,
+        // so exporting one as free would silently defeat the user's setting.
+        for (RandoItemId id : itemPool) {
+            if (!Rando::Logic::IsItemAllowedAtCheck(id, RC_UNKNOWN)) {
+                cached = nlohmann::json{
+                    { "error",
+                      "MM confined item has no remaining native check: " + Rando::StaticData::GetItemDisplayName(id) },
+                    { "checks", nlohmann::json::array() },
+                    { "pool", nlohmann::json::array() },
+                    { "fixed", nlohmann::json::array() }
+                }.dump();
+                return cached.c_str();
+            }
+        }
+        saveInfo = gSaveContext.save.shipSaveInfo.rando;
+    }
     std::set<RandoCheckId> stillFillable(checkPool.begin(), checkPool.end());
 
     // GeneratePools under-fills (MM's own OnFileCreate pads junk); mirror it so every fillable check
@@ -4579,12 +4668,17 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
 
     // RI_TRAP is RITYPE_LESSER but never gates logic — class it junk like OOT's traps.
     auto isAdvancement = [](const auto& it) {
-        return it.randoItemType != RITYPE_JUNK && it.randoItemType != RITYPE_HEALTH && it.randoItemId != RI_TRAP;
+        return it.randoItemType != RITYPE_JUNK && it.randoItemType != RITYPE_HEALTH && it.randoItemId != RI_TRAP &&
+               it.randoItemId != RI_OOT_NEI_RITO_MASK;
     };
 
     // ComboShip: native category, so the cross fill can trim ONLY junk — `advancement` alone can't say
     // that (it lumps junk with hearts/traps). Unknown maps to "major" so it is never trimmable.
     auto categoryName = [](const auto& it) -> const char* {
+        // Door keys share the gray small-key cue across both hosts. Keep their
+        // native MAJOR type and advancement status unchanged for gameplay/fill.
+        if (Rando::RustyDoorKeys::IsDoorKeyItem(it.randoItemId))
+            return "smallKey";
         switch (it.randoItemType) {
             case RITYPE_JUNK:
                 return "junk";
@@ -4617,7 +4711,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         auto chkIt = Rando::StaticData::Checks.find(id);
         if (chkIt == Rando::StaticData::Checks.end() || !chkIt->second.name || chkIt->second.name[0] == '\0')
             continue;
-        auto iit = Rando::StaticData::Items.find(RANDO_SAVE_CHECKS[id].randoItemId);
+        auto iit = Rando::StaticData::Items.find(saveInfo.randoSaveChecks[id].randoItemId);
         if (iit == Rando::StaticData::Items.end() || !iit->second.spoilerName || iit->second.spoilerName[0] == '\0')
             continue;
         // ComboShip: friendly check + item names for the normalized combo spoiler. These are genuinely
@@ -4625,6 +4719,8 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         fixed.push_back({ { "check", Rando::StaticData::GetCheckDisplayName(id) },
                           { "item", Rando::StaticData::GetItemDisplayName(iit->first) },
                           { "advancement", isAdvancement(iit->second) },
+                          { "validate", true },
+                          { "allowedChecks", confinedChecks.at(iit->first) },
                           { "hintable", true } });
     }
 
@@ -4721,11 +4817,13 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
     // ComboShip: per-check hint-safe location name (GetLocationNameForHint(rc,false)) — the combo
     // hint layer's cross-game text composition needs the same "region" phrasing MM's own hints use.
     nlohmann::json locationHints = nlohmann::json::object();
+    nlohmann::json checkMetadata = nlohmann::json::object();
     for (auto& [id, chk] : Rando::StaticData::Checks) {
         const std::string& cn = Rando::StaticData::GetCheckDisplayName(id); // ComboShip: friendly name
         if (cn.empty())
             continue;
         locationHints[cn] = Rando::StaticData::GetLocationNameForHint(id, false);
+        checkMetadata[cn] = { { "scene", chk.sceneId }, { "id", static_cast<int>(id) }, { "sourceName", chk.name } };
     }
 
     // ComboShip: the two hint options that decide whether the combo hint layer's cross gossip pool is
@@ -4742,11 +4840,30 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         junkPool.push_back(Rando::StaticData::GetItemDisplayName(id));
     }
 
+    nlohmann::json startingSouls = nlohmann::json::array();
+    // Configured starts are stored/truncated by the same native save helper as
+    // the oracle. Computed enemy souls occur only when that family is disabled.
+    for (RandoItemId item : Rando::GetStartingItemsFromSave(saveInfo))
+        if (const char* name = Rando::SoulShuffle::SharedName(item))
+            startingSouls.push_back(name);
+    nlohmann::json soulOptions = { { "enemy", saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_SOULS] != 0 },
+                                   { "npc", saveInfo.randoSaveOptions[RO_SHUFFLE_NPC_SOULS] != 0 },
+                                   { "animal", saveInfo.randoSaveOptions[RO_SHUFFLE_ANIMAL_SOULS] != 0 },
+                                   { "misc", saveInfo.randoSaveOptions[RO_SHUFFLE_MISC_SOULS] != 0 } };
+
     cached = nlohmann::json{
-        { "checks", std::move(checks) },   { "pool", std::move(pool) },
-        { "fixed", std::move(fixed) },     { "items", std::move(items) },
-        { "prices", std::move(prices) },   { "locationHints", std::move(locationHints) },
-        { "options", std::move(options) }, { "junkPool", std::move(junkPool) }
+        { "songEvents", saveInfo.songEvents },
+        { "startingSouls", std::move(startingSouls) },
+        { "soulOptions", std::move(soulOptions) },
+        { "checks", std::move(checks) },
+        { "pool", std::move(pool) },
+        { "fixed", std::move(fixed) },
+        { "items", std::move(items) },
+        { "prices", std::move(prices) },
+        { "locationHints", std::move(locationHints) },
+        { "checkMetadata", std::move(checkMetadata) },
+        { "options", std::move(options) },
+        { "junkPool", std::move(junkPool) }
     }.dump();
     return cached.c_str();
 }
@@ -4779,7 +4896,28 @@ static void ComboGrantTradeSlot(u8 itemId) {
 // Covers the save-context mutations that logic conditions read (INV_CONTENT, equipment,
 // quest items, rando flags, dungeon items, week event regs). Derived from GiveItem.cpp.
 static void GiveItemForOracle(RandoItemId ri) {
+    if (Rando::InfiniteUpgrades::Give(ri))
+        return;
+    if (Rando::Wallets::Give(ri))
+        return;
+    if (Rando::Bags::Give(ri) || Rando::Bags::GiveCapacity(ri))
+        return;
+    if (Rando::RustyDoorKeys::Give(ri))
+        return;
+    // Soul catalog mm_oracle begin
+    if (const auto* soul = Rando::SoulShuffle::Find(ri)) {
+        Flags_SetRandoInf(soul->flag);
+        return;
+    }
+    // Soul catalog mm_oracle end
+
     switch (ri) {
+        case RI_WOODFALL_KEY_RING:
+        case RI_SNOWHEAD_KEY_RING:
+        case RI_GREAT_BAY_KEY_RING:
+        case RI_STONE_TOWER_KEY_RING:
+            Rando::KeyRings::Give(ri);
+            break;
         case RI_JUNK:
         case RI_NONE:
         case RI_TRAP:
@@ -4857,12 +4995,18 @@ static void GiveItemForOracle(RandoItemId ri) {
             Inventory_ChangeUpgrade(UPG_WALLET, 3);
             break;
 
-        // Heart pieces/containers — logic doesn't check these for reachability, but include for completeness
+        // Real native health gates require complete four-piece sets, matching Item_Give.
         case RI_HEART_CONTAINER:
             gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+            gSaveContext.save.saveInfo.playerData.health += 0x10;
             break;
         case RI_HEART_PIECE:
-            gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+            INCREMENT_QUEST_HEART_PIECE_COUNT;
+            if (EQ_MAX_QUEST_HEART_PIECE_COUNT) {
+                RESET_HEART_PIECE_COUNT;
+                gSaveContext.save.saveInfo.playerData.healthCapacity += 0x10;
+                gSaveContext.save.saveInfo.playerData.health += 0x10;
+            }
             break;
 
         // Bottle
@@ -5162,11 +5306,19 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
         memcpy(&sMM_OracleSavedContext, &gSaveContext, sizeof(SaveContext));
         sMM_OracleSavedRegionTime = gCurrentRegionTime;
         sMM_OracleActive = true;
+        // Mapping validation can throw; Restore must already own the snapshot
+        // and suspended audit even when setup fails before the inventory reset.
+        if (sMM_OracleSavedContext.save.shipSaveInfo.rando.finalSeed == (u32)sMMComboRandoSeed)
+            Rando::SongEvents::RememberSavedMapping(sMM_OracleSavedContext.save.shipSaveInfo.rando);
     }
     memset(&gSaveContext, 0, sizeof(SaveContext));
+    // Match native Sram_ResetSave's valid empty custom slots and contents.
+    Nei_InitNewSave();
     // Empty inventory slots are ITEM_NONE (0xFF), not 0: ITEM_OCARINA_OF_TIME is item id 0, so a
     // zeroed slot makes HAS_ITEM (an equality compare) report the ocarina owned and every song playable.
     memset(gSaveContext.save.saveInfo.inventory.items, ITEM_NONE, sizeof(gSaveContext.save.saveInfo.inventory.items));
+    // Form zero is Fierce Deity; native randomizer files start as Human.
+    gSaveContext.save.playerForm = PLAYER_FORM_HUMAN;
     if (!sMM_OracleInventorySweepDone) { // one-time guard against future zero-collision regressions
         sMM_OracleInventorySweepDone = true;
         for (auto& [id, item] : Rando::StaticData::Items) {
@@ -5191,7 +5343,14 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
         gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[id] =
             (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
     }
+    // Native Sram_InitNewSave begins at three hearts. GrantStartingItems first
+    // applies the kit, then overrides health only for a nondefault option.
+    gSaveContext.save.saveInfo.playerData.healthCapacity = gSaveContext.save.saveInfo.playerData.health = 0x30;
+    Rando::SongEvents::RestoreForOracle(gSaveContext.save.shipSaveInfo.rando);
+    Rando::SoloEntrances::RestoreForOracle(gSaveContext.save.shipSaveInfo.rando);
     // ComboShip (#136): combo owns the goal, so the hidden CVars above must not decide it here either.
+    Rando::Wallets::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando,
+                                     Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
     gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] =
         gMMComboGoalHunt ? RO_GENERIC_YES : RO_GENERIC_NO;
     if (gMMComboGoalHunt) {
@@ -5215,11 +5374,19 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
     {
         auto startingItems = Rando::GetStartingItemsFromConfig();
         Rando::SetStartingItemsInSave(gSaveContext.save.shipSaveInfo.rando, startingItems);
+        // Match GrantStartingItems: the persisted native array is bounded and
+        // cleared by SetStartingItemsInSave, unlike the original config vector.
+        startingItems = Rando::GetStartingItemsFromSave(gSaveContext.save.shipSaveInfo.rando);
         auto computed = Rando::GetComputedStartingItems(gSaveContext.save.shipSaveInfo.rando);
         startingItems.insert(startingItems.end(), computed.begin(), computed.end());
         for (RandoItemId si : startingItems) {
             GiveItemForOracle(Rando::ConvertItem(si));
         }
+    }
+
+    if (RANDO_SAVE_OPTIONS[RO_STARTING_HEALTH] != 3) {
+        gSaveContext.save.saveInfo.playerData.healthCapacity = gSaveContext.save.saveInfo.playerData.health =
+            RANDO_SAVE_OPTIONS[RO_STARTING_HEALTH] * 0x10;
     }
 
     // The memset wiped check prices too; re-apply the rolled/spoiler set or every CAN_AFFORD gate
@@ -5708,21 +5875,23 @@ extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
     } crossGuard;
     std::set<RandoRegionId> reachable;
     std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
-    if (ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
+    if (!Combo_IsCombinedGame() || ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
         reachable.insert(RR_MAX);
         timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
     }
-    for (int index : ComboCrossMm::state.arrivals) {
-        auto region = Rando::Logic::GetRegionIdFromEntrance(index);
-        reachable.insert(region);
-        auto states = Rando::Logic::InitializeRegionTimeStates(region);
-        // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
-        // wait. A physical cross arrival inherits its native region's waiting restrictions.
-        for (auto& [arrivalRegion, incoming] : states) {
-            incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
-            const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
-            if (!inserted)
-                it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+    if (Combo_IsCombinedGame()) {
+        for (int index : ComboCrossMm::state.arrivals) {
+            auto region = Rando::Logic::GetRegionIdFromEntrance(index);
+            reachable.insert(region);
+            auto states = Rando::Logic::InitializeRegionTimeStates(region);
+            // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
+            // wait. A physical cross arrival inherits its native region's waiting restrictions.
+            for (auto& [arrivalRegion, incoming] : states) {
+                incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
+                const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
+                if (!inserted)
+                    it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+            }
         }
     }
 
@@ -5806,7 +5975,9 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Restore(void) {
     sMM_OracleActive = false;
     ItemGrantAudit_Resume();
 }
-#endif // COMBO_BUILD — combo-only region opened above MM_LoadSaveForCombo
+
+#include "Rando/Logic/SoloRandoHeadless.inc"
+#endif // COMBO_BUILD — ComboShip module exports
 
 #ifdef COMBO_BUILD
 // ComboShip: cross-game item-draw exports (MM_GetItemDrawInfo / MM_GetItemAnimDrawInfo). Bodies

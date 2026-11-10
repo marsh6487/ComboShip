@@ -102,7 +102,8 @@ void DescriptorPose(const CwItemDrawInfo& info){
     }
     record();
 }
-void GetItem_Draw(PlayState*,int){record();}
+int nativeFallbackDraws=0, nativeFallbackDrawId=-1;
+void GetItem_Draw(PlayState*,int drawId){++nativeFallbackDraws;nativeFallbackDrawId=drawId;record();}
 namespace Rando::StaticData {
 struct Item {
   int drawId = 1;
@@ -196,6 +197,8 @@ int main(){
         drawnPaths.clear();
         const int opensBefore = interpolationOpens, closesBefore = interpolationCloses;
         DrawNativeIkanaGI();
+        check(nativeFallbackDraws == 0,
+              "available native MM shield uses its dedicated case, not generic dispatch");
         check(interpolationOpens == opensBefore + 1 && interpolationCloses == closesBefore + 1,
               "native namespaced MM shield draw uses paired global C interpolation calls");
         check(drawnPaths == std::vector<std::string>({ COMBO_IKANA_GI_OPA_MM, COMBO_IKANA_GI_XLU_MM }),
@@ -261,6 +264,10 @@ int main(){
           "local worn model cannot override native GI");
     donorAvailable = false;
     drawnPaths.clear();
+    Rando::StaticData::Items[RI_SHIELD_MIRROR].drawId = 73;
+    DrawNativeIkanaGI();
+    check(nativeFallbackDraws == 1 && nativeFallbackDrawId == 73 && drawnPaths.empty(),
+          "unavailable native MM shield executes the actual catalog fallback");
     Randomizer_DrawExtShieldOfIkana(&play, nullptr);
     check(drawnPaths.empty(),
           "unavailable native pair is left to the authored fallback selector");

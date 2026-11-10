@@ -20,6 +20,7 @@
 #include "soh/SohGui/SohGui.hpp"
 #include "soh/SohGui/SohMenu.h"
 #include "ShuffleSilver.h"
+#include "mods/extended_inventory.h"
 #include "static_data.h"
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/util.h"
@@ -50,6 +51,7 @@ extern PlayState* gPlayState;
 
 void DrawEquip(ItemTrackerItem item);
 void DrawItem(ItemTrackerItem item);
+static void DrawRitoMask(ItemTrackerItem item);
 void DrawDungeonItem(ItemTrackerItem item);
 void DrawBottle(ItemTrackerItem item);
 void DrawQuest(ItemTrackerItem item);
@@ -89,18 +91,32 @@ extern std::shared_ptr<SohMenu> mSohMenu;
 }
 
 std::vector<ItemTrackerItem> inventoryItems = {
-    ITEM_TRACKER_ITEM(ITEM_STICK, "", 0, DrawItem),       ITEM_TRACKER_ITEM(ITEM_NUT, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_BOMB, "", 0, DrawItem),        ITEM_TRACKER_ITEM(ITEM_BOW, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_ARROW_FIRE, "", 0, DrawItem),  ITEM_TRACKER_ITEM(ITEM_DINS_FIRE, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_SLINGSHOT, "", 0, DrawItem),   ITEM_TRACKER_ITEM(ITEM_OCARINA_FAIRY, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_BOMBCHU, "", 0, DrawItem),     ITEM_TRACKER_ITEM(ITEM_HOOKSHOT, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_ARROW_ICE, "", 0, DrawItem),   ITEM_TRACKER_ITEM(ITEM_FARORES_WIND, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_BOOMERANG, "", 0, DrawItem),   ITEM_TRACKER_ITEM(ITEM_LENS, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_BEAN, "", 0, DrawItem),        ITEM_TRACKER_ITEM(ITEM_HAMMER, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_ARROW_LIGHT, "", 0, DrawItem), ITEM_TRACKER_ITEM(ITEM_NAYRUS_LOVE, "", 0, DrawItem),
-    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 0, DrawBottle),    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 1, DrawBottle),
-    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 2, DrawBottle),    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 3, DrawBottle),
-    ITEM_TRACKER_ITEM(ITEM_POCKET_EGG, "", 0, DrawItem),  ITEM_TRACKER_ITEM(ITEM_MASK_KEATON, "", 0, DrawItem),
+    { RG_RITO_MASK, ITEM_KIND_RG, "Rito Mask", "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex",
+      "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex", 0, DrawRitoMask },
+    ITEM_TRACKER_ITEM(ITEM_STICK, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_NUT, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BOMB, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BOW, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_ARROW_FIRE, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_DINS_FIRE, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_SLINGSHOT, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_OCARINA_FAIRY, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BOMBCHU, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_HOOKSHOT, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_ARROW_ICE, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_FARORES_WIND, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BOOMERANG, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_LENS, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BEAN, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_HAMMER, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_ARROW_LIGHT, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_NAYRUS_LOVE, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 0, DrawBottle),
+    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 1, DrawBottle),
+    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 2, DrawBottle),
+    ITEM_TRACKER_ITEM(ITEM_BOTTLE, "", 3, DrawBottle),
+    ITEM_TRACKER_ITEM(ITEM_POCKET_EGG, "", 0, DrawItem),
+    ITEM_TRACKER_ITEM(ITEM_MASK_KEATON, "", 0, DrawItem),
 };
 
 std::vector<ItemTrackerItem> equipmentItems = {
@@ -1030,6 +1046,15 @@ bool HasBossSoul(RandomizerInf bossSoul) {
         return OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_BOSS_SOULS) &&
                Flags_GetRandomizerInf(bossSoul);
     }
+}
+
+static void DrawRitoMask(ItemTrackerItem item) {
+    auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+    const float size = static_cast<float>(CVarGetInteger(CVAR_TRACKER_ITEM("IconSize"), 36));
+    const bool owned = TrackerHasSave() && RitoMask_IsOwned();
+    ImGui::ImageWithBg(gui->GetTextureByName(item.iconName), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1),
+                       ImVec4(0, 0, 0, 0), owned ? ImVec4(1, 1, 1, 1) : ImVec4(.35f, .35f, .35f, .5f));
+    Tooltip("Rito Mask");
 }
 
 void DrawItem(ItemTrackerItem item) {

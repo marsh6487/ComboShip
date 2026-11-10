@@ -64,7 +64,8 @@ def main():
             "/* PRODUCTION */", production).replace("/* CONVERT_ARM */", convert_arm).replace(
                 "/* GRANT_ARMS */", native_arms))
         flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DCONTROLLERBUTTONS_T=uint32_t", "-I" + str(build),
-                 "-include", str(ROOT / "tests/dungeon_rewards/headless.h")]
+                 "-include", str(ROOT / "tests/dungeon_rewards/headless.h"),
+                 "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections"]
         for path in (".", "mm/include", "mm/include/PR", "mm/2s2h", "mm", "mm/src", "mm/assets",
                      "libultraship/include", "combo"):
             flags += ["-isystem", str(ROOT / path)]
@@ -79,7 +80,8 @@ def main():
             for case in (("pool", "grant") if args.case == "all" else (args.case,)):
                 binary = build / (case + "-" + mode)
                 sources = ([ROOT / "tests/item_availability/pool_test.cpp",
-                            ROOT / "mm/2s2h/Rando/Logic/GeneratePools.cpp", build / "placement.cpp"]
+                            ROOT / "mm/2s2h/Rando/Logic/GeneratePools.cpp",
+                            ROOT / "mm/2s2h/Rando/SongEvents.cpp", build / "placement.cpp"]
                            if case == "pool" else [build / "grant.cpp"])
                 subprocess.run([*compiler, *flags, *mode_flags, *map(str, sources), "-o", str(binary)], check=True)
                 failures += subprocess.run([str(binary)], env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"},

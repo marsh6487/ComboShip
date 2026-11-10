@@ -1,0 +1,22 @@
+{
+  "blossom": {
+    "source": "tools/spring_blossoms/SOURCE/blossom-source.png",
+    "source_sha256": "fbcb48d4fde5f461667b5ee2581054a5862e3bd7ce725d2dfe1f4991d10879c6",
+    "native_sha256": "7d03add28e54ddd3c59433d02618353a9ce25ecd7fc017c0a4e486a7d864501f",
+    "physical_size": 256,
+    "logical_size": 32,
+    "format": "RGBA32 raw8x OTEXv1",
+    "tmem_bytes": 4096,
+    "transparent_gutter_pixels": 8
+  },
+  "petal": {
+    "source": "tools/spring_blossoms/SOURCE/petal-source.png",
+    "source_sha256": "c1b177ebb69ee2cf35862433d3dad80de10a0ce326694d16f96fdd2d5612e37e",
+    "native_sha256": "5d3e01160dcba5369c9b6ca811b252bf9515178b9ba3a23128226d58034d976a",
+    "physical_size": 256,
+    "logical_size": 32,
+    "format": "RGBA32 raw8x OTEXv1",
+    "tmem_bytes": 4096,
+    "transparent_gutter_pixels": 8
+  }
+}

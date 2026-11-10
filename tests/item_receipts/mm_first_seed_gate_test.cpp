@@ -12,6 +12,7 @@
 #include "ComboExport.h"
 #include "gui/ComboGenProgress.h"
 #include "gui/ComboForeground.h"
+#include "gui/ComboMenuModel.h"
 #include "rando/SharedItems.h"
 #include "rando/ComboPlaythrough.h"
 
@@ -20,6 +21,16 @@ static int foregroundGame = 0;
 static int generationCalls = 0;
 static int reloadCalls = 0;
 static const char* pressedButton = "Generate";
+// Native ComboMenuModel resolves these observer exports through its real loader.
+static int ootSharedChanges = 0, mmSharedChanges = 0;
+extern "C" void SOH_MenuApplyCVarChange(const char* cvar) {
+    assert(std::strcmp(cvar, "fixture.shared.option") == 0);
+    ++ootSharedChanges;
+}
+extern "C" void MM_MenuApplyCVarChange(const char* cvar) {
+    assert(std::strcmp(cvar, "fixture.shared.option") == 0);
+    ++mmSharedChanges;
+}
 namespace ImGui {
 void TextWrapped(const char*, ...) {}
 void TextDisabled(const char*, ...) {}
@@ -120,6 +131,7 @@ void PlandoSavePlay() { sRequestReload("fixture-seed.json"); }
 /* ACTUAL_PLANDO_STATE */
 /* ACTUAL_FILE_SELECT_GATE */
 /* ACTUAL_PLANDO_PANEL */
+/* ACTUAL_SHARED_OPTION_CHANGE */
 /* ACTUAL_COMBO_PANEL */
 }
 
@@ -142,6 +154,11 @@ static void CheckActions(ComboRando::ComboMenu& menu, bool generate, bool reload
 }
 
 int main() {
+#if FIXTURE_HAS_SHARED_OPTION_CHANGE
+    ComboRando::ApplySharedRandoOptionChange("fixture.shared.option");
+    Check(ootSharedChanges == 1 && mmSharedChanges == 1,
+          "actual shared option helper loads the native model and forwards both game callbacks");
+#endif
     GameState fileSelect{};
     fileSelect.main = FileChoose_Main;
     fileSelect.running = true;

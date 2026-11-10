@@ -17,6 +17,7 @@ parser.add_argument("--control", action="store_true", help="Exercise the baselin
 args = parser.parse_args()
 inventory = (ROOT / "soh/mods/extended_inventory.c").read_text()
 store = (ROOT / "soh/mods/nei_save.cpp").read_text()
+forms = (ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text()
 cane = (ROOT / "soh/mods/items/logic/item_cane_of_somaria.c").read_text()
 helper = ROOT / "soh/soh/Enhancements/debugger/NeiEditorItems.h"
 
@@ -49,6 +50,7 @@ extern "C" unsigned char Picto_IsOwned() { assert(false); return 0; }
 extern "C" unsigned char PowerKeg_IsOwned() { assert(false); return 0; }
 '''
 production = "\n".join(function(store, name) for name in ("Nei_Save", "Nei_GetOwnedItem", "Nei_SetOwnedItem"))
+production += "\n" + function(forms, "RitoMask_IsOwned")
 production += "\n" + store[store.index("#define NEI_CANE_SKILL_MAX"):store.index('extern "C" uint8_t Nei_CaneActiveSkill')]
 production += "\n" + inventory[inventory.index("const uint8_t gPage2Items["):inventory.index("// Age requirements for page 2")]
 production += "\n" + inventory[inventory.index("static const uint8_t sWandQuest"):inventory.index("static void* const sWandNameTex")]

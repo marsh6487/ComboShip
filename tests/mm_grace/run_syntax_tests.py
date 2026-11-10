@@ -44,7 +44,7 @@ for filename in (sys.argv[1:] or SOURCES):
         for key, value in re.findall(r'set\((CVAR_PREFIX_\w+) "([^"]+)"\)',
                                     (ROOT / "CMake" / ("2ship-cvars.cmake" if game == "mm" else "soh-cvars.cmake")).read_text()):
             flags.append(f'-D{key}="{value}"')
-    flags += ["-I" + str(ROOT / directory) for directory in directories]
+    flags += ["-I" + str(ROOT / directory) for directory in [*directories, ""]]
     # GCC 15 diagnoses existing UI fluent methods that share their enum names.
     # Keep those baseline declarations as warnings during this compiler probe.
     if cpp:

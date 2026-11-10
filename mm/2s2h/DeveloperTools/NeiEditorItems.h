@@ -107,6 +107,8 @@ inline bool WandModeEarned(int mode) {
 }
 
 inline bool IsOwned(RandoItemId id) {
+    if (id == RI_OOT_NEI_RITO_MASK)
+        return RitoMask_IsOwned();
     if (id == RI_OOT_NEI_TIME_GATE || id == RI_OOT_NEI_MAGIC_MIRROR) {
         const auto selected = Nei_GetOwnedItem(SLOT_MAGIC_MIRROR);
         const auto item = id == RI_OOT_NEI_TIME_GATE ? ITEM_TIME_GATE : EXT_ITEM_MAGIC_MIRROR;
@@ -249,6 +251,11 @@ inline bool RestoreOwnedHost(RandoItemId id) {
 }
 
 inline bool Grant(RandoItemId id) {
+    if (id == RI_OOT_NEI_RITO_MASK) {
+        const bool changed = !RitoMask_IsOwned();
+        RitoMask_Grant();
+        return changed;
+    }
     if (!IsItem(id)) {
         return false;
     }

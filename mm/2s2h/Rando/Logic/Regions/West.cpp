@@ -1,4 +1,5 @@
 #include "rando/CrossEntranceBoss.h"
+#include "2s2h/FleetShipCombo/FleetComboIds.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 
@@ -128,7 +129,43 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_GREAT_BAY_COAST] = RandoRegion{ .sceneId = SCENE_30GYOSON,
         .checks = {
-            CHECK(RC_GREAT_BAY_COAST_MIKAU, CAN_USE_ABILITY(SWIM) && CAN_PLAY_SONG(HEALING)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_1, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]) && Combo_MM_CrossBossLogicalClear(10, RANDO_EVENTS[RE_CLEARED_GREAT_BAY_TEMPLE])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_CLEARED_2, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON]) && Combo_MM_CrossBossLogicalClear(10, RANDO_EVENTS[RE_CLEARED_GREAT_BAY_TEMPLE])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_01, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_02, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_03, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_04, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_05, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_06, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_07, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_08, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_09, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_10, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_11, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_12, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_13, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_14, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_15, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_16, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_17, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_18, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_19, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_20, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_21, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_22, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_23, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_24, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_25, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_26, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_27, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_WATER_28, (Rando::Logic::CanReturnToHuman() && CAN_USE_ABILITY(SWIM) && HAS_ITEM(ITEM_MASK_BLAST) && HAS_ANY_SHIELD && gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOOTS_IRON])),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_SAND_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_SAND_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_SAND_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_SAND_4, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_SAND_5, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
+            CHECK(RC_GREAT_BAY_COAST_MIKAU, CAN_USE_ABILITY(SWIM) && Rando::SongEvents::CanPlay(7)),
             CHECK(RC_GREAT_BAY_COAST_POT_03, true),
             CHECK(RC_GREAT_BAY_COAST_POT_04, true),
             CHECK(RC_GREAT_BAY_COAST_GRASS_01, true),
@@ -193,6 +230,11 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_GREAT_BAY_COAST_CLIFFSIDE] = RandoRegion{ .sceneId = SCENE_30GYOSON,
         .checks = {
+            CHECK(RC_GREAT_BAY_COAST_ROCK_CLIFFS_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_CLIFFS_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_ROCK_CLIFFS_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_GREAT_BAY_COAST_SOIL, (Rando::Logic::CanReturnToHuman() && HAS_BOTTLE && CAN_ACCESS(BUGS)) && HAS_ITEM(ITEM_HOOKSHOT)),
+
             CHECK(RC_GREAT_BAY_COAST_PIECE_OF_HEART, CAN_HOOK_SCARECROW && CAN_GROW_BEAN_PLANT),
             CHECK(RC_GREAT_BAY_COAST_POT_05, true),
             CHECK(RC_GREAT_BAY_COAST_POT_06, true),
@@ -329,6 +371,9 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN] = RandoRegion{ .sceneId = SCENE_31MISAKI,
         .checks = {
+            CHECK(RC_ZORA_CAPE_LARGE_BOULDER_1, CAN_USE_EXPLOSIVE),
+            CHECK(RC_ZORA_CAPE_LARGE_BOULDER_2, CAN_USE_EXPLOSIVE),
+
             CHECK(RC_ENEMY_DROP_GUAY, CanKillEnemy(ACTOR_EN_CROW)),
         },
         .exits = { //     TO                                         FROM
@@ -340,6 +385,23 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ZORA_CAPE] = RandoRegion{ .sceneId = SCENE_31MISAKI,
         .checks = {
+            CHECK(RC_ZORA_CAPE_ROCK_ISLAND_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))),
+            CHECK(RC_ZORA_CAPE_ROCK_ISLAND_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))),
+            CHECK(RC_ZORA_CAPE_ROCK_ISLAND_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))),
+            CHECK(RC_ZORA_CAPE_ROCK_ISLAND_4, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))),
+            CHECK(RC_ZORA_CAPE_ROCK_ISLAND_5, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && (HAS_ITEM(ITEM_HOOKSHOT) || (CAN_USE_MAGIC_ARROW(ICE) && (CAN_BE_GORON || CAN_BE_ZORA)))),
+            CHECK(RC_ZORA_CAPE_ROCK_WATER_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ZORA_CAPE_ROCK_WATER_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ZORA_CAPE_ROCK_WATER_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ZORA_CAPE_ROCK_WATER_4, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ZORA_CAPE_ROCK_WATER_5, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+            CHECK(RC_ZORA_CAPE_ROCK_SAND_1, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true),
+            CHECK(RC_ZORA_CAPE_ROCK_SAND_2, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true),
+            CHECK(RC_ZORA_CAPE_ROCK_SAND_3, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true),
+            CHECK(RC_ZORA_CAPE_ROCK_SAND_4, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true),
+            CHECK(RC_ZORA_CAPE_ROCK_SAND_5, (Rando::Logic::CanReturnToHuman() || CAN_BE_GORON || CAN_USE_EXPLOSIVE) && true),
+            CHECK(RC_ZORA_CAPE_BOULDER, (CAN_BE_GORON || CAN_USE_EXPLOSIVE)),
+
             CHECK(RC_ZORA_CAPE_LEDGE_CHEST_01,             HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_ZORA_CAPE_LEDGE_CHEST_02,             HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_ZORA_CAPE_UNDERWATER_CHEST,           CAN_BE_ZORA && CAN_USE_ABILITY(SWIM)),
@@ -388,7 +450,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(ZORA_HALL, 3),                    ENTRANCE(ZORA_HALL_ROOMS, 2), true),
         },
         .events = {
-            EVENT(RE_ACCESS_GREEN_POTION_REFILL, CAN_BE_ZORA),
+            EVENT(RE_ACCESS_GREEN_POTION_REFILL, CAN_BE_ZORA && CAN_PAY_FEE(40)),
         },
     };
     Regions[RR_ZORA_HALL_MIKAUS_ROOM] = RandoRegion{ .name = "Mikau's Room", .sceneId = SCENE_BANDROOM,

@@ -12,8 +12,8 @@ This pass follows the latest feedback: Gilded was too long, Master's narrow
 blade section above the guard was too thin, and True Master was accepted.
 
 - [Two before/after pairs at one common scale](swords_tuned_before_after_scale.png)
-- [Gilded, Master and accepted True Master rotating](swords_tuned_group_2.gif)
-- [All nine swords rotating](swords_tuned.gif)
+- Gilded, Master and accepted True Master rotating (animated preview omitted from publication)
+- All nine swords rotating (animated preview omitted from publication)
 - [All models guard-aligned, effects off](swords_tuned_measured_scale.png)
 
 Gilded's visible blade is about 21% shorter. Its guard, red grip, silver pommel,

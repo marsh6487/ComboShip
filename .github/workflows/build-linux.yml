@@ -29,7 +29,7 @@ jobs:
             libusb-dev libusb-1.0-0-dev libsdl2-dev libsdl2-net-dev libpng-dev libglew-dev \
             nlohmann-json3-dev libtinyxml2-dev libspdlog-dev ninja-build \
             libogg-dev libopus-dev opus-tools libopusfile-dev libvorbis-dev \
-            libzip-dev zipcmp zipmerge ziptool
+            libzip-dev zipcmp zipmerge ziptool gdb
 
       # ~2600 objects across lus/soh/2ship/combo: ccache is the difference between ~90 min cold
       # and a few minutes warm. In-repository PRs can warm their own scoped cache;
@@ -87,7 +87,7 @@ jobs:
       # Fixed seed keeps failures reproducible; exit code is the verdict (0 = beatable).
       - name: Smoke-test seed generation (comborando)
         working-directory: build-cmake/combo
-        run: ./comborando --seed ci-linux-smoke --count 1
+        run: python3 ../../scripts/ci/run_seed_smoke.py ./comborando --seed ci-linux-smoke --count 1
 
       - name: Smoke-test door-only cross-game entrance generation
         working-directory: build-cmake/combo
@@ -98,12 +98,11 @@ jobs:
           --cross-interior-entrances=0 --cross-grotto-entrances=0
           --cross-shop-entrances=1 --cross-door-interior-entrances=1
 
-      # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
-      # are ROM-extracted by the user and never built or shipped here) and packages it as a
-      # self-contained AppImage — linuxdeploy bundles the system .so deps and combo/linux/AppRun
-      # recreates the launcher's portable cwd layout in a writable data dir at run time.
-      - name: Stage Linux package + build AppImage
-        run: ./scripts/linux/make-appimage.sh build-cmake _packages
+      # Save the built validator/runtime before distribution packaging. A linuxdeploy
+      # download or AppImage failure must not discard a fully linked native build.
+      - name: Stage native Linux runtime
+        id: native_runtime
+        run: ./scripts/linux/make-appimage.sh build-cmake _packages --stage-only
 
       - name: Upload ComboShip-linux artifact
         uses: actions/upload-artifact@v4
@@ -111,6 +110,80 @@ jobs:
           name: ComboShip-linux
           path: _packages/stage
           if-no-files-found: error
+
+      - name: Verify actual native Solo MM entrance generation and replay
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 15
+        run: >
+          python3 -B tests/solo_mm_entrances/native_seed_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --output "$RUNNER_TEMP/native-solo-mm-entrances"
+          --case off --case mixed-decoupled --seed 20261110
+
+      - name: Preserve native Solo MM entrance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-solo-mm-entrances-linux
+          path: |
+            ${{ runner.temp }}/native-solo-mm-entrances
+            !${{ runner.temp }}/native-solo-mm-entrances/**/runtime/**
+          if-no-files-found: warn
+
+      - name: Verify actual native first-drop graph, fill and replay (Vanilla)
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 90
+        run: >
+          python3 -B tests/shuffle_parity/enemy_drops/native_seed_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-first-drops"
+          --case vanilla-off --case vanilla-on --case vanilla-on-excluded
+
+      - name: Preserve native seed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-first-drops-linux
+          path: |
+            ${{ runner.temp }}/native-first-drops
+            !${{ runner.temp }}/native-first-drops/runtime/**
+          if-no-files-found: warn
+
+      - name: Verify actual native both-solo and combined parity seeds
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 120
+        run: >
+          python3 -B tests/shuffle_parity/boss_keys/native_boss_key_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-boss-keys"
+
+      - name: Preserve native parity seed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-boss-keys-linux
+          path: |
+            ${{ runner.temp }}/native-boss-keys
+            !${{ runner.temp }}/native-boss-keys/runtime/**
+          if-no-files-found: warn
+
+      # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
+      # are ROM-extracted by the user and never built or shipped here) and packages it as a
+      # self-contained AppImage — linuxdeploy bundles the system .so deps and combo/linux/AppRun
+      # recreates the launcher's portable cwd layout in a writable data dir at run time.
+      - name: Stage Linux package + build AppImage
+        shell: bash
+        run: ./scripts/linux/make-appimage.sh build-cmake _packages 2>&1 | tee "$RUNNER_TEMP/linux-packaging.log"
+
+      - name: Preserve packaging diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packaging-log
+          path: ${{ runner.temp }}/linux-packaging.log
+          if-no-files-found: warn
 
       # GitHub zips artifact contents on download, which drops the exec bit — the docs tell users
       # to chmod +x the AppImage after unzipping (standard for CI-distributed AppImages).

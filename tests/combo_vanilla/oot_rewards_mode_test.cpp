@@ -1,5 +1,6 @@
 #include "combo/vanilla/ComboVanillaMode.h"
 #include "soh/mods/nei_save.h"
+#include "soh/include/z64item.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -11,9 +12,6 @@ int gComboVanillaMode = 1;
 using u8 = unsigned char;
 using s32 = int;
 using s8 = signed char;
-constexpr int ITEM_NONE = 0xFF, ITEM_FARORES_WIND = 13, ITEM_RITO_MASK = 0xFB;
-constexpr int SLOT_FARORES_WIND = 13;
-constexpr int ITEM_NAYRUS_LOVE = 19, ITEM_ROCS_FEATHER = 0x9D, SLOT_NAYRUS_LOVE = 19;
 constexpr int RAND_INF_OBTAINED_ROCS_FEATHER = 0, RAND_INF_OBTAINED_NAYRUS_LOVE = 1;
 static bool randomizerFlags[2]{};
 bool Flags_GetRandomizerInf(int flag) {
@@ -25,8 +23,6 @@ bool Flags_GetRandomizerInf(int flag) {
 #define CANE_SKILL_MAX 6
 #define CANE_SKILL_TYPE(skill) ((skill) / 3)
 #define CANE_SKILL_SLOT(skill) ((skill) % 3)
-#define SLOT_CANE_OF_SOMARIA 45
-#define ITEM_CANE_OF_SOMARIA 0xAB
 #define CANE_TYPE_SOMARIA 0
 #define CANE_TYPE_TRIROD 1
 #define CANE_TYPE_PACCI 2
@@ -71,10 +67,11 @@ void Nei_SetOwnedItem(uint8_t slot, uint16_t value) {
     assert(slot >= 24 && slot < 72);
     nei.ownedItems[slot - 24] = value;
 }
+#define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
+struct ItemEquips { u8 buttonItems[8]; u8 cButtonSlots[7]; };
 struct {
-    struct {
-        u8 items[24];
-    } inventory;
+    struct { u8 items[24]; } inventory;
+    ItemEquips equips, childEquips, adultEquips;
 } gSaveContext;
 #include "oot_reward_modes.inc"
 
@@ -147,7 +144,7 @@ int main() {
     optionValue = 1;
     assert(ExtInv_IsOnlyTransformation());
     RitoItem_SyncCell();
-    assert(nei.ritoMaskFlags & RITO_FLAG_MASK_OWNED); // Existing seeded/solo behavior.
+    assert(!(nei.ritoMaskFlags & RITO_FLAG_MASK_OWNED)); // Seeded/solo pause cannot grant the mask.
     gComboGameMode = COMBO_GAME_OOT;
     gComboVanillaMode = 1;
     optionValue = 0;

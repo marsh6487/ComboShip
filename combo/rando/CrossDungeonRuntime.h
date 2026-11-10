@@ -87,8 +87,50 @@ class RuntimeState {
         }
         routes = std::move(next);
         dungeons = std::move(nextDungeons);
+        allowNonbossRecovery = false;
         if (bossRecoveryResume && RecoveryForBoss(bossRecoveryResume->arena) != bossRecoveryResume)
             bossRecoveryResume.reset(); // Recovery-only metadata can change without changing route endpoints.
+    }
+    // Solo's codec supports mixed categories and independent reverse routes.
+    // It validates its canonical catalogue before this boundary; keep the
+    // combined Install/Decode contract unchanged and enforce local ownership
+    // again before committing any explicit route state.
+    void InstallValidated(const nlohmann::json& seed, std::vector<Route> next, std::vector<Dungeon> nextDungeons) {
+        if (seed.is_null()) {
+            if (!next.empty() || !nextDungeons.empty())
+                throw std::invalid_argument("disabled local entrance seed has routes");
+            Install(nullptr);
+            return;
+        }
+        Validate(nextDungeons);
+        for (const auto& dungeon : nextDungeons)
+            if (dungeon.entrance.game != game)
+                throw std::invalid_argument("foreign portal in local entrance catalogue");
+        std::set<std::tuple<Phase, int, int32_t>> unique;
+        for (const auto& route : next) {
+            if (!Valid(route.from) || !Valid(route.to) || route.from.game != game || route.to.game != game ||
+                (route.arrivalCheckpoint &&
+                 (!Valid(*route.arrivalCheckpoint) || route.arrivalCheckpoint->game != game)) ||
+                !unique.emplace(route.phase, route.from.game, route.from.index).second)
+                throw std::invalid_argument("invalid or foreign local entrance route");
+            const bool sourceKnown = std::any_of(nextDungeons.begin(), nextDungeons.end(), [&](const Dungeon& d) {
+                if (route.phase == Phase::AfterNative)
+                    return d.entrance == route.from;
+                return d.exit == route.from ||
+                       std::find(d.escapeExits.begin(), d.escapeExits.end(), route.from) != d.escapeExits.end();
+            });
+            if (!sourceKnown)
+                throw std::invalid_argument("local entrance route lacks a source portal");
+        }
+        if (routes != next) {
+            arrival = -1;
+            bossRecoveryResume.reset();
+        }
+        routes = std::move(next);
+        dungeons = std::move(nextDungeons);
+        allowNonbossRecovery = true;
+        if (bossRecoveryResume && RecoveryForBoss(bossRecoveryResume->arena) != bossRecoveryResume)
+            bossRecoveryResume.reset();
     }
     bool Enabled() const {
         return !routes.empty();
@@ -138,10 +180,12 @@ class RuntimeState {
             if (route.phase != Phase::AfterNative || route.to != arena)
                 continue;
             for (const auto& source : dungeons)
-                if (source.pool == Pool::Boss && source.entrance == route.from)
+                if ((source.pool == Pool::Boss || allowNonbossRecovery) && source.entrance == route.from)
                     return BossRecovery{ arena, source.entrance,
-                                         source.deathCheckpoint.value_or(
-                                             source.reverseCheckpoint.value_or(source.returnTo)) };
+                                         source.pool == Pool::Boss
+                                             ? source.deathCheckpoint.value_or(
+                                                   source.reverseCheckpoint.value_or(source.returnTo))
+                                             : source.returnTo };
         }
         return std::nullopt;
     }
@@ -175,6 +219,14 @@ class RuntimeState {
                 (d.returnTo.index == index || (d.reverseCheckpoint && d.reverseCheckpoint->index == index) ||
                  (d.deathCheckpoint && d.deathCheckpoint->index == index)))
                 return true;
+        if (allowNonbossRecovery)
+            for (const auto& d : dungeons) {
+                if (d.pool != Pool::Boss)
+                    continue;
+                const auto recovery = RecoveryForBoss(d.entrance);
+                if (recovery && recovery->parent == Endpoint{ game, index })
+                    return true;
+            }
         return false;
     }
     int32_t RecoveryForArrival(int32_t index) const {
@@ -205,6 +257,7 @@ class RuntimeState {
     int32_t arrival = -1;
     std::vector<Route> routes;
     std::vector<Dungeon> dungeons;
+    bool allowNonbossRecovery = false;
     std::optional<BossRecovery> bossRecoveryResume;
 };
 } // namespace ComboRando::CrossDungeon

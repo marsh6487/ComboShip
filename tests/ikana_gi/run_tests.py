@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check real Ikana pose producers, both grids and the engine's texture route."""
 from pathlib import Path
-import argparse, hashlib, os, re, struct, subprocess, tempfile
+import argparse, hashlib, os, re, struct, subprocess, sys, tempfile
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 parser=argparse.ArgumentParser(description=__doc__)
@@ -11,12 +11,22 @@ parser.add_argument("--archive",type=Path,action="append",default=[],help="optio
 parser.add_argument("--fados-archive",type=Path,help="local supplied Fados worn-shield O2R; mesh data is not distributed")
 args=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
+from foreign_gi_fixture_dependencies import clock_descriptor
 def function(source,name):
     match=re.search(r'^(?![ \t]*/)(?:static\s+)?[^\n{};]+\b'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
     if not match:raise RuntimeError('Missing production function '+name)
     cursor,depth=match.end(),1
     while depth:
         depth+=(source[cursor]=='{')-(source[cursor]=='}');cursor+=1
+    return source[match.start():cursor]
+def braced_case(source,label):
+    match=re.search(r'^\s*case '+re.escape(label)+r':\s*\{',source,re.M)
+    if not match:raise RuntimeError('Missing production braced case '+label)
+    cursor,depth=match.end(),1
+    while depth and cursor<len(source):
+        depth+=(source[cursor]=='{')-(source[cursor]=='}');cursor+=1
+    if depth:raise RuntimeError('Unclosed production case '+label)
     return source[match.start():cursor]
 def read(path):return (ROOT/path).read_text()
 source=read('tests/ikana_gi/presentation_test.cpp')
@@ -26,9 +36,11 @@ case=re.search(r'        case RG_EXT_SHIELD_OF_IKANA:.*?(?=\n        case )',own
 source=source.replace('/* OOT_DESCRIPTOR */',function(owner,'CwSimple')+'\nint DescribeIkana(CwItemDrawInfo* out){switch(RG_EXT_SHIELD_OF_IKANA){\n'+case+'\n}return 0;}')
 mm_draw=read('mm/2s2h/Rando/DrawItem.cpp')
 native=function(mm_draw,'DrawResolvedItem')
-case=re.search(r'        case RI_SHIELD_MIRROR:.*?(?=\n        case )',native,re.S)
-if case:case=case[0]
-else:case=re.search(r'        default:\s*GetItem_Draw\(gPlayState,.*?break;',native,re.S)[0]
+# Mirror Shield may be the last case before default. Copy its complete braced
+# body, including the unavailable-resource fallback, never an unrelated default.
+case=braced_case(native,'RI_SHIELD_MIRROR')
+assert 'ResourceMgr_IsIkanaShieldGiAvailable()' in case and 'DrawNativeIkanaFallback()' in case, 'actual native Ikana shield dispatch'
+assert 'default:' not in case and 'DrawShuffledSoul' not in case, 'shield case must not absorb the default soul dispatch'
 # Keep the real namespace-qualified caller: block-scope DISPS declarations in
 # this context must still resolve to the global C interpolation implementation.
 gfx=read('mm/include/gfx.h')
@@ -37,7 +49,7 @@ source=source.replace('/* MM_NATIVE_DRAW */',port+'\n'
     '#undef OPEN_DISPS\n#undef CLOSE_DISPS\n'
     '#define OPEN_DISPS(x) { OPEN_DISPS_PORT_HELPERS(x);\n'
     '#define CLOSE_DISPS(x) CLOSE_DISPS_PORT_HELPERS(x); }\n'+
-    (function(mm_draw,'DrawNativeIkanaFallback')+'\n' if 'static void DrawNativeIkanaFallback(' in mm_draw else '')+
+    function(mm_draw,'DrawNativeIkanaFallback')+'\n'+
     'namespace Rando { void DrawNativeIkanaGI(); }\n'
     'void Rando::DrawNativeIkanaGI(){const int randoItemId=RI_SHIELD_MIRROR;switch(randoItemId){\n'+case+'\n}}\n'
     'using Rando::DrawNativeIkanaGI;')
@@ -79,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
         subprocess.run([os.environ.get('CXX','c++'),*iconflags,str(cpp),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
 
-    exported=read('tests/ikana_gi/mm_export_test.cpp')
+    exported=clock_descriptor(ROOT)+read('tests/ikana_gi/mm_export_test.cpp')
     mm=read('combo/menu/ComboItemDrawMM.h')
     collectible=read('combo/menu/ComboCollectibleShimmerHost.h')
     profile='#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'+function(collectible,'ComboCollectibleShimmer_ProfileForDrawId')+'\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'

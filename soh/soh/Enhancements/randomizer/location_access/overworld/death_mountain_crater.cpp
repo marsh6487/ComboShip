@@ -391,7 +391,7 @@ void RegionTable_Init_DeathMountainCrater() {
 
     areaTable[RR_DMC_GREAT_FAIRY_FOUNTAIN] = Region("DMC Great Fairy Fountain", SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, {}, {
         //Locations
-        LOCATION(RC_DMC_GREAT_FAIRY_REWARD, logic->CanUse(RG_ZELDAS_LULLABY)),
+        LOCATION(RC_DMC_GREAT_FAIRY_REWARD, logic->CanPlaySongEvent(9)),
     }, {
         //Exits
         ENTRANCE(RR_DMC_BLOCKED_ENTRY, true),

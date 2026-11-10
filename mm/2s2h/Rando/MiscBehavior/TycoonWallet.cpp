@@ -92,21 +92,23 @@ static void DrawTycoonRupeeCounter() {
 }
 
 void Rando::MiscBehavior::InitTycoonWallet() {
-    bool shouldRegister = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES;
+    // Register capacity-based dispatch for every rando save: an imported or
+    // already owned wallet may retain four-digit capacity with Tycoon off.
+    bool shouldRegister = IS_RANDO;
 
-    if (shouldRegister) {
+    if (shouldRegister && RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES) {
         gUpgradeCapacities[UPG_WALLET][3] = 5000;
     }
 
     COND_VB_SHOULD(VB_DRAW_RUPEE_ICON, shouldRegister, {
-        if (CUR_UPG_VALUE(UPG_WALLET) >= 3) {
+        if (CUR_CAPACITY(UPG_WALLET) >= 1000) {
             *should = false;
             DrawTycoonRupeeIcon();
         }
     });
 
     COND_VB_SHOULD(VB_DRAW_RUPEE_COUNTER, shouldRegister, {
-        if (CUR_UPG_VALUE(UPG_WALLET) >= 3) {
+        if (CUR_CAPACITY(UPG_WALLET) >= 1000) {
             *should = false;
             DrawTycoonRupeeCounter();
         }

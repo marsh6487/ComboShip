@@ -52,7 +52,7 @@ for file, pattern in [("libultraship/cmake/cvars.cmake", r'set\((CVAR_\w+) "([^"
     flags += [f'-D{key}="{value}"' for key, value in re.findall(pattern, (ROOT / file).read_text())]
 flags += ["-I" + str(ROOT / directory) for directory in
           ["mm/include", "mm/include/PR", "mm/src", "mm", "mm/assets", "mm/mods", "mm/2s2h",
-           "libultraship/include", "libultraship/src", "combo", "combo/menu", "combo/gui"]]
+           "libultraship/include", "libultraship/src", "combo", "combo/menu", "combo/gui", ""]]
 cpp_flags = ["-fpermissive", *shlex.split(os.environ.get("SYNTAX_CXXFLAGS", ""))]
 for header in ["libultraship/bridge/consolevariablebridge.h", "ship/Context.h",
                "ship/resource/ResourceManager.h", "ship/window/Window.h", "spdlog/spdlog.h",

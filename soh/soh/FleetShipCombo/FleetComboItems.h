@@ -852,7 +852,170 @@
       "Season: Winter", "Season: Winter")                                                                              \
     /* Standalone Mirror identity. Appended: FCI ordinals are serialized. */                                           \
     X(FCI_MAGIC_MIRROR, 1, FCI_F_NONE, RG_MAGIC_MIRROR, RI_OOT_NEI_MAGIC_MIRROR, "Magic Mirror", "Magic Mirror",       \
-      "Magic Mirror")
+      "Magic Mirror")                                                                                                  \
+    X(FCI_MM_KEY_RING_WOODFALL, 1, FCI_F_NONE, RG_MM_KEY_RING_WOODFALL, RI_WOODFALL_KEY_RING, "Woodfall Key Ring",     \
+      "Woodfall Key Ring", "Woodfall Key Ring")                                                                        \
+    X(FCI_MM_KEY_RING_SNOWHEAD, 1, FCI_F_NONE, RG_MM_KEY_RING_SNOWHEAD, RI_SNOWHEAD_KEY_RING, "Snowhead Key Ring",     \
+      "Snowhead Key Ring", "Snowhead Key Ring")                                                                        \
+    X(FCI_MM_KEY_RING_GREAT_BAY, 1, FCI_F_NONE, RG_MM_KEY_RING_GREAT_BAY, RI_GREAT_BAY_KEY_RING, "Great Bay Key Ring", \
+      "Great Bay Key Ring", "Great Bay Key Ring")                                                                      \
+    X(FCI_MM_KEY_RING_STONE_TOWER, 1, FCI_F_NONE, RG_MM_KEY_RING_STONE_TOWER, RI_STONE_TOWER_KEY_RING,                 \
+      "Stone Tower Key Ring", "Stone Tower Key Ring", "Stone Tower Key Ring")                                          \
+    X(FCI_OOT_CLOCK, 1, FCI_F_NONE, RG_CLOCK, RI_OOT_CLOCK, "Clock", "Clock", "Clock")                                 \
+    X(FCI_OOT_RUSTY_KEY_TREASURE_CHEST_GAME, 1, FCI_F_NONE, RG_TREASURE_CHEST_GAME_BUILDING_KEY,                       \
+      RI_OOT_RUSTY_KEY_TREASURE_CHEST_GAME, "Treasure Chest Game Building Key", "Treasure Chest Game Building Key",    \
+      "Treasure Chest Game Building Key")                                                                              \
+    X(FCI_OOT_RUSTY_KEY_GUARD_HOUSE, 1, FCI_F_NONE, RG_GUARD_HOUSE_KEY, RI_OOT_RUSTY_KEY_GUARD_HOUSE,                  \
+      "Guard House Key", "Guard House Key", "Guard House Key")                                                         \
+    X(FCI_OOT_RUSTY_KEY_HYRULE_CASTLE, 1, FCI_F_NONE, RG_RUSTY_KEY_HYRULE_CASTLE, RI_OOT_RUSTY_KEY_HYRULE_CASTLE,      \
+      "Rusty Key (Hyrule Castle Gatehouse)", "Rusty Key (Hyrule Castle Gatehouse)",                                    \
+      "Rusty Key (Hyrule Castle Gatehouse)")                                                                           \
+    X(FCI_OOT_RUSTY_KEY_DOG_LADY_HOUSE, 1, FCI_F_NONE, RG_RICHARDS_HOUSE_KEY, RI_OOT_RUSTY_KEY_DOG_LADY_HOUSE,         \
+      "Richard's House Key", "Richard's House Key", "Richard's House Key")                                             \
+    X(FCI_OOT_RUSTY_KEY_BACK_ALLEY_HOUSE, 1, FCI_F_NONE, RG_ALLEY_HOUSE_KEY, RI_OOT_RUSTY_KEY_BACK_ALLEY_HOUSE,        \
+      "Alley House Key", "Alley House Key", "Alley House Key")                                                         \
+    X(FCI_OOT_RUSTY_KEY_BOMBCHU_SHOP, 1, FCI_F_NONE, RG_BOMBCHU_SHOP_KEY, RI_OOT_RUSTY_KEY_BOMBCHU_SHOP,               \
+      "Bombchu Shop Key", "Bombchu Shop Key", "Bombchu Shop Key")                                                      \
+    X(FCI_OOT_RUSTY_KEY_MASK_SHOP, 1, FCI_F_NONE, RG_MASK_SHOP_KEY, RI_OOT_RUSTY_KEY_MASK_SHOP, "Mask Shop Key",       \
+      "Mask Shop Key", "Mask Shop Key")                                                                                \
+    X(FCI_OOT_RUSTY_KEY_CHILD_BAZAAR, 1, FCI_F_NONE, RG_MARKET_BAZAAR_KEY, RI_OOT_RUSTY_KEY_CHILD_BAZAAR,              \
+      "Market Bazaar Key", "Market Bazaar Key", "Market Bazaar Key")                                                   \
+    X(FCI_OOT_RUSTY_KEY_CHILD_POTION_SHOP, 1, FCI_F_NONE, RG_MARKET_POTION_SHOP_KEY,                                   \
+      RI_OOT_RUSTY_KEY_CHILD_POTION_SHOP, "Market Potion Shop Key", "Market Potion Shop Key",                          \
+      "Market Potion Shop Key")                                                                                        \
+    X(FCI_OOT_RUSTY_KEY_CHILD_SHOOTING_GALLERY, 1, FCI_F_NONE, RG_MARKET_SHOOTING_GALLERY_KEY,                         \
+      RI_OOT_RUSTY_KEY_CHILD_SHOOTING_GALLERY, "Market Shooting Gallery Key", "Market Shooting Gallery Key",           \
+      "Market Shooting Gallery Key")                                                                                   \
+    X(FCI_OOT_RUSTY_KEY_BOMBCHU_BOWLING, 1, FCI_F_NONE, RG_BOMBCHU_BOWLING_KEY, RI_OOT_RUSTY_KEY_BOMBCHU_BOWLING,      \
+      "Bombchu Bowling Alley Key", "Bombchu Bowling Alley Key", "Bombchu Bowling Alley Key")                           \
+    X(FCI_OOT_RUSTY_KEY_LABORATORY, 1, FCI_F_NONE, RG_HYLIA_LAB_KEY, RI_OOT_RUSTY_KEY_LABORATORY,                      \
+      "Hylia Laboratory Key", "Hylia Laboratory Key", "Hylia Laboratory Key")                                          \
+    X(FCI_OOT_RUSTY_KEY_FISHING_POND, 1, FCI_F_NONE, RG_FISHING_HOLE_KEY, RI_OOT_RUSTY_KEY_FISHING_POND,               \
+      "Fishing Hole Key", "Fishing Hole Key", "Fishing Hole Key")                                                      \
+    X(FCI_OOT_RUSTY_KEY_SILO, 1, FCI_F_NONE, RG_BACK_TOWER_KEY, RI_OOT_RUSTY_KEY_SILO, "Back Tower Key",               \
+      "Back Tower Key", "Back Tower Key")                                                                              \
+    X(FCI_OOT_RUSTY_KEY_RANCH_STABLE, 1, FCI_F_NONE, RG_STABLES_KEY, RI_OOT_RUSTY_KEY_RANCH_STABLE, "Stables Key",     \
+      "Stables Key", "Stables Key")                                                                                    \
+    X(FCI_OOT_RUSTY_KEY_RANCH_HOUSE, 1, FCI_F_NONE, RG_TALONS_HOUSE_KEY, RI_OOT_RUSTY_KEY_RANCH_HOUSE,                 \
+      "Talon's House Key", "Talon's House Key", "Talon's House Key")                                                   \
+    X(FCI_OOT_RUSTY_KEY_RANCH_HOUSE_ROOM, 1, FCI_F_NONE, RG_RUSTY_KEY_RANCH_HOUSE_ROOM,                                \
+      RI_OOT_RUSTY_KEY_RANCH_HOUSE_ROOM, "Rusty Key (Malon's Room)", "Rusty Key (Malon's Room)",                       \
+      "Rusty Key (Malon's Room)")                                                                                      \
+    X(FCI_OOT_RUSTY_KEY_GRAVEYARD, 1, FCI_F_NONE, RG_DAMPES_HUT_KEY, RI_OOT_RUSTY_KEY_GRAVEYARD, "Dampe's Hut Key",    \
+      "Dampe's Hut Key", "Dampe's Hut Key")                                                                            \
+    X(FCI_OOT_RUSTY_KEY_WINDMILL, 1, FCI_F_NONE, RG_WINDMILL_KEY, RI_OOT_RUSTY_KEY_WINDMILL, "Windmill Key",           \
+      "Windmill Key", "Windmill Key")                                                                                  \
+    X(FCI_OOT_RUSTY_KEY_IMPA_HOUSE, 1, FCI_F_NONE, RG_IMPAS_HOUSE_KEY, RI_OOT_RUSTY_KEY_IMPA_HOUSE,                    \
+      "Impa's House Key", "Impa's House Key", "Impa's House Key")                                                      \
+    X(FCI_OOT_RUSTY_KEY_CARPENTER_HOUSE, 1, FCI_F_NONE, RG_BOSS_HOUSE_KEY, RI_OOT_RUSTY_KEY_CARPENTER_HOUSE,           \
+      "Boss's House Key", "Boss's House Key", "Boss's House Key")                                                      \
+    X(FCI_OOT_RUSTY_KEY_GRANNY_POTION_SHOP, 1, FCI_F_NONE, RG_GRANNYS_POTION_SHOP_KEY,                                 \
+      RI_OOT_RUSTY_KEY_GRANNY_POTION_SHOP, "Granny's Potion Shop Key", "Granny's Potion Shop Key",                     \
+      "Granny's Potion Shop Key")                                                                                      \
+    X(FCI_OOT_RUSTY_KEY_ADULT_SHOOTING_GALLERY, 1, FCI_F_NONE, RG_KAK_SHOOTING_GALLERY_KEY,                            \
+      RI_OOT_RUSTY_KEY_ADULT_SHOOTING_GALLERY, "Kakariko Shooting Gallery Key", "Kakariko Shooting Gallery Key",       \
+      "Kakariko Shooting Gallery Key")                                                                                 \
+    X(FCI_OOT_RUSTY_KEY_SKULLTULA_HOUSE, 1, FCI_F_NONE, RG_SKULLTULA_HOUSE_KEY, RI_OOT_RUSTY_KEY_SKULLTULA_HOUSE,      \
+      "Skulltula House Key", "Skulltula House Key", "Skulltula House Key")                                             \
+    X(FCI_OOT_RUSTY_KEY_ADULT_BAZAAR, 1, FCI_F_NONE, RG_KAK_BAZAAR_KEY, RI_OOT_RUSTY_KEY_ADULT_BAZAAR,                 \
+      "Kakariko Bazaar Key", "Kakariko Bazaar Key", "Kakariko Bazaar Key")                                             \
+    X(FCI_OOT_RUSTY_KEY_ADULT_POTION_SHOP, 1, FCI_F_NONE, RG_KAK_POTION_SHOP_KEY, RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP,  \
+      "Kakariko Potion Shop Key", "Kakariko Potion Shop Key", "Kakariko Potion Shop Key")                              \
+    X(FCI_OOT_RUSTY_KEY_ADULT_POTION_SHOP_BACK, 1, FCI_F_NONE, RG_RUSTY_KEY_ADULT_POTION_SHOP_BACK,                    \
+      RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP_BACK, "Rusty Key (Kakariko Potion Shop Back)",                                \
+      "Rusty Key (Kakariko Potion Shop Back)", "Rusty Key (Kakariko Potion Shop Back)")                                \
+    X(FCI_MM_RUSTY_KEY_TOURIST_INFORMATION, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_TOURIST_INFORMATION,                        \
+      RI_RUSTY_KEY_TOURIST_INFORMATION, "Rusty Key (Tourist Information)", "Rusty Key (Tourist Information)",          \
+      "Rusty Key (Tourist Information)")                                                                               \
+    X(FCI_MM_RUSTY_KEY_POTION_SHOP, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_POTION_SHOP, RI_RUSTY_KEY_POTION_SHOP,              \
+      "Rusty Key (Kotake's Potion Shop)", "Rusty Key (Kotake's Potion Shop)", "Rusty Key (Kotake's Potion Shop)")      \
+    X(FCI_MM_RUSTY_KEY_POST_OFFICE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_POST_OFFICE, RI_RUSTY_KEY_POST_OFFICE,              \
+      "Rusty Key (Post Office)", "Rusty Key (Post Office)", "Rusty Key (Post Office)")                                 \
+    X(FCI_MM_RUSTY_KEY_SWORDSMAN_SCHOOL, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_SWORDSMAN_SCHOOL,                              \
+      RI_RUSTY_KEY_SWORDSMAN_SCHOOL, "Rusty Key (Swordsman's School)", "Rusty Key (Swordsman's School)",               \
+      "Rusty Key (Swordsman's School)")                                                                                \
+    X(FCI_MM_RUSTY_KEY_LOTTERY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_LOTTERY, RI_RUSTY_KEY_LOTTERY, "Rusty Key (Lottery)",   \
+      "Rusty Key (Lottery)", "Rusty Key (Lottery)")                                                                    \
+    X(FCI_MM_RUSTY_KEY_BOMB_SHOP, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_BOMB_SHOP, RI_RUSTY_KEY_BOMB_SHOP,                    \
+      "Rusty Key (Bomb Shop)", "Rusty Key (Bomb Shop)", "Rusty Key (Bomb Shop)")                                       \
+    X(FCI_MM_RUSTY_KEY_TRADING_POST, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_TRADING_POST, RI_RUSTY_KEY_TRADING_POST,           \
+      "Rusty Key (Trading Post)", "Rusty Key (Trading Post)", "Rusty Key (Trading Post)")                              \
+    X(FCI_MM_RUSTY_KEY_CURIOSITY_SHOP, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_CURIOSITY_SHOP, RI_RUSTY_KEY_CURIOSITY_SHOP,     \
+      "Rusty Key (Curiosity Shop)", "Rusty Key (Curiosity Shop)", "Rusty Key (Curiosity Shop)")                        \
+    X(FCI_MM_RUSTY_KEY_KAFEI_HIDEOUT, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_KAFEI_HIDEOUT, RI_RUSTY_KEY_KAFEI_HIDEOUT,        \
+      "Rusty Key (Kafei's Hideout)", "Rusty Key (Kafei's Hideout)", "Rusty Key (Kafei's Hideout)")                     \
+    X(FCI_MM_RUSTY_KEY_TOWN_ARCHERY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_TOWN_ARCHERY, RI_RUSTY_KEY_TOWN_ARCHERY,           \
+      "Rusty Key (Clock Town Shooting Gallery)", "Rusty Key (Clock Town Shooting Gallery)",                            \
+      "Rusty Key (Clock Town Shooting Gallery)")                                                                       \
+    X(FCI_MM_RUSTY_KEY_SWAMP_ARCHERY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_SWAMP_ARCHERY, RI_RUSTY_KEY_SWAMP_ARCHERY,        \
+      "Rusty Key (Swamp Shooting Gallery)", "Rusty Key (Swamp Shooting Gallery)",                                      \
+      "Rusty Key (Swamp Shooting Gallery)")                                                                            \
+    X(FCI_MM_RUSTY_KEY_OBSERVATORY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_OBSERVATORY, RI_RUSTY_KEY_OBSERVATORY,              \
+      "Rusty Key (Astral Observatory)", "Rusty Key (Astral Observatory)", "Rusty Key (Astral Observatory)")            \
+    X(FCI_MM_RUSTY_KEY_BLACKSMITH, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_BLACKSMITH, RI_RUSTY_KEY_BLACKSMITH,                 \
+      "Rusty Key (Mountain Smithy)", "Rusty Key (Mountain Smithy)", "Rusty Key (Mountain Smithy)")                     \
+    X(FCI_MM_RUSTY_KEY_MUSIC_HOUSE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MUSIC_HOUSE, RI_RUSTY_KEY_MUSIC_HOUSE,              \
+      "Rusty Key (Music Box House)", "Rusty Key (Music Box House)", "Rusty Key (Music Box House)")                     \
+    X(FCI_MM_RUSTY_KEY_LABORATORY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_LABORATORY, RI_RUSTY_KEY_LABORATORY,                 \
+      "Rusty Key (Marine Research Lab)", "Rusty Key (Marine Research Lab)", "Rusty Key (Marine Research Lab)")         \
+    X(FCI_MM_RUSTY_KEY_BENEATH_GRAVEYARD, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_BENEATH_GRAVEYARD,                            \
+      RI_RUSTY_KEY_BENEATH_GRAVEYARD, "Rusty Key (Beneath the Graveyard)", "Rusty Key (Beneath the Graveyard)",        \
+      "Rusty Key (Beneath the Graveyard)")                                                                             \
+    X(FCI_MM_RUSTY_KEY_DAMPE_HOUSE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_DAMPE_HOUSE, RI_RUSTY_KEY_DAMPE_HOUSE,              \
+      "Rusty Key (Dampe's House)", "Rusty Key (Dampe's House)", "Rusty Key (Dampe's House)")                           \
+    X(FCI_MM_RUSTY_KEY_MAYOR_RESIDENCE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MAYOR_RESIDENCE, RI_RUSTY_KEY_MAYOR_RESIDENCE,  \
+      "Rusty Key (Mayor's Residence)", "Rusty Key (Mayor's Residence)", "Rusty Key (Mayor's Residence)")               \
+    X(FCI_MM_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE,                  \
+      RI_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE, "Rusty Key (Mayor's Residence Office)",                                     \
+      "Rusty Key (Mayor's Residence Office)", "Rusty Key (Mayor's Residence Office)")                                  \
+    X(FCI_MM_RUSTY_KEY_MAYOR_RESIDENCE_SALON, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_SALON,                    \
+      RI_RUSTY_KEY_MAYOR_RESIDENCE_SALON, "Rusty Key (Mayor's Residence Salon)",                                       \
+      "Rusty Key (Mayor's Residence Salon)", "Rusty Key (Mayor's Residence Salon)")                                    \
+    X(FCI_MM_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI,                    \
+      RI_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI, "Rusty Key (Mayor's Residence Bedroom)",                                     \
+      "Rusty Key (Mayor's Residence Bedroom)", "Rusty Key (Mayor's Residence Bedroom)")                                \
+    X(FCI_MM_RUSTY_KEY_TREASURE_CHEST_GAME, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_TREASURE_CHEST_GAME,                        \
+      RI_RUSTY_KEY_TREASURE_CHEST_GAME, "Rusty Key (Clock Town Chest Game)", "Rusty Key (Clock Town Chest Game)",      \
+      "Rusty Key (Clock Town Chest Game)")                                                                             \
+    X(FCI_MM_RUSTY_KEY_HONEY_DARLING, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_HONEY_DARLING, RI_RUSTY_KEY_HONEY_DARLING,        \
+      "Rusty Key (Honey & Darling)", "Rusty Key (Honey & Darling)", "Rusty Key (Honey & Darling)")                     \
+    X(FCI_MM_RUSTY_KEY_MILK_BAR, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_MILK_BAR, RI_RUSTY_KEY_MILK_BAR,                       \
+      "Rusty Key (Milk Bar)", "Rusty Key (Milk Bar)", "Rusty Key (Milk Bar)")                                          \
+    X(FCI_MM_RUSTY_KEY_DOG_RACETRACK, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_DOG_RACETRACK, RI_RUSTY_KEY_DOG_RACETRACK,        \
+      "Rusty Key (Doggy Racetrack)", "Rusty Key (Doggy Racetrack)", "Rusty Key (Doggy Racetrack)")                     \
+    X(FCI_MM_RUSTY_KEY_CUCCO_SHACK, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_CUCCO_SHACK, RI_RUSTY_KEY_CUCCO_SHACK,              \
+      "Rusty Key (Cucco Shack)", "Rusty Key (Cucco Shack)", "Rusty Key (Cucco Shack)")                                 \
+    X(FCI_MM_RUSTY_KEY_RANCH_HOUSE, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_RANCH_HOUSE, RI_RUSTY_KEY_RANCH_HOUSE,              \
+      "Rusty Key (Romani Ranch House)", "Rusty Key (Romani Ranch House)", "Rusty Key (Romani Ranch House)")            \
+    X(FCI_MM_RUSTY_KEY_RANCH_BARN, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_RANCH_BARN, RI_RUSTY_KEY_RANCH_BARN,                 \
+      "Rusty Key (Romani Ranch Barn)", "Rusty Key (Romani Ranch Barn)", "Rusty Key (Romani Ranch Barn)")               \
+    X(FCI_MM_RUSTY_KEY_RANCH_HOUSE_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_RANCH_HOUSE_ROOM,                              \
+      RI_RUSTY_KEY_RANCH_HOUSE_ROOM, "Rusty Key (Romani Ranch Bedroom)", "Rusty Key (Romani Ranch Bedroom)",           \
+      "Rusty Key (Romani Ranch Bedroom)")                                                                              \
+    X(FCI_MM_RUSTY_KEY_ZORA_SHOP, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_ZORA_SHOP, RI_RUSTY_KEY_ZORA_SHOP,                    \
+      "Rusty Key (Zora Shop)", "Rusty Key (Zora Shop)", "Rusty Key (Zora Shop)")                                       \
+    X(FCI_MM_RUSTY_KEY_ZORA_JAPAS_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_ZORA_JAPAS_ROOM, RI_RUSTY_KEY_ZORA_JAPAS_ROOM,  \
+      "Rusty Key (Japas' Room)", "Rusty Key (Japas' Room)", "Rusty Key (Japas' Room)")                                 \
+    X(FCI_MM_RUSTY_KEY_ZORA_TIJO_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_ZORA_TIJO_ROOM, RI_RUSTY_KEY_ZORA_TIJO_ROOM,     \
+      "Rusty Key (Tijo's Room)", "Rusty Key (Tijo's Room)", "Rusty Key (Tijo's Room)")                                 \
+    X(FCI_MM_RUSTY_KEY_ZORA_LULU_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_ZORA_LULU_ROOM, RI_RUSTY_KEY_ZORA_LULU_ROOM,     \
+      "Rusty Key (Lulu's Room)", "Rusty Key (Lulu's Room)", "Rusty Key (Lulu's Room)")                                 \
+    X(FCI_MM_RUSTY_KEY_ZORA_EVAN_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_ZORA_EVAN_ROOM, RI_RUSTY_KEY_ZORA_EVAN_ROOM,     \
+      "Rusty Key (Evan's Room)", "Rusty Key (Evan's Room)", "Rusty Key (Evan's Room)")                                 \
+    X(FCI_MM_RUSTY_KEY_STOCK_POT_INN, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_STOCK_POT_INN, RI_RUSTY_KEY_STOCK_POT_INN,        \
+      "Rusty Key (Stock Pot Inn)", "Rusty Key (Stock Pot Inn)", "Rusty Key (Stock Pot Inn)")                           \
+    X(FCI_MM_RUSTY_KEY_STOCK_POT_INN_ROOF, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_STOCK_POT_INN_ROOF,                          \
+      RI_RUSTY_KEY_STOCK_POT_INN_ROOF, "Rusty Key (Stock Pot Inn Roof)", "Rusty Key (Stock Pot Inn Roof)",             \
+      "Rusty Key (Stock Pot Inn Roof)")                                                                                \
+    X(FCI_MM_RUSTY_KEY_GRANDMA_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_GRANDMA_ROOM, RI_RUSTY_KEY_GRANDMA_ROOM,           \
+      "Rusty Key (Grandma's Room)", "Rusty Key (Grandma's Room)", "Rusty Key (Grandma's Room)")                        \
+    X(FCI_MM_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM,              \
+      RI_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM, "Rusty Key (Stock Pot Inn Staff Room)",                                   \
+      "Rusty Key (Stock Pot Inn Staff Room)", "Rusty Key (Stock Pot Inn Staff Room)")                                  \
+    X(FCI_MM_RUSTY_KEY_STOCK_POT_INN_DORMITORY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_STOCK_POT_INN_DORMITORY,                \
+      RI_RUSTY_KEY_STOCK_POT_INN_DORMITORY, "Rusty Key (Stock Pot Inn Dormitory)",                                     \
+      "Rusty Key (Stock Pot Inn Dormitory)", "Rusty Key (Stock Pot Inn Dormitory)")                                    \
+    X(FCI_RITO_MASK, 1, FCI_F_NONE, RG_RITO_MASK, RI_OOT_NEI_RITO_MASK, "Rito Mask", "Rito Mask", "Rito Mask")
 
 // -----------------------------------------------------------------------------
 // Enum estable de items combo (generado por la lista; APPEND-ONLY)

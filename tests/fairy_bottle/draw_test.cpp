@@ -163,19 +163,20 @@ struct ResourceManagerScope {
     ~ResourceManagerScope() { ownerScope = 1; }
 };
 }
-struct ComboForeignDrawInfo {
-    int count = 4;
-    const char* dls[4] = {genericOpaque, genericGlass, fairy, "__OTR__@mm:matrix"};
-    const char* matAnimPath = "texAnim";
-    int drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER, xluStart = 1, neiEffect = 0, neiShimmer = 0;
-    int opCount = 0;
-    CwDrawOp ops[CW_DRAW_MAX_OPS] = {};
-    float scale = 0, neiEffectCenter[3]{};
-    bool animOk = false;
-    int32_t itemShimmer = CW_ITEM_SHIMMER_LEGACY;
-    uint8_t itemShimmerColor[4] = {255,160,235,255}, primColorXlu[4]{};
-    CwItemAnimDrawInfo anim{};
-};
+#include "fairy_draw_info.inc"
+ComboForeignDrawInfo FairyDrawInfo() {
+    ComboForeignDrawInfo info;
+    info.count = 4;
+    info.dls[0] = genericOpaque; info.dls[1] = genericGlass;
+    info.dls[2] = fairy; info.dls[3] = "__OTR__@mm:matrix";
+    info.matAnimPath = "texAnim";
+    info.drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER;
+    info.xluStart = 1;
+    info.itemShimmer = CW_ITEM_SHIMMER_LEGACY;
+    const uint8_t pink[] = {255,160,235,255};
+    std::memcpy(info.itemShimmerColor,pink,sizeof(pink));
+    return info;
+}
 using ComboForeignDrawInfoOOT = ComboForeignDrawInfo;
 using RandomizerCheck = int;
 constexpr int RC_UNKNOWN_CHECK = -1;
@@ -282,6 +283,25 @@ constexpr int ANIMMODE_LOOP=0,G_RM_PASS=0,G_RM_ZB_CLD_SURF2=0;
 #define xw x
 #define yw y
 #define zw z
+// Keep the generic foreign dispatcher linked to its real key-ring renderer.
+// Fairy scenarios must never reach procedural key geometry: these additional
+// graphics boundaries fail immediately instead of silently drawing another GI.
+#include "fairy_vertex.inc"
+void Matrix_RotateAxis(float,Vec3f*,int) { assert(false && "fairy selected key-ring geometry"); }
+Mtx* Matrix_NewMtx(GraphicsContext*,char*,int) { assert(false); return nullptr; }
+extern "C" bool NeiGi_CanDrawLayers(PlayState*,size_t,size_t,size_t) { assert(false); return false; }
+extern "C" void NeiGi_ReportBlackMarketModel(const char*,const char*,const char*) { assert(false); }
+extern "C" void NeiGi_ReportBlackMarketVertices(const Vtx*,size_t) { assert(false); }
+#define gSPGrayscale(...) assert(false)
+#define gSPTexture(...) assert(false)
+#define gSPClearGeometryMode(...) assert(false)
+#define gSPSetGeometryMode(...) assert(false)
+#define gDPSetCombineLERP(...) assert(false)
+#define gSPVertex(...) assert(false)
+#define gSP2Triangles(...) assert(false)
+#define COMBO_MM_KEY_RING_HOST_OOT
+#include "combo/ComboMmKeyRingDraw.h"
+#undef COMBO_MM_KEY_RING_HOST_OOT
 #include "fairy_production.inc"
 #undef xw
 #undef yw
@@ -392,7 +412,7 @@ int main() {
         }
         for (int route = 0; route < 6; ++route) {
             const auto shell = route == 4 ? oot::GetItem_FairyBottleShell(0) : mm::GetItem_FairyBottleShell(0);
-            ComboForeignDrawInfo modInfo;
+            auto modInfo = FairyDrawInfo();
             modInfo.dls[0] = shell.opaque;
             modInfo.dls[1] = shell.glass;
             Reset(27);
@@ -505,7 +525,7 @@ int main() {
     puts("PASS fairy-only glass exports, exact selected shells and missing-new-asset fallback; ordinary empty bottles "
          "unchanged");
 
-    selectedMods.clear(); ComboForeignDrawInfo info;
+    selectedMods.clear(); auto info = FairyDrawInfo();
     for (uint32_t frame : {0u,27u}) {
         Reset(frame); OOT_DrawForeignFairyBottle(&play,&info); CheckDraw(0,true);
         Reset(frame); MM_DrawForeignFairy(&info); CheckDraw(0,true);

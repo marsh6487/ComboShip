@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <functional>
 #include <memory>
 #include <string>
@@ -37,8 +38,9 @@ struct Gfx {
 struct Actor {};
 struct GraphicsContext {
   Gfx opa[4096]{}, xlu[4096]{};
-  Gfx *op = opa;
-  Gfx *xp = xlu;
+  struct { Gfx* p; Gfx* d = nullptr; } polyOpa{opa}, polyXlu{xlu};
+  Gfx*& op = polyOpa.p;
+  Gfx*& xp = polyXlu.p;
   std::vector<void *> allocations;
   ~GraphicsContext() {
     for (auto p : allocations)
@@ -83,8 +85,10 @@ struct SkelAnime {
   float playSpeed = 1;
   float curFrame = 0;
 };
-#define OPEN_DISPS(ctx) {
-#define CLOSE_DISPS(ctx) }
+extern "C" void FrameInterpolation_RecordOpenChild(const void*, int);
+extern "C" void FrameInterpolation_RecordCloseChild();
+#define OPEN_DISPS(ctx) { FrameInterpolation_RecordOpenChild(nullptr, 0);
+#define CLOSE_DISPS(ctx) FrameInterpolation_RecordCloseChild(); }
 #define POLY_OPA_DISP play->state.gfxCtx->op
 #define POLY_XLU_DISP play->state.gfxCtx->xp
 #define SEGMENTED_TO_VIRTUAL(p) ((StandardLimb *)(p))
@@ -109,9 +113,10 @@ struct SkelAnime {
 #define G_RM_AA_ZB_XLU_SURF2 0
 #define M_PIf 3.14159265358979323846f
 #define ANIMMODE_ONCE 2
+#define gDPSetCombineLERP(p, ...) ((p)->kind = 0)
 #define gDPPipeSync(p) ((p)->kind = 0)
-void gDPSetPrimColor(Gfx* p, int, int, int r, int g, int b, int a) {
-  *p = {4, 0, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
+void gDPSetPrimColor(Gfx* p, int, int lod, int r, int g, int b, int a) {
+  *p = {4, lod, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
 }
 void gDPSetEnvColor(Gfx* p, int r, int g, int b, int a) {
   *p = {5, 0, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
@@ -133,7 +138,12 @@ void gSPSegment(Gfx *p, int seg, void *target) {
   gSPSegment(p, seg, (uintptr_t)target);
 }
 void gSPMatrix(Gfx *p, Mtx *target, int) { *p = {2, 0, (uintptr_t)target}; }
-void gSPDisplayList(Gfx *p, Gfx *target) { *p = {3, 0, (uintptr_t)target}; }
+static int throwAtDisplayList = -1;
+void gSPDisplayList(Gfx *p, Gfx *target) {
+  if (throwAtDisplayList == 0) { throwAtDisplayList = -1; throw std::runtime_error("injected GBI failure"); }
+  if (throwAtDisplayList > 0) --throwAtDisplayList;
+  *p = {3, 0, (uintptr_t)target};
+}
 void *Graph_Alloc(GraphicsContext *c, size_t n) {
   auto p = std::calloc(1, n);
   assert(p);
@@ -143,7 +153,16 @@ void *Graph_Alloc(GraphicsContext *c, size_t n) {
 #define GRAPH_ALLOC(c, n) Graph_Alloc(c, n)
 static Mtx current;
 static std::vector<Mtx> matrices;
-void Matrix_Push() { matrices.push_back(current); }
+using MtxF = Mtx;
+static MtxF fixtureMatrixStack[20];
+extern "C" MtxF* Matrix_GetCurrent() { return fixtureMatrixStack + matrices.size(); }
+void Matrix_Get(MtxF* target) { *target = current; }
+void Matrix_Put(MtxF* source) { current = *source; }
+extern "C" s32 Matrix_GetRemainingStack() { return 19 - matrices.size(); }
+extern "C" void Matrix_RestoreSoulDrawStack(MtxF* pointer, const MtxF* value) {
+  matrices.resize(pointer - fixtureMatrixStack); current = *value;
+}
+void Matrix_Push() { assert(matrices.size() < 19); matrices.push_back(current); }
 void Matrix_Pop() {
   current = matrices.back();
   matrices.pop_back();
@@ -173,10 +192,10 @@ Mtx *Matrix_NewMtx(GraphicsContext *c, char * = nullptr, int = 0) {
 }
 #define MATRIX_FINALIZE_AND_LOAD(p, c) gSPMatrix(p, Matrix_NewMtx(c), 0)
 template <class T> T *Lib_SegmentedToVirtual(T *p) { return p; }
-void Gfx_SetupDL25_Opa(GraphicsContext *) {}
-void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
-void Gfx_SetupDL_25Opa(GraphicsContext *) {}
-void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
+void Gfx_SetupDL25_Opa(GraphicsContext *c) { (c->op++)->kind = 10; }
+void Gfx_SetupDL25_Xlu(GraphicsContext *c) { (c->xp++)->kind = 10; }
+void Gfx_SetupDL_25Opa(GraphicsContext *c) { (c->op++)->kind = 10; }
+void Gfx_SetupDL_25Xlu(GraphicsContext *c) { (c->xp++)->kind = 10; }
 static std::vector<std::array<int64_t, 16>> scrollRequests;
 Gfx *Gfx_TwoTexScrollEx(GraphicsContext*, int a, u32 x1, u32 y1, int w1, int h1,
                       int b, u32 x2, u32 y2, int w2, int h2, int sx1, int sy1, int sx2, int sy2) {
@@ -203,7 +222,6 @@ using PostLimbDrawOpa = void (*)(PlayState *, s32, Gfx **, Vec3s *, LimbArg);
 #ifndef HOST_MM
 // Boss-soul fixtures have no native NPC skin plan. Execute the real native
 // helper's null-plan path and reject unexpected palette blending.
-using MtxF = Mtx;
 static const void* NativeNpcPose_GetSkinPlan(void**, s32) { return nullptr; }
 static float NativeNpcPose_GetDrawScale(void**) { return 1.f; }
 static s32 NativeNpcPose_SkinMatrixCount(const void* plan) {
@@ -212,8 +230,9 @@ static s32 NativeNpcPose_SkinMatrixCount(const void* plan) {
 }
 static void NativeNpcPose_BlendSkinMatrix(const void*, s32, MtxF*, MtxF*) { assert(false); }
 static void Matrix_MtxToMtxF(Mtx* source, MtxF* target) { *target = *source; }
-static void Matrix_Put(MtxF* source) { current = *source; }
 #endif
+using OverrideLimbDraw = s32 (*)(PlayState*, s32, Gfx**, Vec3f*, Vec3s*, LimbArg, Gfx**);
+using PostLimbDraw = void (*)(PlayState*, s32, Gfx**, Vec3s*, LimbArg, Gfx**);
 extern "C" {
 #include "native_draw.inc"
 }
@@ -246,22 +265,23 @@ s32 SkelAnime_Update(SkelAnime *) {
   updates++;
   return 0;
 }
-template <class... T>
-Gfx *SkelAnime_DrawFlex(PlayState *, void **, Vec3s *, int, T...) {
-  assert(false);
-  return nullptr;
-}
 namespace Ship {
+struct ResourceInitData { uint32_t Type = 0x4F534B4C; };
 struct IResource {
   virtual ~IResource() = default;
   virtual void *GetRawPointer() = 0;
+  virtual size_t GetPointerSize() { return 256; }
+  std::shared_ptr<ResourceInitData> metadata = std::make_shared<ResourceInitData>();
+  std::shared_ptr<ResourceInitData> GetInitData() { return metadata; }
 };
 struct ResourceManager {
   bool alt = false;
+  std::string throwPath;
   std::unordered_map<std::string, std::shared_ptr<IResource>> normal,
       replacement;
   bool IsAltAssetsEnabled() { return alt; }
   std::shared_ptr<IResource> LoadResource(const char *p) {
+    if (p == throwPath) throw std::runtime_error("injected resource factory failure");
     auto &m = alt ? replacement : normal;
     return m[p];
   }
@@ -293,6 +313,32 @@ struct CrossRMRegistry {
   static void RegisterTeardownListener(void (*)()){};
 };
 } // namespace Ship
+// Resource factories are the fixture boundary; production validates actual
+// native animation vectors and metadata before calling the engine initializer.
+namespace SOH {
+struct Skeleton : Ship::IResource { std::vector<void*> skeletonHeaderSegments; };
+enum class AnimationType { Normal, Link, Curve };
+struct RotationIndex { uint16_t x = 0, y = 0, z = 0; };
+struct AnimationHeader {
+  struct { int16_t frameCount = 43; } common;
+  int16_t* frameData = nullptr;
+  RotationIndex* jointIndices = nullptr;
+  uint16_t staticIndexMax = 1;
+};
+struct Animation : Ship::IResource {
+  AnimationType type = AnimationType::Normal;
+  struct { AnimationHeader animationHeader; } animationData;
+  std::vector<uint16_t> rotationValues = std::vector<uint16_t>(256);
+  std::vector<RotationIndex> rotationIndices = std::vector<RotationIndex>(256);
+  Animation() {
+    metadata->Type = 0x4F414E4D;
+    animationData.animationHeader.frameData = (int16_t*)rotationValues.data();
+    animationData.animationHeader.jointIndices = rotationIndices.data();
+  }
+  void* GetRawPointer() override { return &animationData; }
+  size_t GetPointerSize() override { return sizeof(AnimationHeader); }
+};
+}
 static FlexSkeletonHeader* resolveNativeFlexHeader(FlexSkeletonHeader* header) {
   // Native initialization receives an OTR path; the shared consumer receives
   // the owning factory's loaded header. Resource I/O is the fixture boundary.
@@ -304,8 +350,20 @@ static FlexSkeletonHeader* resolveNativeFlexHeader(FlexSkeletonHeader* header) {
   }
   return header;
 }
-extern "C" void FrameInterpolation_RecordOpenChild(const void *, int) {}
-extern "C" void FrameInterpolation_RecordCloseChild() {}
+static int fixtureRecordingDepth = 0;
+extern "C" void FrameInterpolation_RecordOpenChild(const void *, int) { ++fixtureRecordingDepth; }
+extern "C" void FrameInterpolation_RecordCloseChild() { assert(fixtureRecordingDepth > 0); --fixtureRecordingDepth; }
+extern "C" void* FrameInterpolation_BeginSoulDraw(const void*) { return new int(fixtureRecordingDepth++); }
+extern "C" void FrameInterpolation_EndSoulDraw(void* handle, int) noexcept {
+  if (handle) { fixtureRecordingDepth = *(int*)handle; delete (int*)handle; }
+}
+#include "ComboItemDrawABI.h"
+static int32_t FixtureOotSoulResource(const char*, int32_t, int32_t, CwSoulResourceInfo*);
+static int32_t FixtureMmSoulResource(const char*, int32_t, int32_t, CwSoulResourceInfo*);
+static void* Combo_ResolveSym(const char* module, const char*) {
+  return !std::strcmp(module, "2ship") ? (void*)&FixtureMmSoulResource : (void*)&FixtureOotSoulResource;
+}
+#define CFA_RESOURCE_FIXTURE 1
 #include "foreign_anim.h"
 #ifndef SKIP_TWINMOLD_TESTS
 #include "twinmold_production.inc"
@@ -330,10 +388,61 @@ struct SkeletonResource : Ship::IResource {
   }
   void *GetRawPointer() override { return &h; }
 };
-struct AnimationResource : Ship::IResource {
-  AnimationHeader h;
-  void *GetRawPointer() override { return &h; }
+struct AnimationResource : SOH::Animation {};
+struct RendererDisplayListResource : Ship::IResource {
+  Gfx data[2]{};
+  RendererDisplayListResource() { metadata->Type = 0x4F444C54; }
+  void* GetRawPointer() override { return data; }
+  size_t GetPointerSize() override { return sizeof(data); }
 };
+static int32_t FixtureSoulResource(const char* game, const char* path, int32_t kind, int32_t count, CwSoulResourceInfo* out) {
+  auto rm = Ship::CrossRMRegistry::Get(game);
+  if (!rm) return -1;
+  auto resource = rm->LoadResource(path);
+  if (!resource || !resource->GetRawPointer() || !resource->GetInitData()) return 0;
+  const uint32_t type = resource->GetInitData()->Type;
+  if (kind == CW_SOUL_RESOURCE_SKELETON) {
+    if (type != 0x4F534B4C || resource->GetPointerSize() < sizeof(CfaLoadedSkeletonHeader)) return 0;
+    auto h = (CfaLoadedSkeletonHeader*)resource->GetRawPointer();
+    size_t bones = h->limbCount;
+    if (auto native = std::dynamic_pointer_cast<SOH::Skeleton>(resource)) {
+      bones = native->skeletonHeaderSegments.size();
+      if (native->skeletonHeaderSegments.data() != h->segment) return 0;
+      if (bones != h->limbCount && (strcmp(game, "mm") || strcmp(path, "__OTR__objects/object_fsn/gFsnSkel") ||
+                                   h->limbCount != 18 || bones != 17 || count != 18)) return 0;
+    }
+    if (bones + 1 != (size_t)count || h->skeletonType > 1) return 0;
+    out->elementCount = bones; out->skeletonType = h->skeletonType;
+    out->dListCount = h->skeletonType ? ((CfaLoadedFlexSkeletonHeader*)h)->dListCount : 0;
+  } else if (kind == CW_SOUL_RESOURCE_ANIMATION) {
+    auto anim = std::dynamic_pointer_cast<SOH::Animation>(resource);
+    if (type != 0x4F414E4D || !anim || anim->type != SOH::AnimationType::Normal ||
+        anim->rotationIndices.size() < (size_t)count || anim->rotationValues.empty()) return 0;
+    const auto& h = anim->animationData.animationHeader;
+    if (h.common.frameCount <= 0 || h.frameData != (const int16_t*)anim->rotationValues.data() ||
+        (const void*)h.jointIndices != (const void*)anim->rotationIndices.data()) return 0;
+    for (int i = 0; i < count; ++i) {
+      const auto& idx = anim->rotationIndices[i];
+      for (uint16_t value : {idx.x, idx.y, idx.z}) {
+        size_t end = value + (value >= h.staticIndexMax ? h.common.frameCount - 1 : 0);
+        if (end >= anim->rotationValues.size()) return 0;
+      }
+    }
+    out->elementCount = anim->rotationIndices.size();
+  } else if (kind == CW_SOUL_RESOURCE_PLAYER_POSE) {
+    if (type != 0x4F50414D || resource->GetPointerSize() < count * sizeof(Vec3s)) return 0;
+    out->elementCount = resource->GetPointerSize() / sizeof(Vec3s);
+  } else return 0;
+  out->rawPointer = resource->GetRawPointer();
+  return 1;
+}
+static int32_t FixtureOotSoulResource(const char* path, int32_t kind, int32_t count, CwSoulResourceInfo* out) {
+  return FixtureSoulResource("oot", path, kind, count, out);
+}
+static int32_t FixtureMmSoulResource(const char* path, int32_t kind, int32_t count, CwSoulResourceInfo* out) {
+  return FixtureSoulResource("mm", path, kind, count, out);
+}
+
 #ifndef SKIP_TWINMOLD_TESTS
 // Exercise the final model material pass through the complete production consumer,
 // including both loaded rig types and independent host/owner resource managers.

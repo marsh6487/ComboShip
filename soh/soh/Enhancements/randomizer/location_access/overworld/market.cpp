@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -169,7 +170,7 @@ void RegionTable_Init_Market() {
 
     areaTable[RR_MARKET_BOMBCHU_BOWLING] = Region("Market Bombchu Bowling", SCENE_BOMBCHU_BOWLING_ALLEY, {
         //Events
-        EVENT_ACCESS(LOGIC_COULD_PLAY_BOWLING, logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_COULD_PLAY_BOWLING, logic->HasItem(RG_SOUL_NPC_BOMBCHU_BOWLING_LADY) && logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE,  logic->Get(LOGIC_COULD_PLAY_BOWLING) && logic->BombchusEnabled()),
@@ -198,17 +199,17 @@ void RegionTable_Init_Market() {
         //Locations
         LOCATION(RC_GREG_HINT,                         logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
         LOCATION(RC_MARKET_TREASURE_CHEST_GAME_SHOPKEEPER, logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME)),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_1,  logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 1) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_1, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 1) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_2,  logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 2) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_2, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 2) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_3,  logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 3) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_3, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 3) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_4,  logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 4) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_4, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 4) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_5,  logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 5) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_5, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 5) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
-        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_REWARD, logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 6) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_1,  Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 1) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_1, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 1) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_2,  Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 2) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_2, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 2) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_3,  Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 3) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_3, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 3) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_4,  Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 4) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_4, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 4) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_KEY_5,  Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 5) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_ITEM_5, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 5) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
+        LOCATION(RC_MARKET_TREASURE_CHEST_GAME_REWARD, Rando::RustyDoorKeys::CanUseInterior(*ctx, *logic, RG_TREASURE_CHEST_GAME_BUILDING_KEY) && logic->CanOpenLargeChest() && (ctx->GetOption(RSK_SHUFFLE_CHEST_MINIGAME) ? logic->SmallKeys(SCENE_TREASURE_BOX_SHOP, 6) : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN) && logic->CanUse(RG_LENS_OF_TRUTH)))),
     }, {
         //Exits
         ENTRANCE(RR_THE_MARKET, true),

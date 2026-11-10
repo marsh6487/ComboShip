@@ -25,7 +25,7 @@ if 'OOT_SetGiCosmeticFrame(' in editor:
 else:
  fixture=fixture.replace('/* EDITOR_SAMPLER */','void OOT_SetGiCosmeticFrame(uint32_t) {}')
 helpers='\n'.join(function(owner,n) for n in ('CwSimple','CwLayerEnv','CwLayerPrim'))
-a=owner.index('    bool customKeys =');b=owner.index('    // Overworld keys:',a)
+a=owner.index('    bool customKeys =');b=owner.index('    if (ComboDoorKeyGi::Describe(',a)
 fixture=fixture.replace('/* OWNER_KEY_RECIPES */',helpers+'\nint DescribeKeys(RandomizerGet rg,CwItemDrawInfo* out) {\n'+owner[a:b]+' return 0;\n}')
 a=draw.index('const char* SmallBodyCvarValue');b=draw.index('Color_RGB8 MapOrCompassColor',a)
 fixture=fixture.replace('/* KEY_PALETTE_TABLES */',draw[a:b])
@@ -34,7 +34,21 @@ fixture=fixture.replace('/* HOST_INFO */',host[a:b])
 fixture=fixture.replace('/* HOST_RESOLVER */','inline bool ResourceMgr_IsAltAssetsEnabled(){return true;}\n#include "combo/menu/ComboSwordGiAssetSelection.h"\n/* HOST_RESOLVER */')
 fixture=fixture.replace('/* HOST_RESOLVER */','int32_t ComboNativeMmImport(const char*) {return -1;}\n'+function(host,'ComboFillForeignDrawInfoOOT'))
 a=host.index('struct ComboForeignDrawCacheOOT {');b=host.index('} // namespace',a)
-fixture=fixture.replace('/* HOST_CACHE */',host[a:b])
+# Keep this key-only boundary out of the C++ prefix reused by the silver fixture.
+owner_boundary='''namespace Ship {
+struct ResourceManager { bool IsAltAssetsEnabled() const { return false; } };
+struct CrossRMRegistry {
+ static ResourceManager* Get(const char* game) {
+  assert(!std::strcmp(game, "oot"));
+  static ResourceManager owner;
+  return &owner;
+ }
+};
+}
+'''
+soul_settings=(ROOT/'combo/menu/ComboSoulModelSettings.h').read_text()
+fixture=fixture.replace('/* HOST_CACHE */',owner_boundary+
+                       soul_settings[soul_settings.index('namespace ComboSoulModels {'):]+'\n'+host[a:b])
 fixture=fixture.replace('/* HOST_GRAY_DRAW */',function(host,'MM_DrawForeignGrayscaleLayers') if 'MM_DrawForeignGrayscaleLayers(' in host else 'void MM_DrawForeignGrayscaleLayers(const ComboForeignDrawInfoOOT*) {}')
 fixture=fixture.replace('/* HOST_COLOR_DRAW */',function(host,'MM_DrawForeignColorLayers'))
 if (ROOT/'combo/menu/ComboLiveCosmetics.h').exists():

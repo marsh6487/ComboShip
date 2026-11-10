@@ -14,7 +14,8 @@
 #include "soh/ShipInit.hpp"
 #include "soh/Notification/Notification.h" // Nei_TrirodNotify bridge
 #include <soh/OTRGlobals.h>                // gSaveContext
-#include <libultraship/libultraship.h>     // Ship::Context (full def for GetPathRelativeToAppDirectory)
+#include "extended_inventory.h"
+#include <libultraship/libultraship.h> // Ship::Context (full def for GetPathRelativeToAppDirectory)
 
 static NeiSaveData gNeiSave;
 
@@ -530,6 +531,7 @@ void NeiSave_Load() {
     TradeItems_SyncRead(); // standalone legacy bridge; never overrides a ComboShip playthrough
     // Session wheel trackers must not leak across files (per-frame reconcile would ghost-write).
     Bottle_WheelResetTracking();
+    RitoMask_MigrateLegacy();
 }
 
 void Register() {

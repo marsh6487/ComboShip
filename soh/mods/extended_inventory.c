@@ -194,6 +194,9 @@ uint8_t ExtInv_GetItemAgeReq(uint16_t itemId) {
 extern uint8_t gSlotAgeReqs[];
 
 uint8_t ExtInv_GetSlotAgeReq(uint8_t slot) {
+    if (slot == SLOT_TRADE_CHILD && ExtInv_GetSlotItem(slot) == ITEM_RITO_MASK) {
+        return AGE_REQ_NONE;
+    }
     // Transformation mask override: the per-form allowlist IS the age requirement.
     // Allowed slots return 9 (AGE_REQ_NONE = always passes), restricted slots return
     // opposite age (always fails → greyed out). This lets child Link use adult items
@@ -328,8 +331,7 @@ static const CustomItemAsset sCustomItemAssets[] = {
     // RAND_INF_OBTAINED_MARIO_MASK and unlocks MARIO MODE in the Crossover Items
     // form selector, which is also what reads this name texture. Skijer's NEI
     { ITEM_MARIO_MASK, (void*)gItemIconMarioMaskTex, (void*)gMarioMaskNameTex }, // 0xD6
-    // Rito Mask: no page-2 cell of its own — it shares the Farore's Wind cell and
-    // is reached with the kaleido cycle there (RitoItem_* in custom_forms.cpp).
+    // Rito Mask is selected with the existing bottom-right mask wheel.
     { ITEM_RITO_MASK, (void*)gItemIconRitoMaskTex, (void*)gRitoMaskNameTex }, // 0xD2
     // Bottle Randomizer extra items (Skijer's NEI). Net + Bottomless Bottle; SLOT_BOTTLE_3/4.
     { ITEM_NET, (void*)gItemIconNetTex, (void*)gNetNameTex },                                         // 0xF4
@@ -487,6 +489,11 @@ uint8_t Nei_CaneOwned(void);
 uint8_t Nei_CaneActiveSkill(void);
 
 void* ExtInv_GetItemIcon(uint16_t itemId) {
+    // Rito has a native u8 identity outside gItemIcons. Resolve its shipped art
+    // before the generic fallback, which otherwise returns the Deku Stick.
+    if (itemId == ITEM_RITO_MASK) {
+        return (void*)"__OTR__textures/icon_item_custom/gItemIconRitoMaskTex";
+    }
     if (ExtEquip_IsButtonItem(itemId)) {
         const u16 offset = itemId - EXT_EQUIP_BUTTON_ITEM_BASE;
         return ExtEquip_GetIcon(offset / 3, offset % 3 + 1);
@@ -1605,11 +1612,9 @@ uint8_t ExtInv_GetItemSlot(uint16_t itemId) {
     if (itemId < 52) {
         return gItemSlots[itemId];
     }
-    // Rito Mask has no cell of its own: it lives in the Farore's Wind cell and is
-    // reached by cycling there, the same shared-slot idea as Roc's Feather in the
-    // Nayru's Love cell. Skijer's NEI
+    // Rito joins the existing bottom-right mask wheel in OoT and Combo.
     if (itemId == ITEM_RITO_MASK) {
-        return SLOT_FARORES_WIND;
+        return SLOT_TRADE_CHILD;
     }
     // Page 2 items (incl. ROCS_CAPE -> shared SLOT_ROCS): unified NEI registry. Skijer's NEI
     const NeiItem* it = Nei_FindByItem(itemId);

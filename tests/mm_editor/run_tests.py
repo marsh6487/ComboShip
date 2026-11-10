@@ -41,6 +41,11 @@ def main():
     for name in ["Seasons_RandoMode", "Seasons_UpdateGates"]:
         production += function(seasons, name) + "\n"
     inventory = source("mm/mods/extended_inventory.c")
+    for name in ("RitoMask_IsOwned", "RitoMask_Grant"):
+        production += function(inventory, name) + "\n"
+    # This fixture exercises editor grants, not live form/button removal.
+    # Keep real ownership/grant helpers; any unexpected removal must fail.
+    production += 'void RitoMask_Remove(void) { REQUIRE(false && "editor grant fixture reached Rito removal"); }\n'
     production += inventory[inventory.index("static const uint8_t sWandQuest"):
                             inventory.index("static void* const sWandNameTex")]
     for name in ["TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant", "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
@@ -52,8 +57,13 @@ def main():
     glue = source("mm/2s2h/FleetShipCombo/FleetComboItemsGlue.cpp")
     production += glue[glue.index("namespace {"):glue.index('extern "C" const char* FcCombo_NativeNameForItem')]
 
-    give = function(source("mm/2s2h/Rando/GiveItem.cpp"), "Rando::GiveItem")
-    switch_start = give.index("    switch (randoItemId) {\n        case RI_CLOCK_TOWN_STRAY_FAIRY:")
+    grant_source = source("mm/2s2h/Rando/GiveItem.cpp")
+    # The extracted body retains its production optional audit scope and TLS guard.
+    production += re.search(r"^#include <optional>$", grant_source, re.M).group(0) + "\n"
+    production += re.search(r"^thread_local bool Rando::gItemGrantSimulation[^;]*;",
+                            grant_source, re.M).group(0) + "\n"
+    give = function(grant_source, "Rando::GiveItem")
+    switch_start = re.search(r"^    switch \(randoItemId\) \{$", give, re.M).start()
     labels = list(re.finditer(r"^        (?:case RI_[A-Z0-9_]+:|default:)", give[switch_start:], re.M))
     # Every selected arm is copied intact from the real switch. All other native/receipt
     # branches are excluded so an accidental ordinary-inventory grant fails immediately.
@@ -97,9 +107,11 @@ def main():
         (build / "editor_production.inc").write_text(production)
         binary = build / "editor_grant_test"
         cxx = shlex.split(os.environ.get("CXX", "c++"))
+        # The native item-data slice retains includes relative to StaticData.
+        catalog_quotes = ["-iquote", str(ROOT / "mm/2s2h/Rando/StaticData")]
         subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
                         "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
-                        *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
+                        *flags(), *catalog_quotes, "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         *(["-DMM_EDITOR_CONTROL"] if args.control else []),
                         "-I" + str(build), "-include", "nlohmann/json.hpp",
                         "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-missing-field-initializers",
@@ -107,7 +119,10 @@ def main():
         environment = {**os.environ, "ASAN_OPTIONS": os.environ.get("ASAN_OPTIONS", "") + ":detect_leaks=0"}
         subprocess.run([str(binary)], check=True, env=environment)
         bindings = source("mm/2s2h/Rando/NeiGiPresentation.cpp")
-        pool_binding = item_data + "\nnamespace Rando::Logic {\n"
+        headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
+                          ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
+        headers += '#include "combo/rando/RitoMaskSettings.h"\n'
+        pool_binding = headers + item_data + "\nnamespace Rando::Logic {\n"
         constraints = source("mm/2s2h/Rando/Logic/PlacementConstraints.cpp")
         pool_binding += "\n".join(function(constraints, name) for name in
                                   ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",
@@ -125,16 +140,17 @@ def main():
         subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
                         "-DFMT_HEADER_ONLY",
                         "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
-                        *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
+                        *flags(), *catalog_quotes, "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         "-I" + str(build), "-include", "nlohmann/json.hpp", "-include", "ship/Context.h",
-                        "-include", "spdlog/spdlog.h", str(ROOT / "tests/mm_editor/pool_binding_test.cpp"),
+                        "-include", "spdlog/spdlog.h", "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+                        str(ROOT / "tests/mm_editor/pool_binding_test.cpp"), str(ROOT / "mm/2s2h/Rando/SongEvents.cpp"),
                         "-Wl,--export-dynamic-symbol=OOT_GetNeiGiDrawInfo", "-ldl", "-o", str(pool_binary)], check=True)
         subprocess.run([str(pool_binary)], check=True, env=environment)
         native_flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         "-DNON_EQUIVALENT", "-DNON_MATCHING"]
         native_flags += ["-I" + str(ROOT / p) for p in
                          ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
-                          "libultraship/include", "libultraship/src", "combo", "combo/menu")]
+                          "libultraship/include", "libultraship/src", "combo", "combo/menu", "")]
         for path in ["mm/2s2h/DeveloperTools/SaveEditor.cpp", "mm/2s2h/Rando/GiveItem.cpp"]:
             subprocess.run([*cxx, "-std=c++20", "-fpermissive", *native_flags,
                             "-include", "nlohmann/json.hpp", "-include", str(ROOT / "mm/include/global.h"),

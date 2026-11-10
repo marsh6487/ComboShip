@@ -8,7 +8,7 @@ The two effect circles are complete meshes. Their camera-facing plane was anchor
 
 The fix places the ring plane ahead of the projected bounds of the approved Slate, with a 0.75 native-unit clearance. Its position in the camera plane, two native-unit radii, colors, and animation are retained. Depth testing remains enabled. Perspective can change apparent size when depth changes; final appearance still needs an in-game check.
 
-[Before and after rotation](slate_rotation_comparison.gif)
+Before and after rotation (animated preview omitted from publication)
 
 [Selected front/back views](slate_rotation_comparison.png)
 

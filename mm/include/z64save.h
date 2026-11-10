@@ -388,6 +388,22 @@ typedef struct RandoSaveCheck {
     u16 price; // Only applicable for shops/merchants
 } RandoSaveCheck;
 
+// A native save owns its Solo MM entrance permutation. Keeping this POD in the
+// save context prevents file-select previews or oracle snapshots from changing
+// the active file's routing through process-global import state.
+typedef struct RandoSoloEntranceSave {
+    u32 version;
+    u32 seed;
+    u32 policy;
+    u16 options;
+    u16 count;
+    u16 permutation[256];
+    u16 reversePermutation[256];
+    s32 checkpoint;
+    s32 faroresWindCheckpoint;
+    u16 completedBossMask;
+} RandoSoloEntranceSave;
+
 typedef struct RandoSaveInfo {
     u16 randoInf[(RANDO_INF_MAX + 15) / 16];
     u8 randoEvents[RE_MAX]; // This is purely for logic tracking, not to be used for anything else
@@ -399,6 +415,8 @@ typedef struct RandoSaveInfo {
     u16 foundTriforcePieces;
     u8 sariaHintsAvailable;
     u16 sariaPriorityItems[16];
+    u8 songEvents[13]; // Seed-owned event songs, separate from song item ownership.
+    RandoSoloEntranceSave soloEntrances;
 #ifdef COMBO_BUILD
     u8 pendingTrapCount; // ComboShip: cross-world traps granted while MM was dormant; drained on activation
 #endif
@@ -1905,5 +1923,7 @@ extern s32 gFlashOwlSaveStartPages[];
 extern s32 gFlashOwlSaveNumPages[];
 
 extern SaveContext gSaveContext;
+
+#include "rando_capacity.h"
 
 #endif

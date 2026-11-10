@@ -1,3 +1,4 @@
+#include "RustyDoorKeys.h"
 #include "../../../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -234,6 +235,9 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_SLEEPING_WATERFALL, {"Closed", "Open"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SleepingWaterfall"));
     OPT_U8(RSK_JABU_OPEN, {"Closed", "Open"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("JabuJabu"));
     OPT_BOOL(RSK_LOCK_OVERWORLD_DOORS, CVAR_RANDOMIZER_SETTING("LockOverworldDoors"));
+    OPT_U8(RSK_RUSTY_DOOR_KEY_VERSION, "Rusty Door Key Catalog", {"Legacy24", "Rusty27"}, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("RustyDoorKeyCatalogVersion"), "Saved seed compatibility version.",
+           WIDGET_CVAR_COMBOBOX, 0, true);
     // ComboShip: (#133)
     OPT_CALLBACK(RSK_LOCK_OVERWORLD_DOORS, {
         if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("LockOverworldDoors"), RO_GENERIC_OFF) == RO_GENERIC_OFF) {
@@ -661,6 +665,9 @@ void Settings::CreateOptions() {
         }
     });
     OPT_U8(RSK_LINKS_POCKET_REWARD, {"Any Reward", "Any Stone", "Any Medallion", "Light Medallion"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("LinksPocketReward"), WIDGET_CVAR_COMBOBOX, RO_LINKS_POCKET_ANY_REWARD);
+    OPT_U8(RSK_SHUFFLE_SONG_EVENTS, "Shuffle Song Events", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSongEvents"), "Randomize songs required to activate world events. Song items use their own setting.", WIDGET_CVAR_COMBOBOX);
+    OPT_U8(RSK_SHUFFLE_CLOCK, "Shuffle Clock", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleClock"), "Lock OoT to the configured starting time until the Clock is found.", WIDGET_CVAR_COMBOBOX);
+    OPT_U8(RSK_CLOCK_START, "Clock Starting Time", {"Day", "Night", "Random"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ClockStart"), "Time held before the Clock is found. Random is deterministic for the seed.", WIDGET_CVAR_COMBOBOX);
     OPT_U8(RSK_SHUFFLE_SONGS, {"Off", "Song Locations", "Dungeon Rewards", "Anywhere"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSongs"), WIDGET_CVAR_COMBOBOX, RO_SONG_SHUFFLE_SONG_LOCATIONS);
     OPT_U8(RSK_SHOPSANITY, {"Off", "Specific Count", "Random"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("Shopsanity"), WIDGET_CVAR_COMBOBOX, RO_SHOPSANITY_OFF);
     OPT_CALLBACK(RSK_SHOPSANITY, {
@@ -933,6 +940,8 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_SHUFFLE_BOULDERS, {"Off", "Dungeons", "Overworld", "All Boulders"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleBoulders"), WIDGET_CVAR_COMBOBOX, RO_SHUFFLE_BOULDERS_OFF);
     OPT_BOOL(RSK_SHUFFLE_TREES, CVAR_RANDOMIZER_SETTING("ShuffleTrees"));
     OPT_BOOL(RSK_SHUFFLE_BUSHES, CVAR_RANDOMIZER_SETTING("ShuffleBushes"));
+    OPT_BOOL(RSK_SHUFFLE_ENEMY_DROPS, {"Off", "On"}, OptionCategory::Setting,
+             CVAR_RANDOMIZER_SETTING("ShuffleEnemyDrops"), WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_BOOL(RSK_SHUFFLE_ICICLES, CVAR_RANDOMIZER_SETTING("ShuffleIcicles"));
     OPT_BOOL(RSK_SHUFFLE_RED_ICE, CVAR_RANDOMIZER_SETTING("ShuffleRedIce"));
     OPT_U8(RSK_SHUFFLE_SIGNS, {"Off", "Dungeons", "Overworld", "All Signs"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleSigns"), WIDGET_CVAR_COMBOBOX, RO_SHUFFLE_SIGNS_OFF);
@@ -1126,6 +1135,10 @@ void Settings::CreateOptions() {
         }
     });
     OPT_BOOL(RSK_SHUFFLE_BEAN_SOULS, CVAR_RANDOMIZER_SETTING("ShuffleBeanSouls"), IMFLAG_SEPARATOR_BOTTOM, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_ENEMY_SOULS, "Enemy Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleEnemySouls"), "Enemies remain immune to damage until their corresponding soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_NPC_SOULS, "NPC Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleNpcSouls"), "Native NPC conversation, shop, quest and minigame roles require their corresponding soul. Blocking NPCs retain their barriers until their soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_ANIMAL_SOULS, "Animal Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleAnimalSouls"), "Animals and their checks become available after their corresponding soul is obtained.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
+    OPT_U8(RSK_SHUFFLE_MISC_SOULS, "Miscellaneous Souls", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleMiscSouls"), "Gold Skulltula and Business Scrub actors and checks require their corresponding soul.", WIDGET_CVAR_COMBOBOX, RO_GENERIC_OFF);
     OPT_U8(RSK_SHUFFLE_BOSS_SOULS, {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ShuffleBossSouls"), WIDGET_CVAR_COMBOBOX);
     OPT_BOOL(RSK_SHUFFLE_DEKU_STICK_BAG, CVAR_RANDOMIZER_SETTING("ShuffleDekuStickBag"), IMFLAG_SEPARATOR_BOTTOM, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_CALLBACK(RSK_SHUFFLE_DEKU_STICK_BAG, {
@@ -1423,6 +1436,8 @@ void Settings::CreateOptions() {
         }
     });
     OPT_BOOL(RSK_SHUFFLE_MASKS, CVAR_RANDOMIZER_SETTING("ShuffleMasks"));
+    OPT_BOOL(RSK_SHUFFLE_RITO_MASK, "Shuffle Rito Mask", CVAR_RANDOMIZER_SETTING("ShuffleRitoMask"),
+             "Adds exactly one optional Rito Mask. No progression checks require it.", IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_U8(RSK_GOSSIP_STONE_HINTS, {"No Hints", "Need Nothing", "Mask of Truth", "Stone of Agony"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("GossipStoneHints"), WIDGET_CVAR_COMBOBOX, RO_GOSSIP_STONES_NEED_NOTHING, false, nullptr, IMFLAG_NONE);
     OPT_CALLBACK(RSK_GOSSIP_STONE_HINTS, {
         if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("GossipStoneHints"), RO_GOSSIP_STONES_NEED_NOTHING) ==
@@ -2274,6 +2289,10 @@ void Settings::CreateOptions() {
                                                                               &mOptions[RSK_SHUFFLE_DUNGEON_REWARDS],
                                                                               &mOptions[RSK_GERUDO_KEYS],
                                                                               &mOptions[RSK_SHUFFLE_BOSS_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_NPC_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
+                                                                              &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                                                           },
                                                                           WidgetContainerType::SECTION);
     mOptionGroups[RSG_MENU_COLUMN_DUNGEON_ITEMS] =
@@ -2321,6 +2340,9 @@ void Settings::CreateOptions() {
         OptionGroup::SubGroup("Shuffle Items",
                               {
                                   &mOptions[RSK_SHUFFLE_SONGS],
+                                  &mOptions[RSK_SHUFFLE_SONG_EVENTS],
+                                  &mOptions[RSK_SHUFFLE_CLOCK],
+                                  &mOptions[RSK_CLOCK_START],
                                   &mOptions[RSK_SHUFFLE_TOKENS],
                                   &mOptions[RSK_SHUFFLE_KOKIRI_SWORD],
                                   &mOptions[RSK_SHUFFLE_MASTER_SWORD],
@@ -2330,6 +2352,7 @@ void Settings::CreateOptions() {
                                   &mOptions[RSK_SHUFFLE_SCARECROWS_SONG],
                                   &mOptions[RSK_SHUFFLE_GERUDO_MEMBERSHIP_CARD],
                                   &mOptions[RSK_SHUFFLE_MASKS],
+                                  &mOptions[RSK_SHUFFLE_RITO_MASK],
                                   &mOptions[RSK_FISHSANITY],
                                   &mOptions[RSK_FISHSANITY_POND_COUNT],
                                   &mOptions[RSK_FISHSANITY_AGE_SPLIT],
@@ -2345,6 +2368,7 @@ void Settings::CreateOptions() {
                                   &mOptions[RSK_SHUFFLE_ROCKS],
                                   &mOptions[RSK_SHUFFLE_TREES],
                                   &mOptions[RSK_SHUFFLE_BUSHES],
+                                  &mOptions[RSK_SHUFFLE_ENEMY_DROPS],
                                   &mOptions[RSK_SHUFFLE_ICICLES],
                                   &mOptions[RSK_SHUFFLE_RED_ICE],
                                   &mOptions[RSK_SHUFFLE_SIGNS],
@@ -2667,6 +2691,9 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_DUNGEON_REWARDS],
                                             &mOptions[RSK_LINKS_POCKET],
                                             &mOptions[RSK_SHUFFLE_SONGS],
+                                            &mOptions[RSK_SHUFFLE_SONG_EVENTS],
+                                            &mOptions[RSK_SHUFFLE_CLOCK],
+                                            &mOptions[RSK_CLOCK_START],
                                             &mOptions[RSK_SHOPSANITY],
                                             &mOptions[RSK_SHOPSANITY_COUNT],
                                             &mOptions[RSK_SHOPSANITY_PRICES],
@@ -2705,6 +2732,7 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_ROCKS],
                                             &mOptions[RSK_SHUFFLE_TREES],
                                             &mOptions[RSK_SHUFFLE_BUSHES],
+                                            &mOptions[RSK_SHUFFLE_ENEMY_DROPS],
                                             &mOptions[RSK_SHUFFLE_ICICLES],
                                             &mOptions[RSK_SHUFFLE_RED_ICE],
                                             &mOptions[RSK_SHUFFLE_SIGNS],
@@ -2722,6 +2750,7 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_SCARECROWS_SONG],
                                             &mOptions[RSK_SHUFFLE_GERUDO_MEMBERSHIP_CARD],
                                             &mOptions[RSK_SHUFFLE_MASKS],
+                                            &mOptions[RSK_SHUFFLE_RITO_MASK],
                                             &mOptions[RSK_SHUFFLE_MERCHANTS],
                                             &mOptions[RSK_MERCHANT_PRICES],
                                             &mOptions[RSK_MERCHANT_PRICES_FIXED_PRICE],
@@ -2771,6 +2800,10 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED],
                                             &mOptions[RSK_PROGRESSIVE_GORON_SWORD],
                                             &mOptions[RSK_SHUFFLE_BOSS_SOULS],
+                                            &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
+                                            &mOptions[RSK_SHUFFLE_NPC_SOULS],
+                                            &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
+                                            &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                             &mOptions[RSK_SHUFFLE_DEKU_STICK_BAG],
                                             &mOptions[RSK_SHUFFLE_DEKU_NUT_BAG],
                                             &mOptions[RSK_SHUFFLE_FREESTANDING],
@@ -3095,6 +3128,7 @@ void Settings::UpdateAllOptions() {
 
 void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocations,
                                const std::set<RandomizerTrick>& enabledTricks) {
+    GenerateSongEvents();
 #ifdef COMBO_BUILD
     if (Combo_IsCombinedGame()) {
         // ComboShip: the Happy Mask Shop scene is the OOT->MM portal and never runs, so its hint can never
@@ -3131,7 +3165,8 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
                 mOptions[RSK_FOREST].Set(RO_CLOSED_FOREST_DEKU_ONLY);
             }
         }
-        // ComboShip: Shared Wallets has no MM equivalent for Child Wallet, so force it off (see deviations/rando.md).
+        // Shared Wallets retain the normal base wallet and scalar tier ABI.
+        // MM normalizes its Child Wallet option off for the same combined policy.
         if (gComboSharedMask & (1 << ComboRando::SF_WALLET)) {
             mOptions[RSK_SHUFFLE_CHILD_WALLET].Set(RO_GENERIC_OFF);
         }
@@ -3609,12 +3644,15 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
 }
 
 void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
+    RustyDoorKeys::ResetImportedCatalog(*mContext);
     mContext->SetSeedString(spoilerFileJson.at("seed").get<std::string>());
     mContext->SetSeed(spoilerFileJson.at("finalSeed").get<uint32_t>());
     // A native spoiler from before this option must not retain the setting
     // from a previously loaded seed in the same Context.
     mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
     mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF);
+    mContext->GetOption(RSK_SHUFFLE_RITO_MASK).Set(RO_GENERIC_OFF);
+    mContext->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Set(RO_GENERIC_OFF);
     // Pre-policy spoilers included Grace without a gate. Loading one after a
     // newer seed must restore that behavior rather than inherit its restriction.
     mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
@@ -3658,8 +3696,12 @@ void Settings::SetAllToContext() {
     for (int i = 0; i < RSK_MAX; i++) {
         mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set(mOptions[i].GetOptionIndex());
     }
-    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
-        mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_ON);
+    if (Combo_IsCombinedGame())
+        mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR)
+            .Set(CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF);
+    if (Combo_IsCombinedGame())
+        mContext->GetOption(RSK_SHUFFLE_RITO_MASK)
+            .Set(CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF);
     for (int i = 0; i < RT_MAX; i++) {
         mContext->GetTrickOption(static_cast<RandomizerTrick>(i)).Set(mTrickSettings[i].GetOptionIndex());
     }
@@ -3730,6 +3772,8 @@ void Settings::RandomizeAllSettings() {
             case RSK_STARTING_ZORA_MASK:
             case RSK_STARTING_GERUDO_MASK:
             case RSK_STARTING_MASK_OF_TRUTH:
+            // Internal saved migration metadata is never a randomized user option.
+            case RSK_RUSTY_DOOR_KEY_VERSION:
             // ComboShip: (#133/#134) opt-outs, never randomized
             case RSK_EXCLUDE_MASK_SHOP_KEY:
             case RSK_EXCLUDE_MASK_SHOP_ENTRANCE:

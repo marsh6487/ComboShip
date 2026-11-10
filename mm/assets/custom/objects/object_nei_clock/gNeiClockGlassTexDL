@@ -1,0 +1,5 @@
+<DisplayList Version="0">
+  <PipeSync />
+  <LoadTextureBlock Path="objects/object_nei_clock/gNeiClockGlassTex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1" />
+  <EndDisplayList />
+</DisplayList>

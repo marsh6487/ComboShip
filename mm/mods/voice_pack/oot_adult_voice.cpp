@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <spdlog/spdlog.h>
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
 #include <ship/resource/CrossRMRegistry.h>
@@ -244,6 +245,17 @@ Clip Decode(const std::vector<char>& bytes) {
 }
 std::array<Action, 32> cache;
 bool ready = false;
+bool Unavailable(const char* reason, const char* resource = "") {
+    // Loading may retry on later requests. Report a changed failure once rather
+    // than flooding the log on every attack while a companion is unavailable.
+    static std::string lastReason, lastResource;
+    if (lastReason != reason || lastResource != resource) {
+        lastReason = reason;
+        lastResource = resource;
+        SPDLOG_WARN("[LinkVoice] native OoT adult recordings unavailable: reason={} resource={}", reason, resource);
+    }
+    return false;
+}
 bool Load() {
     if (ready)
         return true;
@@ -256,10 +268,10 @@ bool Load() {
     auto owner = context ? context->GetResourceManager() : nullptr;
 #endif
     if (!owner || !owner->GetArchiveManager())
-        return false;
+        return Unavailable("OoT resource owner not ready");
     auto archives = owner->GetArchiveManager()->GetArchives();
     if (!archives)
-        return false;
+        return Unavailable("archive list not ready");
     std::shared_ptr<Ship::Archive> native;
     // Select the actual base archive, bypassing mod/Alt path shadowing.
     // Normal OoT takes precedence over MQ, matching the existing companion loader.
@@ -278,7 +290,7 @@ bool Load() {
             break;
     }
     if (!native)
-        return false;
+        return Unavailable("native oot.o2r or oot-mq.o2r not mounted");
     std::array<Clip, 135> samples;
     std::array<Action, 32> loaded;
     for (unsigned action = 0; action < recipes.size(); ++action) {
@@ -288,10 +300,10 @@ bool Load() {
                 if (samples[id].empty()) {
                     auto file = native->LoadFile(SamplePath(id));
                     if (!file || !file->Buffer)
-                        return false;
+                        return Unavailable("native sample missing", SamplePath(id));
                     samples[id] = Decode(*file->Buffer);
                     if (samples[id].empty())
-                        return false;
+                        return Unavailable("native sample decode rejected", SamplePath(id));
                 }
                 clip.insert(clip.end(), samples[id].begin(), samples[id].end());
             }
@@ -300,6 +312,7 @@ bool Load() {
     }
     cache = std::move(loaded);
     ready = true;
+    SPDLOG_INFO("[LinkVoice] native OoT adult recordings ready: archive={} actions=32 rate=32000", native->GetPath());
     return ready;
 }
 } // namespace

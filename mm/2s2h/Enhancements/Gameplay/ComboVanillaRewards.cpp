@@ -556,7 +556,9 @@ bool Transact(const Reward& reward, int slot) {
     bool success = false;
     try {
         if (alreadyOwned || Grant(reward)) {
-            gSaveContext.save.saveInfo.playerData.rupees -= price;
+            if (!RandoCapacity_InfiniteWallet()) {
+                gSaveContext.save.saveInfo.playerData.rupees -= price;
+            }
             if (Host(RewardAction::PrepareCapture, reward, slot) == 1) {
                 SaveManager_SaveCurrentForCombo(true);
                 success = Host(RewardAction::Commit, reward, slot) == 1;

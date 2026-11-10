@@ -16,7 +16,7 @@ from run_mm_scene_randomization_tests import function as production_function
 ROOT = Path(__file__).resolve().parents[2]
 
 def function(source, name):
-    start = re.search(r'^(?:static |extern )?void ' + re.escape(name) + r'\(', source, re.M).start()
+    start = re.search(r'^(?:static |extern )?(?:void|Gfx\*) ' + re.escape(name) + r'\(', source, re.M).start()
     token = source.index(name + '(', start)
     brace = source.index('{', token)
     depth, end = 1, brace + 1
@@ -94,10 +94,11 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
         draw_names += ['SkelAnime_DrawFlexOpa']
         if 'void SkelAnime_DrawFlexOpaWithXlu(' in engine:
             draw_names += ['SkelAnime_DrawFlexOpaWithXlu']
+        draw_names += ['SkelAnime_DrawLimb', 'SkelAnime_Draw', 'SkelAnime_DrawFlexLimb', 'SkelAnime_DrawFlex']
         production = '\n'.join(function(engine, n) for n in draw_names)
         # C's implicit void-pointer conversions need explicit casts in this C++ harness.
         production = production.replace('= Lib_SegmentedToVirtual(skeleton[', '= (StandardLimb*)Lib_SegmentedToVirtual(skeleton[')
-        production = production.replace('Mtx* mtx = GRAPH_ALLOC(', 'Mtx* mtx = (Mtx*)GRAPH_ALLOC(')
+        production = production.replace('mtx = GRAPH_ALLOC(', 'mtx = (Mtx*)GRAPH_ALLOC(')
         production = production.replace('Mtx* mtx = Graph_Alloc(', 'Mtx* mtx = (Mtx*)Graph_Alloc(')
         (build / 'native_draw.inc').write_text(production)
         soul = (ROOT / 'mm/2s2h/Rando/DrawFuncs.cpp').read_text()

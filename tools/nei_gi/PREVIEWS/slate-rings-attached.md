@@ -6,7 +6,7 @@ The revised rings are front-mounted sigils in the Slate's local XY plane. Their 
 
 At side angles, the circles narrow into ellipses and a thin edge profile. From the back, the solid casing hides these front-face sigils. This occlusion is expected for their placement.
 
-[Camera-facing versus model-attached animation](slate_rotation_attached_comparison.gif)
+Camera-facing versus model-attached animation (animated preview omitted from publication)
 
 [Front/back comparison](slate_rotation_attached_comparison_front_back.png)
 

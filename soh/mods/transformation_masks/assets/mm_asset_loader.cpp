@@ -2489,7 +2489,9 @@ static s16* MmDirectAudio_DecodeADPCM(SoundFontSample* sample, u32* outLength) {
 // =============================================================================
 
 #define MM_DIRECT_MAX_SOUNDS 16
-#define MM_GAKKI_SFXID 0x5800 // Dedicated sfxId for gakki instrument notes (stop/replace management)
+#define MM_GAKKI_SFXID 0x5800 // Live/replay instrument owner (stopped on note-off or putaway)
+// Private direct-mixer tag, outside MM's SFX banks. Never sent to the SFX dispatcher.
+#define MM_GAKKI_JINGLE_SFXID 0xFFFE
 // The note MM's ocarina channel plays; every other note is a transposition of it.
 #define MM_GAKKI_SAMPLE_NOTE 60
 
@@ -2500,19 +2502,20 @@ static s16* MmDirectAudio_DecodeADPCM(SoundFontSample* sample, u32* outLength) {
 #define ADSR_PHASE_RELEASE 3
 
 typedef struct {
-    s16* pcmData;       // Decoded PCM buffer (allocated, must be freed)
-    u32 pcmLength;      // Total samples in buffer
-    f32 pcmPosition;    // Current fractional playback position
-    f32 advance;        // Samples to advance per output sample (tuning * freqScale)
-    f32 volume;         // Volume [0..1] (base volume before envelope)
-    f32 pan;            // Pan [0=left, 0.5=center, 1=right]
-    u32 loopStart;      // Loop start sample (from sample->loop)
-    u32 loopEnd;        // Loop end sample (0 = no loop)
-    u32 lifeSamples;    // Output samples elapsed since start
-    u32 maxLifeSamples; // Maximum output samples before auto-stop (0 = no limit)
-    f32 vibratoPhase;   // Vibrato LFO phase [0..1]
-    f32 vibratoRate;    // Vibrato LFO rate (Hz), 0 = no vibrato
-    f32 vibratoDepth;   // Vibrato pitch modulation depth [0..1]
+    s16* pcmData;         // Decoded PCM buffer (allocated, must be freed)
+    u32 pcmLength;        // Total samples in buffer
+    f32 pcmPosition;      // Current fractional playback position
+    f32 advance;          // Samples to advance per output sample (tuning * freqScale)
+    f32 gakkiBaseAdvance; // Untransposed sample rate for live instrument pitch/bend updates
+    f32 volume;           // Volume [0..1] (base volume before envelope)
+    f32 pan;              // Pan [0=left, 0.5=center, 1=right]
+    u32 loopStart;        // Loop start sample (from sample->loop)
+    u32 loopEnd;          // Loop end sample (0 = no loop)
+    u32 lifeSamples;      // Output samples elapsed since start
+    u32 maxLifeSamples;   // Maximum output samples before auto-stop (0 = no limit)
+    f32 vibratoPhase;     // Vibrato LFO phase [0..1]
+    f32 vibratoRate;      // Vibrato LFO rate (Hz), 0 = no vibrato
+    f32 vibratoDepth;     // Vibrato pitch modulation depth [0..1]
     // Portamento (pitch sweep from startAdvance to target advance over portaDuration samples)
     f32 portaStartAdv;       // Starting advance rate (0 = no portamento)
     f32 portaEndAdv;         // Target advance rate
@@ -2591,10 +2594,11 @@ static const u16 sContinuousSfxIds[] = {
     // propeller hum. Without continuous handling, per-frame triggers re-attack the
     // sample = buzzy stutter. Stopped in MmForm_EndDekuFly.
     0x1851,
-    0x185A, // DEKUNUTS_BUBLE_SHOT_LEVEL — MM z_en_arrow.c:499 fires every frame during bubble
-            // flight. LAYER_2249 has noteldv PITCH_G4 48t + rjump LAYER_2256 = sustained loop
-            // until note-off. Continuous semantic refreshes single slot vs stacking attacks.
-    0x5800, // GAKKI instrument notes (stopped on button release)
+    0x185A,                // DEKUNUTS_BUBLE_SHOT_LEVEL — MM z_en_arrow.c:499 fires every frame during bubble
+                           // flight. LAYER_2249 has noteldv PITCH_G4 48t + rjump LAYER_2256 = sustained loop
+                           // until note-off. Continuous semantic refreshes single slot vs stacking attacks.
+    MM_GAKKI_SFXID,        // Live/replay instrument notes (explicit note-off)
+    MM_GAKKI_JINGLE_SFXID, // Song jingle notes (explicit sequence gate/end)
 };
 static const s32 sContinuousSfxIdsSize = sizeof(sContinuousSfxIds) / sizeof(sContinuousSfxIds[0]);
 
@@ -3421,7 +3425,7 @@ static SoundFontSound* MmDirectAudio_GetInstrumentSound(SoundFont* font, u8 inst
 
 // Same as GetInstrumentSound but skips the inst->loaded check.
 // SoH's AudioSoundFontFactory always sets loaded=0 (managed by OOT's AudioLoad, not us).
-// Only safe for dedicated instrument soundfonts loaded from mm.o2r (gakki: SF29/34/38).
+// Only safe for instrument soundfonts retained from mm.o2r (gakki uses SF0).
 static SoundFontSound* MmDirectAudio_GetInstrumentSoundDirect(SoundFont* font, u8 instrumentIdx, u8 midiNote) {
     if (!font || !font->instruments)
         return nullptr;
@@ -3929,6 +3933,7 @@ static s32 MmDirectAudio_PlaySinglePCM(s16* pcm, u32 pcmLength, f32 advance, u16
     snd->pcmLength = pcmLength;
     snd->pcmPosition = 0.0f;
     snd->advance = advance;
+    snd->gakkiBaseAdvance = 0.0f; // PCM SFX have no Gakki-owned, untransposed sample rate.
     snd->volume = volume;
     snd->pan = pan;
     snd->mmSfxId = mmSfxId;
@@ -4034,6 +4039,7 @@ static s32 MmDirectAudio_PlaySingle(SoundFontSound* sfxSound, f32 pitchScale, f3
     snd->pcmLength = pcmLength;
     snd->pcmPosition = 0.0f;
     snd->advance = sfxSound->tuning * pitchScale * freqScale;
+    snd->gakkiBaseAdvance = sfxSound->tuning * freqScale;
 
     // Volume attenuation for extreme pitches — prevents high-pitched screeching
     // (e.g., transform flash 0x484F at advance=3.0 becomes 67% volume)
@@ -4674,17 +4680,11 @@ static s32 MmDirectAudio_Play(u16 mmSfxId, f32 freqScale, Vec3f* pos) {
 }
 
 // =============================================================================
-// Gakki (Instrument) Audio - Play MM instrument notes from form-specific soundfonts
-// Goron Drums → Soundfont_38, Zora Guitar → Soundfont_29, Deku Pipes → Soundfont_34
+// Gakki (Instrument) Audio - Play MM instrument notes from the retained MM soundfont
+// Goron Drums → Soundfont_0[92], Zora Guitar → Soundfont_0[93], Deku Pipes → Soundfont_0[94]
 // From 2Ship z64ocarina.h: OCARINA_INSTRUMENT_GORON_DRUMS/ZORA_GUITAR/DEKU_PIPES
 // =============================================================================
 
-// Load the instrument for each MM form's musical instrument.
-// Zora Guitar and Deku Pipes work from Soundfont_0 (empirically verified):
-//   Zora Guitar → Soundfont_0 instruments[93]
-//   Deku Pipes  → Soundfont_0 instruments[94]
-// Goron Drums uses dedicated Soundfont_38 (SampleBank_2: GoronDrum, BassSlap, TomDrum, etc.)
-//   because Soundfont_0's inst[107] doesn't have real drum samples.
 // Per-form instrument table — the equivalent of MM's sPlayerFormOcarinaInstruments
 // (z_message.c:4560), which maps each transformation to its own instrument:
 //   Human/Fierce Deity -> OCARINA_INSTRUMENT_DEFAULT (the plain ocarina)
@@ -4940,6 +4940,38 @@ struct MmAudioScopedLock {
 // Forward declaration (defined later in file)
 static void MmDirectAudio_StopById(u16 mmSfxId);
 
+static SoundFontSound* MmGakki_GetInstrumentSound(SoundFont* font, u8 instIdx) {
+    SoundFontSound* sound = MmDirectAudio_GetInstrumentSoundDirect(font, instIdx, MM_GAKKI_SAMPLE_NOTE);
+    if (!sound || instIdx < 92 || instIdx > 94) {
+        return sound;
+    }
+
+    // The shared importer can leave an OoT sample pointer when a donor sample is
+    // missing. For the three native form instruments, require the selected sample
+    // to be retained by our archive-specific MM loader. Check only on note onset;
+    // held pitch updates need neither resource lookup nor archive access. Leave
+    // the shared font and custom-instrument fallback behavior unchanged.
+    for (const auto& resource : sMmResourceCache) {
+        if (resource.second && resource.second->GetRawPointer() == sound->sample) {
+            return sound;
+        }
+    }
+    MMSFX_LOG("[MmGakki] Soundfont_0 inst[%d] selected sample is not retained from mm.o2r", instIdx);
+    return nullptr;
+}
+
+static f32 MmGakki_GetPitchScale(u8 pitch, f32 bendFreq) {
+    s32 midiNote = 60 + (s32)pitch;
+    if (midiNote > 127) {
+        midiNote = 127;
+    }
+    f32 pitchScale = powf(2.0f, ((f32)midiNote - 60.0f) / 12.0f);
+    if (bendFreq > 0.0f) {
+        pitchScale *= bendFreq;
+    }
+    return pitchScale;
+}
+
 // Play an instrument note for the current MM form
 // form: MM_PLAYER_FORM_GORON(1), ZORA(2), DEKU(3)
 // buttonIndex: 0=A, 1=CDown, 2=CRight, 3=CLeft, 4=CUp (from OOT sCurOcarinaBtnIdx / lastOcaNoteIdx)
@@ -4960,7 +4992,7 @@ void MmGakki_PlayNote(s32 form, u8 buttonIndex, Vec3f* pos) {
         return;
     }
 
-    // Load the dedicated instrument soundfont for this form (SF29/34/38).
+    // Load the retained MM soundfont selected by this form's instrument row.
     u8 instIdx = 0;
     SoundFont* font = MmGakki_LoadFormFont(form, &instIdx);
     if (!font) {
@@ -4971,7 +5003,7 @@ void MmGakki_PlayNote(s32 form, u8 buttonIndex, Vec3f* pos) {
     u8 midiNote = sOcarinaButtonToMidi[buttonIndex];
 
     // Get the instrument sound, skipping loaded check (factory always sets loaded=0).
-    SoundFontSound* sound = MmDirectAudio_GetInstrumentSoundDirect(font, instIdx, MM_GAKKI_SAMPLE_NOTE);
+    SoundFontSound* sound = MmGakki_GetInstrumentSound(font, instIdx);
     if (!sound || !sound->sample) {
         MMSFX_LOG("[MmGakki] PlayNote: no sound for form=%d note=%d (sound=%p)", form, midiNote, sound);
         return;
@@ -4994,7 +5026,7 @@ void MmGakki_PlayNote(s32 form, u8 buttonIndex, Vec3f* pos) {
 // `bendFreq` is sCurOcarinaBendFreq — the control-stick pitch bend the engine applies to
 // the native ocarina; passing it through keeps our synth bending in lockstep.
 // Shared body: the caller has already resolved which soundfont instrument sings.
-static void MmGakki_PlayResolvedPitch(SoundFont* font, u8 instIdx, u8 pitch, f32 bendFreq, Vec3f* pos) {
+static void MmGakki_PlayResolvedPitch(SoundFont* font, u8 instIdx, u8 pitch, f32 bendFreq, Vec3f* pos, u16 ownerId) {
     s32 midiNote = 60 + (s32)pitch; // OCARINA_PITCH_C4 == 0
     if (midiNote > 127) {
         midiNote = 127;
@@ -5005,33 +5037,26 @@ static void MmGakki_PlayResolvedPitch(SoundFont* font, u8 instIdx, u8 pitch, f32
     // C4 sample. Selecting per-note crossed into the instrument's low/high split,
     // recorded for other registers — inst[90]'s high sample has tuning 0.031 against
     // 0.500, a 4-octave drop.
-    SoundFontSound* sound = MmDirectAudio_GetInstrumentSoundDirect(font, instIdx, MM_GAKKI_SAMPLE_NOTE);
+    SoundFontSound* sound = MmGakki_GetInstrumentSound(font, instIdx);
     if (!sound || !sound->sample) {
         MMSFX_LOG("[MmGakki] PlayPitch: no sound for inst[%d] midi=%d", instIdx, midiNote);
         return;
     }
 
-    f32 pitchScale = powf(2.0f, ((f32)midiNote - 60.0f) / 12.0f);
-    if (bendFreq > 0.0f) {
-        pitchScale *= bendFreq;
-    }
+    f32 pitchScale = MmGakki_GetPitchScale(pitch, bendFreq);
 
     f32 vol, pan;
     MmDirectAudio_ComputeSpatial(pos, &vol, &pan);
 
-    if (!MmDirectAudio_PlaySingle(sound, pitchScale, 1.0f, MM_GAKKI_SFXID, vol, pan, 0.0f, 0.0f)) {
+    s32 slot = MmDirectAudio_PlaySingle(sound, pitchScale, 1.0f, ownerId, vol, pan, 0.0f, 0.0f);
+    if (slot == 0) {
         return;
     }
 
     // Shape the note with the instrument's OWN envelope instead of the generic preset:
     // this is what makes a drum hit decay like a drum and the guitar/pipes sustain the way
     // MM does. Applied after PlaySingle because that is what claims the slot.
-    Instrument* inst = font->instruments[instIdx];
-    for (s32 i = 0; i < MM_DIRECT_MAX_SOUNDS; i++) {
-        if (sPlayingSounds[i].active && sPlayingSounds[i].mmSfxId == MM_GAKKI_SFXID) {
-            MmDirectAudio_ApplyInstrumentEnvelope(&sPlayingSounds[i], inst);
-        }
-    }
+    MmDirectAudio_ApplyInstrumentEnvelope(&sPlayingSounds[slot - 1], font->instruments[instIdx]);
 }
 
 void MmGakki_PlayPitch(s32 form, u8 pitch, f32 bendFreq, Vec3f* pos) {
@@ -5041,7 +5066,21 @@ void MmGakki_PlayPitch(s32 form, u8 pitch, f32 bendFreq, Vec3f* pos) {
     u8 instIdx = 0;
     SoundFont* font = MmGakki_LoadFormFont(form, &instIdx);
     if (font != NULL) {
-        MmGakki_PlayResolvedPitch(font, instIdx, pitch, bendFreq, pos);
+        MmGakki_PlayResolvedPitch(font, instIdx, pitch, bendFreq, pos, MM_GAKKI_SFXID);
+    }
+}
+
+// Change a held live/replay note in place. Its sample, playback cursor and
+// envelope remain owned by the original attack; repeated bends cannot compound.
+void MmGakki_UpdatePitch(u8 pitch, f32 bendFreq) {
+    MmAudioScopedLock audioLock;
+    f32 pitchScale = MmGakki_GetPitchScale(pitch, bendFreq);
+    for (s32 i = 0; i < MM_DIRECT_MAX_SOUNDS; i++) {
+        MmPlayingSound* snd = &sPlayingSounds[i];
+        if (snd->active && snd->mmSfxId == MM_GAKKI_SFXID && snd->gakkiBaseAdvance > 0.0f) {
+            snd->advance = snd->gakkiBaseAdvance * pitchScale;
+            snd->lastRefreshFrame = sMmAudioFrame;
+        }
     }
 }
 
@@ -5051,14 +5090,14 @@ void MmGakki_PlayPitch(s32 form, u8 pitch, f32 bendFreq, Vec3f* pos) {
 // because the jingle is synthesised by us and never reaches OoT's sequence player.
 void MmGakki_PlayInstrumentPitch(u8 instIdx, u8 pitch, f32 bendFreq, Vec3f* pos) {
     MmAudioScopedLock audioLock;
-    MmDirectAudio_StopById(MM_GAKKI_SFXID);
+    MmDirectAudio_StopById(MM_GAKKI_JINGLE_SFXID);
 
     SoundFont* font = MmSfx_LoadFont(0);
     if (font == NULL || font->instruments == NULL || instIdx >= font->numInstruments ||
         font->instruments[instIdx] == NULL) {
         return;
     }
-    MmGakki_PlayResolvedPitch(font, instIdx, pitch, bendFreq, pos);
+    MmGakki_PlayResolvedPitch(font, instIdx, pitch, bendFreq, pos, MM_GAKKI_JINGLE_SFXID);
 }
 
 // Splice points for a held note are put on RISING zero crossings, so the wrap is
@@ -5087,14 +5126,14 @@ static u32 MmGakki_RisingZeroBackward(const s16* pcm, u32 from) {
     return from;
 }
 
-// Apply the settings a sequence carries per note to the gakki note just started. The
+// Apply the settings a sequence carries per note to the jingle note just started. The
 // ocarina itself needs none of this — every button press is the same strength, centred and
 // one-shot — but a song jingle has velocity, pan, reverb and notes longer than the sample.
 void MmGakki_ShapeActiveNote(const MmGakkiNoteShape* shape) {
     MmAudioScopedLock audioLock;
     for (s32 i = 0; i < MM_DIRECT_MAX_SOUNDS; i++) {
         MmPlayingSound* snd = &sPlayingSounds[i];
-        if (!snd->active || snd->mmSfxId != MM_GAKKI_SFXID) {
+        if (!snd->active || snd->mmSfxId != MM_GAKKI_JINGLE_SFXID) {
             continue;
         }
 
@@ -5124,17 +5163,14 @@ void MmGakki_ReleaseNote(void) {
     MmAudioScopedLock audioLock;
     for (s32 i = 0; i < MM_DIRECT_MAX_SOUNDS; i++) {
         MmPlayingSound* snd = &sPlayingSounds[i];
-        if (snd->active && snd->mmSfxId == MM_GAKKI_SFXID && snd->envPhase < ADSR_PHASE_RELEASE) {
+        if (snd->active && snd->mmSfxId == MM_GAKKI_JINGLE_SFXID && snd->envPhase < ADSR_PHASE_RELEASE) {
             snd->envPhase = ADSR_PHASE_RELEASE;
         }
     }
 }
 
-// Keep a held gakki note alive. MM_GAKKI_SFXID (0x5800) is in sContinuousSfxIds, and the
-// mixer auto-releases continuous slots not refreshed within ~3 mixer frames — the old
-// staff-polling code only (re)triggered on note CHANGE, so long held notes faded out
-// early (part of the "no suena 1:1" report). The OnOcarinaNote hook fires every frame
-// while a note is held; it calls this to bump the refresh stamp.
+// Legacy refresh API. Instrument voices have explicit note-off and are exempt
+// from the continuous-SFX timeout; current live callers use UpdatePitch for bends.
 void MmGakki_RefreshNote(void) {
     MmAudioScopedLock audioLock;
     for (s32 i = 0; i < MM_DIRECT_MAX_SOUNDS; i++) {
@@ -5148,6 +5184,11 @@ void MmGakki_RefreshNote(void) {
 void MmGakki_StopNote(void) {
     MmAudioScopedLock audioLock;
     MmDirectAudio_StopById(MM_GAKKI_SFXID);
+}
+
+void MmGakki_StopJingleNote(void) {
+    MmAudioScopedLock audioLock;
+    MmDirectAudio_StopById(MM_GAKKI_JINGLE_SFXID);
 }
 
 // MM SFX engine tick (mirrors 2Ship code_8019AF00.c:3680-3682).
@@ -5202,15 +5243,15 @@ void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
     // In MM, continuous SFX must be re-triggered every frame via Audio_PlaySfxGeneral.
     // If the game stops calling it (e.g., player stops rolling), the sound stops.
     //
-    // The gakki note is exempt, and must be: this function runs AUDIO_FRAMES_PER_UPDATE
+    // The gakki and jingle notes are exempt: this function runs AUDIO_FRAMES_PER_UPDATE
     // (= R_UPDATE_RATE, 3) times per audio update, so sMmAudioFrame gains 3 for every ONE
     // refresh the 20 Hz ocarina hook delivers. Against a 3-frame grace that is a margin of
     // exactly zero, and one late game frame releases the note ~50 ms in — inaudible at the
-    // 65 Hz Garo's instrument sings at. It needs no heuristic anyway: it is the only
-    // continuous slot with a real note-off (MmGakki_StopNote, and StopById on the next note).
+    // 65 Hz Garo's instrument sings at. Both owners have explicit note-off; replay
+    // and jingle events are emitted at note boundaries, not every held frame.
     for (s32 slot = 0; slot < MM_DIRECT_MAX_SOUNDS; slot++) {
         MmPlayingSound* snd = &sPlayingSounds[slot];
-        if (snd->mmSfxId == MM_GAKKI_SFXID) {
+        if (snd->mmSfxId == MM_GAKKI_SFXID || snd->mmSfxId == MM_GAKKI_JINGLE_SFXID) {
             continue;
         }
         if (snd->active && snd->isContinuous && sMmAudioFrame > snd->lastRefreshFrame + 3) {
@@ -5292,7 +5333,7 @@ void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
                     // report it going quiet. lifeSamples separates "released early" from
                     // "played in full and still inaudible", and effVol shows the whole gain
                     // chain that produced it.
-                    if (snd->mmSfxId == MM_GAKKI_SFXID) {
+                    if (snd->mmSfxId == MM_GAKKI_SFXID || snd->mmSfxId == MM_GAKKI_JINGLE_SFXID) {
                         MMSFX_LOG("[MmDirectAudio] Gakki note end: %u of %u samples (%ums), vol=%.3f env=%.3f "
                                   "master=%.3f effVol=%.4f",
                                   snd->lifeSamples + i, snd->pcmLength, (snd->lifeSamples + i) * 1000 / 32000,

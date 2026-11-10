@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -32,6 +33,7 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
     ctx->FinalizeSettings(excludedLocations, enabledTricks);
     // once the settings have been finalized turn them into a string for hashing
     std::string settingsStr;
+    bool shuffleEnemyDrops = false;
     auto& optionGroups = Rando::Settings::GetInstance()->GetOptionGroups();
     for (size_t i = 0; i < RSG_MAX; i++) {
         auto& optionGroup = optionGroups[i];
@@ -43,6 +45,15 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
         for (Rando::Option* option : optionGroup.GetOptions()) {
             if (option->GetCategory() != Rando::OptionCategory::Toggle) {
                 if (option->GetOptionCount() > 0) {
+                    // Preserve the original Off hash and the already issued On
+                    // identity. Serialize this append-only setting once, at the
+                    // end, rather than adding another generic Off/On token now
+                    // that it is present in the real generation option group.
+                    if (option->GetCategory() == Rando::OptionCategory::Setting &&
+                        option->GetKey() == RSK_SHUFFLE_ENEMY_DROPS) {
+                        shuffleEnemyDrops = ctx->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Get();
+                        continue;
+                    }
                     if (i >= RSG_EXCLUDES_KOKIRI_FOREST && i <= RSG_EXCLUDES_GANONS_CASTLE) {
                         auto locationOption = static_cast<Rando::LocationOption*>(option);
                         settingsStr += option->GetOptionText(ctx->GetLocationOption(locationOption->GetKey()).Get());
@@ -55,6 +66,14 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
                 }
             }
         }
+    }
+
+    if (ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS) &&
+        Rando::RustyDoorKeys::IsExtended(ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get())) {
+        settingsStr += "|rusty-door-keys=27|";
+    }
+    if (shuffleEnemyDrops) {
+        settingsStr += "|native-first-enemy-drops=1|";
     }
 
     if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("DontGenerateSpoiler"), 0)) {

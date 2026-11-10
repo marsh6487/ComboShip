@@ -580,10 +580,15 @@ s32 MmGakki_FormHasOwnInstrument(s32 form);
  */
 void MmGakki_PlayPitch(s32 form, u8 pitch, f32 bendFreq, Vec3f* pos);
 
-/** Keep the held gakki note alive (call once per frame while the pitch is held). */
+/** Update a held live/replay note's pitch/bend without restarting its sample or envelope.
+ *  Has no effect after note-off or sample exhaustion, and never changes the song jingle.
+ *  Use PlayPitch for each replay attack, including repeated identical pitches. */
+void MmGakki_UpdatePitch(u8 pitch, f32 bendFreq);
+
+/** Legacy live/replay refresh; explicit note-off owns the voice's lifetime. */
 void MmGakki_RefreshNote(void);
 
-/** Note-off: release the current gakki note. */
+/** Stop the live/replay instrument immediately; the song jingle keeps its own voice. */
 void MmGakki_StopNote(void);
 
 // Per-note settings a sequence carries and the plain ocarina does not.
@@ -594,14 +599,17 @@ typedef struct {
     u8 sustain;      // hold a loopless sample instead of letting it run out mid-note
 } MmGakkiNoteShape;
 
-/** Apply a sequence's note settings to the gakki note just started. */
+/** Apply a sequence's note settings only to the song jingle just started. */
 void MmGakki_ShapeActiveNote(const MmGakkiNoteShape* shape);
 
-/** Note-off through the instrument's own release, instead of cutting the sound dead. */
+/** Release only the song jingle through its envelope, without changing live/replay audio. */
 void MmGakki_ReleaseNote(void);
 
-/** Sing a note with a named Soundfont_0 instrument rather than the form's gakki row. */
+/** Start/replace the song jingle's note with a named MM Soundfont_0 instrument. */
 void MmGakki_PlayInstrumentPitch(u8 instIdx, u8 pitch, f32 bendFreq, Vec3f* pos);
+
+/** Stop only the song jingle immediately (end, cancellation or form teardown). */
+void MmGakki_StopJingleNote(void);
 
 #ifdef __cplusplus
 }

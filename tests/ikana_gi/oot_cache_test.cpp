@@ -18,6 +18,24 @@ extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() { return 1; }
   }                                                                            \
   ;
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboSoulMiniOOT.h"
+extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
+  assert(!strcmp(key, ComboSoulModels::kSimplerEnemyCvar) ||
+         !strcmp(key, ComboSoulModels::kSimplerNpcCvar));
+  return fallback;
+}
+namespace Ship {
+struct FixtureResourceManager {
+  bool IsAltAssetsEnabled() const { return false; }
+};
+struct CrossRMRegistry {
+  static FixtureResourceManager* Get(const char* game) {
+    assert(!strcmp(game, "oot"));
+    static FixtureResourceManager owner;
+    return &owner;
+  }
+};
+} // namespace Ship
 namespace ItemGrantAudit {
 struct Scope {
   Scope(const char *, int, int, bool) {}

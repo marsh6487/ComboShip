@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
 /*
  * File: z_en_dodojr.c
  * Overlay: ovl_En_Dodojr
@@ -439,7 +440,7 @@ void EnDodojr_CrawlTowardsTarget(EnDodojr* this, PlayState* play) {
         this->timer4 = 5;
     }
 
-    if (EnDodojr_TryEatBomb(this) != 0) {
+    if (Randomizer_SoulCanDamageActor(play, &this->actor) && EnDodojr_TryEatBomb(this) != 0) {
         EnDodojr_SetupEatBomb(this);
         this->actionFunc = EnDodojr_EatBomb;
         return;

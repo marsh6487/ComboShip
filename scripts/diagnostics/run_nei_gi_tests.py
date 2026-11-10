@@ -100,7 +100,22 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
                     for path in asset.glob("mesh_*_vtx") for v in ET.parse(path).getroot()]
         words = struct.unpack_from("<16I", (asset / "scale_mtx").read_bytes(), 64)
         scale = ((words[0] >> 16) * 65536 + (words[8] >> 16)) / 65536
-        meta = json.loads((ROOT / "tools/nei_gi/CHECKPOINTS" / asset.name / "checkpoint.json").read_text())
+        if asset.name == "rito_mask":
+            # Rito's authored GI has its own manifest, outside the legacy
+            # checkpoint catalog. Validate its real mesh before adding it to
+            # the same complete framing and pickup sweep as every older model.
+            meta = json.loads((ROOT / "tools/rito_mask_gi/manifest.json").read_text())
+            assert meta["root"] == "__OTR__objects/nei_gi_redesign/rito_mask/gi_dl"
+            assert len(vertices) == meta["vertices"]
+            assert scale == meta["matrix_scale"]
+            bounds = [[extreme(p[axis] for p in vertices) for axis in range(3)]
+                      for extreme in (min, max)]
+            assert bounds == meta["bounds_native"]
+            assert [[value*scale for value in bound] for bound in bounds] == meta["bounds_after_internal_matrix"]
+            assert math.isclose(2*max(math.hypot(p[0], p[2]) for p in vertices)*scale,
+                                meta["rotation_width"], abs_tol=1e-9)
+        else:
+            meta = json.loads((ROOT / "tools/nei_gi/CHECKPOINTS" / asset.name / "checkpoint.json").read_text())
         low = min(p[1] for p in vertices)*scale
         high = max(p[1] for p in vertices)*scale
         width = 2*max(math.hypot(p[0],p[2]) for p in vertices)*scale
@@ -108,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             pickup_vertices.append(asset.name + ' ' + ' '.join(str(v*scale) for v in point))
         all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
                           f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
-    assert len(all_frames) == 63
+    assert len(all_frames) == 64
     (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     pickup_vertex_path = Path(tmp) / "mm_pickup_vertices.txt"
     pickup_vertex_path.write_text("\n".join(pickup_vertices))
@@ -134,7 +149,9 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             fallback_class = fallback_class[fallback_class.index("class MM_NeiGiFallbackShimmer"):]
             foreign_source = (ROOT / "combo/menu/ComboForeignDrawOOT.h").read_text()
             foreign_info = re.search(r"struct ComboForeignDrawInfo \{.*?\n\};", foreign_source, re.S)[0]
-            foreign_draw = functions(foreign_source)["OOT_DrawForeignNativeEquipment"] + "\n" + functions(foreign_source)["OOT_DrawComboForeign"]
+            foreign_draw = functions((ROOT / "combo/menu/ComboForeignAnim.h").read_text())["CfaIsOtrPath"] + "\n"
+            foreign_draw += functions(foreign_source)["ComboInternRoutedPath"] + "\n"
+            foreign_draw += functions(foreign_source)["OOT_DrawForeignNativeEquipment"] + "\n" + functions(foreign_source)["OOT_DrawComboForeign"]
             mirror_helper = functions((ROOT / "combo/menu/ComboMagicMirrorForeign.h").read_text())["ComboDrawMagicMirrorForeign"]
             foreign_draw = ('extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "NEI dispatch selected Mirror"); }\n'
                             + mirror_helper + '\n' + foreign_draw)
@@ -150,6 +167,13 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
 #include <unordered_set>
 #include "ComboMaskShimmer.h"
 #include "ComboCollectibleShimmerDraw.h"
+#include "ComboNeiGiResourceOwner.h"
+#include "combo/NeiClockGI.h"
+// This fixture dispatches NEI/song/arrow presentations. Counted key-ring
+// geometry and both host callbacks execute in shuffle_parity/key_rings.
+namespace ComboMmKeyRing {
+template<class... Args> bool Draw(Args...) { assert(false && "unexpected key-ring dispatch"); return false; }
+}
 extern "C" { PlayState* gPlayState = &Fixture::play; }
 bool ownerAlt = false;
 extern "C" int32_t OOT_NeiAltAssetsEnabled(void) { return ownerAlt; }
@@ -194,6 +218,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
 #define MATRIX_FINALIZE_AND_LOAD(pkt, gfx) gSPMatrix(pkt, Matrix_NewMtx(gfx, (char*)__FILE__, __LINE__), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH)
 """
             owner_functions = functions((ROOT / "combo/menu/ComboItemDrawOOT.h").read_text())
+            shim += '\nextern "C" {\n' + functions((ROOT / "mm/src/code/stubs.c").read_text())["gDPSetTileSizeLerp"] + '\n}\n'
             shim = shim.replace("/* SELECTED_SWORD_PRODUCER */", "\n".join(
                 owner_functions[name] for name in ("CwSimple", "CwCustomGi", "CwAltSwordGi")))
             spell_producer = functions((ROOT / "combo/menu/ComboItemDrawMM.h").read_text())["MM_FillElementalSpellDrawInfo"]
@@ -218,6 +243,7 @@ FOREIGN_DRAW_STUB(OOT_DrawForeignPoes)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFairyBottle)
 bool OOT_DrawForeignFairyContainer(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; return true; }
 FOREIGN_DRAW_STUB(OOT_DrawForeignSoulFlame)
+FOREIGN_DRAW_STUB(OOT_DrawForeignShuffledSoul)
 FOREIGN_DRAW_STUB(OOT_DrawForeignOps)
 #undef FOREIGN_DRAW_STUB
 void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const uint8_t[4], const char*) {
@@ -249,7 +275,8 @@ void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
 """
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
             mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
-            mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
+            mm_foreign_draw = functions(mm_foreign_source)["ComboInternRoutedPathOOT"] + "\n"
+            mm_foreign_draw += functions(mm_foreign_source)["MM_DrawComboForeign"]
             if "--baseline-gold-overlays" in sys.argv:
                 mm_foreign_draw=mm_foreign_draw.replace("Kind::Gold","Kind::MarioMask")
             mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(", mm_foreign_draw)))
@@ -268,9 +295,11 @@ void Matrix_RotateYS(s16, u8) {}
 void func_800B8118(Actor*,PlayState*,int) {}
 void func_800B8050(Actor*,PlayState*,int) {}
 int DungeonItem_GetOwner(RandoItemId) {return -1;}
+int DungeonItem_GetKeyRingCount(RandoItemId) {return 0;}
 bool GetItem_DrawDungeonItem(PlayState*,s16,int) {assert(false);return false;}
 int mmShopLegacyDraws;
 namespace Rando {
+void DrawKeyRing(RandoItemId) {assert(false && "unexpected native key ring");}
 void DrawItem(RandoItemId,RandoCheckId,Actor*);
 void DrawResolvedItem(RandoItemId,RandoCheckId,Actor*);
 RandoItemId ConvertItem(RandoItemId item,RandoCheckId) {return item;}
@@ -291,6 +320,8 @@ const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {ret
 Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false);return nullptr;}
 """ + functions(mm_foreign_source)["MM_DrawForeignSimple"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignMusicNote"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignCustomGi"]
             mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
+            mm_shop_support += '\n#define COMBO_DOOR_KEY_HOST_MM\n#include "combo/ComboDoorKeyGi.h"\n'
+            mm_shop_support += functions(mm_draw_source)["DrawDoorKey"] + "\n"
             # The receipt is a CustomItem actor, not Player_DrawGetItemImpl.
             # Execute its actual visible pose statements before the queue's
             # draw callback scale so camera framing probes use the active path.
@@ -338,7 +369,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
  std::map<std::string,std::vector<std::array<float,3>>> vertices;
  std::string slug;std::array<float,3> point{};
  while(input>>slug>>point[0]>>point[1]>>point[2])vertices[slug].push_back(point);
- assert(input.eof() && vertices.size()==63);
+ assert(input.eof() && vertices.size()==64);
  return vertices;
 }
 '''

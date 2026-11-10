@@ -1,6 +1,18 @@
+#include "combo/rando/SongEventsMenu.h"
 #include "Rando/Rando.h"
+#include "MMEnvironment.h"
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"
+#include "../../../combo/ComboGameMode.h"
+#include "../../../combo/rando/MagicMirrorSettings.h"
+#include "../../../combo/rando/RitoMaskSettings.h"
+#include "Rando/Lottery.h"
 #include "Rando/MagicHints.h"
+#include "Rando/KeyRings.h"
+#include "Rando/VanillaCompatibility.h"
 #include "../../../combo/gui/WhatsNew.h"
+#ifdef COMBO_BUILD
+#include "ComboSoulModelSettings.h"
+#endif
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
 #include "Rando/Spoiler/Spoiler.h"
@@ -80,18 +92,6 @@ std::unordered_map<int32_t, const char*> songShuffleOptions = {
     { RO_SONG_SHUFFLE_VANILLA, "Vanilla" },
 };
 
-// clang-format off
-std::vector<int32_t> incompatibleWithVanilla = {
-    RO_SHUFFLE_BOSS_SOULS,
-    RO_SHUFFLE_SWIM,
-    RO_SHUFFLE_ENEMY_SOULS,
-    RO_SHUFFLE_OCARINA_BUTTONS,
-    RO_PLENTIFUL_ITEMS,
-    RO_CLOCK_SHUFFLE,
-    RO_SHUFFLE_TYCOON_WALLET,
-};
-// clang-format on
-
 std::vector<RandoCheckId> checkExclusionList;
 
 namespace BenGui {
@@ -141,36 +141,17 @@ static void ApplyClockItemRendering(RandoItemId item, ImVec4& tintColor, std::st
 }
 
 void ClearIncompatibleSetting() {
-    int32_t currentLogicSetting =
-        CVarGetInteger(Rando::StaticData::Options[RO_LOGIC].cvar, Rando::StaticData::Options[RO_LOGIC].defaultValue);
-    switch (currentLogicSetting) {
-        // Vanilla can't add items without corresponding checks
-        case RO_LOGIC_VANILLA:
-            CVarClear(Rando::StaticData::Options[RO_PLENTIFUL_ITEMS].cvar);
-            CVarClear(Rando::StaticData::Options[RO_SHUFFLE_BOSS_SOULS].cvar);
-            CVarClear(Rando::StaticData::Options[RO_SHUFFLE_SWIM].cvar);
-            CVarClear(Rando::StaticData::Options[RO_CLOCK_SHUFFLE].cvar);
-            CVarClear(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar);
-            break;
-        default:
-            break;
+    const auto& logic = Rando::StaticData::Options[RO_LOGIC];
+    if (CVarGetInteger(logic.cvar, logic.defaultValue) == RO_LOGIC_VANILLA) {
+        for (auto option : Rando::VanillaCompatibility::UnsupportedOptions)
+            CVarClear(Rando::StaticData::Options[option].cvar);
     }
 }
 
 bool IncompatibleWithLogicSetting(int32_t option) {
-    int32_t currentLogicSetting =
-        CVarGetInteger(Rando::StaticData::Options[RO_LOGIC].cvar, Rando::StaticData::Options[RO_LOGIC].defaultValue);
-    switch (currentLogicSetting) {
-        case RO_LOGIC_VANILLA:
-            if (std::find(incompatibleWithVanilla.begin(), incompatibleWithVanilla.end(), option) !=
-                incompatibleWithVanilla.end()) {
-                return true;
-            }
-            break;
-        default:
-            break;
-    }
-    return false;
+    const auto& logic = Rando::StaticData::Options[RO_LOGIC];
+    return CVarGetInteger(logic.cvar, logic.defaultValue) == RO_LOGIC_VANILLA &&
+           Rando::VanillaCompatibility::Unsupported(static_cast<RandoOptionId>(option));
 }
 
 void SortExcludedChecks() {
@@ -253,6 +234,11 @@ static std::map<RandoCheckType, const char*> checkTypeNames = {
     { RCTYPE_SHOP, "Shop Items" },
     { RCTYPE_SKULL_TOKEN, "Skulltula Tokens" },
     { RCTYPE_SNOWBALL, "Snowballs" },
+    { RCTYPE_ICICLE, "Icicles" },
+    { RCTYPE_ROCK, "Rocks" },
+    { RCTYPE_BOULDER, "Boulders" },
+    { RCTYPE_RED_BOULDER, "Red Boulders" },
+    { RCTYPE_SOIL, "Soft Soil" },
     { RCTYPE_SONG, "Songs" },
     { RCTYPE_STRAY_FAIRY, "Stray Fairies" },
     { RCTYPE_TINGLE_SHOP, "Tingle Maps" },
@@ -337,6 +323,9 @@ static std::set<RandoItemId> setOfItemsInPool;
 static std::set<RandoCheckId> setOfChecksInPool;
 static uint32_t checkPoolGeneration = 0;
 void RefreshMetrics() {
+    // Config imports can bypass the Logic combobox's change callback. Keep the
+    // visible preferences and exclusion filters consistent with backend policy.
+    ClearIncompatibleSetting();
     setOfItemsInPool.clear();
     setOfChecksInPool.clear();
     RandoSaveInfo randoSaveInfo{};
@@ -351,7 +340,7 @@ void RefreshMetrics() {
     auto startingItems = Rando::GetStartingItemsFromConfig();
     Rando::SetStartingItemsInSave(randoSaveInfo, startingItems);
 
-    Rando::Logic::GeneratePools(randoSaveInfo, checkPool, itemPool);
+    Rando::Logic::GeneratePools(randoSaveInfo, checkPool, itemPool, /*preserveSongMapping=*/true);
 
     checksInPool = checkPool.size();
     itemsInPool = itemPool.size();
@@ -390,72 +379,133 @@ void RefreshMetrics() {
     checkPoolGeneration++;
 }
 
-static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics, {
-                                                                   // I Don't love this, but it works...
-                                                                   "gRando.ExcludedChecks",
-                                                                   "gRando.Options.RO_ACCESS_DUNGEONS",
-                                                                   "gRando.Options.RO_ACCESS_MAJORA_MASKS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MAJORA_REMAINS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MOON_MASKS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MOON_REMAINS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_TRIALS",
-                                                                   "gRando.Options.RO_CLOCK_SHUFFLE_PROGRESSIVE",
-                                                                   "gRando.Options.RO_CLOCK_SHUFFLE",
-                                                                   "gRando.Options.RO_HINTS_BOSS_REMAINS",
-                                                                   "gRando.Options.RO_HINTS_GOSSIP_STONE_STRENGTH",
-                                                                   "gRando.Options.RO_HINTS_GOSSIP_STONES",
-                                                                   "gRando.Options.RO_HINTS_HOOKSHOT",
-                                                                   "gRando.Options.RO_HINTS_OATH_TO_ORDER",
-                                                                   "gRando.Options.RO_HINTS_PURCHASEABLE",
-                                                                   "gRando.Options.RO_HINTS_SPIDER_HOUSES",
-                                                                   "gRando.Options.RO_LOGIC",
-                                                                   "gRando.Options.RO_PLACEMENT_BOSS_KEYS",
-                                                                   "gRando.Options.RO_PLACEMENT_SMALL_KEYS",
-                                                                   "gRando.Options.RO_PLACEMENT_STRAY_FAIRIES",
-                                                                   "gRando.Options.RO_PLENTIFUL_ITEMS",
-                                                                   "gRando.Options.RO_SHUFFLE_BARREL_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOSS_REMAINS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOSS_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_BUTTERFLIES",
-                                                                   "gRando.Options.RO_SHUFFLE_COWS",
-                                                                   "gRando.Options.RO_SHUFFLE_CRATE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_ENEMY_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_ENEMY_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_FREESTANDING_ITEMS",
-                                                                   "gRando.Options.RO_SHUFFLE_FROGS",
-                                                                   "gRando.Options.RO_SHUFFLE_GOLD_SKULLTULAS",
-                                                                   "gRando.Options.RO_SHUFFLE_GRASS_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_HIVE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_OCARINA_BUTTONS",
-                                                                   "gRando.Options.RO_SHUFFLE_OWL_STATUES",
-                                                                   "gRando.Options.RO_SHUFFLE_POT_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SHOPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SKELETON_KEY",
-                                                                   "gRando.Options.RO_SHUFFLE_SNOWBALL_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SONGS",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_DOUBLE_TIME",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_INVERTED_TIME",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_SARIA",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_SUN",
-                                                                   "gRando.Options.RO_SHUFFLE_SWIM",
-                                                                   "gRando.Options.RO_SHUFFLE_TINGLE_SHOPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TRAPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TREE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TRIFORCE_PIECES",
-                                                                   "gRando.Options.RO_SHUFFLE_TYCOON_WALLET",
-                                                                   "gRando.Options.RO_SHUFFLE_WONDER_ITEMS",
-                                                                   "gRando.Options.RO_SKULLTULA_SHUFFLED",
-                                                                   "gRando.Options.RO_SKULLTULA_TOKENS_REQUIRED",
-                                                                   "gRando.Options.RO_STARTING_CONSUMABLES",
-                                                                   "gRando.Options.RO_STARTING_HEALTH",
-                                                                   "gRando.Options.RO_STARTING_MAPS_AND_COMPASSES",
-                                                                   "gRando.Options.RO_STARTING_RUPEES",
-                                                                   "gRando.Options.RO_STRAY_FAIRIES_MAX",
-                                                                   "gRando.Options.RO_STRAY_FAIRIES_REQUIRED",
-                                                                   "gRando.Options.RO_TRAP_AMOUNT",
-                                                                   "gRando.Options.RO_TRIFORCE_PIECES_MAX",
-                                                                   "gRando.Options.RO_TRIFORCE_PIECES_REQUIRED",
-                                                               });
+// Keep every native option observable: the same callbacks refresh the pool,
+// balance strip and the generation-keyed exclusion lists after CVar edits.
+static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics,
+                                               {
+                                                   "gRando.ExcludedChecks",
+                                                   "gCombo.Rando.Shared.Wallets",
+                                                   "gRando.Generation.ShuffleMagicMirror",
+                                                   "gRando.Generation.ShuffleRitoMask",
+                                                   "gCombo.Rando.ShuffleMagicMirror",
+                                                   "gCombo.Rando.ShuffleRitoMask",
+                                                   "gRando.Options.RO_SHUFFLE_RUSTY_KEYS",
+                                                   "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG",
+                                                   "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG",
+                                                   "gRando.Options.RO_SHUFFLE_CHILD_WALLET",
+                                                   "gRando.Options.RO_INFINITE_UPGRADES",
+                                                   "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS",
+                                                   "gRando.Options.RO_SHUFFLE_ICICLE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ROCK_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_BOULDER_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_RED_BOULDER_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SOIL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_INTERIOR_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_SHOP_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_DOOR_INTERIORS",
+                                                   "gRando.Options.RO_SHUFFLE_GROTTO_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_OVERWORLD_ENTRANCES",
+                                                   "gRando.Options.RO_DECOUPLED_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_ENTRANCE_POOLS",
+                                                   "gRando.Options.RO_MIX_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_BOSS_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_INTERIOR_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_SHOP_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_GROTTO_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_OVERWORLD_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_KEY_RINGS",
+                                                   "gRando.Options.RO_SHUFFLE_NPC_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_ANIMAL_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_MISC_SOULS",
+                                                   "gRando.Options.RO_ACCESS_DUNGEONS",
+                                                   "gRando.Options.RO_ACCESS_MAJORA_MASKS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MAJORA_REMAINS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MOON_MASKS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MOON_REMAINS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_TRIALS",
+                                                   "gRando.Options.RO_CLOCK_SHUFFLE_PROGRESSIVE",
+                                                   "gRando.Options.RO_CLOCK_SHUFFLE",
+                                                   "gRando.Options.RO_CLOCK_TERMINAL_TIME",
+                                                   "gRando.Options.RO_HINTS_BANK_SIGN",
+                                                   "gRando.Options.RO_HINTS_BOSS_REMAINS",
+                                                   "gRando.Options.RO_HINTS_GOSSIP_STONE_STRENGTH",
+                                                   "gRando.Options.RO_HINTS_GOSSIP_STONES",
+                                                   "gRando.Options.RO_HINTS_HOOKSHOT",
+                                                   "gRando.Options.RO_HINTS_MOON_GOSSIP_STONES",
+                                                   "gRando.Options.RO_HINTS_OATH_TO_ORDER",
+                                                   "gRando.Options.RO_HINTS_PURCHASEABLE",
+                                                   "gRando.Options.RO_HINTS_SONG_OF_SOARING",
+                                                   "gRando.Options.RO_HINTS_SPIDER_HOUSES",
+                                                   "gRando.Options.RO_HINTS_TRANSFORMATIONS",
+                                                   "gRando.Options.RO_LOGIC",
+                                                   "gRando.Options.RO_PLACEMENT_BOSS_KEYS",
+                                                   "gRando.Options.RO_PLACEMENT_SMALL_KEYS",
+                                                   "gRando.Options.RO_PLACEMENT_STRAY_FAIRIES",
+                                                   "gRando.Options.RO_PLENTIFUL_ITEMS",
+                                                   "gRando.Options.RO_PURCHASE_INFINITE_RUPEES",
+                                                   "gRando.Options.RO_SHUFFLE_BARREL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_REMAINS",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_BUTTERFLIES",
+                                                   "gRando.Options.RO_SHUFFLE_COWS",
+                                                   "gRando.Options.RO_SHUFFLE_CRATE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ENEMY_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ENEMY_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_FREESTANDING_ITEMS",
+                                                   "gRando.Options.RO_SHUFFLE_FROGS",
+                                                   "gRando.Options.RO_SHUFFLE_GOLD_SKULLTULAS",
+                                                   "gRando.Options.RO_SHUFFLE_GRASS_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_HIVE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_OCARINA_BUTTONS",
+                                                   "gRando.Options.RO_SHUFFLE_OWL_STATUES",
+                                                   "gRando.Options.RO_SHUFFLE_POT_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SHOPS",
+                                                   "gRando.Options.RO_SHUFFLE_SKELETON_KEY",
+                                                   "gRando.Options.RO_SHUFFLE_SNOWBALL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_EVENTS",
+                                                   "gRando.Options.RO_SHUFFLE_SONGS",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_DOUBLE_TIME",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_INVERTED_TIME",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_SARIA",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_SUN",
+                                                   "gRando.Options.RO_SHUFFLE_SWIM",
+                                                   "gRando.Options.RO_SHUFFLE_TINGLE_SHOPS",
+                                                   "gRando.Options.RO_SHUFFLE_TRAPS",
+                                                   "gRando.Options.RO_SHUFFLE_TREE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_TRIFORCE_PIECES",
+                                                   "gRando.Options.RO_SHUFFLE_TYCOON_WALLET",
+                                                   "gRando.Options.RO_SHUFFLE_WONDER_ITEMS",
+                                                   "gRando.Options.RO_SKULLTULA_SHUFFLED",
+                                                   "gRando.Options.RO_SKULLTULA_TOKENS_REQUIRED",
+                                                   "gRando.Options.RO_STARTING_CONSUMABLES",
+                                                   "gRando.Options.RO_STARTING_HEALTH",
+                                                   "gRando.Options.RO_STARTING_MAPS_AND_COMPASSES",
+                                                   "gRando.Options.RO_STARTING_RUPEES",
+                                                   "gRando.Options.RO_STRAY_FAIRIES_MAX",
+                                                   "gRando.Options.RO_STRAY_FAIRIES_REQUIRED",
+                                                   "gRando.Options.RO_TRAP_AMOUNT",
+                                                   "gRando.Options.RO_TRIFORCE_PIECES_MAX",
+                                                   "gRando.Options.RO_TRIFORCE_PIECES_REQUIRED",
+                                                   "gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",
+                                                   "gRando.Options.RO_SHUFFLE_RITO_MASK",
+                                                   "gRando.Options.RO_SHUFFLE_NEI_ITEMS",
+                                                   "gRando.Options.RO_SHUFFLE_BOMB_ARROWS",
+                                                   "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_GEAR",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_EQUIPMENT",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_QUEST",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_MASKS",
+                                                   "gRando.Options.RO_CROSSOVER_POKEBALL",
+                                                   "gRando.Options.RO_CROSSOVER_MARIO_MASK",
+                                                   "gRando.Options.RO_HYLIAS_GRACE",
+                                                   "gRando.Options.RO_HYLIAS_GRACE_REWARDS",
+                                                   "gRando.Options.RO_ROD_OF_SEASONS",
+                                                   "gRando.Options.RO_STARTING_ROD_OF_SEASONS",
+                                                   "gRando.Options.RO_MAPS_COMPASSES_GIVE_INFORMATION",
+                                               });
 
 // Shop checks that Rando::Logic::GeneratePools always shuffles even with Shops off
 static constexpr RandoCheckId ALWAYS_SHUFFLED_SHOP_CHECKS[] = {
@@ -465,8 +515,23 @@ static constexpr RandoCheckId ALWAYS_SHUFFLED_SHOP_CHECKS[] = {
 };
 
 // Must mirror the check-skipping rules in Rando::Logic::GeneratePools
+static bool EnvironmentSourceAvailable(RandoCheckId check) {
+    if (!Rando::MMEnvironment::RequiresIronBoots(check))
+        return true;
+    const auto startingItems = Rando::GetStartingItemsFromConfig();
+    const bool startsWithIronBoots =
+        std::find(startingItems.begin(), startingItems.end(), RI_OOT_IRON_BOOTS) != startingItems.end();
+    return Rando::MMEnvironment::SourceEligible(check, Combo_IsCombinedGame() || FleetCombo_UnifiedPoolActive(),
+                                                startsWithIronBoots);
+}
+
 static const std::map<RandoCheckType, int>& GetCheckCountsByType() {
-    static const std::map<RandoCheckType, int> counts = [] {
+    static std::map<RandoCheckType, int> counts;
+    static int cachedSourcePolicy = -1;
+    const int sourcePolicy = EnvironmentSourceAvailable(RC_GREAT_BAY_COAST_ROCK_WATER_01);
+    if (cachedSourcePolicy == sourcePolicy)
+        return counts;
+    counts = [] {
         std::map<RandoCheckType, int> result;
         std::set<RandoCheckId> seen;
         for (auto& [randoRegionId, randoRegion] : Rando::Logic::Regions) {
@@ -475,6 +540,8 @@ static const std::map<RandoCheckType, int>& GetCheckCountsByType() {
                 if (randoStaticCheck.randoCheckId == RC_UNKNOWN || randoStaticCheck.sceneId == SCENE_LAST_BS) {
                     continue;
                 }
+                if (!EnvironmentSourceAvailable(randoCheckId))
+                    continue;
                 if (!seen.insert(randoCheckId).second) {
                     continue;
                 }
@@ -484,6 +551,7 @@ static const std::map<RandoCheckType, int>& GetCheckCountsByType() {
         result[RCTYPE_SHOP] = std::max(0, result[RCTYPE_SHOP] - (int)std::size(ALWAYS_SHUFFLED_SHOP_CHECKS));
         return result;
     }();
+    cachedSourcePolicy = sourcePolicy;
     return counts;
 }
 
@@ -498,8 +566,13 @@ static void PoolCountSuffix(int count) {
 
 static bool CheckPoolCheckbox(const char* label, RandoOptionId optionId, RandoCheckType checkType, const char* tooltip,
                               int countOverride = -1) {
-    bool changed =
-        CVarCheckbox(label, Rando::StaticData::Options[optionId].cvar, CheckboxOptions({ { .tooltip = tooltip } }));
+    const bool disabled = IncompatibleWithLogicSetting(optionId);
+    WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[optionId].cvar, label,
+                                     CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, disabled);
+    bool changed = CVarCheckbox(
+        label, Rando::StaticData::Options[optionId].cvar,
+        CheckboxOptions(
+            { { .tooltip = tooltip, .disabled = disabled, .disabledTooltip = "Incompatible with Vanilla Logic." } }));
     if (countOverride >= 0) {
         PoolCountSuffix(countOverride);
         return changed;
@@ -630,10 +703,16 @@ static void DrawGeneralTab() {
 
     ImGui::SeparatorText("Live Options");
     ImGui::TextWrapped("These options can be changed on the fly, and are not tied to the seed generation.");
-    UIWidgets::CVarCheckbox(
-        "Container Style Matches Contents", "gRando.CSMC",
-        UIWidgets::CheckboxOptions().Tooltip("This will make the contents of a container match the container itself. "
-                                             "Eg chests, pots, crates, grass, etc."));
+    {
+        WhatsNew::Scope releaseHighlight("gRando.CSMC", "Container Style Matches Contents",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        UIWidgets::CVarCheckbox(
+            "Container Style Matches Contents", "gRando.CSMC",
+            UIWidgets::CheckboxOptions().Tooltip(
+                "Show the assigned reward's category on shuffled containers and environmental checks. "
+                "Includes chests, pots, crates, grass, rocks, boulders, icicles and soft soil, "
+                "including cross-game rewards. Environmental checks keep a generic gold marker when this is off."));
+    }
 
     UIWidgets::CVarCombobox(
         "Junk Items", "gRando.JunkItems", &junkItemsOptions,
@@ -710,6 +789,14 @@ static const SceneryDropGroup SCENERY_DROP_GROUPS[] = {
     { "Pot Drops", RO_SHUFFLE_POT_DROPS, RCTYPE_POT, "Breaking each pot is a check." },
     { "Crate Drops", RO_SHUFFLE_CRATE_DROPS, RCTYPE_CRATE, "Breaking each crate is a check." },
     { "Barrel Drops", RO_SHUFFLE_BARREL_DROPS, RCTYPE_BARREL, "Breaking each barrel is a check." },
+    { "Rock Drops", RO_SHUFFLE_ROCK_DROPS, RCTYPE_ROCK,
+      "Lifting and breaking each small rock is a check. The 30 underwater Great Bay rocks require combined gameplay or "
+      "Iron Boots as a starting item; solo MM otherwise has 97 rock checks." },
+    { "Boulder Drops", RO_SHUFFLE_BOULDER_DROPS, RCTYPE_BOULDER, "Breaking each bombable boulder is a check." },
+    { "Red Boulder Drops", RO_SHUFFLE_RED_BOULDER_DROPS, RCTYPE_RED_BOULDER, "Breaking each red boulder is a check." },
+    { "Icicle Drops", RO_SHUFFLE_ICICLE_DROPS, RCTYPE_ICICLE, "Breaking each stalagmite is a check." },
+    { "Soft Soil Drops", RO_SHUFFLE_SOIL_DROPS, RCTYPE_SOIL,
+      "Releasing bugs into soft soil creates one check per reward." },
     { "Snowball Drops", RO_SHUFFLE_SNOWBALL_DROPS, RCTYPE_SNOWBALL, "Breaking each large snowball is a check." },
     { "Grass Drops", RO_SHUFFLE_GRASS_DROPS, RCTYPE_GRASS, "Cutting each clump of grass is a check." },
     { "Tree Drops", RO_SHUFFLE_TREE_DROPS, RCTYPE_TREE,
@@ -737,6 +824,16 @@ static void DrawCheckPoolTab() {
 
     UIWidgets::BeginCard("checkPoolWorld");
     ImGui::SeparatorText("World & NPCs");
+    {
+        const bool disabled = IncompatibleWithLogicSetting(RO_SHUFFLE_SONG_EVENTS);
+        WhatsNew::Scope highlight(Rando::StaticData::Options[RO_SHUFFLE_SONG_EVENTS].cvar, "Song Events",
+                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, disabled);
+        UIWidgets::CVarCheckbox(
+            "Song Events", Rando::StaticData::Options[RO_SHUFFLE_SONG_EVENTS].cvar,
+            CheckboxOptions({ { .tooltip = "Shuffle songs required by world events. Song items keep their own setting.",
+                                .disabled = disabled,
+                                .disabledTooltip = "Incompatible with Vanilla Logic." } }));
+    }
     UIWidgets::CVarCombobox(
         "Songs", Rando::StaticData::Options[RO_SHUFFLE_SONGS].cvar, &songShuffleOptions,
         UIWidgets::ComboboxOptions()
@@ -982,6 +1079,8 @@ static bool ItemPoolCheckbox(const char* label, RandoOptionId optionId, const ch
     if (disabledReason == nullptr && IncompatibleWithLogicSetting(optionId)) {
         disabledReason = "Incompatible with current Logic Setting";
     }
+    WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[optionId].cvar, label,
+                                     CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0, disabledReason != nullptr);
     bool changed = CVarCheckbox(
         label, Rando::StaticData::Options[optionId].cvar,
         CheckboxOptions(
@@ -1020,8 +1119,13 @@ static void NeiRando_EnableCrossover() {
 
 static void NeiRando_SetAll(bool on) {
     for (const auto& o : kNeiRandoOptions) {
-        CVarSetInteger(Rando::StaticData::Options[o.id].cvar, on ? o.on : 0);
+        const char* cvar = Combo_IsCombinedGame() && o.id == RO_SHUFFLE_MAGIC_MIRROR
+                               ? ComboRando::MagicMirrorSettings::SharedCvar
+                               : Rando::StaticData::Options[o.id].cvar;
+        CVarSetInteger(cvar, on ? o.on : 0);
     }
+    if (Combo_IsCombinedGame())
+        ShipInit::Init(ComboRando::MagicMirrorSettings::SharedCvar);
     NeiRando_EnableCrossover();
     CVarSetInteger("gMods.BombArrows.Mode",
                    CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, RO_BOMB_ARROWS_OFF));
@@ -1066,6 +1170,23 @@ static void DrawItemPoolTab() {
                      "Adds the Skeleton Key to the item pool. Collecting it immediately grants "
                      "the maximum number of Small Keys for every dungeon.",
                      1, skeletonKeyDisabledReason);
+    UIWidgets::EndCard();
+
+    UIWidgets::BeginCard("itemPoolCapacities");
+    ImGui::SeparatorText("Bags & Capacities");
+    ItemPoolCheckbox("Deku Stick Bag", RO_SHUFFLE_DEKU_STICK_BAG,
+                     "Adds one Deku Stick Bag to the pool. Until you find it, you cannot carry or use sticks.\n"
+                     "Capacity upgrades can be collected first and take effect once the bag is found.",
+                     1);
+    ItemPoolCheckbox("Deku Nut Bag", RO_SHUFFLE_DEKU_NUT_BAG,
+                     "Adds one Deku Nut Bag to the pool. Until you find it, you cannot carry or use nuts.\n"
+                     "Capacity upgrades can be collected first and take effect once the bag is found.",
+                     1);
+    const bool sharedWallets = Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0);
+    ItemPoolCheckbox("Child Wallet", RO_SHUFFLE_CHILD_WALLET,
+                     "Adds a base wallet as the first progressive wallet upgrade. Until you find a wallet,\n"
+                     "you cannot hold rupees or pay for shops and minigames. Free interactions stay available.",
+                     1, sharedWallets ? "Shared Wallets use the normal base wallet in combined games" : nullptr);
     ItemPoolCheckbox("Tycoon's Wallet", RO_SHUFFLE_TYCOON_WALLET,
                      "Adds the Tycoon's Wallet (5,000 rupees) to the item pool\n"
                      "as a third progressive wallet upgrade.",
@@ -1075,21 +1196,29 @@ static void DrawItemPoolTab() {
                                                 "Silver Rupee for 1 rupee). When enabled, those rupees can be "
                                                 "purchased any number of times per cycle; otherwise only once "
                                                 "per cycle." } }));
-    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
-    ImGui::SeparatorText("Coming Soon");
-    ImGui::PopStyleColor();
-    CVarCheckbox("Deku Stick Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Deku Nut Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Child Wallet", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Infinite Upgrades", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
+    ItemPoolCheckbox(
+        "Infinite Upgrades", RO_INFINITE_UPGRADES,
+        "Adds six unique upgrades: Infinite Quiver, Bomb Bag, Deku Sticks, Deku Nuts, Magic and Wallet.\n"
+        "Each requires its normal item, bag or wallet before it works. Finite upgrades remain in the pool.",
+        6);
+    UIWidgets::EndCard();
+
+    UIWidgets::BeginCard("itemPoolLottery");
+    ImGui::SeparatorText("Lottery");
+    if (ItemPoolCheckbox("Separate Lottery Nights", RO_SHUFFLE_LOTTERY_NIGHTS,
+                         "Gives each lottery night its own permanent reward. Adds two checks and two purple rupees.\n"
+                         "Buy a 10-rupee ticket during that day, then match its numbers that evening before 11 PM.\n"
+                         "When disabled, the original single lottery reward can be won on any night.",
+                         2)) {
+        RefreshMetrics();
+    }
     UIWidgets::EndCard();
 
     UIWidgets::BeginCard("itemPoolSongs");
     ImGui::SeparatorText("Extra Songs");
+    ImGui::BeginDisabled(IncompatibleWithLogicSetting(RO_SHUFFLE_SONG_EVENTS));
+    ComboRando::SongEvents::DrawPlando(ComboRando::SongEvents::Game::Mm);
+    ImGui::EndDisabled();
     ItemPoolCheckbox("Sun's Song", RO_SHUFFLE_SONG_SUN,
                      "Adds the Sun's Song to the item pool. Playing it sets the time of day to 06:00 or 18:00, "
                      "whichever comes first.",
@@ -1132,6 +1261,40 @@ static void DrawItemPoolTab() {
                      "Adds the \"souls\" of regular enemies to the item pool. An enemy will be "
                      "immune to damage until its corresponding soul has been obtained.",
                      RI_SOUL_ENEMY_WOLFOS - RI_SOUL_ENEMY_ALIEN + 1);
+    ItemPoolCheckbox("NPC Souls", RO_SHUFFLE_NPC_SOULS,
+                     "Adds NPC souls to the pool. Their native conversation, shop, quest and minigame roles "
+                     "become available after their corresponding soul is obtained. Blocking NPCs retain their barriers "
+                     "until their soul is obtained.",
+                     RI_SOUL_NPC_THIEVES - RI_SOUL_NPC_AROMA + 1);
+    ItemPoolCheckbox(
+        "Animal Souls", RO_SHUFFLE_ANIMAL_SOULS,
+        "Adds the four animal souls to the pool. Their animals become available after their soul is obtained.", 4);
+    ItemPoolCheckbox(
+        "Miscellaneous Souls", RO_SHUFFLE_MISC_SOULS,
+        "Adds Gold Skulltula and Business Scrub souls to the pool. Their actors and checks require their soul.", 2);
+#ifdef COMBO_BUILD
+    ImGui::SeparatorText("Soul Models");
+    {
+        WhatsNew::Scope releaseHighlight(ComboSoulModels::kSimplerEnemyCvar, "Simpler Enemy Soul Models",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Simpler Enemy Soul Models", ComboSoulModels::kSimplerEnemyCvar,
+            CheckboxOptions(
+                { { .tooltip = "Show enemy souls as a simple token and soul flame instead of miniature enemies. "
+                               "Applies immediately in both games, including cross-game pickups. "
+                               "NPC and boss soul models are separate." } }));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(ComboSoulModels::kSimplerNpcCvar, "Simpler NPC Soul Models",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Simpler NPC Soul Models", ComboSoulModels::kSimplerNpcCvar,
+            CheckboxOptions(
+                { { .tooltip = "Show NPC souls as a simple token and soul flame instead of miniature characters. "
+                               "Applies immediately in both games, including cross-game pickups. "
+                               "Enemy and boss soul models are separate." } }));
+    }
+#endif
     UIWidgets::EndCard();
 
     UIWidgets::BeginCard("itemPoolTime");
@@ -1224,6 +1387,50 @@ static void DrawItemPoolTab() {
             "Vanilla - Small keys stay on the checks that hold them in the vanilla game, and none are added to "
             "the item pool.\n\n"
             "Start With - You begin with every dungeon's small keys, and none are added to the item pool."));
+    {
+        const bool disabled = IncompatibleWithLogicSetting(RO_SHUFFLE_RUSTY_KEYS);
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_RUSTY_KEYS].cvar,
+                                         "Rusty Overworld Door Keys", CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         disabled);
+        CVarCheckbox("Rusty Overworld Door Keys", Rando::StaticData::Options[RO_SHUFFLE_RUSTY_KEYS].cvar,
+                     CheckboxOptions({ { .tooltip = "Locks overworld doors with permanent matching keys. Door "
+                                                    "schedules and form requirements still apply.",
+                                         .disabled = disabled,
+                                         .disabledTooltip = "Incompatible with Vanilla Logic." } }));
+    }
+    ImGui::SeparatorText("Small-Key Rings");
+    const char* ringLabels[] = { "Woodfall Key Ring (1 key)", "Snowhead Key Ring (3 keys)",
+                                 "Great Bay Key Ring (1 key)", "Stone Tower Key Ring (4 keys)" };
+    const bool vanillaLogic = IncompatibleWithLogicSetting(RO_SHUFFLE_KEY_RINGS);
+    const bool vanillaKeys = vanillaLogic || CVarGetInteger(Rando::StaticData::Options[RO_PLACEMENT_SMALL_KEYS].cvar,
+                                                            RO_DUNGEON_ITEM_ANYWHERE) == RO_DUNGEON_ITEM_VANILLA;
+    const char* ringCvar = Rando::StaticData::Options[RO_SHUFFLE_KEY_RINGS].cvar;
+    int32_t selectedRings = CVarGetInteger(ringCvar, RO_GENERIC_OFF);
+    bool ringsChanged = false;
+    for (size_t i = 0; i < std::size(Rando::KeyRings::Catalog); ++i) {
+        const auto& ring = Rando::KeyRings::Catalog[i];
+        bool selected = (selectedRings & ring.selection) != 0;
+        WhatsNew::Scope releaseHighlight(ringCvar, ringLabels[i], CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         vanillaKeys);
+        if (Checkbox(ringLabels[i], &selected,
+                     CheckboxOptions(
+                         { { .tooltip = "Replaces this dungeon's small keys with one ring. Receiving "
+                                        "the ring grants every small key for that dungeon. Uses the "
+                                        "Small Keys placement above; Start With starts with the ring.",
+                             .disabled = vanillaKeys,
+                             .disabledTooltip = vanillaLogic ? "Incompatible with Vanilla Logic."
+                                                             : "Choose a Small Keys placement other than Vanilla to "
+                                                               "use key rings. Your selections are retained." } }))) {
+            selectedRings = selected ? selectedRings | ring.selection : selectedRings & ~ring.selection;
+            ringsChanged = true;
+        }
+    }
+    if (ringsChanged) {
+        CVarSetInteger(ringCvar, selectedRings);
+        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        ShipInit::Init(ringCvar);
+    }
+    ImGui::SeparatorText("Other Dungeon Items");
     UIWidgets::CVarCombobox(
         "Boss Keys", Rando::StaticData::Options[RO_PLACEMENT_BOSS_KEYS].cvar, &dungeonItemPlacementOptions,
         UIWidgets::ComboboxOptions().Tooltip(
@@ -1388,6 +1595,22 @@ static void DrawItemPoolTab() {
                      CheckboxOptions({ { .tooltip = "Adds the Skull, Spooky and Gerudo masks to a solo-MM pool.\n\n"
                                                     "Not considered by logic." } }));
     }
+    {
+        const char* ritoCvar = Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].cvar;
+        if (Combo_IsCombinedGame()) {
+            ComboRando::RitoMaskSettings::Shared();
+            ritoCvar = ComboRando::RitoMaskSettings::SharedCvar;
+        }
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (CVarCheckbox(
+                "Shuffle Rito Mask", ritoCvar,
+                CheckboxOptions(
+                    { { .tooltip = "Adds exactly one optional Rito Mask. In Combo both games share one reward.\n"
+                                   "Choose it in the mask wheel in Combo or OoT; solo MM cycles the Bremen slot.\n"
+                                   "Default off. No progression checks require the Rito Mask." } })))
+            ShipInit::Init(ritoCvar);
+    }
     // Crossover Items: no inventory cell, so they get their own gates rather than riding
     // RO_SHUFFLE_NEI_ITEMS. Each one unlocks its form on the equipment page's Crossover sub-page.
     {
@@ -1514,11 +1737,16 @@ static void DrawItemPoolTab() {
                          "Seasons are not used by the reachability solver."));
     }
     {
+        const char* mirrorCvar = Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar;
+        if (Combo_IsCombinedGame()) {
+            ComboRando::MagicMirrorSettings::Shared();
+            mirrorCvar = ComboRando::MagicMirrorSettings::SharedCvar;
+        }
         WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar, nullptr,
                                          CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
                                          CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
         CVarCheckbox(
-            "Shuffle Magic Mirror", Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar,
+            "Shuffle Magic Mirror", mirrorCvar,
             CheckboxOptions(
                 { { .tooltip =
                         "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
@@ -1684,9 +1912,13 @@ static void DrawStartingItemsTab() {
                         u8 maxCount = Rando::StaticData::MaxStartingItemsMap.count(item)
                                           ? Rando::StaticData::MaxStartingItemsMap[item]
                                           : 1;
-                        if (item == RI_PROGRESSIVE_WALLET &&
-                            CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar, 0)) {
-                            maxCount = 3;
+                        if (item == RI_PROGRESSIVE_WALLET) {
+                            const bool sharedWallets =
+                                Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0);
+                            maxCount = 2 +
+                                       !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar, 0) +
+                                       (!sharedWallets &&
+                                        !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_CHILD_WALLET].cvar, 0));
                         }
                         if (std::count(setStartingItemsList.begin(), setStartingItemsList.end(), item) < maxCount) {
 
@@ -1728,6 +1960,16 @@ static void BulkRestoreChecks(const std::vector<RandoCheckId>& checks) {
     SaveExcludedChecks();
 }
 
+static bool EnvironmentCheckEnabled(RandoCheckId check) {
+    const auto found = Rando::StaticData::Checks.find(check);
+    if (found == Rando::StaticData::Checks.end())
+        return true;
+    if (!EnvironmentSourceAvailable(check))
+        return false;
+    const auto option = Rando::MMEnvironment::OptionForType(found->second.randoCheckType);
+    return option == RO_MAX || CVarGetInteger(Rando::StaticData::Options[option].cvar, 0) != 0;
+}
+
 static const std::vector<std::string>& GetCheckFilterGroupLabels() {
     static std::vector<std::string> labels;
     static uint32_t builtGeneration = 0;
@@ -1740,12 +1982,22 @@ static const std::vector<std::string>& GetCheckFilterGroupLabels() {
     for (auto& checkFilterGroup : GetCheckFilterGroups()) {
         size_t count;
         if (checkFilterGroup.checks.empty()) {
-            count = setOfChecksInPool.size() + checkExclusionList.size();
+            count = setOfChecksInPool.size() +
+                    std::count_if(checkExclusionList.begin(), checkExclusionList.end(), [](RandoCheckId check) {
+                        return EnvironmentCheckEnabled(check) &&
+                               Rando::Lottery::IsEnabled(
+                                   check,
+                                   CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0);
+                    });
         } else {
             count = std::count_if(
                 checkFilterGroup.checks.begin(), checkFilterGroup.checks.end(), [](RandoCheckId randoCheckId) {
-                    return setOfChecksInPool.contains(randoCheckId) ||
-                           std::binary_search(checkExclusionList.begin(), checkExclusionList.end(), randoCheckId);
+                    return EnvironmentCheckEnabled(randoCheckId) &&
+                           Rando::Lottery::IsEnabled(
+                               randoCheckId,
+                               CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0) &&
+                           (setOfChecksInPool.contains(randoCheckId) ||
+                            std::binary_search(checkExclusionList.begin(), checkExclusionList.end(), randoCheckId));
                 });
         }
         labels.push_back(checkFilterGroup.label + " (" + std::to_string(count) + ")");
@@ -1784,15 +2036,25 @@ static void DrawCheckGroupFilter(UIWidgets::Colors menuThemeColor) {
                        "Bulk actions apply to the checks currently shown.");
 }
 
+static std::string CheckListLabel(RandoCheckId check) {
+    std::string label = Rando::StaticData::CheckNames[check];
+    if (check == RC_CLOCK_TOWN_WEST_LOTTERY &&
+        CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0)) {
+        label += " (Night 1)";
+    }
+    return label;
+}
+
 static bool IsCheckShownAsShuffled(RandoCheckId randoCheckId, ImGuiTextFilter& filter) {
     return randoCheckId != RC_UNKNOWN && setOfChecksInPool.contains(randoCheckId) &&
-           PassesCheckGroupFilter(randoCheckId) &&
-           filter.PassFilter(Rando::StaticData::CheckNames[randoCheckId].c_str());
+           PassesCheckGroupFilter(randoCheckId) && filter.PassFilter(CheckListLabel(randoCheckId).c_str());
 }
 
 static bool IsCheckShownAsExcluded(RandoCheckId randoCheckId, ImGuiTextFilter& filter) {
-    return PassesCheckGroupFilter(randoCheckId) &&
-           filter.PassFilter(Rando::StaticData::CheckNames[randoCheckId].c_str());
+    return EnvironmentCheckEnabled(randoCheckId) &&
+           Rando::Lottery::IsEnabled(
+               randoCheckId, CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_LOTTERY_NIGHTS].cvar, 0) != 0) &&
+           PassesCheckGroupFilter(randoCheckId) && filter.PassFilter(CheckListLabel(randoCheckId).c_str());
 }
 
 static RandoCheckId DrawCheckList(const char* id, const char* title, const char* rowTooltip,
@@ -1821,7 +2083,7 @@ static RandoCheckId DrawCheckList(const char* id, const char* title, const char*
     while (clipper.Step()) {
         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
             RandoCheckId randoCheckId = shownChecks[i];
-            if (ImGui::Selectable(Rando::StaticData::CheckNames[randoCheckId].c_str())) {
+            if (ImGui::Selectable(CheckListLabel(randoCheckId).c_str())) {
                 clickedCheck = randoCheckId;
             }
             UIWidgets::Tooltip(rowTooltip);
@@ -1908,6 +2170,91 @@ static void DrawCheckExclusionsTab() {
     if (restoreShownChecks) {
         BulkRestoreChecks(shownExcludedChecks);
     }
+}
+
+static void DrawEntrancesTab() {
+#ifdef COMBO_BUILD
+    if (gComboGameMode != COMBO_GAME_MM) {
+        return;
+    }
+    ImGui::BeginChild("randoEntrances");
+    ImGui::TextWrapped(
+        "Shuffle Majora's Mask entrances. The layout and return rules are saved with the next generated seed.");
+    const bool vanilla =
+        CVarGetInteger(Rando::StaticData::Options[RO_LOGIC].cvar, RO_LOGIC_GLITCHLESS) == RO_LOGIC_VANILLA;
+    auto entranceCheckbox = [&](const char* label, RandoOptionId option, const char* help, bool disabled = false,
+                                const char* disabledHelp = nullptr) {
+        const char* cvar = Rando::StaticData::Options[option].cvar;
+        WhatsNew::Scope releaseHighlight(cvar, label, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         vanilla || disabled);
+        CVarCheckbox(
+            label, cvar,
+            CheckboxOptions({ { .tooltip = help,
+                                .disabled = vanilla || disabled,
+                                .disabledTooltip = vanilla ? "Choose a randomized logic mode to shuffle entrances."
+                                                           : disabledHelp } }));
+    };
+    entranceCheckbox(
+        "Dungeon Entrances", RO_SHUFFLE_DUNGEON_ENTRANCES,
+        "Shuffle the temple entrances within Majora's Mask, including both normal and inverted Stone Tower.");
+    const bool dungeons = CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_DUNGEON_ENTRANCES].cvar, 0) != 0;
+    entranceCheckbox("Expanded Dungeon Pool", RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES,
+                     "Add the Spider Houses, Ikana Castle, Secret Shrine, Beneath the Well's two entrances, "
+                     "and Pirates' Fortress to the dungeon pool.",
+                     !dungeons, "Enable Dungeon Entrances to use the expanded pool.");
+    entranceCheckbox("Boss Entrances", RO_SHUFFLE_BOSS_ENTRANCES,
+                     "Shuffle Majora's Mask's four bosses. Rewards belong to the arena; completion and the blue warp "
+                     "follow the shuffled boss door.");
+    entranceCheckbox("Interiors", RO_SHUFFLE_INTERIOR_ENTRANCES,
+                     "Shuffle houses and other nonretail interiors, including open passageways and Door Interiors. "
+                     "Shops use their own checkbox.");
+    entranceCheckbox("Shops", RO_SHUFFLE_SHOP_ENTRANCES,
+                     "Shuffle retail shop entrances with other shops, including shops with open entrances. "
+                     "Only this checkbox includes shops.");
+    const bool interiors = CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_INTERIOR_ENTRANCES].cvar, 0) != 0;
+    entranceCheckbox(
+        "Door Interiors", RO_SHUFFLE_DOOR_INTERIORS,
+        "Shuffle nonretail interiors with doors you open. Open houses, caves, tunnels and other passageways "
+        "stay in place. Shops use their separate checkbox.",
+        interiors, "Interiors already includes Door Interiors.");
+    entranceCheckbox("Grottos", RO_SHUFFLE_GROTTO_ENTRANCES,
+                     "Shuffle grotto entrances, including their return and void positions.");
+    entranceCheckbox("Overworld Entrances", RO_SHUFFLE_OVERWORLD_ENTRANCES,
+                     "Shuffle the connections between overworld areas in Majora's Mask. With Mixed Entrance Pools and "
+                     "Mix Overworld enabled, these paths can also lead to the other categories selected for mixing.");
+    entranceCheckbox("Decouple Entrances", RO_DECOUPLED_ENTRANCES,
+                     "Shuffle entrance and return paths independently. Leaving through an entrance can lead to a "
+                     "different place from the one you entered from.");
+    entranceCheckbox("Mixed Entrance Pools", RO_MIX_ENTRANCE_POOLS,
+                     "Combine the selected entrance categories into one pool. Choose at least two categories below "
+                     "to mix their destinations. Each category must also have its entrance shuffle enabled.");
+    const bool mixed = CVarGetInteger(Rando::StaticData::Options[RO_MIX_ENTRANCE_POOLS].cvar, 0) != 0;
+    auto selected = [](RandoOptionId option) {
+        return CVarGetInteger(Rando::StaticData::Options[option].cvar, 0) != 0;
+    };
+    auto mixCheckbox = [&](const char* label, RandoOptionId option, bool shuffled, const char* help) {
+        entranceCheckbox(label, option, help, !mixed || !shuffled,
+                         !mixed ? "Enable Mixed Entrance Pools to choose categories."
+                                : "Enable this category's entrance shuffle before mixing it.");
+    };
+    mixCheckbox(
+        "Mix Dungeons", RO_MIX_DUNGEON_ENTRANCES, dungeons,
+        "Mix dungeon entrances with the other selected categories, including the expanded dungeon pool when enabled.");
+    mixCheckbox("Mix Bosses", RO_MIX_BOSS_ENTRANCES, selected(RO_SHUFFLE_BOSS_ENTRANCES),
+                "Mix boss entrances with the other selected categories. Boss rewards and regional clears belong to the "
+                "physical boss when bosses are mixed with another category.");
+    mixCheckbox("Mix Interiors", RO_MIX_INTERIOR_ENTRANCES, interiors || selected(RO_SHUFFLE_DOOR_INTERIORS),
+                "Mix the selected nonretail interiors with other categories. Uses Door Interiors when only that "
+                "shuffle is enabled.");
+    mixCheckbox("Mix Shops", RO_MIX_SHOP_ENTRANCES, selected(RO_SHUFFLE_SHOP_ENTRANCES),
+                "Mix retail shop entrances with the other selected categories.");
+    mixCheckbox("Mix Grottos", RO_MIX_GROTTO_ENTRANCES, selected(RO_SHUFFLE_GROTTO_ENTRANCES),
+                "Mix grotto entrances with the other selected categories.");
+    mixCheckbox("Mix Overworld", RO_MIX_OVERWORLD_ENTRANCES, selected(RO_SHUFFLE_OVERWORLD_ENTRANCES),
+                "Allow an overworld path to lead to a selected dungeon, boss, interior, shop or grotto, and entrances "
+                "from those categories to lead to overworld areas.");
+    ImGui::EndChild();
+#endif
 }
 
 static void DrawHintsTab() {
@@ -2017,6 +2364,15 @@ void Rando::RegisterMenu() {
     mBenMenu->AddWidget(path, "Logic/Conditions", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
         DrawLogicConditionsTab();
     });
+#ifdef COMBO_BUILD
+    if (gComboGameMode == COMBO_GAME_MM) {
+        mBenMenu->AddSidebarEntry("Rando", "Entrances", 1);
+        path.sidebarName = "Entrances";
+        mBenMenu->AddWidget(path, "Entrances", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+            DrawEntrancesTab();
+        });
+    }
+#endif
 
     // Searching by name would otherwise render these entire pages inline in the results
     mBenMenu->AddSidebarEntry("Rando", "Check Pool", 1);

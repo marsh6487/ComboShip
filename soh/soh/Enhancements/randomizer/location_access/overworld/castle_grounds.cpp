@@ -1,3 +1,4 @@
+#include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -25,7 +26,7 @@ void RegionTable_Init_CastleGrounds() {
         //Events
         EVENT_ACCESS(LOGIC_FAIRY_ACCESS, logic->CallGossipFairy() || logic->CanUse(RG_STICKS)),
         EVENT_ACCESS(LOGIC_BUG_ACCESS,   logic->HasItem(RG_POWER_BRACELET)),
-        EVENT_ACCESS(LOGIC_MALON_RETURNED_FROM_CASTLE, logic->Get(LOGIC_TALON_RETURNED_FROM_CASTLE) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_MALON_RETURNED_FROM_CASTLE, logic->HasItem(RG_SOUL_NPC_MALON) && logic->Get(LOGIC_TALON_RETURNED_FROM_CASTLE) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_HC_MALON_EGG,      logic->HasItem(RG_SPEAK_HYLIAN)),
@@ -38,7 +39,9 @@ void RegionTable_Init_CastleGrounds() {
         //Exits
         ENTRANCE(RR_CASTLE_GROUNDS, true),
         ENTRANCE(RR_HC_ABOVE_VINE,  logic->HasItem(RG_CLIMB) || logic->CanUse(RG_HOOKSHOT)),
-        ENTRANCE(RR_HC_PAST_GATE,   logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        ENTRANCE(RR_HC_PAST_GATE,   Rando::RustyDoorKeys::CastleGateUsesKey(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS).Get(), ctx->GetOption(RSK_RUSTY_DOOR_KEY_VERSION).Get())
+                                      ? logic->HasItem(RG_RUSTY_KEY_HYRULE_CASTLE)
+                                      : (logic->HasItem(RG_CHILD_WALLET) && logic->HasItem(RG_SPEAK_HYLIAN))),
     });
 
     areaTable[RR_HC_ABOVE_VINE] = Region("Hyrule Castle Above Vine", SCENE_HYRULE_CASTLE, {
@@ -98,7 +101,7 @@ void RegionTable_Init_CastleGrounds() {
 
     areaTable[RR_HC_MOAT] = Region("Hyrule Castle Moat", SCENE_HYRULE_CASTLE, {
         //Events
-        EVENT_ACCESS(LOGIC_TALON_RETURNED_FROM_CASTLE, logic->CanUse(RG_WEIRD_EGG) && logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_TALON_RETURNED_FROM_CASTLE, logic->HasItem(RG_SOUL_NPC_TALON) && logic->CanUse(RG_WEIRD_EGG) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_HC_GRASS_1,             logic->CanCutShrubs()),
@@ -132,7 +135,7 @@ void RegionTable_Init_CastleGrounds() {
 
     areaTable[RR_HC_GARDEN] = Region("HC Garden", SCENE_CASTLE_COURTYARD_ZELDA, {
         //Events
-        EVENT_ACCESS(LOGIC_MET_ZELDA, logic->HasItem(RG_SPEAK_HYLIAN)),
+        EVENT_ACCESS(LOGIC_MET_ZELDA, logic->HasItem(RG_SOUL_NPC_ZELDA) && logic->HasItem(RG_SPEAK_HYLIAN)),
     }, {
         //Locations
         LOCATION(RC_HC_ZELDAS_LETTER,                 logic->Get(LOGIC_MET_ZELDA)),
@@ -146,7 +149,7 @@ void RegionTable_Init_CastleGrounds() {
 
     areaTable[RR_HC_GREAT_FAIRY_FOUNTAIN] = Region("HC Great Fairy Fountain", SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS, {}, {
         //Locations
-        LOCATION(RC_HC_GREAT_FAIRY_REWARD, logic->CanUse(RG_ZELDAS_LULLABY)),
+        LOCATION(RC_HC_GREAT_FAIRY_REWARD, logic->CanPlaySongEvent(6)),
     }, {
         //Exits
         ENTRANCE(RR_CASTLE_GROUNDS_FROM_GREAT_FAIRY, true),
@@ -216,7 +219,7 @@ void RegionTable_Init_CastleGrounds() {
 
     areaTable[RR_OGC_GREAT_FAIRY_FOUNTAIN] = Region("OGC Great Fairy Fountain", SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, {}, {
         //Locations
-        LOCATION(RC_OGC_GREAT_FAIRY_REWARD, logic->CanUse(RG_ZELDAS_LULLABY)),
+        LOCATION(RC_OGC_GREAT_FAIRY_REWARD, logic->CanPlaySongEvent(10)),
     }, {
         //Exits
         ENTRANCE(RR_CASTLE_GROUNDS_FROM_GREAT_FAIRY, true),

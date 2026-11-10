@@ -15,6 +15,8 @@
 
 #define FLAGS ACTOR_FLAG_UPDATE_CULLING_DISABLED
 
+extern int Randomizer_RustyDoorLocked(PlayState* play, Actor* actor);
+
 #define DOOR_AJAR_SLAM_RANGE 120.0f
 #define DOOR_AJAR_OPEN_RANGE (2 * DOOR_AJAR_SLAM_RANGE)
 
@@ -201,7 +203,7 @@ void EnDoor_Idle(EnDoor* this, PlayState* play) {
         this->actionFunc = EnDoor_Open;
         Animation_PlayOnceSetSpeed(&this->skelAnime, D_809FCECC[this->animStyle],
                                    (player->stateFlags1 & PLAYER_STATE1_IN_WATER) ? 0.75f : 1.5f);
-        if (this->lockTimer != 0) {
+        if (this->lockTimer != 0 || Randomizer_RustyDoorLocked(play, &this->actor)) {
             if (GameInteractor_Should(VB_CONSUME_SMALL_KEY, true, this)) {
                 gSaveContext.inventory.dungeonKeys[gSaveContext.mapIndex]--;
                 Flags_SetSwitch(play, this->actor.params & 0x3F);
@@ -209,7 +211,7 @@ void EnDoor_Idle(EnDoor* this, PlayState* play) {
             Audio_PlayActorSound2(&this->actor, NA_SE_EV_CHAIN_KEY_UNLOCK);
             GameInteractor_ExecuteOnDungeonKeyUsedHooks(gSaveContext.mapIndex);
         }
-    } else if (!Player_InCsMode(play)) {
+    } else if (!Player_InCsMode(play) && !Randomizer_RustyDoorLocked(play, &this->actor)) {
         if (GameInteractor_Should(VB_EN_DOOR_OFFER_OPEN,
                                   (fabsf(playerPosRelToDoor.y) < 20.0f && fabsf(playerPosRelToDoor.x) < 20.0f &&
                                    fabsf(playerPosRelToDoor.z) < 50.0f),
@@ -357,11 +359,11 @@ void EnDoor_Draw(Actor* thisx, PlayState* play) {
             if (CVarGetInteger(CVAR_ENHANCEMENT("ShowDoorLocksOnBothSides"), 0)) {
                 Matrix_Push();
             }
-            Actor_DrawDoorLock(play, this->lockTimer, DOORLOCK_NORMAL);
+            Actor_DrawDoorLock(play, this->lockTimer ? this->lockTimer : 10, DOORLOCK_NORMAL);
             if (CVarGetInteger(CVAR_ENHANCEMENT("ShowDoorLocksOnBothSides"), 0)) {
                 Matrix_Pop();
                 Matrix_RotateZYX(0, 0x8000, 0, MTXMODE_APPLY);
-                Actor_DrawDoorLock(play, this->lockTimer, DOORLOCK_NORMAL);
+                Actor_DrawDoorLock(play, this->lockTimer ? this->lockTimer : 10, DOORLOCK_NORMAL);
             }
         }
 

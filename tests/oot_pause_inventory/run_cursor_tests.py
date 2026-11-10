@@ -189,6 +189,7 @@ def main():
         return (ROOT / path).read_text()
 
     inventory = read("soh/mods/extended_inventory.c")
+    forms = read("soh/mods/transformation_masks/custom_forms.cpp").replace('extern "C" ', '')
     ui = read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c")
     scope = read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope_PAL.c")
     draw = function(ui, "KaleidoScope_DrawItemSelect")
@@ -199,6 +200,7 @@ def main():
         "ExtInv_SwitchPage", "ExtInv_GetCurrentPage", "ExtInv_GetMaxPages", "ExtInv_IsCustomItemsEnabled",
         "ExtInv_IsMmMasksEnabled", "ExtInv_GetInventorySlot",
     ))
+    production += "\n" + function(forms, "RitoMask_IsOwned")
     production += "\n" + function(scope, "KaleidoScope_MoveCursorToSpecialPos")
     production += "\n" + function(scope, "KaleidoScope_UpdateCursorSize")
     production += "\n" + function(ui, "KaleidoScope_SetCursorVtx")

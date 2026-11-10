@@ -1374,7 +1374,9 @@ int main(int argc, char** argv) {
   // Native icon resolution above retains the established path; donor export
   // itself must never resolve a progressive item against the live inventory.
   liveResolutionCalls = 0;
-  for (const auto *excluded : {"Skeleton Key", "Room Key", "Woodfall Key Ring",
+  assert(ComboDungeonKeyReceipt::Find("Woodfall Key Ring").keyRingCount == 1);
+  assert(!ComboDungeonKeyReceipt::Markup("Woodfall Key Ring").empty());
+  for (const auto *excluded : {"Skeleton Key", "Room Key",
                                "Ice Cavern Small Key"}) {
     assert(ComboDungeonKeyReceipt::Markup(excluded).empty());
   }

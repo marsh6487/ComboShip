@@ -343,6 +343,13 @@ void SaveManager::LoadRandomizer() {
         randoContext->GetOption(RandomizerSettingKey(i)).Set(value);
     });
 
+    randoContext->GenerateSongEvents();
+    SaveManager::Instance->LoadArray("songEvents", randoContext->songEvents.size(), [&](size_t i) {
+        const auto fallback = randoContext->songEvents[i];
+        SaveManager::Instance->LoadData("", randoContext->songEvents[i], fallback);
+        if (randoContext->songEvents[i] >= 12)
+            randoContext->songEvents[i] = fallback;
+    });
     SaveManager::Instance->LoadArray("hintLocations", RH_MAX, [&](size_t i) {
         auto hint = RandomizerHint(i);
         nlohmann::json json;
@@ -496,6 +503,9 @@ void SaveManager::SaveRandomizer(const SaveContext& saveContext, int sectionID, 
     SaveManager::Instance->SaveData("inputSeed", randoContext->GetSeedString());
 
     SaveManager::Instance->SaveData("finalSeed", randoContext->GetSeed());
+    SaveManager::Instance->SaveArray("songEvents", randoContext->songEvents.size(), [&](size_t i) {
+        SaveManager::Instance->SaveData("", randoContext->songEvents[i]);
+    });
 
     SaveManager::Instance->SaveArray("randoSettings", RSK_MAX, [&](size_t i) {
         SaveManager::Instance->SaveData("", randoContext->GetOption((RandomizerSettingKey(i))).Get());

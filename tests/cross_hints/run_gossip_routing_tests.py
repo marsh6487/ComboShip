@@ -56,7 +56,7 @@ def build(exporter_override=None):
     playthrough = source("combo/rando/ComboPlaythrough.h")
     foreign = source("combo/rando/CrossForeign.h")
     custom = source("soh/soh/Enhancements/custom-message/CustomMessageManager.cpp")
-    parts = [prefix, '#include "rando/HintPresentation.h"\n#include "rando/SariaHintPolicy.h"\n', "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
+    parts = [prefix,  '#include "rando/HintPresentation.h"\n#include "rando/SariaHintPolicy.h"\n#include "rando/NativeRandoDump.h"\n', "#include <array>\n#include <cstring>\n#include <functional>\n#include <fstream>\n#include <map>\n#include <optional>\n#include <set>\n#include <tuple>\n#include <unordered_set>\n"]
     parts += [block(custom, "CustomMessage::CustomMessage(std::string english_, TextBoxType type_, TextBoxPosition position_)"),
               block(custom, "void CustomMessage::Replace(std::string&& oldStr, std::string&& newStr)"),
               block(custom, "void CustomMessage::SetSingularPlural()")]
@@ -107,11 +107,15 @@ def build(exporter_override=None):
 def mm_fixture():
     block = native.block
     actor = source("mm/2s2h/Rando/ActorBehavior/EnGs.cpp")
+    # Enum text moves into the temporary fixture; retain its actual catalogue include closure.
     types = source("mm/2s2h/Rando/Types.h")
     convert = source("mm/2s2h/Rando/ConvertItem.cpp")
     names = source("mm/2s2h/Rando/StaticData/Items.cpp")
     enums = "\n".join(enum(types, name) for name in ("RandoCheckType", "RandoCheckId", "RandoItemType", "RandoItemId"))
-    algorithms = []
+    rusty = block(source("mm/2s2h/Rando/RustyDoorKeys.h"), "inline constexpr bool IsDoorKeyItem(")
+    rusty = rusty.replace('#include "../../../combo/rando/RustyDoorKeyCatalog.inc"',
+                          '#include "' + str(ROOT / "combo/rando/RustyDoorKeyCatalog.inc") + '"')
+    algorithms = ["namespace Rando::RustyDoorKeys {\n" + rusty + "\n}\n"]
     for name in ("riToWeight", "rcToWeight", "itemTypeToWeight"):
         marker = re.search(r"std::unordered_map<[^\n]+> " + name + r" =", actor).group()
         algorithms.append(block(actor, marker, True))
@@ -144,7 +148,8 @@ def main():
         cpp.write_text(build(args.baseline_exporter))
         binary = root / "test"
         command = [*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-DCOMBO_BUILD",
-                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"), "-I" + str(ROOT / "combo")]
+                   "-I" + os.environ.get("NLOHMANN_JSON_INCLUDE", "/usr/include"), "-I" + str(ROOT / "combo"),
+                   "-I" + str(ROOT), "-I" + str(ROOT / "mm/2s2h/Rando")]
         if args.sanitize:
             command += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                         "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]

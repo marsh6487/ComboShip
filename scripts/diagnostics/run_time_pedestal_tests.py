@@ -227,7 +227,10 @@ static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
             "\nreturn ITEM_NONE;\n}\n" +
             functions((ROOT / "soh/src/code/z_inventory.c").read_text())["Inventory_DeleteEquipment"])
         metadata = functions((ROOT / "soh/mods/nei_save.cpp").read_text())
+        rito = functions((ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text().replace('extern "C" ', ''))
         (build / "metadata.cpp").write_text('#include "time_pedestal_fixture.h"\n#include "combo/menu/ItemGrantAuditBridge.h"\n' +
+            "\n".join('extern "C" ' + rito[name] for name in
+                      ("RitoMask_IsOwned", "RitoItem_NoteCellItem", "RitoMask_MigrateLegacy")) + "\n" +
             "static NeiSaveData& gNeiSave = *Nei_Save();\n" + metadata["NeiSave_Save"] + "\n" + metadata["NeiSave_Load"])
         (build / "music.c").write_text('#include "time_pedestal_fixture.h"\n' +
             functions((ROOT / "soh/src/code/z_kankyo.c").read_text())["Environment_PlaySceneSequence"])

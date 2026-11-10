@@ -24,7 +24,7 @@ with zipfile.ZipFile(archive) as z, tempfile.TemporaryDirectory(prefix='oot-adul
         if f[index] and f[index][0] in source: assert f[index][1]==0.625
     for combo in (False,True):
         target=td/('combo' if combo else 'solo')
-        command=['c++','-std=c++17','-Wall','-Wextra','-Wno-unused-parameter','-I'+str(td),'-I'+str(ROOT/'mm/mods/voice_pack'),str(ROOT/'tests/oot_adult_voice/provider_test.cpp'),'-o',str(target)]
+        command=['c++','-std=c++17','-DFMT_HEADER_ONLY','-Wall','-Wextra','-Wno-unused-parameter','-I'+str(td),'-I'+str(ROOT/'mm/mods/voice_pack'),str(ROOT/'tests/oot_adult_voice/provider_test.cpp'),'-o',str(target)]
         if combo: command.insert(1,'-DCOMBO_BUILD')
         subprocess.run(command,check=True)
         subprocess.run([str(target),str(td)],check=True)

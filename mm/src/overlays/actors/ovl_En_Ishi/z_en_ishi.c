@@ -5,6 +5,7 @@
  */
 
 #include "z_en_ishi.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "z64quake.h"
 #include "z64rumble.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
@@ -189,9 +190,9 @@ void EnIshi_SpawnDebrisSmallRock(Actor* thisx, PlayState* play) {
     Vec3f pos;
 
     if (!ENISHI_GET_USE_OBJECT(&this->actor)) {
-        debrisModel = gFieldSmallRockOpaDL; // same dl in gameplay keep
+        debrisModel = (Gfx*)gFieldSmallRockOpaDL; // same dl in gameplay keep
     } else {
-        debrisModel = gSmallRockDL;
+        debrisModel = (Gfx*)gSmallRockDL;
     }
 
     objectId = sObjectIds[ENISHI_GET_USE_OBJECT(&this->actor)];
@@ -272,7 +273,7 @@ void EnIshi_SpawnDebrisBoulder(Actor* thisx, PlayState* play) {
 
         EffectSsKakera_Spawn(play, &pos, &velocity, &this->actor.world.pos, gravity, arg5, 30, 5, 0,
                              sIshiBoulderDebrisScales[i], 5, 2, 70, 0, GAMEPLAY_FIELD_KEEP,
-                             gFieldSilverBoulderDebrisDL);
+                             (Gfx*)gFieldSilverBoulderDebrisDL);
     }
 }
 
@@ -319,6 +320,8 @@ void EnIshi_SpawnDustBoulder(Actor* thisx, PlayState* play) {
 }
 
 void EnIshi_DropItem(EnIshi* this, PlayState* play) {
+    if (!GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, &this->actor, 0))
+        return;
     if ((ENISHI_GET_SIZE_FLAG(&this->actor) == ISHI_SIZE_SMALL_ROCK) &&
         !ENISHI_GET_IGNORE_DROP_TABLE_FLAG(&this->actor)) {
         Item_DropCollectibleRandom(play, NULL, &this->actor.world.pos, ENISHI_GET_DROP_TABLE(&this->actor) * 0x10);
@@ -326,6 +329,8 @@ void EnIshi_DropItem(EnIshi* this, PlayState* play) {
 }
 
 void EnIshi_DropCollectable(EnIshi* this, PlayState* play) {
+    if (!GameInteractor_Should(VB_ENVIRONMENT_DROP_COLLECTIBLE, true, &this->actor, 0))
+        return;
     s32 pad;
     s32 collectableItem00Id = sIshiItemDrops[ENISHI_GET_COLLECTABLE_ID(&this->actor)];
     Actor* item;
@@ -753,7 +758,7 @@ void EnIshi_DrawGameplayKeepSmallRock(EnIshi* this, PlayState* play) {
 
     if ((this->actor.projectedPos.z <= 1200.0f) ||
         ((this->flags & ISHI_FLAG_UNDERWATER) && (this->actor.projectedPos.z < 1300.0f))) {
-        Gfx_DrawDListOpa(play, gFieldSmallRockOpaDL);
+        Gfx_DrawDListOpa(play, (Gfx*)gFieldSmallRockOpaDL);
         return;
     }
 
@@ -766,7 +771,7 @@ void EnIshi_DrawGameplayKeepSmallRock(EnIshi* this, PlayState* play) {
 
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (s32)alpha);
-        gSPDisplayList(POLY_XLU_DISP++, gFieldSmallRockXluDL);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gFieldSmallRockXluDL);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }
@@ -787,10 +792,10 @@ void EnIshi_DrawGameplayKeepBoulder(EnIshi* this, PlayState* play) {
 
         Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
-        gSPSegment(POLY_OPA_DISP++, 0x08, D_801AEFA0); // empty displaylist
+        gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)D_801AEFA0); // empty displaylist
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
-        gSPDisplayList(POLY_OPA_DISP++, gFieldSilverBoulderDL);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gFieldSilverBoulderDL);
 
     } else if (this->actor.projectedPos.z < 2250.0f) { // falling after breaking
         f32 alpha = (2250.0f - this->actor.projectedPos.z) * 2.55f;
@@ -799,10 +804,10 @@ void EnIshi_DrawGameplayKeepBoulder(EnIshi* this, PlayState* play) {
 
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
-        gSPSegment(POLY_XLU_DISP++, 0x08, D_801AEF88); // in z_actor, transparency dl I think
+        gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)D_801AEF88); // in z_actor, transparency dl I think
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (s32)alpha);
-        gSPDisplayList(POLY_XLU_DISP++, gFieldSilverBoulderDL);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gFieldSilverBoulderDL);
 
     } else {
         this->actor.shape.shadowAlpha = 0;
@@ -820,5 +825,5 @@ void EnIshi_DrawGameplayKeepObject(Actor* thisx, PlayState* play) {
 }
 
 void EnIshi_DrawIshiObject(Actor* thisx, PlayState* play) {
-    Gfx_DrawDListOpa(play, gSmallRockDL);
+    Gfx_DrawDListOpa(play, (Gfx*)gSmallRockDL);
 }

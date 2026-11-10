@@ -774,7 +774,7 @@ static void Trident_QuadOff(Player* player) {
 static void Trident_PayBallMagic(PlayState* play) {
     s16 cost = MAGIC_REQ(TRI_BALL_MAGIC_COST);
 
-    if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired) {
+    if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired || RandoCapacity_InfiniteMagic()) {
         return;
     }
     if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
@@ -2646,7 +2646,7 @@ static void Trident_Behavior(Player* player, PlayState* play) {
         if (++sTri.flyHold >= TRI_FLY_ENTER_HOLD) {
             sTri.flyHold = 0;
             if ((player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && !(player->stateFlags1 & PLAYER_STATE1_DAMAGED) &&
-                (ExtEquip_CapeOwned() || (gSaveContext.save.saveInfo.playerData.magic > 0))) {
+                (ExtEquip_CapeOwned() || RandoCapacity_CanSpendMagic(1))) {
                 Trident_FlyEnter(play, player);
             }
         }

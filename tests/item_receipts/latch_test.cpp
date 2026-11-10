@@ -1,5 +1,6 @@
 #include "mm/2s2h/Rando/Types.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "combo/menu/ComboItemDrawABI.h"
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -12,10 +13,25 @@ static uint64_t generation = 0;
 namespace Rando::MiscBehavior {
 uint64_t ComboRandoGen() { return generation; }
 } // namespace Rando::MiscBehavior
+// Native draw-cache dependencies: this receipt-identity fixture has no loaded
+// resource owner or optional soul presentation. Keep executing the real cache.
+namespace Ship {
+struct ResourceManager {
+  bool IsAltAssetsEnabled() const { return false; }
+};
+struct CrossRMRegistry {
+  static ResourceManager* Get(const char*) { return nullptr; }
+};
+} // namespace Ship
+namespace ComboSoulModels {
+unsigned PreferenceMask() { return 0; }
+} // namespace ComboSoulModels
 struct ComboForeignDrawInfoOOT {
   bool ok = true, stateDependent = true, appearanceDependent = true,
        animOk = false;
   int neiShimmer = 0;
+  int drawKind = CW_DRAW_KIND_SIMPLE;
+  CwItemAnimDrawInfo anim{};
   std::string resolvedName = "Magic Meter";
 };
 enum class ComboForeignResolveOOT { Ok, NotReady, Unknown };

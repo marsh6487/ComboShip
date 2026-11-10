@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsMenu.h"
 #include <vector>
 #include <fstream>
 #include <filesystem>
@@ -531,6 +532,20 @@ void PlandomizerSaveSpoilerLog() {
         inputFile.close();
     }
 
+    if (spoilerSave.contains("songEvents")) {
+        auto map =
+            ComboRando::SongEvents::ParseMapping(ComboRando::SongEvents::Game::Oot, spoilerSave.at("songEvents"));
+        for (unsigned event = 0; event < map.size(); ++event) {
+            auto key = ComboRando::SongEvents::PlandoKey(ComboRando::SongEvents::Game::Oot, event);
+            int song = CVarGetInteger(key.c_str(), -1);
+            if (song >= 0 && song < 20 && ComboRando::SongEvents::Playable(ComboRando::SongEvents::Game::Oot, song))
+                map[event] = song;
+        }
+        spoilerSave["songEvents"] = map;
+        for (unsigned event = 0; event < map.size(); ++event)
+            spoilerSave["songEventAssignments"][ComboRando::SongEvents::OotLabels[event]] =
+                ComboRando::SongEvents::SongLabels[map[event]];
+    }
     spoilerSave["file_hash"] = { plandoHash[0], plandoHash[1], plandoHash[2], plandoHash[3], plandoHash[4] };
 
     for (auto& import : plandoHintData) {
@@ -1171,6 +1186,7 @@ void PlandomizerDrawSpoilerTable() {
 
 void PlandomizerWindow::DrawElement() {
     PlandomizerDrawOptions();
+    ComboRando::SongEvents::DrawPlando(ComboRando::SongEvents::Game::Oot);
     UIWidgets::Separator(true, true, 0.f, 0.f);
     PlandomizerDrawSpoilerTable();
 }

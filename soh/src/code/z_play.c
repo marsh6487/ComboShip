@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "../../../combo/emotes/EmoteBridge.h"
 #include "ui_visibility.h"
 #include "rando/CrossEntranceBoss.h"
@@ -529,6 +530,7 @@ void Play_Init(GameState* thisx) {
         gSaveContext.skyboxTime = gSaveContext.nextDayTime;
     }
 
+    SongEvents_OotApplyClockLock();
     if (gSaveContext.dayTime > 0xC000 || gSaveContext.dayTime < 0x4555) {
         gSaveContext.nightFlag = 1;
     } else {

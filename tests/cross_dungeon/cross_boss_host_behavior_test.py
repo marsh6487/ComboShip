@@ -17,7 +17,10 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <cassert>
 #define SPDLOG_ERROR(...) ((void)0)
 static bool active=false; static int saves=0; static void* gPlayState=nullptr;
-static struct { int fileNum=0; } gSaveContext;
+static struct {
+ int fileNum=0;
+ struct { struct { struct { struct { uint16_t completedBossMask=0; } soloEntrances; } rando; } shipSaveInfo; } save;
+} gSaveContext;
 static bool nativeFlags[1000]{};
 static void Flags_SetEventChkInf(int flag) { nativeFlags[flag]=true; }
 #define SET_WEEKEVENTREG(flag) (nativeFlags[flag]=true)
@@ -35,6 +38,12 @@ native_table=native_function((root/'soh/soh/Enhancements/randomizer/entrance.cpp
 entrance_types=(root/'soh/soh/Enhancements/randomizer/entrance.h').read_text()
 native_types=re.search(r'enum class EntranceType \{.*?\};',entrance_types,re.S).group()
 native_link=re.search(r'typedef struct \{\n    EntranceType type;.*?\} EntranceLinkInfo;',entrance_types,re.S).group()
+shared_catalogue=(root/'combo/rando/CrossEntranceMmCatalogue.h').read_text()
+shared_start=shared_catalogue.index('inline void AppendBossCatalogue(')
+shared_opening=shared_catalogue.index('{',shared_start);shared_depth=1;shared_end=shared_opening+1
+while shared_depth:
+ shared_depth+=(shared_catalogue[shared_end]=='{')-(shared_catalogue[shared_end]=='}');shared_end+=1
+shared_boss_catalogue=shared_catalogue[shared_start:shared_end]
 for game,host in [(0,'Oot'),(1,'Mm')]:
  header=root/f'combo/rando/CrossEntrance{host}Boss.inc.h'; text=header.read_text()
  constants=sorted(set(re.findall(r'\b(?:ENTR_|SCENE_|RR_|LOGIC_|ACTOR_|EVENTCHKINF_|WEEKEVENTREG_)[A-Z0-9_]+',text)))
@@ -132,10 +141,14 @@ int main() {
 #define ENTRANCE(scene,spawn) (((scene)<<9)|((spawn)<<4))
 static bool kill[1000]{};
 namespace Rando::Logic { using RegionTimeState=int; static void SetCurrentRegionTime(const std::unordered_map<int,int>&,int){} static bool CanKillEnemy(int id){return kill[id];} }
+namespace Rando { thread_local bool gItemGrantSimulation=false; }
+namespace Rando::SoloEntrances { int LogicalClear(int,int nativeValue){assert(false && "combined must not query Solo logic");return nativeValue;} }
+extern "C" int Combo_MM_SoloEntranceBossSource(int){assert(false && "combined must not query Solo runtime");return -1;}
 static void SaveManager_SaveCurrentForCombo(){++saves;}
 extern "C" int Combo_MM_CrossBossEnabled(){return active;}
 namespace ComboCrossMm { using namespace ComboRando::CrossDungeon; static HostState state(1); static bool searching=false; static std::set<int> reachable; static std::unordered_map<int,int> timeStates; }
 '''
+  prefix+='\nnamespace ComboCrossMmCatalogue { using namespace ComboRando::CrossDungeon;\n'+shared_boss_catalogue+'\n}\n'
   # unordered_map is an engine include in the real host.
   prefix='#include <unordered_map>\n'+prefix
   main=r'''
@@ -180,5 +193,5 @@ int main() {
  with tempfile.TemporaryDirectory(prefix='boss-host-') as tmp:
   source=pathlib.Path(tmp)/'test.cpp';binary=pathlib.Path(tmp)/'test'
   source.write_text(prefix+'\n#include "'+str(header)+'"\n'+main)
-  subprocess.run(['g++',*sanitize_flags,'-std=c++20','-Wall','-Wextra','-Wno-unused-function','-I',str(root),'-I',str(root/'combo'),'-I',str(root/'soh/include'),'-I',str(root.parent/'build-deps/usr/include'),str(source),'-o',str(binary)],check=True)
+  subprocess.run(['g++',*sanitize_flags,'-std=c++20','-Wall','-Wextra','-Wno-unused-function','-I',str(root),'-I',str(root/'combo'),'-I',str(root/'soh/include'),'-I',str(root/'mm/2s2h'),'-I',str(root.parent/'build-deps/usr/include'),str(source),'-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)

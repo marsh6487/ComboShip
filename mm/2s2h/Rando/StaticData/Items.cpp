@@ -36,6 +36,147 @@ namespace StaticData {
 
 // clang-format off
 std::map<RandoItemId, RandoStaticItem> Items = {
+    RI(RI_OOT_RUSTY_KEY_TREASURE_CHEST_GAME, "the", "Treasure Chest Game Building Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_GUARD_HOUSE, "the", "Guard House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_HYRULE_CASTLE, "the", "Rusty Key (Hyrule Castle Gatehouse)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_DOG_LADY_HOUSE, "the", "Richard's House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_BACK_ALLEY_HOUSE, "the", "Alley House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_BOMBCHU_SHOP, "the", "Bombchu Shop Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_MASK_SHOP, "the", "Mask Shop Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_CHILD_BAZAAR, "the", "Market Bazaar Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_CHILD_POTION_SHOP, "the", "Market Potion Shop Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_CHILD_SHOOTING_GALLERY, "the", "Market Shooting Gallery Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_BOMBCHU_BOWLING, "the", "Bombchu Bowling Alley Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_LABORATORY, "the", "Hylia Laboratory Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_FISHING_POND, "the", "Fishing Hole Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_SILO, "the", "Back Tower Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_RANCH_STABLE, "the", "Stables Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_RANCH_HOUSE, "the", "Talon's House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_RANCH_HOUSE_ROOM, "the", "Rusty Key (Malon's Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_GRAVEYARD, "the", "Dampe's Hut Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_WINDMILL, "the", "Windmill Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_IMPA_HOUSE, "the", "Impa's House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_CARPENTER_HOUSE, "the", "Boss's House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_GRANNY_POTION_SHOP, "the", "Granny's Potion Shop Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_ADULT_SHOOTING_GALLERY, "the", "Kakariko Shooting Gallery Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_SKULLTULA_HOUSE, "the", "Skulltula House Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_ADULT_BAZAAR, "the", "Kakariko Bazaar Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP, "the", "Kakariko Potion Shop Key", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_OOT_RUSTY_KEY_ADULT_POTION_SHOP_BACK, "the", "Rusty Key (Kakariko Potion Shop Back)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_TOURIST_INFORMATION, "the", "Rusty Key (Tourist Information)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_POTION_SHOP, "the", "Rusty Key (Kotake's Potion Shop)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_POST_OFFICE, "the", "Rusty Key (Post Office)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_SWORDSMAN_SCHOOL, "the", "Rusty Key (Swordsman's School)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_LOTTERY, "the", "Rusty Key (Lottery)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_BOMB_SHOP, "the", "Rusty Key (Bomb Shop)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_TRADING_POST, "the", "Rusty Key (Trading Post)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_CURIOSITY_SHOP, "the", "Rusty Key (Curiosity Shop)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_KAFEI_HIDEOUT, "the", "Rusty Key (Kafei's Hideout)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_TOWN_ARCHERY, "the", "Rusty Key (Clock Town Shooting Gallery)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_SWAMP_ARCHERY, "the", "Rusty Key (Swamp Shooting Gallery)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_OBSERVATORY, "the", "Rusty Key (Astral Observatory)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_BLACKSMITH, "the", "Rusty Key (Mountain Smithy)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MUSIC_HOUSE, "the", "Rusty Key (Music Box House)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_LABORATORY, "the", "Rusty Key (Marine Research Lab)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_BENEATH_GRAVEYARD, "the", "Rusty Key (Beneath the Graveyard)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_DAMPE_HOUSE, "the", "Rusty Key (Dampe's House)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MAYOR_RESIDENCE, "the", "Rusty Key (Mayor's Residence)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MAYOR_RESIDENCE_OFFICE, "the", "Rusty Key (Mayor's Residence Office)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MAYOR_RESIDENCE_SALON, "the", "Rusty Key (Mayor's Residence Salon)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MAYOR_RESIDENCE_KAFEI, "the", "Rusty Key (Mayor's Residence Bedroom)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_TREASURE_CHEST_GAME, "the", "Rusty Key (Clock Town Chest Game)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_HONEY_DARLING, "the", "Rusty Key (Honey & Darling)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_MILK_BAR, "the", "Rusty Key (Milk Bar)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_DOG_RACETRACK, "the", "Rusty Key (Doggy Racetrack)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_CUCCO_SHACK, "the", "Rusty Key (Cucco Shack)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_RANCH_HOUSE, "the", "Rusty Key (Romani Ranch House)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_RANCH_BARN, "the", "Rusty Key (Romani Ranch Barn)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_RANCH_HOUSE_ROOM, "the", "Rusty Key (Romani Ranch Bedroom)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_ZORA_SHOP, "the", "Rusty Key (Zora Shop)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_ZORA_JAPAS_ROOM, "the", "Rusty Key (Japas' Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_ZORA_TIJO_ROOM, "the", "Rusty Key (Tijo's Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_ZORA_LULU_ROOM, "the", "Rusty Key (Lulu's Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_ZORA_EVAN_ROOM, "the", "Rusty Key (Evan's Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_STOCK_POT_INN, "the", "Rusty Key (Stock Pot Inn)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_STOCK_POT_INN_ROOF, "the", "Rusty Key (Stock Pot Inn Roof)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_GRANDMA_ROOM, "the", "Rusty Key (Grandma's Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_STOCK_POT_INN_STAFF_ROOM, "the", "Rusty Key (Stock Pot Inn Staff Room)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_RUSTY_KEY_STOCK_POT_INN_DORMITORY, "the", "Rusty Key (Stock Pot Inn Dormitory)", RITYPE_MAJOR, ITEM_NONE, GI_KEY_SMALL, GID_KEY_SMALL),
+
+    RI(RI_DEKU_STICK_BAG, "the", "Deku Stick Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
+    RI(RI_DEKU_NUT_BAG, "the", "Deku Nut Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_NUTS_1, GID_DEKU_NUTS),
+    RI(RI_WALLET_CHILD, "the", "Child's Wallet", RITYPE_MAJOR, ITEM_NONE, GI_WALLET_ADULT, GID_WALLET_ADULT),
+    RI(RI_INFINITE_BOW, "the", "Infinite Quiver", RITYPE_MAJOR, ITEM_NONE, GI_QUIVER_50, GID_QUIVER_50),
+    RI(RI_INFINITE_BOMB_BAG, "the", "Infinite Bomb Bag", RITYPE_MAJOR, ITEM_NONE, GI_BOMB_BAG_40, GID_BOMB_BAG_40),
+    RI(RI_INFINITE_STICKS, "", "Infinite Deku Sticks", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
+    RI(RI_INFINITE_NUTS, "", "Infinite Deku Nuts", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_NUTS_1, GID_DEKU_NUTS),
+    RI(RI_INFINITE_MAGIC, "", "Infinite Magic", RITYPE_MAJOR, ITEM_NONE, GI_MAGIC_JAR_BIG, GID_MAGIC_JAR_BIG),
+    RI(RI_INFINITE_WALLET, "the", "Infinite Wallet", RITYPE_MAJOR, ITEM_NONE, GI_WALLET_GIANT, GID_WALLET_GIANT),
+    RI(RI_WOODFALL_KEY_RING, "the", "Woodfall Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_SNOWHEAD_KEY_RING, "the", "Snowhead Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_GREAT_BAY_KEY_RING, "the", "Great Bay Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
+    RI(RI_STONE_TOWER_KEY_RING, "the", "Stone Tower Key Ring", RITYPE_SMALL_KEY, ITEM_KEY_SMALL, GI_KEY_SMALL, GID_KEY_SMALL),
+
+    RI(RI_SOUL_NPC_AROMA, "the", "Aroma NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_SHOOTING_GALLERY_OWNER, "the", "Shooting Gallery Owner NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BAZAAR_SHOPKEEPER, "the", "Bazaar Shopkeeper NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GORON, "the", "Goron NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GORON_CHILD, "the", "Goron Child NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BOMBCHU_SHOPKEEPER, "the", "Bombchu Shopkeeper NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BOMBERS, "the", "Bombers NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BUTLER_DEKU, "the", "Butler Deku NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_CITIZEN, "the", "Citizen NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_COMPOSER_BROS, "the", "Composer Bros NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_DAMPE, "the", "Dampe NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_DEKU_KING, "the", "Deku King NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_DEKU_PRINCESS, "the", "Deku Princess NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_PLAYGROUND_SCRUBS, "the", "Playground Scrubs NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GORON_ELDER, "the", "Goron Elder NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_CHEST_GAME_OWNER, "the", "Chest Game Owner NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GORON_SHOPKEEPER, "the", "Goron Shopkeeper NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_HONEY_DARLING, "the", "Honey Darling NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_TOTO, "the", "Toto NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_RUTO, "the", "Ruto NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ZORA_MUSICIANS, "the", "Zora Musicians NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_KAFEI, "the", "Kafei NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_KEATON, "the", "Keaton NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_KOUME_KOTAKE, "the", "Koume Kotake NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_MAYOR_DOTOUR, "the", "Mayor Dotour NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_MEDIGORON, "the", "Medigoron NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BIGGORON, "the", "Biggoron NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_TALON, "the", "Talon NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ASTRONOMER, "the", "Astronomer NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_POE_COLLECTOR, "the", "Poe Collector NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BLACKSMITHS, "the", "Blacksmiths NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BOMBCHU_BOWLING_LADY, "the", "Bombchu Bowling Lady NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_TINGLE, "the", "Tingle NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_TOILET_HAND, "the", "Toilet Hand NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_FISHING_POND_OWNER, "the", "Fishing Pond Owner NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ROOFTOP_MAN, "the", "Rooftop Man NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ZORA, "the", "Zora NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ZORA_SHOPKEEPER, "the", "Zora Shopkeeper NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_MALON, "the", "Malon NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BEAN_SALESMAN, "the", "Bean Salesman NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_CARPENTERS, "the", "Carpenters NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_ANJU, "the", "Anju NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GURU_GURU, "the", "Guru Guru NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_SCIENTIST, "the", "Scientist NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GORMAN, "the", "Gorman NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_GROG, "the", "Grog NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_DOG_LADY, "the", "Dog Lady NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_CARPET_MAN, "the", "Carpet Man NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_OLD_HAG, "the", "Old Hag NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_TOURIST_CENTER, "the", "Tourist Center NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_BANKER, "the", "Banker NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_MOON_CHILDREN, "the", "Moon Children NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_NPC_THIEVES, "the", "Thieves NPC Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_ANIMAL_CUCCO, "the", "Cucco Animal Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_ANIMAL_COW, "the", "Cow Animal Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_ANIMAL_DOG, "the", "Dog Animal Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_ANIMAL_BUTTERFLY, "the", "Butterfly Animal Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_MISC_GS, "the", "Gold Skulltula Misc Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+    RI(RI_SOUL_MISC_BUSINESS_SCRUB, "the", "Business Scrub Misc Soul", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_SKULL_TOKEN),
+
     RI(RI_UNKNOWN,                    "",     "Unknown",                    RITYPE_JUNK,            ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_ABILITY_SWIM,               "the",  "Ability to Swim",            RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_ARROW_FIRE,                 "",     "Fire Arrows",                RITYPE_MAJOR,           ITEM_ARROW_FIRE,                 GI_ARROW_FIRE,               GID_ARROW_FIRE),
@@ -279,6 +420,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_SHOVEL,             "the",  "Shovel",                     RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SPINNER,            "the",  "Spinner",                    RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SWITCH_HOOK,        "the",  "Switch Hook",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_RITO_MASK,          "the", "Rito Mask", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_OOT_NEI_MAGIC_MIRROR,       "the",  "Magic Mirror",               RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_OOT_NEI_TIME_GATE,          "the",  "Time Gate",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_WHIP,               "the",  "Whip",                       RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -307,6 +449,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_PROGRESSIVE_STICK_CAPACITY, "a", "Progressive Stick Capacity", RITYPE_MAJOR,          ITEM_NONE,                       GI_DEKU_STICKS_1,            GID_DEKU_STICK),
     RI(RI_OOT_ROCS_FEATHER,           "a",    "Roc's Feather",              RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE), // SoH's ship-vanilla feather (Nayru's Love slot), NOT the progressive Skijer Roc above
     RI(RI_OOT_RUTOS_LETTER,           "a",    "Bottle with Ruto's Letter",  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE), // OoT object_gi_bottle_letter (custom draw)
+    RI(RI_OOT_CLOCK, "the", "Clock", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_OOT_SKELETON_KEY,           "the",  "Skeleton Key",               RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_SMALL_KEY_BOTTOM_OF_THE_WELL, "a", "Bottom of the Well Small Key", RITYPE_MAJOR,      ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_SMALL_KEY_FIRE_TEMPLE,  "a",    "Fire Temple Small Key",      RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -370,6 +513,12 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_PROGRESSIVE_BOW,            "a",    "Progressive Bow",            RITYPE_MAJOR,           ITEM_BOW,                        GI_QUIVER_30,                GID_BOW),
     RI(RI_PROGRESSIVE_LULLABY,        "",     "Progressive Goron Lullaby",  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_HINT_MAGIC_STAT_UPGRADE, "", "Magic Stat Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_MAGIC_JAR_BIG),
+    RI(RI_HINT_DEFENSE_UPGRADE, "", "Defense Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
+    RI(RI_HINT_SPEED_UPGRADE, "", "Speed Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
+    RI(RI_HINT_POWER_UPGRADE, "", "Power Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
+    RI(RI_HINT_CRAWL_SPEED_UPGRADE, "", "Crawl Speed Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
+    RI(RI_HINT_CLIMB_SPEED_UPGRADE, "", "Climb Speed Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
+    RI(RI_HINT_PUSH_SPEED_UPGRADE, "", "Push Speed Upgrade", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_PROGRESSIVE_MAGIC,          "",     "Progressive Magic",          RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_MAGIC_JAR_SMALL),
     RI(RI_PROGRESSIVE_SWORD,          "a",    "Progressive Sword",          RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_SWORD_KOKIRI),
     RI(RI_PROGRESSIVE_WALLET,         "a",    "Progressive Wallet",         RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_WALLET_ADULT),
@@ -527,7 +676,10 @@ std::map<RandoItemId, RandoStaticItem> Items = {
 
 std::map<StartingItemCategory, std::vector<RandoItemId>> StartingItemsMap = {
     { STARTING_ITEMS_INVENTORY, 
-        { RI_OCARINA,               RI_PROGRESSIVE_BOW, RI_ARROW_FIRE,  RI_ARROW_ICE,   RI_ARROW_LIGHT,
+        { RI_DEKU_STICK_BAG, RI_DEKU_NUT_BAG,
+          RI_INFINITE_BOW, RI_INFINITE_BOMB_BAG, RI_INFINITE_STICKS, RI_INFINITE_NUTS,
+          RI_INFINITE_MAGIC, RI_INFINITE_WALLET,
+          RI_OCARINA,               RI_PROGRESSIVE_BOW, RI_ARROW_FIRE,  RI_ARROW_ICE,   RI_ARROW_LIGHT,
           RI_PROGRESSIVE_BOMB_BAG,  RI_BOMBCHU,         RI_DEKU_STICK,  RI_DEKU_NUT,    RI_MAGIC_BEAN,
           RI_POWDER_KEG,            RI_PICTOGRAPH_BOX,  RI_LENS,        RI_HOOKSHOT,    RI_GREAT_FAIRY_SWORD,
           RI_BOTTLE_EMPTY
@@ -551,7 +703,16 @@ std::map<StartingItemCategory, std::vector<RandoItemId>> StartingItemsMap = {
           RI_LETTER_TO_KAFEI, RI_PENDANT_OF_MEMORIES
         } },
     { STARTING_ITEMS_MISC, 
-        { RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG,  RI_SOUL_BOSS_MAJORA, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD,
+        {
+#define RUSTY_KEY(game,key,rg,ri,flag,name) RUSTY_START_##game(ri)
+#define RUSTY_START_MM(ri) ri,
+#define RUSTY_START_OOT(ri)
+#include "../../../../combo/rando/RustyDoorKeyCatalog.inc"
+#undef RUSTY_START_MM
+#undef RUSTY_START_OOT
+#undef RUSTY_KEY
+          RI_WOODFALL_KEY_RING, RI_SNOWHEAD_KEY_RING, RI_GREAT_BAY_KEY_RING, RI_STONE_TOWER_KEY_RING,
+          RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG,  RI_SOUL_BOSS_MAJORA, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD,
           RI_FROG_BLUE, RI_FROG_CYAN,   RI_FROG_PINK,   RI_FROG_WHITE,
           RI_TIME_DAY_1, RI_TIME_NIGHT_1, RI_TIME_DAY_2, RI_TIME_NIGHT_2, RI_TIME_DAY_3, RI_TIME_NIGHT_3, RI_TIME_PROGRESSIVE,
           RI_OCARINA_BUTTON_A, RI_OCARINA_BUTTON_C_DOWN, RI_OCARINA_BUTTON_C_RIGHT, RI_OCARINA_BUTTON_C_LEFT, RI_OCARINA_BUTTON_C_UP,
@@ -665,6 +826,7 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
             return GI_HEART_CONTAINER;
         case RI_SINGLE_MAGIC:
             return GI_MAGIC_JAR_SMALL;
+        case RI_INFINITE_MAGIC:
         case RI_DOUBLE_MAGIC:
             return GI_MAGIC_JAR_BIG;
         case RI_GREAT_SPIN_ATTACK:
@@ -746,6 +908,12 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
 
 const char* GetIconTexturePath(RandoItemId randoItemId) {
     switch (randoItemId) {
+        case RI_INFINITE_NUTS:
+        case RI_DEKU_NUT_BAG:
+            return (const char*)gItemIcons[ITEM_DEKU_NUT];
+        case RI_INFINITE_STICKS:
+        case RI_DEKU_STICK_BAG:
+            return (const char*)gItemIcons[ITEM_DEKU_STICK];
         case RI_SHIELD_MIRROR:
             return COMBO_IKANA_SHIELD_ICON;
         case RI_BOMBCHU:
@@ -757,6 +925,7 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return (const char*)gItemIcons[ITEM_HEART_CONTAINER];
         case RI_SINGLE_MAGIC:
             return (const char*)gItemIcons[ITEM_MAGIC_JAR_SMALL];
+        case RI_INFINITE_MAGIC:
         case RI_DOUBLE_MAGIC:
             return (const char*)gItemIcons[ITEM_MAGIC_JAR_BIG];
         case RI_GREAT_SPIN_ATTACK:
@@ -780,14 +949,18 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_WOODFALL_MAP:
         case RI_STONE_TOWER_MAP:
             return (const char*)gItemIcons[ITEM_COMPASS];
+        case RI_INFINITE_BOMB_BAG:
         case RI_PROGRESSIVE_BOMB_BAG:
             return (const char*)gItemIcons[ITEM_BOMB_BAG_20];
+        case RI_INFINITE_BOW:
         case RI_PROGRESSIVE_BOW:
             return (const char*)gItemIcons[ITEM_BOW];
         case RI_PROGRESSIVE_SWORD:
             return (const char*)gItemIcons[ITEM_SWORD_KOKIRI];
         case RI_PROGRESSIVE_WALLET:
+        case RI_WALLET_CHILD:
             return (const char*)gItemIcons[ITEM_WALLET_ADULT];
+        case RI_INFINITE_WALLET:
         case RI_WALLET_TYCOON:
             return (const char*)gItemIcons[ITEM_WALLET_GIANT];
         case RI_PROGRESSIVE_LULLABY:
@@ -795,6 +968,15 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_HINT_MAGIC_STAT_UPGRADE:
         case RI_PROGRESSIVE_MAGIC:
             return (const char*)gItemIcons[ITEM_MAGIC_JAR_SMALL];
+        case RI_HINT_DEFENSE_UPGRADE:
+            return (const char*)gItemIcons[ITEM_RECOVERY_HEART];
+        case RI_HINT_POWER_UPGRADE:
+            return (const char*)gItemIcons[ITEM_SWORD_KOKIRI];
+        case RI_HINT_SPEED_UPGRADE:
+        case RI_HINT_CRAWL_SPEED_UPGRADE:
+        case RI_HINT_CLIMB_SPEED_UPGRADE:
+        case RI_HINT_PUSH_SPEED_UPGRADE:
+            return (const char*)gItemIcons[ITEM_MASK_BUNNY];
         case RI_SOUL_BOSS_GOHT:
             return (const char*)gItemIcons[ITEM_REMAINS_GOHT];
         case RI_SOUL_BOSS_GYORG:
@@ -1197,6 +1379,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSpinnerTex";
         case RI_OOT_NEI_SWITCH_HOOK:
             return "__OTR__textures/icon_item_custom/gItemIconSwitchHookTex";
+        case RI_OOT_NEI_RITO_MASK:
+            return "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex";
         case RI_OOT_NEI_MAGIC_MIRROR:
             return "__OTR__textures/icon_item_custom/gItemIconMagicMirrorTex";
         case RI_OOT_NEI_TIME_GATE:

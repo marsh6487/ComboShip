@@ -34,8 +34,8 @@ static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 
 SaveContext gSaveContext;
-// Other-form ownership is a service boundary; use the real Rito predicate
-// with the same explicit seeded identity as these legacy audio controls.
+// Use the real Rito ownership and availability predicates over a controlled
+// save. These Goron audio cases do not grant the unrelated Rito mask.
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 int gComboVanillaMode = 0;
@@ -57,7 +57,7 @@ extern "C" void DinFireSword_FinishForget(PlayState* state, Actor* actor) {
     ++finishForgetCalls;
 }
 static struct {
-    int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction;
+    int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction, gakkiActive;
     int cutsceneTimer, cutscenePhase, flashAlpha, zoraSwimEnabled, groundPoundCrackTimer;
     int zoraMeleeActive, zoraJumpTrailActive, hazardVoidType;
     void* savedAgeProperties;
@@ -77,6 +77,10 @@ static u16 channelSfx[16];
 // this fixture keeps the real bank/dispatcher and Goron lifetime entrypoints.
 static void MmForm_InterruptNativeMaskForScene(Player*, PlayState*, u8) {}
 static void MmForm_CancelNativeMaskCutscene(u8) {}
+// The form-instrument suite owns these independent voices. Keep this fixture
+// focused on the native Goron rolling bank and its existing lifetime assertions.
+static void MmForm_GakkiVoiceOff() {}
+extern "C" void FormJingle_Stop() {}
 
 extern "C" void Audio_SetVolScale(u8, u8, u8, u8) {
 }
@@ -182,6 +186,33 @@ static void MmForm_UpdateZoraSwimSfx(Player*) {
 static void MmForm_ClearZoraSwimTrails(PlayState*) {
 }
 static void MmForm_RitoWindClear() {
+}
+// Keep the real Rito reload guard in Update. Its unrelated flight, rendering
+// and equipment services must remain untouched by these Goron audio cases.
+extern "C" void MmForm_RitoResetFlight() {
+    assert(false && "unexpected Rito flight cleanup in Goron audio case");
+}
+extern "C" void MmForm_RitoBowReset() {
+    assert(false && "unexpected Rito bow cleanup in Goron audio case");
+}
+static void MmForm_FreeRootMotion() {
+    assert(false && "unexpected form root-motion cleanup in Goron audio case");
+}
+static void MmForm_ClearCachedDLs() {
+    assert(false && "unexpected form display-list cleanup in Goron audio case");
+}
+static void MmForm_UnpinFormResources() {
+    assert(false && "unexpected form resource cleanup in Goron audio case");
+}
+extern "C" const char* O2rLoader_GetForcedName() {
+    assert(false && "unexpected forced model lookup in Goron audio case");
+    return nullptr;
+}
+extern "C" void O2rLoader_ClearForcedModel() {
+    assert(false && "unexpected forced model cleanup in Goron audio case");
+}
+static void ExtEquip_ClearTransformBackup() {
+    assert(false && "unexpected transform equipment cleanup in Goron audio case");
 }
 static void ExtEquip_RestoreFromTransform() {
 }

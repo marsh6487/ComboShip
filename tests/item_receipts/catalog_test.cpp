@@ -18,6 +18,8 @@
 #include "boss_soul_fixtures.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
+#include "rando/CrossEntranceMmCatalogue.h"
+#include "rando/SoloEntranceMmOverworld.h"
 extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h"
@@ -125,6 +127,31 @@ static std::string requested;
 static bool donorReady = true;
 static int donorReads = 0;
 static uint64_t generation = 0;
+// Receipt tests replace the saved-layout retrieval boundary. Production hint
+// resolution consumes these returned routes; codec tests cover their storage.
+static nlohmann::json soloEntranceSeed;
+static bool soloExplicitRoutes = false;
+static bool soloPhysicalBossClears = false;
+static std::vector<ComboRando::CrossDungeon::Route> soloEntranceRoutes;
+static std::vector<ComboRando::CrossDungeon::Dungeon> soloEntranceCatalogue;
+namespace Rando::SoloEntrances {
+nlohmann::json Seed(const RandoSaveInfo& save) {
+  assert(&save == &gSaveContext.save.shipSaveInfo.rando);
+  return soloEntranceSeed;
+}
+std::vector<ComboRando::CrossDungeon::Route> BuildRoutes(const RandoSaveInfo&) {
+  return soloExplicitRoutes ? soloEntranceRoutes : ComboRando::CrossDungeon::Decode(soloEntranceSeed);
+}
+std::vector<ComboRando::CrossDungeon::Dungeon> CatalogueForSave(const RandoSaveInfo&) {
+  if (soloExplicitRoutes) return soloEntranceCatalogue;
+  std::vector<ComboRando::CrossDungeon::Dungeon> result;
+  if (soloEntranceSeed.is_object())
+    for (const auto& entry : soloEntranceSeed.at("dungeons"))
+      result.push_back(ComboRando::CrossDungeon::ParseDungeon(entry));
+  return result;
+}
+bool BossesUsePhysicalClears(const RandoSaveInfo&) { return soloPhysicalBossClears; }
+}
 static bool mapCompassInfo = false;
 static int randomRupeeNames = 0;
 static int wandRule = 0;
@@ -702,6 +729,171 @@ static void CheckShuffledDungeonInformation() {
   std::cout << "PASS MM information: saved map/boss permutations, native composition, physical rewards/icons, collection/C-Up, reload, malformed and solo ownership\n";
 }
 
+static void CheckSoloEntranceInformation() {
+  using namespace ComboRando::CrossDungeon;
+  const auto saved = gSaveContext;
+  const auto combinedBefore = ComboRando::g_comboForeignJson;
+  const int modeBefore = gComboGameMode;
+  gComboGameMode = COMBO_GAME_MM;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  RANDO_SAVE_OPTIONS[RO_MAPS_COMPASSES_GIVE_INFORMATION] = 1;
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] = 0;
+  std::vector<Dungeon> dungeons = {
+    {"mm:woodfall", {1,ENTRANCE(WOODFALL_TEMPLE,0)}, {1,ENTRANCE(WOODFALL,1)}, {1,ENTRANCE(WOODFALL,1)}},
+    {"mm:snowhead", {1,ENTRANCE(SNOWHEAD_TEMPLE,0)}, {1,ENTRANCE(SNOWHEAD,1)}, {1,ENTRANCE(SNOWHEAD,1)}},
+    {"mm:greatbay", {1,ENTRANCE(GREAT_BAY_TEMPLE,0)}, {1,ENTRANCE(ZORA_CAPE,9)}, {1,ENTRANCE(ZORA_CAPE,9)}},
+    {"mm:stonetower", {1,ENTRANCE(STONE_TOWER_TEMPLE,0)}, {1,ENTRANCE(STONE_TOWER,2)}, {1,ENTRANCE(STONE_TOWER,2)}},
+    {"mm:inverted", {1,ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)}, {1,ENTRANCE(STONE_TOWER_INVERTED,1)}, {1,ENTRANCE(STONE_TOWER_INVERTED,1)}}
+  };
+  soloEntranceSeed = Encode(dungeons,{1,0,3,4,2});
+  ComboRando::Combo_SetForeignJson("{\"crossDungeonEntrances\":{\"enabled\":true}}");
+  const auto before = gSaveContext;
+  const auto map = Rando::GetDungeonMapCompassInfo(0,false);
+  assert(map.find("at Snowhead") != std::string::npos && "Solo map must use the native saved permutation");
+  const auto tower = Rando::GetDungeonMapCompassInfo(3,false);
+  assert(tower.find("normal: Zora Cape's turtle; inverted: Stone Tower (normal)") != std::string::npos);
+  assert(!PauseItemDesc_GetMapInfo(0,ITEM_DUNGEON_MAP));
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] |= 1 << DUNGEON_MAP;
+  assert(PauseItemDesc_GetMapInfo(0,ITEM_DUNGEON_MAP) == map);
+  CustomMessage::Entry mapReceipt;
+  assert(Rando::ApplyItemReceiptText(RI_WOODFALL_MAP,mapReceipt));
+  assert(FlattenReceiptLines(mapReceipt.msg).find("Snowhead") != std::string::npos);
+  gSaveContext = before;
+  // A different saved layout must replace the cached route even in the same slot.
+  soloEntranceSeed = Encode(dungeons,{0,1,2,3,4});
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  const int arenas[] = {ENTRANCE(ODOLWAS_LAIR,0), ENTRANCE(GOHTS_LAIR,0),
+                        ENTRANCE(GYORGS_LAIR,0), ENTRANCE(TWINMOLDS_LAIR,0)};
+  const char* owners[] = {"mm:woodfall", "mm:snowhead", "mm:greatbay", "mm:inverted"};
+  const int dungeonEntries[] = {ENTRANCE(WOODFALL_TEMPLE,0), ENTRANCE(SNOWHEAD_TEMPLE,0),
+                                ENTRANCE(GREAT_BAY_TEMPLE,0), ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)};
+  for (int i=0;i<4;++i) {
+    Dungeon boss{"mm:boss:"+std::to_string(i+8),{1,arenas[i]},{1,dungeonEntries[i]},{1,dungeonEntries[i]}};
+    boss.pool=Pool::Boss; boss.boss=i+8; boss.owner=owners[i]; boss.hasReverse=false;
+    boss.warpReturn=Endpoint{1,dungeonEntries[i]}; dungeons.push_back(boss);
+  }
+  soloEntranceSeed = Encode(dungeons,{1,0,3,4,2,8,7,5,6});
+  RANDO_SAVE_CHECKS[RC_WOODFALL_TEMPLE_BOSS_WARP].randoItemId = RI_PROGRESSIVE_SWORD;
+  RANDO_SAVE_CHECKS[RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP].randoItemId = RI_HOOKSHOT;
+  const auto compass = Rando::GetDungeonMapCompassInfo(0,true);
+  assert(compass.find("Twinmold") != std::string::npos && compass.find("Odolwa") == std::string::npos);
+  assert(compass.find(Rando::StaticData::Items.at(RI_HOOKSHOT).name) != std::string::npos);
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] |= 1 << DUNGEON_COMPASS;
+  const auto owned = gSaveContext;
+  assert(PauseItemDesc_GetMapInfo(0,ITEM_COMPASS) == compass);
+  CustomMessage::Entry compassReceipt;
+  assert(Rando::ApplyItemReceiptText(RI_WOODFALL_COMPASS,compassReceipt));
+  assert(FlattenReceiptLines(compassReceipt.msg).find("Twinmold") != std::string::npos);
+  assert(std::strstr(compassReceipt.receiptPresentation.iconPath,"Hookshot"));
+  assert(!std::memcmp(&owned,&gSaveContext,sizeof(owned)));
+  RANDO_SAVE_OPTIONS[RO_MAPS_COMPASSES_GIVE_INFORMATION] = 0;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).empty() && Rando::GetDungeonMapCompassInfo(0,true).empty());
+  RANDO_SAVE_OPTIONS[RO_MAPS_COMPASSES_GIVE_INFORMATION] = 1;
+  soloEntranceSeed["permutation"] = {0,0,0,0,0,0,0,0,0};
+  assert(Rando::GetDungeonMapCompassInfo(0,false).empty() && Rando::GetDungeonMapCompassInfo(0,true).empty());
+  // Legacy or unshuffled Solo slots clear the previous record, retaining native descriptions.
+  soloEntranceSeed = nullptr;
+  ++gSaveContext.fileNum;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  assert(Rando::GetDungeonMapCompassInfo(0,true).find("Odolwa") != std::string::npos);
+  // Equal serialized text from different providers must not share a cache entry.
+  const bool informationBefore = mapCompassInfo;
+  gComboGameMode = COMBO_GAME_BOTH;
+  mapCompassInfo = true;
+  ComboRando::Combo_SetForeignJson("null");
+  assert(Rando::GetDungeonMapCompassInfo(0,false).empty());
+  gComboGameMode = COMBO_GAME_MM;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  mapCompassInfo = informationBefore;
+  gSaveContext = saved;
+  gComboGameMode = modeBefore;
+  ComboRando::Combo_SetForeignJson(combinedBefore.c_str());
+  std::cout << "PASS Solo MM information: saved entrances, both Stone Tower faces, shuffled bosses/rewards/icons, ownership, cache reload, malformed and legacy layouts\n";
+}
+
+static void CheckMixedSoloEntranceInformation() {
+  using namespace ComboRando::CrossDungeon;
+  const auto saved = gSaveContext;
+  const int modeBefore = gComboGameMode;
+  gComboGameMode = COMBO_GAME_MM;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  RANDO_SAVE_OPTIONS[RO_MAPS_COMPASSES_GIVE_INFORMATION] = 1;
+  Dungeon woodfall{"mm:woodfall",{1,ENTRANCE(WOODFALL_TEMPLE,0)},
+                    {1,ENTRANCE(WOODFALL,1)},{1,ENTRANCE(WOODFALL,1)}};
+  Dungeon shop{"mm:interior:trading_post:0",{1,ENTRANCE(TRADING_POST,0)},
+                {1,ENTRANCE(WEST_CLOCK_TOWN,5)},{1,ENTRANCE(WEST_CLOCK_TOWN,5)}};
+  shop.pool=Pool::Shop;
+  soloExplicitRoutes = true;
+  auto mapFrom = [&](const Dungeon& source) {
+    soloEntranceCatalogue = {woodfall,source};
+    soloEntranceRoutes = {
+      {Phase::AfterNative,source.entrance,woodfall.entrance,woodfall.id},
+      {Phase::AfterNative,woodfall.entrance,source.entrance,source.id},
+      // An independently shuffled reverse path must not replace the canonical map ingress.
+      {Phase::BeforeNative,woodfall.exit,woodfall.returnTo,woodfall.id}
+    };
+    soloEntranceSeed = {{"version",2},{"enabled",true},{"dungeons",{DungeonJson(woodfall),DungeonJson(source)}},
+                        {"permutation",{1,0}},{"reversePermutation",{0,1}}};
+    return Rando::GetDungeonMapCompassInfo(0,false);
+  };
+  assert(mapFrom(shop).find("at Trading Post") != std::string::npos &&
+         "native mixed/decoupled layout must use native routes instead of the coupled cross-game decoder");
+  for (const auto& portal : ComboCrossMmCatalogue::Interiors()) {
+    Dungeon source{portal.id,{1,portal.entrance},{1,portal.exit},{1,portal.exit}};
+    source.pool=Pool::Interior;
+    const auto info=mapFrom(source);
+    assert(!info.empty() && info.find("mm:")==std::string::npos &&
+           "every modeled interior/shop ingress needs a readable map source");
+  }
+  for (const auto& grotto : ComboCrossMmCatalogue::Grottos()) {
+    Dungeon source{"mm:grotto:"+std::to_string(grotto.logicalSpawn),{1,grotto.Entry()},{1,grotto.Exit()},{1,grotto.Exit()}};
+    source.pool=Pool::Grotto;
+    const auto info=mapFrom(source);
+    assert(!info.empty() && info.find("mm:")==std::string::npos && "every modeled grotto needs a readable map source");
+  }
+  for (const auto& portal : ComboSoloMmOverworld::Portals()) {
+    Dungeon source{portal.id,{1,portal.entrance},{1,portal.exit},{1,portal.exit}};
+    source.pool=Pool::Overworld;
+    const auto info=mapFrom(source);
+    assert(info.find(portal.sourceLabel)!=std::string::npos && "mixed overworld maps must identify the source path");
+  }
+  Dungeon boss{"mm:boss:8",{1,ENTRANCE(ODOLWAS_LAIR,0)},woodfall.exit,woodfall.entrance};
+  boss.pool=Pool::Boss; boss.boss=8; boss.owner=woodfall.id; boss.hasReverse=false; boss.warpReturn=woodfall.exit;
+  soloEntranceCatalogue={woodfall,shop,boss};
+  soloEntranceRoutes={{Phase::AfterNative,shop.entrance,woodfall.entrance,woodfall.id},
+                      {Phase::AfterNative,woodfall.entrance,boss.entrance,boss.id},
+                      {Phase::AfterNative,boss.entrance,shop.entrance,shop.id}};
+  soloEntranceSeed={{"version",2},{"enabled",true},
+                    {"dungeons",{DungeonJson(woodfall),DungeonJson(shop),DungeonJson(boss)}},
+                    {"permutation",{2,0,1}},{"reversePermutation",{1,0,2}}};
+  soloPhysicalBossClears=true;
+  RANDO_SAVE_CHECKS[RC_WOODFALL_TEMPLE_BOSS_WARP].randoItemId=RI_PROGRESSIVE_SWORD;
+  const auto compass=Rando::GetDungeonMapCompassInfo(0,true);
+  assert(compass.find("Odolwa")!=std::string::npos && compass.find("clear Woodfall Temple")!=std::string::npos &&
+         compass.find("Progressive Sword")!=std::string::npos && compass.find("boss door leads to Trading Post")!=std::string::npos);
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] |= 1 << DUNGEON_COMPASS;
+  const auto before=gSaveContext;
+  assert(PauseItemDesc_GetMapInfo(0,ITEM_COMPASS)==compass);
+  CustomMessage::Entry receipt;
+  assert(Rando::ApplyItemReceiptText(RI_WOODFALL_COMPASS,receipt));
+  assert(FlattenReceiptLines(receipt.msg).find("Odolwa")!=std::string::npos &&
+         FlattenReceiptLines(receipt.msg).find("Trading Post")!=std::string::npos);
+  assert(std::strstr(receipt.receiptPresentation.iconPath,"KokiriSword") && receipt.receiptPresentation.rewardLine==1);
+  char body[4096]{}; std::memcpy(body,receipt.msg.data(),receipt.msg.size());
+  const auto layout=ComboReceipt_Layout(&receipt.receiptPresentation,body,receipt.msg.size(),sizeof(body),
+                                         true,sNESFontWidths,160);
+  assert(layout.iconPageStart==0 && layout.iconY==12 &&
+         std::string(body,layout.bodySize).find("Trading Post")!=std::string::npos &&
+         "mixed boss destination follows the first-page boss/reward sprite without displacing it");
+  assert(!std::memcmp(&before,&gSaveContext,sizeof(before)));
+  soloExplicitRoutes=false; soloPhysicalBossClears=false;
+  soloEntranceSeed=nullptr; soloEntranceCatalogue.clear(); soloEntranceRoutes.clear();
+  gSaveContext=saved; gComboGameMode=modeBefore;
+  std::cout<<"PASS Solo MM mixed/decoupled information: all interior/grotto/overworld labels, canonical ingress, physical boss clear/reward, actual door destination and preserved receipt sprite\n";
+}
+
 static void CheckRandomRupeeReceipts() {
   const auto saved = gSaveContext;
   gSaveContext.fileNum = 0;
@@ -1095,6 +1287,8 @@ int main(int argc, char** argv) {
 #ifdef COMPASS_DONOR_INTEGRATION
   CheckForestCompassReceiveRoutes(argc > 1 ? argv[1] : nullptr);
   CheckShuffledDungeonInformation();
+  CheckSoloEntranceInformation();
+  CheckMixedSoloEntranceInformation();
   return 0;
 #else
   // Header is deliberately a story entry with a different icon and next ID.
@@ -1126,6 +1320,8 @@ int main(int argc, char** argv) {
   CheckDungeonKeyReceipts();
   CheckMapCompassInformation();
   CheckShuffledDungeonInformation();
+  CheckSoloEntranceInformation();
+  CheckMixedSoloEntranceInformation();
   // Native MM receipt and exported icon both retain MM's own shield artwork.
   stagedIconPath = nullptr;
   assert(Rando::StaticData::GetIconForZMessage(RI_SHIELD_MIRROR) == 0xF5);

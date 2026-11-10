@@ -4,9 +4,10 @@ import os, re, subprocess, sys, tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import block_from, functions
+from foreign_gi_fixture_dependencies import clock_descriptor
 owner=(ROOT/'combo/menu/ComboItemDrawMM.h').read_text()
 fns=functions(owner)
-fixture=(ROOT/'tests/ikana_gi/mm_export_test.cpp').read_text().split('/* MM_PRODUCER */')[0]
+fixture=clock_descriptor(ROOT)+(ROOT/'tests/ikana_gi/mm_export_test.cpp').read_text().split('/* MM_PRODUCER */')[0]
 # Remove the borrowed fixture's complete stubs, independent of C++ formatting.
 for name in ('MM_FillImportedSwordFallback', 'MM_FillCaneDrawInfo'):
     stub=functions(fixture)[name]

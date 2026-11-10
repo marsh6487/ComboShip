@@ -1,3 +1,5 @@
+#include "combo/rando/SongEvents.h"
+#include "EnemyFirstDrops.h"
 #include "location_access.h"
 
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -427,7 +429,7 @@ Region::Region(std::string regionName_, SceneID scene_, std::vector<EventAccess>
 Region::~Region() = default;
 
 bool Region::TimePass() {
-    return timePass;
+    return timePass && logic->ClockAllowsTimePass();
 }
 
 void Region::ApplyTimePass() {
@@ -919,6 +921,8 @@ void RegionTable_Init() {
     RegionTable_Init_GerudoTrainingGround();
     RegionTable_Init_GanonsCastle();
 
+    EnemyFirstDrops::RegisterAccess();
+
     // Set parent regions
     for (uint32_t i = RR_ROOT; i < RR_MAX; i++) {
         areaTable[i].randomizerRegionKey = (RandomizerRegion)i;
@@ -995,7 +999,8 @@ void AccessReset() {
         RegionTable(region)->ResetVariables();
     }
 
-    if (/*Settings::HasNightStart TODO:: Randomize Starting Time*/ false) {
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK).Get() &&
+        ComboRando::SongEvents::ClockStart(ctx->GetOption(RSK_CLOCK_START).Get(), ctx->GetSeed()) >= 0xc000) {
         if (ctx->GetOption(RSK_SELECTED_STARTING_AGE).Is(RO_AGE_CHILD)) {
             RegionTable(RR_ROOT)->childNight = true;
         } else {
@@ -1022,7 +1027,8 @@ void ResetAllLocations() {
         }
     }
 
-    if (/*Settings::HasNightStart TODO:: Randomize Starting Time*/ false) {
+    if (ctx->GetOption(RSK_SHUFFLE_CLOCK).Get() &&
+        ComboRando::SongEvents::ClockStart(ctx->GetOption(RSK_CLOCK_START).Get(), ctx->GetSeed()) >= 0xc000) {
         if (ctx->GetOption(RSK_SELECTED_STARTING_AGE).Is(RO_AGE_CHILD)) {
             RegionTable(RR_ROOT)->childNight = true;
         } else {

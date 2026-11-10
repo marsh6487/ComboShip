@@ -1,4 +1,5 @@
 #include "rando/CrossWorldRando.h"
+#include "combo/rando/MagicMirrorSettingsKeys.h"
 #include <fstream>
 #include <map>
 #include <stdexcept>
@@ -30,6 +31,7 @@ std::vector<RandomizerGet> Generate(int climb,int chest,int abundance) {
 }
 namespace Mm {
 #include "mm/2s2h/Rando/Types.h"
+#include "mm_rusty_visual.inc"
 std::map<std::string,int> cvars;
 int CVarGetInteger(const char* name,int fallback){auto it=cvars.find(name);return it==cvars.end()?fallback:it->second;}
 void CVarSetInteger(const char* name,int value){cvars[name]=value;}
@@ -42,6 +44,16 @@ std::map<RandoItemId,Item> Items={
 #include "mm_item_rows.inc"
 };
 #include "mm_names.inc"
+}
+bool Combo_IsCombinedGame();
+namespace ShipInit {
+// Live GUI dispatch is outside this pool/emission fixture; record the exact
+// canonical key rather than replacing any settings or pool policy.
+static int sharedRefreshes;
+void Init(const char* key) {
+    REQUIRE(std::string(key) == ComboRando::MagicMirrorSettings::SharedCvar);
+    ++sharedRefreshes;
+}
 }
 #include "mm_menu.inc"
 #include "mm_active.inc"

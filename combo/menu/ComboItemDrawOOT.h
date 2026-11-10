@@ -19,12 +19,21 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "../ComboDoorKeyGi.h"
+#include "../NeiClockGI.h"
+#include "ComboSoulMiniOOT.h"
+#include "soh/Enhancements/randomizer/SoulShuffle.h"
+#include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "ComboCollectibleShimmerHost.h"
 
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
+#include "../../soh/soh/resource/type/Skeleton.h"
+#include "../../soh/soh/resource/type/Animation.h"
+#include "../../soh/soh/resource/type/PlayerAnimation.h"
+#include "ComboSoulResourceValidation.h"
 #include "ComboMaskShimmer.h"
 #include "ComboSongDrawOOT.h"
 #include "ComboBottleContents.h"
@@ -261,6 +270,21 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             break;
     }
 
+    if (Rando::SoulShuffle::Find(rg)) {
+        out->stateDependent = 2; // Live enemy/NPC simpler preference, including simple-to-detailed.
+        out->drawKind = CW_DRAW_KIND_SHUFFLED_SOUL;
+        out->dlistCount = 2;
+        out->dlists[0] = gGiSkulltulaTokenDL;
+        out->dlists[1] = gBossSoulFlameDL;
+        out->xluStartIndex = 1;
+        // An older consumer can safely retain the body and bind a valid segment
+        // for its plain fallback; new consumers use the exact native boss pass.
+        out->xluSeg8TexScroll = 1;
+        out->primColorXlu[0] = out->primColorXlu[1] = out->primColorXlu[2] = 155;
+        out->primColorXlu[3] = 255;
+        return 1;
+    }
+
     // Boss souls: bespoke func the gid-keyed table can't express (vestigial skull-token gid).
     // The non-skeletal Morpha core has its own consumer. Keep canonical owner paths so its
     // Alt replacement is selected by OoT's RM just like the native DrawMorpha routine.
@@ -432,8 +456,10 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         return 1;
     }
 
-    // Overworld keys: white prim+env house key (Randomizer_DrawOverworldKey).
-    if (rg >= RG_GUARD_HOUSE_KEY && rg <= RG_FISHING_HOLE_KEY) {
+    if (ComboDoorKeyGi::Describe(ComboDoorKeyGi::ItemOrigin(rg), out))
+        return 1;
+    // Keep the old house key when an OoT authored resource is unavailable.
+    if (ComboDoorKeyGi::ItemOrigin(rg) == ComboDoorKeyGi::Origin::OOT) {
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
         out->dlistCount = 1;
         out->xluStartIndex = -1;
@@ -841,6 +867,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->dlists[0] = gGiScaleDL;
             out->dlists[1] = gGiScaleWaterDL;
             return 1;
+        case RG_CLOCK:
+            return NeiClockGi::Describe(out, NeiClockGi::Opaque,
+                                        CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0);
         case RG_SKELETON_KEY: // env-tinted skeleton key (Randomizer_DrawSkeletonKey)
             out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
             out->dlistCount = 1;
@@ -1195,7 +1224,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
             return 0;
         }
         // Boss souls drawing their real skeleton have no static DL row — served by the animated ABI.
-        if (OOT_BossSoulUsesSkeleton(rg)) {
+        if (OOT_BossSoulUsesSkeleton(rg) || ComboSoulMiniOOT::UsesDetailed((int32_t)rg)) {
             return 0;
         }
         // We run on MM's graph thread while OOT is dormant, and Item::GetGIEntry dereferences
@@ -1487,6 +1516,23 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
 // than a SkelAnime skeleton and rides the static ABI. Returns 0 otherwise; MM falls back to its
 // sentinel. Mirror of MM_GetItemAnimDrawInfo.
 // Whole body inside the try: an unwind across the C ABI into 2ship.dll is unrecoverable.
+// ID entry point for native Combo pickups. Native and foreign requests use the
+// same owner catalog; the receiving draw TU never includes this producer glue.
+// Inspect native C++ resource vectors inside their owning DLL, exporting only
+// the stable checked POD fields and raw native engine header to either receiver.
+extern "C" COMBO_OOT_EXPORT int32_t OOT_GetSoulResourceInfo(const char* path, int32_t kind, int32_t expectedJoints,
+                                                            CwSoulResourceInfo* out) {
+    try {
+        return ComboSoulValidateOwnedResource("oot", path, kind, expectedJoints, out);
+    } catch (...) { return 0; }
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetSoulMiniDrawInfo(int32_t itemId, CwItemAnimDrawInfo* out) {
+    try {
+        return ComboSoulMiniOOT::Describe(itemId, out);
+    } catch (...) { return 0; }
+}
+
 extern "C" COMBO_EXPORT int32_t OOT_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-AnimDrawInfo", -1, -1, true);
     try {
@@ -1495,9 +1541,12 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemAnimDrawInfo(const char* itemName, Cw
         }
         auto& nameMap = Rando::StaticData::itemNameToEnum;
         auto it = nameMap.find(itemName);
-        if (it == nameMap.end() || !OOT_BossSoulUsesSkeleton(it->second)) {
+        if (it == nameMap.end())
             return 0;
-        }
+        if (ComboSoulMiniOOT::Find((int32_t)it->second))
+            return OOT_GetSoulMiniDrawInfo((int32_t)it->second, out);
+        if (!OOT_BossSoulUsesSkeleton(it->second))
+            return 0;
         *out = CwItemAnimDrawInfo{};
         return OOT_FillBossSoulAnim((int)it->second - (int)RG_GOHMA_SOUL, out);
     } catch (...) { return 0; }

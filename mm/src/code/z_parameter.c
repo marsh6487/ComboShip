@@ -4289,6 +4289,11 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
     u8 temp;
     u8 slot;
 
+    if (!RandoCapacity_HasBagForItem(item)) {
+        RandoCapacity_RepairBagAmmo();
+        return ITEM_NONE;
+    }
+
     slot = SLOT(item);
     if (item >= ITEM_DEKU_STICKS_5) {
         slot = SLOT(sExtraItemBases[item - ITEM_DEKU_STICKS_5]);
@@ -4429,7 +4434,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 2);
-        AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 2);
+        AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_STICK_UPGRADE_30) {
@@ -4437,7 +4442,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_STICK) = ITEM_DEKU_STICK;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_STICKS, 3);
-        AMMO(ITEM_DEKU_STICK) = CAPACITY(UPG_DEKU_STICKS, 3);
+        AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_NUT_UPGRADE_30) {
@@ -4445,7 +4450,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 2);
-        AMMO(ITEM_DEKU_NUT) = CAPACITY(UPG_DEKU_NUTS, 2);
+        AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_NUT_UPGRADE_40) {
@@ -4453,7 +4458,7 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_DEKU_NUT) = ITEM_DEKU_NUT;
         }
         Inventory_ChangeUpgrade(UPG_DEKU_NUTS, 3);
-        AMMO(ITEM_DEKU_NUT) = CAPACITY(UPG_DEKU_NUTS, 3);
+        AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         return ITEM_NONE;
 
     } else if (item == ITEM_DEKU_STICK) {
@@ -5356,55 +5361,28 @@ void Health_GiveHearts(s16 hearts) {
 }
 
 void Rupees_ChangeBy(s16 rupeeChange) {
+    if (!RandoCapacity_HasWallet()) {
+        RandoCapacity_RepairWallet();
+        return;
+    }
+    if (rupeeChange < 0 && RandoCapacity_InfiniteWallet())
+        return;
     gSaveContext.rupeeAccumulator += rupeeChange;
 }
 
 void Inventory_ChangeAmmo(s16 item, s16 ammoChange) {
-    if (item == ITEM_DEKU_STICK) {
-        AMMO(ITEM_DEKU_STICK) += ammoChange;
-
-        if (AMMO(ITEM_DEKU_STICK) >= CUR_CAPACITY(UPG_DEKU_STICKS)) {
-            AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
-        } else if (AMMO(ITEM_DEKU_STICK) < 0) {
-            AMMO(ITEM_DEKU_STICK) = 0;
-        }
-
-    } else if (item == ITEM_DEKU_NUT) {
-        AMMO(ITEM_DEKU_NUT) += ammoChange;
-
-        if (AMMO(ITEM_DEKU_NUT) >= CUR_CAPACITY(UPG_DEKU_NUTS)) {
-            AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
-        } else if (AMMO(ITEM_DEKU_NUT) < 0) {
-            AMMO(ITEM_DEKU_NUT) = 0;
-        }
-
-    } else if (item == ITEM_BOMBCHU) {
-        AMMO(ITEM_BOMBCHU) += ammoChange;
-
-        if (AMMO(ITEM_BOMBCHU) >= CUR_CAPACITY(UPG_BOMB_BAG)) {
-            AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
-        } else if (AMMO(ITEM_BOMBCHU) < 0) {
-            AMMO(ITEM_BOMBCHU) = 0;
-        }
-
-    } else if (item == ITEM_BOW) {
-        AMMO(ITEM_BOW) += ammoChange;
-
-        if (AMMO(ITEM_BOW) >= CUR_CAPACITY(UPG_QUIVER)) {
-            AMMO(ITEM_BOW) = CUR_CAPACITY(UPG_QUIVER);
-        } else if (AMMO(ITEM_BOW) < 0) {
-            AMMO(ITEM_BOW) = 0;
-        }
-
-    } else if (item == ITEM_BOMB) {
-        AMMO(ITEM_BOMB) += ammoChange;
-
-        if (AMMO(ITEM_BOMB) >= CUR_CAPACITY(UPG_BOMB_BAG)) {
-            AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
-        } else if (AMMO(ITEM_BOMB) < 0) {
-            AMMO(ITEM_BOMB) = 0;
-        }
-
+    if (ammoChange < 0 && RandoCapacity_InfiniteAmmo(item))
+        return;
+    if (item == ITEM_BOW || item == ITEM_BOMB || item == ITEM_BOMBCHU || item == ITEM_DEKU_STICK ||
+        item == ITEM_DEKU_NUT) {
+        s32 upgrade = item == ITEM_BOW          ? UPG_QUIVER
+                      : item == ITEM_DEKU_STICK ? UPG_DEKU_STICKS
+                      : item == ITEM_DEKU_NUT   ? UPG_DEKU_NUTS
+                                                : UPG_BOMB_BAG;
+        // Clamp before the native s8 store, including large foreign refills.
+        s32 capacity = CUR_CAPACITY(upgrade);
+        s32 next = (s32)AMMO(item) + ammoChange;
+        AMMO(item) = CLAMP(next, 0, capacity);
     } else if (item == ITEM_MAGIC_BEANS) {
         AMMO(ITEM_MAGIC_BEANS) += ammoChange;
 
@@ -5450,7 +5428,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
     }
 
     // Not enough magic available to consume
-    if ((gSaveContext.save.saveInfo.playerData.magic - magicToConsume) < 0) {
+    if (!RandoCapacity_InfiniteMagic() && (gSaveContext.save.saveInfo.playerData.magic - magicToConsume) < 0) {
         if (gSaveContext.magicCapacity != 0) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
         }
@@ -5466,7 +5444,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
                 }
-                if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                     magicToConsume = 0;
                 }
                 gSaveContext.magicToConsume = magicToConsume;
@@ -5485,7 +5463,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
                 }
-                if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                     magicToConsume = 0;
                 }
                 gSaveContext.magicToConsume = magicToConsume;
@@ -5498,7 +5476,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
 
         case MAGIC_CONSUME_LENS:
             if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
-                if (gSaveContext.save.saveInfo.playerData.magic != 0) {
+                if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
                     interfaceCtx->magicConsumptionTimer = 80;
                     gSaveContext.magicState = MAGIC_STATE_CONSUME_LENS;
                     return true;
@@ -5529,7 +5507,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
 
         case MAGIC_CONSUME_GORON_ZORA:
             // Goron spiked rolling or Zora electric barrier
-            if (gSaveContext.save.saveInfo.playerData.magic != 0) {
+            if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
                 interfaceCtx->magicConsumptionTimer = 10;
                 gSaveContext.magicState = MAGIC_STATE_CONSUME_GORON_ZORA_SETUP;
                 return true;
@@ -5540,7 +5518,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
         case MAGIC_CONSUME_GIANTS_MASK:
             // Wearing Giant's Mask
             if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
-                if (gSaveContext.save.saveInfo.playerData.magic != 0) {
+                if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
                     interfaceCtx->magicConsumptionTimer = R_MAGIC_CONSUME_TIMER_GIANTS_MASK;
                     gSaveContext.magicState = MAGIC_STATE_CONSUME_GIANTS_MASK;
                     return true;
@@ -5561,7 +5539,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
                 }
-                if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                     magicToConsume = 0;
                 }
                 gSaveContext.save.saveInfo.playerData.magic -= magicToConsume;
@@ -5649,7 +5627,7 @@ void Magic_Update(PlayState* play) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     s16 magicCapacityTarget;
 
-    if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+    if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
         Magic_FlashMeterBorder();
     }
 
@@ -5703,7 +5681,7 @@ void Magic_Update(PlayState* play) {
 
         case MAGIC_STATE_CONSUME:
             // Consume magic until target is reached or no more magic is available
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 gSaveContext.save.saveInfo.playerData.magic =
                     ((void)0, gSaveContext.save.saveInfo.playerData.magic) - ((void)0, gSaveContext.magicToConsume);
                 if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
@@ -5716,7 +5694,7 @@ void Magic_Update(PlayState* play) {
         case MAGIC_STATE_METER_FLASH_1:
         case MAGIC_STATE_METER_FLASH_2:
         case MAGIC_STATE_METER_FLASH_3:
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 Magic_FlashMeterBorder();
             }
             break;
@@ -5732,7 +5710,7 @@ void Magic_Update(PlayState* play) {
                 (play->gameOverCtx.state == GAMEOVER_INACTIVE) && (play->transitionTrigger == TRANS_TRIGGER_OFF) &&
                 (play->transitionMode == TRANS_MODE_OFF) && !Play_InCsMode(play)) {
 
-                if ((gSaveContext.save.saveInfo.playerData.magic == 0) ||
+                if ((!RandoCapacity_CanSpendMagic(1)) ||
                     ((Player_GetEnvironmentalHazard(play) >= PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) &&
                      (Player_GetEnvironmentalHazard(play) <= PLAYER_ENV_HAZARD_UNDERWATER_FREE)) ||
                     ((BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT) != ITEM_LENS_OF_TRUTH) &&
@@ -5756,7 +5734,7 @@ void Magic_Update(PlayState* play) {
 
                 interfaceCtx->magicConsumptionTimer--;
                 if (interfaceCtx->magicConsumptionTimer == 0) {
-                    if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                    if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                         gSaveContext.save.saveInfo.playerData.magic--;
                     }
                     // Skijer's NEI: the Lens drains via this timer (no per-call amount), so the Magic
@@ -5768,13 +5746,13 @@ void Magic_Update(PlayState* play) {
                     }
                 }
             }
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 Magic_FlashMeterBorder();
             }
             break;
 
         case MAGIC_STATE_CONSUME_GORON_ZORA_SETUP:
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 gSaveContext.save.saveInfo.playerData.magic -= 2;
             }
             if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
@@ -5789,7 +5767,7 @@ void Magic_Update(PlayState* play) {
                 if (!Play_InCsMode(play)) {
                     interfaceCtx->magicConsumptionTimer--;
                     if (interfaceCtx->magicConsumptionTimer == 0) {
-                        if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                        if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                             gSaveContext.save.saveInfo.playerData.magic--;
                         }
                         if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
@@ -5799,7 +5777,7 @@ void Magic_Update(PlayState* play) {
                     }
                 }
             }
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 Magic_FlashMeterBorder();
             }
             break;
@@ -5811,7 +5789,7 @@ void Magic_Update(PlayState* play) {
                 if (!Play_InCsMode(play)) {
                     interfaceCtx->magicConsumptionTimer--;
                     if (interfaceCtx->magicConsumptionTimer == 0) {
-                        if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+                        if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                             gSaveContext.save.saveInfo.playerData.magic--;
                         }
                         if (gSaveContext.save.saveInfo.playerData.magic <= 0) {
@@ -5821,7 +5799,7 @@ void Magic_Update(PlayState* play) {
                     }
                 }
             }
-            if (!CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
+            if (!(CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
                 Magic_FlashMeterBorder();
             }
             break;
@@ -10366,6 +10344,11 @@ void Interface_Update(PlayState* play) {
     }
 
     LifeMeter_UpdateColors(play);
+
+    // Imported or pending debits cannot consume an owned Infinite Wallet.
+    if (RandoCapacity_InfiniteWallet() && gSaveContext.rupeeAccumulator < 0) {
+        gSaveContext.rupeeAccumulator = 0;
+    }
 
     // Update rupees
     if (gSaveContext.rupeeAccumulator != 0) {

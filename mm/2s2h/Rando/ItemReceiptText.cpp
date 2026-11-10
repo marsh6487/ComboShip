@@ -26,6 +26,8 @@
 #include "ComboResolve.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
+#include "Rando/SoloEntrances.h"
+#include "rando/SoloEntranceMmOverworld.h"
 #include <unordered_map>
 namespace Rando::MiscBehavior {
 uint64_t ComboRandoGen();
@@ -48,8 +50,8 @@ struct DungeonInformation {
     RandoCheckId reward;
 };
 
-// Native identities remain the fallback for solo and legacy seeds. Combined
-// hints resolve saved cross routes before choosing a physical boss reward.
+// Native identities remain the fallback for unshuffled and legacy seeds. Saved
+// entrance routes determine the source and physical boss in either rando mode.
 constexpr DungeonInformation kDungeonInformation[] = {
     { "Woodfall Temple", "Odolwa", "Woodfall", RC_WOODFALL_TEMPLE_BOSS_WARP },
     { "Snowhead Temple", "Goht", "Snowhead", RC_SNOWHEAD_TEMPLE_BOSS_WARP },
@@ -140,21 +142,46 @@ std::string DungeonRewardName(int32_t dungeon) {
 #ifdef COMBO_BUILD
 struct SavedInformationRoutes {
     bool valid = true;
+    bool physicalBossClears = false;
     std::vector<ComboRando::CrossDungeon::Dungeon> dungeons;
     std::vector<ComboRando::CrossDungeon::Route> routes;
 };
 
+bool UsesSoloInformationRoutes() {
+    return gComboGameMode == COMBO_GAME_MM && gSaveContext.fileNum != 0xFF &&
+           gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO;
+}
+
 const SavedInformationRoutes& InformationRoutes() {
     static bool initialized = false;
+    static bool previousSolo = false;
     static std::string previous;
     static SavedInformationRoutes cached;
-    const auto& raw = ComboRando::g_comboForeignJson;
-    if (!initialized || previous != raw) {
+    const bool solo = UsesSoloInformationRoutes();
+    std::string soloRaw;
+    try {
+        if (solo) {
+            soloRaw = Rando::SoloEntrances::Seed(gSaveContext.save.shipSaveInfo.rando).dump();
+        }
+    } catch (...) {
+        initialized = false;
+        cached = {};
+        cached.valid = false;
+        return cached;
+    }
+    const auto& raw = Combo_IsCombinedGame() ? ComboRando::g_comboForeignJson : soloRaw;
+    if (!initialized || previousSolo != solo || previous != raw) {
         initialized = true;
+        previousSolo = solo;
         previous = raw;
         cached = {};
         try {
-            if (!raw.empty()) {
+            if (solo) {
+                const auto& save = gSaveContext.save.shipSaveInfo.rando;
+                cached.routes = Rando::SoloEntrances::BuildRoutes(save);
+                cached.dungeons = Rando::SoloEntrances::CatalogueForSave(save);
+                cached.physicalBossClears = Rando::SoloEntrances::BossesUsePhysicalClears(save);
+            } else if (!raw.empty()) {
                 const auto seed = nlohmann::json::parse(raw);
                 const auto cross = seed.value("crossDungeonEntrances", nlohmann::json{});
                 cached.routes = ComboRando::CrossDungeon::Decode(cross);
@@ -178,6 +205,10 @@ std::string InformationEntranceSource(const ComboRando::CrossDungeon::Dungeon& s
         const int32_t size = getSource ? getSource(source.entrance.index, name, sizeof(name)) : 0;
         return size > 0 && static_cast<size_t>(size) < sizeof(name) ? std::string(name, size) : std::string{};
     }
+    if (source.pool == ComboRando::CrossDungeon::Pool::Overworld) {
+        const char* name = ComboSoloMmOverworld::SourceLabel(source.entrance.index);
+        return name ? name : std::string{};
+    }
     static const std::map<std::string, const char*> names = {
         { "mm:woodfall", "Woodfall" },
         { "mm:snowhead", "Snowhead" },
@@ -190,7 +221,79 @@ std::string InformationEntranceSource(const ComboRando::CrossDungeon::Dungeon& s
         { "mm:secret-shrine", "Ikana Canyon's Secret Shrine" },
         { "mm:beneath-well-front", "Beneath the Well's front entrance" },
         { "mm:beneath-well-back", "Beneath the Well's castle entrance" },
-        { "mm:pirates-fortress", "Great Bay's Pirates' Fortress" }
+        { "mm:pirates-fortress", "Great Bay's Pirates' Fortress" },
+        { "mm:boss:8", "Woodfall Temple's boss door" },
+        { "mm:boss:9", "Snowhead Temple's boss door" },
+        { "mm:boss:10", "Great Bay Temple's boss door" },
+        { "mm:boss:11", "Stone Tower Temple's boss door" },
+        { "mm:interior:fishermans_hut:0", "Fisherman's Hut" },
+        { "mm:interior:marine_research_lab:0", "Marine Research Lab" },
+        { "mm:interior:fairy_fountain:3", "Zora Cape's Great Fairy Fountain" },
+        { "mm:interior:zora_hall_rooms:5", "Zora Hall Shop" },
+        { "mm:interior:zora_hall_rooms:2", "Lulu's Room" },
+        { "mm:interior:zora_hall_rooms:3", "Evan's Room" },
+        { "mm:interior:zora_hall_rooms:1", "Japas's Room" },
+        { "mm:interior:zora_hall_rooms:0", "Mikau's Room" },
+        { "mm:interior:swamp_shooting_gallery:0", "Swamp Shooting Gallery" },
+        { "mm:interior:tourist_information:0", "Swamp Tourist Center" },
+        { "mm:interior:magic_hags_potion_shop:0", "Magic Hags' Potion Shop" },
+        { "mm:interior:fairy_fountain:1", "Woodfall's Great Fairy Fountain" },
+        { "mm:interior:ghost_hut:0", "Ikana Canyon's Ghost Hut" },
+        { "mm:interior:music_box_house:0", "Music Box House" },
+        { "mm:interior:fairy_fountain:4", "Ikana's Great Fairy Fountain" },
+        { "mm:interior:ranch_house:0", "Romani Ranch Barn" },
+        { "mm:interior:ranch_house:1", "Romani Ranch House" },
+        { "mm:interior:cucco_shack:0", "Cucco Shack" },
+        { "mm:interior:doggy_racetrack:0", "Doggy Racetrack" },
+        { "mm:interior:astral_observatory:1", "Astral Observatory's outdoor door" },
+        { "mm:interior:astral_observatory:0", "Astral Observatory's Bombers' passage" },
+        { "mm:interior:treasure_chest_shop:0", "Treasure Chest Shop" },
+        { "mm:interior:honey_and_darlings_shop:0", "Honey and Darling's Shop" },
+        { "mm:interior:mayors_residence:0", "Mayor's Residence" },
+        { "mm:interior:town_shooting_gallery:0", "Town Shooting Gallery" },
+        { "mm:interior:stock_pot_inn:0", "Stock Pot Inn's front door" },
+        { "mm:interior:stock_pot_inn:1", "Stock Pot Inn's roof door" },
+        { "mm:interior:milk_bar:0", "Milk Bar" },
+        { "mm:interior:curiosity_shop:1", "Curiosity Shop's back door" },
+        { "mm:interior:fairy_fountain:0", "Clock Town's Great Fairy Fountain" },
+        { "mm:interior:deku_scrub_playground:0", "Deku Scrub Playground" },
+        { "mm:interior:swordmans_school:0", "Swordsman's School" },
+        { "mm:interior:curiosity_shop:0", "Curiosity Shop's front door" },
+        { "mm:interior:trading_post:0", "Trading Post" },
+        { "mm:interior:bomb_shop:0", "Bomb Shop" },
+        { "mm:interior:post_office:0", "Post Office" },
+        { "mm:interior:lottery_shop:0", "Lottery Shop" },
+        { "mm:interior:goron_shop:0", "Goron Shop" },
+        { "mm:interior:goron_shrine:0", "Goron Shrine" },
+        { "mm:interior:mountain_smithy:0", "Mountain Smithy" },
+        { "mm:interior:goron_graveryard:0", "Goron Graveyard" },
+        { "mm:interior:fairy_fountain:2", "Snowhead's Great Fairy Fountain" },
+        { "mm:grotto:0", "Termina Field Gossip Stone Grotto 3" },
+        { "mm:grotto:1", "Termina Field Gossip Stone Grotto 1" },
+        { "mm:grotto:2", "Termina Field Gossip Stone Grotto 4" },
+        { "mm:grotto:3", "Termina Field Gossip Stone Grotto 2" },
+        { "mm:grotto:5", "Path to Goron Village Hot Spring Grotto" },
+        { "mm:grotto:7", "Termina Field Dodongo Grotto" },
+        { "mm:grotto:9", "Termina Field Scrub Grotto" },
+        { "mm:grotto:11", "Termina Field Bio Baba Grotto" },
+        { "mm:grotto:12", "Deku Palace Bean Salesman Grotto" },
+        { "mm:grotto:13", "Termina Field Peahat Grotto" },
+        { "mm:grotto:16", "Lone Peak Shrine" },
+        { "mm:grotto:17", "Termina Field Cow Grotto" },
+        { "mm:grotto:18", "Termina Field Pillar Grotto" },
+        { "mm:grotto:19", "Termina Field Tall Grass Grotto" },
+        { "mm:grotto:20", "Road to Southern Swamp Grotto" },
+        { "mm:grotto:21", "Southern Swamp Grotto" },
+        { "mm:grotto:22", "Woods of Mystery Grotto" },
+        { "mm:grotto:23", "Mountain Village Tunnel Grotto" },
+        { "mm:grotto:24", "Path to Goron Village Ramp Grotto" },
+        { "mm:grotto:25", "Path to Snowhead Grotto" },
+        { "mm:grotto:26", "Great Bay Coast Fisherman Grotto" },
+        { "mm:grotto:27", "Great Bay Coast Cow Grotto" },
+        { "mm:grotto:28", "Zora Cape Grotto" },
+        { "mm:grotto:29", "Ikana Canyon Grotto" },
+        { "mm:grotto:30", "Ikana Graveyard Grotto" },
+        { "mm:grotto:31", "Road to Ikana Grotto" }
     };
     const auto found = names.find(source.id);
     return found == names.end() ? std::string{} : found->second;
@@ -199,7 +302,7 @@ std::string InformationEntranceSource(const ComboRando::CrossDungeon::Dungeon& s
 // nullopt means this endpoint was excluded from cross shuffle. An empty name
 // means the saved route is unusable, so callers must not invent a native hint.
 std::optional<std::string> CrossInformationEntranceSource(ComboRando::CrossDungeon::Endpoint entrance) {
-    if (!Combo_IsCombinedGame())
+    if (!Combo_IsCombinedGame() && !UsesSoloInformationRoutes())
         return std::nullopt;
     using namespace ComboRando::CrossDungeon;
     const auto& saved = InformationRoutes();
@@ -223,7 +326,7 @@ std::optional<std::string> CrossInformationEntranceSource(ComboRando::CrossDunge
 int InformationBossDestination(int boss) {
     if (boss < 0 || boss >= 12)
         return -1;
-    if (!Combo_IsCombinedGame())
+    if (!Combo_IsCombinedGame() && !UsesSoloInformationRoutes())
         return boss;
     using namespace ComboRando::CrossDungeon;
     const auto& saved = InformationRoutes();
@@ -231,8 +334,12 @@ int InformationBossDestination(int boss) {
         return -1;
     using NativeTarget = int32_t (*)(int32_t, int32_t*, int32_t*);
     using DungeonBoss = int32_t (*)(int32_t);
-    const auto nativeTarget = reinterpret_cast<NativeTarget>(Combo_ResolveSym("soh", "OOT_GetNativeBossHintTarget"));
-    const auto dungeonBoss = reinterpret_cast<DungeonBoss>(Combo_ResolveSym("soh", "OOT_GetDungeonBossIndex"));
+    const auto nativeTarget =
+        Combo_IsCombinedGame() ? reinterpret_cast<NativeTarget>(Combo_ResolveSym("soh", "OOT_GetNativeBossHintTarget"))
+                               : nullptr;
+    const auto dungeonBoss = Combo_IsCombinedGame()
+                                 ? reinterpret_cast<DungeonBoss>(Combo_ResolveSym("soh", "OOT_GetDungeonBossIndex"))
+                                 : nullptr;
     unsigned visited = 0;
     while (boss >= 0 && boss < 12 && !(visited & (1u << boss))) {
         visited |= 1u << boss;
@@ -288,7 +395,7 @@ std::string InformationEntranceName(int32_t dungeon) {
     if (dungeon < 0 || dungeon >= 4)
         return {};
 #ifdef COMBO_BUILD
-    if (Combo_IsCombinedGame()) {
+    if (Combo_IsCombinedGame() || UsesSoloInformationRoutes()) {
         using namespace ComboRando::CrossDungeon;
         const auto& saved = InformationRoutes();
         if (!saved.valid)
@@ -319,10 +426,57 @@ std::string InformationEntranceName(int32_t dungeon) {
     return kDungeonInformation[dungeon].entrance;
 }
 
+#ifdef COMBO_BUILD
+bool InformationUsesPhysicalBossClears() {
+    if (!UsesSoloInformationRoutes())
+        return false;
+    const auto& saved = InformationRoutes();
+    return saved.valid && saved.physicalBossClears;
+}
+
+std::string InformationBossDoorDestination(int32_t dungeon) {
+    if (dungeon < 0 || dungeon >= 4 || !InformationUsesPhysicalBossClears())
+        return {};
+    using namespace ComboRando::CrossDungeon;
+    const auto& saved = InformationRoutes();
+    for (const auto& source : saved.dungeons) {
+        if (source.pool != Pool::Boss || source.boss != dungeon + 8)
+            continue;
+        for (const auto& route : saved.routes) {
+            if (route.phase != Phase::AfterNative || route.from != source.entrance)
+                continue;
+            for (const auto& target : saved.dungeons) {
+                if (target.entrance != route.to)
+                    continue;
+                if (target.pool == Pool::Boss && target.boss >= 8 && target.boss < 12)
+                    return std::string(kDungeonInformation[target.boss - 8].boss) + "'s Lair";
+                if (target.pool == Pool::Dungeon) {
+                    const char* ids[] = { "mm:woodfall", "mm:snowhead", "mm:greatbay", "mm:stonetower" };
+                    for (int i = 0; i < 4; ++i)
+                        if (target.id == ids[i])
+                            return kDungeonInformation[i].temple;
+                    if (target.id == "mm:inverted")
+                        return "Stone Tower Temple (inverted)";
+                }
+                return InformationEntranceSource(target);
+            }
+        }
+    }
+    return {};
+}
+#endif
+
 int InformationBoss(int32_t dungeon) {
     if (dungeon < 0 || dungeon >= 4)
         return -1;
 #ifdef COMBO_BUILD
+    if (UsesSoloInformationRoutes()) {
+        const auto& saved = InformationRoutes();
+        if (!saved.valid)
+            return -1;
+        if (saved.physicalBossClears)
+            return dungeon + 8;
+    }
     return InformationBossDestination(dungeon + 8);
 #else
     return dungeon + 8;
@@ -733,6 +887,15 @@ std::string Rando::GetDungeonMapCompassInfo(int32_t dungeon, bool compass) {
     const std::string reward = InformationRewardName(dungeon);
     if (boss.empty() || reward.empty())
         return {};
+#ifdef COMBO_BUILD
+    if (InformationUsesPhysicalBossClears()) {
+        std::string text = "Defeat " + boss + " to clear " + info.temple + " and receive " + reward + ".";
+        const auto destination = InformationBossDoorDestination(dungeon);
+        if (!destination.empty())
+            text += " The boss door leads to " + destination + ".";
+        return text;
+    }
+#endif
     return std::string("The boss of ") + info.temple + " is " + boss + ". Defeat " + boss + " for " + reward + ".";
 }
 
@@ -982,6 +1145,10 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (id == RI_OOT_NEI_RITO_MASK) {
+        SetReceiptBody(entry, "You found the %gRito Mask%w!\nWear it to take to the skies.");
+        return true;
+    }
     if (id == RI_OOT_NEI_MAGIC_MIRROR) {
         SetReceiptBody(
             entry,
@@ -1007,12 +1174,21 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
             std::string body = (compass ? "You received a %g" : "You found the %g") + std::string(item.name) + "%w!";
             if (compass) {
                 const auto boss = InformationBossName(dungeon);
-                if (!boss.empty())
-                    body += "&It points to %r" + boss + "%w";
+                if (!boss.empty()) {
+#ifdef COMBO_BUILD
+                    if (InformationUsesPhysicalBossClears())
+                        body += "&Defeat %r" + boss + "%w";
+                    else
+#endif
+                        body += "&It points to %r" + boss + "%w";
+                }
 #ifdef COMBO_BUILD
                 CwItemIconInfo icon{};
                 if (MM_GetDungeonRewardIconInfo(dungeon, &icon) == 1)
                     ComboReceipt_CopyIcon(&entry.receiptPresentation, &icon, "mm");
+                const auto destination = InformationBossDoorDestination(dungeon);
+                if (!destination.empty())
+                    body += "^The boss door leads to %c" + destination + "%w.";
 #endif
                 entry.receiptPresentation.rewardLine = 1;
             } else {

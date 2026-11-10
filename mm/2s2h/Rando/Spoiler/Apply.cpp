@@ -1,3 +1,6 @@
+#include "Rando/SongEvents.h"
+#include "Rando/VanillaCompatibility.h"
+#include "Rando/SoloEntrances.h"
 #include "Spoiler.h"
 #include "Rando/Rando.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -12,13 +15,29 @@ namespace Rando {
 namespace Spoiler {
 
 void ApplyToSaveContext(nlohmann::json spoiler) {
-    gSaveContext.save.shipSaveInfo.rando.finalSeed = spoiler["finalSeed"].get<uint32_t>();
+    // Validate the entire entrance record before mutating settings or placements.
+    // Conversion of the temporary save has no gameplay or oracle side effects.
+    RandoSaveInfo entranceCandidate{};
+    SoloEntrances::ApplySeed(entranceCandidate, spoiler.value("soloEntrances", nlohmann::json()));
+    entranceCandidate.finalSeed = spoiler["finalSeed"].get<uint32_t>();
 
     for (auto& [randoOptionId, randoStaticOption] : Rando::StaticData::Options) {
-        RANDO_SAVE_OPTIONS[randoOptionId] =
+        entranceCandidate.randoSaveOptions[randoOptionId] =
             spoiler["options"].value(randoStaticOption.name, (uint32_t)randoStaticOption.defaultValue);
     }
+    SoloEntrances::ValidateSettings(entranceCandidate);
+    gSaveContext.save.shipSaveInfo.rando.finalSeed = entranceCandidate.finalSeed;
+    std::copy(std::begin(entranceCandidate.randoSaveOptions), std::end(entranceCandidate.randoSaveOptions),
+              std::begin(RANDO_SAVE_OPTIONS));
 
+    gSaveContext.save.shipSaveInfo.rando.soloEntrances = entranceCandidate.soloEntrances;
+
+    VanillaCompatibility::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando);
+    if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_VANILLA) {
+        VanillaCompatibility::NormalizeSavedState(gSaveContext.save.shipSaveInfo.rando);
+    } else {
+        Rando::SongEvents::Import(gSaveContext.save.shipSaveInfo.rando, spoiler);
+    }
     if (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_GOLD_SKULLTULAS]) {
         RANDO_SAVE_OPTIONS[RO_SKULLTULA_TOKENS_REQUIRED] = SPIDER_HOUSE_TOKENS_REQUIRED;
     }
@@ -104,6 +123,7 @@ void ApplyToSaveContext(nlohmann::json spoiler) {
             RANDO_SAVE_CHECKS[randoCheckId].shuffled = true;
         }
     }
+    VanillaCompatibility::NormalizeSavedState(gSaveContext.save.shipSaveInfo.rando);
 }
 
 } // namespace Spoiler

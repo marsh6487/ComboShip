@@ -1,0 +1,96 @@
+{
+  "recipe": "build.py",
+  "original_authorship": true,
+  "draw_scale": 0.25,
+  "models": {
+    "RustyKey": {
+      "owner": "mm",
+      "root": "objects/combo_door_keys/RustyKeyDL",
+      "triangles": 972,
+      "vertices": 2916,
+      "bounds_native": [
+        [
+          -52,
+          -140,
+          -14
+        ],
+        [
+          52,
+          143,
+          14
+        ]
+      ],
+      "bounds_draw_scale_0_25": [
+        [
+          -13.0,
+          -35.0,
+          -3.5
+        ],
+        [
+          13.0,
+          35.75,
+          3.5
+        ]
+      ],
+      "unique_triangles": 972,
+      "submitted_triangles": 1944,
+      "material_passes": 2
+    },
+    "OverworldKey": {
+      "owner": "soh",
+      "root": "objects/combo_door_keys/OverworldKeyDL",
+      "triangles": 744,
+      "vertices": 2232,
+      "bounds_native": [
+        [
+          -48,
+          -140,
+          -9
+        ],
+        [
+          48,
+          140,
+          9
+        ]
+      ],
+      "bounds_draw_scale_0_25": [
+        [
+          -12.0,
+          -35.0,
+          -2.25
+        ],
+        [
+          12.0,
+          35.0,
+          2.25
+        ]
+      ],
+      "unique_triangles": 744,
+      "submitted_triangles": 1488,
+      "material_passes": 2
+    }
+  },
+  "sha256": {
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyDL": "891fde109bbbaaaeb22ea4a4342bfd380944bbc0d050f42d64889af5964cf81c",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyTex": "71e97b36de364639f9d2c95d761b81300be524ee62a8a665990dafc404f6571c",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyVtx": "0f7659e0fa2885ddace74a2dba51d8041f5eee40976aee67961f2b3d71f28f90",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyDL": "a0e02ba05d451090d7ea45c59b17b52b00b3022aaca311c4f01c8690fc0cdc71",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeDL": "73f856b4b5739f65fceb8c0fab8e9461b5d7f1d756180c342b52eafbf607a664",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeTex": "d884816d00e8c663ffad18ef72aed5de6758c073c0bc7dc9dbf02e876679e2e7",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeVtx": "6647aaf8cd0d89291245a5aae0bee810793aa2c672c8a187f745d4d752ea2d59",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyReflectionDL": "fa559ed0ed4b6440eb8359f70f8b8a2a7b27407fc9cdc8ed20d9bdb23484fad6",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyReflectionTex": "85c0d96b8b627ebb8a22444b6ca293152623055a06ba777d400a0a13782f48d9",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyDL": "d0fdae1a20ee2bdb36cacfb1fd32995139a9e09721e1b3d43068bf08825c3539",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyTex": "94296f5d000e43d285d75f17927b3ccdefbada1d44bf67fecffff61a2af23280",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyVtx": "d0678be1ffa2e797c2ad2e41a18eb4dfae9331ccaf0c5b16463f0fd249ed3d20",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyDL": "c852b35c1581d6c233ab34e01781590e96ad18868f9e70d97697834716dc1e3a",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeDL": "eaead969a33ac16ee164b0e0627981cd250f53e62b59936cf4d0721331434ff6",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeTex": "ea9fb10e20a5b28183e9c8e51b735a7e40324135652f175cde86b9cbecb4e1d8",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeVtx": "e2c199109f78967f165e796e5a4f31a82d89781cfd954c7f8804e4e053354850",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaDL": "99d581d07521c2b658feda470217c95a4a76ef0efc48b219e3c20ee9eb2da68a",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaTex": "5e7fcb1ae8e0126a78e8a2b9d05f314df52475faf1f316ea6fd3b8ba14ba57ec",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaVtx": "7cf48627a547fda36e8ee10c29b3b70dd41be86a2eebdf4413668bb24a079128",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyReflectionDL": "145be5ad84ddbbf86b53dcd6f72011cb7d34535516be4406160d97694d2b84bb",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyReflectionTex": "85c0d96b8b627ebb8a22444b6ca293152623055a06ba777d400a0a13782f48d9"
+  }
+}

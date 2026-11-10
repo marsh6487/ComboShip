@@ -71,13 +71,19 @@ foreign = foreign.replace('/* HOST_RESOLVER */',
     'int32_t ComboNativeMmImport(const char*) {return -1;}\n' + function(host, 'ComboFillForeignDrawInfoOOT'))
 a = host.index('struct ComboForeignDrawCacheOOT {')
 b = host.index('} // namespace', a)
-foreign = foreign.replace('/* HOST_CACHE */', host[a:b])
+cache = host[a:b]
+foreign = foreign.replace('/* HOST_CACHE */', '')
 foreign = ('#include "objects/object_gi_rupy/object_gi_rupy.h"\n'
            '#include "objects/gameplay_keep/gameplay_keep.h"\n'
            'std::vector<std::pair<int,std::vector<int>>> primColors;\n' + foreign)
 # Standard container declarations must precede the extra boundary state.
 foreign = '#include <vector>\n#include <utility>\n#include "combo/menu/ComboCollectibleShimmer.h"\n' + foreign
 foreign += read('tests/mm_presentation/silver_rupee_cosmetic_test.cpp')
+soul_settings = read('combo/menu/ComboSoulModelSettings.h')
+# The real cache queries both its owner and presentation preferences. Insert it
+# after this fixture's resource boundary and retain the production helper body.
+foreign = foreign.replace('/* HOST_CACHE */',
+                          soul_settings[soul_settings.index('namespace ComboSoulModels {'):] + '\n' + cache)
 foreign = foreign.replace('/* REGISTERED_OPTION */', option)
 foreign = foreign.replace('/* SILVER_HOST_DRAW */', function(host, 'MM_DrawForeignSilverRupee'))
 foreign = foreign.replace('/* COLOR_HOST_DRAW */', function(host, 'MM_DrawForeignColorLayers'))

@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 /*
  * File: z_en_po_composer.c
  * Overlay: ovl_En_Po_Composer
@@ -316,7 +317,9 @@ void EnPoComposer_PlayCurse(EnPoComposer* this, PlayState* play) {
 
     // Song check, check if player just played song of storms or song of healing
     if (play->msgCtx.ocarinaMode == OCARINA_MODE_EVENT) {
-        switch (play->msgCtx.lastPlayedSong) {
+        switch (play->msgCtx.lastPlayedSong == SongEvents_MmSong(11, OCARINA_SONG_STORMS) ? OCARINA_SONG_STORMS
+                : play->msgCtx.lastPlayedSong == OCARINA_SONG_STORMS                      ? 0xFF
+                                                                     : play->msgCtx.lastPlayedSong) {
             case OCARINA_SONG_STORMS:
                 this->sharpCsNum = SHARP_CS_SONG_STORMS;
                 EnPoComposer_SetupStartCutscene(this);

@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "global.h"
 #include "young_epona.h"
 #include "message_data_static.h"
@@ -1106,7 +1107,8 @@ void Message_HandleOcarina(PlayState* play) {
             // "Ocarina（%d）"
             osSyncPrintf("オカリナ（%d） ", msgCtx->ocarinaAction);
             if (msgCtx->ocarinaAction == OCARINA_ACTION_UNK_0 || msgCtx->ocarinaAction == OCARINA_ACTION_FREE_PLAY ||
-                msgCtx->ocarinaAction >= OCARINA_ACTION_CHECK_SARIA) {
+                msgCtx->ocarinaAction >= OCARINA_ACTION_CHECK_SARIA ||
+                SongEvents_OotIsEventAction(msgCtx->ocarinaAction)) {
                 msgCtx->msgMode = MSGMODE_OCARINA_STARTING;
                 osSyncPrintf("000000000000  -> ");
             } else if (msgCtx->ocarinaAction >= OCARINA_ACTION_TEACH_MINUET &&
@@ -3206,7 +3208,8 @@ void Message_StartOcarina(PlayState* play, u16 ocarinaActionId) {
         msgCtx->ocarinaAction = ocarinaActionId;
         Message_OpenText(play, 0x86D); // Play using [A] and [C].
         textId = ocarinaActionId + 0x86E;
-    } else if (ocarinaActionId == OCARINA_ACTION_FREE_PLAY || ocarinaActionId >= OCARINA_ACTION_CHECK_SARIA) {
+    } else if (ocarinaActionId == OCARINA_ACTION_FREE_PLAY || ocarinaActionId >= OCARINA_ACTION_CHECK_SARIA ||
+               SongEvents_OotIsEventAction(ocarinaActionId)) {
         osSyncPrintf("ocarina_set 000000000000000000  = %d\n", ocarinaActionId);
         msgCtx->ocarinaAction = ocarinaActionId;
         if (ocarinaActionId >= OCARINA_ACTION_CHECK_SARIA && ocarinaActionId <= OCARINA_ACTION_CHECK_STORMS) {
@@ -3644,7 +3647,8 @@ void Message_DrawMain(PlayState* play, Gfx** p) {
                         msgCtx->ocarinaAction == OCARINA_ACTION_FREE_PLAY ||
                         msgCtx->ocarinaAction == OCARINA_ACTION_SCARECROW_RECORDING ||
                         msgCtx->ocarinaAction == OCARINA_ACTION_CHECK_NOWARP ||
-                        msgCtx->ocarinaAction >= OCARINA_ACTION_CHECK_SARIA) {
+                        msgCtx->ocarinaAction >= OCARINA_ACTION_CHECK_SARIA ||
+                        SongEvents_OotIsEventAction(msgCtx->ocarinaAction)) {
                         if (msgCtx->ocarinaAction == OCARINA_ACTION_FREE_PLAY ||
                             msgCtx->ocarinaAction == OCARINA_ACTION_CHECK_NOWARP) {
                             AudioOcarina_Start(sOcarinaSongBitFlags + 0xC000);
@@ -4088,7 +4092,8 @@ void Message_DrawMain(PlayState* play, Gfx** p) {
             case MSGMODE_SONG_PLAYED_ACT:
                 msgCtx->stateTimer--;
                 if (msgCtx->stateTimer == 0) {
-                    if (msgCtx->lastPlayedSong < OCARINA_SONG_SARIAS &&
+                    if (!SongEvents_OotShouldCapture(msgCtx->ocarinaAction, msgCtx->lastPlayedSong) &&
+                        msgCtx->lastPlayedSong < OCARINA_SONG_SARIAS &&
                         (msgCtx->ocarinaAction < OCARINA_ACTION_PLAYBACK_MINUET ||
                          msgCtx->ocarinaAction >= OCARINA_ACTION_PLAYBACK_SARIA)) {
                         if (msgCtx->disableWarpSongs || (interfaceCtx->restrictions.warpSongs == 3 && !IS_RANDO)) {

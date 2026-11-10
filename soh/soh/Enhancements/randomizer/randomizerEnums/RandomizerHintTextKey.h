@@ -1710,6 +1710,14 @@ RANDO_ENUM_ITEM(RHT_MAGIC_STAT_UPGRADE)
 RANDO_ENUM_ITEM(RHT_CRAWL_SPEED_UPGRADE)
 RANDO_ENUM_ITEM(RHT_CLIMB_SPEED_UPGRADE)
 RANDO_ENUM_ITEM(RHT_PUSH_SPEED_UPGRADE)
+// Global first enemy-type rewards (append-only).
+#define ENEMY_FIRST_DROP(key, name) RANDO_ENUM_ITEM(RHT_ENEMY_DROP_##key)
+#include "../EnemyFirstDropsCatalog.inc"
+#undef ENEMY_FIRST_DROP
+// Soul item descriptions are separate from first-defeat location descriptions.
+#define SOUL_HINT(item, key, ...) RANDO_ENUM_ITEM(key)
+#include "../SoulHintCatalog.inc"
+#undef SOUL_HINT
 // MAX
 RANDO_ENUM_ITEM(RHT_MAX)
 RANDO_ENUM_END(RandomizerHintTextKey)

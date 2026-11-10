@@ -22,6 +22,10 @@ s32 Object_GetSlot(ObjectContext* c, s16 id) { return objectAvailable ? 0 : OBJE
 s32 Flags_GetClear(PlayState* p, s32 room) { return cleared; }
 void Actor_FreeOverlay(ActorOverlay* o) {}
 static s16 ComboForestSkullKid_ObjectId(s16 id, s32 params, s16 native) { return native; }
+// Soul ownership is an independent preallocation boundary; these regional
+// recovery cases run with all souls available. Its deny path has native tests
+// in tests/shuffle_parity/souls/run_mm_runtime_tests.py.
+bool MM_SoulCanSpawnNonEnemy(PlayState* play, s16 id, s16 params) { return true; }
 /* PREFIX */
 int main(void) {
     PlayState play = {0};

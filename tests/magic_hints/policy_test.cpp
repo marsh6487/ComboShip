@@ -9,6 +9,9 @@ static ComboRando::ForeignItem foreignItem;
 const ComboRando::ForeignItem* Rando::MiscBehavior::MM_LookupForeign(RandoCheckId) { return &foreignItem; }
 #endif
 SaveContext gSaveContext;
+// Configuration service boundary; this legacy suite exercises hint identity.
+// The shuffle-parity native suite varies all seven actual setting keys.
+extern "C" int32_t CVarGetInteger(const char*, int32_t) { return 1; }
 std::map<RandoCheckId, Rando::StaticData::RandoStaticCheck> Rando::StaticData::Checks;
 static RandoItemId nextTier = RI_SINGLE_MAGIC;
 RandoItemId Rando::ConvertItem(RandoItemId item, RandoCheckId check) { return nextTier; }

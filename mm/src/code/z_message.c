@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventsBridge.h"
 #include "mods/partners/Partners.h"
 #include "prevent_bss_reordering.h"
 #include "global.h"
@@ -206,6 +207,7 @@ u8 D_801C6A70 = 0;
 s16 sOcarinaButtonIndexBufPos = 0;
 s16 sOcarinaButtonIndexBufLen = 0;
 s16 sLastPlayedSong = 0xFF;
+static s16 sSongEventReservedSong = -1;
 s16 sOcarinaButtonStepR = 0;
 s16 sOcarinaButtonStepG = 0;
 s16 sOcarinaButtonStepB = 0;
@@ -4043,6 +4045,7 @@ void Message_DisplayOcarinaStaffImpl(PlayState* play, u16 ocarinaAction) {
     }
 
     sLastPlayedSong = 0xFF;
+    sSongEventReservedSong = -1;
     msgCtx->lastPlayedSong = 0xFF;
     msgCtx->ocarinaButtonIndex = OCARINA_BTN_INVALID;
     noStop = false;
@@ -5001,6 +5004,8 @@ void Message_DrawMain(PlayState* play, Gfx** gfxP) {
                                   msgCtx->ocarinaStaff->state); // NEI-DBG
                     }
                     sLastPlayedSong = msgCtx->ocarinaStaff->state;
+                    sSongEventReservedSong =
+                        SongEvents_MmInterceptSong(msgCtx->ocarinaStaff->state) ? msgCtx->ocarinaStaff->state : -1;
                     msgCtx->lastPlayedSong = msgCtx->ocarinaStaff->state;
                     Message_ContinueTextbox(play, 0x1B5B);
                     msgCtx->msgMode = MSGMODE_SONG_PLAYED;
@@ -5053,6 +5058,8 @@ void Message_DrawMain(PlayState* play, Gfx** gfxP) {
                     } else if (GameInteractor_Should(VB_SONG_AVAILABLE_TO_PLAY, vanillaOwnedSongCheck,
                                                      &msgCtx->ocarinaStaff->state)) {
                         sLastPlayedSong = msgCtx->ocarinaStaff->state;
+                        sSongEventReservedSong =
+                            SongEvents_MmInterceptSong(msgCtx->ocarinaStaff->state) ? msgCtx->ocarinaStaff->state : -1;
                         msgCtx->lastPlayedSong = msgCtx->ocarinaStaff->state;
                         msgCtx->songPlayed = msgCtx->ocarinaStaff->state;
                         msgCtx->msgMode = MSGMODE_E;
@@ -6396,6 +6403,14 @@ void Message_Update(PlayState* play) {
                 break;
             }
 
+            if ((sSongEventReservedSong >= 0 && sSongEventReservedSong == msgCtx->lastPlayedSong) ||
+                (sLastPlayedSong != 0xFF && sLastPlayedSong == msgCtx->lastPlayedSong &&
+                 SongEvents_MmInterceptSong(msgCtx->lastPlayedSong))) {
+                sSongEventReservedSong = -1;
+                sLastPlayedSong = 0xFF;
+                msgCtx->ocarinaAction = OCARINA_ACTION_CHECK_NOTIME_DONE;
+                msgCtx->ocarinaMode = OCARINA_MODE_EVENT;
+            }
             if (sLastPlayedSong == OCARINA_SONG_SOARING) {
                 if (interfaceCtx->restrictions.songOfSoaring == 0) {
                     if (Map_CurRoomHasMapI(play) || (play->sceneId == SCENE_SECOM)) {

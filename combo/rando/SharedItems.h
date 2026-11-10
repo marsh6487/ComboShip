@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "SharedSouls.h"
 
 namespace ComboRando {
 
@@ -31,6 +32,8 @@ enum SharedFamily {
     SF_MASK_OF_TRUTH,
     SF_COUNT
 };
+
+static_assert(SF_COUNT == 17, "Shared soul bits must not alias scalar tier families");
 
 struct SharedFamilyDef {
     SharedFamily family;
@@ -111,12 +114,15 @@ inline uint32_t SharedMaskFromKeys(const nlohmann::json& keys) {
         for (int i = 0; i < SF_COUNT; ++i)
             if (s == SharedFamilyTable()[i].key)
                 mask |= (1u << i);
+        for (const auto& category : SharedSoulCategories)
+            if (s == category.key)
+                mask |= category.bit;
     }
     return mask;
 }
 
 inline uint32_t SharedMaskAll() {
-    return (SF_COUNT >= 32) ? 0xFFFFFFFFu : ((1u << SF_COUNT) - 1u);
+    return (SF_COUNT >= 32) ? 0xFFFFFFFFu : (((1u << SF_COUNT) - 1u) | SS_ALL);
 }
 
 // Names to leave untagged by SuffixCrossGameItems: both games' pool name for every effective family.
@@ -129,6 +135,11 @@ inline std::set<std::string> SharedUntaggedNames(uint32_t mask) {
         if (SharedFamilyTable()[i].mmHasItem)
             out.insert(SharedFamilyTable()[i].mmName);
     }
+    for (const auto& pair : SharedSoulPairs)
+        if (mask & pair.bit) {
+            out.insert(pair.ootName);
+            out.insert(pair.mmName);
+        }
     return out;
 }
 
@@ -137,6 +148,9 @@ inline std::vector<std::string> SharedKeysFromMask(uint32_t mask) {
     for (int i = 0; i < SF_COUNT; ++i)
         if (mask & (1u << i))
             out.push_back(SharedFamilyTable()[i].key);
+    for (const auto& category : SharedSoulCategories)
+        if (mask & category.bit)
+            out.push_back(category.key);
     return out;
 }
 
