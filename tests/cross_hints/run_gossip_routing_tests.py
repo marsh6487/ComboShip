@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Run native generation/stone consumers; optionally audit a read-only combo save.
 
-Engine inventory, RNG draws and font submission are controlled boundaries. This
-does not launch a game or prove an active mod archive's actor placements/pixels.
+Engine inventory, item/region metadata, RNG draws, wrapping and font submission
+are controlled boundaries. Generation, saved-hint loaders, static lookup, native
+callbacks and color encoding stay real. This does not launch a game or prove an
+active mod archive's actor placements/pixels.
 """
 import argparse
 import hashlib
@@ -69,7 +71,9 @@ def build(exporter_override=None):
               block(playthrough, "struct RequirednessResult", True),
               block(playthrough, "inline std::vector<CwPlacedItem> ParseSpoilerPlacements(")]
     parts.append("std::string g_comboForeignJson;\n")
-    parts += [block(foreign, "struct HintGossipEntry", True), block(foreign, "struct MmHints", True),
+    parts += [block(foreign, "inline std::string GameIdToKey("), block(foreign, "inline GameId KeyToGameId("),
+              block(foreign, "struct ForeignPlacement", True), block(foreign, "inline std::unordered_map<std::string, ForeignPlacement> LoadForeignByItem("),
+              block(foreign, "struct HintGossipEntry", True), block(foreign, "struct MmHints", True),
               block(foreign, "inline MmHints LoadHintsMM("), "}\n"]
     parts.append(cross[cross.index("namespace ComboRando {"):])
     parts.append(macro_enum(source(RANDO + "randomizerEnums/RandomizerCheck.h"), "RandomizerCheck"))
@@ -111,6 +115,7 @@ def mm_fixture():
     types = source("mm/2s2h/Rando/Types.h")
     convert = source("mm/2s2h/Rando/ConvertItem.cpp")
     names = source("mm/2s2h/Rando/StaticData/Items.cpp")
+    runtime = source("mm/2s2h/Rando/Rando.cpp")
     enums = "\n".join(enum(types, name) for name in ("RandoCheckType", "RandoCheckId", "RandoItemType", "RandoItemId"))
     rusty = block(source("mm/2s2h/Rando/RustyDoorKeys.h"), "inline constexpr bool IsDoorKeyItem(")
     rusty = rusty.replace('#include "../../../combo/rando/RustyDoorKeyCatalog.inc"',
@@ -121,11 +126,16 @@ def mm_fixture():
         algorithms.append(block(actor, marker, True))
     algorithms += [block(convert, "static RandoItemType ForeignTypeFromCategory("),
                    block(convert, "RandoItemType Rando::GetItemTypeForCheck(")]
-    algorithms.append("namespace Rando::StaticData {\n" + block(names, "std::string GetItemName(") + "}\n")
+    algorithms.append("namespace Rando::StaticData {\n" + block(names, "RandoItemId GetItemIdFromVanillaItemId(") +
+                      block(names, "std::string GetItemName(") + "}\n")
+    algorithms += [block(runtime, "RandoCheckId Rando::FindItemPlacement("),
+                   block(runtime, "std::string Rando::GetItemLocationHintName(")]
     for marker in ("s32 GetNormalizedCost()", "EnGs* GetGossipStone()", "bool ShouldHintMoonMask(",
-                   "RandoCheckId GetRandomCheck(", "static void ComboReportStoneHint("):
+                   "RandoCheckId GetRandomCheck(", "static void ComboReportStoneHint(",
+                   "static std::string MoonMaskLocationHint("):
         algorithms.append(block(actor, marker))
-    for native_id, name in (("FIRST_GS_MESSAGE", "FirstMessage"), ("SECOND_GS_MESSAGE", "SecondMessage")):
+    for native_id, name in (("FIRST_GS_MESSAGE", "FirstMessage"), ("SECOND_GS_MESSAGE", "SecondMessage"),
+                            ("MOON_GS_MASK_MESSAGE", "MoonMessage")):
         section = actor[actor.index("    COND_ID_HOOK(OnOpenText, " + native_id):]
         algorithms.append("auto " + name + " = " + block(section, "[](u16* textId, bool* loadFromMessageTable)") + ";\n")
     boundary = (ROOT / "tests/cross_hints/mm_gossip_boundary.inc").read_text()

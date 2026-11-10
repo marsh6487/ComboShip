@@ -37,6 +37,76 @@ json GenerateCase(bool repaired,int clarity,uint32_t seed,int distribution=1,boo
                   {"mm",{{"Mm Home","RI_NATIVE_RELIC"},{"Mm Foreign","placeholder"}}},{"foreign",foreign}};
     return Generate(seed,oot.dump(),hints.dump(),mm.dump(),foreign,spoiler.dump(),{});
 }
+// The saved static source must identify the global reward, not its tracker bucket.
+// Withholding only the static export input is an RNG/output isolation control:
+// the same foreign placements still reach Generate through the actual spoiler.
+json FirstDropStaticHintSeed(
+    json source={{"en","the first Stalfos drop"},{"de","bei der ersten Beute des Typs Stalfos"},
+                 {"fr","le premier butin du type Stalfos"}},
+    bool enemyIdentity=true,bool exportSources=true,uint32_t seed=0x12345678u) {
+    json firstDrop={{"name","Global Enemy Drop: Stalfos"},{"area","Hyrule Field"},{"overworld",true},
+                    {"locationHint",hintText("They say that defeating your first %rStalfos%w rewards %g[[1]]%w.")}};
+    if(enemyIdentity)firstDrop["enemyDropName"]="Stalfos";
+    if(!source.is_null())firstDrop["enemyDropSource"]=source;
+    json hints={{"options",{{"gossipStoneHints",1},{"hintClarity",2},{"hintDistribution",1}}},
+                {"stones",json::array({0,1,2,3,4,5})},
+                {"checks",json::array({firstDrop,
+                    {{"name","HF Open Grotto Chest"},{"area","Hyrule Field"},{"overworld",true},
+                     {"locationHint",hintText("The grotto holds [[1]].")}},
+                    {{"name","Legacy Empty Area"},{"area",""},{"overworld",true},
+                     {"locationHint",hintText("An old check holds [[1]].")}}})},
+                {"hintTextTable",{{"RHT_CAN_BE_FOUND_AT",hintText("[[1]] can be found at [[2]].")},
+                                   {"RHT_HOARDS",hintText("[[2]] hoards [[1]].")},
+                                   {"RHT_JUNK01",hintText("A harmless junk rumor.")}}}};
+    json foreign=json::array(),placements=json::object(),items=json::array(),pool=json::array();
+    for(const auto& [check,item]:std::vector<std::pair<std::string,std::string>>{
+            {"Global Enemy Drop: Stalfos","Mask of Truth"},{"HF Open Grotto Chest","Hookshot"},
+            {"Legacy Missing Check","Zora Mask"},{"Legacy Empty Area","Goron Mask"}}) {
+        foreign.push_back({{"checkGame","oot"},{"checkName",check},{"itemGame","mm"},
+                           {"itemName",item},{"advancement",true}});
+        placements[check]="foreign placeholder";
+        items.push_back({{"name",item},{"displayName",item}});
+        pool.push_back({{"name",item},{"advancement",true}});
+    }
+    json spoiler={{"oot",placements},{"mm",json::object()},{"foreign",foreign}};
+    json mm={{"items",items},{"pool",pool}};
+    // Malformed/empty item metadata must not create a blank static lookup key.
+    auto emptyItem=foreign[0];emptyItem["itemName"]="";foreign.push_back(emptyItem);
+    return Generate(seed,"{}",hints.dump(),mm.dump(),exportSources?foreign:json::array(),spoiler.dump(),{});
+}
+void CheckFirstDropStaticGeneration() {
+    const json source={{"en","the first Stalfos drop"},{"de","bei der ersten Beute des Typs Stalfos"},
+                       {"fr","le premier butin du type Stalfos"}};
+    for(uint32_t seed:{1u,0x12345678u,0xffffffffu}) {
+        auto output=FirstDropStaticHintSeed(source,true,true,seed);
+        const auto& locations=output.at("mm").at("itemLocations");
+        const std::string observed=locations.at("Mask of Truth");
+        if(observed!="at the first Stalfos drop (OOT)")
+            std::cerr<<"observed static first-drop source: "<<observed<<'\n';
+        require(observed=="at the first Stalfos drop (OOT)",
+                "static MM first-drop hint must name the enemy source instead of Hyrule Field");
+        require(locations==json{{"Mask of Truth","at the first Stalfos drop (OOT)"},
+                                {"Hookshot","in Hyrule Field (OOT)"},
+                                {"Zora Mask","in Legacy Missing Check (OOT)"},
+                                {"Goron Mask","in Legacy Empty Area (OOT)"}},
+                "static source export changed ordinary/legacy fallbacks or admitted an empty item");
+        auto withoutExport=FirstDropStaticHintSeed(source,true,false,seed);
+        output["mm"].erase("itemLocations");withoutExport["mm"].erase("itemLocations");
+        require(output==withoutExport,"static source export changed RNG, gossip, slots, weights or stats");
+    }
+    const auto authored=FirstDropStaticHintSeed({{"en","the first Stalfos reward"}});
+    require(authored["mm"]["itemLocations"]["Mask of Truth"]=="at the first Stalfos reward (OOT)",
+            "static source must preserve the authored English fragment");
+    for(const json& missingSource:{json(),json{{"de","bei der ersten Beute des Typs Stalfos"}},json{{"en",""}}}) {
+        const auto fallback=FirstDropStaticHintSeed(missingSource);
+        require(fallback["mm"]["itemLocations"]["Mask of Truth"]=="at the first Stalfos drop (OOT)",
+                "known first-drop identity must survive missing English source metadata");
+    }
+    const auto legacy=FirstDropStaticHintSeed(source,false);
+    require(legacy["mm"]["itemLocations"]["Mask of Truth"]=="in Hyrule Field (OOT)",
+            "old check metadata without enemy identity must retain the existing area fallback");
+    std::cout<<"PASS actual Generate static first-drop source, authored/fallback metadata, ordinary/legacy controls and unchanged gossip/RNG outputs\n";
+}
 void CheckGeneration() {
     Rando::StaticData::hintTextTable[RHT_NONE]=HintText(CustomMessage("No Hint","Kein Hinweis","Pas d'Indice"));
     for(int clarity=0;clarity<3;++clarity)for(uint32_t seed:{1u,0x12345678u,0xffffffffu}) {
@@ -172,7 +242,9 @@ json CheckOotRouting(const json& hints,const json& savedRows=json::array()) {
     return rows;
 }
 int main(int argc,char**argv) {
-    CheckGeneration();CheckOotClaimContract();
+    CheckGeneration();
+    MmGossip::CheckStaticFirstDrop(FirstDropStaticHintSeed());
+    CheckFirstDropStaticGeneration();CheckOotClaimContract();
     json save=argc>1?json::parse(std::ifstream(argv[1])):json::object();
     json hints;
     if(!save.empty())hints=save.at("combo").at("rando").at("hints");

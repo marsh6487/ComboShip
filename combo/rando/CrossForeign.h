@@ -739,7 +739,8 @@ struct HintGossipEntry {
 };
 struct MmHints {
     std::vector<HintGossipEntry> gossipPool;
-    std::unordered_map<std::string, std::string> itemLocations; // itemName -> "in <area> (OOT)"
+    // itemName -> plain location/source phrase, including (OOT).
+    std::unordered_map<std::string, std::string> itemLocations;
 };
 
 // Load the hints.mm object from the pushed spoiler blob. Empty (never throws) on missing/corrupt
