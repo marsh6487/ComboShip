@@ -66,6 +66,34 @@ Gfx* Gfx_TwoTexScrollEx(GraphicsContext*, s32, u32, u32, s32 width1, s32 height1
     return scratch;
 }
 }
+// Deliberate rendering boundary: keep executing each real native token/flame
+// callback after both simpler mode and a failed detailed draw. Detailed renderer
+// geometry/resources are exercised separately by the full-catalog fixture.
+static bool forceSimpler;
+static int descriptorRequests, failedDetailedDraws;
+#if HOST_MM
+static bool ComboDrawNativeMmSoul(RandoItemId id) {
+    assert(Rando::SoulShuffle::Find(id));
+    ++descriptorRequests;
+    if (!forceSimpler) ++failedDetailedDraws;
+    return false;
+}
+#else
+extern "C" int32_t OOT_GetSoulMiniDrawInfo(int32_t id, CwItemAnimDrawInfo* out) {
+    const auto* soul = Rando::SoulShuffle::Find(static_cast<RandomizerGet>(id));
+    assert(soul && out);
+    ++descriptorRequests;
+    if (forceSimpler || (soul->option != RSK_SHUFFLE_ENEMY_SOULS && soul->option != RSK_SHUFFLE_NPC_SOULS))
+        return 0;
+    out->stateDependent = 1;
+    return 1;
+}
+static int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char* game, PlayState* host) {
+    assert(info && info->stateDependent && !strcmp(game, "oot") && host == &play);
+    ++failedDetailedDraws;
+    return 0;
+}
+#endif
 /* PRODUCTION */
 static void Reset(u32 frame) {
     submitted.clear(); matrixDepth = 0; scrollSize = {};
@@ -105,15 +133,25 @@ int main() {
         assert(recipe.xluStartIndex == 1 && recipe.xluSeg8TexScroll == 1);
         assert(recipe.primColorXlu[0] == 155 && recipe.primColorXlu[1] == 155 &&
                recipe.primColorXlu[2] == 155 && recipe.primColorXlu[3] == 255);
-        for (u32 frame : {0u, 1u, 127u, 128u, 0xffffffffu}) {
+        for (bool simpler : {false, true}) {
+          forceSimpler = simpler;
+          for (u32 frame : {0u, 1u, 127u, 128u, 0xffffffffu}) {
+            descriptorRequests = failedDetailedDraws = 0;
             Reset(frame);
 #if HOST_MM
-            DrawShuffledSoul();
+            DrawShuffledSoul(soul.item);
 #else
             GetItemEntry entry{}; entry.getItemId = soul.item;
             Randomizer_DrawShuffledSoul(&play, &entry);
 #endif
             CheckDraw(body, flame);
+            assert(descriptorRequests == 1);
+#if HOST_MM
+            assert(failedDetailedDraws == (simpler ? 0 : 1));
+#else
+            const bool detailedCategory = soul.option == RSK_SHUFFLE_ENEMY_SOULS || soul.option == RSK_SHUFFLE_NPC_SOULS;
+            assert(failedDetailedDraws == (!simpler && detailedCategory ? 1 : 0));
+#endif
             Reset(frame);
 #if HOST_MM
             ComboForeignDrawInfoOOT foreign{};
@@ -127,10 +165,11 @@ int main() {
             OOT_DrawForeignShuffledSoul(&play, &foreign);
 #endif
             CheckDraw(foreignBody, flame);
+          }
         }
     }
     CwItemDrawInfo ordinary{};
     assert(!DescribeAddedSoul(static_cast<decltype(Rando::SoulShuffle::Catalog[0].item)>(0), &ordinary));
-    std::printf("PASS %zu native soul identities: token bodies, native+foreign boss flame root/scroll, owner brackets, stable ABI\n",
+    std::printf("PASS %zu native soul identities: simpler and failed-detail token bodies, native+foreign boss flame root/scroll, owner brackets, stable ABI\n",
                 std::size(Rando::SoulShuffle::Catalog));
 }

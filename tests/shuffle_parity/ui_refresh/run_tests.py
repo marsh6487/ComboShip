@@ -23,6 +23,10 @@ def prepare(build):
     start = menu.index('static const float POOL_BALANCE_UNLIKELY_RATIO')
     end = menu.index('// Shop checks', start)
     (build / 'metrics.inc').write_text(menu[start:end])
+    start = menu.index('"Shuffle Magic Mirror"')
+    start = menu.rfind('\n    {\n', 0, start)
+    end = menu.index('\n    }', start) + len('\n    }')
+    (build / 'mirror.inc').write_text(menu[start:end])
     # Overloaded helpers are extracted by complete signature (the common native
     # function extractor intentionally returns just the first matching overload).
     def exact(signature):

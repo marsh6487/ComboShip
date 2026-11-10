@@ -43,6 +43,7 @@ extensions = [f'FCI_MM_KEY_RING_{dungeon}' for dungeon in
               ('WOODFALL', 'SNOWHEAD', 'GREAT_BAY', 'STONE_TOWER')]
 extensions += ['FCI_OOT_CLOCK']
 extensions += [f'FCI_{game}_RUSTY_KEY_{key}' for game, key in rusty]
+extensions += ['FCI_RITO_MASK']
 
 def check_combo_registry(current):
     assert len(current) == len(set(current)), 'duplicate serialized combo identity'

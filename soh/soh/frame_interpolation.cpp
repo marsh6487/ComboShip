@@ -505,6 +505,8 @@ void FrameInterpolation_RecordCloseChild(void) {
     current_path.pop_back();
 }
 
+#include "../../combo/menu/ComboFrameInterpolationTransaction.h"
+
 void FrameInterpolation_DontInterpolateCamera(void) {
     camera_epoch = previous_camera_epoch + 1;
 }

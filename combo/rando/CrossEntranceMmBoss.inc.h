@@ -1,5 +1,8 @@
 // Included after ComboCrossMm's oracle HostState and reachable/time maps are defined.
 #include "rando/CrossEntranceBoss.h"
+#include "Rando/SoloEntrances.h"
+extern "C" int Combo_MM_SoloEntranceBossSource(int physicalBoss);
+extern "C" COMBO_EXPORT void MM_ApplyCrossBossClear(int sourceBossId, int dormant);
 namespace ComboCrossMm {
 static ComboRando::CrossDungeon::BossCompletionState bossCompletion;
 static const int32_t bossEntrances[4] = { ENTRANCE(ODOLWAS_LAIR, 0), ENTRANCE(GOHTS_LAIR, 0), ENTRANCE(GYORGS_LAIR, 0),
@@ -22,31 +25,7 @@ static bool BossLogicEnabled() {
     return Combo_IsCombinedGame() && state.HasPool(Pool::Boss);
 }
 static void AppendBossCatalogue(std::vector<Dungeon>& out) {
-    const int32_t dungeon[] = { ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(SNOWHEAD_TEMPLE, 0),
-                                ENTRANCE(GREAT_BAY_TEMPLE, 0), ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0) };
-    const char* owner[] = { "mm:woodfall", "mm:snowhead", "mm:greatbay", "mm:inverted" };
-    const int32_t escape[] = { ENTRANCE(WOODFALL_TEMPLE, 1), ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7),
-                               ENTRANCE(ZORA_CAPE, 9), ENTRANCE(IKANA_CANYON, 15) };
-    const int32_t warp[] = { ENTRANCE(WOODFALL_TEMPLE, 1), ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7), ENTRANCE(ZORA_CAPE, 9),
-                             ENTRANCE(IKANA_CANYON, 15) };
-    for (int i = 0; i < 4; ++i) {
-        Dungeon boss{
-            "mm:boss:" + std::to_string(i + 8), { 1, bossEntrances[i] }, { 1, escape[i] }, { 1, dungeon[i] }
-        };
-        boss.pool = Pool::Boss;
-        boss.boss = i + 8;
-        boss.owner = owner[i];
-        boss.hasReverse = false;
-        boss.escapeExits = { { 1, escape[i] } };
-        boss.warpReturn = Endpoint{ 1, warp[i] };
-        boss.reverseCheckpoint = boss.warpCheckpoint = Endpoint{ 1, dungeon[i] };
-        boss.deathCheckpoint = Endpoint{ 1, dungeon[i] };
-        out.push_back(std::move(boss));
-    }
-    // Odolwa always completes to prison spawn 1 while cross Boss is active.
-    // WOODFALL 0 is ordinary overworld travel; WOODFALL 3 is the prison's outer
-    // dungeon exit. Neither belongs to the physical boss's completion aliases.
-    out[out.size() - 2].escapeExits.push_back({ 1, ENTRANCE(ZORA_CAPE, 8) });
+    ComboCrossMmCatalogue::AppendBossCatalogue(out);
 }
 } // namespace ComboCrossMm
 extern "C" COMBO_EXPORT void MM_SetCrossBossNotify(void (*notify)(int)) {
@@ -57,19 +36,36 @@ extern "C" COMBO_EXPORT void MM_SetCrossBossCompletedMask(uint16_t mask) {
 }
 extern "C" int Combo_MM_CrossBossLogicalClear(int id, int nativeValue) {
     using namespace ComboCrossMm;
+    if (gComboGameMode == COMBO_GAME_MM) {
+        if (searching || Rando::gItemGrantSimulation)
+            return Rando::SoloEntrances::LogicalClear(id, nativeValue);
+        // Solo blue warps set the source temple's native weekly flag. Its world
+        // effect still resets each cycle even though completion is remembered.
+        return nativeValue;
+    }
     if (searching && BossLogicEnabled())
         return id >= 0 && id < COMBO_BOSS_COUNT && (state.logicalClears & (1u << id));
     // MM world effects reset each cycle; loading persistent completion must not restore spring.
     return bossCompletion.LogicalClear(id, nativeValue != 0, !searching && Combo_MM_CrossBossEnabled()) && nativeValue;
 }
 extern "C" int Combo_MM_CrossBossWarp(int scene) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        const int source = Combo_MM_SoloEntranceBossSource(ComboCrossMm::BossFromScene(scene));
+        if (source < COMBO_BOSS_ODOLWA || source > COMBO_BOSS_TWINMOLD)
+            return 0;
+        MM_ApplyCrossBossClear(source, 0);
+        return 1; // Suppress native physical-temple clear; the source owns the completion.
+    }
     return ComboCrossMm::bossCompletion.Warp(ComboCrossMm::BossFromScene(scene), Combo_MM_CrossBossEnabled());
 }
 extern "C" COMBO_EXPORT void MM_ApplyCrossBossClear(int sourceBossId, int dormant) try {
     using namespace ComboCrossMm;
     if (sourceBossId < 8 || sourceBossId >= 12 || gSaveContext.fileNum < 0 || gSaveContext.fileNum > 2)
         return;
-    bossCompletion.SetCompletedMask(bossCompletion.CompletedMask() | (1u << sourceBossId));
+    if (gComboGameMode == COMBO_GAME_MM)
+        gSaveContext.save.shipSaveInfo.rando.soloEntrances.completedBossMask |= 1u << sourceBossId;
+    else
+        bossCompletion.SetCompletedMask(bossCompletion.CompletedMask() | (1u << sourceBossId));
     switch (sourceBossId) {
         case COMBO_BOSS_ODOLWA:
             SET_WEEKEVENTREG(WEEKEVENTREG_CLEARED_WOODFALL_TEMPLE);

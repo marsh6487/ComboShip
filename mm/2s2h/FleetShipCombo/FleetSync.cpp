@@ -91,6 +91,7 @@ void Bottle_WheelPersist(unsigned char wheel, unsigned short slotItem);
 void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 // Elemental Wand / Sheikah Slate grants (mods/extended_inventory.c): place the cell item, light the
 // rod/rune bit and pick the active mode -- the same call the native pickup makes.
+void RitoMask_Grant(void);
 unsigned char Cane_GiveSkill(unsigned char skill);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
@@ -657,7 +658,8 @@ static void ApplyVanillaShared(const nlohmann::json& sh) {
     });
     if (filtered.value("separateRocsFeather", 0))
         nei->ootSpellsOwned |= 8u; // Dedicated NEI feather only; no native spell ownership.
-    nei->ritoMaskOwned |= static_cast<uint8_t>(filtered.value("ritoMaskOwned", 0));
+    if (filtered.value("ritoMaskOwned", 0))
+        RitoMask_Grant();
     nei->ootWeaponUpgradesOwned |= static_cast<uint8_t>(filtered.value("ootWeaponUpgradesOwned", 0));
     ComboVanilla::ApplySharingCells(*nei, filtered, FcEquip_MmToOot16, FcEquip_OotToMm16);
     if (nei->twilightUpgrade & 1u)

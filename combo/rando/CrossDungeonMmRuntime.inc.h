@@ -1,5 +1,6 @@
 // Gameplay route ownership is deliberately separate from CrossDungeonMm.inc.h's oracle state.
 #include "rando/CrossDungeonRuntime.h"
+#include "rando/SoloEntranceMmRuntime.h"
 #include "ComboGameMode.h"
 #include "rando/CrossEntranceMmGrottos.inc.h"
 extern "C" int Combo_MM_GiantsEscape(int32_t* entrance, int32_t* cutscene, int consume);
@@ -19,27 +20,31 @@ static bool ValidEntrance(int32_t index) {
         return true;
     return Rando::Logic::GetRegionIdFromEntrance(index) != RR_MAX;
 }
-static void ObserveScene(int scene) {
+static bool OwnsScene(const RuntimeState& routes, int scene) {
     const bool temple = scene == SCENE_MITURIN || scene == SCENE_HAKUGIN || scene == SCENE_SEA ||
                         scene == SCENE_INISIE_N || scene == SCENE_INISIE_R || scene == SCENE_MITURIN_BS ||
                         scene == SCENE_HAKUGIN_BS || scene == SCENE_SEA_BS || scene == SCENE_INISIE_BS ||
                         scene == SCENE_KYOJINNOMA;
     bool owned = temple;
-    if (state.HasPool(Pool::Grotto) && scene == SCENE_KAKUSIANA)
+    if (routes.HasPool(Pool::Grotto) && scene == SCENE_KAKUSIANA)
         owned = true;
     for (const auto& portal : ComboCrossMmCatalogue::Interiors())
-        if (state.FindEntrance(portal.entrance) && Rando::Logic::Regions.at(portal.region).sceneId == scene)
+        if (routes.FindEntrance(portal.entrance) && Rando::Logic::Regions.at(portal.region).sceneId == scene)
             owned = true;
-    if (state.HasPool(Pool::Dungeon)) {
+    if (routes.HasPool(Pool::Dungeon)) {
         for (const auto& portal : ComboCrossMmCatalogue::ExpandedDungeons())
-            if (state.FindEntrance(portal.entrance) && Rando::Logic::Regions.at(portal.region).sceneId == scene)
+            if (routes.FindEntrance(portal.entrance) && Rando::Logic::Regions.at(portal.region).sceneId == scene)
                 owned = true;
-        if (state.FindEntrance(ENTRANCE(IKANA_CASTLE, 1)) && scene == SCENE_IKNINSIDE)
+        if (routes.FindEntrance(ENTRANCE(IKANA_CASTLE, 1)) && scene == SCENE_IKNINSIDE)
             owned = true;
-        if (state.FindEntrance(ENTRANCE(PIRATES_FORTRESS_EXTERIOR, 0)) &&
+        if (routes.FindEntrance(ENTRANCE(PIRATES_FORTRESS_EXTERIOR, 0)) &&
             (scene == SCENE_KAIZOKU || scene == SCENE_PIRATE))
             owned = true;
     }
+    return owned;
+}
+static void ObserveScene(int scene) {
+    const bool owned = OwnsScene(state, scene);
     if (localDungeonArrival >= 0) {
         checkpoint.Arrive(localDungeonArrival, owned);
         localDungeonArrival = -1;
@@ -168,13 +173,21 @@ extern "C" int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void) {
     return ComboMmMaterializeGrotto(recovery->parent.index);
 }
 extern "C" int Combo_MM_CrossDungeonRuntimeEnabled(void) {
+    if (gComboGameMode == COMBO_GAME_MM)
+        return Combo_MM_SoloEntranceRuntimeEnabled();
     return Combo_IsCombinedGame() && ComboCrossMmRuntime::state.Enabled();
 }
 extern "C" int Combo_MM_CrossBossEnabled(void) {
+    if (gComboGameMode == COMBO_GAME_MM)
+        return Combo_MM_SoloEntranceBossEnabled();
     return Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum >= 0 &&
            gSaveContext.fileNum <= 2 && ComboCrossMmRuntime::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
 extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        Combo_MM_SoloEntranceRestoreCheckpoint(index);
+        return;
+    }
     using namespace ComboCrossMmRuntime;
     const bool known = state.Enabled() && state.IsRecoveryEntrance(index) && ValidEntrance(index);
     checkpoint.Arrive(known ? index : -1, known);
@@ -202,6 +215,10 @@ extern "C" int32_t Combo_MM_ConsumeCrossDungeonArrival(void) {
     return materialized;
 }
 extern "C" void Combo_MM_RequestCrossBossDeathRecovery(void) {
+    if (gComboGameMode == COMBO_GAME_MM) {
+        Combo_MM_SoloEntranceRequestBossDeathRecovery();
+        return;
+    }
     using namespace ComboCrossMmRuntime;
     // Native automatic game-over and the optional Continue menu use different respawn modes.
     bossDeathRecoveryRequested =
@@ -209,6 +226,8 @@ extern "C" void Combo_MM_RequestCrossBossDeathRecovery(void) {
 }
 // MM has no native entrance permutation; the central transition boundary takes one composed leg.
 extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
+    if (gComboGameMode == COMBO_GAME_MM)
+        return Combo_MM_SoloEntranceTransition(index);
     if (!Combo_IsCombinedGame())
         return 0;
     using namespace ComboCrossMmRuntime;
@@ -274,6 +293,8 @@ extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
     return 1;
 }
 extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void) {
+    if (gComboGameMode == COMBO_GAME_MM)
+        return Combo_MM_SoloEntranceSavedCheckpoint();
     return ComboCrossMmRuntime::checkpoint.Saved();
 }
 extern "C" void Combo_MM_LoadCrossDungeonCheckpoint(int32_t index) {

@@ -4,6 +4,61 @@ Plan: `docs/superpowers/plans/2026-11-08-shuffle-parity.md`.
 
 ## Current integrated source and authorization
 
+### R22 integration checkpoint (supersedes older status summaries below)
+
+Published R21 remains `0063920e18145299afc1682aab98407ebd366fc5`, tree
+`55582071d0afddc81529bcc1d495d3c083d32c2e`. The controller has preserved and
+integrated the additional user-authorized checkouts through `394353da`, the
+reviewed shared Mirror handoff `08bae2d8` (local integration `0eb7d529`), and the
+optional preview omission `4a48edda`.
+Publication stays on the existing candidate branch and draft PR89. Existing
+authorization includes these additions; no repeated approval, merge, master
+update or release promotion is required or performed.
+
+| Requirement / workstream | Owner | Source / checkpoint | Verification state |
+| --- | --- | --- | --- |
+| Original complete parity checklist below | Original feature owners / controller | Published R21 `0063920e` | Linux complete targets/resources/package, native eight-profile matrix and full12 Vanilla/MQ/mixed first-drop cases PASS; 660 own-soul negatives PASS. R21 modules and exact evidence are preserved independently. |
+| Windows games, launcher and required native CLI | ci_native | R21 job129414631601 | Completed SUCCESS, including actual mandatory comborando build/link. Optional standalone validator upload remains skipped by policy. Artifact13711710699 SHA256 d831002e1d8eccabca5cf05b0a34cc7c148a45b8cfafbe5bb4b7f43ea689d7d7. |
+| R21 regression failure | controller / independent reviewer | `4608e863` | ITEMS failed at Desired Items provider compilation: missing explicit pinned ImGui include. Four-line fixture-only repair passes the whole exact row with GCC13/native ABI/ASan and CPATH/CPLUS_INCLUDE_PATH/C_INCLUDE_PATH cleared; fresh cumulative CI still required. Other five groups PASS. |
+| Termina Field authored collision | environment / controller | `8b9800bf`, CI registration `394353da` | Actual original input reproduces baseline heap overflow. Both guards pass with5740 nodes inside new8393 capacity; native market regression passes. WORLD now requires that public-input regression. Configured Ikana traversal remains separate. |
+| Authored overworld-key GIs | door_keys / controller | `5bf6ce4e`, `aa65fce9`, `e8a75fba`; reviewed donor47d90b9f | All66 identities and both receiving hosts pass sanitized routing. Deterministic resources/native factory checks pass. Reviewed raw asset blobs are uploaded as base64 with exact Git hashes, then final tree/readback must match before publication is counted verified. |
+| Enemy/NPC actual-model soul GIs | firstdrops / controller | `0096d1eb`; reviewed donor0414b109 | Complete public sanitizer gate PASS:189 recipes,4536 draws, both hosts, native/replacement/native transitions, material factory, allocation failure/matrix rollback, owner bridge and real settings/accent controls. Both native modules must rebuild and ship together because appended draw/descriptor ABI is same-build. |
+| Shared Magic Mirror checkboxes | song_clock / recovery controller | Reviewed donor `08bae2d8`; integrated `0eb7d529` | Both existing Combo controls use one effective setting including OFF, with standalone preferences preserved. Actual ImGui/native MM-card original and Combo ASan/UBSan tests PASS: all four retained solo-preference combinations, OFF/ON/OFF, exact item/check count changes and restored preferences. Merged shared-policy sanitizer checks PASS. No extra global control is added. |
+| New integrated builds and native generation | ci_native / controller | Next immutable R22 tree | Pending cumulative publication and fresh CI. R21 successes are prior-baseline evidence, not a claim that newer modules have linked or replayed. |
+
+The interrupted asset upload is recovered without the optional
+`tools/authored_door_keys/previews/sheen/door-keys-sheen-rotation.gif`, as the
+user requested. All 49 remaining planned paths reuse 45 existing base64-uploaded
+Git blobs; each receipt, byte count, Git hash and SHA-256 matches. The GIF is
+removed from the candidate tree and preview hash list and its output path is
+ignored. No production resource depends on it. Five asset tests and deterministic
+regeneration PASS; all four original/Combo receiving-host sanitizer fixtures
+PASS for all 66 key identities with the GIF absent. Independent integration
+review preserves all 41 Mirror donor paths and all 327 unique regression rows,
+including the key, soul and collision gates. The final full source tree must
+still pass remote equality/readback before publication is called complete.
+
+The model controls retain gold What's New accents and the global accent toggle.
+Enemy/NPC souls use actual owner models and compatible replacement resources;
+animal/misc soul tokens retain their established presentation. All new source
+keeps original identifiers, save fields and accepted resource paths. No private
+scene archive, replacement pack, ROM, save or gameplay log is published.
+
+Earlier independently restorable combined checkpoint:
+`ComboShip_Integrated_Keys_Souls_Collision_Source_20261109.zip`,
+SHA256 `b74201965d8826653c1ca33b23cdf8e19a13ce4d728ed5e3cf8f14e567dd4191`,
+Library `libfile_498dc1324148819191e32d35422f4faa`, restores0096d1eb/tree91d67784.
+The later collision CI registration, Mirror integration and preview omission are
+committed separately. Preserve the full cumulative source and exact restoration
+tree before publication and the new long build.
+
+R22 implementation and the focused integration reviews are complete. Remaining
+work is final cumulative publication, fresh full platform builds and native
+generation/replay checks, plus configured gameplay acceptance. The preserved
+R21 build evidence does not cover the newer integrated modules.
+
+### Historical R20 summary
+
 The full user authorization remains active for implementation, six concurrent
 workers, integration, regression repairs, builds, independently recoverable
 checkpoints and publication to candidate/ootmm-shuffle-parity-20261108 / draft

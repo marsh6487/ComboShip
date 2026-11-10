@@ -1,5 +1,6 @@
 """Execute the real combo seed normalize/restore/save-application paths."""
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,11 @@ if any('RustyDoorKeys::' in body for body in soh.values()):
                          rusty.index('inline RandomizerGet LegacySourceItem(')]
     parts.append("namespace Rando::RustyDoorKeys {\n" + rusty_policy + "\n" +
                  extract(source("soh/soh/Enhancements/randomizer/LockOverworldDoors.cpp"), "void PrepareNewGeneration()") + "\n}")
+launcher = source("combo/ComboShip.cpp")
+if 'static std::string Combo_UserRandoSettingsSnapshot(' in launcher:
+    parts += [re.search(r'^typedef const char\* \(\*FnDumpData\)\(void\);', launcher, re.M)[0],
+              re.search(r'^static int \(\*SOH_ReadComboMagicMirrorPreference\)\(void\) = nullptr;', launcher, re.M)[0],
+              extract(launcher, 'static std::string Combo_UserRandoSettingsSnapshot(')]
 parts += ["namespace Rando {\n" + extract(settings, "std::shared_ptr<Settings> Settings::GetInstance()") + "\n" +
          extract(settings, "const std::array<Option, RSK_MAX>& Settings::GetAllOptions() const") + "\n" +
          extract(option, "const std::string& Option::GetCVarName() const") + "\n}",

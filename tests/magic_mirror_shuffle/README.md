@@ -4,13 +4,14 @@ The native `Shuffle Magic Mirror` option defaults OFF. OFF uses the existing fix
 
 In solo OoT, the check follows the native Lost Woods region and its room-1 fairy tunnel. In solo MM, it follows the native Woods of Mystery passage. The combined pool owns one physical MM check. Its two genuine routes are native MM Woods of Mystery (which returns through OoT Lost Woods) and the OoT Lost Woods fairy tunnel. The direct OoT oracle reports an access-only probe after its actual inventory-specific native region search. The shared fill, playthrough, requiredness and cross-dungeon fixed point union that probe into the same MM check, including before the main interworld portal opens. The probe never becomes a pool location or a reward, and reaching it does not open MM's main overworld.
 
-The active combined launcher already invokes `SOH_NormalizeComboGraceFromMM` before its native dumps. That existing shared-policy entry point also ORs the two independent Mirror requests into `gRando.Generation.ShuffleMagicMirror`. Both native seed flags and replay snapshots consume this generation state without changing either checkbox or enabling the broad NEI pool. Old snapshots clear the absent state; old native OoT spoilers explicitly default OFF; old MM check arrays load with the appended check uncollected.
+In Combo, the existing controls in both game tabs edit one authoritative `gCombo.Rando.ShuffleMagicMirror` preference. Either control can turn it ON or OFF, independently of the retained solo preferences. Native MM cards, flat OoT widgets, presets, bulk controls, config import and live pool previews use the same value. The launcher invokes `SOH_NormalizeComboGraceFromMM` before native dumps to freeze that preference into `gRando.Generation.ShuffleMagicMirror`; both native seed policies explicitly apply zero as well as one. Replay normalizes both native snapshots before restore, while temporary save creation preserves the user's newer UI preference. Only old configurations or snapshots without a canonical value migrate by OR-ing the old native settings. Solo modes retain their native controls, generation and settings. Old MM check arrays load with the appended check uncollected.
 
 `CW_DRAW_KIND_MAGIC_MIRROR = 42` describes the procedural Mirror through the portable item ABI. Both foreign renderers call the receiving host's authored Mirror draw function, so they retain its mesh/reflection/leaves and native scale without copying donor display-list pointers or regenerating art.
 
 Run the focused checks with project nlohmann and spdlog include directories in `CPATH`:
 
 - `python -B tests/magic_mirror_shuffle/registry_test.py`
+- `python -B tests/magic_mirror_shuffle/run_shared_settings_tests.py --sanitize`
 - `python -B tests/magic_mirror_shuffle/run_option_tests.py`
 - `python -B tests/magic_mirror_shuffle/run_grant_tests.py`
 - `python -B tests/magic_mirror_shuffle/run_pool_tests.py`

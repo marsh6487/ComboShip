@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="seasons-mode-pool-") as td:
                          "IsSongLocationItem"))
     start_source = (ROOT / "mm/2s2h/Rando/StartingItems.cpp").read_text()
     starting = block_from(start_source, start_source.index("std::vector<RandoItemId> GetComputedStartingItems("))
-    headers = ''.join('#include "Rando/' + name + '.h"\n' for name in
+    headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
                       ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
     (build / "pool.inc").write_text(headers + "namespace Rando {\n" + starting + "\nnamespace Logic {\n" + helpers + "\n" + generator + "\n}}\n")
     binary = build / "pool"

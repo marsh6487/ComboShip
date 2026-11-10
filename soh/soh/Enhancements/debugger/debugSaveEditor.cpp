@@ -39,7 +39,7 @@ extern PlayState* gPlayState;
 #include "textures/icon_item_24_static/icon_item_24_static.h"
 #include "textures/parameter_static/parameter_static.h"
 #include "mods/extended_inventory.h"
-#include "mods/transformation_masks/custom_forms.h" // RitoItem_NoteCellItem (shared Farore's Wind cell)
+#include "mods/transformation_masks/custom_forms.h" // Rito ownership and existing corner mask wheel
 #include "mods/nei_save.h"                          // Skijer's NEI — bottle flags (Nei_Save)
 // Dual Cane (Somaria / Pacci) — mods/items/logic/item_cane_of_somaria.c. Lights one of the six
 // skill bits and, on the first one obtained, also drops the cane into SLOT_CANE_OF_SOMARIA.
@@ -52,6 +52,7 @@ unsigned char TradeAdult_IsOwnedIndex(int index);
 void TradeAdult_SetOwnedIndex(int index, unsigned char on);
 int TradeAdult_Count(void);
 void TradeAdult_GiveIndex(int index);
+void TradeAdult_FoldCurrent(uint16_t item);
 // Skijer's NEI — mods/items/logic/twilight_upgrade.c
 unsigned char TwilightUpgrade_HasClawshot(void);
 unsigned char TwilightUpgrade_HasBombArrows(void);
@@ -1535,7 +1536,12 @@ void DrawInventoryTab() {
                 if (ImGui::Button("##itemNonePicker",
                                   ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2)) {
                     if (selectedIndex != SLOT_NONE) {
-                        gSaveContext.inventory.items[selectedIndex] = ITEM_NONE;
+                        if (selectedIndex == SLOT_TRADE_CHILD &&
+                            gSaveContext.inventory.items[selectedIndex] == ITEM_RITO_MASK) {
+                            RitoMask_Remove();
+                        } else {
+                            gSaveContext.inventory.items[selectedIndex] = ITEM_NONE;
+                        }
                         if (syncButtons) {
                             SyncButtonItemsForSlot(selectedIndex);
                         }
@@ -1571,11 +1577,8 @@ void DrawInventoryTab() {
                     addRocsFeather = true;
                 }
 
-                // Rito Mask (Skijer's NEI): it shares the Farore's Wind cell instead of
-                // owning one, so the gItemSlots scan above can never find it — offer it
-                // explicitly on that cell. Picking it here IS how you grant yourself the
-                // mask; the kaleido records ownership the next time the menu opens.
-                if (selectedIndex == SLOT_FARORES_WIND) {
+                // Rito uses the existing corner mask wheel.
+                if (selectedIndex == SLOT_TRADE_CHILD) {
                     auto ritoIt = customItemMapping.find((uint32_t)ITEM_RITO_MASK);
                     if (ritoIt != customItemMapping.end()) {
                         possibleItems.push_back(ritoIt->second);
@@ -1592,12 +1595,12 @@ void DrawInventoryTab() {
                                                   ImVec2(IMAGE_SIZE, IMAGE_SIZE), ImVec2(0, 0), ImVec2(1, 1));
                     PopStyleButton();
                     if (ret) {
-                        // Remember what the shared Farore's Wind cell held before it is
-                        // overwritten — that cell is the only record of owning either the
-                        // spell or the Rito Mask. Skijer's NEI
-                        if (selectedIndex == SLOT_FARORES_WIND) {
+                        if (selectedIndex == SLOT_TRADE_CHILD) {
+                            TradeAdult_FoldCurrent(gSaveContext.inventory.items[selectedIndex]);
                             RitoItem_NoteCellItem(gSaveContext.inventory.items[selectedIndex]);
                             RitoItem_NoteCellItem(slotEntry.id);
+                            if (slotEntry.id == ITEM_RITO_MASK)
+                                RitoMask_Grant();
                         }
                         gSaveContext.inventory.items[selectedIndex] = slotEntry.id;
                         if (syncButtons) {
@@ -2121,6 +2124,19 @@ void DrawInventoryTab() {
 
     ImGui::Spacing();
     ImGui::Spacing();
+
+    if (ImGui::CollapsingHeader("Corner Mask Wheel (Page 1)")) {
+        bool ritoOwned = RitoMask_IsOwned() != 0;
+        if (ImGui::Checkbox("Rito Mask", &ritoOwned)) {
+            OotNeiEditor::SetRitoMaskOwned(ritoOwned);
+        }
+        UIWidgets::Tooltip("Select Rito with the other masks in the bottom-right inventory wheel.");
+        if (ritoOwned && ImGui::Button("Select Rito Mask")) {
+            TradeAdult_FoldCurrent(gSaveContext.inventory.items[SLOT_TRADE_CHILD]);
+            RitoItem_NoteCellItem(gSaveContext.inventory.items[SLOT_TRADE_CHILD]);
+            gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_RITO_MASK;
+        }
+    }
 
     // ============================================================================
     // MM MASKS INVENTORY (Page 3 - Slots 48-71)

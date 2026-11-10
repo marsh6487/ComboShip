@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check real Ikana pose producers, both grids and the engine's texture route."""
 from pathlib import Path
-import argparse, hashlib, os, re, struct, subprocess, tempfile
+import argparse, hashlib, os, re, struct, subprocess, sys, tempfile
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 parser=argparse.ArgumentParser(description=__doc__)
@@ -11,6 +11,8 @@ parser.add_argument("--archive",type=Path,action="append",default=[],help="optio
 parser.add_argument("--fados-archive",type=Path,help="local supplied Fados worn-shield O2R; mesh data is not distributed")
 args=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
+from foreign_gi_fixture_dependencies import clock_descriptor
 def function(source,name):
     match=re.search(r'^(?![ \t]*/)(?:static\s+)?[^\n{};]+\b'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
     if not match:raise RuntimeError('Missing production function '+name)
@@ -89,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
         subprocess.run([os.environ.get('CXX','c++'),*iconflags,str(cpp),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
 
-    exported=read('tests/ikana_gi/mm_export_test.cpp')
+    exported=clock_descriptor(ROOT)+read('tests/ikana_gi/mm_export_test.cpp')
     mm=read('combo/menu/ComboItemDrawMM.h')
     collectible=read('combo/menu/ComboCollectibleShimmerHost.h')
     profile='#define COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'+function(collectible,'ComboCollectibleShimmer_ProfileForDrawId')+'\n#undef COMBO_COLLECTIBLE_SHIMMER_HOST_MM\n'

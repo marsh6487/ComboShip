@@ -111,6 +111,22 @@ void Matrix_Init(GameState* gameState) {
  *
  * @remark original name: "Matrix_push"
  */
+#ifdef COMBO_BUILD
+/* Bounded item-render transactions use the actual native 20-entry stack. */
+s32 Matrix_GetRemainingStack(void) {
+    if (sMatrixStack == NULL || sCurrentMatrix == NULL)
+        return 0;
+    return 19 - (s32)(sCurrentMatrix - sMatrixStack);
+}
+
+void Matrix_RestoreSoulDrawStack(MtxF* position, const MtxF* value) {
+    if (position < sMatrixStack || position >= sMatrixStack + 20 || value == NULL)
+        return;
+    sCurrentMatrix = position;
+    *sCurrentMatrix = *value;
+}
+#endif
+
 void Matrix_Push(void) {
     MtxF* prev = sCurrentMatrix;
 

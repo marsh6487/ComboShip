@@ -114,7 +114,7 @@ def main():
         environment = {**os.environ, "ASAN_OPTIONS": os.environ.get("ASAN_OPTIONS", "") + ":detect_leaks=0"}
         subprocess.run([str(binary)], check=True, env=environment)
         bindings = source("mm/2s2h/Rando/NeiGiPresentation.cpp")
-        headers = ''.join('#include "Rando/' + name + '.h"\n' for name in
+        headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
                           ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
         pool_binding = headers + item_data + "\nnamespace Rando::Logic {\n"
         constraints = source("mm/2s2h/Rando/Logic/PlacementConstraints.cpp")

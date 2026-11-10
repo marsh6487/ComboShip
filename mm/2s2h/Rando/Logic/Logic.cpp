@@ -7,6 +7,8 @@ extern "C" int Combo_MM_CrossDungeonEntranceFromRegion(int index, int region);
 #include "Logic.h"
 #ifdef COMBO_BUILD
 #include "rando/CrossEntranceMmCatalogue.h"
+#include "rando/SoloEntranceMmOverworld.h"
+#include "Rando/SoloEntrances.h"
 #endif
 
 namespace Rando {
@@ -42,6 +44,12 @@ RandoRegionId GetRegionIdFromEntrance(s32 entrance) {
         return region;
     if (auto region = ComboCrossMmCatalogue::RegionForGrottoEntry(entrance); region != RR_MAX)
         return region;
+    if (gComboGameMode == COMBO_GAME_MM && IS_RANDO && gSaveContext.save.shipSaveInfo.rando.soloEntrances.version) {
+        if (auto region = ComboSoloMmOverworld::RegionForEntry(entrance); region != RR_MAX)
+            return region;
+        if (auto region = ComboSoloMmOverworld::RegionForReturn(entrance); region != RR_MAX)
+            return region;
+    }
     // A composed boss-only Goht warp may arrive at this previously source-only endpoint.
     if (entrance == ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7))
         return RR_MOUNTAIN_VILLAGE;
@@ -231,6 +239,8 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
             destination = Combo_MM_CrossDungeonEntranceFromRegion(exitId, currentRegion);
             if (destination < 0)
                 continue;
+        } else if (gComboGameMode == COMBO_GAME_MM) {
+            destination = Rando::SoloEntrances::ResolveEntrance(exitId, currentRegion);
         }
 #endif
         RandoRegionId connectedRegionId = GetRegionIdFromEntrance(destination);

@@ -6,6 +6,8 @@ extern "C" void Partners_Reset(void);
 
 #include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "rando/MagicMirrorShuffle.h"
+#include "rando/MagicMirrorSettingsSnapshot.h"
+#include "rando/RitoMaskSettingsSnapshot.h"
 #include "Enhancements/randomizer/SoulShuffle.h"
 #include "Enhancements/randomizer/EnemyFirstDrops.h"
 #include "../../combo/ComboGameMode.h"
@@ -5358,6 +5360,14 @@ static bool Combo_ClearNumericExclusions() {
 // ComboShip: snapshot every OOT rando option as {cvarName: value}. The combo orchestrator stores
 // this in the consolidated spoiler so a dropped/reloaded seed reproduces the exact settings on any
 // machine (OOT options are CVar-backed; SOH_RestoreRandoSettings writes them back).
+extern "C" COMBO_EXPORT int SOH_ReadComboMagicMirrorPreference(void) {
+    return ComboRando::MagicMirrorSettings::Preview();
+}
+
+extern "C" COMBO_EXPORT int SOH_ReadComboRitoMaskPreference(void) {
+    return ComboRando::RitoMaskSettings::Preview();
+}
+
 extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
     static std::string cached;
     nlohmann::json j = nlohmann::json::object();
@@ -5370,6 +5380,15 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
     // exclusions (GAP-7). Restore below is type-aware.
     j[CVAR_RANDOMIZER_SETTING("ExcludedLocations")] = CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");
     j["gRando.Generation.ShuffleMagicMirror"] = CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::MagicMirrorSettings::SharedCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+        j[ComboRando::MagicMirrorSettings::OotCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+    }
+    j["gRando.Generation.ShuffleRitoMask"] = CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::RitoMaskSettings::SharedCvar] = j["gRando.Generation.ShuffleRitoMask"];
+        j[ComboRando::RitoMaskSettings::OotCvar] = j["gRando.Generation.ShuffleRitoMask"];
+    }
     cached = j.dump();
     return cached.c_str();
 }
@@ -5379,13 +5398,8 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
 // Replays restore their existing snapshots instead of calling this normalizer.
 extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM(void) {
     Rando::RustyDoorKeys::PrepareNewGeneration();
-    // One physical combined stump: OR the independent native requests, while
-    // keeping both checkbox CVars unchanged. The generation value is snapshotted
-    // separately so replay reconstructs both native seed flags.
-    CVarSetInteger(
-        "gRando.Generation.ShuffleMagicMirror",
-        ComboRando::MagicMirrorShuffle::Requested(CVarGetInteger(CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), 0),
-                                                  CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", 0)));
+    ComboRando::MagicMirrorSettings::PrepareGeneration();
+    ComboRando::RitoMaskSettings::PrepareGeneration();
     const auto mode = NeiGrace_SeedMode(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", NEI_GRACE_OFF));
     const auto rewards = NeiGrace_SeedRequired(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4));
     CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", mode);
@@ -5412,6 +5426,11 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         auto j = nlohmann::json::parse(json);
         CVarSetInteger(Rando::RustyDoorKeys::CatalogVersionCVar, 0);
         CVarSetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+        CVarSetInteger("gRando.Generation.ShuffleRitoMask", 0);
+        if (Combo_IsCombinedGame())
+            ComboRando::MagicMirrorSettings::RestoreSnapshot(j);
+        if (Combo_IsCombinedGame())
+            ComboRando::RitoMaskSettings::RestoreSnapshot(j);
         // Upstream appended these renames to the already-run ConfigVersion7 updater, so older snapshots
         // still carry the old keys; rename them here (same table, values unchanged).
         static const std::pair<const char*, const char*> kRenamed[] = {
@@ -5449,7 +5468,10 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         // Snapshot is authoritative: pre-clear so a key missing from an older spoiler reads as the
         // default, not this machine's local value (options, then exclusions).
         for (const auto& opt : Rando::Settings::GetInstance()->GetAllOptions()) {
-            if (!opt.GetCVarName().empty())
+            if (!opt.GetCVarName().empty() &&
+                !(Combo_IsCombinedGame() &&
+                  (ComboRando::MagicMirrorSettings::NativeControl(opt.GetCVarName().c_str()) ||
+                   ComboRando::RitoMaskSettings::NativeControl(opt.GetCVarName().c_str()))))
                 CVarClear(opt.GetCVarName().c_str());
         }
         CVarSetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");

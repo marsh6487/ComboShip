@@ -1014,7 +1014,8 @@
       "Rusty Key (Stock Pot Inn Staff Room)", "Rusty Key (Stock Pot Inn Staff Room)")                                  \
     X(FCI_MM_RUSTY_KEY_STOCK_POT_INN_DORMITORY, 1, FCI_F_NONE, RG_MM_RUSTY_KEY_STOCK_POT_INN_DORMITORY,                \
       RI_RUSTY_KEY_STOCK_POT_INN_DORMITORY, "Rusty Key (Stock Pot Inn Dormitory)",                                     \
-      "Rusty Key (Stock Pot Inn Dormitory)", "Rusty Key (Stock Pot Inn Dormitory)")
+      "Rusty Key (Stock Pot Inn Dormitory)", "Rusty Key (Stock Pot Inn Dormitory)")                                    \
+    X(FCI_RITO_MASK, 1, FCI_F_NONE, RG_RITO_MASK, RI_OOT_NEI_RITO_MASK, "Rito Mask", "Rito Mask", "Rito Mask")
 
 // -----------------------------------------------------------------------------
 // Enum estable de items combo (generado por la lista; APPEND-ONLY)

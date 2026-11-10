@@ -3,6 +3,7 @@
 #define BenJsonConversions_hpp
 
 #include "Rando/VanillaCompatibility.h"
+#include "Rando/SoloEntrances.h"
 #include <nlohmann/json.hpp>
 #include "../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
@@ -96,6 +97,7 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "nayruRocsMode", n.nayruRocsMode },
         { "ootUpgrades", n.ootUpgrades },
         { "ootMasksOwned", n.ootMasksOwned },
+        { "ootMaskCursor", n.ootMaskCursor },
         // Farore's Wind warp point (Skijer's NEI spells pass)
         { "fwSet", n.fwSet },
         { "fwPosX", n.fwPosX },
@@ -118,6 +120,7 @@ inline void to_json(json& j, const NeiSaveData& n) {
         // Latent NEI ownership is separate from effect-driving native bases.
         { "ultrashotOwned", n.ultrashotOwned },
         { "ritoMaskOwned", n.ritoMaskOwned },
+        { "ritoMaskSelected", n.ritoMaskSelected },
         { "ootWeaponUpgradesOwned", n.ootWeaponUpgradesOwned & 0x09 },
         // Fleet Ship Combo cross-game fields (layouts in 2s2h/FleetShipCombo/FleetComboIds.h)
         { "shieldOwned", n.shieldOwned },
@@ -236,6 +239,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     const auto ritoMask = j.find("ritoMaskOwned");
     if (ritoMask != j.end() && ritoMask->is_number_integer() && *ritoMask == 1)
         n.ritoMaskOwned = 1;
+    const auto ritoSelected = j.find("ritoMaskSelected");
+    n.ritoMaskSelected = ritoSelected != j.end() && ritoSelected->is_number_integer() && *ritoSelected == 1;
     const auto weaponOwnership = j.find("ootWeaponUpgradesOwned");
     if (weaponOwnership != j.end() && weaponOwnership->is_number_integer() && *weaponOwnership >= 0 &&
         *weaponOwnership <= 0xFF)
@@ -243,6 +248,9 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.nayruRocsMode = j.value("nayruRocsMode", (uint8_t)0);
     n.ootUpgrades = j.value("ootUpgrades", (uint16_t)0);
     n.ootMasksOwned = j.value("ootMasksOwned", (uint16_t)0);
+    const auto maskCursor = j.find("ootMaskCursor");
+    if (maskCursor != j.end() && maskCursor->is_number_integer() && *maskCursor >= 0 && *maskCursor <= 8)
+        n.ootMaskCursor = maskCursor->get<uint8_t>();
     // Farore's Wind warp point (Skijer's NEI spells pass) — absent keys default to "no warp set".
     n.fwSet = j.value("fwSet", (uint8_t)0);
     n.fwPosX = j.value("fwPosX", 0.0f);
@@ -354,6 +362,7 @@ inline void to_json(json& j, const SpiritualStoneWarpSave& w) {
         { "posX", w.posX },
         { "posY", w.posY },
         { "posZ", w.posZ },
+        { "soloEntranceCheckpoint", w.soloEntranceCheckpoint },
     };
 }
 
@@ -365,6 +374,7 @@ inline void from_json(const json& j, SpiritualStoneWarpSave& w) {
     w.posX = j.value("posX", 0.0f);
     w.posY = j.value("posY", 0.0f);
     w.posZ = j.value("posZ", 0.0f);
+    w.soloEntranceCheckpoint = j.value("soloEntranceCheckpoint", (int32_t)-1);
 }
 
 inline void to_json(json& j, const SpiritualStonesSaveData& s) {
@@ -380,6 +390,7 @@ inline void from_json(const json& j, SpiritualStonesSaveData& s) {
     for (int i = 0; i < SPIRITUAL_STONE_SAVE_COUNT; i++) {
         s.warp[i].entranceId = -1;
         s.warp[i].sceneId = -1;
+        s.warp[i].soloEntranceCheckpoint = -1;
     }
     if (j.contains("passive")) {
         for (int i = 0; i < SPIRITUAL_STONE_SAVE_COUNT; i++)
@@ -420,6 +431,7 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
         { "randoSaveChecks", rando.randoSaveChecks },
         { "finalSeed", rando.finalSeed },
         { "songEvents", rando.songEvents },
+        { "soloEntrances", Rando::SoloEntrances::Seed(rando) },
         { "randoSaveOptions", rando.randoSaveOptions },
         { "randoStartingItems", rando.randoStartingItems },
         { "foundDungeonKeys", rando.foundDungeonKeys },
@@ -440,7 +452,13 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     for (size_t i = 0; i < savedInf.size() && i < ARRAY_COUNT(rando.randoInf); ++i) {
         rando.randoInf[i] = savedInf[i];
     }
-    j.at("randoEvents").get_to(rando.randoEvents);
+    // Event IDs are append-only too. A pre-Twinmold save has no final event;
+    // absent events must clear when a native context is reused for another file.
+    const auto savedEvents = j.at("randoEvents").get<std::vector<u8>>();
+    memset(rando.randoEvents, 0, sizeof(rando.randoEvents));
+    for (size_t i = 0; i < savedEvents.size() && i < ARRAY_COUNT(rando.randoEvents); ++i) {
+        rando.randoEvents[i] = savedEvents[i];
+    }
     // Check IDs are append-only. Old saves have a shorter array; future saves
     // may have a longer one. Preserve known checks and default absent additions.
     const auto savedChecks = j.at("randoSaveChecks").get<std::vector<RandoSaveCheck>>();
@@ -470,6 +488,10 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
         auto map = ComboRando::SongEvents::ParseMapping(ComboRando::SongEvents::Game::Mm, j.at("songEvents"));
         std::copy(map.begin(), map.end(), rando.songEvents);
     }
+    // These conversions are also used by file-select previews. Deserialize
+    // only into the supplied save; runtime binding belongs to actual save load.
+    Rando::SoloEntrances::ApplySeed(rando, j.value("soloEntrances", json{}));
+    Rando::SoloEntrances::ValidateSettings(rando);
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);
     j.at("foundTriforcePieces").get_to(rando.foundTriforcePieces);

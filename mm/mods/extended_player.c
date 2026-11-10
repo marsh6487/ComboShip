@@ -589,6 +589,10 @@ static const NeiItem* ExtPlayer_FindByIA(int32_t itemAction) {
  * Get the PLAYER_IA_xxx value for a given ITEM_xxx value.
  */
 int8_t ExtPlayer_GetItemAction(int32_t item) {
+    // Rito's full-width button identity is consumed by the custom-form input
+    // listener; it never indexes the native u8 action table.
+    if (item == EXT_ITEM_RITO_MASK)
+        return PLAYER_IA_NONE;
     // EXT button IDs are wider than the vanilla item range; keep a neutral action.
     if (item == EXT_ITEM_MAGIC_MIRROR) {
         return PLAYER_IA_ELEMENTAL_WAND;

@@ -79,6 +79,9 @@ void Combo_MM_Rando_Restore() {
   sMM_OracleActive = false;
 }
 const char *MM_DumpRandoSettings() { return "{}"; }
+namespace Rando::SoloEntrances {
+nlohmann::json Seed(const RandoSaveInfo&) { return nullptr; }
+}
 #include "mm/2s2h/Rando/Logic/SoloRandoHeadless.inc"
 int main() {
   using nlohmann::json;
@@ -123,6 +126,7 @@ int main() {
          generations == 1 && resets == 1 && restores == 1);
   assert(r["prices"]["native paid check"] == 17 &&
          r["prices"]["native free check"] == 0);
+  assert(r.contains("soloEntrances") && r["soloEntrances"].is_null());
   assert(sMMComboCheckPrices == originalPrices);
   assert(!memcmp(&before, &gSaveContext, sizeof(gSaveContext)) &&
          gPlayState == play && gFcCombo_SuppressRecord == 9 &&

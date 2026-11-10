@@ -1,5 +1,6 @@
 #include "NeiGiPresentation.h"
 #include "NeiResourceRouting.h"
+#include "ComboNeiGiResourceOwner.h"
 #include "variables.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
@@ -63,6 +64,7 @@ const Binding kBindings[] = {
     { RI_OOT_NEI_MINISH_CAP, "minish_cap" },
     { RI_OOT_NEI_LANTERN, "lantern" },
     { RI_OOT_NEI_MARIO_MASK, "mario_mask" },
+    { RI_OOT_NEI_RITO_MASK, "rito_mask" },
     { RI_OOT_TRADE_COJIRO, "cojiro" },
     { RI_OOT_NEI_ELEMENTAL_WAND, "elemental_wand" },
     { RI_OOT_NEI_WAND_SAND_ROD, "sand_rod" },
@@ -306,7 +308,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
     Matrix_Push();
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);
-    const char* owner = std::strncmp(info.dlists[0], "__OTR__@oot-gi-base:", 20) == 0 ? "oot-gi-base" : "oot";
+    const char* owner = CwNeiGiResourceOwner(info.dlists[0]);
     NeiGi_DrawPresentation(play, info.dlists[0],
                            info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
                            info.neiEffect, info.neiEffectCenter,
@@ -319,6 +321,20 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     if (!out)
         return false;
     *out = CwItemDrawInfo{};
+    if (item == RI_OOT_NEI_RITO_MASK) {
+        out->drawKind = CW_DRAW_KIND_NEI_GI;
+        out->dlistCount = 1;
+        out->xluStartIndex = -1;
+        // Native MM uses its local archive even without an OoT DLL or cross registry.
+        // The foreign OoT resolver adds @mm when exporting this portable recipe.
+        out->dlists[0] = "__OTR__objects/nei_gi_redesign/rito_mask/gi_dl";
+        out->scale = 1.f;
+        out->neiEffect = static_cast<int>(Kind::Gold);
+        out->neiShimmer = static_cast<int>(Kind::Gold) + 1;
+        out->itemShimmer = 1;
+        out->stateDependent = 2;
+        return true;
+    }
     if (item >= RI_OOT_NEI_SEASON_SPRING && item <= RI_OOT_NEI_SEASON_WINTER) {
         *out = CwItemDrawInfo{};
         out->drawKind = CW_DRAW_KIND_SEASON_GI;
@@ -361,7 +377,8 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     out->neiShimmer = info.neiShimmer;
     const bool mandatory = info.neiShimmer > 0 && (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
                                                    NeiGi::IsEquipment(static_cast<Kind>(info.neiShimmer - 1)) ||
-                                                   item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
+                                                   item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK ||
+                                                   item == RI_OOT_NEI_RITO_MASK);
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
     const bool vanillaSword =

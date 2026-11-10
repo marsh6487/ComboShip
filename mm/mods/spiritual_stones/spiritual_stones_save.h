@@ -28,6 +28,7 @@ typedef struct SpiritualStoneWarpSave {
     float posX;
     float posY;
     float posZ;
+    int32_t soloEntranceCheckpoint; // -1 = no Solo MM shuffled-entrance ownership
 } SpiritualStoneWarpSave;
 
 typedef struct SpiritualStonesSaveData {

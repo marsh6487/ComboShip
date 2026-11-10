@@ -1,4 +1,5 @@
 #include "rando/CrossWorldRando.h"
+#include "combo/rando/MagicMirrorSettingsKeys.h"
 #include <fstream>
 #include <map>
 #include <stdexcept>
@@ -43,6 +44,16 @@ std::map<RandoItemId,Item> Items={
 #include "mm_item_rows.inc"
 };
 #include "mm_names.inc"
+}
+bool Combo_IsCombinedGame();
+namespace ShipInit {
+// Live GUI dispatch is outside this pool/emission fixture; record the exact
+// canonical key rather than replacing any settings or pool policy.
+static int sharedRefreshes;
+void Init(const char* key) {
+    REQUIRE(std::string(key) == ComboRando::MagicMirrorSettings::SharedCvar);
+    ++sharedRefreshes;
+}
 }
 #include "mm_menu.inc"
 #include "mm_active.inc"

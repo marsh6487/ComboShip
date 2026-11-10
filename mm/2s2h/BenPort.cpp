@@ -1,4 +1,6 @@
 #include "Rando/SongEvents.h"
+#include "../../combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "../../combo/rando/RitoMaskSettingsSnapshot.h"
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
 #include "Rando/RustyDoorKeys.h"
@@ -363,6 +365,7 @@ static std::shared_ptr<Ship::ResourceManager> sMMResourceManager;
 
 #ifdef COMBO_BUILD
 #include "rando/CrossDungeonMmRuntime.inc.h"
+#include "rando/SoloEntranceMmRuntime.inc.h"
 #endif
 
 extern "C" char** cameraStrings;
@@ -1660,6 +1663,15 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
+    if (gComboGameMode == COMBO_GAME_MM) {
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(
+            [](s8 sceneId, s8) { Combo_MM_SoloEntranceObserveScene(sceneId); });
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(Combo_MM_SoloEntranceOnPlayDestroy);
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::BeforeEndOfCycleSave>(
+            []() { Combo_MM_SoloEntranceRestoreCheckpoint(-1); });
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::BeforeMoonCrash>(
+            []() { Combo_MM_SoloEntranceRestoreCheckpoint(-1); });
+    }
     if (Combo_IsCombinedGame()) {
         // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
         // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
@@ -4154,8 +4166,12 @@ extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placem
         for (auto& [id, opt] : Rando::StaticData::Options) {
             options[opt.name] = (uint32_t)CVarGetInteger(opt.cvar, opt.defaultValue);
         }
-        if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
-            options[Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].name] = RO_GENERIC_ON;
+        if (Combo_IsCombinedGame())
+            options[Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].name] =
+                CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF;
+        if (Combo_IsCombinedGame())
+            options[Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].name] =
+                CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF;
         // ComboShip (#136): combo owns the goal and MM's own toggle is hidden, so the CVar loop above
         // would save hunt=off — leaving Majora killable pre-completion and the tracker row missing.
         options[Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].name] =
@@ -4454,6 +4470,15 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoSettings(void) {
     }
     j["gRando.StartingItems"] = si;
     j["gRando.Generation.ShuffleMagicMirror"] = CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::MagicMirrorSettings::SharedCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+        j[ComboRando::MagicMirrorSettings::MmCvar] = j["gRando.Generation.ShuffleMagicMirror"];
+    }
+    j["gRando.Generation.ShuffleRitoMask"] = CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0);
+    if (Combo_IsCombinedGame()) {
+        j[ComboRando::RitoMaskSettings::SharedCvar] = j["gRando.Generation.ShuffleRitoMask"];
+        j[ComboRando::RitoMaskSettings::MmCvar] = j["gRando.Generation.ShuffleRitoMask"];
+    }
     cached = j.dump();
     return cached.c_str();
 }
@@ -4466,8 +4491,16 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         return;
     try {
         auto j = nlohmann::json::parse(json);
-        CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", RO_GENERIC_OFF);
+        if (!Combo_IsCombinedGame())
+            CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR", RO_GENERIC_OFF);
+        if (!Combo_IsCombinedGame())
+            CVarSetInteger("gRando.Options.RO_SHUFFLE_RITO_MASK", RO_GENERIC_OFF);
         CVarSetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+        CVarSetInteger("gRando.Generation.ShuffleRitoMask", 0);
+        if (Combo_IsCombinedGame())
+            ComboRando::MagicMirrorSettings::RestoreSnapshot(j);
+        if (Combo_IsCombinedGame())
+            ComboRando::RitoMaskSettings::RestoreSnapshot(j);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
@@ -4635,7 +4668,8 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
 
     // RI_TRAP is RITYPE_LESSER but never gates logic — class it junk like OOT's traps.
     auto isAdvancement = [](const auto& it) {
-        return it.randoItemType != RITYPE_JUNK && it.randoItemType != RITYPE_HEALTH && it.randoItemId != RI_TRAP;
+        return it.randoItemType != RITYPE_JUNK && it.randoItemType != RITYPE_HEALTH && it.randoItemId != RI_TRAP &&
+               it.randoItemId != RI_OOT_NEI_RITO_MASK;
     };
 
     // ComboShip: native category, so the cross fill can trim ONLY junk — `advancement` alone can't say
@@ -5313,6 +5347,7 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
     // applies the kit, then overrides health only for a nondefault option.
     gSaveContext.save.saveInfo.playerData.healthCapacity = gSaveContext.save.saveInfo.playerData.health = 0x30;
     Rando::SongEvents::RestoreForOracle(gSaveContext.save.shipSaveInfo.rando);
+    Rando::SoloEntrances::RestoreForOracle(gSaveContext.save.shipSaveInfo.rando);
     // ComboShip (#136): combo owns the goal, so the hidden CVars above must not decide it here either.
     Rando::Wallets::NormalizeOptions(gSaveContext.save.shipSaveInfo.rando,
                                      Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0));
@@ -5840,21 +5875,23 @@ extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
     } crossGuard;
     std::set<RandoRegionId> reachable;
     std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
-    if (ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
+    if (!Combo_IsCombinedGame() || ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
         reachable.insert(RR_MAX);
         timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
     }
-    for (int index : ComboCrossMm::state.arrivals) {
-        auto region = Rando::Logic::GetRegionIdFromEntrance(index);
-        reachable.insert(region);
-        auto states = Rando::Logic::InitializeRegionTimeStates(region);
-        // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
-        // wait. A physical cross arrival inherits its native region's waiting restrictions.
-        for (auto& [arrivalRegion, incoming] : states) {
-            incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
-            const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
-            if (!inserted)
-                it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+    if (Combo_IsCombinedGame()) {
+        for (int index : ComboCrossMm::state.arrivals) {
+            auto region = Rando::Logic::GetRegionIdFromEntrance(index);
+            reachable.insert(region);
+            auto states = Rando::Logic::InitializeRegionTimeStates(region);
+            // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
+            // wait. A physical cross arrival inherits its native region's waiting restrictions.
+            for (auto& [arrivalRegion, incoming] : states) {
+                incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
+                const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
+                if (!inserted)
+                    it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+            }
         }
     }
 

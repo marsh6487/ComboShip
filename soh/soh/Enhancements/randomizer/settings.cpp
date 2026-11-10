@@ -1436,6 +1436,8 @@ void Settings::CreateOptions() {
         }
     });
     OPT_BOOL(RSK_SHUFFLE_MASKS, CVAR_RANDOMIZER_SETTING("ShuffleMasks"));
+    OPT_BOOL(RSK_SHUFFLE_RITO_MASK, "Shuffle Rito Mask", CVAR_RANDOMIZER_SETTING("ShuffleRitoMask"),
+             "Adds exactly one optional Rito Mask. No progression checks require it.", IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_U8(RSK_GOSSIP_STONE_HINTS, {"No Hints", "Need Nothing", "Mask of Truth", "Stone of Agony"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("GossipStoneHints"), WIDGET_CVAR_COMBOBOX, RO_GOSSIP_STONES_NEED_NOTHING, false, nullptr, IMFLAG_NONE);
     OPT_CALLBACK(RSK_GOSSIP_STONE_HINTS, {
         if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("GossipStoneHints"), RO_GOSSIP_STONES_NEED_NOTHING) ==
@@ -2350,6 +2352,7 @@ void Settings::CreateOptions() {
                                   &mOptions[RSK_SHUFFLE_SCARECROWS_SONG],
                                   &mOptions[RSK_SHUFFLE_GERUDO_MEMBERSHIP_CARD],
                                   &mOptions[RSK_SHUFFLE_MASKS],
+                                  &mOptions[RSK_SHUFFLE_RITO_MASK],
                                   &mOptions[RSK_FISHSANITY],
                                   &mOptions[RSK_FISHSANITY_POND_COUNT],
                                   &mOptions[RSK_FISHSANITY_AGE_SPLIT],
@@ -2747,6 +2750,7 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_SCARECROWS_SONG],
                                             &mOptions[RSK_SHUFFLE_GERUDO_MEMBERSHIP_CARD],
                                             &mOptions[RSK_SHUFFLE_MASKS],
+                                            &mOptions[RSK_SHUFFLE_RITO_MASK],
                                             &mOptions[RSK_SHUFFLE_MERCHANTS],
                                             &mOptions[RSK_MERCHANT_PRICES],
                                             &mOptions[RSK_MERCHANT_PRICES_FIXED_PRICE],
@@ -3647,6 +3651,7 @@ void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     // from a previously loaded seed in the same Context.
     mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
     mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF);
+    mContext->GetOption(RSK_SHUFFLE_RITO_MASK).Set(RO_GENERIC_OFF);
     mContext->GetOption(RSK_SHUFFLE_ENEMY_DROPS).Set(RO_GENERIC_OFF);
     // Pre-policy spoilers included Grace without a gate. Loading one after a
     // newer seed must restore that behavior rather than inherit its restriction.
@@ -3691,8 +3696,12 @@ void Settings::SetAllToContext() {
     for (int i = 0; i < RSK_MAX; i++) {
         mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set(mOptions[i].GetOptionIndex());
     }
-    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))
-        mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_ON);
+    if (Combo_IsCombinedGame())
+        mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR)
+            .Set(CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF);
+    if (Combo_IsCombinedGame())
+        mContext->GetOption(RSK_SHUFFLE_RITO_MASK)
+            .Set(CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0) ? RO_GENERIC_ON : RO_GENERIC_OFF);
     for (int i = 0; i < RT_MAX; i++) {
         mContext->GetTrickOption(static_cast<RandomizerTrick>(i)).Set(mTrickSettings[i].GetOptionIndex());
     }

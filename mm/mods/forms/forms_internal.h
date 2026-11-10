@@ -148,4 +148,13 @@ void GaroForm_PostLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, 
 void GaroForm_OnDeath(Player* player, PlayState* play);
 u16 GaroForm_VoiceFor(u16 linkVoiceSfx);
 
+void RitoForm_Reset(Player* player, PlayState* play);
+void RitoForm_ForgetContext(void);
+void RitoForm_FilterInput(Player* player, Input* input);
+void RitoForm_Update(Player* player, PlayState* play);
+u8 RitoForm_OwnsAction(void);
+f32 RitoForm_DrawOffset(Player* player);
+void RitoForm_PostLimb(PlayState* play, Player* player, s32 limbIndex);
+void RitoForm_DrawWorld(PlayState* play, Player* player);
+
 #endif

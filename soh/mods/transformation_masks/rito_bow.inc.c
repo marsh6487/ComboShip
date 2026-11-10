@@ -77,6 +77,8 @@ typedef struct {
 
 typedef struct {
     u8 loaded;
+    u8 seedUsesNative;
+    u8 releaseUsesNative;
     u8 state;
     u8 moving;               // which hold loop is running: 0 = idle04, 1 = run07
     u8 fired;                // this release has already loosed, so the lead frame cannot fire twice
@@ -129,19 +131,51 @@ static void MmForm_RitoBowLoadClips(void) {
     sRitoBow.release = MmForm_RitoBowLoadClip(RITO_BOW_CLIP_RELEASE, RITO_BOW_RELEASE_SPEED);
     sRitoBow.seed = MmForm_RitoBowLoadClip(RITO_BOW_CLIP_SEED, RITO_BOW_SEED_SPEED);
     sRitoBow.airTap = MmForm_RitoBowLoadClip(RITO_BOW_CLIP_AIR_TAP, RITO_BOW_SPEED);
-    if (sRitoBow.holdStill == NULL) {
-        SPDLOG_WARN("[Rito] bow clips missing ({}) — B will not draw", RITO_BOW_CLIP_HOLD_STILL);
+    // Optional authored bow clips are not required to use the owned Rito mask.
+    // These native Link clips stay untouched and retain their original timing.
+    if (sRitoBow.air == NULL)
+        sRitoBow.air = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_ready;
+    if (sRitoBow.enterStill == NULL)
+        sRitoBow.enterStill = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_ready;
+    if (sRitoBow.holdStill == NULL)
+        sRitoBow.holdStill = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_wait;
+    if (sRitoBow.enterMove == NULL)
+        sRitoBow.enterMove = (LinkAnimationHeader*)gPlayerAnim_link_bow_walk2ready;
+    if (sRitoBow.holdMove == NULL)
+        sRitoBow.holdMove = (LinkAnimationHeader*)gPlayerAnim_link_bow_side_walk;
+    if (sRitoBow.release == NULL) {
+        sRitoBow.release = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_end;
+        sRitoBow.releaseUsesNative = 1;
     }
+    if (sRitoBow.seed == NULL) {
+        sRitoBow.seed = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_next;
+        sRitoBow.seedUsesNative = 1;
+    }
+    if (sRitoBow.airTap == NULL)
+        sRitoBow.airTap = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_next;
 }
 
 static f32 MmForm_RitoBowDrawLift(Player* player) {
-    if ((sRitoBow.seed != NULL) && (player->skelAnime.animation == sRitoBow.seed)) {
+    if (!sRitoBow.seedUsesNative && (sRitoBow.seed != NULL) && (player->skelAnime.animation == sRitoBow.seed)) {
         return RITO_BOW_SEED_LIFT;
     }
-    if ((sRitoBow.release != NULL) && (player->skelAnime.animation == sRitoBow.release)) {
+    if (!sRitoBow.releaseUsesNative && (sRitoBow.release != NULL) &&
+        (player->skelAnime.animation == sRitoBow.release)) {
         return RITO_BOW_RELEASE_LIFT;
     }
     return 0.0f;
+}
+
+extern "C" u8 MmForm_RitoBowUsesNativePose(Player* player) {
+    if (player == NULL)
+        return 0;
+    const LinkAnimationHeader* anim = player->skelAnime.animation;
+    return anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_ready ||
+           anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_wait ||
+           anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_walk2ready ||
+           anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_side_walk ||
+           anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_end ||
+           anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_next;
 }
 
 extern "C" u8 MmForm_RitoBowIsOut(void) {

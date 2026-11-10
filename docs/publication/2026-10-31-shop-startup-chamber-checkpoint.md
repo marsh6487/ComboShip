@@ -62,18 +62,13 @@ camera predicate changed. Preserve the initial publication checkpoint at
 
 ## Original history and rollback
 
-`docs/recovery/oct31-shop-startup-chamber-37b6be75.bundle` retains all eight
-original repair/integration commits above the already published parent. It is
-a bounded recovery bundle and requires that parent and its ancestors.
-
-```sh
-git fetch origin 628e891c683f5cd5b02a5570b1572ad62d42dd37
-git bundle verify docs/recovery/oct31-shop-startup-chamber-37b6be75.bundle
-git fetch docs/recovery/oct31-shop-startup-chamber-37b6be75.bundle refs/heads/fix/initialization-shop-receipt-20261031-poc1:refs/heads/recovery/oct31-shop-startup-chamber
-git rev-parse recovery/oct31-shop-startup-chamber^{tree}
-```
-
-The last command must print `f55b402803767ec7dbb6794cec912da8dbbc312f`.
+The original local recovery bundle retained all eight repair/integration
+commits above the published parent. The November 9 cumulative publication
+omits Git history packages, including that bundle; it is not a runtime asset.
+The original recovery tree remains recorded as
+`f55b402803767ec7dbb6794cec912da8dbbc312f` for comparison with retained local
+checkpoints. Public source recovery uses the candidate commit and the verified
+source-only checkpoint described in the cumulative publication record.
 Use separate rollback branches or worktrees; retain the cumulative baseline and
 the POC11 archive. Runtime acceptance still needs the reported MM-to-OoT Lost
 Woods handoff, seasonal shop purchases with both continuation choices, and

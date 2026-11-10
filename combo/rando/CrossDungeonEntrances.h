@@ -34,7 +34,7 @@ struct Endpoint {
 };
 
 enum class Phase { BeforeNative, AfterNative };
-enum class Pool { Dungeon = 0, Boss = 1, Interior = 2, Grotto = 3, Shop = 4, DoorInterior = 5 };
+enum class Pool { Dungeon = 0, Boss = 1, Interior = 2, Grotto = 3, Shop = 4, DoorInterior = 5, Overworld = 6 };
 inline bool IsInteriorPool(Pool pool) {
     return pool == Pool::Interior || pool == Pool::Shop || pool == Pool::DoorInterior;
 }
@@ -110,7 +110,7 @@ inline void Validate(const std::vector<Dungeon>& dungeons) {
     for (const auto& d : dungeons) {
         if (d.id.empty() || !ids.insert(d.id).second || !Valid(d.entrance) || !Valid(d.exit) || !Valid(d.returnTo) ||
             d.entrance.game != d.exit.game || d.exit.game != d.returnTo.game || !entries.insert(d.entrance).second ||
-            static_cast<int>(d.pool) < 0 || static_cast<int>(d.pool) > 5) {
+            static_cast<int>(d.pool) < 0 || static_cast<int>(d.pool) > 6) {
             throw std::invalid_argument("invalid or duplicate cross-dungeon endpoint");
         }
         if (d.hasReverse)

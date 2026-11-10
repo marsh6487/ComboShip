@@ -26,6 +26,31 @@ int main() {
   const auto mm = ConfigWithMods(mmOrder);
   const json::json_pointer ootKey("/CVars/gSettings/EnabledMods");
   const json::json_pointer mmKey("/CVars/gSettings/EnabledModsMM");
+  const json::json_pointer sharedMirror(
+      "/CVars/gCombo/Rando/ShuffleMagicMirror");
+  const json::json_pointer soloOotMirror(
+      "/CVars/gRandoSettings/ShuffleMagicMirror");
+  const json::json_pointer soloMmMirror(
+      "/CVars/gRando/Options/RO_SHUFFLE_MAGIC_MIRROR");
+  for (int ootValue : {0, 1})
+    for (int mmValue : {0, 1}) {
+      json ootConfig = json::object(), mmConfig = json::object();
+      ootConfig[soloOotMirror] = ootValue;
+      mmConfig[soloMmMirror] = mmValue;
+      auto migrated = ComboSettingsImport::Merge(ootConfig, mmConfig);
+      Check(migrated.at(sharedMirror).get<int>() == (ootValue || mmValue),
+            "missing shared Mirror key migrates the old OR once");
+      ootConfig[sharedMirror] = 0;
+      auto disabled = ComboSettingsImport::Merge(ootConfig, mmConfig);
+      Check(disabled.at(sharedMirror) == 0,
+            "explicit Combo Mirror OFF beats either solo ON");
+      Check(disabled.at(soloOotMirror) == ootValue &&
+                disabled.at(soloMmMirror) == mmValue,
+            "shared Mirror import preserves independent solo preferences");
+      Check(ootConfig.at(soloOotMirror) == ootValue &&
+                mmConfig.at(soloMmMirror) == mmValue,
+            "shared Mirror migration never modifies imported inputs");
+    }
 
   auto merged = ComboSettingsImport::Merge(soh, mm);
   Check(merged.value(ootKey, std::string()) == ootOrder,

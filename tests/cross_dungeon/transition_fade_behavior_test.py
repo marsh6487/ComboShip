@@ -243,7 +243,9 @@ struct TransitionContext {
 '''
 mm = fixture('mm_adapter_behavior_test.py', 'program')
 mm = mm.replace(function(mm, 'void CheckNativeBossCatalogue()'), '')
-mm = re.sub(r'constexpr int TRANS_TYPE_FADE_BLACK\s*=\s*\d+;', '', mm)
+# This fixture supplies the complete native enum; remove the adapter's minimal
+# declarations for constants that are already present in that enum.
+mm = re.sub(r'constexpr int TRANS_TYPE_(?:FADE_BLACK|INSTANT)\s*=\s*\d+;', '', mm)
 mm = mm_types + mm
 mm = mm.replace('int gameMode=0,', 'int minigameStatus=0,seqId=0,ambienceId=0,transWipeSpeed=0,transFadeDuration=0;int gameMode=0,')
 mm = mm.replace('struct Play { int sceneId=0;', r'''struct Play { int sceneId=0,nextEntrance=0;
@@ -427,6 +429,7 @@ using namespace ComboRando::CrossDungeon;
         body += 'static EntranceInfo sFixtureEntranceTable[ENTR_MAX]{};\nEntranceInfo* gEntranceTable = sFixtureEntranceTable;\n'
     else:
         body += r'''
+#include "tests/cross_dungeon/mm_solo_runtime_stubs.inc"
 static int32_t ComboMmMaterializeGrotto(int32_t index) { return index; }
 static int32_t ComboMmCanonicalGrottoLoad(int32_t index) { return index; }
 static int32_t ComboMmCanonicalGrottoExit(int32_t index,int) { return index; }

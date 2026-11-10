@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboSoulModelSettings.h"
 #include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboElementalArrowGi.h"
@@ -22,12 +23,14 @@
 // The actual owner export scopes its resource manager even for native mask rows.
 namespace Ship {
 inline bool ownerActive = false;
+struct ResourceManager { bool IsAltAssetsEnabled() const { return false; } };
+inline ResourceManager fixtureOwner;
 struct CrossRMRegistry {
- static int Get(const char* game) { assert(!std::strcmp(game,"oot")); return 1; }
+ static ResourceManager* Get(const char* game) { assert(!std::strcmp(game,"oot")); return &fixtureOwner; }
 };
 struct ResourceManagerScope {
  bool before = ownerActive;
- explicit ResourceManagerScope(int owner) { assert(owner==1); ownerActive=true; }
+ explicit ResourceManagerScope(ResourceManager* owner) { assert(owner==&fixtureOwner); ownerActive=true; }
  ~ResourceManagerScope() { ownerActive=before; }
 };
 }

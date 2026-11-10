@@ -147,7 +147,7 @@ void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, u8 canCycle, u
 // alone cannot tell the two sides apart: the Lantern's fire types differ only by flame colour, and
 // the Gale Boomerang is the same item id with a different texture. Ported from SoH's
 // KaleidoCycle_DrawRocStyle, which carries the same two parameters for the same reason.
-static void KaleidoScope_DrawItemCycleExtrasTinted(PlayState* play, u8 slot, u8 canCycle, u8 leftItem, u8 rightItem,
+static void KaleidoScope_DrawItemCycleExtrasTinted(PlayState* play, u8 slot, u8 canCycle, u16 leftItem, u16 rightItem,
                                                    u8 forceShow, void* leftTex, void* rightTex, const u8* leftTint,
                                                    const u8* rightTint) {
     PauseContext* pauseCtx = &play->pauseCtx;
@@ -1200,6 +1200,29 @@ static void Slate_KaleidoDraw(PlayState* play) {
     Slate_KaleidoDrawGlyph(play, cellVtx, Slate_RuneMiniIcon(rune), 11, 11, (u8)pauseCtx->alpha);
 }
 
+static void RitoMask_FollowWheelButtons(PlayState* play, u16 oldItem, u16 newItem, u8 nativeSlot) {
+    if (oldItem == newItem)
+        return;
+    for (s32 btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+        if (ExtButton_GetItem(0, btn) == oldItem) {
+            ExtButton_ClearItem(0, btn);
+            if (newItem == EXT_ITEM_RITO_MASK)
+                ExtButton_SetItem(0, btn, newItem);
+            else
+                BUTTON_ITEM_EQUIP(0, btn) = newItem;
+            C_SLOT_EQUIP(0, btn) = newItem == EXT_ITEM_RITO_MASK ? SLOT_NONE : nativeSlot;
+            Interface_LoadItemIconImpl(play, btn);
+        }
+    }
+    for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+        if (ExtButton_GetDpadItem(0, btn) == oldItem) {
+            ExtButton_SetDpadItem(0, btn, newItem);
+            DPAD_SLOT_EQUIP(0, btn) = newItem == EXT_ITEM_RITO_MASK ? VSLOT_RITO_MASK : nativeSlot;
+            Interface_Dpad_LoadItemIconImpl(play, btn);
+        }
+    }
+}
+
 void KaleidoScope_HandleItemCycles(PlayState* play) {
     s32 page = ExtInv_GetCurrentPage();
     // A wheel left open on one page must not be inherited by the same cell index on another —
@@ -1209,6 +1232,34 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
     if (page != sCycleOpenPage) {
         gCurrentItemCyclingSlot = -1;
         sCycleOpenPage = (s8)page;
+    }
+
+    // Solo MM keeps every fixed mask cell and independently selects Rito/Bremen.
+    if (page == 2 && !RitoMask_UsesCornerWheel()) {
+        const u8 cell = 7;
+        PauseContext* pause = &play->pauseCtx;
+        const u8 canCycle =
+            RitoMask_IsOwned() && gSaveContext.save.saveInfo.inventory.items[SLOT_MASK_BREMEN] == ITEM_MASK_BREMEN;
+        if (canCycle && pause->cursorSlot[PAUSE_ITEM] == cell &&
+            CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_A)) {
+            Audio_PlaySfx(NA_SE_SY_DECIDE);
+            gCurrentItemCyclingSlot = gCurrentItemCyclingSlot == cell ? -1 : cell;
+        }
+        if (gCurrentItemCyclingSlot == cell) {
+            if (pause->cursorSlot[PAUSE_ITEM] != cell)
+                gCurrentItemCyclingSlot = -1;
+            else {
+                pause->cursorColorSet = 8;
+                if (canCycle && ABS(pause->stickAdjX) > 30) {
+                    const u16 oldItem = RitoMask_BremenCellItem();
+                    Nei_Save()->ritoMaskSelected = oldItem != EXT_ITEM_RITO_MASK;
+                    RitoMask_FollowWheelButtons(play, oldItem, RitoMask_BremenCellItem(), SLOT_MASK_BREMEN);
+                    Audio_PlaySfx(NA_SE_SY_CURSOR);
+                }
+                pause->cursorItem[PAUSE_ITEM] = RitoMask_BremenCellItem();
+            }
+        }
+        return;
     }
 
     if (page == 1) {
@@ -1343,7 +1394,11 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
             s32 maskDir = (maskPause->stickAdjX > 30) ? 1 : ((maskPause->stickAdjX < -30) ? -1 : 0);
             if (maskCanCycle && (maskDir != 0)) {
                 Audio_PlaySfx(NA_SE_SY_CURSOR);
+                const u16 oldItem = ExtInv_GetSlotItem(VSLOT_OOT_MASKS);
                 OotMask_CursorStep(maskDir);
+                const u16 newItem = ExtInv_GetSlotItem(VSLOT_OOT_MASKS);
+                RitoMask_FollowWheelButtons(play, oldItem, newItem, VSLOT_OOT_MASKS);
+                maskPause->cursorItem[PAUSE_ITEM] = newItem;
             }
         }
     }
@@ -1363,6 +1418,14 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
 
 void KaleidoScope_DrawItemCycles(PlayState* play) {
     s32 page = ExtInv_GetCurrentPage();
+
+    if (page == 2 && !RitoMask_UsesCornerWheel()) {
+        const u8 canCycle =
+            RitoMask_IsOwned() && gSaveContext.save.saveInfo.inventory.items[SLOT_MASK_BREMEN] == ITEM_MASK_BREMEN;
+        const u16 other = RitoMask_BremenCellItem() == EXT_ITEM_RITO_MASK ? ITEM_MASK_BREMEN : EXT_ITEM_RITO_MASK;
+        KaleidoScope_DrawItemCycleExtrasTinted(play, 7, canCycle, other, other, 0, NULL, NULL, NULL, NULL);
+        return;
+    }
 
     if (page == 1) {
         GustJar_KaleidoDraw(play);

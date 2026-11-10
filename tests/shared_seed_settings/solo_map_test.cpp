@@ -24,6 +24,7 @@ static bool donorEnabled;
 static int donorCalls;
 static std::map<std::string, int> config;
 static std::vector<std::string> controls;
+static std::map<std::string, bool> disabledControls;
 namespace ImGui {
 // This fixture observes native hint routing; styling/input uses real Dear ImGui
 // in tests/whats_new.
@@ -33,6 +34,7 @@ ImVec2 GetContentRegionAvail() { return {1000, 700}; }
 ImGuiStyle& GetStyle() { static ImGuiStyle style; return style; }
 bool BeginChild(const char*, const ImVec2&, ImGuiChildFlags, ImGuiWindowFlags) { return true; }
 void EndChild() {}
+void TextWrapped(const char*, ...) {}
 }
 ImGuiStyle::ImGuiStyle() { ItemSpacing = {}; }
 struct CheckboxOptions {
@@ -49,8 +51,11 @@ struct IntSliderOptions {
     IntSliderOptions& DefaultValue(int) { return *this; }
     IntSliderOptions& Tooltip(const char*) { return *this; }
 };
-static bool CVarCheckbox(const char*, const char* key, const CheckboxOptions&) {
-    if (key) controls.emplace_back(key);
+static bool CVarCheckbox(const char*, const char* key, const CheckboxOptions& options) {
+    if (key) {
+        controls.emplace_back(key);
+        disabledControls[key] = options.data.disabled;
+    }
     return false;
 }
 static void CVarSliderInt(const char*, const char*, const IntSliderOptions&) {}
@@ -61,6 +66,7 @@ extern "C" int CVarGetInteger(const char* key, int fallback) {
 }
 /* INFORMATION_GATE */
 /* NATIVE_HINT_MENU */
+/* NATIVE_ENTRANCE_MENU */
 static void LoadOptions(const nlohmann::json& j, RandoSaveInfo& rando) {
     /* SAVE_OPTIONS_LOAD */
 }
@@ -69,6 +75,84 @@ static void Check(bool ok, const char* message) {
     if (!ok) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
 }
 int main() {
+    const char* entranceOptions[] = {
+        "RO_SHUFFLE_DUNGEON_ENTRANCES", "RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES",
+        "RO_SHUFFLE_BOSS_ENTRANCES", "RO_SHUFFLE_INTERIOR_ENTRANCES",
+        "RO_SHUFFLE_SHOP_ENTRANCES", "RO_SHUFFLE_DOOR_INTERIORS", "RO_SHUFFLE_GROTTO_ENTRANCES",
+        "RO_SHUFFLE_OVERWORLD_ENTRANCES", "RO_DECOUPLED_ENTRANCES", "RO_MIX_ENTRANCE_POOLS",
+        "RO_MIX_DUNGEON_ENTRANCES", "RO_MIX_BOSS_ENTRANCES", "RO_MIX_INTERIOR_ENTRANCES",
+        "RO_MIX_SHOP_ENTRANCES", "RO_MIX_GROTTO_ENTRANCES", "RO_MIX_OVERWORLD_ENTRANCES"
+    };
+    for (const char* name : entranceOptions) {
+        const auto id = Rando::StaticData::GetOptionIdFromName(name);
+        Check(id != RO_MAX, "every modeled Solo MM entrance pool is a saved seed option");
+        if (id != RO_MAX) {
+            const auto& descriptor = Rando::StaticData::Options.at(id);
+            Check(descriptor.defaultValue == 0 && std::string(descriptor.cvar) == "gRando.Options." + std::string(name),
+                  "Solo entrance options have independent native keys and default Off");
+        }
+    }
+#ifdef COMBO_BUILD
+    gComboGameMode = COMBO_GAME_MM;
+    controls.clear();
+    DrawEntrancesTab();
+    for (const char* name : entranceOptions)
+        Check(std::count(controls.begin(), controls.end(), "gRando.Options." + std::string(name)) == 1,
+              "Solo entrances page exposes each modeled pool once");
+    Check(disabledControls["gRando.Options.RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES"],
+          "expanded dungeon pool requires dungeon entrances");
+    Check(!disabledControls["gRando.Options.RO_SHUFFLE_DOOR_INTERIORS"] &&
+              !disabledControls["gRando.Options.RO_SHUFFLE_SHOP_ENTRANCES"],
+          "door interiors and shops can be selected independently");
+    config["gRando.Options.RO_SHUFFLE_DUNGEON_ENTRANCES"] = 1;
+    config["gRando.Options.RO_SHUFFLE_INTERIOR_ENTRANCES"] = 1;
+    DrawEntrancesTab();
+    Check(!disabledControls["gRando.Options.RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES"] &&
+              disabledControls["gRando.Options.RO_SHUFFLE_DOOR_INTERIORS"] &&
+              !disabledControls["gRando.Options.RO_SHUFFLE_SHOP_ENTRANCES"],
+          "broad interiors include door interiors while retaining the separate shop pool");
+    const char* mixOptions[] = {
+        "RO_MIX_DUNGEON_ENTRANCES", "RO_MIX_BOSS_ENTRANCES", "RO_MIX_INTERIOR_ENTRANCES",
+        "RO_MIX_SHOP_ENTRANCES", "RO_MIX_GROTTO_ENTRANCES", "RO_MIX_OVERWORLD_ENTRANCES"
+    };
+    for (const char* name : mixOptions)
+        Check(disabledControls["gRando.Options." + std::string(name)], "pool mixing requires its saved master setting");
+    config["gRando.Options.RO_MIX_ENTRANCE_POOLS"] = 1;
+    config["gRando.Options.RO_SHUFFLE_OVERWORLD_ENTRANCES"] = 1;
+    DrawEntrancesTab();
+    Check(!disabledControls["gRando.Options.RO_MIX_DUNGEON_ENTRANCES"] &&
+              !disabledControls["gRando.Options.RO_MIX_INTERIOR_ENTRANCES"] &&
+              !disabledControls["gRando.Options.RO_MIX_OVERWORLD_ENTRANCES"] &&
+              disabledControls["gRando.Options.RO_MIX_BOSS_ENTRANCES"] &&
+              disabledControls["gRando.Options.RO_MIX_SHOP_ENTRANCES"] &&
+              disabledControls["gRando.Options.RO_MIX_GROTTO_ENTRANCES"],
+          "only shuffled pool categories can participate in mixed entrances");
+    config["gRando.Options.RO_SHUFFLE_INTERIOR_ENTRANCES"] = 0;
+    config["gRando.Options.RO_SHUFFLE_DOOR_INTERIORS"] = 1;
+    config["gRando.Options.RO_SHUFFLE_BOSS_ENTRANCES"] = 1;
+    config["gRando.Options.RO_SHUFFLE_SHOP_ENTRANCES"] = 1;
+    config["gRando.Options.RO_SHUFFLE_GROTTO_ENTRANCES"] = 1;
+    DrawEntrancesTab();
+    for (const char* name : mixOptions)
+        Check(!disabledControls["gRando.Options." + std::string(name)],
+              "all selected categories, including door-only interiors, can join the mixed pool");
+    config["gRando.Options.RO_LOGIC"] = RO_LOGIC_VANILLA;
+    DrawEntrancesTab();
+    for (const char* name : entranceOptions)
+        Check(disabledControls["gRando.Options." + std::string(name)],
+              "native Vanilla item layout cannot enable shuffled entrances");
+    controls.clear(); gComboGameMode = COMBO_GAME_BOTH;
+    DrawEntrancesTab();
+    Check(controls.empty(), "combined mode keeps its existing cross-game entrance controls authoritative");
+    controls.clear(); gComboGameMode = COMBO_GAME_OOT;
+    DrawEntrancesTab();
+    Check(controls.empty(), "dormant MM menu cannot expose Solo entrance controls in Solo OoT");
+#else
+    controls.clear();
+    DrawEntrancesTab();
+    Check(controls.empty(), "upstream standalone MM does not expose ComboShip-only entrance routing");
+#endif
+    config.clear();
     int option = RO_MAX;
     for (const auto& [id, descriptor] : Rando::StaticData::Options)
         if (!std::strcmp(descriptor.name, "RO_MAPS_COMPASSES_GIVE_INFORMATION")) {

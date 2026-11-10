@@ -145,8 +145,10 @@ ownerAlt = false;
 alt = true;
 assert(OOT_GetNeiGiDrawInfo("fire_rod", &exported) == 0);
 int authored = 0;
+int ritoAuthored = 0;
 for (const auto& item : kPresentations) {
     if (!item.opaque) continue;
+    ritoAuthored += item.draw == Randomizer_DrawRitoMask;
     Reset();
     files.insert(item.opaque);
     if (item.translucent) files.insert(item.translucent);
@@ -197,7 +199,7 @@ for (const auto& item : kPresentations) {
     }
     ++authored;
 }
-assert(authored == 68);
+assert(authored == 69 && ritoAuthored == 1);
 std::cout << "PASS real owner descriptors and MM host draw: all authored bindings, effects, split passes, concrete Somaria flame, missing-resource fallback\n";
 Reset();
 

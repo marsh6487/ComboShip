@@ -2,6 +2,8 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include "rando/MagicMirrorSettingsJson.h"
+#include "rando/RitoMaskSettingsJson.h"
 
 namespace ComboSettingsImport {
 
@@ -53,6 +55,8 @@ inline nlohmann::json Merge(const nlohmann::json& soh, const nlohmann::json& mm)
         merged[mmOrderKey] = *mmOrder;
     }
 
+    ComboRando::MagicMirrorSettings::NormalizeConfig(merged);
+    ComboRando::RitoMaskSettings::NormalizeConfig(merged);
     merged.erase("Window"); // machine-specific
     // Only a SoH version can drive SoH's config migrations.
     if (!soh.is_object() || !soh.contains("ConfigVersion")) {

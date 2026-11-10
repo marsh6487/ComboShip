@@ -420,6 +420,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_SHOVEL,             "the",  "Shovel",                     RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SPINNER,            "the",  "Spinner",                    RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SWITCH_HOOK,        "the",  "Switch Hook",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_RITO_MASK,          "the", "Rito Mask", RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_OOT_NEI_MAGIC_MIRROR,       "the",  "Magic Mirror",               RITYPE_MAJOR, ITEM_NONE, GI_NONE, GID_NONE),
     RI(RI_OOT_NEI_TIME_GATE,          "the",  "Time Gate",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_WHIP,               "the",  "Whip",                       RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -1378,6 +1379,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSpinnerTex";
         case RI_OOT_NEI_SWITCH_HOOK:
             return "__OTR__textures/icon_item_custom/gItemIconSwitchHookTex";
+        case RI_OOT_NEI_RITO_MASK:
+            return "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex";
         case RI_OOT_NEI_MAGIC_MIRROR:
             return "__OTR__textures/icon_item_custom/gItemIconMagicMirrorTex";
         case RI_OOT_NEI_TIME_GATE:

@@ -409,6 +409,8 @@ bool Logic::HasItem(RandomizerGet itemName) {
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_CANE_OF_SOMARIA, true);
         case RG_DOMINION_ROD:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_DOMINION_ROD, true);
+        case RG_RITO_MASK:
+            return RitoMask_IsOwned();
         case RG_MAGIC_MIRROR:
             return MagicMirror_IsOwned();
         case RG_TIME_GATE:

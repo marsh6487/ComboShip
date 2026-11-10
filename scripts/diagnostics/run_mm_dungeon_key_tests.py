@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from foreign_gi_fixture_dependencies import clock_descriptor
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -32,6 +33,7 @@ oot = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
 owner = (ROOT / 'mm/2s2h/Rando/DungeonItemVisuals.h').read_text()
 owner = owner[owner.index('static inline int'):owner.rindex('#endif')]
 owner_sword = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
+soul_settings = (ROOT / 'combo/menu/ComboSoulModelSettings.h').read_text()
 master_case = owner_sword[owner_sword.index('        case RG_TRUE_MASTER_SWORD:',owner_sword.index('static int32_t OOT_DescribeCustomDraw')):
                           owner_sword.index('        case RG_DOUBLE_DEFENSE:',owner_sword.index('static int32_t OOT_DescribeCustomDraw'))]
 # The extracted producer also contains its added-soul dispatch. Compile against
@@ -46,13 +48,14 @@ constexpr RandoItemId RI_TEST_COMPASS = static_cast<RandoItemId>(RI_MAX + 2);
 '''
 parts = {
     'ITEM_ENUM': item_enum,
+    'SOUL_SETTINGS': soul_settings[soul_settings.index('namespace ComboSoulModels {'):],
     'SPIN': function((ROOT / 'mm/2s2h/Rando/SpinAttackGi.h').read_text(), 'MM_FillSpinAttackGi'),
     'OWNER': owner,
     'OPS': '\n'.join(function(mm, n) for n in ['MM_Op', 'MM_OpV', 'MM_OpColor', 'MM_OpDL']),
     'CROSS': '\n'.join(function(mm, n) for n in ['MM_FillDungeonKeyModelInfo', 'MM_FillKeyRingDrawInfo', 'MM_FillDungeonTintInfo']),
     'OWNER_SWORD': '\n'.join(function(owner_sword,n) for n in ['CwSimple','CwCustomGi','CwAltSwordGi']),
     'OWNER_MASTER_CASE': master_case,
-    'PRODUCER': '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',
+    'PRODUCER': clock_descriptor(ROOT) + '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',
                                                    'MM_FillImportedSwordFallback', 'MM_FillCaneDrawInfo', 'MM_IsSwordAppearanceDependent',
                                                    'MM_FillElementalSpellDrawInfo', 'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],

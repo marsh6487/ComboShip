@@ -252,6 +252,9 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
     if (randoItemId == RI_WALLET_CHILD)
         return !hasObtainedCheck && !RandoCapacity_HasWallet();
 
+    if (randoItemId == RI_OOT_NEI_RITO_MASK)
+        return !RitoMask_IsOwned();
+
     u8 vanillaCantObtain = false;
     if (Rando::StaticData::Items[randoItemId].itemId != ITEM_NONE &&
         Rando::StaticData::Items[randoItemId].getItemId != GI_NONE) {

@@ -1,4 +1,6 @@
 #include "Rando/SongEvents.h"
+#include "../../../../combo/rando/MagicMirrorSettings.h"
+#include "../../../../combo/rando/RitoMaskSettings.h"
 #include "Rando/VanillaCompatibility.h"
 #include "Rando/SoulShuffle.h"
 #include "Rando/KeyRings.h"
@@ -58,11 +60,16 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         }
     }
 #endif
-    // Generation-only request from the OoT checkbox. Keep the UI CVars independent,
-    // but serialize the shared feature into the generated MM save/spoiler.
+    // Preview follows the live Combo preference. Generation/replay use the
+    // frozen setting snapshot, and must explicitly apply OFF as well as ON.
 #ifdef COMBO_BUILD
-    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0)) {
-        saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = RO_GENERIC_ON;
+    if (Combo_IsCombinedGame()) {
+        const int mirror = preserveSongMapping ? ComboRando::MagicMirrorSettings::Preview()
+                                               : CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0);
+        saveInfo.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] = mirror ? RO_GENERIC_ON : RO_GENERIC_OFF;
+        const int rito = preserveSongMapping ? ComboRando::RitoMaskSettings::Preview()
+                                             : CVarGetInteger("gRando.Generation.ShuffleRitoMask", 0);
+        saveInfo.randoSaveOptions[RO_SHUFFLE_RITO_MASK] = rito ? RO_GENERIC_ON : RO_GENERIC_OFF;
     }
 #endif
     std::vector<RandoItemId> startingItems = Rando::GetStartingItemsFromSave(saveInfo);
@@ -619,11 +626,15 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     // Plentiful
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_RITO_MASK] == RO_GENERIC_ON)
+        itemPool.push_back(RI_OOT_NEI_RITO_MASK);
+
     if (saveInfo.randoSaveOptions[RO_PLENTIFUL_ITEMS] == RO_GENERIC_YES) {
         std::vector<RandoItemId> plentifulItems;
         for (size_t i = 0; i < itemPool.size(); i++) {
             // The user can specify exactly how many pieces they want to shuffle, so skip those
-            if (itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR || itemPool[i] == RI_OOT_SONG_COMMAND_MELODY) {
+            if (itemPool[i] == RI_OOT_NEI_RITO_MASK || itemPool[i] == RI_OOT_NEI_MAGIC_MIRROR ||
+                itemPool[i] == RI_OOT_SONG_COMMAND_MELODY) {
                 continue; // One physical Mirror / Command Melody in every density.
             }
             if (itemPool[i] == RI_TRIFORCE_PIECE) {

@@ -1,0 +1,86 @@
+{
+  "recipe": "build.py",
+  "original_authorship": true,
+  "draw_scale": 0.25,
+  "models": {
+    "RustyKey": {
+      "owner": "mm",
+      "root": "objects/combo_door_keys/RustyKeyDL",
+      "triangles": 972,
+      "vertices": 2916,
+      "bounds_native": [
+        [
+          -52,
+          -140,
+          -14
+        ],
+        [
+          52,
+          143,
+          14
+        ]
+      ],
+      "bounds_draw_scale_0_25": [
+        [
+          -13.0,
+          -35.0,
+          -3.5
+        ],
+        [
+          13.0,
+          35.75,
+          3.5
+        ]
+      ]
+    },
+    "OverworldKey": {
+      "owner": "soh",
+      "root": "objects/combo_door_keys/OverworldKeyDL",
+      "triangles": 744,
+      "vertices": 2232,
+      "bounds_native": [
+        [
+          -48,
+          -140,
+          -9
+        ],
+        [
+          48,
+          140,
+          9
+        ]
+      ],
+      "bounds_draw_scale_0_25": [
+        [
+          -12.0,
+          -35.0,
+          -2.25
+        ],
+        [
+          12.0,
+          35.0,
+          2.25
+        ]
+      ]
+    }
+  },
+  "sha256": {
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyDL": "2c7e991012df19ebd93c962595c3397333e54f5c644974eeffc6c694b370ff12",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyTex": "d66adad77788ecfd10a6be83a47a5653900ba0f9885a1a237bac3b53c066dad3",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyBodyVtx": "0f7659e0fa2885ddace74a2dba51d8041f5eee40976aee67961f2b3d71f28f90",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyDL": "21c7ca27453238124e221db48f84a11f93e7d4ba2d8efc0a78bf5c3cff5d9abe",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeDL": "a54487aed3d83d1ae601b15c437ef37c46325050b188d2c7c609f25065ced0d3",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeTex": "d25c3562892557a50850e49b6cdd3d307bb909d758ded83f0317670519a4d9c5",
+    "mm/assets/custom/objects/combo_door_keys/RustyKeyEdgeVtx": "6647aaf8cd0d89291245a5aae0bee810793aa2c672c8a187f745d4d752ea2d59",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyDL": "9398a520ead84f8758c6044bc38e80781e1a32cb7552581e0c647fa71bd48e71",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyTex": "41a1ec015a3e48fcca09ae5bef175c3f1336133e6845e7ce75bea70b442c2853",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyBodyVtx": "d0678be1ffa2e797c2ad2e41a18eb4dfae9331ccaf0c5b16463f0fd249ed3d20",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyDL": "3e707e96bc5a3cce8e8029df7a75868302753959734c6fe64ef52e5d9d6614fe",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeDL": "334dbb2be0d36bceb14eee05842a3429514886011026fffe73813dd5e19f8b42",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeTex": "9ab4f4282ad20bfa1a5fb945c4bac76a39ee2092ead445cceb489520e1d2a2b9",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyEdgeVtx": "e2c199109f78967f165e796e5a4f31a82d89781cfd954c7f8804e4e053354850",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaDL": "7f6d3cc1d3eb50a4f9dfe4c134c36fbbc5fb5bf6ef9ed7aea8decdaa71118b27",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaTex": "afba28b15ff49a32ff0ee7fdcdf4c149fcebba19ff57b60db401ea7d603372b9",
+    "soh/assets/custom/objects/combo_door_keys/OverworldKeyPatinaVtx": "7cf48627a547fda36e8ee10c29b3b70dd41be86a2eebdf4413668bb24a079128"
+  }
+}

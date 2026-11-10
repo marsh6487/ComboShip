@@ -54,6 +54,8 @@ inline bool Selected(const Dungeon& d, const PoolOptions& p) {
             return p.shops && (!p.interiors || !p.legacyInteriors);
         case Pool::DoorInterior:
             return p.doorInteriors && !p.interiors;
+        case Pool::Overworld:
+            return false; // Solo's separate codec owns this pool; combined seeds cannot enable it.
     }
     return false;
 }

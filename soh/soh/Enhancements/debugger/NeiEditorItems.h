@@ -8,6 +8,13 @@ uint8_t Cane_GiveSkill(uint8_t skill);
 
 namespace OotNeiEditor {
 
+inline void SetRitoMaskOwned(bool owned) {
+    if (owned)
+        RitoMask_Grant();
+    else
+        RitoMask_Remove();
+}
+
 // The legacy byte table predates the u16 cell owners. Keep the gameplay table
 // and existing saves untouched; project the current layout for this editor.
 inline uint16_t Page2Item(int index) {

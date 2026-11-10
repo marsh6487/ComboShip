@@ -1,4 +1,6 @@
 #define main CurrentRuntimeMatrixMain
+#include "combo/rando/MagicMirrorSettingsSnapshot.h"
+
 #include "oot_runtime_test.cpp"
 #undef main
 #include "combo/NeiGracePolicy.h"

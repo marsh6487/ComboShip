@@ -34,7 +34,8 @@ struct SaveBoundary {
 #define MM_INV gSaveContext.save.saveInfo.inventory
 #define MM_EQ gSaveContext.save.saveInfo.equips
 #else
-struct SaveBoundary { InventoryBoundary inventory; uint8_t bgsFlag{}; int32_t fileNum{}; uint32_t nativeVitalsAndTime[16]{}; } gSaveContext;
+struct ItemEquips { uint8_t buttonItems[8]{}; uint8_t cButtonSlots[7]{}; };
+struct SaveBoundary { InventoryBoundary inventory; ItemEquips equips, childEquips, adultEquips; uint8_t bgsFlag{}; int32_t fileNum{}; uint32_t nativeVitalsAndTime[16]{}; } gSaveContext;
 #endif
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
@@ -292,12 +293,14 @@ static void TestNativeAdapters(const json& incoming) {
     assert(snapshot["vanillaNei"]["ultrashotOwned"] == true && live.ultrashotOwned == 0 && live.ootHookshotLevel == 3);
     live.ultrashotOwned = 1; live.ootHookshotLevel = 0;
 #else
-    // Imported Rito ownership seeds only its NEI identity into an empty local
-    // cell. An earned Farore spell stays in place and is remembered locally.
+    // Imported Rito ownership fills an empty corner mask wheel. An earned Farore
+    // spell stays in its own cell and is remembered only for legacy migration.
     const json ritoOnly = {{"vanillaNei", {{"version", 1}, {"slot", 0}, {"ritoMaskOwned", true}}}};
     live.ritoMaskFlags = 0; gSaveContext.inventory.items[SLOT_FARORES_WIND] = ITEM_NONE;
+    gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_NONE;
     ApplyVanillaShared(ritoOnly);
-    assert(live.ritoMaskFlags == RITO_FLAG_MASK_OWNED && gSaveContext.inventory.items[SLOT_FARORES_WIND] == ITEM_RITO_MASK);
+    assert(live.ritoMaskFlags == RITO_FLAG_MASK_OWNED && gSaveContext.inventory.items[SLOT_TRADE_CHILD] == ITEM_RITO_MASK);
+    assert(gSaveContext.inventory.items[SLOT_FARORES_WIND] == ITEM_NONE);
     live.ritoMaskFlags = 0; gSaveContext.inventory.items[SLOT_FARORES_WIND] = ITEM_FARORES_WIND;
     ApplyVanillaShared(ritoOnly);
     assert(live.ritoMaskFlags == (RITO_FLAG_MASK_OWNED | RITO_FLAG_FARORES_OWNED));

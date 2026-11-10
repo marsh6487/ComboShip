@@ -105,7 +105,7 @@ s32 RocsFeatherVanilla_TryUse(PlayState* play, Player* this, s32 item) {
     if (!NayrusWheel_HasRocs()) {
         return 0;
     }
-    if (sRocsUseCount >= ROCS_FEATHER_MAX_USES) {
+    if (sRocsUseCount >= ROCS_FEATHER_MAX_USES && !MmRitoAirRocsAllowed(this)) {
         return 1; // consumed, but still airborne / not re-armed
     }
 

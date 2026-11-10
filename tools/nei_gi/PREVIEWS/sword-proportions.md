@@ -13,12 +13,12 @@ uses the same pedestal sword.
 
 ## Previews
 
-- [All nine swords rotating](swords_proportions.gif)
+- All nine swords rotating (animated preview omitted from publication)
 - [Guard-aligned models at one common scale, effects off](swords_proportions_measured_scale.png)
 - [Six before/after comparisons at the same scale](swords_proportions_before_after_scale.png)
-- [Kokiri variants and corrected Razor](swords_proportions_group_1.gif)
-- [Gilded, Master and True Master](swords_proportions_group_2.gif)
-- [Biggoron, Great Fairy and Four Sword](swords_proportions_group_3.gif)
+- Kokiri variants and corrected Razor (animated preview omitted from publication)
+- Gilded, Master and True Master (animated preview omitted from publication)
+- Biggoron, Great Fairy and Four Sword (animated preview omitted from publication)
 
 The camera fits all nine models and actual particle samples together. Each sword
 uses the same world-to-screen scale within a view; models are never individually

@@ -22,16 +22,25 @@ source=r'''
 extern "C" {int gComboGameMode=COMBO_GAME_BOTH;}
 struct {int gameMode=0,fileNum=1;} gSaveContext;
 constexpr int GAMEMODE_NORMAL=0;
+constexpr bool IS_RANDO=true;
 namespace ComboRando::CrossDungeon {enum class Pool {Boss};}
 struct State {
     int queued=0;
-    bool Enabled(){return true;}
+    bool enabled=true;
+    bool Enabled(){return enabled;}
     bool HasPool(ComboRando::CrossDungeon::Pool){return true;}
     bool QueueArrival(int){++queued;return true;}
 };
 namespace ComboCrossOotRuntime {State state;std::optional<int> pendingBossRecovery;}
 namespace ComboCrossMmRuntime {State state;std::optional<int> pendingBossRecovery;bool bossDeathRecoveryRequested;}
 '''
+solo=(ROOT/'combo/rando/SoloEntranceMmRuntime.inc.h').read_text()
+# The combined map remains active in this fixture; no local map was selected.
+# Execute the actual local enable predicates rather than replacing the new
+# dispatch boundary with unconditional false results.
+source+='\nnamespace ComboSoloMmRuntime { State state{.enabled=false};\n'+block(solo,'static bool Playable(')+'\n}\n'
+for marker in ['int Combo_MM_SoloEntranceRuntimeEnabled(', 'int Combo_MM_SoloEntranceBossEnabled(']:
+    source+='\n'+block(solo,marker)+'\n'
 for prefix,name in [('SOH','Oot'),('MM','Mm')]:
     text=(ROOT/f'combo/rando/CrossDungeon{name}Runtime.inc.h').read_text()
     for marker in [f'int Combo_{prefix}_CrossDungeonRuntimeEnabled(',f'int Combo_{prefix}_CrossBossEnabled(',

@@ -5,9 +5,9 @@
 
 struct ObjSwitch;
 
-typedef void (*ObjSwitchActionFunc)(struct ObjSwitch* this, PlayState* play);
-typedef void (*ObjSwitchDrawFunc)(struct ObjSwitch* this, PlayState* play);
-typedef void (*ObjSwitchSetupActionFunc)(struct ObjSwitch* this);
+typedef void (*ObjSwitchActionFunc)(struct ObjSwitch* thisx, PlayState* play);
+typedef void (*ObjSwitchDrawFunc)(struct ObjSwitch* thisx, PlayState* play);
+typedef void (*ObjSwitchSetupActionFunc)(struct ObjSwitch* thisx);
 
 typedef enum {
     /* 0 */ OBJSWITCH_TYPE_FLOOR,

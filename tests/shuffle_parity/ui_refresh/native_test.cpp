@@ -7,6 +7,7 @@ static std::map<std::string, int32_t> values;
 #include "Rando/SongEvents.h"
 #include "gui/WhatsNew.h"
 #include "Rando/VanillaCompatibility.h"
+#include "rando/MagicMirrorSettings.h"
 #include <imgui_internal.h>
 
 // Only storage, GUI scheduling and ResourceManager acquisition are boundaries.
@@ -53,6 +54,9 @@ std::string WrappedText(const std::string&, unsigned int = 80);
 #include "widgets.inc"
 }
 using namespace UIWidgets;
+static void DrawMirror() {
+#include "mirror.inc"
+}
 #include "compatibility.inc"
 static void DrawRusty() {
 #include "rusty.inc"
@@ -95,6 +99,25 @@ int main() {
         if (id != RC_UNKNOWN) Rando::Logic::Regions[static_cast<RandoRegionId>(0)].checks[id] =
             {[] { return true; }, "UI pool candidate membership"};
     ShipInit::InitAll();
+#ifdef COMBO_BUILD
+    // This is the actual custom MM card, with the actual CVarCheckbox/ImGui
+    // input and real pool generator. It is not a synthetic flat-menu control.
+    for (int oot : {0, 1}) for (int mm : {0, 1}) {
+        values[ComboRando::MagicMirrorSettings::OotCvar] = oot;
+        values[ComboRando::MagicMirrorSettings::MmCvar] = mm;
+        values[ComboRando::MagicMirrorSettings::SharedCvar] = 0;
+        RefreshMetrics();
+        const int beforeMirrorChecks = checksInPool, beforeMirrorItems = itemsInPool;
+        Click(DrawMirror);
+        REQUIRE(CVarGetInteger(ComboRando::MagicMirrorSettings::SharedCvar, -1) == 1);
+        REQUIRE(checksInPool == beforeMirrorChecks + 1 && itemsInPool == beforeMirrorItems + 1);
+        REQUIRE(values[ComboRando::MagicMirrorSettings::OotCvar] == oot && values[ComboRando::MagicMirrorSettings::MmCvar] == mm);
+        Click(DrawMirror);
+        REQUIRE(CVarGetInteger(ComboRando::MagicMirrorSettings::SharedCvar, -1) == 0);
+        REQUIRE(checksInPool == beforeMirrorChecks && itemsInPool == beforeMirrorItems);
+        REQUIRE(values[ComboRando::MagicMirrorSettings::OotCvar] == oot && values[ComboRando::MagicMirrorSettings::MmCvar] == mm);
+    }
+#endif
     // Actual UI preview must preserve the mapping used by later oracle replay.
     {
         auto previous = gSaveContext.save.shipSaveInfo.rando;

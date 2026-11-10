@@ -783,6 +783,8 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerCheck(Randomizer
 }
 
 ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGet randoGet) {
+    if (randoGet == RG_RITO_MASK)
+        return RitoMask_IsOwned() ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
     // progressive open chest has a second copy that unlocks large chests
     if (randoGet == RG_OPEN_CHEST && GetRandoSettingValue(RSK_SHUFFLE_OPEN_CHEST) == RO_OPEN_CHEST_PROGRESSIVE) {
         return Flags_GetRandomizerInf(RAND_INF_CAN_OPEN_LARGE_CHEST) ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
@@ -2459,6 +2461,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             break;
         case RG_SHADOW_CRYSTAL:
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
+            break;
+        case RG_RITO_MASK:
+            RitoMask_Grant();
             break;
         case RG_MAGIC_MIRROR:
             TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);

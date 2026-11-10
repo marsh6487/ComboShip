@@ -30,6 +30,7 @@ common = model[:model.index('using f32=')]
 common = common.replace('name+=7;\n        auto it=', 'name+=7;\n        if(name[0]==\'@\'){const char* colon=strchr(name,\':\');if(!colon)return nullptr;name=colon+1;}\n        auto it=')
 # The count query is pure native policy; use its real item IDs and declarations.
 declarations = '#include "mm/2s2h/Rando/DungeonItemVisuals.h"\n'
+declarations += '#define COMBO_DOOR_KEY_HOST_MM\n#include "combo/ComboDoorKeyGi.h"\n'
 binding_start = native.index('struct Binding {')
 binding_end = native.index('// Only roots', binding_start)
 declarations += native[binding_start:binding_end]
@@ -42,7 +43,9 @@ declarations += '\nnamespace CustomItem {' + custom[flags_start:flags_end] + '}\
 # draw reached by these sword receipts is a dispatch error.
 key_ring_boundary = function(draw, 'DrawKeyRing').split('{', 1)[0] + \
     '{ assert(false && "sword receipt must not dispatch key-ring geometry"); }\n'
-production = key_ring_boundary + '\n'.join(function(native, name) for name in [
+door_key_boundary = function(draw, 'DrawDoorKey').split('{', 1)[0] + \
+    '{ assert(ComboDoorKeyGi::ItemOrigin(item) == ComboDoorKeyGi::Origin::None && "sword receipt must not dispatch door-key geometry"); return false; }\n'
+production = key_ring_boundary + door_key_boundary + '\n'.join(function(native, name) for name in [
     'HasMmLegacyGiMod', 'GetSelectedOwnerGi', 'MM_DescribeNeiGi', 'MM_TryDrawNeiGi'])
 production += '\n' + native[native.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
 start = draw.index('    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;')

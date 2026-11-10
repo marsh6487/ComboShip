@@ -7,6 +7,7 @@
 // virtual grotto returns must pass through ComboMmMaterializeGrotto before native scene loading.
 namespace ComboCrossMmCatalogue {
 using ComboRando::CrossDungeon::Dungeon;
+using ComboRando::CrossDungeon::Endpoint;
 using ComboRando::CrossDungeon::InteriorKind;
 using ComboRando::CrossDungeon::InteriorPool;
 using ComboRando::CrossDungeon::Pool;
@@ -461,5 +462,68 @@ inline void Append(std::vector<Dungeon>& out, const PoolOptions& options) {
             dungeon.pool = Pool::Grotto;
             out.push_back(std::move(dungeon));
         }
+}
+// One immutable catalogue serves combined generation, Solo MM and saved-layout validation.
+inline void AppendBossCatalogue(std::vector<Dungeon>& out) {
+    const int32_t bossEntrances[] = { ENTRANCE(ODOLWAS_LAIR, 0), ENTRANCE(GOHTS_LAIR, 0), ENTRANCE(GYORGS_LAIR, 0),
+                                      ENTRANCE(TWINMOLDS_LAIR, 0) };
+    const int32_t dungeon[] = { ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(SNOWHEAD_TEMPLE, 0),
+                                ENTRANCE(GREAT_BAY_TEMPLE, 0), ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0) };
+    const char* owner[] = { "mm:woodfall", "mm:snowhead", "mm:greatbay", "mm:inverted" };
+    const int32_t escape[] = { ENTRANCE(WOODFALL_TEMPLE, 1), ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7),
+                               ENTRANCE(ZORA_CAPE, 9), ENTRANCE(IKANA_CANYON, 15) };
+    const int32_t warp[] = { ENTRANCE(WOODFALL_TEMPLE, 1), ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7), ENTRANCE(ZORA_CAPE, 9),
+                             ENTRANCE(IKANA_CANYON, 15) };
+    for (int i = 0; i < 4; ++i) {
+        Dungeon boss{
+            "mm:boss:" + std::to_string(i + 8), { 1, bossEntrances[i] }, { 1, escape[i] }, { 1, dungeon[i] }
+        };
+        boss.pool = Pool::Boss;
+        boss.boss = i + 8;
+        boss.owner = owner[i];
+        boss.hasReverse = false;
+        boss.escapeExits = { { 1, escape[i] } };
+        boss.warpReturn = Endpoint{ 1, warp[i] };
+        boss.reverseCheckpoint = boss.warpCheckpoint = Endpoint{ 1, dungeon[i] };
+        boss.deathCheckpoint = Endpoint{ 1, dungeon[i] };
+        out.push_back(std::move(boss));
+    }
+    // Odolwa always completes to prison spawn 1 while cross Boss is active.
+    // WOODFALL 0 is ordinary overworld travel; WOODFALL 3 is the prison's outer
+    // dungeon exit. Neither belongs to the physical boss's completion aliases.
+    out[out.size() - 2].escapeExits.push_back({ 1, ENTRANCE(ZORA_CAPE, 8) });
+}
+inline std::vector<Dungeon> Catalogue(const PoolOptions& options) {
+    std::vector<Dungeon> dungeons = { { "mm:woodfall",
+                                        { 1, ENTRANCE(WOODFALL_TEMPLE, 0) },
+                                        { 1, ENTRANCE(WOODFALL, 1) },
+                                        { 1, ENTRANCE(WOODFALL, 1) } },
+                                      { "mm:snowhead",
+                                        { 1, ENTRANCE(SNOWHEAD_TEMPLE, 0) },
+                                        { 1, ENTRANCE(SNOWHEAD, 1) },
+                                        { 1, ENTRANCE(SNOWHEAD, 1) } },
+                                      { "mm:greatbay",
+                                        { 1, ENTRANCE(GREAT_BAY_TEMPLE, 0) },
+                                        { 1, ENTRANCE(ZORA_CAPE, 7) },
+                                        { 1, ENTRANCE(ZORA_CAPE, 7) } },
+                                      { "mm:stonetower",
+                                        { 1, ENTRANCE(STONE_TOWER_TEMPLE, 0) },
+                                        { 1, ENTRANCE(STONE_TOWER, 2) },
+                                        { 1, ENTRANCE(STONE_TOWER, 2) } },
+                                      { "mm:inverted",
+                                        { 1, ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0) },
+                                        { 1, ENTRANCE(STONE_TOWER_INVERTED, 1) },
+                                        { 1, ENTRANCE(STONE_TOWER_INVERTED, 1) } } };
+    dungeons[0].escapeExits = { { 1, ENTRANCE(WOODFALL, 3) } };
+    dungeons[1].escapeExits = { { 1, ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7) } };
+    dungeons[2].escapeExits = { { 1, ENTRANCE(ZORA_CAPE, 9) } };
+    dungeons[4].escapeExits = { { 1, ENTRANCE(IKANA_CANYON, 15) } };
+    if (!options.dungeons)
+        dungeons.clear();
+    Append(dungeons, options);
+    if (options.bosses)
+        AppendBossCatalogue(dungeons);
+    Validate(dungeons);
+    return dungeons;
 }
 } // namespace ComboCrossMmCatalogue

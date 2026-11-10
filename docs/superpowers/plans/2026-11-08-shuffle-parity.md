@@ -24,6 +24,29 @@
 
 ## Current execution state — November 9, 2026
 
+R22 follow-up integration is underway on the same authorized candidate: Termina
+collision capacity, reviewed authored-key GIs and complete enemy/NPC actor-model
+soul GIs are integrated through394353da. The completed Mirror follow-up binds both
+existing Combo checkboxes to one effective setting (including OFF), retaining
+independent standalone preferences; final original/Combo native-card verification
+passes and the reviewed donor08bae2d8 is integrated. The optional rotating key
+GIF is excluded at the user's request; all other uploaded assets are retained.
+No additional user-facing global control is part of that task. The controller
+owns merged files, exact asset blobs/tree verification, checkpoints and PR89
+publication. Workstream owners and current evidence are recorded at the top of
+`docs/SHUFFLE_PARITY_PROGRESS_20261108.md`; older status text below is historical.
+
+- [x] Preserve/review/integrate Termina collision, authored key resources and full
+  enemy/NPC soul models with both receiving-game renderers.
+- [x] Close R21 real Windows native CLI build/link requirement; full job SUCCESS.
+- [x] Repair the R21 Desired Items provider's pinned ImGui include dependency,
+  retaining assertions and diagnostics; exact full row PASS without ambient paths.
+- [x] Finish and integrate final shared Mirror native-card/settings/preset tests.
+- [ ] Publish cumulative checkpoint with raw base64 asset blobs, exact Git hashes,
+  final tree equality and fetched-byte verification.
+- [ ] Complete fresh integrated Linux/Windows resources/modules/CLI and native
+  generation/replay checks; repair actual failures while independent work continues.
+
 The source implementation and independent native boundary reviews for Tasks 1–11
 are integrated. Checked steps mean their stated source/boundary work has evidence;
 they do not imply configured gameplay acceptance. The detailed owner, source

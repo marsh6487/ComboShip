@@ -112,7 +112,10 @@ static bool ComboDrawMorphaTentacleGi(PlayState* host, const char* owner,
     return false;
 }
 /* PRODUCTION_DRAW */
+// This fixture isolates boss/minifrog dispatch. Added NPC/enemy detail belongs
+// to the full-catalog renderer fixture; neither boundary handles a boss ID.
 static int32_t MM_FillEnemySoulAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
+static int32_t MM_FillNpcSoulAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
 static int32_t MM_FillMinifrogAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
 /* PRODUCTION_MM_RECIPE */
 int main() {

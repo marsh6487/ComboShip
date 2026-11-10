@@ -73,7 +73,9 @@ typedef struct {
 } BgCheckSceneMemEntry; // size = 0x8
 
 BgCheckSceneMemEntry sSceneMemList[] = {
-    { SCENE_00KEIKOKU, 0xC800 },
+    // Authored Termina Field adds collision beyond the native static-node budget.
+    // 64 KiB covers every candidate cell of the 2,522-poly scene (6,303 nodes).
+    { SCENE_00KEIKOKU, 0x10000 },
 #ifdef COMBO_BUILD
     // The authored market needs more static lookup nodes than the native budget.
     { COMBO_BLACK_MARKET_SCENE, 0x30000 },

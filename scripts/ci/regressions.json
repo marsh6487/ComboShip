@@ -1333,6 +1333,13 @@
   },
   {
     "suite": "entrances",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native Solo MM saved entrance pools, overworld, mixed routes and decoupled returns",
+    "run": "python3 -B tests/solo_mm_entrances/run_tests.py"
+  },
+  {
+    "suite": "entrances",
     "origin": "nei",
     "name": "tests/farores_wind/run_tests.py",
     "run": "python3 -B tests/farores_wind/run_tests.py"
@@ -1378,6 +1385,12 @@
     "origin": "gate",
     "name": "Foreign soul replacement skeletons and limb matrices",
     "run": "python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py\npython3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py\npython3 -B scripts/diagnostics/run_boss_soul_model_tests.py --sanitize\npython3 -B scripts/diagnostics/run_barinade_syntax_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py\npython3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py\npython3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Enemy and NPC soul catalogs, live preferences and both-host rendering",
+    "run": "python3 -B tests/soul_mini_models/run_tests.py --sanitize"
   },
   {
     "suite": "equipment",
@@ -1590,10 +1603,17 @@
     "run": "python3 -B tests/magic_mirror_shuffle/registry_test.py\npython3 -B tests/magic_mirror_shuffle/run_pool_tests.py\npython3 -B tests/magic_mirror_shuffle/run_grant_tests.py\npython3 -B tests/magic_mirror_shuffle/run_save_tests.py\npython3 -B tests/magic_mirror_shuffle/run_foreign_tests.py"
   },
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native Rito Mask optional pools stable IDs shared controls grants and authored GI",
+    "run": "python3 -B tests/rito_mask_rando/run_tests.py\npython3 -B tests/rito_mask_oot/run_tests.py\npython3 -B tests/rito_mask_oot/run_animation_tests.py\npython3 -B tests/rito_mask_mm/run_inventory_tests.py\npython3 -B tests/rito_mask_mm/run_form_tests.py\npython3 -B tests/rito_mask_mm/run_controller_tests.py\npython3 -B tests/rito_mask_mm/run_lifecycle_tests.py\npython3 -B tests/rito_mask_mm/run_save_tests.py\npython3 -B tests/rito_mask_mm/run_editor_tests.py\npython3 -B tests/rito_mask/gi_assets_test.py"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Magic Mirror combined route logic policy snapshots and queue invalidation",
-    "run": "python3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
+    "run": "python3 -B tests/magic_mirror_shuffle/run_shared_settings_tests.py --sanitize\npython3 -B tests/magic_mirror_shuffle/run_route_tests.py\npython3 -B tests/magic_mirror_shuffle/run_option_tests.py\npython3 -B tests/magic_mirror_shuffle/run_cancel_tests.py"
   },
   {
     "suite": "systems",
@@ -2048,5 +2068,33 @@
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Authored MM Rusty and OoT overworld key assets, origins, native draws and foreign recipes",
+    "run": "python3 -B tests/authored_door_keys/asset_test.py\npython3 -B tests/authored_door_keys/run_routing_tests.py"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native authored-scene static collision capacity, complete chains and real arena",
+    "run": "python3 -B tests/black_market/run_collision_pool_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Authored Clock resources, native and foreign routes, shimmer and effects-off",
+    "run": "python3 -B tools/authored_clock/build.py --check\npython3 -B tools/authored_clock/verify.py\npython3 -B tests/authored_clock/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Spring blossom texture factories, identical hosts and owned-texture fade combiner",
+    "run": "python3 -B tools/spring_blossoms/pack_textures.py --check\npython3 -B tests/seasons/run_spring_texture_tests.py\npython3 -B tests/seasons/run_spring_combiner_tests.py"
   }
 ]

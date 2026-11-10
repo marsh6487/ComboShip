@@ -1,0 +1,900 @@
+<DisplayList Version="0">
+  <PipeSync />
+  <Matrix Path="objects/nei_gi_redesign/rito_mask/scale_mtx" Param="G_MTX_PUSH" />
+  <SetCycleType G_CYC_2CYCLE="1" />
+  <SetAlphaCompare Mode="0" />
+  <SetTextureLUT Mode="G_TT_NONE" />
+  <ClearGeometryMode G_CULL_FRONT="1" G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" G_FOG="1" />
+  <SetGeometryMode G_ZBUFFER="1" G_SHADE="1" G_SHADING_SMOOTH="1" G_LIGHTING="1" G_CULL_BACK="1" />
+  <SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2" />
+  <PipeSync />
+  <ClearGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <Texture S="65535" T="65535" Level="0" Tile="0" On="1" />
+  <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255" />
+  <SetEnvColor R="255" G="255" B="255" A="255" />
+  <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_0" Ad0="G_ACMUX_1" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED" />
+  <LoadTextureBlock Path="objects/nei_gi_redesign/rito_mask/lining_tex" Format="0" Size="2" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXWrap="1" CMT_TXNoMirror="1" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="0" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="30" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="60" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="90" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="120" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="150" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="180" Count="3" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <PipeSync />
+  <ClearGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <Texture S="65535" T="65535" Level="0" Tile="0" On="1" />
+  <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255" />
+  <SetEnvColor R="255" G="255" B="255" A="255" />
+  <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_0" Ad0="G_ACMUX_1" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED" />
+  <LoadTextureBlock Path="objects/nei_gi_redesign/rito_mask/ivoryedge_tex" Format="0" Size="2" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXWrap="1" CMT_TXNoMirror="1" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="183" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="213" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="243" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="273" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="303" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="333" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="363" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="393" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="423" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="453" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="483" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="513" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="543" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="573" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="603" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="633" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="663" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="693" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="723" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="753" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="783" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="813" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="843" Count="12" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <PipeSync />
+  <ClearGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <Texture S="65535" T="65535" Level="0" Tile="0" On="1" />
+  <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255" />
+  <SetEnvColor R="255" G="255" B="255" A="255" />
+  <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_0" Ad0="G_ACMUX_1" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED" />
+  <LoadTextureBlock Path="objects/nei_gi_redesign/rito_mask/ivory_tex" Format="0" Size="2" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXWrap="1" CMT_TXNoMirror="1" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="855" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="885" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="915" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="945" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="975" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1005" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1035" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1065" Count="3" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <PipeSync />
+  <ClearGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <Texture S="65535" T="65535" Level="0" Tile="0" On="1" />
+  <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255" />
+  <SetEnvColor R="255" G="255" B="255" A="255" />
+  <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_0" Ad0="G_ACMUX_1" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED" />
+  <LoadTextureBlock Path="objects/nei_gi_redesign/rito_mask/goldedge_tex" Format="0" Size="2" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXWrap="1" CMT_TXNoMirror="1" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1068" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1098" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1128" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1158" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1188" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1218" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1248" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1278" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1308" Count="27" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <PipeSync />
+  <SetGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <Texture S="1984" T="1984" Level="0" Tile="0" On="1" />
+  <SetPrimColor M="0" L="0" R="255" G="219" B="119" A="255" />
+  <SetEnvColor R="112" G="68" B="16" A="255" />
+  <SetCombineLERP A0="G_CCMUX_PRIMITIVE" B0="G_CCMUX_ENVIRONMENT" C0="G_CCMUX_TEXEL0" D0="G_CCMUX_ENVIRONMENT" Aa0="G_ACMUX_0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_0" Ad0="G_ACMUX_1" A1="G_CCMUX_COMBINED" B1="G_CCMUX_0" C1="G_CCMUX_SHADE" D1="G_CCMUX_0" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED" />
+  <LoadTextureBlock Path="objects/nei_gi_redesign/rito_mask/gold_tex" Format="0" Size="2" Width="32" Height="32" MaskS="0" MaskT="0" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXClamp="1" CMT_TXClamp="1" CMT_TXNoMirror="1" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1335" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1365" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1395" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1425" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1455" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1485" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1515" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1545" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1575" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1605" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1635" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1665" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1695" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1725" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1755" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1785" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1815" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1845" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1875" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1905" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1935" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1965" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1995" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2025" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2055" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2085" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2115" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2145" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2175" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2205" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2235" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2265" Count="30" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <Triangle1 V00="9" V01="10" V02="11" />
+  <Triangle1 V00="12" V01="13" V02="14" />
+  <Triangle1 V00="15" V01="16" V02="17" />
+  <Triangle1 V00="18" V01="19" V02="20" />
+  <Triangle1 V00="21" V01="22" V02="23" />
+  <Triangle1 V00="24" V01="25" V02="26" />
+  <Triangle1 V00="27" V01="28" V02="29" />
+  <LoadVertices Path="objects/nei_gi_redesign/rito_mask/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="2295" Count="9" />
+  <Triangle1 V00="0" V01="1" V02="2" />
+  <Triangle1 V00="3" V01="4" V02="5" />
+  <Triangle1 V00="6" V01="7" V02="8" />
+  <PipeSync />
+  <Texture S="0" T="0" Level="0" Tile="0" On="0" />
+  <ClearGeometryMode G_TEXTURE_GEN="1" G_TEXTURE_GEN_LINEAR="1" />
+  <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255" />
+  <SetEnvColor R="255" G="255" B="255" A="255" />
+  <PopMatrix Param="G_MTX_MODELVIEW" />
+  <EndDisplayList />
+</DisplayList>

@@ -842,8 +842,8 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     }
 
     if (season == SEASON_SPRING && spB4) {
-        // Petals use an untextured material. Restore the standard textured XLU
-        // setup once for the next consumer; empty/culled layers change no state.
+        // Petals use their own textured tint/fade material. Restore standard
+        // XLU setup once for the next consumer; empty/culled layers change no state.
         POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, SETUPDL_0);
     }
 

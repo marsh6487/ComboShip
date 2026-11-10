@@ -3,11 +3,16 @@
 #include "MMEnvironment.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/rando/MagicMirrorSettings.h"
+#include "../../../combo/rando/RitoMaskSettings.h"
 #include "Rando/Lottery.h"
 #include "Rando/MagicHints.h"
 #include "Rando/KeyRings.h"
 #include "Rando/VanillaCompatibility.h"
 #include "../../../combo/gui/WhatsNew.h"
+#ifdef COMBO_BUILD
+#include "ComboSoulModelSettings.h"
+#endif
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
 #include "Rando/Spoiler/Spoiler.h"
@@ -376,110 +381,131 @@ void RefreshMetrics() {
 
 // Keep every native option observable: the same callbacks refresh the pool,
 // balance strip and the generation-keyed exclusion lists after CVar edits.
-static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics, {
-                                                                   "gRando.ExcludedChecks",
-                                                                   "gCombo.Rando.Shared.Wallets",
-                                                                   "gRando.Generation.ShuffleMagicMirror",
-                                                                   "gRando.Options.RO_SHUFFLE_RUSTY_KEYS",
-                                                                   "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG",
-                                                                   "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG",
-                                                                   "gRando.Options.RO_SHUFFLE_CHILD_WALLET",
-                                                                   "gRando.Options.RO_INFINITE_UPGRADES",
-                                                                   "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS",
-                                                                   "gRando.Options.RO_SHUFFLE_ICICLE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_ROCK_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOULDER_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_RED_BOULDER_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SOIL_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_KEY_RINGS",
-                                                                   "gRando.Options.RO_SHUFFLE_NPC_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_ANIMAL_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_MISC_SOULS",
-                                                                   "gRando.Options.RO_ACCESS_DUNGEONS",
-                                                                   "gRando.Options.RO_ACCESS_MAJORA_MASKS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MAJORA_REMAINS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MOON_MASKS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_MOON_REMAINS_COUNT",
-                                                                   "gRando.Options.RO_ACCESS_TRIALS",
-                                                                   "gRando.Options.RO_CLOCK_SHUFFLE_PROGRESSIVE",
-                                                                   "gRando.Options.RO_CLOCK_SHUFFLE",
-                                                                   "gRando.Options.RO_CLOCK_TERMINAL_TIME",
-                                                                   "gRando.Options.RO_HINTS_BANK_SIGN",
-                                                                   "gRando.Options.RO_HINTS_BOSS_REMAINS",
-                                                                   "gRando.Options.RO_HINTS_GOSSIP_STONE_STRENGTH",
-                                                                   "gRando.Options.RO_HINTS_GOSSIP_STONES",
-                                                                   "gRando.Options.RO_HINTS_HOOKSHOT",
-                                                                   "gRando.Options.RO_HINTS_MOON_GOSSIP_STONES",
-                                                                   "gRando.Options.RO_HINTS_OATH_TO_ORDER",
-                                                                   "gRando.Options.RO_HINTS_PURCHASEABLE",
-                                                                   "gRando.Options.RO_HINTS_SONG_OF_SOARING",
-                                                                   "gRando.Options.RO_HINTS_SPIDER_HOUSES",
-                                                                   "gRando.Options.RO_HINTS_TRANSFORMATIONS",
-                                                                   "gRando.Options.RO_LOGIC",
-                                                                   "gRando.Options.RO_PLACEMENT_BOSS_KEYS",
-                                                                   "gRando.Options.RO_PLACEMENT_SMALL_KEYS",
-                                                                   "gRando.Options.RO_PLACEMENT_STRAY_FAIRIES",
-                                                                   "gRando.Options.RO_PLENTIFUL_ITEMS",
-                                                                   "gRando.Options.RO_PURCHASE_INFINITE_RUPEES",
-                                                                   "gRando.Options.RO_SHUFFLE_BARREL_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOSS_REMAINS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOSS_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_BUTTERFLIES",
-                                                                   "gRando.Options.RO_SHUFFLE_COWS",
-                                                                   "gRando.Options.RO_SHUFFLE_CRATE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_ENEMY_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_ENEMY_SOULS",
-                                                                   "gRando.Options.RO_SHUFFLE_FREESTANDING_ITEMS",
-                                                                   "gRando.Options.RO_SHUFFLE_FROGS",
-                                                                   "gRando.Options.RO_SHUFFLE_GOLD_SKULLTULAS",
-                                                                   "gRando.Options.RO_SHUFFLE_GRASS_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_HIVE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_OCARINA_BUTTONS",
-                                                                   "gRando.Options.RO_SHUFFLE_OWL_STATUES",
-                                                                   "gRando.Options.RO_SHUFFLE_POT_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SHOPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SKELETON_KEY",
-                                                                   "gRando.Options.RO_SHUFFLE_SNOWBALL_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_EVENTS",
-                                                                   "gRando.Options.RO_SHUFFLE_SONGS",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_DOUBLE_TIME",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_INVERTED_TIME",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_SARIA",
-                                                                   "gRando.Options.RO_SHUFFLE_SONG_SUN",
-                                                                   "gRando.Options.RO_SHUFFLE_SWIM",
-                                                                   "gRando.Options.RO_SHUFFLE_TINGLE_SHOPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TRAPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TREE_DROPS",
-                                                                   "gRando.Options.RO_SHUFFLE_TRIFORCE_PIECES",
-                                                                   "gRando.Options.RO_SHUFFLE_TYCOON_WALLET",
-                                                                   "gRando.Options.RO_SHUFFLE_WONDER_ITEMS",
-                                                                   "gRando.Options.RO_SKULLTULA_SHUFFLED",
-                                                                   "gRando.Options.RO_SKULLTULA_TOKENS_REQUIRED",
-                                                                   "gRando.Options.RO_STARTING_CONSUMABLES",
-                                                                   "gRando.Options.RO_STARTING_HEALTH",
-                                                                   "gRando.Options.RO_STARTING_MAPS_AND_COMPASSES",
-                                                                   "gRando.Options.RO_STARTING_RUPEES",
-                                                                   "gRando.Options.RO_STRAY_FAIRIES_MAX",
-                                                                   "gRando.Options.RO_STRAY_FAIRIES_REQUIRED",
-                                                                   "gRando.Options.RO_TRAP_AMOUNT",
-                                                                   "gRando.Options.RO_TRIFORCE_PIECES_MAX",
-                                                                   "gRando.Options.RO_TRIFORCE_PIECES_REQUIRED",
-                                                                   "gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",
-                                                                   "gRando.Options.RO_SHUFFLE_NEI_ITEMS",
-                                                                   "gRando.Options.RO_SHUFFLE_BOMB_ARROWS",
-                                                                   "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE",
-                                                                   "gRando.Options.RO_SHUFFLE_OOT_GEAR",
-                                                                   "gRando.Options.RO_SHUFFLE_OOT_EQUIPMENT",
-                                                                   "gRando.Options.RO_SHUFFLE_OOT_QUEST",
-                                                                   "gRando.Options.RO_SHUFFLE_OOT_MASKS",
-                                                                   "gRando.Options.RO_CROSSOVER_POKEBALL",
-                                                                   "gRando.Options.RO_CROSSOVER_MARIO_MASK",
-                                                                   "gRando.Options.RO_HYLIAS_GRACE",
-                                                                   "gRando.Options.RO_HYLIAS_GRACE_REWARDS",
-                                                                   "gRando.Options.RO_ROD_OF_SEASONS",
-                                                                   "gRando.Options.RO_STARTING_ROD_OF_SEASONS",
-                                                                   "gRando.Options.RO_MAPS_COMPASSES_GIVE_INFORMATION",
-                                                               });
+static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics,
+                                               {
+                                                   "gRando.ExcludedChecks",
+                                                   "gCombo.Rando.Shared.Wallets",
+                                                   "gRando.Generation.ShuffleMagicMirror",
+                                                   "gRando.Generation.ShuffleRitoMask",
+                                                   "gCombo.Rando.ShuffleMagicMirror",
+                                                   "gCombo.Rando.ShuffleRitoMask",
+                                                   "gRando.Options.RO_SHUFFLE_RUSTY_KEYS",
+                                                   "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG",
+                                                   "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG",
+                                                   "gRando.Options.RO_SHUFFLE_CHILD_WALLET",
+                                                   "gRando.Options.RO_INFINITE_UPGRADES",
+                                                   "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS",
+                                                   "gRando.Options.RO_SHUFFLE_ICICLE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ROCK_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_BOULDER_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_RED_BOULDER_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SOIL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_INTERIOR_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_SHOP_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_DOOR_INTERIORS",
+                                                   "gRando.Options.RO_SHUFFLE_GROTTO_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_OVERWORLD_ENTRANCES",
+                                                   "gRando.Options.RO_DECOUPLED_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_ENTRANCE_POOLS",
+                                                   "gRando.Options.RO_MIX_DUNGEON_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_BOSS_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_INTERIOR_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_SHOP_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_GROTTO_ENTRANCES",
+                                                   "gRando.Options.RO_MIX_OVERWORLD_ENTRANCES",
+                                                   "gRando.Options.RO_SHUFFLE_KEY_RINGS",
+                                                   "gRando.Options.RO_SHUFFLE_NPC_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_ANIMAL_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_MISC_SOULS",
+                                                   "gRando.Options.RO_ACCESS_DUNGEONS",
+                                                   "gRando.Options.RO_ACCESS_MAJORA_MASKS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MAJORA_REMAINS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MOON_MASKS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_MOON_REMAINS_COUNT",
+                                                   "gRando.Options.RO_ACCESS_TRIALS",
+                                                   "gRando.Options.RO_CLOCK_SHUFFLE_PROGRESSIVE",
+                                                   "gRando.Options.RO_CLOCK_SHUFFLE",
+                                                   "gRando.Options.RO_CLOCK_TERMINAL_TIME",
+                                                   "gRando.Options.RO_HINTS_BANK_SIGN",
+                                                   "gRando.Options.RO_HINTS_BOSS_REMAINS",
+                                                   "gRando.Options.RO_HINTS_GOSSIP_STONE_STRENGTH",
+                                                   "gRando.Options.RO_HINTS_GOSSIP_STONES",
+                                                   "gRando.Options.RO_HINTS_HOOKSHOT",
+                                                   "gRando.Options.RO_HINTS_MOON_GOSSIP_STONES",
+                                                   "gRando.Options.RO_HINTS_OATH_TO_ORDER",
+                                                   "gRando.Options.RO_HINTS_PURCHASEABLE",
+                                                   "gRando.Options.RO_HINTS_SONG_OF_SOARING",
+                                                   "gRando.Options.RO_HINTS_SPIDER_HOUSES",
+                                                   "gRando.Options.RO_HINTS_TRANSFORMATIONS",
+                                                   "gRando.Options.RO_LOGIC",
+                                                   "gRando.Options.RO_PLACEMENT_BOSS_KEYS",
+                                                   "gRando.Options.RO_PLACEMENT_SMALL_KEYS",
+                                                   "gRando.Options.RO_PLACEMENT_STRAY_FAIRIES",
+                                                   "gRando.Options.RO_PLENTIFUL_ITEMS",
+                                                   "gRando.Options.RO_PURCHASE_INFINITE_RUPEES",
+                                                   "gRando.Options.RO_SHUFFLE_BARREL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_REMAINS",
+                                                   "gRando.Options.RO_SHUFFLE_BOSS_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_BUTTERFLIES",
+                                                   "gRando.Options.RO_SHUFFLE_COWS",
+                                                   "gRando.Options.RO_SHUFFLE_CRATE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ENEMY_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_ENEMY_SOULS",
+                                                   "gRando.Options.RO_SHUFFLE_FREESTANDING_ITEMS",
+                                                   "gRando.Options.RO_SHUFFLE_FROGS",
+                                                   "gRando.Options.RO_SHUFFLE_GOLD_SKULLTULAS",
+                                                   "gRando.Options.RO_SHUFFLE_GRASS_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_HIVE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_OCARINA_BUTTONS",
+                                                   "gRando.Options.RO_SHUFFLE_OWL_STATUES",
+                                                   "gRando.Options.RO_SHUFFLE_POT_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SHOPS",
+                                                   "gRando.Options.RO_SHUFFLE_SKELETON_KEY",
+                                                   "gRando.Options.RO_SHUFFLE_SNOWBALL_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_EVENTS",
+                                                   "gRando.Options.RO_SHUFFLE_SONGS",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_DOUBLE_TIME",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_INVERTED_TIME",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_SARIA",
+                                                   "gRando.Options.RO_SHUFFLE_SONG_SUN",
+                                                   "gRando.Options.RO_SHUFFLE_SWIM",
+                                                   "gRando.Options.RO_SHUFFLE_TINGLE_SHOPS",
+                                                   "gRando.Options.RO_SHUFFLE_TRAPS",
+                                                   "gRando.Options.RO_SHUFFLE_TREE_DROPS",
+                                                   "gRando.Options.RO_SHUFFLE_TRIFORCE_PIECES",
+                                                   "gRando.Options.RO_SHUFFLE_TYCOON_WALLET",
+                                                   "gRando.Options.RO_SHUFFLE_WONDER_ITEMS",
+                                                   "gRando.Options.RO_SKULLTULA_SHUFFLED",
+                                                   "gRando.Options.RO_SKULLTULA_TOKENS_REQUIRED",
+                                                   "gRando.Options.RO_STARTING_CONSUMABLES",
+                                                   "gRando.Options.RO_STARTING_HEALTH",
+                                                   "gRando.Options.RO_STARTING_MAPS_AND_COMPASSES",
+                                                   "gRando.Options.RO_STARTING_RUPEES",
+                                                   "gRando.Options.RO_STRAY_FAIRIES_MAX",
+                                                   "gRando.Options.RO_STRAY_FAIRIES_REQUIRED",
+                                                   "gRando.Options.RO_TRAP_AMOUNT",
+                                                   "gRando.Options.RO_TRIFORCE_PIECES_MAX",
+                                                   "gRando.Options.RO_TRIFORCE_PIECES_REQUIRED",
+                                                   "gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",
+                                                   "gRando.Options.RO_SHUFFLE_RITO_MASK",
+                                                   "gRando.Options.RO_SHUFFLE_NEI_ITEMS",
+                                                   "gRando.Options.RO_SHUFFLE_BOMB_ARROWS",
+                                                   "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_GEAR",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_EQUIPMENT",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_QUEST",
+                                                   "gRando.Options.RO_SHUFFLE_OOT_MASKS",
+                                                   "gRando.Options.RO_CROSSOVER_POKEBALL",
+                                                   "gRando.Options.RO_CROSSOVER_MARIO_MASK",
+                                                   "gRando.Options.RO_HYLIAS_GRACE",
+                                                   "gRando.Options.RO_HYLIAS_GRACE_REWARDS",
+                                                   "gRando.Options.RO_ROD_OF_SEASONS",
+                                                   "gRando.Options.RO_STARTING_ROD_OF_SEASONS",
+                                                   "gRando.Options.RO_MAPS_COMPASSES_GIVE_INFORMATION",
+                                               });
 
 // Shop checks that Rando::Logic::GeneratePools always shuffles even with Shops off
 static constexpr RandoCheckId ALWAYS_SHUFFLED_SHOP_CHECKS[] = {
@@ -1093,8 +1119,13 @@ static void NeiRando_EnableCrossover() {
 
 static void NeiRando_SetAll(bool on) {
     for (const auto& o : kNeiRandoOptions) {
-        CVarSetInteger(Rando::StaticData::Options[o.id].cvar, on ? o.on : 0);
+        const char* cvar = Combo_IsCombinedGame() && o.id == RO_SHUFFLE_MAGIC_MIRROR
+                               ? ComboRando::MagicMirrorSettings::SharedCvar
+                               : Rando::StaticData::Options[o.id].cvar;
+        CVarSetInteger(cvar, on ? o.on : 0);
     }
+    if (Combo_IsCombinedGame())
+        ShipInit::Init(ComboRando::MagicMirrorSettings::SharedCvar);
     NeiRando_EnableCrossover();
     CVarSetInteger("gMods.BombArrows.Mode",
                    CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, RO_BOMB_ARROWS_OFF));
@@ -1241,6 +1272,29 @@ static void DrawItemPoolTab() {
     ItemPoolCheckbox(
         "Miscellaneous Souls", RO_SHUFFLE_MISC_SOULS,
         "Adds Gold Skulltula and Business Scrub souls to the pool. Their actors and checks require their soul.", 2);
+#ifdef COMBO_BUILD
+    ImGui::SeparatorText("Soul Models");
+    {
+        WhatsNew::Scope releaseHighlight(ComboSoulModels::kSimplerEnemyCvar, "Simpler Enemy Soul Models",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Simpler Enemy Soul Models", ComboSoulModels::kSimplerEnemyCvar,
+            CheckboxOptions(
+                { { .tooltip = "Show enemy souls as a simple token and soul flame instead of miniature enemies. "
+                               "Applies immediately in both games, including cross-game pickups. "
+                               "NPC and boss soul models are separate." } }));
+    }
+    {
+        WhatsNew::Scope releaseHighlight(ComboSoulModels::kSimplerNpcCvar, "Simpler NPC Soul Models",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        CVarCheckbox(
+            "Simpler NPC Soul Models", ComboSoulModels::kSimplerNpcCvar,
+            CheckboxOptions(
+                { { .tooltip = "Show NPC souls as a simple token and soul flame instead of miniature characters. "
+                               "Applies immediately in both games, including cross-game pickups. "
+                               "Enemy and boss soul models are separate." } }));
+    }
+#endif
     UIWidgets::EndCard();
 
     UIWidgets::BeginCard("itemPoolTime");
@@ -1541,6 +1595,22 @@ static void DrawItemPoolTab() {
                      CheckboxOptions({ { .tooltip = "Adds the Skull, Spooky and Gerudo masks to a solo-MM pool.\n\n"
                                                     "Not considered by logic." } }));
     }
+    {
+        const char* ritoCvar = Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].cvar;
+        if (Combo_IsCombinedGame()) {
+            ComboRando::RitoMaskSettings::Shared();
+            ritoCvar = ComboRando::RitoMaskSettings::SharedCvar;
+        }
+        WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_RITO_MASK].cvar, nullptr,
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        if (CVarCheckbox(
+                "Shuffle Rito Mask", ritoCvar,
+                CheckboxOptions(
+                    { { .tooltip = "Adds exactly one optional Rito Mask. In Combo both games share one reward.\n"
+                                   "Choose it in the mask wheel in Combo or OoT; solo MM cycles the Bremen slot.\n"
+                                   "Default off. No progression checks require the Rito Mask." } })))
+            ShipInit::Init(ritoCvar);
+    }
     // Crossover Items: no inventory cell, so they get their own gates rather than riding
     // RO_SHUFFLE_NEI_ITEMS. Each one unlocks its form on the equipment page's Crossover sub-page.
     {
@@ -1667,11 +1737,16 @@ static void DrawItemPoolTab() {
                          "Seasons are not used by the reachability solver."));
     }
     {
+        const char* mirrorCvar = Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar;
+        if (Combo_IsCombinedGame()) {
+            ComboRando::MagicMirrorSettings::Shared();
+            mirrorCvar = ComboRando::MagicMirrorSettings::SharedCvar;
+        }
         WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar, nullptr,
                                          CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
                                          CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
         CVarCheckbox(
-            "Shuffle Magic Mirror", Rando::StaticData::Options[RO_SHUFFLE_MAGIC_MIRROR].cvar,
+            "Shuffle Magic Mirror", mirrorCvar,
             CheckboxOptions(
                 { { .tooltip =
                         "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
@@ -2097,6 +2172,91 @@ static void DrawCheckExclusionsTab() {
     }
 }
 
+static void DrawEntrancesTab() {
+#ifdef COMBO_BUILD
+    if (gComboGameMode != COMBO_GAME_MM) {
+        return;
+    }
+    ImGui::BeginChild("randoEntrances");
+    ImGui::TextWrapped(
+        "Shuffle Majora's Mask entrances. The layout and return rules are saved with the next generated seed.");
+    const bool vanilla =
+        CVarGetInteger(Rando::StaticData::Options[RO_LOGIC].cvar, RO_LOGIC_GLITCHLESS) == RO_LOGIC_VANILLA;
+    auto entranceCheckbox = [&](const char* label, RandoOptionId option, const char* help, bool disabled = false,
+                                const char* disabledHelp = nullptr) {
+        const char* cvar = Rando::StaticData::Options[option].cvar;
+        WhatsNew::Scope releaseHighlight(cvar, label, CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                         vanilla || disabled);
+        CVarCheckbox(
+            label, cvar,
+            CheckboxOptions({ { .tooltip = help,
+                                .disabled = vanilla || disabled,
+                                .disabledTooltip = vanilla ? "Choose a randomized logic mode to shuffle entrances."
+                                                           : disabledHelp } }));
+    };
+    entranceCheckbox(
+        "Dungeon Entrances", RO_SHUFFLE_DUNGEON_ENTRANCES,
+        "Shuffle the temple entrances within Majora's Mask, including both normal and inverted Stone Tower.");
+    const bool dungeons = CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_DUNGEON_ENTRANCES].cvar, 0) != 0;
+    entranceCheckbox("Expanded Dungeon Pool", RO_SHUFFLE_EXPANDED_DUNGEON_ENTRANCES,
+                     "Add the Spider Houses, Ikana Castle, Secret Shrine, Beneath the Well's two entrances, "
+                     "and Pirates' Fortress to the dungeon pool.",
+                     !dungeons, "Enable Dungeon Entrances to use the expanded pool.");
+    entranceCheckbox("Boss Entrances", RO_SHUFFLE_BOSS_ENTRANCES,
+                     "Shuffle Majora's Mask's four bosses. Rewards belong to the arena; completion and the blue warp "
+                     "follow the shuffled boss door.");
+    entranceCheckbox("Interiors", RO_SHUFFLE_INTERIOR_ENTRANCES,
+                     "Shuffle houses and other nonretail interiors, including open passageways and Door Interiors. "
+                     "Shops use their own checkbox.");
+    entranceCheckbox("Shops", RO_SHUFFLE_SHOP_ENTRANCES,
+                     "Shuffle retail shop entrances with other shops, including shops with open entrances. "
+                     "Only this checkbox includes shops.");
+    const bool interiors = CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_INTERIOR_ENTRANCES].cvar, 0) != 0;
+    entranceCheckbox(
+        "Door Interiors", RO_SHUFFLE_DOOR_INTERIORS,
+        "Shuffle nonretail interiors with doors you open. Open houses, caves, tunnels and other passageways "
+        "stay in place. Shops use their separate checkbox.",
+        interiors, "Interiors already includes Door Interiors.");
+    entranceCheckbox("Grottos", RO_SHUFFLE_GROTTO_ENTRANCES,
+                     "Shuffle grotto entrances, including their return and void positions.");
+    entranceCheckbox("Overworld Entrances", RO_SHUFFLE_OVERWORLD_ENTRANCES,
+                     "Shuffle the connections between overworld areas in Majora's Mask. With Mixed Entrance Pools and "
+                     "Mix Overworld enabled, these paths can also lead to the other categories selected for mixing.");
+    entranceCheckbox("Decouple Entrances", RO_DECOUPLED_ENTRANCES,
+                     "Shuffle entrance and return paths independently. Leaving through an entrance can lead to a "
+                     "different place from the one you entered from.");
+    entranceCheckbox("Mixed Entrance Pools", RO_MIX_ENTRANCE_POOLS,
+                     "Combine the selected entrance categories into one pool. Choose at least two categories below "
+                     "to mix their destinations. Each category must also have its entrance shuffle enabled.");
+    const bool mixed = CVarGetInteger(Rando::StaticData::Options[RO_MIX_ENTRANCE_POOLS].cvar, 0) != 0;
+    auto selected = [](RandoOptionId option) {
+        return CVarGetInteger(Rando::StaticData::Options[option].cvar, 0) != 0;
+    };
+    auto mixCheckbox = [&](const char* label, RandoOptionId option, bool shuffled, const char* help) {
+        entranceCheckbox(label, option, help, !mixed || !shuffled,
+                         !mixed ? "Enable Mixed Entrance Pools to choose categories."
+                                : "Enable this category's entrance shuffle before mixing it.");
+    };
+    mixCheckbox(
+        "Mix Dungeons", RO_MIX_DUNGEON_ENTRANCES, dungeons,
+        "Mix dungeon entrances with the other selected categories, including the expanded dungeon pool when enabled.");
+    mixCheckbox("Mix Bosses", RO_MIX_BOSS_ENTRANCES, selected(RO_SHUFFLE_BOSS_ENTRANCES),
+                "Mix boss entrances with the other selected categories. Boss rewards and regional clears belong to the "
+                "physical boss when bosses are mixed with another category.");
+    mixCheckbox("Mix Interiors", RO_MIX_INTERIOR_ENTRANCES, interiors || selected(RO_SHUFFLE_DOOR_INTERIORS),
+                "Mix the selected nonretail interiors with other categories. Uses Door Interiors when only that "
+                "shuffle is enabled.");
+    mixCheckbox("Mix Shops", RO_MIX_SHOP_ENTRANCES, selected(RO_SHUFFLE_SHOP_ENTRANCES),
+                "Mix retail shop entrances with the other selected categories.");
+    mixCheckbox("Mix Grottos", RO_MIX_GROTTO_ENTRANCES, selected(RO_SHUFFLE_GROTTO_ENTRANCES),
+                "Mix grotto entrances with the other selected categories.");
+    mixCheckbox("Mix Overworld", RO_MIX_OVERWORLD_ENTRANCES, selected(RO_SHUFFLE_OVERWORLD_ENTRANCES),
+                "Allow an overworld path to lead to a selected dungeon, boss, interior, shop or grotto, and entrances "
+                "from those categories to lead to overworld areas.");
+    ImGui::EndChild();
+#endif
+}
+
 static void DrawHintsTab() {
     f32 columnWidth = ImGui::GetContentRegionAvail().x / 3 - (ImGui::GetStyle().ItemSpacing.x * 2);
     f32 halfHeight = ImGui::GetContentRegionAvail().y / 2 - (ImGui::GetStyle().ItemSpacing.y * 2);
@@ -2204,6 +2364,15 @@ void Rando::RegisterMenu() {
     mBenMenu->AddWidget(path, "Logic/Conditions", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
         DrawLogicConditionsTab();
     });
+#ifdef COMBO_BUILD
+    if (gComboGameMode == COMBO_GAME_MM) {
+        mBenMenu->AddSidebarEntry("Rando", "Entrances", 1);
+        path.sidebarName = "Entrances";
+        mBenMenu->AddWidget(path, "Entrances", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+            DrawEntrancesTab();
+        });
+    }
+#endif
 
     // Searching by name would otherwise render these entire pages inline in the results
     mBenMenu->AddSidebarEntry("Rando", "Check Pool", 1);

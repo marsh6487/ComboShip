@@ -11,6 +11,7 @@
 extern "C" {
 #include "variables.h"
 #include "functions.h"
+#include "mods/extended_inventory.h"
 }
 
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
@@ -32,6 +33,9 @@ void Rando::RemoveItem(RandoItemId randoItemId) {
     // Soul catalog mm_remove end
 
     switch (randoItemId) {
+        case RI_OOT_NEI_RITO_MASK:
+            RitoMask_Remove();
+            break;
         case RI_WOODFALL_KEY_RING:
         case RI_SNOWHEAD_KEY_RING:
         case RI_GREAT_BAY_KEY_RING:

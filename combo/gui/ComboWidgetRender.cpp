@@ -18,6 +18,8 @@
 #include "WhatsNew.h"
 #include "ComboAudioBridge.h"      // Shared-tab audio -> MM mirror
 #include "ComboResolutionEditor.h" // combo-owned Advanced Resolution editor (intercepts broken widgets)
+#include "../rando/MagicMirrorSettings.h"
+#include "../rando/RitoMaskSettings.h"
 
 #include <libultraship/libultraship.h>         // ImGui-adjacent + CVar bridge (CVarGet/Set*) + color.h
 #include <ship/window/gui/IconsFontAwesome4.h> // ICON_FA_* for the window-toggle button (matches SoH)
@@ -179,7 +181,7 @@ static bool DelegatesToGame(CwKind k) {
     }
 }
 
-void RenderWidget(const CwWidget& w, const GameMenu& game, int widthBudget) {
+static void RenderNativeWidget(const CwWidget& w, const GameMenu& game, int widthBudget) {
     // Unique id namespace per widget so two widgets sharing a display label don't collide.
     ImGui::PushID(w.index);
 
@@ -474,6 +476,41 @@ void RenderWidget(const CwWidget& w, const GameMenu& game, int widthBudget) {
         ImGui::EndDisabled();
     }
     ImGui::PopID();
+}
+
+void RenderWidget(const CwWidget& w, const GameMenu& game, int widthBudget) {
+    const int before = MagicMirrorSettings::Preview();
+    const int ritoBefore = RitoMaskSettings::Preview();
+    if (RitoMaskSettings::NativeControl(w.cvar)) {
+        RitoMaskSettings::NativePreferenceScope rito(true);
+        RenderNativeWidget(w, game, widthBudget);
+        rito.Finish();
+    } else if (!MagicMirrorSettings::NativeControl(w.cvar)) {
+        RenderNativeWidget(w, game, widthBudget);
+    } else {
+        // Keep both controls in their native tabs and retain the real game's draw,
+        // accent, disabled predicate and callbacks. Only their backing preference
+        // is shared during this draw; solo CVars are restored before config saves.
+        MagicMirrorSettings::NativePreferenceScope mirror(true);
+        RenderNativeWidget(w, game, widthBudget);
+        mirror.Finish();
+    }
+    // MM's card and native presets are custom widgets rather than flat CVar
+    // controls. Their canonical edits must refresh the peer's preview too.
+    if (MagicMirrorSettings::Preview() != before) {
+        auto& model = ComboMenuModel::Get();
+        for (const auto* owner : { &model.Oot(), &model.Mm() }) {
+            if (owner->applyCVarChange)
+                owner->applyCVarChange(MagicMirrorSettings::SharedCvar);
+        }
+    }
+    if (RitoMaskSettings::Preview() != ritoBefore) {
+        auto& model = ComboMenuModel::Get();
+        for (const auto* owner : { &model.Oot(), &model.Mm() }) {
+            if (owner->applyCVarChange)
+                owner->applyCVarChange(RitoMaskSettings::SharedCvar);
+        }
+    }
 }
 
 void RenderSidebarWidgets(const CwSidebar& side, const GameMenu& game) {

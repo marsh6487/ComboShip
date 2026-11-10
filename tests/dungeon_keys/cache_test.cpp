@@ -11,13 +11,20 @@
 extern "C" {
 #include "fixture_api.h"
 }
+/* PRODUCTION_SOUL_SETTINGS */
 #define COMBO_EXPORT
 namespace Ship {
 static bool ownerActive=false;
-struct CrossRMRegistry { static int Get(const char* game) { assert(!strcmp(game,"mm")); return 1; } };
+struct FixtureResourceManager {
+ bool IsAltAssetsEnabled() const { return ResourceMgr_IsAltAssetsEnabled(); }
+};
+static FixtureResourceManager mmOwner;
+struct CrossRMRegistry {
+ static FixtureResourceManager* Get(const char* game) { assert(!strcmp(game,"mm")); return &mmOwner; }
+};
 struct ResourceManagerScope {
  bool previous=ownerActive;
- ResourceManagerScope(int) { ownerActive=true; }
+ ResourceManagerScope(FixtureResourceManager* owner) { assert(owner==&mmOwner); ownerActive=true; }
  ~ResourceManagerScope() { ownerActive=previous; }
 };
 }

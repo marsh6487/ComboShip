@@ -486,6 +486,10 @@ bool GenerateItemPool() {
         AddFixedItemToPool(RG_SKELETON_KEY, 1);
     }
 
+    // Optional utility reward: one copy in every density, independent of other masks/NEI.
+    if (ctx->GetOption(RSK_SHUFFLE_RITO_MASK))
+        AddFixedItemToPool(RG_RITO_MASK, 1);
+
     if (ctx->GetOption(RSK_SHUFFLE_MASKS)) {
         // Cross-game masks remain one shared pool identity. Respect native starting
         // masks for copies that are still supplied by the OoT pool.

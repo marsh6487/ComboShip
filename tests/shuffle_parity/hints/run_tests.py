@@ -89,6 +89,10 @@ def main():
         flags = [f for f in compiler_flags('soh', True)
                  if not f.startswith('-Wno-') and not f.startswith('-std=')
                  and f != '-Werror=implicit-function-declaration']
+        # The real OoT provider headers reach Tricks' ImVec4 declarations. Use
+        # the same pinned ImGui supplied by CI without relying on ambient CPATH.
+        if imgui_dir := os.environ.get('IMGUI_DIR'):
+            flags += ['-isystem', str(Path(imgui_dir).resolve())]
         binary = build / 'provider'
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-I' + str(build),
                         *flags, str(ROOT / 'tests/shuffle_parity/hints/provider_test.cpp'),

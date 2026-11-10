@@ -185,6 +185,7 @@ pool_program = COMMON.replace('#define COMBO_BUILD\n', '') + r'''
 #include <vector>
 #include "Rando/SongEvents.h"
 #include "Rando/VanillaCompatibility.h"
+#include "combo/rando/MagicMirrorSettings.h"
 #include "mm/2s2h/FleetShipCombo/FleetShipCombo.h"
 ''' + legacy_access + block(fleet, 'int FleetCombo_UnifiedPoolActive(void)') + r'''
 int mirrorRequested=0,mirrorReads=0;

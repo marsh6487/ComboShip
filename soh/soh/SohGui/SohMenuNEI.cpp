@@ -1,5 +1,7 @@
 #include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/rando/MagicMirrorSettings.h"
+#include "../../../combo/rando/RitoMaskSettings.h"
 #include "SohMenu.h"
 #include "../../../combo/NeiGracePolicy.h"
 #include "../../../combo/NeiSeasonsPolicy.h"
@@ -329,7 +331,10 @@ void NeiRando_MirrorSettingByCVar(const char* setting) {
 
 void NeiRando_SetAll(bool on) {
     for (const auto& s : kNeiRandoSettings) {
-        CVarSetInteger(s.setting, on ? s.on : 0);
+        const char* cvar = Combo_IsCombinedGame() && ComboRando::MagicMirrorSettings::NativeControl(s.setting)
+                               ? ComboRando::MagicMirrorSettings::SharedCvar
+                               : s.setting;
+        CVarSetInteger(cvar, on ? s.on : 0);
         NeiRando_MirrorSetting(s);
     }
     CVarSetInteger(CVAR_RANDOMIZER_SETTING("MmMasksTransform"), 0); // MmMasksAll already covers those 4
@@ -515,7 +520,19 @@ void RegisterNEIMenu() {
         { NEI_SEASONS_GATED, "Gated" },
     };
     mSohMenu
-        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMasks"), "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMasks"), "Shuffle Rito Mask",
+                         WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_RANDOMIZER_SETTING("ShuffleRitoMask"))
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(
+            CheckboxOptions().Tooltip("Adds exactly one optional Rito Mask. In Combo both games share one reward.\n"
+                                      "Choose it in the mask wheel in Combo or OoT; solo MM cycles the Bremen slot.\n"
+                                      "Default off. No progression checks require the Rito Mask."));
+    mSohMenu
+        ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleRitoMask"), "Rod of Seasons",
+                         WIDGET_CVAR_COMBOBOX)
         .CVar(seasonsModeCvar)
         .RaceDisable(false)
         .PreFunc(

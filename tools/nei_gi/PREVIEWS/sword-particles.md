@@ -12,10 +12,10 @@ game. True Master has the supplied gold blade, white handle and blue gemstone.
 
 ## Rotating previews
 
-- [All nine swords](swords_rotation.gif)
-- [OoT Kokiri, MM Kokiri and Razor — larger view](swords_rotation_group_1.gif)
-- [Gilded, Master and True Master — larger view](swords_rotation_group_2.gif)
-- [Biggoron, Great Fairy and Four Sword — larger view](swords_rotation_group_3.gif)
+- All nine swords (animated preview omitted from publication)
+- OoT Kokiri, MM Kokiri and Razor — larger view (animated preview omitted from publication)
+- Gilded, Master and True Master — larger view (animated preview omitted from publication)
+- Biggoron, Great Fairy and Four Sword — larger view (animated preview omitted from publication)
 - [Four-angle contact sheet](swords_rotation_contact.png)
 - [Models with effects disabled](swords_rotation_models_only.png)
 

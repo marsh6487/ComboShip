@@ -38,6 +38,7 @@ extern "C" {
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 extern TexturePtr gItemIcons[131];
+uint8_t ResourceMgr_FileExists(const char* path);
 void* ExtInv_GetItemIcon(unsigned short itemId);
 // Unified trade wheel ownership (trade_items.c) — same two entry points soh's debugSaveEditor uses,
 // so both editors drive the identical tradeAdultOwned bitmask. Skijer 2026-07-30
@@ -2579,8 +2580,30 @@ static void DrawMagicMirrorEditor() {
     }
 }
 
+static void DrawRitoMaskEditor() {
+    ImGui::SeparatorText("Rito Mask");
+    const char* ritoIcon = static_cast<const char*>(ExtInv_GetItemIcon(EXT_ITEM_RITO_MASK));
+    auto ritoGui = Ship_GetFast3dGui();
+    if (ritoIcon != nullptr && ResourceMgr_FileExists(ritoIcon)) {
+        if (!ritoGui->HasTextureByName(ritoIcon))
+            ritoGui->LoadGuiTexture(ritoIcon, ritoIcon);
+        ImGui::Image(ritoGui->GetTextureByName(ritoIcon), ImVec2(32.0f, 32.0f));
+        ImGui::SameLine();
+    }
+    bool ritoOwned = RitoMask_IsOwned() != 0;
+    if (ImGui::Checkbox("Rito Mask owned", &ritoOwned)) {
+        if (ritoOwned)
+            RitoMask_Grant();
+        else
+            RitoMask_Remove();
+    }
+    ImGui::TextDisabled(RitoMask_UsesCornerWheel() ? "Select in the corner mask wheel."
+                                                   : "Shares the Bremen Mask cell; A then stick selects.");
+}
+
 static void DrawNeiTab() {
     DrawMagicMirrorEditor();
+    DrawRitoMaskEditor();
     // Unified trade wheel — visual cell 22 (row 4, col 5). MM had NO trade editor at all, so there was
     // no way to inspect or set ownership here and the shared slot was untestable from this side.
     // Same 23 entries, same order, same indices as soh's debugSaveEditor: the index IS the

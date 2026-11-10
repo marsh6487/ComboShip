@@ -1,5 +1,6 @@
 #include "Logic.h"
 #include "2s2h/Rando/Types.h"
+#include "Rando/SoloEntrances.h"
 #include "regs.h"
 
 #include <algorithm>
@@ -167,6 +168,17 @@ void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std
         return checks;
     };
 
+    // Entrance candidates use this same native item/event/time fixed point and
+    // deadline. Every inventory snapshot receives the selected map, so neither
+    // assumed fill nor its final no-assumption replay can fall back to vanilla.
+    SoloEntrances::SelectForLogic(simulation.original.save.shipSaveInfo.rando,
+                                  [&](const RandoSoloEntranceSave& layout) {
+                                      for (auto& context : assumed)
+                                          context.save.shipSaveInfo.rando.soloEntrances = layout;
+                                      const auto reached = reachable(0);
+                                      return std::all_of(checkPool.begin(), checkPool.end(),
+                                                         [&](RandoCheckId check) { return reached.contains(check); });
+                                  });
     const auto fullInventory = reachable(0);
     for (RandoCheckId check : checkPool) {
         if (!fullInventory.contains(check)) {

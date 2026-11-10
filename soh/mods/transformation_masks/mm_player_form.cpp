@@ -237,6 +237,7 @@ extern "C" void MmForm_RitoWindClear(void);
 extern "C" void MmForm_RitoWindDraw(PlayState* play);
 extern "C" LinkAnimationHeader* MmForm_RitoFlyAnim(void);
 extern "C" u8 MmForm_RitoBowIsOut(void);
+extern "C" u8 MmForm_RitoBowUsesNativePose(Player* player);
 static Gfx* MmForm_RitoBowDL(void); // defined next to the Rito shield's loader, used before it
 static Gfx* MmForm_RitoBowStringDL(void);
 static Gfx* MmForm_RitoHarpDL(void);
@@ -15585,10 +15586,10 @@ static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
         }
     }
 
-    // The bow goes in the LEFT hand and the hand goes with it. Dropping the limb here is
-    // the whole of the hiding; MmForm_PostLimbDraw puts the bow back in its place with a
-    // matrix of its own, which a *dList swap could not carry.
-    if (MmForm_RitoBowIsOut() && (limbIndex == PLAYER_LIMB_L_HAND)) {
+    // Authored clips hold the bow left; native fallback clips hold it right.
+    // The post-limb renderer must use the same hand as this hide operation.
+    if (MmForm_RitoBowIsOut() &&
+        limbIndex == (MmForm_RitoBowUsesNativePose(player) ? PLAYER_LIMB_R_HAND : PLAYER_LIMB_L_HAND)) {
         *dList = NULL;
     }
 
@@ -15810,9 +15811,8 @@ static void MmForm_DrawZoraSwimTrail(PlayState* play, s32 fin) {
     EffectBlure_AddVertex((EffectBlure*)Effect_GetByIndex(gFormState.zoraSwimTrailIndex[fin]), &tip, &base);
 }
 
-// OOT's held bow with the fist truncated off the end by apps/build_rito_bow.py. Every
-// gLinkAdultRightHandHoldingBow*DL models Link's own hand into the same display list, and
-// the cut is clean: the bow runs under one texture, the fist under five that follow it.
+// Prefer the optional handless Rito bow. The built-in adult bow remains a usable
+// fallback when that authored extraction is not installed (it includes Link's hand).
 static Gfx* MmForm_RitoBowDL(void) {
     static Gfx* sCached = NULL;
     static u8 sTried = 0;
@@ -15822,6 +15822,11 @@ static Gfx* MmForm_RitoBowDL(void) {
         const char* otr = "__OTR__objects/object_nei_rito_bow/gRitoBowDL";
         if (ResourceMgr_FileExists(otr)) {
             sCached = ResourceMgr_LoadGfxByName(otr);
+        }
+        if (sCached == NULL) {
+            const char* nativeBow = "__OTR__objects/object_link_boy/gLinkAdultRightHandHoldingBowNearDL";
+            if (ResourceMgr_FileExists(nativeBow))
+                sCached = ResourceMgr_LoadGfxByName(nativeBow);
         }
     }
     return sCached;
@@ -16271,10 +16276,9 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
             }
         }
 
-        // The bow, in the left hand the limb above just emptied. It draws in the limb's own
-        // matrix because that is the space it was authored in, and needs no object bound
-        // behind it: the vertices and textures it calls for are object_link_boy's own.
-        if (MmForm_RitoBowIsOut() && (limbIndex == PLAYER_LIMB_L_HAND)) {
+        // Use the hand selected by the current authored/native bow pose.
+        if (MmForm_RitoBowIsOut() &&
+            limbIndex == (MmForm_RitoBowUsesNativePose(player) ? PLAYER_LIMB_R_HAND : PLAYER_LIMB_L_HAND)) {
             Gfx* bow = MmForm_RitoBowDL();
             Gfx* string = MmForm_RitoBowStringDL();
 
@@ -16927,6 +16931,40 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
 
 extern "C" {
 
+// A new scene/file has its own native player and equips. Discard a departed
+// Rito form that this file cannot use without restoring the old player's saved
+// properties or equip backup into the new save.
+static void MmForm_DiscardUnownedRitoReload(void) {
+    const bool ritoContext =
+        gFormState.currentForm == MM_PLAYER_FORM_RITO ||
+        (gFormState.state == MMFORM_STATE_TRANSFORMING && gFormState.targetForm == MM_PLAYER_FORM_RITO);
+    if (!sPendingSoftReload || (!ritoContext && sPendingReactivateForm != MM_PLAYER_FORM_RITO) ||
+        RitoItem_FormEnabled())
+        return;
+    sPendingReactivate = 0;
+    sPendingSoftReload = 0;
+    sPendingReactivateForm = MM_PLAYER_FORM_HUMAN;
+    if (!ritoContext)
+        return;
+    // Old actor arenas are already gone; forget handles before flight reset.
+    MmForm_RitoWindClear();
+    MmForm_RitoResetFlight();
+    MmForm_RitoBowReset();
+    MmForm_FreeRootMotion();
+    MmForm_ClearCachedDLs();
+    MmForm_UnpinFormResources();
+    const char* forced = O2rLoader_GetForcedName();
+    if (forced != NULL && strcmp(forced, "rito") == 0)
+        O2rLoader_ClearForcedModel();
+    sEquipsSaved = 0;
+    ExtEquip_ClearTransformBackup();
+    memset(&gFormState, 0, sizeof(gFormState));
+    gFormState.state = MMFORM_STATE_INACTIVE;
+    gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
+    gFormState.targetForm = MM_PLAYER_FORM_HUMAN;
+    gFormState.initialized = 1;
+}
+
 void MmForm_Init(PlayState* play, Player* player) {
     MmForm_InterruptNativeMaskForScene(player, play, 1);
     MmForm_GakkiVoiceOff();
@@ -16989,6 +17027,7 @@ void MmForm_Init(PlayState* play, Player* player) {
     }
 
     gFormState.initialized = 1;
+    MmForm_DiscardUnownedRitoReload();
 
     // Auto-enable mask replacement CVars when Transformation Masks is enabled
     // This ensures Skull Mask → Deku, Spooky → Stone, Gerudo → Fierce Deity
@@ -18518,6 +18557,9 @@ void MmForm_Update(PlayState* play, Player* player) {
         }
     }
 
+    // Recheck after cross-game arrival can queue a new form above.
+    MmForm_DiscardUnownedRitoReload();
+
     // === Seamless form reload after scene transition ===
     // sPendingSoftReload is set by MmForm_Init when the player was transformed in the old scene.
     // We wait until the first Update frame (new PlayState is fully initialized) to reload assets.
@@ -19600,6 +19642,45 @@ void MmForm_Reset(void) {
         gFormState.groundPoundCrackTimer = 0;
         gFormState.groundPoundFloorPoly = NULL;
     }
+}
+
+// Removing the mask through the editor/native adapter also removes its form.
+// Use the existing full restoration path, then let the caller clear any restored
+// Rito button bindings. Other active forms and their pending reloads are untouched.
+void MmForm_OnRitoMaskRemoved(void) {
+    if (sPendingReactivateForm == MM_PLAYER_FORM_RITO) {
+        sPendingReactivate = 0;
+        sPendingSoftReload = 0;
+        sPendingReactivateForm = MM_PLAYER_FORM_HUMAN;
+    }
+    if (sFleetPendingForm == MM_PLAYER_FORM_RITO)
+        sFleetPendingForm = -1;
+    if (gFormState.currentForm != MM_PLAYER_FORM_RITO &&
+        !(gFormState.state == MMFORM_STATE_TRANSFORMING && gFormState.targetForm == MM_PLAYER_FORM_RITO))
+        return;
+    if (gPlayState != NULL) {
+        Player* player = GET_PLAYER(gPlayState);
+        if (player != NULL) {
+            gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
+            gFormState.skeletonLoaded = 0;
+            // Before the flash, ApplyFormProperties has not saved any native
+            // mass/shadow/tunic state. Restoring those fields then would corrupt
+            // Link. Only a form that actually applied properties can restore.
+            if (gFormState.savedAgeProperties != NULL)
+                MmForm_RestoreOotState(player);
+            player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
+            player->stateFlags3 &= ~PLAYER_STATE3_PAUSE_ACTION_FUNC;
+            MmForm_RestoreEquips(gPlayState);
+        }
+    }
+    // Skeleton loading can precede ApplyFormProperties during the flash.
+    const char* forced = O2rLoader_GetForcedName();
+    if (forced != NULL && strcmp(forced, "rito") == 0)
+        O2rLoader_ClearForcedModel();
+    // Reset discards this backup; restore real equipment before that happens.
+    ExtEquip_RestoreFromTransform();
+    MmForm_Reset();
+    gFormState.targetForm = MM_PLAYER_FORM_HUMAN;
 }
 
 // =============================================================================

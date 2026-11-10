@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   ReadCollision(argv[1], &header);
   u32 memory;
   assert(BgCheck_TryGetCustomMemsize(SCENE_00KEIKOKU, &memory) &&
-         memory == 0xC800);
+         memory == 0x10000);
   assert(!BgCheck_TryGetCustomMemsize(SCENE_20SICHITAI, &memory));
 #ifndef COMBO_BUILD
   assert(!BgCheck_TryGetCustomMemsize(COMBO_BLACK_MARKET_SCENE, &memory));

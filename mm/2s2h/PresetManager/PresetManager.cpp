@@ -1,4 +1,7 @@
 #include "PresetManager.h"
+#include "../../../combo/ComboGameMode.h"
+#include "../../../combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "../../../combo/rando/RitoMaskSettingsSnapshot.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <algorithm>
 #include <filesystem>
@@ -781,6 +784,15 @@ void PresetManager_ApplyPreset(nlohmann::json j) {
     if (!j.contains("type") || j["type"] != "2S2H_PRESET") {
         throw std::runtime_error("Invalid preset");
     }
+    ComboRando::MagicMirrorSettings::NativePreferenceScope mirror(Combo_IsCombinedGame());
+    const int mirrorValue =
+        Combo_IsCombinedGame()
+            ? ComboRando::MagicMirrorSettings::MmPresetValue(j, ComboRando::MagicMirrorSettings::Shared())
+            : 0;
+    ComboRando::RitoMaskSettings::NativePreferenceScope rito(Combo_IsCombinedGame());
+    const int ritoValue = Combo_IsCombinedGame()
+                              ? ComboRando::RitoMaskSettings::MmPresetValue(j, ComboRando::RitoMaskSettings::Shared())
+                              : 0;
 
     if (j.contains("ClearCVars")) {
         auto clearCVars = j["ClearCVars"].get<std::vector<std::string>>();
@@ -801,6 +813,8 @@ void PresetManager_ApplyPreset(nlohmann::json j) {
         ApplyPresetCVars("", j["CVars"]);
     }
 
+    mirror.Finish(mirrorValue);
+    rito.Finish(ritoValue);
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
     ShipInit::Init("*");
     Notification::Emit({ .message = "Preset Loaded" });
@@ -818,6 +832,12 @@ void PresetManager_CreatePreset(std::string presetName) {
         newJson["type"] = "2S2H_PRESET";
         newJson["version"] = 1;
         newJson["CVars"] = existingJson["CVars"];
+        if (Combo_IsCombinedGame()) {
+            ComboRando::MagicMirrorSettings::StampNativePreset(newJson["CVars"], false,
+                                                               ComboRando::MagicMirrorSettings::Shared());
+            ComboRando::RitoMaskSettings::StampNativePreset(newJson["CVars"], false,
+                                                            ComboRando::RitoMaskSettings::Shared());
+        }
         // We may handle this differently in the future, but for now we're just not going to include gSettings and
         // gWindows. Users can still manually add them if they want.
         newJson["CVars"].erase("gSettings");

@@ -21,6 +21,7 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#include "mods/forms/custom_forms.h"
 
 // Native MM jump animations (gameplay_keep is included earlier in this z_player.c TU). Skijer's NEI
 #define ROCS_ANIM_BACKFLIP ((PlayerAnimationHeader*)gPlayerAnim_link_fighter_backturn_jump)
@@ -77,7 +78,7 @@ void Handle_RocsCape(Player* p, PlayState* play) {
         rcMmAnimTimer = -2; // Negative = pending, will count up to 0
         sPendingAnimType = CVarGetInteger("gMods.RocsItems.InvertAnims", 0) ? 2 : 1;
 
-    } else if (rcJumpCount == 0) {
+    } else if (MmRitoAirRocsAllowed(p) || rcJumpCount == 0) {
         // Double jump (second jump, while in air)
         rcJumpCount = 1;
         p->actor.velocity.y = ROCSCAPE_DOUBLE_JUMP_VELOCITY;

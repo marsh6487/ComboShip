@@ -5,6 +5,9 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#ifdef COMBO_BUILD
+#include "rando/SoloEntranceMmRuntime.h"
+#endif
 
 extern "C" {
 #include "z64actor.h"
@@ -53,6 +56,11 @@ void GameInteractor_ExecuteOnSaveInit(s16 fileNum) {
 
 void GameInteractor_ExecuteOnSaveLoad(s16 fileNum) {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveLoad>(fileNum);
+#ifdef COMBO_BUILD
+    // Ordinary hooks may restore native respawn data. Bind the selected Solo
+    // MM map and materialize its final recovery only after they have finished.
+    Combo_MM_SoloEntranceOnSaveLoad();
+#endif
 }
 
 void GameInteractor_ExecuteOnFileSelectSaveLoad(s16 fileNum, bool isOwlSave, SaveContext* saveContext) {

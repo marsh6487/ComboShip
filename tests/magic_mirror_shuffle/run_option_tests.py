@@ -31,20 +31,21 @@ option_methods='\n'.join(extract(option,signature).replace('Option::','FakeOptio
  'uint8_t Option::GetOptionIndex() const'))
 bodies='\n'.join(extract(s,q) for s,q in [
  (oot,'extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM('),
+ (oot,'extern "C" COMBO_EXPORT int SOH_ReadComboMagicMirrorPreference('),
  (oot,'extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings('),
  (oot,'extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings('),
  (mm,'extern "C" COMBO_EXPORT const char* MM_DumpRandoSettings('),
  (mm,'extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(')])
-force_oot=extract(settings[settings.index('void Settings::SetAllToContext()'):], '    if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))')
-force_mm=extract(mm, '        if (Combo_IsCombinedGame() && CVarGetInteger("gRando.Generation.ShuffleMagicMirror", 0))')
-# These are single-statement ifs: block_from would include the following unrelated braced section.
-force_oot=force_oot.split(';',1)[0]+';'
-force_mm=force_mm.split(';',1)[0]+';'
+# Retain the complete native single-statement overrides, independent of clang-format whitespace.
+force_oot=re.search(r'if\s*\(Combo_IsCombinedGame\(\)\)\s*mContext->GetOption\(RSK_SHUFFLE_MAGIC_MIRROR\).*?;',extract(settings,'void Settings::SetAllToContext()'),re.S)[0]
+force_mm=re.search(r'if\s*\(Combo_IsCombinedGame\(\)\)\s*options\[Rando::StaticData::Options\[RO_SHUFFLE_MAGIC_MIRROR\].*?;',mm,re.S)[0]
 fixture=r'''
 #include <nlohmann/json.hpp>
 #include "global.h"
 #include "2s2h/Rando/Rando.h"
 #include "rando/MagicMirrorShuffle.h"
+#include "rando/MagicMirrorSettingsSnapshot.h"
+#include "rando/RitoMaskSettingsSnapshot.h"
 #include "NeiGracePolicy.h"
 #include "NeiSeasonsPolicy.h"
 #include "tests/test_require.h"
@@ -103,6 +104,16 @@ static Ctx* mContext=&context;
 int EffectiveOot(){context.GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(CVarGetInteger("gRandoSettings.ShuffleMagicMirror",0));/* OOT */return context.GetOption(RSK_SHUFFLE_MAGIC_MIRROR).value;}
 int EffectiveMm(){nlohmann::json options={{"RO_SHUFFLE_MAGIC_MIRROR",CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)}};/* MM */return options["RO_SHUFFLE_MAGIC_MIRROR"].get<int>();}
 int main(){
+ // A persisted explicit Combo OFF must beat both independent solo ON values.
+ ints.clear();strings.clear();
+ CVarSetInteger("gCombo.Rando.ShuffleMagicMirror",0);
+ CVarSetInteger("gRandoSettings.ShuffleMagicMirror",1);
+ CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",1);
+ SOH_NormalizeComboGraceFromMM();
+ REQUIRE(CVarGetInteger("gRando.Generation.ShuffleMagicMirror",-1)==0);
+ REQUIRE(EffectiveOot()==0 && EffectiveMm()==0);
+ REQUIRE(CVarGetInteger("gRandoSettings.ShuffleMagicMirror",0)==1);
+ REQUIRE(CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)==1);
  for(bool oot:{false,true})for(bool mm:{false,true}) {
   ints.clear();strings.clear();
   CVarSetInteger("gRandoSettings.ShuffleMagicMirror",oot);CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",mm);
@@ -151,9 +162,30 @@ int main(){
  SOH_RestoreRandoSettings("{}");MM_RestoreRandoSettings("{}");
  REQUIRE(CVarGetInteger(Rando::RustyDoorKeys::CatalogVersionCVar,Rando::RustyDoorKeys::LegacyCatalog)==0);
  REQUIRE(!EffectiveOot()&&!EffectiveMm()&&!CVarGetInteger("gRando.Generation.ShuffleMagicMirror",0));
+ CVarSetInteger("gRandoSettings.ShuffleMagicMirror",0);
+ CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",1);
  CVarSetInteger("gRando.Generation.ShuffleMagicMirror",1);gComboGameMode=COMBO_GAME_MM;
- REQUIRE(!EffectiveMm()&&!EffectiveOot());
- puts("PASS active normalizer + native seed flag policies + real snapshot/restore: OR requests, unchanged UI/NEI, both serialized, new-to-old OFF, solo ignores combined override");
+ REQUIRE(EffectiveMm()==1 && EffectiveOot()==0);
+ // Slot creation/repair temporarily restores a frozen seed, while the UI may
+ // already request a different new seed. Restore each phase independently.
+ gComboGameMode=COMBO_GAME_BOTH;
+ CVarSetInteger("gRandoSettings.ShuffleMagicMirror",1);
+ CVarSetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",1);
+ for(int ui:{0,1})for(int frozen:{0,1}) {
+  CVarSetInteger("gCombo.Rando.ShuffleMagicMirror",ui);
+  CVarSetInteger("gRando.Generation.ShuffleMagicMirror",frozen);
+  auto user=ComboRando::MagicMirrorSettings::WithSharedPreference(SOH_DumpRandoSettings(),SOH_ReadComboMagicMirrorPreference());
+  CVarSetInteger("gCombo.Rando.ShuffleMagicMirror",!ui);
+  CVarSetInteger("gRando.Generation.ShuffleMagicMirror",!frozen);
+  SOH_RestoreRandoSettings(user.c_str());
+  REQUIRE(CVarGetInteger("gCombo.Rando.ShuffleMagicMirror",-1)==ui);
+  REQUIRE(CVarGetInteger("gRando.Generation.ShuffleMagicMirror",-1)==frozen);
+  REQUIRE(EffectiveOot()==frozen && EffectiveMm()==frozen);
+  REQUIRE(CVarGetInteger("gRandoSettings.ShuffleMagicMirror",0)==1 && CVarGetInteger("gRando.Options.RO_SHUFFLE_MAGIC_MIRROR",0)==1);
+  SOH_NormalizeComboGraceFromMM();
+  REQUIRE(EffectiveOot()==ui && EffectiveMm()==ui);
+ }
+ puts("PASS actual normalizer + native seed policies + snapshots: authoritative Combo OFF/ON, legacy migration, independent solo preferences and catalog identities");
 }
 '''.replace('/* RUSTY CONTRACT */',rusty_contract).replace('/* OPTION METHODS */',option_methods).replace('/* BODIES */',bodies).replace('/* OOT */',force_oot).replace('/* MM */',force_mm)
 # Verify the real launcher calls the normalizer before each native dump sequence.

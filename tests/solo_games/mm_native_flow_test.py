@@ -55,6 +55,7 @@ creation=COMMON.replace('#define COMBO_BUILD\n','')+r'''
 #include <nlohmann/json.hpp>
 #include <imgui.h>
 #include "Rando/SongEvents.h"
+#include "Rando/SoloEntrances.h"
 #include "Rando/VanillaCompatibility.h"
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"
 extern "C" {SaveContext gSaveContext{};}
@@ -245,7 +246,8 @@ with tempfile.TemporaryDirectory(prefix='mm-native-flow-') as directory:
                 for path in ('mm/include','mm/include/PR','mm/2s2h','mm','mm/src','mm/assets','libultraship/include','combo','combo/menu'):
                     flags+=['-isystem',str(ROOT/path)]
                 if combined:flags+=['-DCOMBO_BUILD']
-                sources+=[str(ROOT/'mm/2s2h/Rando/SongEvents.cpp')]
+                sources+=[str(ROOT/'mm/2s2h/Rando/SongEvents.cpp'),
+                          str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp')]
                 # Preserve native C initializer/conversion semantics for the
                 # equipment masks and real flag reader; no C++ narrowing bypass.
                 native_source=tmp/(label+'-services.c');native_object=tmp/(label+'-services.o')

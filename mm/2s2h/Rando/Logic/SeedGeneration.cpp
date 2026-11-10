@@ -2,6 +2,7 @@
 #include "Rando/VanillaCompatibility.h"
 #include "Rando/Rando.h"
 #include "Rando/Logic/Logic.h"
+#include "Rando/SoloEntrances.h"
 #include "2s2h/ShipUtils.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <spdlog/spdlog.h>
@@ -150,6 +151,7 @@ std::string GenerateSeedInSaveContext(std::string inputSeed) {
     }
 
     if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_VANILLA) {
+        SoloEntrances::Clear(gSaveContext.save.shipSaveInfo.rando);
         GiveItem(RI_SWORD_KOKIRI);
         GiveItem(RI_SHIELD_HERO);
 
@@ -161,17 +163,29 @@ std::string GenerateSeedInSaveContext(std::string inputSeed) {
         }
         VanillaCompatibility::NormalizeSavedState(gSaveContext.save.shipSaveInfo.rando);
     } else if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_NO_LOGIC) {
+        SoloEntrances::Generate(gSaveContext.save.shipSaveInfo.rando, finalSeed);
         Rando::Logic::ApplyNoLogicToSaveContext(checkPool, itemPool);
     } else if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_NEARLY_NO_LOGIC) {
+        SoloEntrances::Generate(gSaveContext.save.shipSaveInfo.rando, finalSeed);
         Rando::Logic::ApplyNearlyNoLogicToSaveContext(checkPool, itemPool);
     } else if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_GLITCHLESS) {
         // Various things can result in failed generation now (confined placement, junked items,
         // too many traps, etc), so we retry a few times before giving up
         const int maxAttempts = 10;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (attempt > 1) {
+                // A timed-out search consumes a machine-dependent number of random
+                // choices. Give each retry its own seed-derived stream instead of
+                // inheriting that partial work. Keep the first attempt's existing
+                // stream position after pool and price generation unchanged.
+                const uint64_t retrySeed =
+                    static_cast<uint64_t>(finalSeed) ^ (0x9e3779b97f4a7c15ULL * static_cast<uint64_t>(attempt - 1));
+                Ship_Random_Seed(retrySeed);
+            }
             std::vector<RandoCheckId> attemptCheckPool = checkPool;
             std::vector<RandoItemId> attemptItemPool = itemPool;
             try {
+                SoloEntrances::Generate(gSaveContext.save.shipSaveInfo.rando, finalSeed, attempt - 1);
                 Rando::Logic::ApplyGlitchlessLogicToSaveContext(attemptCheckPool, attemptItemPool);
                 break;
             } catch (const std::exception& e) {

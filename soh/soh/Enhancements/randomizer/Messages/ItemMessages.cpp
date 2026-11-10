@@ -465,6 +465,16 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     } else {
         rgid = player->getItemId;
     }
+    if (rgid == RG_RITO_MASK) {
+        msg = CustomMessage("You found the %gRito Mask%w!&Wear it to take to the skies.", TEXTBOX_TYPE_BLUE);
+        msg.receiptPresentation.singleBox = 1;
+        msg.receiptPresentation.rewardLine = 0;
+        std::snprintf(msg.receiptPresentation.iconPath, sizeof(msg.receiptPresentation.iconPath), "%s",
+                      "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex");
+        msg.receiptPresentation.iconWidth = msg.receiptPresentation.iconHeight = 32;
+        msg.AutoFormat(ITEM_CUSTOM);
+        return;
+    }
     if (rgid == RG_MAGIC_MIRROR) {
         msg = CustomMessage(
             "You found the %gMagic Mirror%w!&Equip it to a C Button to return&to the Lost Woods from outdoors.",

@@ -120,6 +120,7 @@ typedef enum {
 
 typedef struct {
     u8 loaded;
+    u8 landUsesNative;
     u8 state;
     s16 charge;  // frames A has been held on the ground
     s16 boost;   // frames left of a Roc's climb punched through the glide
@@ -219,6 +220,22 @@ static void MmForm_RitoLoadClips(void) {
     sRito.hopClips[3] = MmForm_RitoLoadClip(RITO_CLIP_HOP_RIGHT);
     sRito.hopSettle = MmForm_RitoLoadClip(RITO_CLIP_HOP_SETTLE);
     sRito.throwItem = MmForm_RitoLoadClip(RITO_CLIP_THROW);
+    // The optional MHR alias pack is absent from the shipped assets. Native
+    // Link clips keep every action usable and must never be resampled in place.
+    if (sRito.launch == NULL)
+        sRito.launch = (LinkAnimationHeader*)gPlayerAnim_link_normal_jump;
+    if (sRito.land == NULL) {
+        sRito.land = (LinkAnimationHeader*)gPlayerAnim_link_normal_landing;
+        sRito.landUsesNative = 1;
+    }
+    for (int direction = 0; direction < 4; ++direction) {
+        if (sRito.hopClips[direction] == NULL)
+            sRito.hopClips[direction] = (LinkAnimationHeader*)gPlayerAnim_link_normal_jump;
+    }
+    if (sRito.hopSettle == NULL)
+        sRito.hopSettle = (LinkAnimationHeader*)gPlayerAnim_link_normal_jump;
+    if (sRito.throwItem == NULL)
+        sRito.throwItem = (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_shoot_next;
     MmForm_RitoInstallLanding();
     if (sRito.fly == NULL) {
         SPDLOG_WARN("[Rito] flight clip missing ({}) — A will not fly", RITO_CLIP_FLY);
@@ -320,7 +337,7 @@ extern "C" f32 MmForm_RitoDrawYOffset(Player* player) {
     if (player == NULL) {
         return RITO_DRAW_Y_BASE;
     }
-    if ((sRito.land != NULL) && (player->skelAnime.animation == sRito.land)) {
+    if (!sRito.landUsesNative && (sRito.land != NULL) && (player->skelAnime.animation == sRito.land)) {
         return RITO_DRAW_Y_BASE + RITO_LAND_LIFT;
     }
     return RITO_DRAW_Y_BASE + MmForm_RitoBowDrawLift(player);

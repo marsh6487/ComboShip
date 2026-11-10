@@ -28,6 +28,7 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#include "mods/forms/custom_forms.h"
 
 // Native MM jump animations. gameplay_keep is included earlier in this z_player.c TU, so these are
 // already declared as OTR path strings — cast straight to PlayerAnimationHeader* (same idiom as
@@ -86,5 +87,9 @@ void Handle_RocsFeather(Player* p, PlayState* play) {
         // jump-state animation change settle first, else it overwrites ours immediately).
         rfMmAnimTimer = -2; // Negative = pending, will count up to 0
         sRfPendingAnimType = CVarGetInteger("gMods.RocsItems.InvertAnims", 0) ? 2 : 1;
+    } else if (MmRitoAirRocsAllowed(p)) {
+        p->actor.velocity.y = ROCSFEATHER_JUMP_VELOCITY;
+        ItemVoice_Play(p, ROCSFEATHER_SOUND_JUMP_ADULT, ROCSFEATHER_SOUND_JUMP_CHILD);
+        FX_SpawnSparkles(p, play);
     }
 }

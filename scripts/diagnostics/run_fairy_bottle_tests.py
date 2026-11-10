@@ -104,6 +104,9 @@ def main():
     bodies += function(source, 'OOT_DrawForeignFairyBottle') + '\n'
     bodies += function(source, 'OOT_DrawForeignFairyContainer') + '\n'
     dispatch = function(source, 'OOT_DrawComboForeign')
+    bodies += '#include "combo/menu/ComboNeiGiResourceOwner.h"\n'
+    bodies += function((ROOT/'combo/menu/ComboForeignAnim.h').read_text(), 'CfaIsOtrPath') + '\n'
+    bodies += function(source, 'ComboInternRoutedPath') + '\n'
     bodies += 'extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "fairy dispatch selected Mirror"); }\n'
     bodies += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(), 'ComboDrawMagicMirrorForeign') + '\n'
     for name in sorted(set(re.findall(r'\bOOT_DrawForeign\w+', dispatch)) -

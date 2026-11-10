@@ -564,6 +564,7 @@ typedef enum ItemId {
 #define EXT_ITEM_PHANTOM_HOURGLASS 0x0221
 #define EXT_ITEM_SHADOW_CRYSTAL   0x0222
 #define EXT_ITEM_ROD_OF_SEASONS   0x0223
+#define EXT_ITEM_RITO_MASK        0x0225
 #endif
 // Back-compat aliases (same u16 values) so existing consumers keep their names; all > 0xFF now.
 #ifndef ITEM_SPIRITUAL_STONE_KOKIRI

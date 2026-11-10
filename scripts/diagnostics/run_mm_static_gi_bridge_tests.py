@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 from run_mm_scene_randomization_tests import function
+from foreign_gi_fixture_dependencies import clock_descriptor
 
 ROOT = Path(__file__).resolve().parents[2]
 owner = (ROOT/'combo/menu/ComboItemDrawOOT.h').read_text()
@@ -21,7 +22,7 @@ if '// Static custom GI bridge recipes.' in owner:
     a = owner.index('// Static custom GI bridge recipes.')
     b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)
     helpers += '\n' + owner[a:b]
-fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
+fixture = clock_descriptor(ROOT) + (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
 # The complete extracted custom descriptor contains the added-soul branch.
 # Preserve its actual enum/catalog/resource include protocol. The fixture's
 # previous Get-only enum and synthetic PATH handles duplicate those headers.
@@ -32,6 +33,7 @@ get_enum = '''#define RANDO_ENUM_BEGIN(x) enum x {
 assert fixture.count(get_enum) == 1, 'Missing prior fixture Get enum boundary'
 fixture = fixture.replace(get_enum, '''#include "soh/soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/soh/Enhancements/randomizer/SoulShuffle.h"
+#include "combo/menu/ComboSoulMiniOOT.h"
 #include "soh/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "soh/assets/objects/object_gi_map/object_gi_map.h"
 #include "soh/assets/soh_assets.h"''')
@@ -73,13 +75,15 @@ fixture = fixture.replace('/* HOST_TUNIC_DRAW */', '\n'.join(function(native, na
     'LoadNeiLegacyGfx', 'DrawOotMedallion', 'DrawOotGetItemOpaOpaTint', 'DrawOotTunicTint',
     'DrawOotExtSpiritBreastplate', 'DrawOotExtChampionsTunic', 'DrawOotExtSagesTunic')))
 if 'inline void MM_DrawForeignCustomGi(' in host:
+    clock = (ROOT/'combo/NeiClockGI.h').read_text()
+    clock_policy = 'namespace NeiClockGi {\n' + '\n'.join(function(clock,name) for name in ('TextureForGlass','CanDrawForeign')) + '\n}\n'
     fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', '#include "combo/menu/ComboSwordGiEffectFit.h"\n' +
-                              function(host, 'MM_DrawForeignCustomGi'))
+                              clock_policy + function(host, 'MM_DrawForeignCustomGi'))
 else:
     fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', 'void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*) {}')
 with tempfile.TemporaryDirectory(prefix='mm-static-gi-') as td:
     path=Path(td)/'test.cpp';path.write_text(fixture);binary=Path(td)/'test'
     flags=['-std=c++20','-DCOMBO_BUILD','-Wall','-Wextra','-Wno-unused-parameter']
     if '--sanitize' in sys.argv: flags+=['-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie']
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'soh/assets'),str(path),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'soh/assets'),'-I'+str(ROOT/'libultraship/include'),str(path),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

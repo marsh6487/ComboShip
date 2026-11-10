@@ -783,6 +783,21 @@ void SohMenu::AddMenuRandomizer() {
         .Options(CheckboxOptions().Tooltip(
             "When shuffling boss souls, they'll appear as a simpler model instead of showing the bosses' models. "
             "This might make boss souls more distinguishable from a distance, and can help with performance."));
+#ifdef COMBO_BUILD
+    AddWidget(path, "Simpler Enemy Soul Models", WIDGET_CVAR_CHECKBOX)
+        .CVar("gRandoEnhancements.SimplerEnemySoulModels")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().Tooltip(
+            "Show enemy souls as a simple token and soul flame instead of miniature enemies. "
+            "Applies immediately in both games, including cross-game pickups. NPC and boss soul models are separate."));
+    AddWidget(path, "Simpler NPC Soul Models", WIDGET_CVAR_CHECKBOX)
+        .CVar("gRandoEnhancements.SimplerNpcSoulModels")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().Tooltip(
+            "Show NPC souls as a simple token and soul flame instead of miniature characters. "
+            "Applies immediately in both games, including cross-game pickups. Enemy and boss soul models are "
+            "separate."));
+#endif
     AddWidget(path, "Skip Get Item Animations", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_RANDOMIZER_ENHANCEMENT("TimeSavers.SkipGetItemAnimation"))
         .Options(ComboboxOptions().ComboMap(skipGetItemAnimationOptions).DefaultIndex(SGIA_JUNK));

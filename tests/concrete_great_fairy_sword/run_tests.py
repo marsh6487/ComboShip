@@ -69,7 +69,7 @@ using RandoCheckId = int;
 constexpr int RC_UNKNOWN = 0, FC_OOT_SWORD_BIGGORON = 0;
 enum { GID_SWORD_BGS = 11, GID_SWORD_GREAT_FAIRY = 12 };
 namespace NeiGi { enum class Kind { Neutral, KokiriSword, RazorSword, GildedSword,
- MasterSword, SwordAura, BiggoronSword, GiantsKnife, GreatFairySword, Pokeball, Pacci, Last };
+ MasterSword, SwordAura, BiggoronSword, GiantsKnife, GreatFairySword, Pokeball, Pacci, Gold, Last };
 bool IsSword(Kind k) { return k >= Kind::KokiriSword && k <= Kind::GreatFairySword; }
 bool IsEquipment(Kind) { return false; }
 }

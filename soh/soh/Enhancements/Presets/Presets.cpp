@@ -1,4 +1,7 @@
 #include "Presets.h"
+#include "../../../../combo/ComboGameMode.h"
+#include "../../../../combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "../../../../combo/rando/RitoMaskSettingsSnapshot.h"
 #include <algorithm>
 #include <string>
 #include <fstream>
@@ -124,6 +127,10 @@ static SectionStrategy GetSectionStrategy(const PresetInfo& info, int section) {
 }
 
 void applyPreset(std::string presetName, std::vector<PresetSection> includeSections) {
+    ComboRando::MagicMirrorSettings::NativePreferenceScope mirror(Combo_IsCombinedGame());
+    ComboRando::RitoMaskSettings::NativePreferenceScope rito(Combo_IsCombinedGame());
+    int mirrorValue = Combo_IsCombinedGame() ? ComboRando::MagicMirrorSettings::Shared() : 0;
+    int ritoValue = Combo_IsCombinedGame() ? ComboRando::RitoMaskSettings::Shared() : 0;
     auto& info = presets[presetName];
     bool randoApplied = false;
     for (int i = PRESET_SECTION_SETTINGS; i < PRESET_SECTION_MAX; i++) {
@@ -144,6 +151,12 @@ void applyPreset(std::string presetName, std::vector<PresetSection> includeSecti
             }
             auto section = info.presetValues["blocks"][blockInfo[i].names[1]];
             SectionStrategy sectionStrategy = GetSectionStrategy(info, i);
+            if (Combo_IsCombinedGame() && i == PRESET_SECTION_RANDOMIZER) {
+                mirrorValue = ComboRando::MagicMirrorSettings::OotPresetValue(
+                    section, sectionStrategy == SectionStrategy::Merge, mirrorValue);
+                ritoValue = ComboRando::RitoMaskSettings::OotPresetValue(
+                    section, sectionStrategy == SectionStrategy::Merge, ritoValue);
+            }
 
             for (auto& item : section.items()) {
                 if (section[item.key()].is_null()) {
@@ -169,6 +182,8 @@ void applyPreset(std::string presetName, std::vector<PresetSection> includeSecti
             }
         }
     }
+    mirror.Finish(mirrorValue);
+    rito.Finish(ritoValue);
     if (randoApplied) {
         // Unversioned presets predate v4. Only migrate when rando came from the preset
         uint32_t presetVersion = SOH::GetConfigVersion(info.presetValues, 3);
@@ -443,6 +458,12 @@ void DrawEditPresetPopup() {
                         .Color(THEME_COLOR))) {
         presets[newPresetName] = {};
         auto config = Ship::Context::GetRawInstance()->GetConfig()->GetNestedJson();
+        if (Combo_IsCombinedGame()) {
+            ComboRando::MagicMirrorSettings::StampNativePreset(config["CVars"], true,
+                                                               ComboRando::MagicMirrorSettings::Shared());
+            ComboRando::RitoMaskSettings::StampNativePreset(config["CVars"], true,
+                                                            ComboRando::RitoMaskSettings::Shared());
+        }
         for (int i = PRESET_SECTION_SETTINGS; i < PRESET_SECTION_MAX; i++) {
             if (saveSection[i]) {
                 for (size_t j = 0; j < blockInfo[i].sections.size(); j++) {

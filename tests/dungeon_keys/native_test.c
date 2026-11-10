@@ -91,6 +91,10 @@ Gfx *ResourceMgr_LoadGfxByName(const char *p) {
   return testLoadFail && strstr(p, "combo_dungeon_keys") ? NULL : (Gfx *)p;
 }
 int CVarGetInteger(const char *p, int fallback) {
+  // Soul presentation preferences are outside this dungeon/key fixture.
+  if (!strcmp(p, "gRandoEnhancements.SimplerEnemySoulModels") ||
+      !strcmp(p, "gRandoEnhancements.SimplerNpcSoulModels"))
+    return fallback;
   if (strcmp(p, "gEnhancements.DungeonItemColors") == 0)
     return testColors;
   assert(strncmp(p, "gCosmetic.Items.", 16) == 0 &&

@@ -93,15 +93,11 @@ void* CustomForms_ResolveVanillaResource(const char* vanillaPath);  // display l
 void* CustomForms_ResolveVanillaTexture(const char* vanillaSymbol); // eyes / mouth
 u8 CustomForms_PreferFaceTextures(void);                            // Gerudo's segmented eyes belong to the active form
 
-// Rito Mask sharing the Farore's Wind cell, the way Roc's Feather shares the
-// Nayru's Love one. OtherItem is what the cell can flip to (ITEM_NONE = nothing);
-// a two-item cycle answers the same for prev and next. Only offered to a save
-// that owns Farore's Wind — the cell IS the state, nothing extra is stored.
-void RitoItem_NoteCellItem(s32 item); // remember that this file owns that cell item
-u8 RitoItem_FormEnabled(void);        // per-file earned Vanilla form; legacy option for other files
-void RitoItem_SyncCell(void);         // record ownership (call before the cycler); never writes the cell
-s32 RitoItem_OtherItem(void);
-u8 RitoItem_CanCycle(void);
+// Rito ownership is per file; the corner mask wheel selects its inventory icon.
+void RitoItem_NoteCellItem(s32 item); // preserve ownership before a wheel/editor selection
+u8 RitoItem_FormEnabled(void);
+void RitoItem_SyncCell(void);        // migrate old Farore placement, never auto-grant
+void MmForm_OnRitoMaskRemoved(void); // exit only Rito and cancel its pending reload
 
 u8 CustomForms_WantsPathSwap(void);
 void CustomForms_SetChainedOverride(void* fn);

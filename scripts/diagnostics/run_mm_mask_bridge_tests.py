@@ -43,7 +43,8 @@ handlers=set(re.findall(r'\b(MM_DrawForeign\w+)\(',foreign))
 fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('template<class...T>'+('bool ' if n=='MM_DrawForeignSilverRupee' else 'void ')+n+'(T...) { assert(0); '+('return false;' if n=='MM_DrawForeignSilverRupee' else '')+' }' for n in sorted(handlers) if n not in {'MM_DrawForeignSimple','MM_DrawForeignSpinAttack','MM_DrawForeignCustomGi'}))
 mirror_helper=function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(),'ComboDrawMagicMirrorForeign')
 mirror_boundary='extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "mask dispatch selected Mirror"); }\n'
-fixture=fixture.replace('/* HOST_DISPATCH */',mirror_boundary+mirror_helper+'\n'+foreign)
+anim_path=function((ROOT/'combo/menu/ComboForeignAnim.h').read_text(),'CfaIsOtrPath')
+fixture=fixture.replace('/* HOST_DISPATCH */',anim_path+'\n'+mirror_boundary+mirror_helper+'\n'+foreign)
 # Named RG and ITEM ordering must match the real registrations and native table.
 ids=re.findall(r'RANDO_ENUM_ITEM\((RG_MM_MASK_\w+)\)',(ROOT/'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())
 assert len(ids)==24
@@ -56,5 +57,5 @@ with tempfile.TemporaryDirectory(prefix='mm-mask-bridge-') as td:
     path=Path(td)/'test.cpp';path.write_text(fixture);binary=Path(td)/'test'
     flags=['-std=c++20','-Wall','-Wextra','-Wno-unused-parameter']
     if '--sanitize' in sys.argv: flags+=['-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie']
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),str(path),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'libultraship/include'),str(path),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':os.environ.get('ASAN_OPTIONS','detect_leaks=0')})

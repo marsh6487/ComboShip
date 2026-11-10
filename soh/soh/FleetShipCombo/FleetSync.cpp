@@ -95,6 +95,7 @@ void Bottle_WheelPersist(unsigned char wheel, unsigned short slotItem);
 void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 // Elemental Wand / Sheikah Slate grants (mods/extended_inventory.c): place the cell item, light the
 // rod/rune bit and pick the active mode -- the same call the native pickup makes.
+void RitoMask_Grant(void);
 unsigned char Cane_GiveSkill(unsigned char skill);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
@@ -498,15 +499,8 @@ static void ApplyVanillaShared(const nlohmann::json& sh) {
     });
     if (filtered.value("separateRocsFeather", 0) && !(nei->separateRocsFlags & 1u))
         VanillaRocsFeather_Grant();
-    if (filtered.value("ritoMaskOwned", 0)) {
-        // Record only this world's real spell before sharing the empty cell.
-        // The peer's remembered Farore ownership is never part of the protocol.
-        auto& cell = gSaveContext.inventory.items[SLOT_FARORES_WIND];
-        RitoItem_NoteCellItem(cell);
-        nei->ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
-        if (cell == ITEM_NONE)
-            cell = ITEM_RITO_MASK;
-    }
+    if (filtered.value("ritoMaskOwned", 0))
+        RitoMask_Grant();
     ComboVanilla::ApplySharingCells(
         *nei, filtered, [](uint16_t item) { return item; }, [](uint16_t item) { return item; });
     RepairFlagOwnedCells(nei);

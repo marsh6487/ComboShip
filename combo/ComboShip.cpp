@@ -273,6 +273,18 @@ static FnVoidV SOH_PrepRandoContext = nullptr;
 static FnVoidV SOH_NormalizeComboGraceFromMM = nullptr;
 static FnTakeStr SOH_RestoreRandoSettings = nullptr;
 static FnTakeStr MM_RestoreRandoSettings = nullptr;
+static int (*SOH_ReadComboMagicMirrorPreference)(void) = nullptr;
+static int (*SOH_ReadComboRitoMaskPreference)(void) = nullptr;
+
+static std::string Combo_UserRandoSettingsSnapshot(FnDumpData dump) {
+    std::string snapshot = dump ? dump() : "";
+    if (SOH_ReadComboMagicMirrorPreference)
+        snapshot =
+            ComboRando::MagicMirrorSettings::WithSharedPreference(snapshot, SOH_ReadComboMagicMirrorPreference());
+    if (SOH_ReadComboRitoMaskPreference)
+        snapshot = ComboRando::RitoMaskSettings::WithSharedPreference(snapshot, SOH_ReadComboRitoMaskPreference());
+    return snapshot;
+}
 static FnTakeStr SOH_SetCheckPrices = nullptr;
 static FnTakeStr MM_SetCheckPrices = nullptr;
 static FnSetReloadCb SOH_SetOnComboReloadCallback = nullptr;
@@ -2945,8 +2957,12 @@ static int Combo_OnReloadRequest(const char* path) {
         }
         auto oot = j.value("oot", nlohmann::json::object());
         auto mm = j.value("mm", nlohmann::json::object());
-        std::string ootSettings = oot.value("settings", nlohmann::json::object()).dump();
-        std::string mmSettings = mm.value("settings", nlohmann::json::object()).dump();
+        auto ootSnapshot = oot.value("settings", nlohmann::json::object());
+        auto mmSnapshot = mm.value("settings", nlohmann::json::object());
+        ComboRando::MagicMirrorSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
+        ComboRando::RitoMaskSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
+        std::string ootSettings = ootSnapshot.dump();
+        std::string mmSettings = mmSnapshot.dump();
 
         // Only OOT's payload is rebuilt here — MM re-derives its own at slot-bind time.
         std::string ootPlacements = ComboRando::ApplyPayloadFromConsolidated(j, ComboRando::GAME_OOT).dump();
@@ -2966,7 +2982,7 @@ static int Combo_OnReloadRequest(const char* path) {
         // seed's OOT settings have done their job (reproduction), instead of persisting to disk.
         std::string userOotSnapshot;
         if (isSilentAutoLoad && SOH_DumpRandoSettings) {
-            userOotSnapshot = SOH_DumpRandoSettings();
+            userOotSnapshot = Combo_UserRandoSettingsSnapshot(SOH_DumpRandoSettings);
             if (userOotSnapshot.empty())
                 std::cout << "[ComboShip] Reload: SOH_DumpRandoSettings returned empty snapshot\n";
         }
@@ -3031,7 +3047,7 @@ static int Combo_OnReloadRequest(const char* path) {
         // which may be many frames away — stash the seed's settings there instead of writing them now,
         // so they never leak into comboship.json before (or without) a slot ever being started.
         if (isSilentAutoLoad && MM_DumpRandoSettings)
-            g_UserMMSettingsSnapshot = MM_DumpRandoSettings();
+            g_UserMMSettingsSnapshot = Combo_UserRandoSettingsSnapshot(MM_DumpRandoSettings);
         else
             g_UserMMSettingsSnapshot.clear();
         g_PendingMMSettingsJson = mmSettings;
@@ -3085,7 +3101,7 @@ static bool Combo_WriteMMSaveForSlot(int fileNum, const nlohmann::json& seed) {
         return false;
     // Save creation AND half-save repair must use this seed's settings, even if
     // the menu changed after generation. Restore the user's UI on every return.
-    const std::string userSettings = MM_DumpRandoSettings ? MM_DumpRandoSettings() : "";
+    const std::string userSettings = Combo_UserRandoSettingsSnapshot(MM_DumpRandoSettings);
     struct RestoreSettings {
         const std::string& snapshot;
         ~RestoreSettings() {
@@ -3579,6 +3595,8 @@ int main(int argc, char** argv) {
     SOH_NormalizeComboGraceFromMM = (FnVoidV)GetSym(sohModule, "SOH_NormalizeComboGraceFromMM");
     SOH_RestoreRandoSettings = (FnTakeStr)GetSym(sohModule, "SOH_RestoreRandoSettings");
     MM_RestoreRandoSettings = (FnTakeStr)GetSym(mmModule, "MM_RestoreRandoSettings");
+    SOH_ReadComboMagicMirrorPreference = (int (*)(void))GetSym(sohModule, "SOH_ReadComboMagicMirrorPreference");
+    SOH_ReadComboRitoMaskPreference = (int (*)(void))GetSym(sohModule, "SOH_ReadComboRitoMaskPreference");
     SOH_SetCheckPrices = (FnTakeStr)GetSym(sohModule, "SOH_SetCheckPrices");
     MM_SetCheckPrices = (FnTakeStr)GetSym(mmModule, "MM_SetCheckPrices");
     SOH_SetOnComboReloadCallback = (FnSetReloadCb)GetSym(sohModule, "SOH_SetOnComboReloadCallback");

@@ -81,6 +81,7 @@ void Randomizer_DrawCryonis(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawPokeball(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMinishCap(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawRitoMask(PlayState* play, GetItemEntry* getItemEntry);
 // Bottle Randomizer Net (RG_NET) — soh.o2r object_nei_net held model as the get-item
 void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry);
 
@@ -157,6 +158,7 @@ void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry);
 // MM time items (6 clock halves): static Clock Town clock-tower face from mm.o2r object_obj_tokeidai,
 // day variants at face rotation 0xC000, night variants with sun/moon panel flipped 0x8000
+void Randomizer_DrawClock(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry);
 // MM per-dungeon items (one shared MM get-item model per type; RG name distinguishes the dungeon)
 void Randomizer_DrawMmSmallKey(PlayState* play, GetItemEntry* getItemEntry);

@@ -49,6 +49,9 @@
 #include "soh/ShipInit.hpp"
 #include "2s2h/CustomMessage/CustomMessage.h" // warp prompt (2ship native two-choice box)
 #include <string>
+#ifdef COMBO_BUILD
+#include "rando/SoloEntranceMmRuntime.h"
+#endif
 
 // OPEN_DISPS / CLOSE_DISPS (used by the statue .c pulled in below) redeclare these two symbols
 // inline at every call site. In a C++ TU that in-block redeclaration takes C++ linkage unless a C
@@ -143,6 +146,11 @@ void ExecuteWarp(PlayState* play, int stone) {
     if (w.entranceId < 0) {
         return;
     }
+#ifdef COMBO_BUILD
+    // Recall keeps its physical position. Restore the cast-time entrance owner
+    // and any logical grotto metadata before rebuilding the positioned TOP slot.
+    Combo_MM_SoloEntranceRestoreWarpCheckpoint(w.soloEntranceCheckpoint);
+#endif
 
     // Use RESPAWN_MODE_TOP (Farore's Wind slot), NOT RESPAWN_MODE_DOWN: DOWN is the VOID-OUT respawn
     // and MM's Player_Init inflicts fall/void damage when reviving through it (that was the "me quita
@@ -177,6 +185,11 @@ void SummonStatueHere(PlayState* play, Player* player, int stone) {
     w.posY = player->actor.world.pos.y;
     w.posZ = player->actor.world.pos.z;
     w.rotY = player->actor.shape.rot.y;
+#ifdef COMBO_BUILD
+    w.soloEntranceCheckpoint = Combo_MM_SoloEntranceSavedCheckpoint();
+#else
+    w.soloEntranceCheckpoint = -1;
+#endif
 
     Vec3f pos = { w.posX, w.posY, w.posZ };
     SpiritualStoneStatue_Spawn(play, &pos, w.rotY, stone);

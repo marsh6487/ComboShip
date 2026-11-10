@@ -1156,6 +1156,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_NEI_DEKU_LEAF:
             ExtInv_GiveItem(SLOT_DEKU_LEAF, ITEM_DEKU_LEAF);
             break;
+        case RI_OOT_NEI_RITO_MASK:
+            RitoMask_Grant();
+            break;
         case RI_OOT_NEI_MAGIC_MIRROR:
             TravelTools_Grant(EXT_ITEM_MAGIC_MIRROR);
             break;

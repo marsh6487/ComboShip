@@ -101,6 +101,9 @@ static std::set<int> reachable;
 static std::unordered_map<int,int> timeStates;
 }
 namespace ComboCrossMmCatalogue { static int GrottoExitForRegion(int) { return -1; } }
+namespace Rando::SoloEntrances {
+static bool BossLogicEnabled() { assert(false && "combined escape oracle must not query Solo logic"); return false; }
+}
 '''
 production_helper = block((root/'combo/rando/CrossDungeonMm.inc.h').read_text(), 'extern \"C\" int Combo_MM_CrossBossLogicEnabled(void)')
 production_oracle = block((root/'combo/rando/CrossDungeonMm.inc.h').read_text(), 'extern "C" COMBO_EXPORT const char* MM_GetCrossDungeonExits(void)')

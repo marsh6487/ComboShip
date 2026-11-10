@@ -1,4 +1,5 @@
 // Actual shared native generation, without the file-create UI/audio/write tail.
+#include "Rando/SoloEntrances.h"
 extern "C" int gFcCombo_SuppressRecord;
 extern "C" COMBO_EXPORT const char* MM_FillSoloRandoSeed(uint32_t seed) {
     static std::string cached;
@@ -38,6 +39,7 @@ extern "C" COMBO_EXPORT const char* MM_FillSoloRandoSeed(uint32_t seed) {
         Rando::PrepareNewRandomizedSave();
         result["inputSeed"] = Rando::GenerateSeedInSaveContext(std::to_string(seed));
         result["finalSeed"] = gSaveContext.save.shipSaveInfo.rando.finalSeed;
+        result["soloEntrances"] = Rando::SoloEntrances::Seed(gSaveContext.save.shipSaveInfo.rando);
         result["placements"] = nlohmann::json::object();
         result["prices"] = nlohmann::json::object();
         result["checks"] = nlohmann::json::object();

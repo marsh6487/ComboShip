@@ -1,6 +1,7 @@
 #include "combo/rando/SongEvents.h"
 #include "Spoiler.h"
 #include "Rando/Rando.h"
+#include "Rando/SoloEntrances.h"
 
 namespace Rando {
 
@@ -11,6 +12,7 @@ nlohmann::json GenerateFromSaveContext() {
     spoiler["type"] = "2S2H_RANDO_SPOILER";
     spoiler["commitHash"] = gSaveContext.save.shipSaveInfo.commitHash;
     spoiler["finalSeed"] = gSaveContext.save.shipSaveInfo.rando.finalSeed;
+    spoiler["soloEntrances"] = SoloEntrances::Seed(gSaveContext.save.shipSaveInfo.rando);
     spoiler["songEvents"] = gSaveContext.save.shipSaveInfo.rando.songEvents;
     for (unsigned event = 0; event < 13; ++event) {
         auto song = gSaveContext.save.shipSaveInfo.rando.songEvents[event];

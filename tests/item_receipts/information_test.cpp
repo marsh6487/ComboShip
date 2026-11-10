@@ -1,5 +1,7 @@
 // Execute production altar routing and saved-setting restore. Requirement
 // builders and final font formatting are boundaries; seed flags/JSON are real.
+#include "combo/rando/MagicMirrorSettingsSnapshot.h"
+
 #include <array>
 #include <algorithm>
 #include <cassert>
@@ -13,6 +15,8 @@
 #include <vector>
 #define COMBO_BUILD
 #define COMBO_EXPORT
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #define RANDO_ENUM_BEGIN(x) enum x {
 #define RANDO_ENUM_ITEM(x, ...) x,
 #define RANDO_ENUM_END(x)                                                      \

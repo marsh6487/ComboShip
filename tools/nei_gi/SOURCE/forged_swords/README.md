@@ -55,6 +55,9 @@ python3 tools/nei_gi/SOURCE/forged_swords/build_swords.py --output /tmp/forged-s
 It writes `GAME_ASSETS/RESOURCES`, `PREVIEW_GLBS` and a model manifest. It uses the
 current corrected recipes and does not recreate the original imported bundle.
 The original manifests and provenance above remain unchanged historical evidence.
+The original MP4 preview is omitted from the public candidate. Its historical
+checksum remains in `SHA256SUMS.txt`; that file is not an inventory of the
+current publication package.
 Front/back checkpoint images use the actual authored triangles and material
 settings; these are offline previews. The import and rebuild metadata retain
 `runtime_tested: false`. See the

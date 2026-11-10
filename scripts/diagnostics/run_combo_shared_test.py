@@ -35,6 +35,14 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
     if result.returncode or a.baseline:
         raise SystemExit(result.returncode)
     source = (ROOT / 'combo/ComboShip.cpp').read_text()
+    helper = '#include "rando/MagicMirrorSettingsJson.h"\n'
+    if 'static std::string Combo_UserRandoSettingsSnapshot(' in source:
+        import re
+        helper += re.search(r'^typedef const char\* \(\*FnDumpData\)\(void\);', source, re.M)[0] + '\n'
+        helper += re.search(r'^static int \(\*SOH_ReadComboMagicMirrorPreference\)\(void\) = nullptr;', source, re.M)[0] + '\n'
+        begin = source.index('static std::string Combo_UserRandoSettingsSnapshot(')
+        end = source.index('\n}', begin) + 2
+        helper += source[begin:end] + '\n'
     begin = source.index('static bool Combo_BindCrossDungeonRuntime(')
     end = source.index('\n}', begin) + 2
     binding = source[begin:end]
@@ -46,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
     runtime += source[begin:end]
     begin = source.index('static std::set<std::string> sAppliedCrossChecks;')
     end = source.index('// Network-receive idempotency:', begin)
-    (directory / 'combo_shared_runtime_functions.h').write_text(binding + '\n' + runtime + source[begin:end])
+    (directory / 'combo_shared_runtime_functions.h').write_text(helper + binding + '\n' + runtime + source[begin:end])
     runtime_binary = directory / 'combo_shared_runtime_test'
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-O0',
                     '-I', str(includes), '-I', str(a.json_include), '-I', str(directory),

@@ -83,6 +83,10 @@ int MM_FillSpinAttackGi(CwItemDrawInfo*){return 0;}
 int MM_FillSongDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillOpsDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillSimpleDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
+int CVarGetInteger(const char* key,int fallback) {
+    assert(!std::strcmp(key,"gEnhancements.SkijerNEI.ItemEffects"));
+    return fallback;
+}
 int MM_FillEnemySoulDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_FillGidAliasDrawInfo(RandoItemId,CwItemDrawInfo*){return 0;}
 int MM_OotBottleShimmerColor(RandoItemId,u8*){return 0;}

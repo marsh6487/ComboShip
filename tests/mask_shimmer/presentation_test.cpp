@@ -28,6 +28,7 @@ void* Combo_ResolveSym(const char*,const char*) { assert(false); return nullptr;
 /* PRODUCTION_DRAW_PRELUDE */
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
+#include "ComboNeiGiResourceOwner.h"
 
 static Gfx opa[8192], xlu[2048], overlay[2048], resource;
 static GraphicsContext gfx;

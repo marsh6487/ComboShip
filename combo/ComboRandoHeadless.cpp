@@ -39,6 +39,8 @@
 #include <string>
 
 #include "rando/CrossWorldRando.h"
+#include "rando/MagicMirrorSettingsJson.h"
+#include "rando/RitoMaskSettingsJson.h"
 #include "rando/ComboPlaythrough.h"
 #include "rando/CrossForeign.h" // BuildForeignArray (foreign enrichment parity with RunComboFill)
 #include "rando/CrossHints.h"
@@ -313,6 +315,8 @@ int main(int argc, char** argv) {
         }
         auto ootSettings = spoiler.value("oot", nlohmann::json::object()).value("settings", nlohmann::json::object());
         auto mmSettings = spoiler.value("mm", nlohmann::json::object()).value("settings", nlohmann::json::object());
+        ComboRando::MagicMirrorSettings::NormalizeSnapshots(ootSettings, mmSettings);
+        ComboRando::RitoMaskSettings::NormalizeSnapshots(ootSettings, mmSettings);
         // Flat placement map that RunPlaythrough consumes.
         nlohmann::json flat;
         flat["oot"] = spoiler.value("oot", nlohmann::json::object()).value("placements", nlohmann::json::object());
@@ -620,10 +624,14 @@ int main(int argc, char** argv) {
             const auto& oot = sj.contains("oot") ? sj["oot"] : sj;
             const auto& mm = sj.contains("mm") ? sj["mm"] : sj;
             settingsOotLayouts = ComboRando::OotDungeonLayoutSnapshot(oot);
+            auto ootSnapshot = oot.value("settings", nlohmann::json::object());
+            auto mmSnapshot = mm.value("settings", nlohmann::json::object());
+            ComboRando::MagicMirrorSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
+            ComboRando::RitoMaskSettings::NormalizeSnapshots(ootSnapshot, mmSnapshot);
             if (oot.contains("settings"))
-                SOH_RestoreSettings(oot["settings"].dump().c_str());
+                SOH_RestoreSettings(ootSnapshot.dump().c_str());
             if (mm.contains("settings"))
-                MM_RestoreSettings(mm["settings"].dump().c_str());
+                MM_RestoreSettings(mmSnapshot.dump().c_str());
             if (SOH_SetEnabledTricks && oot.contains("enabledTricks"))
                 SOH_SetEnabledTricks(oot["enabledTricks"].dump().c_str());
             std::cout << "[comborando] restored settings from '" << settingsFile << "'\n";

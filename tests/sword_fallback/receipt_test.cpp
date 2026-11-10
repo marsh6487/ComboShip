@@ -161,6 +161,7 @@ void Randomizer_DrawCaneSomariaUpgrade(PlayState*,GetItemEntry*){assert(false);}
 void Randomizer_DrawCaneSomariaUpgradeFlame(PlayState*){assert(false);}
 void Randomizer_DrawTrueMasterSwordFlame(PlayState*){assert(false);}
 void Randomizer_DrawMarioMask(PlayState*,GetItemEntry*){assert(false);}
+void Randomizer_DrawRitoMask(PlayState*,GetItemEntry*){assert(false && "sword receipt must not dispatch Rito Mask");}
 void Randomizer_DrawExtSpiritBreastplate(PlayState*,GetItemEntry*){assert(false);}
 void Randomizer_DrawExtSagesTunic(PlayState*,GetItemEntry*){assert(false);}
 void Randomizer_DrawExtShieldOfIkana(PlayState*,GetItemEntry*){assert(false && "sword receipt selected a shield");}

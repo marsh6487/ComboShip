@@ -4,6 +4,8 @@
 #include "draw.h"
 #include "objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "NeiGiRender.h"
+#include "../../../../combo/NeiClockGI.h"
+#include "NeiGiPresentation.h"
 #include <ship/resource/Resource.h>
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
@@ -116,6 +118,8 @@ extern SaveContext gSaveContext;
 // ComboShip: combo-owned animated cross-game item rendering (MM stray fairies). TU-glue: needs the
 // engine headers above (z64.h/macros.h/functions.h) already in scope.
 #include "ComboForeignAnim.h"
+#include "ComboSoulModelSettings.h"
+extern "C" int32_t OOT_GetSoulMiniDrawInfo(int32_t itemId, CwItemAnimDrawInfo* out);
 #include "ComboBottleContentsDraw.h"
 #endif
 
@@ -282,6 +286,7 @@ extern "C" void Randomizer_DrawBossKey(PlayState* play, GetItemEntry* getItemEnt
 
 #define COMBO_MM_KEY_RING_HOST_OOT
 #include "../../../../combo/ComboMmKeyRingDraw.h"
+#include "../../../../combo/ComboDoorKeyGi.h"
 #undef COMBO_MM_KEY_RING_HOST_OOT
 
 // The key ring holds one key mesh repeated around the ring, so a slot is just a rotation about the
@@ -1006,9 +1011,17 @@ extern "C" void Randomizer_DrawBeanSprout(PlayState* play, GetItemEntry* getItem
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Added enemy/NPC/animal/misc souls retain their native token body and use the
-// boss-owned flame material. Never send their arbitrary IDs through boss slot math.
-extern "C" void Randomizer_DrawShuffledSoul(PlayState* play, GetItemEntry*) {
+// Owner-authored enemy/NPC miniatures share the foreign GI renderer in Combo.
+// Animal/misc entries and the original build retain the native token presentation.
+extern "C" void Randomizer_DrawShuffledSoul(PlayState* play, GetItemEntry* entry) {
+#ifdef COMBO_BUILD
+    if (entry) {
+        const int32_t id = entry->getItemId == RG_ICE_TRAP ? entry->drawItemId : entry->getItemId;
+        CwItemAnimDrawInfo info{};
+        if (OOT_GetSoulMiniDrawInfo(id, &info) == 1 && ComboForeignAnim_Draw(&info, "oot", play))
+            return;
+    }
+#endif
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
@@ -1412,6 +1425,19 @@ extern "C" void Randomizer_DrawBombchuBag(PlayState* play, GetItemEntry* getItem
 }
 
 extern "C" void Randomizer_DrawOverworldKey(PlayState* play, GetItemEntry* getItemEntry) {
+    if (!NeiGi_CanDrawLayers(play, 1, 32, 2))
+        return;
+    const auto origin = ComboDoorKeyGi::ItemOrigin(static_cast<RandomizerGet>(getItemEntry->drawItemId));
+    const char* path = ComboDoorKeyGi::SelectedPath(origin);
+    if (!path && origin == ComboDoorKeyGi::Origin::MM) {
+        GetItem_Draw(play, GID_KEY_SMALL);
+        return;
+    }
+    Matrix_Push();
+    if (path) {
+        Matrix_RotateZ(ComboDoorKeyGi::RollRadians, MTXMODE_APPLY);
+        Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
+    }
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -1421,9 +1447,10 @@ extern "C" void Randomizer_DrawOverworldKey(PlayState* play, GetItemEntry* getIt
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
 
-    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gHouseKeyDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)(path ? path : gHouseKeyDL));
 
     CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
 }
 
 // ============================================================================
@@ -1791,6 +1818,21 @@ void Randomizer_DrawMinishCap(PlayState* play, GetItemEntry* getItemEntry) {
 // Two fixes over the generic helper: the plate is modelled lying flat (it hangs
 // facing up off the backpack), so tilt it upright to face the camera; and it is a
 // single-sided plate, so culling is disabled or it vanishes for half of the spin.
+void Randomizer_DrawRitoMask(PlayState* play, GetItemEntry* getItemEntry) {
+    Matrix_Push();
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    Matrix_RotateY(play->gameplayFrames * 0x2 * 0.01f, MTXMODE_APPLY);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    // The authored display list owns its uniform model matrix (external scale 1).
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, "__OTR__objects/nei_gi_redesign/rito_mask/gi_dl", 0, G_DL_PUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    const uint8_t shimmerColor[4] = { 255, 212, 90, 255 };
+    ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
+}
+
 void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     Matrix_Push();
     OPEN_DISPS(play->state.gfxCtx);
@@ -3972,6 +4014,14 @@ static bool MmSoul_DrawDexihand(PlayState* play) {
 void Randomizer_DrawMmSoul(PlayState* play, GetItemEntry* getItemEntry) {
     RandomizerGet rg = (RandomizerGet)getItemEntry->getItemId;
     bool drawn = false;
+#ifdef COMBO_BUILD
+    const bool bossSoul = rg == RG_MM_SOUL_GOHT || rg == RG_MM_SOUL_GYORG || rg == RG_MM_SOUL_MAJORA ||
+                          rg == RG_MM_SOUL_ODOLWA || rg == RG_MM_SOUL_TWINMOLD;
+    if (!bossSoul && ComboSoulModels::SimplerEnemy()) {
+        Randomizer_DrawShuffledSoul(play, getItemEntry);
+        return;
+    }
+#endif
 
     if (MmAssets_IsAvailable()) {
         // Pre-set every segment an MM limb DL might branch/point into (0x08-0x0C) to a valid
@@ -4161,6 +4211,11 @@ void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Authored OoT Clock: available in each host's own archive, including effects-off.
+void Randomizer_DrawClock(PlayState* play, GetItemEntry* getItemEntry) {
+    NeiClockGi::Draw(play, CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0, "oot");
+}
+
 // =============================================================================
 // MM Time Items (clock halves) — Get-Item Draw (from mm.o2r object_obj_tokeidai)
 // -----------------------------------------------------------------------------
@@ -4175,16 +4230,12 @@ void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry) {
 // object_obj_tokeidai is MM-unique (no OoT folder), so plain GSP_MM_DL is safe.
 // =============================================================================
 void Randomizer_DrawMmClock(PlayState* play, GetItemEntry* getItemEntry) {
-    if (!MmAssets_IsAvailable()) {
-        if (getItemEntry->getItemId == RG_CLOCK)
-            GetItem_Draw(play, GID_STONE_OF_AGONY);
+    if (!MmAssets_IsAvailable())
         return;
-    }
 
     f32 clockFaceRotation;    // Z rotation of the clock face
     f32 sunMoonPanelRotation; // Y rotation of the sun/moon panel
     switch ((RandomizerGet)getItemEntry->getItemId) {
-        case RG_CLOCK:
         case RG_MM_TIME_DAY_1:
         case RG_MM_TIME_DAY_2:
         case RG_MM_TIME_DAY_3:

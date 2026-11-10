@@ -1,5 +1,7 @@
 // Native settings/storage probe. run_seed_settings_tests.py supplies verbatim
 // production boundaries. This does not run the fill worker or either game loop.
+#include "combo/rando/MagicMirrorSettingsSnapshot.h"
+
 #include <algorithm>
 #include <array>
 #include <cassert>

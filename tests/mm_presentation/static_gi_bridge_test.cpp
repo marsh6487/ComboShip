@@ -28,7 +28,6 @@ extern "C" int ResourceMgr_IsIkanaShieldGiAvailable() {
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
 using s16=int16_t;using s32=int32_t;using f32=float;
 using u8=uint8_t;
-struct Color_RGB8 {uint8_t r,g,b;};
 #define CVAR_COSMETIC(x) x
 #define CVAR_ENHANCEMENT(x) x
 bool changedMagic=false, dinSelected=false;
@@ -229,6 +228,17 @@ void DrawOotExtRocBoots() {nativeCalled=CW_OOT_EQUIP_ROC_BOOTS;}
 // this static recipe fixture must never dispatch the sword-layer path.
 void ComboDinSwordGi_DrawLayers(PlayState*, const char*, const char*) {
  assert(false && "static GI fixture unexpectedly selected Din sword layers");
+}
+// Clock's complete glass submission runs in authored_clock. This fixture keeps
+// the real resource classification, but must never select its GPU-only branch.
+bool NeiGi_CanDrawLayers(PlayState*,size_t,size_t,size_t) {
+ assert(false && "static GI fixture unexpectedly selected Clock glass");return false;
+}
+namespace NeiClockGi {
+inline const char* TextureForGlass(const char* path);
+inline void PrepareGlass(Gfx*&,uint32_t,const char* path) {
+ assert(!TextureForGlass(path) && "static GI fixture unexpectedly selected Clock glass");
+}
 }
 /* HOST_CUSTOM_DRAW */
 int main() {

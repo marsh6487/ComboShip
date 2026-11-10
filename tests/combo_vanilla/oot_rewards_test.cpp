@@ -104,9 +104,10 @@ void GraceHourglass_Grant(uint16_t item) {
     nei.hyliasGraceOwned = 1;
     grantPayload = item;
 }
-void RitoItem_NoteCellItem(int item) {
-    if (item == ITEM_FARORES_WIND)
-        nei.ritoMaskFlags |= RITO_FLAG_FARORES_OWNED;
+void RitoMask_Grant() {
+    nei.ritoMaskFlags |= RITO_FLAG_MASK_OWNED;
+    if (gSaveContext.inventory.items[SLOT_TRADE_CHILD] == ITEM_NONE)
+        gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_RITO_MASK;
 }
 static bool nativePrize = false;
 int Flags_GetItemGetInf(int) {
