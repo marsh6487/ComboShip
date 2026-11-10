@@ -151,6 +151,43 @@ int main(int argc, char** argv) {
             Check(ExtButton_GetItem(5) == 0x0223, "uninitialized nonlogic target must retain current custom loadout");
         }
         puts("PASS native/rando/nonlogic age C/D custom shadows and legitimate native stick controls");
+    } else if (mode == "trade-age") {
+        // These literal save bits are the appended child-trade identities.
+        // The selected wheel item differs from the equipped item, so replacing
+        // every button from its slot cannot accidentally satisfy preservation.
+        const struct { u8 item; u32 ownedBit; } trades[] = {
+            {ITEM_WEIRD_EGG, 0x00100000}, {ITEM_CHICKEN, 0x00200000}, {ITEM_LETTER_ZELDA, 0x00400000}
+        };
+        for (const auto& trade : trades) for (s32 button = 1; button < 8; ++button)
+            for (s32 age : {LINK_AGE_CHILD, LINK_AGE_ADULT})
+                for (auto quest : {QUEST_NORMAL, QUEST_RANDOMIZER, QUEST_OOTXMM})
+                    for (bool owned : {false, true}) for (bool unifiedSlot : {false, true})
+                        for (bool nonlogic : {false, true}) {
+                            Reset(); gSaveContext.linkAge = age; gSaveContext.ship.quest.id = quest;
+                            nei.tradeAdultOwned = owned ? trade.ownedBit : 0;
+                            gSaveContext.inventory.items[SLOT_TRADE_ADULT] = ITEM_COJIRO;
+                            gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_MASK_SKULL;
+                            const u8 slot = unifiedSlot ? SLOT_TRADE_ADULT : SLOT_TRADE_CHILD;
+                            auto* target = age == LINK_AGE_CHILD ? &gSaveContext.adultEquips : &gSaveContext.childEquips;
+                            target->buttonItems[button] = trade.item;
+                            target->cButtonSlots[button - 1] = slot;
+                            const auto beforeInventory = gSaveContext.inventory;
+                            const auto beforeOwned = nei.tradeAdultOwned;
+                            Swap(nonlogic);
+                            bool preserve = false;
+#ifdef COMBO_BUILD
+                            preserve = !nonlogic && quest != QUEST_NORMAL && unifiedSlot && owned;
+#endif
+                            Check(ExtButton_GetItem(button) ==
+                                      (preserve ? trade.item : unifiedSlot ? ITEM_COJIRO : ITEM_MASK_SKULL),
+                                  "owned migrated trades survive native age restoration; other guards refresh the selected slot");
+                            Check(gSaveContext.equips.cButtonSlots[button - 1] == slot,
+                                  "trade age restoration preserves the saved native inventory-slot binding");
+                            Check(nei.tradeAdultOwned == beforeOwned &&
+                                      !std::memcmp(&beforeInventory, &gSaveContext.inventory, sizeof(beforeInventory)),
+                                  "trade age restoration must not grant ownership or change inventory selection");
+                        }
+        puts("PASS actual trade ownership: Egg/Cucco/Letter, both ages, seven C/D buttons, owned/unowned, slot and native/solo/nonlogic guards");
     } else if (mode == "storage") {
         Reset(); Equip(5, 0x0223); Swap(false); Equip(5, 0x0202); Swap(false);
         nlohmann::json blob = nlohmann::json::object(); manager.currentJsonContext = &blob;

@@ -37,7 +37,13 @@ def main():
     kaleido = read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c")
     # Native button readers share the mode claim and equipment-alias helpers.
     # Keep those bodies real; unrelated world-mode activation is a fixture seam.
-    production = ""
+    # Age restoration preserves an independently selected owned child trade.
+    # Keep the real 23-entry table and the exact ownership dependency closure;
+    # the fixture supplies native save storage, not a replacement predicate.
+    trade = read("soh/mods/items/logic/trade_items.c")
+    production = trade[trade.index("#define TRADE_ADULT_COUNT"):trade.index("s32 TradeAdult_Count(")]
+    production += "\n" + "\n".join(function(trade, name) for name in (
+        "TradeAdult_IndexOfItem", "TradeAdult_IsOwnedIndex", "TradeAdult_IsOwnedItem")) + "\n"
     for path, names in (("soh/mods/items/helpers/equip_helper.c", ("ItemInput_ButtonIsClaimed",)),
                         ("soh/mods/extended_equipment.c", ("ExtEquip_IsButtonItem", "ExtEquip_GetLegacyButtonItem"))):
         dependency = read(path)
@@ -99,7 +105,7 @@ def main():
             subprocess.run([os.environ.get("CXX", "c++"), *flags, *(["-DCOMBO_BUILD"] if combined else []),
                             *includes, str(ROOT / "tests/combo_button_transfer/age_shadow_test.cpp"),
                             "-o", str(binary)], check=True)
-            for mode in ("native", "nonlogic", "storage", "empty-hud"):
+            for mode in ("native", "nonlogic", "storage", "empty-hud", "trade-age"):
                 result = subprocess.run([str(binary), mode], env={**os.environ,
                     "ASAN_OPTIONS": "detect_leaks=0", "UBSAN_OPTIONS": "halt_on_error=1"})
                 failures += bool(result.returncode)
