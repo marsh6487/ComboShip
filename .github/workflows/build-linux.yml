@@ -111,6 +111,25 @@ jobs:
           path: _packages/stage
           if-no-files-found: error
 
+      - name: Verify actual native Solo MM entrance generation and replay
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 15
+        run: >
+          python3 -B tests/solo_mm_entrances/native_seed_regression.py
+          --runtime-dir "$PWD/_packages/stage"
+          --output "$RUNNER_TEMP/native-solo-mm-entrances"
+          --case off --case mixed-decoupled --seed 20261110
+
+      - name: Preserve native Solo MM entrance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-solo-mm-entrances-linux
+          path: |
+            ${{ runner.temp }}/native-solo-mm-entrances
+            !${{ runner.temp }}/native-solo-mm-entrances/**/runtime/**
+          if-no-files-found: warn
+
       - name: Verify actual native first-drop graph, fill and replay (Vanilla)
         if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
         timeout-minutes: 90

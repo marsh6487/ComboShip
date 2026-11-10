@@ -169,7 +169,7 @@ static f32 MmForm_RitoBowDrawLift(Player* player) {
 extern "C" u8 MmForm_RitoBowUsesNativePose(Player* player) {
     if (player == NULL)
         return 0;
-    const LinkAnimationHeader* anim = player->skelAnime.animation;
+    const void* anim = player->skelAnime.animation;
     return anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_ready ||
            anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_bow_wait ||
            anim == (LinkAnimationHeader*)gPlayerAnim_link_bow_walk2ready ||

@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix="seasons-mode-pool-") as td:
     starting = block_from(start_source, start_source.index("std::vector<RandoItemId> GetComputedStartingItems("))
     headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
                       ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
+    headers += '#include "combo/rando/RitoMaskSettings.h"\n'
     (build / "pool.inc").write_text(headers + "namespace Rando {\n" + starting + "\nnamespace Logic {\n" + helpers + "\n" + generator + "\n}}\n")
     binary = build / "pool"
     result = subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O1", "-w", "-DFMT_HEADER_ONLY",

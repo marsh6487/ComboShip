@@ -101,7 +101,8 @@ class WorkflowTests(unittest.TestCase):
 
     def test_real_native_first_drop_seed_evidence_is_required_and_retained(self):
         steps = yaml.safe_load((ROOT / ".github/workflows/build-linux.yml").read_text())["jobs"]["build"]["steps"]
-        native = [step for step in steps if "native_seed_regression.py" in step.get("run", "")]
+        native = [step for step in steps
+                  if "tests/shuffle_parity/enemy_drops/native_seed_regression.py" in step.get("run", "")]
         self.assertEqual(len(native), 1)
         self.assertNotIn("continue-on-error", native[0])
         self.assertIn("!cancelled()", native[0]["if"])

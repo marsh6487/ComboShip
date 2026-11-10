@@ -1,4 +1,5 @@
 #include "rando/MagicMirrorSettingsSnapshot.h"
+#include "rando/RitoMaskSettingsSnapshot.h"
 
 #include "FleetShipCombo/FleetShipCombo.h"
 #include "Rando/Logic/Logic.h"

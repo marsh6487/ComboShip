@@ -1,6 +1,7 @@
 #include "FleetShipCombo/FleetShipCombo.h"
 #include "Rando/Logic/Logic.h"
 #include "Rando/StaticData/StaticData.h"
+#include "Rando/SoloEntrances.h"
 #include "tests/test_require.h"
 #include "ComboDungeonKeyReceipt.h"
 #if __has_include("Rando/KeyRings.h")

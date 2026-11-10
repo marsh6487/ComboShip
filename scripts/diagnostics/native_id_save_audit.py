@@ -234,6 +234,12 @@ int main(){
  puts("PASS actual native MM serializer: compiled public option/check/flag extents preserve old entries, zero new tails, native missing-song defaults, ignore future tails");
 }
 """.replace('OLD_RO', str(old_ro)).replace('OLD_CHECKS', str(old_checks)).replace('OLD_INF', str(old_inf))
+    solo_entrances = repo / 'mm/2s2h/Rando/SoloEntrances.cpp'
+    native_sources = [str(solo_entrances)] if solo_entrances.exists() else []
+    if native_sources:
+        # Link the actual codec owner; its runtime helpers use native engine storage.
+        source = source.replace('int main(){', 'extern "C" {\nSaveContext gSaveContext{};\n'
+                                '#ifdef COMBO_BUILD\nint gComboGameMode = COMBO_GAME_BOTH;\n#endif\n}\nint main(){', 1)
     results = {}
     for mode in ('original', 'combo'):
         cpp = folder / ('native-save-' + mode + '.cpp'); cpp.write_text(source); binary = cpp.with_suffix('')
@@ -241,7 +247,7 @@ int main(){
         if mode == 'combo': flags.append('-DCOMBO_BUILD')
         for path in ('.', 'mm', 'mm/2s2h', 'mm/include', 'mm/include/PR', 'mm/src', 'mm/assets', 'libultraship/include', 'combo'):
             flags.append('-I' + str(repo / path))
-        subprocess.run([os.environ.get('CXX', 'g++-14'), *flags, str(cpp), '-o', str(binary)], check=True, cwd=repo)
+        subprocess.run([os.environ.get('CXX', 'g++-14'), *flags, str(cpp), *native_sources, '-o', str(binary)], check=True, cwd=repo)
         results[mode] = subprocess.check_output([str(binary)]).decode().strip()
     return {'compiledPublicExtents': {'options': old_ro, 'checks': old_checks, 'flags': old_inf}, 'nativeSerializer': results}
 

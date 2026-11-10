@@ -2,6 +2,13 @@
 #include "tests/test_require.h"
 #include <memory>
 #include <cstdio>
+// Native storage for the linked SoloEntrances implementation; JSON remains production code.
+extern "C" {
+SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+}
 int main() {
     auto source=std::make_unique<RandoSaveInfo>();
     struct Key {RandoInf flag;RandoItemId item;};

@@ -47,8 +47,9 @@ def main():
     pieces.append(init[:init.index("    // === Cleanup from previous scene ===")] + "}\n")
     reset = function(source, "MmForm_Reset")
     pieces.append(reset[:reset.index("    MmForm_ClearZoraSwimTrails")] + "}\n")
-    pieces.append(function(forms, "RitoItem_FormEnabled"))
-    pieces.extend(function(source, name) for name in ("MmForm_OnDeath", "MmForm_Update"))
+    pieces.extend(function(forms, name) for name in ("RitoMask_IsOwned", "RitoItem_FormEnabled"))
+    pieces.extend(function(source, name) for name in
+                  ("MmForm_DiscardUnownedRitoReload", "MmForm_OnDeath", "MmForm_Update"))
     pieces.append(function((ROOT / "soh/src/code/z_actor.c").read_text(), "Actor_Destroy"))
 
     cases = sys.argv[1:] or ["scene-init", "reset", "death", "destroy", "void", "transition-trigger",

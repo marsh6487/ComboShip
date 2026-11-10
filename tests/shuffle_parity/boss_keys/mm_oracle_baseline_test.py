@@ -30,6 +30,7 @@ program='''
 #include "Rando/Logic/Logic.h"
 #include "Rando/Wallets.h"
 #include "Rando/SongEvents.h"
+#include "Rando/SoloEntrances.h"
 #include "rando_capacity.h"
 #include "combo/menu/ItemGrantAuditBridge.h"
 #include <cassert>
@@ -191,5 +192,5 @@ int main(){
 with tempfile.TemporaryDirectory(prefix='mm-oracle-baseline-') as td:
  p=Path(td);cpp=p/'test.cpp';cpp.write_text(program);binary=p/'test';flags=['-std=c++20','-DCOMBO_BUILD','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX','-DCONTROLLERBUTTONS_T=uint32_t','-include',str(ROOT/'tests/dungeon_rewards/headless.h')]
  for name in ('.','combo','mm/include','mm/include/PR','mm','mm/2s2h','mm/src','mm/assets','libultraship/include'):flags+=['-I'+str(ROOT/name)]
- subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp'),'-o',str(binary)],check=True);subprocess.run([str(binary)],check=True)
+ subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp'),str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp'),'-o',str(binary)],check=True);subprocess.run([str(binary)],check=True)
 print('PASS actual native empty oracle/forms/custom slots + native GrantStartingItems/Item_Give health order for starts1/3/6/20 and pieces/containers; transactional native Reset failures and second-call recovery')

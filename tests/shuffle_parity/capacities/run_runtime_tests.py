@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
     b = conversions.index('inline void to_json(json& j, const Vec3f&', a)
     # The native deserializer also normalizes unsupported Vanilla save state.
     # Keep that real dependency instead of replacing its policy in the fixture.
-    (build/'bag_json.inc').write_text('#include "Rando/VanillaCompatibility.h"\n'+conversions[a:b])
+    (build/'bag_json.inc').write_text('#include "Rando/VanillaCompatibility.h"\n#include "Rando/SoloEntrances.h"\n'+conversions[a:b])
     starting = (ROOT/'mm/2s2h/Rando/StartingItems.cpp').read_text()
     (build/'bag_starting.inc').write_text('\n'.join(function(starting,n) for n in (
         'GetComputedStartingItems','GetStartingItemsFromSave','SetStartingItemsInSave',
@@ -171,7 +171,8 @@ with tempfile.TemporaryDirectory(prefix='mm-bag-runtime-') as directory:
                    'infinite_runtime_test.cpp' if '--infinite-only' in sys.argv else
                    'wallet_runtime_test.cpp' if '--wallet-only' in sys.argv else 'runtime_test.cpp')
         catalogues = [] if '--wallet-only' in sys.argv or '--infinite-only' in sys.argv else [
-            str(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp'),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp')]
+            str(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp'),str(ROOT/'mm/2s2h/Rando/StaticData/Options.cpp'),
+            str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp')]
         subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if combo else []),
                         str(Path(__file__).with_name(fixture)),*catalogues,
                         str(native),'-o',str(binary)],check=True)

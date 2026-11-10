@@ -1,4 +1,5 @@
 #include "Rando/SongEvents.h"
+#include "Rando/SoloEntrances.h"
 #include "Rando/VanillaCompatibility.h"
 #include "Rando/SongEventsNativeActors.h"
 #include "combo/rando/SongEventsBridge.h"
@@ -7,6 +8,9 @@
 #include <array>
 extern "C" {
 SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
 PlayState* gPlayState;
 u32 gBitFlags[32]{};
 u8 gItemSlots[77]{};

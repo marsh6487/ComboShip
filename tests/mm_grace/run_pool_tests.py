@@ -19,6 +19,7 @@ with tempfile.TemporaryDirectory(prefix="mm-grace-pool-") as temporary:
                          "IsSongLocationItem"))
     headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
                       ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
+    headers += '#include "combo/rando/RitoMaskSettings.h"\n'
     (build / "pool.inc").write_text(headers + "namespace Rando::Logic {\n" + helpers + "\n" +
                                   functions(source)["EnsureCommandMelodyInPool"] + "\n" + functions(source)["GeneratePools"] + "\n}")
     binary = build / "pool"

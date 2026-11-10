@@ -41,6 +41,11 @@ def main():
     for name in ["Seasons_RandoMode", "Seasons_UpdateGates"]:
         production += function(seasons, name) + "\n"
     inventory = source("mm/mods/extended_inventory.c")
+    for name in ("RitoMask_IsOwned", "RitoMask_Grant"):
+        production += function(inventory, name) + "\n"
+    # This fixture exercises editor grants, not live form/button removal.
+    # Keep real ownership/grant helpers; any unexpected removal must fail.
+    production += 'void RitoMask_Remove(void) { REQUIRE(false && "editor grant fixture reached Rito removal"); }\n'
     production += inventory[inventory.index("static const uint8_t sWandQuest"):
                             inventory.index("static void* const sWandNameTex")]
     for name in ["TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant", "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
@@ -116,6 +121,7 @@ def main():
         bindings = source("mm/2s2h/Rando/NeiGiPresentation.cpp")
         headers = '#include "combo/rando/MagicMirrorSettings.h"\n' + ''.join('#include "Rando/' + name + '.h"\n' for name in
                           ('VanillaCompatibility', 'SongEvents', 'MMEnvironment'))
+        headers += '#include "combo/rando/RitoMaskSettings.h"\n'
         pool_binding = headers + item_data + "\nnamespace Rando::Logic {\n"
         constraints = source("mm/2s2h/Rando/Logic/PlacementConstraints.cpp")
         pool_binding += "\n".join(function(constraints, name) for name in

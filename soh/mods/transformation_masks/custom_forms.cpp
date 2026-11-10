@@ -381,7 +381,8 @@ static uint8_t OotMaskWheel_OwnsItem(s32 item, uint8_t allowVanillaMasks) {
     if (item >= ITEM_MASK_KEATON &&
         (allowVanillaMasks || (Nei_Save()->ootMasksOwned & (1u << (item - ITEM_MASK_KEATON)))))
         return 1;
-    return IS_RANDO && Flags_GetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + item - ITEM_WEIRD_EGG);
+    return IS_RANDO && Flags_GetRandomizerInf(
+                           static_cast<RandomizerInf>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + item - ITEM_WEIRD_EGG));
 }
 
 extern "C" uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanillaMasks) {

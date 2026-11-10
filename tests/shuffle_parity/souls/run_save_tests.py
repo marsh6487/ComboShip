@@ -14,7 +14,8 @@ with tempfile.TemporaryDirectory(prefix="soul-save-") as temporary:
             "-DCONTROLLERBUTTONS_T=uint32_t", "-DGBI_FLOAT_MTX", "-DGBI_S32_VTX", "-DFMT_HEADER_ONLY",
             *["-I" + str(ROOT / path) for path in (".", "mm", "mm/2s2h", "mm/include", "mm/include/PR",
                                                  "mm/src", "mm/assets", "libultraship/include", "combo")],
-            str(ROOT / "tests/shuffle_parity/souls/save_test.cpp"), "-o", str(binary)
+            str(ROOT / "tests/shuffle_parity/souls/save_test.cpp"),
+            str(ROOT / "mm/2s2h/Rando/SoloEntrances.cpp"), "-o", str(binary)
         ], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)

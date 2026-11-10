@@ -83,6 +83,6 @@ with tempfile.TemporaryDirectory(prefix='song-event-native-') as td:
         native=Path(td)/('mask-combo.o' if combo else 'mask-original.o')
         cflags=[flag for flag in flags if flag not in ('-std=c++20','-include',str(ROOT/'tests/shuffle_parity/souls/headless.h'))]
         subprocess.run([os.environ.get('CC','cc'),'-std=c11',*cflags,*(['-DCOMBO_BUILD'] if combo else []),'-c',str(Path(td)/'mm_native_mask_transition.c'),'-o',str(native)],check=True)
-        subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if combo else []),str(Path(__file__).with_name('mm_native.cpp')),str(ROOT/'mm/2s2h/Rando/SongEvents.cpp'),str(native),'-o',str(binary)],check=True)
+        subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if combo else []),str(Path(__file__).with_name('mm_native.cpp')),str(ROOT/'mm/2s2h/Rando/SongEvents.cpp'),str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp'),str(native),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True);print('PASS real MM runtime/solver/JSON/oracle, native message reservations and actor state/range/form eligibility',combo,flush=True)
         if rules: print('PASS five actual integrated Keeta CHECK lambdas: STORMS assignment, SONATA negative, prerequisites and disabled defaults',combo,flush=True)

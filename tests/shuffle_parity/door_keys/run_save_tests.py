@@ -11,4 +11,4 @@ with tempfile.TemporaryDirectory(prefix='rusty-save-') as td:
   for path in ('mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo'):flags+=['-isystem',str(ROOT/path)]
   for path in (a.json_include,a.spdlog_include):
    if path:flags+=['-isystem',str(path)]
-  subprocess.run([os.environ.get('CXX','c++'),*flags,str(Path(__file__).with_name('save_test.cpp')),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),*flags,str(Path(__file__).with_name('save_test.cpp')),str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp'),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)

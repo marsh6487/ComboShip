@@ -6,6 +6,7 @@
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/ShipInit.hpp"
+#include "libultraship/bridge/consolevariablebridge.h"
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"

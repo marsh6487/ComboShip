@@ -1,9 +1,10 @@
+#include "soh/include/z64item.h"
+#include "soh/mods/nei_save.h"
+#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include "soh/include/z64item.h"
-#include "soh/mods/nei_save.h"
 using u8 = uint8_t;
 using s32 = int32_t;
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -13,9 +14,12 @@ static int vanilla, toggle = 1, randomizer;
 #define IS_RANDO randomizer
 static bool Combo_IsVanilla() { return vanilla; }
 static int CVarGetInteger(const char*, int) { return toggle; }
-static constexpr int RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG = 100;
-static bool randomizerFlags[128];
-static bool Flags_GetRandomizerInf(int flag) { assert(flag>=100 && flag<=110); return randomizerFlags[flag]; }
+static bool randomizerFlags[RAND_INF_MAX];
+static bool Flags_GetRandomizerInf(RandomizerInf flag) {
+  assert(flag >= RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG &&
+         flag <= RAND_INF_CHILD_TRADES_HAS_MASK_TRUTH);
+  return randomizerFlags[flag];
+}
 struct CustomFormDef { const char* modelName; const char* cvar; uint8_t cvarDefault; };
 struct ItemEquips { uint8_t buttonItems[8]; uint8_t cButtonSlots[7]; };
 static struct { struct { uint8_t items[24]; } inventory; ItemEquips equips, childEquips, adultEquips; } gSaveContext;
@@ -132,11 +136,11 @@ int main() {
         assert(OotMaskWheel_Neighbor(1,0)==current);
     }
     reset();randomizer=1;RitoMask_Grant();
-    randomizerFlags[RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG+ITEM_MASK_TRUTH-ITEM_WEIRD_EGG]=true;
+    randomizerFlags[static_cast<int>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG)+ITEM_MASK_TRUTH-ITEM_WEIRD_EGG]=true;
     assert(OotMaskWheel_Neighbor(1,0)==ITEM_MASK_TRUTH);
     assert(OotMaskWheel_Neighbor(-1,0)==ITEM_MASK_TRUTH);
     // The new item cannot unlock the eight vanilla quest masks by itself.
-    randomizer=0;randomizerFlags[RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG+ITEM_MASK_TRUTH-ITEM_WEIRD_EGG]=false;
+    randomizer=0;randomizerFlags[static_cast<int>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG)+ITEM_MASK_TRUTH-ITEM_WEIRD_EGG]=false;
     assert(OotMaskWheel_Neighbor(1,0)==ITEM_RITO_MASK);
     assert(OotMaskWheel_Neighbor(1,1)==ITEM_MASK_KEATON);
     // The actual form-removal callback must cover active and pre-flash removal.

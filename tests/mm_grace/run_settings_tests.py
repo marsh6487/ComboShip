@@ -25,7 +25,7 @@ option = source("soh/soh/Enhancements/randomizer/option.cpp")
 extract = lambda text, signature: block_from(text, text.index(signature))
 # MM's actual z64 types are already included. Project the verbatim host-neutral
 # seed-policy section of the real OoT owner header, without mixing engine ABIs.
-parts = []
+parts = ['#include "combo/rando/RitoMaskSettingsSnapshot.h"']
 if any('RustyDoorKeys::' in body for body in soh.values()):
     # The historical --baseline predates this owner header entirely.
     rusty = source("soh/soh/Enhancements/randomizer/RustyDoorKeys.h")
@@ -35,6 +35,9 @@ if any('RustyDoorKeys::' in body for body in soh.values()):
                  extract(source("soh/soh/Enhancements/randomizer/LockOverworldDoors.cpp"), "void PrepareNewGeneration()") + "\n}")
 launcher = source("combo/ComboShip.cpp")
 if 'static std::string Combo_UserRandoSettingsSnapshot(' in launcher:
+    rito_preference = re.search(r'^static int \(\*SOH_ReadComboRitoMaskPreference\)\(void\) = nullptr;', launcher, re.M)
+    if rito_preference:  # The historical --baseline predates this preference.
+        parts.append(rito_preference[0])
     parts += [re.search(r'^typedef const char\* \(\*FnDumpData\)\(void\);', launcher, re.M)[0],
               re.search(r'^static int \(\*SOH_ReadComboMagicMirrorPreference\)\(void\) = nullptr;', launcher, re.M)[0],
               extract(launcher, 'static std::string Combo_UserRandoSettingsSnapshot(')]

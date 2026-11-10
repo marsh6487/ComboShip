@@ -1,6 +1,15 @@
 #include "2s2h/BenJsonConversions.hpp"
+#include "ComboGameMode.h"
 #include "tests/test_require.h"
 #include <cstdio>
+
+// Native storage and the combined session identity used by the linked codec.
+extern "C" {
+SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+}
 
 int main() {
     NeiSaveData original{};

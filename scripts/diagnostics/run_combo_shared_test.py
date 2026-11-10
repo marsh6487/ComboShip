@@ -35,11 +35,12 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
     if result.returncode or a.baseline:
         raise SystemExit(result.returncode)
     source = (ROOT / 'combo/ComboShip.cpp').read_text()
-    helper = '#include "rando/MagicMirrorSettingsJson.h"\n'
+    helper = '#include "rando/MagicMirrorSettingsJson.h"\n#include "rando/RitoMaskSettingsJson.h"\n'
     if 'static std::string Combo_UserRandoSettingsSnapshot(' in source:
         import re
         helper += re.search(r'^typedef const char\* \(\*FnDumpData\)\(void\);', source, re.M)[0] + '\n'
         helper += re.search(r'^static int \(\*SOH_ReadComboMagicMirrorPreference\)\(void\) = nullptr;', source, re.M)[0] + '\n'
+        helper += re.search(r'^static int \(\*SOH_ReadComboRitoMaskPreference\)\(void\) = nullptr;', source, re.M)[0] + '\n'
         begin = source.index('static std::string Combo_UserRandoSettingsSnapshot(')
         end = source.index('\n}', begin) + 2
         helper += source[begin:end] + '\n'

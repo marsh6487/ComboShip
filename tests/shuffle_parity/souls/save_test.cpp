@@ -1,6 +1,13 @@
 #include "2s2h/BenJsonConversions.hpp"
 #include "tests/test_require.h"
 #include <cstdio>
+// Native storage for the linked SoloEntrances implementation; JSON remains production code.
+extern "C" {
+SaveContext gSaveContext{};
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
+}
 int main() {
     RandoSaveInfo source{};
     for (size_t i = 0; i < ARRAY_COUNT(source.randoInf); ++i) source.randoInf[i] = i + 1;

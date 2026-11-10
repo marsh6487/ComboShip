@@ -186,10 +186,15 @@ pool_program = COMMON.replace('#define COMBO_BUILD\n', '') + r'''
 #include "Rando/SongEvents.h"
 #include "Rando/VanillaCompatibility.h"
 #include "combo/rando/MagicMirrorSettings.h"
+#include "combo/rando/RitoMaskSettings.h"
 #include "mm/2s2h/FleetShipCombo/FleetShipCombo.h"
 ''' + legacy_access + block(fleet, 'int FleetCombo_UnifiedPoolActive(void)') + r'''
 int mirrorRequested=0,mirrorReads=0;
+int ritoRequested=1,ritoReads=0;
 extern "C" int32_t CVarGetInteger(const char* name,int32_t fallback) {
+    if (std::string(name)==ComboRando::RitoMaskSettings::GenerationCvar) {
+        assert(fallback==0);++ritoReads;return ritoRequested;
+    }
     assert(std::string(name)=="gRando.Generation.ShuffleMagicMirror" && fallback==0);
     ++mirrorReads;return mirrorRequested;
 }
@@ -208,14 +213,18 @@ int main() {
            info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==7 &&
            info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==9);
     assert(mirrorReads==0 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+    assert(ritoReads==0 && info.randoSaveOptions[RO_SHUFFLE_RITO_MASK]==0);
 #ifdef COMBO_BUILD
     gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);
     assert(info.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES]==0);
     assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
-    mirrorRequested=1;gComboGameMode=COMBO_GAME_MM;GeneratePools(info,checks,items);
+    assert(ritoReads==1 && info.randoSaveOptions[RO_SHUFFLE_RITO_MASK]==RO_GENERIC_ON);
+    mirrorRequested=1;ritoRequested=0;gComboGameMode=COMBO_GAME_MM;GeneratePools(info,checks,items);
     assert(mirrorReads==1 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+    assert(ritoReads==1 && info.randoSaveOptions[RO_SHUFFLE_RITO_MASK]==RO_GENERIC_ON);
     gComboGameMode=COMBO_GAME_BOTH;GeneratePools(info,checks,items);
     assert(mirrorReads==2 && info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==RO_GENERIC_ON);
+    assert(ritoReads==2 && info.randoSaveOptions[RO_SHUFFLE_RITO_MASK]==RO_GENERIC_OFF);
     gMMComboGoalHunt=1;GeneratePools(info,checks,items);
     assert(info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==99 &&
            info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==100);
@@ -228,6 +237,7 @@ int main() {
            info.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED]==7 &&
            info.randoSaveOptions[RO_TRIFORCE_PIECES_MAX]==9);
     assert(info.randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR]==0);
+    assert(ritoReads==0 && info.randoSaveOptions[RO_SHUFFLE_RITO_MASK]==0);
 #endif
     std::cout<<"MM native randomizer goals passed\n";
 }

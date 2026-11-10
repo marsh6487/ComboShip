@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
         subprocess.run([os.environ.get('CXX','c++'),*flags,*(['-DCOMBO_BUILD'] if combo else []),
                         str(args.fixture.resolve()),
                         *[str(ROOT / ('mm/2s2h/Rando/'+p)) for p in ('Logic/GeneratePools.cpp',
-                            'SongEvents.cpp','Logic/PlacementConstraints.cpp','StaticData/Items.cpp','StaticData/Options.cpp')],
+                            'SongEvents.cpp','SoloEntrances.cpp','Logic/PlacementConstraints.cpp','StaticData/Items.cpp','StaticData/Options.cpp')],
                         str(native),*logging_libs,'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,timeout=90,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
         print('PASS native MM pool fixture', args.fixture.parent.name, 'Combo' if combo else 'original',flush=True)
