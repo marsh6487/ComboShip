@@ -18,6 +18,11 @@ for host in ['soh', 'mm']:
     production = '\n'.join(function(inv, name) for name in [
         'TravelTools_Heal', 'TravelTools_IsOwned', 'TravelTools_Grant', 'MagicMirror_IsOwned',
         'ExtInv_IsCustomItemsEnabled', 'ExtInv_GetMaxPages'])
+    rito = (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text() if host == 'soh' else inv
+    production = function(rito, 'RitoMask_IsOwned') + '\n' + production
+    if host == 'mm':
+        production = ('extern "C" void RitoMask_Grant(void) { REQUIRE(false); }\n'
+                      'extern "C" void RitoMask_Remove(void) { REQUIRE(false); }\n') + production
     fixture = r'''
 #include "global.h"
 #include "mods/extended_inventory.h"

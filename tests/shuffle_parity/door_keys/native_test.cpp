@@ -9,6 +9,8 @@
 extern "C" int Rando_RustyDoorLocked(PlayState*,Actor*);
 #ifdef COMBO_BUILD
 #include "rando/CrossEntranceMmCatalogue.h"
+#include "rando/SoloEntranceMmOverworld.h"
+#include "Rando/SoloEntrances.h"
 extern "C" int Combo_MM_CrossDungeonEntranceFromRegion(int index,int) {return index;}
 #endif
 #if __has_include("Rando/KeyRings.h")

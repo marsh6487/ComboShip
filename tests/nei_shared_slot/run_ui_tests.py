@@ -19,6 +19,7 @@ def main():
                    else "src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c")
         ui = (ROOT / host / overlay).read_text()
         inv = (ROOT / host / "mods/extended_inventory.c").read_text()
+        rito_owner = inv if host == "mm" else (ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text()
         buttons = (ROOT / host / "mods/ext_buttons/ext_buttons.cpp").read_text()
         prefix = r'''
 #include "global.h"
@@ -50,6 +51,9 @@ extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {}
 extern "C" void ItemGrantAudit_End() {}
 extern "C" s32 TradeAdult_OwnedCount() { return 0; }
 extern "C" u8 TradeAdult_CellItem() { return ITEM_NONE; }
+// These unrelated wheel controls must not grant or remove the Rito mask.
+extern "C" void RitoMask_Grant() { assert(false && "pause wheel fixture granted Rito"); }
+extern "C" void RitoMask_Remove() { assert(false && "pause wheel fixture removed Rito"); }
 '''
         if host == "mm":
             prefix += r'''
@@ -93,6 +97,7 @@ extern "C" void Interface_LoadItemIcon2(PlayState*, u16 btn) { ++icons[btn]; }
             wand_names = ("Wand_KaleidoCycle", "Wand_HandleKaleidoSelector")
         start = inv.rfind("\n", 0, inv.index("sWandQuest["))
         production = inv[start:inv.index(";", start) + 1] + "\n"
+        production += function(rito_owner, "RitoMask_IsOwned") + "\n"
         production += "\n".join(function(inv, n) for n in (
             "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
             "TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant",

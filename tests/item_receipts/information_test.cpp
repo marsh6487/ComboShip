@@ -1,6 +1,7 @@
 // Execute production altar routing and saved-setting restore. Requirement
 // builders and final font formatting are boundaries; seed flags/JSON are real.
 #include "combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "combo/rando/RitoMaskSettingsSnapshot.h"
 
 #include <array>
 #include <algorithm>

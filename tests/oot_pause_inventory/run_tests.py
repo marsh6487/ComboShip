@@ -177,6 +177,7 @@ def main():
     def read(path):
         return subprocess.check_output(["git","show",args.source_ref+":"+path],cwd=ROOT,text=True) if args.source_ref else (ROOT/path).read_text()
     inventory=read("soh/mods/extended_inventory.c")
+    forms=read("soh/mods/transformation_masks/custom_forms.cpp").replace('extern "C" ', '')
     ui=read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c")
     scope=read("soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope_PAL.c")
     draw=function(ui,"KaleidoScope_DrawItemSelect")
@@ -186,6 +187,7 @@ def main():
         "TravelTools_IsOwned","MagicMirror_IsOwned",
         "ExtInv_Reset","ExtInv_Update","ExtInv_CanSwitchPage","ExtInv_SwitchPage","ExtInv_GetCurrentPage",
         "ExtInv_GetMaxPages","ExtInv_IsCustomItemsEnabled","ExtInv_IsMmMasksEnabled","ExtInv_GetInventorySlot"))
+    code+="\n"+function(forms,"RitoMask_IsOwned")
     code+="\n"+function(scope,"KaleidoScope_MoveCursorToSpecialPos")
     code+="\nstatic void Step(PlayState* play) {\n"+locals_+input_+"\n}\n"+CHECKS
     flags=["-std=gnu11","-w","-DF3DEX_GBI_2","-DCONTROLLERBUTTONS_T=uint32_t",

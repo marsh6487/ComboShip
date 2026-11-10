@@ -100,6 +100,10 @@ def production_for(host, serializer_ref, init_ref=None):
     else:
         parts.insert(0, "static NeiSaveData gNeiSave;")
         parts.append(extract(initializers, "NeiSave_Init"))
+        # The native load path also repairs legacy Rito cells and button slots.
+        rito = source_at("soh/mods/transformation_masks/custom_forms.cpp")
+        parts.extend(extract(rito, name) for name in
+                     ("RitoMask_IsOwned", "RitoItem_NoteCellItem", "RitoMask_MigrateLegacy"))
         serializers = source_at("soh/mods/nei_save.cpp", serializer_ref)
         parts.extend(extract(serializers, name) for name in
                      ("Nei_SidecarPath", "TradeItems_SyncWrite", "TradeItems_SyncRead"))

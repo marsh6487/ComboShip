@@ -9,7 +9,9 @@ static void Require(bool value, const char* why) {
 std::string activeOwner = "mm", deferredOwner = "mm", segmentOwner, segmentPath;
 int restoredSegments = 0;
 namespace Ship {
-struct ResourceManager {};
+struct ResourceManager {
+    bool IsAltAssetsEnabled() const { return false; }
+};
 namespace CrossRMRegistry {
 std::shared_ptr<ResourceManager> Get(const char* owner) {
     Require(!std::strcmp(owner,"oot"), "silver texture requested the wrong owner RM");
@@ -22,6 +24,7 @@ struct ResourceManagerScope {
     ~ResourceManagerScope() { activeOwner=before; }
 };
 }
+/* HOST_CACHE */
 #define gSPSegment(p,segment,path) do { (void)(p); Require(segment==8,"silver segment changed"); segmentOwner=activeOwner; segmentPath=reinterpret_cast<const char*>(path); } while(0)
 #define gSPComboRMPush(p,owner) do { (void)(p); deferredOwner=owner; } while(0)
 #define gSPComboRMPop(p) do { (void)(p); deferredOwner="mm"; } while(0)

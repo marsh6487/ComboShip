@@ -13,11 +13,13 @@ from run_tests import function,PREFIX,CHECKS
 PREFIX=PREFIX.replace("unsigned char Picto_IsOwned(void) { return 0; }", "unsigned char Picto_IsOwned(void) { return nei.pictoboxOwned; }")
 ui=(ROOT/"soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c").read_text()
 inventory=(ROOT/"soh/mods/extended_inventory.c").read_text()
+forms=(ROOT/"soh/mods/transformation_masks/custom_forms.cpp").read_text().replace('extern "C" ', '')
 scope=(ROOT/"soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope_PAL.c").read_text()
 draw=function(ui,"KaleidoScope_DrawItemSelect")
 locals_=draw[draw.index("    Input* input"):draw.index("    OPEN_DISPS")]
 input_=draw[draw.index("    // Update extended inventory pagination timer"):draw.index("    gDPSetCombineLERP(OVERLAY_DISP")]
 production="\n".join(function(inventory,n) for n in ("TravelTools_IsOwned","MagicMirror_IsOwned","ExtInv_Reset","ExtInv_Update","ExtInv_CanSwitchPage","ExtInv_SwitchPage","ExtInv_GetCurrentPage","ExtInv_GetMaxPages","ExtInv_IsCustomItemsEnabled","ExtInv_IsMmMasksEnabled","ExtInv_GetInventorySlot"))
+production+="\n"+function(forms,"RitoMask_IsOwned")
 production+="\n"+function(scope,"KaleidoScope_MoveCursorToSpecialPos")
 production+="\nstatic void Step(PlayState* play) {\n"+locals_+input_+"\n}\n"
 picto=(ROOT/"soh/mods/items/logic/picto_box.c").read_text()

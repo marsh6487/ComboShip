@@ -89,6 +89,7 @@ with tempfile.TemporaryDirectory(prefix='mm-native-rusty-keys-') as td:
                             'Logic/PlacementConstraints.cpp','StaticData/Items.cpp','StaticData/Options.cpp','RustyDoorKeys.cpp')],
                         *([str(ROOT / 'mm/2s2h/Rando/SongEvents.cpp')]
                           if (ROOT / 'mm/2s2h/Rando/SongEvents.cpp').exists() else []),
+                        *([str(ROOT / 'mm/2s2h/Rando/SoloEntrances.cpp')] if combo else []),
                         str(native),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True,timeout=90,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
         print('PASS native MM pool fixture', args.fixture.parent.name, 'Combo' if combo else 'original',flush=True)

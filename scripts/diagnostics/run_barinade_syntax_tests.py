@@ -14,7 +14,7 @@ shim = source[source.index('#ifdef COMBO_FOREIGN_ANIM_HOST_MM'):source.index('#i
 callbacks = '\n'.join(function(source, name) for name in
                        ['CfaBarinadeOverride', 'CfaBarinadePost', 'CfaBarinadeBegin',
                         'CfaOverrideLimbDrawOpa', 'CfaPostLimbDrawOpa', 'CfaTwinmoldMatrices'])
-freeze = re.search(r'if \(info->freezeLastFrame\) \{[^}]+}', source).group()
+freeze = re.search(r'if \(info->freezeLastFrame && anim\) \{[^}]+}', source).group()
 prefix = '''
 #include <cstdint>
 #ifdef HOST_MM

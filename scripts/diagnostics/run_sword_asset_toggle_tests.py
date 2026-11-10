@@ -29,7 +29,9 @@ foreign=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
 info=foreign[foreign.index('struct ComboForeignDrawInfoOOT {'):foreign.index('\n};',foreign.index('struct ComboForeignDrawInfoOOT {'))+3]
 source=source.replace('/* FOREIGN_RESOLVER */',info+'\n'+function(foreign,'ComboFillForeignDrawInfoOOT'))
 cache=foreign[foreign.index('struct ComboForeignDrawCacheOOT {'):foreign.index('} // namespace')]
-source=source.replace('/* FOREIGN_CACHE */',cache)
+soul_settings=(ROOT/'combo/menu/ComboSoulModelSettings.h').read_text()
+source=source.replace('/* FOREIGN_CACHE */',
+                      soul_settings[soul_settings.index('namespace ComboSoulModels {'):]+'\n'+cache)
 source=source.replace('/* MM_SELECTION */','\n'.join(mf[n] for n in ('HasMmLegacyGiMod','GetSelectedOwnerGi','MM_DescribeNeiGi')))
 with tempfile.TemporaryDirectory(prefix='sword-asset-toggle-') as tmp:
     cpp=Path(tmp)/'toggle.cpp';cpp.write_text(source);binary=Path(tmp)/'toggle'

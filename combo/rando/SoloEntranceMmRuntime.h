@@ -1,10 +1,11 @@
 #pragma once
 #include <stdint.h>
+#include "../ComboGameExport.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-int MM_SetSoloEntranceRuntimeSeed(const char* raw);
+COMBO_MM_EXPORT int MM_SetSoloEntranceRuntimeSeed(const char* raw);
 int Combo_MM_SoloEntranceRuntimeEnabled(void);
 int Combo_MM_SoloEntranceBossEnabled(void);
 int Combo_MM_SoloEntranceBossSource(int physicalBoss);

@@ -1,5 +1,7 @@
 #define main CurrentRuntimeMatrixMain
+#include "combo/ComboGameMode.h"
 #include "combo/rando/MagicMirrorSettingsSnapshot.h"
+#include "combo/rando/RitoMaskSettingsSnapshot.h"
 
 #include "oot_runtime_test.cpp"
 #undef main
@@ -120,7 +122,6 @@ public:
 static std::map<RandomizerRegion,Region> nativeRegions;
 static Region* RegionTable(RandomizerRegion id){return &nativeRegions[id];}
 #ifdef COMBO_BUILD
-#include "combo/ComboGameMode.h"
 extern "C" {int gComboGameMode=COMBO_GAME_BOTH;int Combo_SOH_CrossDungeonRegion(int,int,int fallback){return fallback;}}
 #endif
 #define SPDLOG_DEBUG(...) ((void)0)

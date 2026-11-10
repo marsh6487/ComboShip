@@ -45,7 +45,12 @@ extern "C" u8 TradeAdult_CellItem() { return ITEM_NONE; }
 '''
     if host == "mm":
         prefix += r'''
+#include "ComboGameMode.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+// Travel-cell writes must never grant or remove the unrelated Rito mask.
+extern "C" void RitoMask_Grant() { assert(false && "travel inventory granted Rito"); }
+extern "C" void RitoMask_Remove() { assert(false && "travel inventory removed Rito"); }
 #define TRAVEL_TOOLS_KALEIDO_CELL (SLOT_MAGIC_MIRROR - 24)
 typedef void (*KaleidoWheelCycleFunc)(PlayState*, s32);
 extern "C" void Audio_PlaySfx(u16) {}
@@ -106,7 +111,9 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
         stick_right = "play.pauseCtx.stickRelX = 40;"
     helpers = ["GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant"]
     helpers += ["TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant", "MagicMirror_IsOwned"]
-    production = "\n".join(function(inv, n) for n in helpers)
+    rito_owner = inv if host == "mm" else (ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text()
+    production = function(rito_owner, "RitoMask_IsOwned") + "\n"
+    production += "\n".join(function(inv, n) for n in helpers)
     production += "\n" + "\n".join(function(buttons, n) for n in button_names)
     production += "\n" + "\n".join(function(ui, n) for n in (
         "KaleidoScope_ResetItemCycling", "KaleidoWheel_Run", "TravelTools_KaleidoCycle", "TravelTools_KaleidoHandle"))
