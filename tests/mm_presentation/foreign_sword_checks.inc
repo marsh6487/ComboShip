@@ -4,8 +4,7 @@
 // increment foreignFallbackCalls; ComboDrawMaskShimmer is the real shared glue.
 {
     const auto samePacked = [](const std::vector<Vtx>& a, const std::vector<Vtx>& b) {
-        return a.size() == b.size() &&
-               !std::memcmp(a.data(), b.data(), a.size() * sizeof(Vtx));
+        return SameVertices(a, b);
     };
     const auto occurrences = [&](const std::vector<std::vector<Vtx>>& meshes, const std::vector<Vtx>& wanted) {
         return std::count_if(meshes.begin(), meshes.end(),
@@ -295,8 +294,7 @@
                                        [&](const Vtx& w) { return sameAttributes(v, w); }));
                 // The hex shimmer keeps its exact packed geometry. Intrinsic
                 // glyphs cancel shelf framing while the caller's .25 scale remains.
-                assert(arena[1].size() == worldMeshes[1].size() &&
-                       !std::memcmp(arena[1].data(), worldMeshes[1].data(), arena[1].size() * sizeof(Vtx)));
+                assert(SameVertices(arena[1], worldMeshes[1]));
                 const size_t tip = native.neiEffect == int(Kind::GreatFairySword) ? 2 : 1;
                 const auto span = [tip](const auto& mesh) {
                     float squared = 0.f;

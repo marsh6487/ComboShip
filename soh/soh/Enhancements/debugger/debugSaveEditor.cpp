@@ -52,7 +52,6 @@ unsigned char TradeAdult_IsOwnedIndex(int index);
 void TradeAdult_SetOwnedIndex(int index, unsigned char on);
 int TradeAdult_Count(void);
 void TradeAdult_GiveIndex(int index);
-void TradeAdult_FoldCurrent(uint16_t item);
 // Skijer's NEI — mods/items/logic/twilight_upgrade.c
 unsigned char TwilightUpgrade_HasClawshot(void);
 unsigned char TwilightUpgrade_HasBombArrows(void);

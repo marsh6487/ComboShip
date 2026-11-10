@@ -37,9 +37,13 @@ def production(host, grant_ref=None):
     fleet = source_at(f"{fleet_dir}/FleetSync.cpp")
     glue = source_at(f"{fleet_dir}/FleetComboItemsGlue.cpp")
     trade = source_at(f"{host}/mods/items/logic/trade_items.c")
-    parts = [array(trade, "static const u8 sTradeAdultItems[")]
-    parts += [extract(trade, name) for name in
-              ("TradeAdult_IndexOfItem", "TradeAdult_IsOwnedIndex", "TradeAdult_GiveItem", "TradeAdult_FoldCurrent")]
+    parts = []
+    # The shared OoT save fixture already includes the complete trade helpers
+    # for load-time mask migration. MM still needs these native dependencies.
+    if host == "mm":
+        parts.append(array(trade, "static const u8 sTradeAdultItems["))
+        parts += [extract(trade, name) for name in
+                  ("TradeAdult_IndexOfItem", "TradeAdult_IsOwnedIndex", "TradeAdult_GiveItem", "TradeAdult_FoldCurrent")]
     parts.append(between(glue, "const int sFcNative[]", "// Tokens stringificados"))
     parts.append(block(glue, "std::unordered_map<int, int>& ReverseMap()"))
     parts += [extract(glue, name) for name in ("FcCombo_NativeForItem", "FcCombo_ItemForNative")]

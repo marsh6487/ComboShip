@@ -21,7 +21,7 @@
     const auto checkStars=[&](const EquipmentTheme& theme) {
         int stars=0;
         for(const auto& vertices:arena) {
-            if(vertices.size()!=expectedStars.size() || memcmp(vertices.data(),expectedStars.data(),vertices.size()*sizeof(Vtx)))continue;
+            if(!SameVertices(vertices,expectedStars))continue;
             ++stars;bool primary=false,secondary=false,white=false;
             for(const auto& vertex:vertices) {
                 const uint32_t rgb=uint32_t(vertex.v.cn[0])<<16|uint32_t(vertex.v.cn[1])<<8|vertex.v.cn[2];
@@ -118,7 +118,7 @@
 #endif
         if(present)files.insert(binding->opaque);
         assert(NeiGi_Draw(&play,&entry));
-        assert(std::count_if(arena.begin(),arena.end(),[&](const auto& mesh){return mesh.size()==stars.size()&&!memcmp(mesh.data(),stars.data(),stars.size()*sizeof(Vtx));})==1);
+        assert(std::count_if(arena.begin(),arena.end(),[&](const auto& mesh){return SameVertices(mesh,stars);})==1);
         for(uint32_t color:NeiGi::FourSwordColors) {
             bool shown=false;
             for(const auto& mesh:arena)for(const auto& vertex:mesh)
@@ -138,7 +138,7 @@
         assert(NeiGi_Draw(&play,&entry)&&fallback==1);
         const auto shown=arena;
         Reset();NeiGi_DrawMesh(&play,NeiGi::SampleShimmer(play.gameplayFrames,true,NeiGi_CameraBasis(&play),Kind::PendantOfMemories));
-        assert(shown.size()==1&&shown.front().size()==arena.front().size()&&!memcmp(shown.front().data(),arena.front().data(),arena.front().size()*sizeof(Vtx)));
+        assert(shown.size()==1&&SameVertices(shown.front(),arena.front()));
 #ifdef COMBO_BUILD
         CwItemDrawInfo alias{};
         assert(!NeiGi_DescribeEntry(&entry,&alias)&&alias.itemShimmer&&alias.neiShimmer==int(Kind::PendantOfMemories)+1&&alias.stateDependent==2);
