@@ -1,0 +1,20 @@
+{
+  "ciMergeCommit": "21451b07feae70c2991c93eb9f90073e0912edf0",
+  "commit": "9fd9803c8d14ae38488dd04f68d2abe5613fde84",
+  "fixtureGenerator": "tests/shuffle_parity/boss_keys/native_boss_key_regression.py",
+  "privacy": "Public CI settings only; no uploaded user configuration, save, or gameplay log.",
+  "repository": "marsh6487/ComboShip",
+  "snapshots": {
+    "all-off.json": {
+      "ciCase": "all-off",
+      "nativeSeed": 20261109,
+      "sha256": "06e42e580fd2595dc53ae50efc626575774f2b7a724fc28c55f3e9d23bd4938a"
+    },
+    "all-parity.json": {
+      "ciCase": "all-parity",
+      "nativeSeed": 20261109,
+      "sha256": "0142c87904441c80fdb633df1dec90e649df2b903e27a53af1561e4fee0c1b8f"
+    }
+  },
+  "source": "Public native-boss-keys-linux CI evidence, consolidated-settings.json"
+}

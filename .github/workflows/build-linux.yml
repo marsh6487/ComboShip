@@ -53,6 +53,17 @@ jobs:
       - name: Verify all bundled emotes and shared playback
         run: python3 -B tests/emotes/run_tests.py
 
+      - name: Verify shared progression with relaxed OoT logic
+        run: >
+          python3 -B tests/shared_progression_logic/run_tests.py
+          --output-dir "$RUNNER_TEMP/shared-progression-unit"
+
+      - name: Verify native settings sweep verdicts
+        run: python3 -B tests/shared_progression_logic/native_sweep.py --self-test
+
+      - name: Verify saved native entrance reload
+        run: python3 -B scripts/diagnostics/run_cross_dungeon_reload_test.py
+
       - name: Configure
         run: >
           cmake -B build-cmake -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -167,6 +178,27 @@ jobs:
           path: |
             ${{ runner.temp }}/native-boss-keys
             !${{ runner.temp }}/native-boss-keys/runtime/**
+          if-no-files-found: warn
+
+      - name: Sweep native combined seed settings
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 45
+        run: >
+          python3 -B tests/shared_progression_logic/native_sweep.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-shared-progression"
+          --jobs 3 --timeout 300
+
+      - name: Preserve shared progression regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-shared-progression-linux
+          path: |
+            ${{ runner.temp }}/shared-progression-unit
+            ${{ runner.temp }}/native-shared-progression
+            !${{ runner.temp }}/native-shared-progression/**/runtime/**
           if-no-files-found: warn
 
       # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r

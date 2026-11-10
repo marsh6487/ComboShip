@@ -9,6 +9,8 @@
 //   comborando.exe --playthrough <spoiler.json>    forward-traverse a finished seed to judge beatability
 //
 // --starting-game <oot|mm|random> overrides the menu's Starting Game CVar for generate mode (#135).
+// --fill-only runs native generation and its reachability validation for regression sweeps, skipping
+// optional hint analysis and spoiler output. It cannot be combined with --playthrough.
 //
 // Exact-seed repro (generate mode): --settings <consolidated.json> restores that seed's OOT/MM settings
 // and tricks, and --master-seed <n> uses n directly instead of hashing --seed. Together they reproduce a
@@ -134,6 +136,7 @@ int main(int argc, char** argv) {
     int count = 1;
     std::string playthroughFile;
     std::string settingsFile; // consolidated spoiler to restore settings/tricks from (exact-seed repro)
+    bool fillOnly = false;
     bool haveMasterSeed = false;
     uint32_t masterSeedArg = 0;
     // #136: combined goal. Absent => read the menu CVars (matches in-game); 0 => force bosses.
@@ -180,6 +183,8 @@ int main(int argc, char** argv) {
             seed = argv[++i];
         else if (a == "--count" && i + 1 < argc)
             count = std::max(1, std::atoi(argv[++i]));
+        else if (a == "--fill-only")
+            fillOnly = true;
         else if (a == "--playthrough" && i + 1 < argc)
             playthroughFile = argv[++i];
         else if (a == "--settings" && i + 1 < argc)
@@ -188,6 +193,11 @@ int main(int argc, char** argv) {
             masterSeedArg = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
             haveMasterSeed = true;
         }
+    }
+
+    if (fillOnly && !playthroughFile.empty()) {
+        std::cerr << "[comborando] --fill-only cannot be combined with --playthrough\n";
+        return 2;
     }
 
 #ifdef _WIN32
@@ -711,6 +721,8 @@ int main(int argc, char** argv) {
                   : startCfg == 2 ? ", starting game random"
                                   : "")
               << "\n";
+    if (fillOnly)
+        std::cout << "[comborando] fill-only: native fill validation enabled; hints and spoiler output skipped\n";
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
     if (SOH_NormalizeComboGraceFromMM)
@@ -802,8 +814,9 @@ int main(int argc, char** argv) {
             r = ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, oot, mmO, nullptr, forced, ootAccess,
                                                    goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
                                                    SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "", sharedMask);
-            if (r.success) {
+            if (r.success)
                 resolvedMmStart = mmStart;
+            if (r.success && !fillOnly) {
                 // Cross-hint data (Phase 2/3 mirror of RunComboFill, incl. the same area maps so the
                 // WotH/Foolish rollup matches in-game): needs this attempt's still-live oracle session.
                 sohHintDump = SOH_DumpRandoHintData ? SOH_DumpRandoHintData() : "";
@@ -863,7 +876,7 @@ int main(int argc, char** argv) {
                       << " cross-game placements)\n";
             // For a single-seed run, emit a consolidated spoiler (settings + placements) so it can be fed
             // straight back to --playthrough. Mirrors ComboShip.cpp's consolidated shape.
-            if (count == 1 && SOH_DumpSettings && MM_DumpSettings) {
+            if (!fillOnly && count == 1 && SOH_DumpSettings && MM_DumpSettings) {
                 try {
                     auto fillSpoiler = nlohmann::json::parse(r.spoilerJson);
                     auto pricesOf = [](const std::string& dump) {

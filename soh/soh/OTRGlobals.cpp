@@ -5,6 +5,7 @@ extern "C" void Partners_Reset(void);
 #endif
 
 #include "soh/Enhancements/randomizer/RustyDoorKeys.h"
+#include "rando/CrossDungeonCatalogue.h"
 #include "rando/MagicMirrorShuffle.h"
 #include "rando/MagicMirrorSettingsSnapshot.h"
 #include "rando/RitoMaskSettingsSnapshot.h"
@@ -46,6 +47,7 @@ extern "C" void Partners_Reset(void);
 
 #include "ResourceManagerHelpers.h"
 #ifdef COMBO_BUILD
+#include "rando/NativeRewardTopology.h"
 #include "unbound/BuiltinTempleSages.h"
 #endif
 #include <fast/Fast3dWindow.h>
@@ -5131,6 +5133,19 @@ static std::optional<uint8_t> sComboRecordedQuestAssets;
 static std::optional<uint8_t> sComboFinalizingQuestAssets;
 static uint8_t sComboPreparedQuestAssets = 0;
 
+#ifdef COMBO_BUILD
+// The dump owns the selected Pocket reward, fixed native items and prices. Keep that
+// exact state for entrance feasibility; regenerating the full item pool would assume
+// fixed keys/songs and hide a reward dependency behind them.
+struct ComboRewardTopologySnapshot {
+    std::vector<Rando::ItemLocation> fixedLocations;
+    std::vector<RandomizerCheck> allowedChecks;
+    std::vector<RandomizerGet> rewards;
+    std::vector<RandomizerGet> freeAdvancement;
+};
+static std::optional<ComboRewardTopologySnapshot> sComboRewardTopology;
+#endif
+
 static uint8_t Combo_InstalledQuestAssets() {
     return (OTRGlobals::Instance->HasOriginal() ? 1 : 0) | (OTRGlobals::Instance->HasMasterQuest() ? 2 : 0);
 }
@@ -5338,6 +5353,7 @@ extern "C" COMBO_EXPORT void SOH_SetComboRandoSeed(uint64_t seed) {
     sComboRandoSeedSet = true;
     sComboContextPrepared = false;
     sOracleInitialized = false;
+    sComboRewardTopology.reset();
     sComboRecordedMqDungeons.reset();
     sComboRecordedQuestAssets.reset();
 }
@@ -5606,6 +5622,9 @@ extern "C" COMBO_EXPORT int SOH_SetDungeonLayoutsForCombo(const char* raw) {
         sComboRecordedQuestAssets = assets;
         sComboContextPrepared = false;
         sOracleInitialized = false;
+#ifdef COMBO_BUILD
+        sComboRewardTopology.reset();
+#endif
         return 1;
     } catch (...) { return 0; }
 }
@@ -5613,6 +5632,9 @@ extern "C" COMBO_EXPORT int SOH_SetDungeonLayoutsForCombo(const char* raw) {
 extern "C" COMBO_EXPORT void SOH_PrepRandoContext(void) {
     sComboContextPrepared = false;
     sOracleInitialized = false;
+#ifdef COMBO_BUILD
+    sComboRewardTopology.reset();
+#endif
     try {
         auto ctx = OTRGlobals::Instance->gRandoContext;
         Rando::Settings::GetInstance()->SetAllToContext();
@@ -5657,10 +5679,54 @@ extern "C" COMBO_EXPORT void SOH_PrepRandoContext(void) {
 // ComboShip: forward decl (defined with the oracle exports below) — see SOH_ShuffleEntrancesForCombo.
 static void EnsureOracleInit();
 
+#ifdef COMBO_BUILD
+static bool Combo_HasNativeRewardTopology() {
+    if (!sComboRewardTopology)
+        return true; // Unaffected modes and legacy prep-only reloads have no dump snapshot.
+    const auto& snapshot = *sComboRewardTopology;
+    auto ctx = OTRGlobals::Instance->gRandoContext;
+    struct RestoreLocations {
+        std::shared_ptr<Rando::Context> ctx;
+        std::vector<Rando::ItemLocation> locations;
+        ~RestoreLocations() {
+            for (size_t i = 0; i < locations.size(); ++i)
+                *ctx->GetItemLocation(static_cast<RandomizerCheck>(i)) = std::move(locations[i]);
+            ctx->GetLogic()->Reset();
+            Regions::AccessReset();
+        }
+    } restore{ ctx, {} };
+    restore.locations.reserve(RC_MAX);
+    for (int i = 0; i < RC_MAX; ++i)
+        restore.locations.push_back(*ctx->GetItemLocation(static_cast<RandomizerCheck>(i)));
+    // Only ItemLocations change temporarily; the candidate entrance graph stays intact.
+    // Full copies retain prices, Pocket, and native fixed items outside the free pool.
+    for (int i = 0; i < RC_MAX; ++i)
+        *ctx->GetItemLocation(static_cast<RandomizerCheck>(i)) = snapshot.fixedLocations[i];
+
+    return ComboRando::HasNativeRewardPlacement(snapshot.rewards.size(), [&](uint16_t collectedMask) -> size_t {
+        ctx->GetLogic()->Reset();
+        for (RandomizerGet item : snapshot.freeAdvancement)
+            Rando::StaticData::RetrieveItem(item).ApplyEffect();
+        for (size_t i = 0; i < snapshot.rewards.size(); ++i)
+            if (collectedMask & (uint16_t{ 1 } << i))
+                Rando::StaticData::RetrieveItem(snapshot.rewards[i]).ApplyEffect();
+        // ReachabilitySearch applies starting inventory and collects fixed items only
+        // at reachable checks. Every movable reward slot remains physically empty.
+        const auto reachable = ReachabilitySearch(snapshot.allowedChecks);
+        return std::count_if(reachable.begin(), reachable.end(), [&](RandomizerCheck rc) {
+            return ctx->GetItemLocation(rc)->GetPlacedRandomizerGet() == RG_NONE &&
+                   std::find(snapshot.allowedChecks.begin(), snapshot.allowedChecks.end(), rc) !=
+                       snapshot.allowedChecks.end();
+        });
+    });
+}
+#endif
+
 // ComboShip: native Fill()'s entrance-shuffle prologue (3drando/fill.cpp), run headlessly — the combo
 // generator never runs Fill(), so without this the OOT entrance options do nothing in combo seeds.
-// Deterministic per seed, so generation/reload/gentest re-derive the same layout. Call after the
-// dump/prep (settings finalized). Returns 1 on success or shuffle-off, 0 when every retry failed.
+// Deterministic per seed and prepared dump; saved seeds restore their recorded overrides.
+// Call after dump/prep (settings finalized). Legacy prep-only callers retain shuffle-only validation.
+// Returns 1 on success or shuffle-off, 0 when every retry failed.
 extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
     try {
         auto ctx = OTRGlobals::Instance->gRandoContext;
@@ -5675,6 +5741,7 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
         // vanilla mid-fill, making logic validate a world the save doesn't play.
         EnsureOracleInit();
         // Native Fill() retries the whole prologue up to 5x on shuffle failure.
+        int rewardTopologyFailures = 0;
         for (int retry = 0; retry < 5; ++retry) {
             ctx->GetEntranceShuffler()->playthroughEntrances.clear();
             RegionTable_Init(); // vanilla graph baseline (needed on retries/regeneration)
@@ -5695,13 +5762,24 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
                 continue;
             }
             SetAreas();
+#ifdef COMBO_BUILD
+            if (!Combo_HasNativeRewardTopology()) {
+                ++rewardTopologyFailures;
+                SPDLOG_WARN("[ComboShip] SOH_ShuffleEntrancesForCombo: no legal End-of-Dungeon reward placement "
+                            "on this layout (retry {}, {} rewards, {} eligible boss checks)",
+                            retry, sComboRewardTopology->rewards.size(), sComboRewardTopology->allowedChecks.size());
+                continue;
+            }
+#endif
             ctx->GetEntranceShuffler()->CreateEntranceOverrides();
             // Warp song destination texts, as native Fill() does. SOH_ApplyComboHints also calls this,
             // but only when hints are enabled — without this a hints-off seed shows "No Hint".
             CreateWarpSongTexts();
             return 1;
         }
-        SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: no valid layout after 5 retries");
+        SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: no valid layout after 5 retries "
+                     "({} rejected for impossible dungeon reward placement)",
+                     rewardTopologyFailures);
     } catch (const std::exception& e) {
         SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: {}", e.what());
     } catch (...) { SPDLOG_ERROR("[ComboShip] SOH_ShuffleEntrancesForCombo: unknown exception"); }
@@ -5709,7 +5787,7 @@ extern "C" COMBO_EXPORT int SOH_ShuffleEntrancesForCombo(uint64_t seed) {
 }
 
 // ComboShip: resolved entrance overrides as JSON for the consolidated spoiler's "entrances.oot".
-// Informational — reload re-derives via SOH_ShuffleEntrancesForCombo.
+// Saved seeds replay these exact overrides, including any reward-feasibility reroll.
 extern "C" COMBO_EXPORT const char* SOH_DumpEntranceOverrides(void) {
     static std::string buf;
     nlohmann::json out = nlohmann::json::array();
@@ -5732,11 +5810,21 @@ extern "C" COMBO_EXPORT const char* SOH_DumpEntranceOverrides(void) {
 // different trick set (all-tricks pass) can accept a different layout than generation did.
 extern "C" COMBO_EXPORT int SOH_ApplyEntranceOverridesForCombo(const char* json) {
     try {
+        auto entrances = nlohmann::json::parse(json ? json : "[]");
+        std::map<int32_t, int> knownTypes;
+        for (const auto& pair : Rando::GetEntranceShuffleTable()) {
+            knownTypes[pair.first.index] = static_cast<int>(pair.first.type);
+            if (pair.second.index >= 0)
+                knownTypes[pair.second.index] = static_cast<int>(pair.second.type);
+        }
+        // Validate before lazy initialization or ParseJson can mutate the live graph.
+        // Reuse the saved-catalogue policy; an explicit empty array remains a valid reset.
+        ComboRando::CrossDungeon::ParseNativeOverrides(entrances, knownTypes, ENTRANCE_OVERRIDES_MAX_COUNT);
         auto ctx = OTRGlobals::Instance->gRandoContext;
         EnsureOracleInit(); // same rationale as SOH_ShuffleEntrancesForCombo: a later lazy init would
                             // RegionTable_Init the graph back to vanilla
         nlohmann::json spoiler;
-        spoiler["entrances"] = nlohmann::json::parse(json ? json : "[]");
+        spoiler["entrances"] = std::move(entrances);
         // ParseJson = UnshuffleAllEntrances + RegionTable_Init + ApplyEntranceOverrides + SetAreas,
         // so an empty array correctly resets to the vanilla graph.
         ctx->GetEntranceShuffler()->ParseJson(spoiler);
@@ -5833,6 +5921,35 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
             return it.IsMajorItem() || (shieldTunicGate && it.IsShieldOrTunic());
         };
 
+        // Native entrance shuffling runs after this dump. End-of-Dungeon rewards
+        // must therefore be solved on the final graph, within their native boss
+        // checks, instead of freezing the vanilla-graph preplacement. The Pocket
+        // reward stays with SOH_GetForcedPlacements; it is outside this catalogue.
+        std::set<RandomizerCheck> movableRewardChecks;
+        nlohmann::json rewardAllowedChecks = nlohmann::json::array();
+        if (ctx->GetOption(RSK_SHUFFLE_ENTRANCES) &&
+            ctx->GetOption(RSK_SHUFFLE_DUNGEON_REWARDS).Is(RO_DUNGEON_REWARDS_END_OF_DUNGEON)) {
+            for (RandomizerCheck rc : Rando::StaticData::dungeonRewardLocations) {
+                if (std::find(ctx->allLocations.begin(), ctx->allLocations.end(), rc) == ctx->allLocations.end())
+                    continue;
+                const auto* location = Rando::StaticData::GetLocation(rc);
+                auto* itemLocation = ctx->GetItemLocation(rc);
+                if (!location || location->GetName().empty() || itemLocation->IsExcluded())
+                    continue;
+                const RandomizerGet placed = itemLocation->GetPlacedRandomizerGet();
+                if (placed != RG_NONE) {
+                    const auto& item = Rando::StaticData::RetrieveItem(placed);
+                    if (item.GetItemType() != ITEMTYPE_DUNGEONREWARD || !comboIsAdv(placed) ||
+                        item.GetName().GetEnglish().empty())
+                        continue;
+                }
+                // Every allowed name is emitted below as either a free check or
+                // a promoted reward row, never an excluded or unrelated fixed row.
+                movableRewardChecks.insert(rc);
+                rewardAllowedChecks.push_back(location->GetName());
+            }
+        }
+
         // Partition allLocations: pre-placed (confined) -> fixed, empty -> fillable check.
         for (RandomizerCheck rc : ctx->allLocations) {
             Rando::Location* loc = Rando::StaticData::GetLocation(rc);
@@ -5854,12 +5971,17 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                 const std::string& in = Rando::StaticData::RetrieveItem(placed).GetName().GetEnglish();
                 // `hintable` = native SetAsHintable state, captured here because oracle ItemResets wipe it.
                 // Confined fills (own-dungeon, rewards, min-set shops, excluded junk) leave it false.
-                if (!in.empty())
+                if (!in.empty()) {
                     fixed.push_back({ { "check", name },
                                       { "item", in },
                                       { "advancement", comboIsAdv(placed) },
                                       { "major", isMajor(placed) },
                                       { "hintable", ctx->GetItemLocation(rc)->IsHintable() } });
+                    if (movableRewardChecks.contains(rc)) {
+                        fixed.back()["validate"] = true;
+                        fixed.back()["allowedChecks"] = rewardAllowedChecks;
+                    }
+                }
             } else {
                 // A real fillable check. GenerateLocationPool already decided what's shuffled and the
                 // meta markers (Link's Pocket, wincon) are skipped above, so emit regardless of vanilla
@@ -5926,6 +6048,35 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
                         { "npc", ctx->GetOption(RSK_SHUFFLE_NPC_SOULS).Get() != 0 },
                         { "animal", ctx->GetOption(RSK_SHUFFLE_ANIMAL_SOULS).Get() != 0 },
                         { "misc", ctx->GetOption(RSK_SHUFFLE_MISC_SOULS).Get() != 0 } };
+        if (!movableRewardChecks.empty()) {
+            ComboRewardTopologySnapshot snapshot;
+            snapshot.allowedChecks.assign(movableRewardChecks.begin(), movableRewardChecks.end());
+            snapshot.fixedLocations.reserve(RC_MAX);
+            for (int i = 0; i < RC_MAX; ++i)
+                snapshot.fixedLocations.push_back(*ctx->GetItemLocation(static_cast<RandomizerCheck>(i)));
+            for (RandomizerCheck rc : snapshot.allowedChecks) {
+                auto& location = snapshot.fixedLocations[rc];
+                const RandomizerGet reward = location.GetPlacedRandomizerGet();
+                if (reward != RG_NONE) {
+                    snapshot.rewards.push_back(reward);
+                    location.RefPlacedItem() = RG_NONE;
+                }
+            }
+            if (!snapshot.rewards.empty()) {
+                // Use the exact exported free advancement multiset, including any pool
+                // padding. Fixed native keys/songs are collected in place, never assumed.
+                for (const auto& item : pool) {
+                    if (!item.at("advancement").get<bool>())
+                        continue;
+                    const auto& name = item.at("name").get_ref<const std::string&>();
+                    const auto found = Rando::StaticData::itemNameToEnum.find(name);
+                    if (found == Rando::StaticData::itemNameToEnum.end())
+                        throw std::runtime_error("native reward topology cannot resolve free item: " + name);
+                    snapshot.freeAdvancement.push_back(found->second);
+                }
+                sComboRewardTopology = std::move(snapshot);
+            }
+        }
         usedPool = true;
 #else
         // Non-combo (unused outside ComboShip): old vanilla-per-check emission.

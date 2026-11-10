@@ -2908,6 +2908,19 @@ static int Combo_OnReloadRequest(const char* path) {
             std::cerr << "[ComboShip] reload: invalid dungeon layouts or required OoT quest assets missing\n";
             return 0;
         }
+        const nlohmann::json* recordedOotEntrances = nullptr;
+        if (j.contains("entrances")) {
+            const auto& entrances = j.at("entrances");
+            if (!entrances.is_object())
+                throw std::invalid_argument("invalid native entrance metadata");
+            if (entrances.contains("oot")) {
+                if (!entrances.at("oot").is_array())
+                    throw std::invalid_argument("invalid native OOT entrance layout");
+                if (!SOH_ApplyEntranceOverridesForCombo)
+                    throw std::runtime_error("native OOT entrance apply export missing; rebuild the OOT module");
+                recordedOotEntrances = &entrances.at("oot");
+            }
+        }
         const auto crossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(j);
         const bool crossEnabled = ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed);
         // The pure seed catalogue and both oracle setters validate B while the accepted native
@@ -2987,7 +3000,7 @@ static int Combo_OnReloadRequest(const char* path) {
                 std::cout << "[ComboShip] Reload: SOH_DumpRandoSettings returned empty snapshot\n";
         }
 
-        // OOT: restore settings -> seed RNG -> prep settings-scoped pool -> re-derive entrances ->
+        // OOT: restore settings -> seed RNG -> prep settings-scoped pool -> restore entrances ->
         // apply placements -> hash.
         if (SOH_RestoreRandoSettings)
             SOH_RestoreRandoSettings(ootSettings.c_str());
@@ -3005,16 +3018,15 @@ static int Combo_OnReloadRequest(const char* path) {
         }
         if (SOH_PrepRandoContext)
             SOH_PrepRandoContext();
-        // Enabled cross-dungeon seeds require the recorded native layout, because return routing
-        // was compiled against it. Existing disabled/legacy reloads keep their original path.
+        // Recorded native layouts are authoritative even with cross-dungeon entrances disabled.
+        // An empty array restores vanilla entrances; only legacy seeds without a layout re-derive it.
         bool nativeEntrancesOk = true;
-        if (crossEnabled && j.contains("entrances") && j.at("entrances").contains("oot") &&
-            SOH_ApplyEntranceOverridesForCombo)
-            nativeEntrancesOk = SOH_ApplyEntranceOverridesForCombo(j.at("entrances").at("oot").dump().c_str()) != 0;
+        if (recordedOotEntrances)
+            nativeEntrancesOk = SOH_ApplyEntranceOverridesForCombo(recordedOotEntrances->dump().c_str()) != 0;
         else if (SOH_ShuffleEntrancesForCombo)
             nativeEntrancesOk = SOH_ShuffleEntrancesForCombo(masterSeed) != 0;
         if (!nativeEntrancesOk) {
-            std::cerr << "[ComboShip] reload: OOT entrance shuffle failed to re-derive — aborting\n";
+            std::cerr << "[ComboShip] reload: OOT entrance layout could not be restored — aborting\n";
             // Restore first: bailing here would otherwise leave the seed's OOT CVars as the baseline.
             if (isSilentAutoLoad && SOH_RestoreRandoSettings)
                 SOH_RestoreRandoSettings(userOotSnapshot.c_str());
