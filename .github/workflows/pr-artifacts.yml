@@ -1,7 +1,7 @@
 name: pr-artifacts
 
 # After "Build Artifacts" finishes for a PR, post (or update) a comment on that PR with
-# nightly.link download links for each uploaded artifact (Windows + Linux both come from the
+# nightly.link download links for the three platform builds (Windows + Linux both come from the
 # single run). Runs in the base-repo context via workflow_run, so it can comment even on fork PRs.
 # Mirrors HarbourMasters/Shipwright/pr-artifacts.yml.
 
@@ -61,7 +61,8 @@ jobs:
               run_id: context.payload.workflow_run.id,
             });
 
-            return allArtifacts.data.artifacts.reduce((acc, item) => {
+            const builds = new Set(['ComboShip-linux', 'ComboShip-linux-appimage', 'ComboShip-windows']);
+            return allArtifacts.data.artifacts.filter(item => builds.has(item.name)).reduce((acc, item) => {
               acc += `
               - [${item.name}.zip](https://nightly.link/${context.repo.owner}/${context.repo.repo}/actions/artifacts/${item.id}.zip)`;
               return acc;

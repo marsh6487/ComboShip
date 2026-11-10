@@ -132,7 +132,7 @@ jobs:
           --case off --case mixed-decoupled --seed 20261110
 
       - name: Preserve native Solo MM entrance evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-solo-mm-entrances-linux
@@ -152,7 +152,7 @@ jobs:
           --case vanilla-off --case vanilla-on --case vanilla-on-excluded
 
       - name: Preserve native seed evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-first-drops-linux
@@ -171,7 +171,7 @@ jobs:
           --output "$RUNNER_TEMP/native-boss-keys"
 
       - name: Preserve native parity seed evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-boss-keys-linux
@@ -191,7 +191,7 @@ jobs:
           --jobs 3 --timeout 300
 
       - name: Preserve shared progression regression evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-shared-progression-linux
@@ -210,7 +210,7 @@ jobs:
         run: ./scripts/linux/make-appimage.sh build-cmake _packages 2>&1 | tee "$RUNNER_TEMP/linux-packaging.log"
 
       - name: Preserve packaging diagnostics
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: linux-packaging-log

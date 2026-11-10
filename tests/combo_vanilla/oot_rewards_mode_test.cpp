@@ -1,6 +1,7 @@
 #include "combo/vanilla/ComboVanillaMode.h"
 #include "soh/mods/nei_save.h"
 #include "soh/include/z64item.h"
+#include "soh/soh/Enhancements/randomizer/randomizerEnums.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -12,9 +13,12 @@ int gComboVanillaMode = 1;
 using u8 = unsigned char;
 using s32 = int;
 using s8 = signed char;
-constexpr int RAND_INF_OBTAINED_ROCS_FEATHER = 0, RAND_INF_OBTAINED_NAYRUS_LOVE = 1;
-static bool randomizerFlags[2]{};
-bool Flags_GetRandomizerInf(int flag) {
+// Mode and randomizer flag storage are engine services. The extracted trade
+// and mask helpers retain their production ownership and migration behavior.
+static bool randomizer = false;
+#define IS_RANDO randomizer
+static bool randomizerFlags[RAND_INF_MAX]{};
+bool Flags_GetRandomizerInf(RandomizerInf flag) {
     return randomizerFlags[flag];
 }
 #define INV_CONTENT(item) gSaveContext.inventory.items[SLOT_NAYRUS_LOVE]
@@ -138,6 +142,7 @@ int main() {
     optionValue = 0;
     assert(GateOn(&form)); // Earned Vanilla ownership survives an off global toggle.
     gComboVanillaMode = 0;
+    randomizer = true;
     assert(Wand_RandoMode() == optionValue);
     assert(!ExtInv_IsCustomItemsEnabled() && !ExtInv_IsMmMasksEnabled() && !ExtEquip_IsEnabled());
     nei.ritoMaskFlags = 0;
@@ -145,8 +150,18 @@ int main() {
     assert(ExtInv_IsOnlyTransformation());
     RitoItem_SyncCell();
     assert(!(nei.ritoMaskFlags & RITO_FLAG_MASK_OWNED)); // Seeded/solo pause cannot grant the mask.
+    // Seeded pause normalizes the real child trade chain without creating a
+    // mask. Using the flag store also exercises the randomizer-only branch.
+    gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_WEIRD_EGG;
+    randomizerFlags[RAND_INF_CHILD_TRADES_HAS_CHICKEN] = true;
+    RitoItem_SyncCell();
+    assert(gSaveContext.inventory.items[SLOT_TRADE_ADULT] == ITEM_WEIRD_EGG);
+    assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD] == ITEM_NONE);
+    assert(nei.tradeAdultOwned == ((1u << 20) | (1u << 21)));
+    assert(!(nei.ritoMaskFlags & RITO_FLAG_MASK_OWNED));
     gComboGameMode = COMBO_GAME_OOT;
     gComboVanillaMode = 1;
+    randomizer = false;
     optionValue = 0;
     assert(Wand_RandoMode() == 0 && !ExtInv_IsCustomItemsEnabled());
     std::cout << "PASS Vanilla earned availability, exact rods, no free Rito, "
