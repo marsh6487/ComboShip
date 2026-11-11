@@ -27,10 +27,10 @@ jobs:
       - name: Install regression dependencies
         timeout-minutes: 10
         run: |
-          # The runner mirror list currently retries an unresolvable Azure host.
-          # Keep Ubuntu's signed repositories, using its standard mirrors directly.
+          # The runner cannot resolve the Ubuntu archive domains.
+          # Use mirrored Ubuntu archives while retaining APT signature checks.
           if [ -f /etc/apt/apt-mirrors.txt ]; then
-            printf '%s\n' https://archive.ubuntu.com/ubuntu https://security.ubuntu.com/ubuntu | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            printf '%s\n' https://mirrors.edge.kernel.org/ubuntu https://mirrors.mit.edu/ubuntu | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o APT::Update::Error-Mode=any update
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y cmake ninja-build nlohmann-json3-dev libtinyxml2-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libzip-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pycparser python3-venv
