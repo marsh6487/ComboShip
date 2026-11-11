@@ -14,6 +14,14 @@ from run_mm_nei_tests import flags as mm_flags
 
 
 def function(source, name):
+    if name == "WeaponUpgrade_ApplyHeldSwordDL" and "WeaponUpgrade_ApplyHeldSwordDLImpl(" in source:
+        return "\n".join(function(source, dependency) for dependency in
+                         ("WeaponUpgrade_ModelSwordSelected", "WeaponUpgrade_ApplyHeldSwordDLImpl",
+                          "WeaponUpgrade_ApplyHeldSwordDLForModel")) + "\n" + _function(source, name)
+    return _function(source, name)
+
+
+def _function(source, name):
     match = re.search(r"(?:static )?u8 " + name + r"\([^)]*\) \{", source)
     assert match, name
     end = match.end()

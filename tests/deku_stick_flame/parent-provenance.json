@@ -1,0 +1,14 @@
+{
+  "soh": {
+    "base": "e082e6ed0a37e1513e5a662260c44d698231e7c6",
+    "source": "soh/src/overlays/actors/ovl_player_actor/z_player.c",
+    "function": "Player_UpdateBurningDekuStick",
+    "fragment_sha256": "6deb028ff690a7cec8c5b865c7ecb4ec2b87154ceb10185dc39cbf25b5b816de"
+  },
+  "mm": {
+    "base": "e082e6ed0a37e1513e5a662260c44d698231e7c6",
+    "source": "mm/src/overlays/actors/ovl_player_actor/z_player.c",
+    "function": "func_808442D8",
+    "fragment_sha256": "8cdc8afd225c4e3a16c5cc215afa71a36b28c9d37931a84faec74d5e6c528b14"
+  }
+}

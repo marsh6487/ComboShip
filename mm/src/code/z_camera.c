@@ -4534,6 +4534,9 @@ s32 Camera_KeepOn4(Camera* camera) {
     s32 adultItemPresentation = camera->setting == CAM_SET_ITEM0 &&
                                 camera->focalActor == &GET_PLAYER(camera->play)->actor &&
                                 AdultLink_UsesAdultItemPresentation((Player*)camera->focalActor);
+    s32 localOcarinaCamera = camera->setting == CAM_SET_ITEM1 && camera->focalActor == &GET_PLAYER(camera->play)->actor;
+    s32 adultOcarinaPresentation =
+        localOcarinaCamera && AdultLink_UsesAdultItemPresentation((Player*)camera->focalActor);
     s32 bgId;
     s16 camMode;
     Player* player;
@@ -4584,9 +4587,15 @@ s32 Camera_KeepOn4(Camera* camera) {
         focalActorHeight = Camera_GetFocalActorHeight(camera);
     }
 
-    if (adultItemPresentation) {
+    if (adultItemPresentation || adultOcarinaPresentation) {
         focalActorHeight = AdultLink_GetItemPresentationHeight();
         adultItemYOffset = AdultLink_GetItemPresentationYOffset();
+        if (adultOcarinaPresentation) {
+            // The overlay draws the adult rig while MM still reports Human height (44).
+            // Keep native state height, sinking displacement and the ocarina table/lifecycle.
+            focalActorHeight += Player_GetHeight((Player*)camera->focalActor) - 44.0f;
+            focalActorHeight -= ((Player*)camera->focalActor)->unk_AB8 * camera->focalActor->scale.y;
+        }
     }
 
     if (rwData->unk_18 != *sp44) {
@@ -4598,7 +4607,9 @@ s32 Camera_KeepOn4(Camera* camera) {
     }
 
     Camera_UnsetStateFlag(camera, CAM_STATE_4);
-    if (RELOAD_PARAMS(camera)) {
+    // ITEM1 dimensions may change with the local adult toggle/scale while open.
+    // Refresh read-only framing without restarting the native transition timer.
+    if (RELOAD_PARAMS(camera) || localOcarinaCamera) {
         values = sCameraSettings[camera->setting].cameraModes[camMode].values;
         new_var = -0.5f;
         roData->unk_00 = GET_NEXT_SCALED_RO_DATA(values) * focalActorHeight *

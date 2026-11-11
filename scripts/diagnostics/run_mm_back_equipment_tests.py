@@ -11,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source: str, name: str) -> str:
+    if name == "WeaponUpgrade_ApplyHeldSwordDL" and "WeaponUpgrade_ApplyHeldSwordDLImpl(" in source:
+        return "\n".join(function(source, dependency) for dependency in
+                         ("WeaponUpgrade_ModelSwordSelected", "WeaponUpgrade_ApplyHeldSwordDLImpl",
+                          "WeaponUpgrade_ApplyHeldSwordDLForModel")) + "\n" + _function(source, name)
+    return _function(source, name)
+
+
+def _function(source: str, name: str) -> str:
     marker = name + "("
     name_at = source.index(marker)
     start = source.rfind("\n", 0, name_at) + 1
@@ -30,7 +38,7 @@ def main() -> None:
     player_source = ROOT / "mm/src/code/z_player_lib.c"
     adult_source = (ROOT / "mm/mods/items/logic/adult_link_render.cpp").read_text()
     extended_source = (ROOT / "mm/mods/extended_equipment.c").read_text()
-    adult_hand_helper = function(adult_source, "AdultLink_ApplyNeiHeldHand")
+    adult_hand_helper = function(adult_source, "AdultLink_ApplyRootTransform") + "\n" + function(adult_source, "AdultLink_ApplyNeiHeldHand")
     adult_callback = function(adult_source, "AdultLink_OverrideLimb")
     extended_back_draw = function(extended_source, "ExtEquip_DrawShieldBackDL")
     cc = shlex.split(os.environ.get("CC", "cc"))
@@ -70,6 +78,7 @@ def main() -> None:
         "ResourceMgr_FileExists",
         "Trident_GoldenArmor",
         "WeaponUpgrade_ApplyHeldSwordDL",
+        "WeaponUpgrade_ApplyHeldSwordDLForModel",
         "WeaponUpgrade_HasGreatFairy",
         "WeaponUpgrade_HasHammerAxe",
         "gEquipMasks",

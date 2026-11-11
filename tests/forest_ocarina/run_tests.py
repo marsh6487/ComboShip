@@ -55,7 +55,7 @@ def build_source():
     native += "\n".join(functions(trig, {"sins", "coss"}).values())
     # KeepOn4 also serves adult item receipts. Link its actual eligibility and
     # dimensions queries; this ocarina fixture controls rig readiness/renderer
-    # services and verifies that ready adult ITEM1 framing stays native.
+    # services and verifies adult ITEM1 framing with native session ownership.
     adult = (ROOT / "mm/mods/items/logic/adult_link_render.cpp").read_text()
     native += "\n" + re.search(r"^#define ADULT_LINK_SCALE_DEFAULT[^\n]*", adult, re.M)[0] + "\n"
     for name in ("AdultLink_IsActive", "AdultLink_UsesAdultPresentation", "AdultLink_UsesAdultItemPresentation",

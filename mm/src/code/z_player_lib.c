@@ -16,6 +16,7 @@
  */
 
 #include "global.h"
+#include "mods/forms/rito_foot_contact.h"
 #include "gui/UiVisibility.h"
 #include "ui_visibility.h"
 #include <string.h>
@@ -2394,10 +2395,18 @@ void Player_AdjustSingleLeg(PlayState* play, Player* player, SkelAnime* skelAnim
     f32 sp74;
     f32 sp70;
     f32 sp7C;
+    f32 ritoFloorY;
+    u8 ritoContact;
+    MtxF ritoParent;
 
     if ((player->stateFlags3 & PLAYER_STATE3_1) || !(player->actor.scale.y >= 0.0f) ||
         (player->stateFlags1 & PLAYER_STATE1_DEAD) || play->soaringCsOrSoTCsPlaying) {
         return;
+    }
+
+    ritoContact = RitoForm_CanAdjustFeet(play, player, skelAnime);
+    if (ritoContact) {
+        Matrix_Get(&ritoParent);
     }
 
     sp74 = D_801C0910[player->transformation];
@@ -2413,7 +2422,7 @@ void Player_AdjustSingleLeg(PlayState* play, Player* player, SkelAnime* skelAnim
     Matrix_Pop();
 
     footprintPos.y += 15.0f;
-    yIntersect = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &footprintPos) + sp7C +
+    yIntersect = (ritoFloorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &footprintPos)) + sp7C +
                  (player->unk_ABC * player->actor.scale.y);
     if (sp84.y < yIntersect) {
         f32 diffX = sp84.x - sp90.x;
@@ -2465,6 +2474,15 @@ void Player_AdjustSingleLeg(PlayState* play, Player* player, SkelAnime* skelAnim
             footprintPos.y = yIntersect;
             EffectSsGFire_Spawn(play, &footprintPos);
         }
+    }
+    // The original ray, angle adjustment and lava effects above run once. The
+    // separate Rito solve starts from that native pose and commits only after
+    // native binang recomposition passes its contact/orientation/reach checks.
+    // Sloped or dynamic floors retain native behavior in this initial POC.
+    if (ritoContact && isfinite(ritoFloorY) && ritoFloorY > BGCHECK_Y_MIN && bgId == BGCHECK_SCENE && poly != NULL &&
+        poly->normal.x == 0 && poly->normal.y == 32767 && poly->normal.z == 0) {
+        RitoFeet_ApplyPostNative(&ritoParent, pos, rot, skelAnime, thighLimbIndex, shinLimbIndex, footLimbIndex,
+                                 ritoFloorY);
     }
 }
 

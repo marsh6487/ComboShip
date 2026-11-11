@@ -72,6 +72,9 @@ u8 CustomForms_WantsClimbableSurface(void);
 u8 CustomForms_VoiceOverride(u16 sfxId, u16* outSfxId);
 u8 MmRitoAirRocsAllowed(Player* player);
 
+// Read-only eligibility for the calibrated Rito post-native leg-contact POC.
+u8 RitoForm_CanAdjustFeet(PlayState* play, Player* player, SkelAnime* skelAnime);
+
 // Renderer seams (adult_link_render.cpp).
 Gfx* CustomForms_HandDL(Player* player, s32 limbIndex, u8* claimed);
 u8 CustomForms_HidesSheath(Player* player);

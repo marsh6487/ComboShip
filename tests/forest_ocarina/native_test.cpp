@@ -637,8 +637,14 @@ int main() {
     const auto view = PlayAndCancel(PLAYER_FORM_HUMAN);
     if (readiness == 0)
       humanControl = view;
-    else
+    else if (readiness == 1)
       SameView(view, humanControl);
+    else
+      Require(view.at.y > humanControl.at.y &&
+                  std::memcmp(&view.eye, &humanControl.eye, sizeof(Vec3f)) &&
+                  view.fov == humanControl.fov && view.setting == humanControl.setting &&
+                  view.mode == humanControl.mode,
+              "ready adult ocarina uses adult framing with native setting/mode/FOV");
   }
   for (int form = 0; form < PLAYER_FORM_MAX; ++form) {
     Reset();

@@ -72,6 +72,12 @@ u8 WeaponUpgrade_IKAxeStrike(struct Actor* actor, struct PlayState* play, u8 hit
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, struct Player* player, u8 bodyEnvR, u8 bodyEnvG,
                                   u8 bodyEnvB);
 
+// Adult/custom-model renderer only: modelHand is the active rig's resolved
+// closed fist. Reuse the exact item/action/tier resolver while treating body
+// pack Master/BGS hand aliases as rig resources; explicit weapons still win.
+u8 WeaponUpgrade_ApplyHeldSwordDLForModel(Gfx** dList, void* modelHand, struct Player* player, u8 bodyEnvR, u8 bodyEnvG,
+                                          u8 bodyEnvB);
+
 #ifdef __cplusplus
 }
 #endif

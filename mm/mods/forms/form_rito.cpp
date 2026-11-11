@@ -11,6 +11,10 @@ extern "C" {
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "z64quake.h"
 PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeaderInPlaceResampled(const char*, uint8_t, int16_t);
+int ResourceMgr_OTRSigCheck(char*);
+u8 Sm64Mario_ShouldHideLink(void);
+u8 WolfLinkForm_IsSelected(void);
+u8 KiteSurf_IsActive(void);
 }
 
 static u8 MmRitoFlightUpdate(Player*, PlayState*);
@@ -40,10 +44,8 @@ void RitoForm_ForgetContext(void) {
     MmRitoRestoreLanding();
     MmRitoWindClear();
     MmRitoBowReset();
-    sRito.state = RITO_FLY_OFF;
-    sRito.flyAction = NULL;
-    sRito.boost = 0;
-    sRitoDamage.lastHealth = 0;
+    MmRitoClearFlightState();
+    sRitoDamage = {};
     sRitoPlay = NULL;
     sRitoPlayer = NULL;
     sRitoLastFrame = 0;
@@ -68,10 +70,8 @@ void RitoForm_Reset(Player* player, PlayState* play) {
         MmRitoWindTrailsOff(play);
     MmRitoWindClear();
     MmRitoBowReset();
-    sRito.state = RITO_FLY_OFF;
-    sRito.flyAction = NULL;
-    sRito.boost = 0;
-    sRitoDamage.lastHealth = 0;
+    MmRitoClearFlightState();
+    sRitoDamage = {};
 }
 
 void RitoForm_FilterInput(Player* player, Input* input) {
@@ -114,6 +114,37 @@ void RitoForm_Update(Player* player, PlayState* play) {
 
 u8 RitoForm_OwnsAction(void) {
     return sRito.state != RITO_FLY_OFF || sRitoBow.state != RITO_BOW_OFF;
+}
+
+// This POC calibrates the actual adult/default renderer only. Unknown rigs,
+// scales and special poses retain native leg IK without any contact rewrite.
+extern "C" u8 RitoForm_CanAdjustFeet(PlayState* play, Player* player, SkelAnime* skelAnime) {
+    if (play == NULL || player == NULL || play != gPlayState || player != GET_PLAYER(play) ||
+        skelAnime != &player->skelAnime || CustomForms_ActiveForm() != CUSTOM_FORM_RITO ||
+        player->transformation != PLAYER_FORM_HUMAN || !Forms_IsAdultAge() || CustomForms_RootScale() != 0.7036f ||
+        !Forms_OnGround(player) || !Forms_CanAct(player) || MmRitoInputBlocked() ||
+        play->csCtx.state != CS_STATE_IDLE || Sm64Mario_ShouldHideLink() || WolfLinkForm_IsSelected() ||
+        KiteSurf_IsActive() || sRito.state != RITO_FLY_OFF || sRitoBow.state != RITO_BOW_OFF ||
+        (player->stateFlags3 & (PLAYER_STATE3_1 | PLAYER_STATE3_PAUSE_ACTION_FUNC))) {
+        return 0;
+    }
+    if (CVarGetFloat("gAdultLink.Scale", 0.01f) != 0.01f || CVarGetFloat("gAdultLink.YOffset", 0.0f) != 0.0f ||
+        player->actor.scale.x != 0.01f || player->actor.scale.y != 0.01f || player->actor.scale.z != 0.01f ||
+        player->actor.shape.yOffset != RITO_DRAW_Y_BASE || player->ageProperties == NULL ||
+        player->ageProperties->unk_08 != 1.0f || player->unk_AB8 != 0.0f || player->unk_ABC != 0.0f) {
+        return 0;
+    }
+    const char* animation = (const char*)player->skelAnime.animation;
+    if (!ResourceMgr_OTRSigCheck((char*)animation)) {
+        return 0;
+    }
+    return BEN_ANIM_EQUAL(animation, gPlayerAnim_link_normal_walk_free) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_normal_walk) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_fighter_walk_long) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_normal_run_free) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_normal_run) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_fighter_run) ||
+           BEN_ANIM_EQUAL(animation, gPlayerAnim_link_fighter_run_long);
 }
 
 f32 RitoForm_DrawOffset(Player* player) {

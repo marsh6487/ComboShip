@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='startup-state-') as temporary:
     subprocess.run([*shlex.split(env.get('CXX', 'c++')), *flags,
                     str(ROOT / 'tests/startup_receipt/state_test.cpp'), '-o', str(binary)], check=True, env=env)
     subprocess.run([str(binary)], check=True, env=env)
-for suite in ('host', 'oot', 'mm'):
+for suite in ('host', 'oot', 'mm', 'creation'):
     command = [sys.executable, '-B', str(ROOT / f'tests/startup_receipt/run_{suite}_tests.py')]
     if suite != 'oot':
         command += ['--json-include', args.json_include]

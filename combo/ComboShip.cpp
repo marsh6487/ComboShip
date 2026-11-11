@@ -478,6 +478,7 @@ static std::map<int, uint32_t> g_startupAckRetries;
 static uint32_t g_startupGeneration = 0;
 static CwFinishMmStartupReceipt MM_FinishStartupReceipt = nullptr;
 static int32_t (*SOH_CaptureStartupReceiptSave)(int32_t) = nullptr;
+static void Combo_PrepareStartupReceiptSeed();
 // Slots whose container was backed up for a COMBO_RELEASE_VERSION mismatch; guarded by g_containerMutex.
 // OOT drains it on the main thread (Combo_TakeEvictionNotice) to surface a popup.
 static std::vector<int> g_evictedSlots;
@@ -856,6 +857,19 @@ static int32_t Combo_StartupReceipt(int32_t action, int32_t game, int32_t slot, 
         (action != CW_STARTUP_BEGIN_FILE && action != CW_STARTUP_PREPARE_PEER_SNAPSHOT && !receipt))
         return -1;
     try {
+        if (action == CW_STARTUP_BEGIN_FILE) {
+            {
+                std::lock_guard<std::mutex> lock(g_containerMutex);
+                const auto creation = g_vanillaCreations.find(slot);
+                if (creation != g_vanillaCreations.end() && creation->second.Active())
+                    return 0;
+            }
+            // OoT initializes startup checks before its new-save callback
+            // creates MM and binds the container. Their foreign owner must
+            // already come from this seed, including after playing another file.
+            // Publish without the save mutex: the native loader owns its hooks.
+            Combo_PrepareStartupReceiptSeed();
+        }
         // Gameplay polling may finish persistence after a failed write, but
         // only explicit save initialization/loading can begin a native award.
         if (action == CW_STARTUP_PEEK)
@@ -1175,6 +1189,11 @@ static uint32_t g_FinalizeMasterSeed = 0; // #169: the gen-roll latch keys off t
 // Consolidated spoiler JSON for the just-generated seed. The worker writes the pending file from it;
 // Combo_OnOOTSaveInit bakes it into the slot's container and pushes it into both DLLs at Start.
 static std::string g_ConsolidatedJson;
+
+static void Combo_PrepareStartupReceiptSeed() {
+    if (SOH_LoadComboRando)
+        SOH_LoadComboRando(g_ConsolidatedJson.empty() ? nullptr : g_ConsolidatedJson.c_str());
+}
 
 // ---------- ComboShip-owned Anchor connection (Phase 1) ----------
 // The persistent socket + receive thread live HERE (launcher) so the connection survives OOT<->MM

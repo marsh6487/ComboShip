@@ -1,5 +1,40 @@
 [
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM Rito default adult gait contact, native pose controls and floor safety",
+    "run": "python3 -B tests/mm_rito_feet/run_tests.py --sanitize --mode original\npython3 -B tests/mm_rito_feet/run_tests.py --sanitize --mode combo"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM adult model first-person visibility, authored grips and exact sword selection",
+    "run": "python3 -B tests/okayu_presentation/test_mm_adult_renderer.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM adult ocarina framing and native first-person focus",
+    "run": "python3 -B tests/mm_adult_camera/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM Rito airborne held input, transient state and authored animation fallback",
+    "run": "python3 -B tests/mm_rito_flight/run_tests.py\npython3 -B tests/mm_rito_flight/run_animation_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Deku Stick private flame family and native burn behavior in both games",
+    "run": "python3 -B tests/deku_stick_flame/run_tests.py"
+  },
+  {
     "suite": "items",
     "origin": "gate",
     "native_abi": "explicit",

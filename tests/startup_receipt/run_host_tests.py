@@ -22,6 +22,7 @@ def function(source, signature):
 
 host = (ROOT / 'combo/ComboShip.cpp').read_text()
 signatures = (
+    'static void Combo_PrepareStartupReceiptSeed() {',
     'static std::string ComboReleaseMajorMinor(', 'static nlohmann::json& LoadOrCreateContainer(',
     'static bool WriteContainerDocument(', 'static bool FlushContainer(',
     'static const char* Combo_ReadGameSave(', 'static void Combo_WriteGameSave(',

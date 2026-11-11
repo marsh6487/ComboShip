@@ -64,6 +64,9 @@ extern TexturePtr sPlayerMouthTextures[PLAYER_FORM_MAX][PLAYER_MOUTH_MAX];
 // of a custom form (the visual half is the skeleton/eye swap); the collider HEIGHT auto-recomputes from
 // the taller adult body-part positions, so only these scalars need scaling.
 extern PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX];
+// The native override resolves running/NEI empty-hand states into these types.
+extern PlayerModelType sPlayerLeftHandType;
+extern PlayerModelType sPlayerRightHandType;
 
 // NEI custom-item in-hand draw dispatcher (beetle, cane of somaria, ball&chain, ...). In the vanilla
 // path it runs AFTER the skeleton draw (which we skip via the early return), reading the world-space
@@ -154,6 +157,7 @@ static Gfx* sDL_RHOpen;
 static Gfx* sDL_RHClosed;
 static Gfx* sDL_RHShield; // shield raised in hand (Hylian)
 static Gfx* sDL_RHBow;
+static Gfx* sDL_RHSlingshot;
 static Gfx* sDL_RHOcarina;
 static Gfx* sDL_RHHookshot;
 static Gfx* sDL_Waist;
@@ -164,6 +168,12 @@ static Gfx* sDL_SheathBoth;        // sword in scabbard + Hylian shield on back
 static Gfx* sDL_RHMirrorShield;    // Mirror shield raised in hand
 static Gfx* sDL_SheathMirror;      // empty scabbard + Mirror shield on back
 static Gfx* sDL_SheathMirrorSword; // sword in scabbard + Mirror shield on back
+static Gfx* sDL_FPLeftForearm;
+static Gfx* sDL_FPLeftHand;
+static Gfx* sDL_FPRightForearm;
+static Gfx* sDL_FPBow;
+static Gfx* sDL_FPHookshot;
+static Gfx* sDL_FPSlingshot;
 
 // A MOD head mesh binds its own eye/mouth via segments 0x08/0x09 (recomp/Fast64 preserves the vanilla
 // structure). We DISCOVER the mod's eye/mouth textures generically by matching each blink state as a
@@ -245,6 +255,24 @@ static Gfx* AdultLink_LoadDL(const char* otrPath) {
         SPDLOG_WARN("[AdultLink] DL load FAILED: {}", otrPath);
     }
     return dl;
+}
+
+// Optional pose meshes must belong to this rig. Missing mod/form fists and
+// first-person arms must not silently borrow the base OoT body part.
+static Gfx* AdultLink_LoadModelDL(const char* otrPath) {
+    const char* path = std::strncmp(otrPath, "__OTR__", 7) == 0 ? otrPath + 7 : otrPath;
+    if (sIsForm) {
+        const char* symbol = std::strrchr(path, '/');
+        std::string formPath = sRigBase + (symbol != NULL ? symbol + 1 : path);
+        return ResourceMgr_FileExists(formPath.c_str()) ? ResourceMgr_LoadGfxByName(formPath.c_str()) : NULL;
+    }
+    if (sIsMod) {
+        std::string altPath = std::string("alt/") + path;
+        return ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileExists(altPath.c_str())
+                   ? ResourceMgr_LoadGfxByName(altPath.c_str())
+                   : NULL;
+    }
+    return AdultLink_LoadDL(otrPath);
 }
 
 // A form/mode change invalidates every cached model resource; the next draw re-runs the setup with the
@@ -465,6 +493,9 @@ static s32 AdultLink_Setup(void) {
     }
 
     sRigBase = sIsForm ? formRigBase : "";
+    sDL_FPLeftForearm = sDL_FPLeftHand = sDL_FPRightForearm = NULL;
+    sDL_FPBow = sDL_FPHookshot = sDL_FPSlingshot = NULL;
+    sDL_RHSlingshot = NULL;
 
     if (sIsChildRig) {
         // Child rig: MM's own child equipment already fits, so the hand overrides stay off (NULL lets the
@@ -498,11 +529,11 @@ static s32 AdultLink_Setup(void) {
     // Equipment DLs the override swaps in for held weapons (both paths). A mod usually lacks holding
     // variants, so these fall to the oot.o2r base; AdultLink_LoadDL prefers a mod alt/ when present.
     sDL_LHOpen = AdultLink_LoadDL(ALB("gLinkAdultLeftHandNearDL"));
-    sDL_LHClosed = AdultLink_LoadDL(ALB("gLinkAdultLeftHandClosedNearDL"));
+    sDL_LHClosed = AdultLink_LoadModelDL(ALB("gLinkAdultLeftHandClosedNearDL"));
     sDL_LHSword = AdultLink_LoadDL(ALB("gLinkAdultLeftHandHoldingMasterSwordNearDL"));
     sDL_LHBgs = AdultLink_LoadDL(ALB("gLinkAdultLeftHandHoldingBgsNearDL"));
     sDL_RHOpen = AdultLink_LoadDL(ALB("gLinkAdultRightHandNearDL"));
-    sDL_RHClosed = AdultLink_LoadDL(ALB("gLinkAdultRightHandClosedNearDL"));
+    sDL_RHClosed = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandClosedNearDL"));
     sDL_RHShield = AdultLink_LoadDL(ALB("gLinkAdultRightHandHoldingHylianShieldNearDL"));
     sDL_RHBow = AdultLink_LoadDL(ALB("gLinkAdultRightHandHoldingBowNearDL"));
     sDL_RHOcarina = AdultLink_LoadDL(ALB("gLinkAdultRightHandHoldingOotNearDL"));
@@ -515,6 +546,18 @@ static s32 AdultLink_Setup(void) {
     sDL_RHMirrorShield = AdultLink_LoadDL(ALB("gLinkAdultRightHandHoldingMirrorShieldNearDL"));
     sDL_SheathMirror = AdultLink_LoadDL(ALB("gLinkAdultMirrorShieldAndSheathNearDL"));
     sDL_SheathMirrorSword = AdultLink_LoadDL(ALB("gLinkAdultMirrorShieldSwordAndSheathNearDL"));
+    // OoT's names are historical: RightArmOut/RightHandOut are drawn on the
+    // LEFT bones, and LeftArmOut on the RIGHT forearm (native OoT FP mapping).
+    sDL_FPLeftForearm = AdultLink_LoadModelDL(ALB("gLinkAdultRightArmOutNearDL"));
+    sDL_FPLeftHand = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandOutNearDL"));
+    sDL_FPRightForearm = AdultLink_LoadModelDL(ALB("gLinkAdultLeftArmOutNearDL"));
+    sDL_FPBow = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandHoldingBowFirstPersonDL"));
+    sDL_FPHookshot = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandHoldingHookshotFarDL"));
+    // This optional adult-rig alias is distinct from OoT's child stretched arm.
+    if (sIsMod || sIsForm) {
+        sDL_FPSlingshot = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandHoldingSlingshotFirstPersonDL"));
+        sDL_RHSlingshot = AdultLink_LoadModelDL(ALB("gLinkAdultRightHandHoldingSlingshotNearDL"));
+    }
 
     sSkel = skel;
     sReady = 1;
@@ -536,13 +579,7 @@ static void AdultLink_ApplyNeiHeldHand(PlayState* play, Player* player, s32 limb
     }
 }
 
-static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
-    // Snapshot the skeleton's OWN limb DL BEFORE the vanilla override runs. For a mod skeleton these are
-    // the mod's meshes (waist / hands / sword+sheath); for the base they're the deep-patched adult DLs.
-    Gfx* skelDL = *dList;
-    s32 ret = Player_OverrideLimbDrawGameplayDefault(play, limbIndex, dList, pos, rot, actor);
-    Player* p = (Player*)actor;
-
+static void AdultLink_ApplyRootTransform(s32 limbIndex, Vec3f* pos) {
     // A short-legged form (Keaton 0.335) scales the ROOT joint translation so Link's animations sit at
     // the form's hip height — the mesh itself is authored at the right size (soh custom_forms rule).
     if (limbIndex == PLAYER_LIMB_ROOT) {
@@ -556,6 +593,15 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
         }
         pos->y -= CustomForms_RootDropAfter();
     }
+}
+
+static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
+    // Snapshot the skeleton's OWN limb DL BEFORE the vanilla override runs. For a mod skeleton these are
+    // the mod's meshes (waist / hands / sword+sheath); for the base they're the deep-patched adult DLs.
+    Gfx* skelDL = *dList;
+    s32 ret = Player_OverrideLimbDrawGameplayDefault(play, limbIndex, dList, pos, rot, actor);
+    Player* p = (Player*)actor;
+    AdultLink_ApplyRootTransform(limbIndex, pos);
 
     // A form may claim a hand outright (Gerudo's scimitar in BOTH hands) or blank the sheath.
     if (limbIndex == PLAYER_LIMB_LEFT_HAND || limbIndex == PLAYER_LIMB_RIGHT_HAND) {
@@ -589,16 +635,25 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 }
                 break;
             }
-            if (p->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD && sDL_LHSword != NULL) {
+            if (sPlayerLeftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD && p->heldItemId == ITEM_SWORD_MASTER &&
+                p->heldItemAction == PLAYER_IA_SWORD_MASTER && sDL_LHSword != NULL) {
                 *dList = sDL_LHSword;
                 if (!sIsMod)
                     DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_MASTER);
-            } else if (p->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD && sDL_LHBgs != NULL) {
+            } else if (sPlayerLeftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD && p->heldItemId == ITEM_SWORD_BGS &&
+                       !WeaponUpgrade_HasGreatFairy() && sDL_LHBgs != NULL) {
                 *dList = sDL_LHBgs;
                 if (!sIsMod)
                     DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_BGS);
-            } else if (!sIsMod && p->leftHandType == PLAYER_MODELTYPE_LH_CLOSED && sDL_LHClosed != NULL) {
+            } else if ((sPlayerLeftHandType == PLAYER_MODELTYPE_LH_CLOSED ||
+                        (p->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD &&
+                         (p->heldItemId == ITEM_NET || BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn()))) &&
+                       sDL_LHClosed != NULL) {
                 *dList = sDL_LHClosed;
+            } else if (sPlayerLeftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
+                       sPlayerLeftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD) {
+                // Keep the native exact equipped/NEI choice as fallback. The
+                // shared resolver below composes that sword with this rig's fist.
             } else {
                 *dList = skelDL; // open / bottle / mod hand -> the skeleton's own hand
             }
@@ -611,7 +666,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 }
                 break;
             }
-            if (p->rightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
+            if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
                 // Draw whichever shield is EQUIPPED in hand, not always Hylian.
                 if (p->currentShield == PLAYER_SHIELD_MIRROR_SHIELD && sDL_RHMirrorShield != NULL) {
                     *dList = sDL_RHMirrorShield;
@@ -620,13 +675,16 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 } else {
                     *dList = skelDL;
                 }
-            } else if (p->rightHandType == PLAYER_MODELTYPE_RH_BOW && sDL_RHBow != NULL) {
+            } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_BOW && p->heldItemAction == PLAYER_IA_SLINGSHOT) {
+                if (sDL_RHSlingshot != NULL)
+                    *dList = sDL_RHSlingshot;
+            } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_BOW && sDL_RHBow != NULL) {
                 *dList = sDL_RHBow;
-            } else if (p->rightHandType == PLAYER_MODELTYPE_RH_INSTRUMENT && sDL_RHOcarina != NULL) {
+            } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_INSTRUMENT && sDL_RHOcarina != NULL) {
                 *dList = sDL_RHOcarina;
-            } else if (p->rightHandType == PLAYER_MODELTYPE_RH_HOOKSHOT && sDL_RHHookshot != NULL) {
+            } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_HOOKSHOT && sDL_RHHookshot != NULL) {
                 *dList = sDL_RHHookshot;
-            } else if (!sIsMod && p->rightHandType == PLAYER_MODELTYPE_RH_CLOSED && sDL_RHClosed != NULL) {
+            } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_CLOSED && sDL_RHClosed != NULL) {
                 *dList = sDL_RHClosed;
             } else {
                 *dList = skelDL;
@@ -665,15 +723,15 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             }
             break;
     }
-    if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && (!sIsMod || FourSword_IsEquipped()) && !sIsForm &&
-        !sIsChildRig && CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f &&
-        !ExtEquip_ShouldHideSwordDL() && !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
+    if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && !sIsForm && !sIsChildRig &&
+        CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f && !ExtEquip_ShouldHideSwordDL() &&
+        !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
         Gfx* heldSword = *dList;
         u8 goldenArmor = Trident_GoldenArmor();
-        if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, sDL_LHClosed, p,
-                                           goldenArmor ? 255 : (u8)CVarGetInteger("gAdultLink.TunicR", 30),
-                                           goldenArmor ? 205 : (u8)CVarGetInteger("gAdultLink.TunicG", 105),
-                                           goldenArmor ? 40 : (u8)CVarGetInteger("gAdultLink.TunicB", 27))) {
+        auto applySword = sIsMod ? WeaponUpgrade_ApplyHeldSwordDLForModel : WeaponUpgrade_ApplyHeldSwordDL;
+        if (applySword(&heldSword, sDL_LHClosed, p, goldenArmor ? 255 : (u8)CVarGetInteger("gAdultLink.TunicR", 30),
+                       goldenArmor ? 205 : (u8)CVarGetInteger("gAdultLink.TunicG", 105),
+                       goldenArmor ? 40 : (u8)CVarGetInteger("gAdultLink.TunicB", 27))) {
             // The helper's staging list is shared; the skeleton's deferred draw owns this copy.
             Gfx* frameSword = static_cast<Gfx*>(GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx)));
             std::memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
@@ -684,16 +742,62 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
     if (*dList != NULL) {
         Gfx* dinHand = NULL;
         if (limbIndex == PLAYER_LIMB_LEFT_HAND)
-            dinHand = static_cast<Gfx*>(DinFireSword_HandDL(play, p, sIsMod ? skelDL : sDL_LHClosed));
+            dinHand = static_cast<Gfx*>(DinFireSword_HandDL(play, p, sDL_LHClosed != NULL ? sDL_LHClosed : skelDL));
         else if (limbIndex == PLAYER_LIMB_RIGHT_HAND)
-            dinHand = static_cast<Gfx*>(DinFireShield_HandDL(play, p, sIsMod ? skelDL : sDL_RHClosed));
+            dinHand = static_cast<Gfx*>(DinFireShield_HandDL(play, p, sDL_RHClosed != NULL ? sDL_RHClosed : skelDL));
         if (dinHand != NULL)
             *dList = dinHand;
     }
-    AdultLink_ApplyNeiHeldHand(
-        play, p, limbIndex, dList,
-        (sIsMod || sIsChildRig) ? skelDL : (limbIndex == PLAYER_LIMB_LEFT_HAND ? sDL_LHClosed : sDL_RHClosed));
+    AdultLink_ApplyNeiHeldHand(play, p, limbIndex, dList,
+                               sIsChildRig ? skelDL
+                                           : (limbIndex == PLAYER_LIMB_LEFT_HAND
+                                                  ? (sDL_LHClosed != NULL ? sDL_LHClosed : skelDL)
+                                                  : (sDL_RHClosed != NULL ? sDL_RHClosed : skelDL)));
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
+    return ret;
+}
+
+static s32 AdultLink_OverrideFirstPerson(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
+                                         Actor* actor) {
+    Gfx* skelDL = *dList;
+    Player* p = (Player*)actor;
+    // Native Common still runs once: it writes body-part positions, root/aim
+    // transforms and hand state even for hidden geometry. Never restore body
+    // limbs after the native FP visibility decision.
+    s32 ret = Player_OverrideLimbDrawGameplayFirstPerson(play, limbIndex, dList, pos, rot, actor);
+    AdultLink_ApplyRootTransform(limbIndex, pos);
+    if (sIsChildRig || p->unk_AA5 != PLAYER_UNKAA5_3)
+        return ret;
+    Gfx* weaponDL = sDL_FPBow;
+    if (Player_IsHoldingHookshot(p))
+        weaponDL = sDL_FPHookshot;
+    else if (p->heldItemAction == PLAYER_IA_SLINGSHOT)
+        weaponDL = sDL_FPSlingshot;
+
+    switch (limbIndex) {
+        case PLAYER_LIMB_LEFT_FOREARM:
+            *dList = sDL_FPLeftForearm != NULL ? sDL_FPLeftForearm : skelDL;
+            break;
+        case PLAYER_LIMB_LEFT_HAND:
+            *dList = sDL_FPLeftHand != NULL ? sDL_FPLeftHand : (sDL_LHClosed != NULL ? sDL_LHClosed : skelDL);
+            break;
+        case PLAYER_LIMB_RIGHT_SHOULDER:
+            *dList = skelDL;
+            break;
+        case PLAYER_LIMB_RIGHT_FOREARM:
+            // The adult OoT FP hand composites use a separate forearm, unlike
+            // MM's stretched child arm. Only show the matching authored part.
+            if (weaponDL != NULL)
+                *dList = sDL_FPRightForearm;
+            break;
+        case PLAYER_LIMB_RIGHT_HAND:
+            if (weaponDL != NULL)
+                *dList = weaponDL;
+            AdultLink_ApplyNeiHeldHand(play, p, limbIndex, dList, sDL_RHClosed != NULL ? sDL_RHClosed : skelDL);
+            break;
+        default:
+            break;
+    }
     return ret;
 }
 
@@ -936,8 +1040,18 @@ extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
 
     // Draw through the real engine path so held items / trails / colliders all work; our override
     // supplies adult equipment DLs. Feed MM's OWN jointTable (identical 21-limb hierarchy) 1:1.
+    OverrideLimbDrawFlex overrideLimbDraw = AdultLink_OverrideLimb;
+    // Match Player_Draw's native camera-plane predicate, including transitions
+    // into/out of aim. The camera's projection, rather than item ID alone,
+    // decides whether a full body would cover the view.
+    if (player->stateFlags1 & PLAYER_STATE1_100000) {
+        Vec3f focus;
+        SkinMatrix_Vec3fMtxFMultXYZ(&play->viewProjectionMtxF, &player->actor.focus.pos, &focus);
+        if (focus.z < -4.0f)
+            overrideLimbDraw = AdultLink_OverrideFirstPerson;
+    }
     Player_DrawImpl(play, sSkel->sh.segment, player->skelAnime.jointTable, sSkel->dListCount, 0, PLAYER_FORM_HUMAN,
-                    player->currentBoots, player->actor.shape.face, AdultLink_OverrideLimb, AdultLink_PostLimb,
+                    player->currentBoots, player->actor.shape.face, overrideLimbDraw, AdultLink_PostLimb,
                     &player->actor);
 
     for (int i = 0; i < PLAYER_EYES_MAX; i++) {

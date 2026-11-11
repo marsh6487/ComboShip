@@ -1,8 +1,8 @@
 /**
  * rito_flight.inc.c — the Rito form's flight mode.
  *
- * Text-included at the END of mm_player_form.cpp (same arrangement as
- * gerudo_mhr_combat.inc.c), so it sees gFormState without exporting it.
+ * Text-included by form_rito.cpp alongside rito_bow.inc.c, so both controllers
+ * share their flight and bow state in the native MM translation unit.
  *
  * THE MOVE
  *   press A            -> an updraft starts charging under the rito (wind builds)
@@ -295,13 +295,9 @@ static s32 MmRitoAdvance(PlayState* play, Player* player) {
     return PlayerAnimation_Update(play, &player->skelAnime);
 }
 
-extern "C" void MmRitoResetFlight(void) {
-    MmRitoRestoreLanding();
-    if (gPlayState != NULL) {
-        // The controller's own teardown never runs once the form is gone, so the
-        // ribbons have to be killed from here or they outlive the transformation.
-        MmRitoWindTrailsOff(gPlayState);
-    }
+// Clear only controller state: resource headers outlive a play arena, while the
+// arena's actors/effects must be forgotten without touching their old addresses.
+static void MmRitoClearFlightState(void) {
     sRito.state = RITO_FLY_OFF;
     sRito.charge = 0;
     sRito.boost = 0;
@@ -311,6 +307,16 @@ extern "C" void MmRitoResetFlight(void) {
     sRito.timer = 0;
     sRito.yaw = 0;
     sRito.flyAction = NULL;
+}
+
+extern "C" void MmRitoResetFlight(void) {
+    MmRitoRestoreLanding();
+    if (gPlayState != NULL) {
+        // The controller's own teardown never runs once the form is gone, so the
+        // ribbons have to be killed from here or they outlive the transformation.
+        MmRitoWindTrailsOff(gPlayState);
+    }
+    MmRitoClearFlightState();
 }
 
 // Roc's Feather / Roc's Cape in mid-air: a rito may use them as many times as it
@@ -592,7 +598,7 @@ static void MmRitoEnterAir(PlayState* play, Player* player) {
     // vanilla's runs while the flight owns Link (Trident_FlyEnter's opening).
     Player_SetAction(play, player, Player_Action_Idle, 0);
     sRito.flyAction = player->actionFunc;
-    player->actor.bgCheckFlags &= ~1; // leave the ground this frame
+    player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND; // leave the ground this frame
     player->stateFlags3 |= PLAYER_STATE3_MIDAIR;
     player->stateFlags1 |= PLAYER_STATE1_JUMPING;
     Camera_ChangeMode(GET_ACTIVE_CAM(play), CAM_MODE_JUMP);
@@ -825,11 +831,18 @@ static u8 MmRitoFlightUpdate(Player* player, PlayState* play) {
             break;
     }
 
-    // Idle: A starts the charge on the ground, or grabs flight straight away in the air.
-    if (!CHECK_BTN_ALL(input->press.button, BTN_A) || (player->stateFlags1 & PLAYER_STATE1_IN_CUTSCENE)) {
+    // A held while walking off a ledge must catch the glide too: the original
+    // press is already spent by then. MM clears GROUND both for no raycast hit
+    // (BGCHECK_Y_MIN) and for a floor too far below to support the actor. A valid
+    // floor somewhere below therefore must not prevent flight. Ground charging
+    // still needs a fresh press, and the HOP release/repress guard above is kept.
+    if (player->stateFlags1 & PLAYER_STATE1_IN_CUTSCENE) {
         return 0;
     }
     if (Forms_OnGround(player)) {
+        if (!CHECK_BTN_ALL(input->press.button, BTN_A)) {
+            return 0;
+        }
         if ((sRito.charge_ == NULL) || (fabsf(player->speedXZ) > 1.0f)) {
             return 0; // moving: leave the roll/hop path alone
         }
@@ -841,7 +854,7 @@ static u8 MmRitoFlightUpdate(Player* player, PlayState* play) {
         MmRitoPlay(play, player, sRito.charge_, 1, 1.0f); // already a wait loop
         return 1;
     }
-    if (sRito.fly != NULL) { // gliding is free — holding A is the whole cost
+    if (aHeld && (sRito.fly != NULL)) { // gliding is free — holding A is the whole cost
         MmRitoEnterAir(play, player);
         sRito.state = RITO_FLY_GLIDE;
         MmRitoPlay(play, player, sRito.fly, 1, 1.0f);

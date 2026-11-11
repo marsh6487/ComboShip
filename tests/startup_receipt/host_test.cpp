@@ -31,6 +31,8 @@ static int32_t FinishMm(CwStartupReceipt* receipt);
 static CwFinishMmStartupReceipt MM_FinishStartupReceipt = FinishMm;
 static int32_t CaptureOot(int32_t slot);
 static int32_t (*SOH_CaptureStartupReceiptSave)(int32_t) = CaptureOot;
+static std::string g_ConsolidatedJson;
+static auto SOH_LoadComboRando = +[](const char*) {};
 /* HOST_FUNCTIONS */
 
 static json mmLive, ootLive;

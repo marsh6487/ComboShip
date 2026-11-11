@@ -39,6 +39,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "overlays/actors/ovl_En_Fish/z_en_fish.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
+#include "overlays/effects/ovl_Effect_Ss_Dust/z_eff_ss_dust.h"
 #include "overlays/effects/ovl_Effect_Ss_Fhg_Flash/z_eff_ss_fhg_flash.h"
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -13507,8 +13508,8 @@ void Player_UpdateBurningDekuStick(PlayState* play, Player* this) {
         this->unk_85C = temp;
     }
 
-    func_8002836C(play, &this->meleeWeaponInfo[0].tip, &D_808547A4, &D_808547B0, &D_808547BC, &D_808547C0,
-                  temp * 200.0f, 0, 8);
+    EffectSsDust_Spawn(play, 0 | EFFECT_SS_DUST_DRAW_DEKU_STICK_FLAME, &this->meleeWeaponInfo[0].tip, &D_808547A4,
+                       &D_808547B0, &D_808547BC, &D_808547C0, temp * 200.0f, 0, 8, 0);
 }
 
 void Player_UpdateBodyShock(PlayState* play, Player* this) {

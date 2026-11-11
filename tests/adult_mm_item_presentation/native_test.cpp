@@ -378,8 +378,8 @@ static void NativeControls() {
     Camera_Demo2(&nativeChest);
     Expect(chest.at.y, nativeChest.at.y, "control chest camera at");
   }
-  // Even an eligible adult keeps all other camera settings and peer framing
-  // native.
+  // Peer framing remains native; local ITEM1 now has its own adult ocarina
+  // regression coverage in tests/mm_adult_camera.
   for (bool peerActor : {false, true})
     for (s16 setting : {CAM_SET_ITEM0, CAM_SET_ITEM1}) {
       Reset();
@@ -388,7 +388,7 @@ static void NativeControls() {
         peer = player;
         c.focalActor = &peer.actor;
       }
-      if (!peerActor && setting == CAM_SET_ITEM0)
+      if (!peerActor)
         continue;
       Camera_KeepOn4(&c);
       mode = 0;

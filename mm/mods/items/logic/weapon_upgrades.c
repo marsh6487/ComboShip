@@ -140,7 +140,34 @@ static IKAxePropState* IKAxe_PropSlot(Actor* actor) {
 
 // Exact reviewed GI geometry in the native human/adult hand frame. The donor
 // mesh graph is atomic; all modelview changes live in balanced resource pushes.
-u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG, u8 bodyEnvB) {
+// With an explicit model fist, the generic adult Master/BGS hand alias belongs
+// to the body rig, not every sword in that hand. Keep explicit weapon overrides
+// authoritative without letting that physical alias turn Kokiri into Master.
+static u8 WeaponUpgrade_ModelSwordSelected(int model) {
+    const u8 twoHand = model == NEI_HELD_SWORD_BIGGORON || model == NEI_HELD_SWORD_GREAT_FAIRY;
+    const char* custom = model == NEI_HELD_SWORD_MASTER || model == NEI_HELD_SWORD_TRUE_MASTER
+                             ? "__OTR__objects/object_custom_equip/gCustomMasterSwordDL"
+                         : twoHand ? "__OTR__objects/object_custom_equip/gCustomLongswordDL"
+                                   : "__OTR__objects/object_custom_equip/gCustomKokiriSwordDL";
+    if (NeiHeldSword_SelectedResource("oot", custom))
+        return 1;
+    // These base identities actually match the adult combined-hand aliases.
+    // Preserve a selected native Master/BGS weapon just as the old caller did.
+    if ((model == NEI_HELD_SWORD_MASTER || model == NEI_HELD_SWORD_BIGGORON) &&
+        NeiHeldSword_EquipmentSelected(model, NEI_HELD_SWORD_OOT_ADULT))
+        return 1;
+    const char* native =
+        model == NEI_HELD_SWORD_MM_KOKIRI ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingKokiriSwordDL"
+        : model == NEI_HELD_SWORD_RAZOR   ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingRazorSwordDL"
+        : model == NEI_HELD_SWORD_GILDED  ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGildedSwordDL"
+        : model == NEI_HELD_SWORD_GREAT_FAIRY
+            ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGreatFairysSwordDL"
+            : NULL;
+    return native != NULL && NeiHeldSword_SelectedResource("mm", native);
+}
+
+static u8 WeaponUpgrade_ApplyHeldSwordDLImpl(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG,
+                                             u8 bodyEnvB, u8 modelHand) {
     extern void* MmAssets_LoadResource(const char* path);
     extern s32 CVarGetInteger(const char* name, s32 defaultValue);
     extern u8 Player_IsCustomLinkModel(Player * player);
@@ -158,7 +185,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         return 0;
     }
     const u8 fourEquipped = FourSword_IsEquipped();
-    if (player->transformation != PLAYER_FORM_HUMAN || (!fourEquipped && Player_IsCustomLinkModel(player)) ||
+    if (player->transformation != PLAYER_FORM_HUMAN ||
+        (!modelHand && !fourEquipped && Player_IsCustomLinkModel(player)) ||
         (player->leftHandType != PLAYER_MODELTYPE_LH_ONE_HAND_SWORD &&
          player->leftHandType != PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
         return 0;
@@ -197,7 +225,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         auraModel = model;
     // A selected native/Din sword does not own the separate Four Sword item.
     // Its getter still preserves a mod of the actual Four Sword blade/hilt.
-    if (!fourEquipped && model >= 0 && NeiHeldSword_EquipmentSelected(model, frame))
+    if (!fourEquipped && model >= 0 &&
+        (modelHand ? WeaponUpgrade_ModelSwordSelected(model) : NeiHeldSword_EquipmentSelected(model, frame)))
         return 0;
     if (!fourEquipped && frame == NEI_HELD_SWORD_MM_HUMAN &&
         player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD) {
@@ -282,6 +311,15 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     *dList = sCompound;
     DinFireSword_SetHandModel(player, sCompound, auraModel);
     return 1;
+}
+
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG, u8 bodyEnvB) {
+    return WeaponUpgrade_ApplyHeldSwordDLImpl(dList, ootHand, player, bodyEnvR, bodyEnvG, bodyEnvB, 0);
+}
+
+u8 WeaponUpgrade_ApplyHeldSwordDLForModel(Gfx** dList, void* modelHand, Player* player, u8 bodyEnvR, u8 bodyEnvG,
+                                          u8 bodyEnvB) {
+    return WeaponUpgrade_ApplyHeldSwordDLImpl(dList, modelHand, player, bodyEnvR, bodyEnvG, bodyEnvB, 1);
 }
 
 u8 WeaponUpgrade_IKAxeStrike(Actor* actor, PlayState* play, u8 hitsNeeded, f32 range) {
