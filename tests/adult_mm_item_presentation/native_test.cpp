@@ -3,6 +3,7 @@
 #include "mods/forms/custom_forms.h"
 #include "mods/items/logic/adult_link_render.h"
 #include "variables.h"
+#include "combo/render/DinsFireTiming.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -26,6 +27,8 @@ static s32 mode = 1, form = CUSTOM_FORM_NONE;
 static f32 modelScale = .01f, modelYOffset = 0;
 static bool mario = false, wolf = false;
 static int rewards, kills, offers, nativeDraws, adultDraws, collisions;
+static int chargeDraws, chargeAdultDraws, chargeItemDraws;
+static float chargePhase;
 static f32 callbackScale;
 Vec3f D_801EDDD0{}, D_801EDDE0{}, D_801EDDF0{};
 extern "C" {
@@ -46,6 +49,8 @@ void AdultLink_Draw(PlayState *, Player *) { ++adultDraws; }
 void Player_DrawGetItem(PlayState *, Player *) { ++nativeDraws; }
 void DinFireSword_BeginPlayerDraw(PlayState *, Player *) {}
 void DinFireSword_DrawAfterPlayer(PlayState *, Player *) {}
+// Only the action identity is used by the extracted charge draw gate.
+void Player_Action_OotMagicSpell(Player *, PlayState *) { assert(false); }
 void Actor_SetScale(Actor *a, f32 scale) { a->scale = {scale, scale, scale}; }
 void Actor_Kill(Actor *) { ++kills; }
 s32 Actor_HasParent(Actor *a, PlayState *) { return a->parent != nullptr; }
@@ -100,6 +105,18 @@ f32 BgCheck_CameraRaycastFloor2(CollisionContext *, CollisionPoly **, s32 *,
   return BGCHECK_Y_MIN;
 }
 }
+// Controlled renderer boundary with the production signature from DinsFireRemakeDraw.h.
+// The extracted production helper decides whether, when and for whom to submit.
+static inline int CwDinsFireRemake_DrawNativeCharge(PlayState *sourcePlay,
+                                                  Player *sourcePlayer,
+                                                  float phaseSeconds) {
+  assert(sourcePlay == &play && sourcePlayer == &player);
+  ++chargeDraws;
+  chargeAdultDraws = adultDraws;
+  chargeItemDraws = nativeDraws;
+  chargePhase = phaseSeconds;
+  return 1;
+}
 static void Reward(EnItem00 *, PlayState *) { ++rewards; }
 /* PRODUCTION */
 static bool Near(float a, float b) { return fabsf(a - b) < .003f; }
@@ -134,6 +151,10 @@ static void Reset() {
   modelYOffset = 0;
   mario = wolf = false;
   rewards = kills = offers = nativeDraws = adultDraws = collisions = 0;
+  chargeDraws = chargeAdultDraws = chargeItemDraws = 0;
+  chargePhase = -1;
+  sDinsFireRemakeCast = false;
+  sDinsFireRemakeCastTicks = 0;
 }
 static EnItem00 Receipt(int flags) {
   EnItem00 item{};
@@ -394,6 +415,54 @@ static void NativeControls() {
   }
 #endif
 }
+static void ChargeDrawOwnership() {
+  // Removing the adult branch's charge call, shifting its release cutoff or
+  // forwarding the wrong phase must fail while adult/GI drawing stays intact.
+  struct ChargeFrame {
+    s16 ticks;
+    int draws;
+    float seconds;
+  };
+  for (const auto frame : {ChargeFrame{0, 1, 0.f}, {10, 1, .5f},
+                           {11, 1, .55f}, {12, 1, .6f}, {20, 1, 1.f},
+                           {21, 0, -1.f}, {27, 0, -1.f}}) {
+    Reset();
+    player.actionFunc = Player_Action_OotMagicSpell;
+    player.getItemDrawIdPlusOne = 2;
+    sDinsFireRemakeCast = true;
+    sDinsFireRemakeCastTicks = frame.ticks;
+    DrawAdultBranch(&play, &player);
+    assert(adultDraws == 1 && nativeDraws == 1);
+    assert(chargeDraws == frame.draws);
+    Expect(chargePhase, frame.seconds, "native charge phase");
+    if (frame.draws)
+      assert(chargeAdultDraws == 1 && chargeItemDraws == 1);
+  }
+  enum Gate { InactiveCast, OtherAction, HiddenPlayer, PeerPlayer,
+              DisabledAdult, UnreadyAdult };
+  for (auto gate : {InactiveCast, OtherAction, HiddenPlayer, PeerPlayer,
+                    DisabledAdult, UnreadyAdult}) {
+    Reset();
+    player.actionFunc = Player_Action_OotMagicSpell;
+    player.getItemDrawIdPlusOne = 2;
+    sDinsFireRemakeCast = true;
+    sDinsFireRemakeCastTicks = 10;
+    Player *drawPlayer = &player;
+    switch (gate) {
+    case InactiveCast: sDinsFireRemakeCast = false; break;
+    case OtherAction: player.actionFunc = nullptr; break;
+    case HiddenPlayer: player.stateFlags2 |= PLAYER_STATE2_20000000; break;
+    case PeerPlayer: peer = player; drawPlayer = &peer; break;
+    case DisabledAdult: mode = 0; break;
+    case UnreadyAdult: sReady = 0; break;
+    }
+    DrawAdultBranch(&play, drawPlayer);
+    const bool ownsBranch = gate != DisabledAdult && gate != UnreadyAdult;
+    assert(adultDraws == ownsBranch);
+    assert(nativeDraws == (ownsBranch && gate != PeerPlayer));
+    assert(chargeDraws == 0 && chargePhase == -1);
+  }
+}
 int main(int argc, char **argv) {
   assert(argc == 2);
   Reset();
@@ -402,6 +471,8 @@ int main(int argc, char **argv) {
     Scaled();
   if (test == "scope")
     NativeControls();
+  if (test == "charge")
+    ChargeDrawOwnership();
   if (test == "controls") {
     Held(false);
     Reset();

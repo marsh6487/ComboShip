@@ -48,6 +48,10 @@ def main():
         parser.error("--archive-only requires --archive/--build-starter and cannot select parser-only")
     candidates = [*args.dependency_root]
     candidates += [Path(p) for p in os.environ.get("DINS_AUDIO_DEPENDENCY_ROOTS", "").split(os.pathsep) if p]
+    # The shared CI setup prepares these real headers for regression fixtures.
+    # Gate-origin tasks do not inherit the NEI umbrella's CPATH assignment.
+    candidates += [Path(p) for variable in ("CPATH", "CPLUS_INCLUDE_PATH", "COMBO_NEI_FIXTURE_CPATH")
+                   for p in os.environ.get(variable, "").split(os.pathsep) if p]
     candidates += [ROOT.parent / "dins_audio_native_dependencies", ROOT / "deps", Path("/usr/include"), Path("/usr/local/include")]
     candidates += [p.parents[1] for p in sorted(ROOT.parents[1].glob("*/deps/nlohmann/json.hpp"))]
     includes = [ROOT, ROOT / "libultraship/include", *[p for p in candidates if p.is_dir()]]

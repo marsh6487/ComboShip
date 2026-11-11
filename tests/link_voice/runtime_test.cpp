@@ -4,6 +4,9 @@
 #include "mods/forms/custom_forms.h"
 #include "mods/items/logic/adult_link_render.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#define CW_DINS_HOST_MM
+#include "combo/audio/DinsFireSfx.h"
+#undef CW_DINS_HOST_MM
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <fstream>
 #include <iterator>
@@ -98,6 +101,10 @@ bool WolfLinkHost_PlayClimbVoice(Player* p,u16 id) { return false; }
 // Headless native synth/scheduler boundaries. The production buffer routine must
 // call LinkVoice_MixInto itself; removing that seam makes the PCM comparison fail.
 AudioContext gAudioCtx;
+static s16* synthOutput;
+static u32 synthFrames;
+static unsigned dinsMixCalls;
+static bool wolfMixed;
 void AudioLoad_DecreaseSampleDmaTtls() {}
 void AudioLoad_ProcessLoads(s32 resetStatus) {}
 void AudioLoad_ProcessScriptLoads() {}
@@ -107,12 +114,21 @@ s32 osRecvMesg(OSMesgQueue* queue,OSMesg* message,s32 flags) { return -1; }
 void AudioThread_ProcessCmds(u32 message) {}
 s32 AudioThread_ScheduleProcessCmds() { return 0; }
 Acmd* AudioSynth_Update(Acmd* commands,s32* written,s16* output,s32 frames) {
+    synthOutput=output;synthFrames=frames;wolfMixed=false;
     *written=0;std::fill_n(output,frames*2,0);return commands;
 }
 void Sm64Audio_MixInto(int16_t* output,uint32_t frames) {}
 void StasisSfx_MixInto(s16* output,u32 frames) {}
 void HourglassSfx_MixInto(s16* output,u32 frames) {}
-void MM_WolfLinkSfx_MixInto(s16* output,u32 frames) {}
+void MM_WolfLinkSfx_MixInto(s16* output,u32 frames) { wolfMixed=true; }
+// Din's Fire is idle in these voice-only cases. Use the real host bridge ABI,
+// and verify the extracted production routine passes stereo frames through the
+// established Wolf -> Din's Fire -> Link voice pipeline without altering PCM.
+extern "C" void DinsFireSfx_MixInto(int16_t* output,uint32_t frames) {
+    assert(output==synthOutput && frames==synthFrames && wolfMixed);
+    for(u32 i=0;i<frames*2;++i)assert(output[i]==0); // Link voice must mix afterwards.
+    ++dinsMixCalls;
+}
 u32 osGetCount() { return 0; }
 #include "audio_mix.inc"
 static void Flush() {
@@ -229,7 +245,9 @@ int main(int argc,char** argv) {
             const auto& selected=banks[adult][action][index];
             const unsigned frames=std::min<size_t>(selected.size(),4096);
             std::vector<int16_t> output(frames*2);
+            const auto dinsCallsBefore=dinsMixCalls;
             AudioMgr_CreateNextAudioBuffer(output.data(),frames);
+            assert(dinsMixCalls==dinsCallsBefore+1);
             for(unsigned i=0;i<frames;++i)assert(output[i*2]==selected[i] && output[i*2+1]==selected[i]);
         }
     }

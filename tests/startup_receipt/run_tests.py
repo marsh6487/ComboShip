@@ -15,7 +15,8 @@ parser.add_argument('--native', action='store_true', help='Also compile both ful
 parser.add_argument('--json-include', default=os.environ.get('NLOHMANN_JSON_INCLUDE', '/usr/include'))
 args = parser.parse_args()
 env = dict(os.environ)
-env['CPLUS_INCLUDE_PATH'] = args.json_include + os.pathsep + env.get('CPLUS_INCLUDE_PATH', '')
+# JSON consumers below receive an explicit -I argument. Prepending a system
+# root to CPLUS_INCLUDE_PATH reorders GCC's include_next search for stdlib.h.
 if args.sanitize:
     # LeakSanitizer is unsupported by the managed ptrace runtime; address and
     # undefined-behavior checks remain enabled in the state/host/MM fixtures.

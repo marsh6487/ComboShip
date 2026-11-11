@@ -32,6 +32,7 @@ static bool missing;
 static int alt;
 static unsigned spawns;
 static bool hasFloor = true;
+static bool playerInCsMode;
 static Vec3f lastFloorProbe;
 static Actor spawned;
 static unsigned skeletonDraws;
@@ -191,7 +192,7 @@ GameState* gGameState;
 int gComboGameMode;
 int gComboVanillaMode = 0;
 bool Player_InCsMode(PlayState*) {
-    return false;
+    return playerInCsMode;
 }
 f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** poly, s32*, Actor*, Vec3f* probe) {
     static CollisionPoly floor;
@@ -456,6 +457,31 @@ int main() {
     SpawnForestSaria();
     CHECK(spawns == 0 && !sSpawnAttempted);
     play.roomCtx.curRoom.segment = reinterpret_cast<void*>(1);
+    // Before-draw forest readiness requires a live player, even after the
+    // room has loaded. A missing player must not consume the visit attempt.
+    auto expectUnsafeForestBlocked = [&] {
+        SpawnForestSaria();
+        SpawnForestEpona();
+        CHECK(spawns == 0 && !sSpawnAttempted && !sHorseSpawnAttempted);
+    };
+    expectUnsafeForestBlocked();
+    static Player player;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].length = 1;
+    player.stateFlags1 = PLAYER_STATE1_DEAD;
+    expectUnsafeForestBlocked();
+    player.stateFlags1 = 0;
+    play.gameOverCtx.state = GAMEOVER_DEATH_START;
+    expectUnsafeForestBlocked();
+    play.gameOverCtx.state = GAMEOVER_INACTIVE;
+    play.transitionTrigger = TRANS_TRIGGER_START;
+    expectUnsafeForestBlocked();
+    play.transitionTrigger = 7;
+    expectUnsafeForestBlocked();
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
+    expectUnsafeForestBlocked();
+    play.transitionMode = TRANS_MODE_OFF;
     Actor authored{};
     authored.id = ACTOR_EN_VIEWER;
     authored.params = 0x7F13;
@@ -469,6 +495,12 @@ int main() {
     CHECK(spawns == 0 && sSpawnAttempted);
     sSpawnAttempted = false;
     hasFloor = true;
+    // Loaded scenery appears during an incoming fade and entrance walk,
+    // without waiting for the player-control boundary to become ready.
+    play.transitionTrigger = TRANS_TRIGGER_END;
+    play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
+    player.stateFlags1 = PLAYER_STATE1_20000000;
+    playerInCsMode = true;
     SpawnForestSaria();
     SpawnForestSaria();
     CHECK(spawns == 1 && spawned.id == ACTOR_EN_VIEWER && spawned.params == 0x7F13 && spawned.world.pos.y == 42);
@@ -486,6 +518,10 @@ int main() {
     // Keep the 226-unit portal arrival clear even with the closer flank marks.
     CHECK(std::hypot(spawned.world.pos.x + 486.0f, spawned.world.pos.z + 227.0f) > 120.0f);
     CHECK(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    play.transitionMode = TRANS_MODE_OFF;
+    player.stateFlags1 = 0;
+    playerInCsMode = false;
 
     // Seated scenery never grants; only the dedicated Termina Field gift does.
     Actor seated{};
@@ -597,6 +633,15 @@ int main() {
         ComboSaria_Destroy(&gift, &play);
     }
     sSpawnAttempted = false;
+    // The fixed Termina Field gift retains its control-ready timing.
+    playerInCsMode = true;
+    SpawnForestSaria();
+    CHECK(spawns == 1 && !sSpawnAttempted);
+    playerInCsMode = false;
+    play.transitionTrigger = TRANS_TRIGGER_END;
+    SpawnForestSaria();
+    CHECK(spawns == 1 && !sSpawnAttempted);
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
     SpawnForestSaria();
     CHECK(spawns == 2 && spawned.params == 0x7E33);
     // cor's Termina Field export: preserve the seated height and native
@@ -696,6 +741,10 @@ int main() {
     authored.world.pos = { portal.x + 100, portal.y, portal.z + 70 };
     play.actorCtx.actorLists[ACTORCAT_NPC].first = &authored;
     SaveContext beforeHorseSave = gSaveContext;
+    play.transitionTrigger = TRANS_TRIGGER_END;
+    play.transitionMode = TRANS_MODE_INSTANCE_RUNNING;
+    player.stateFlags1 = PLAYER_STATE1_20000000;
+    playerInCsMode = true;
     SpawnForestEpona();
     SpawnForestEpona();
     CHECK(spawns == beforeHorse + 1 && spawned.id == ACTOR_EN_HORSE && spawned.params == COMBO_FOREST_EPONA_PARAMS);
@@ -704,6 +753,10 @@ int main() {
     CHECK(std::fabs(dx * std::sin(portalAngle) + dz * std::cos(portalAngle) - 120) < .01);
     CHECK(spawned.world.pos.y == 42);
     CHECK(spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play));
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    play.transitionMode = TRANS_MODE_OFF;
+    player.stateFlags1 = 0;
+    playerInCsMode = false;
     // Moving Saria to the opposite flank flips the horse's automatic side.
     authored.world.pos = { portal.x + 130 * std::cos(portalAngle), portal.y, portal.z - 130 * std::sin(portalAngle) };
     sHorseSpawnAttempted = false;
@@ -810,7 +863,9 @@ int main() {
          "once per native file");
     puts("PASS MM Saria lifecycle: missing donor, independent blink, fixed placement/yaw, collider/talk, Alt "
          "rebind/frame preservation, failure cleanup and exactly-once release");
-    puts("PASS Saria spawn guards: combined exploration/room zero only; cutscene, solo MM, pause, inactive play and "
+    puts("PASS forest appearance readiness: live player required; incoming fade/entrance walk allowed once; "
+         "death, game-over, departures and unknown transitions excluded; field gift still waits for control");
+    puts("PASS Saria spawn guards: exploration/room zero only; cutscene, unrelated solo MM, pause, inactive play and "
          "missing floor excluded; authored placement wins; single spawn; no save writes");
     puts("PASS hands-behind-back default and custom waiting blink: open, half, closed, open head selection across the "
          "full native blink cycle");
@@ -820,5 +875,5 @@ int main() {
     puts("PASS all Saria poses and song variants: green NEI twinkle particles, follow authored placements, "
          "pause/distance guards");
     puts("PASS portal Epona placement: opposite Saria in portal coordinates, clear approach, floor probe, authored "
-         "override, no duplicate or prologue/solo/other-scene spawn");
+         "override, no duplicate or prologue/other-scene spawn");
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Execute production adult eligibility, receipt update, Actor_Draw transform and MM item cameras.
-Native structs and math are used. Resource readiness, animation pose, collision and GI submission
-are controlled service boundaries; this is not a complete renderer or game visual proof.
+Native structs and math are used. Resource readiness, animation pose, collision, GI and native
+charge submission are controlled service boundaries; this is not a complete renderer or game visual proof.
 """
 from pathlib import Path
 import os
@@ -25,6 +25,7 @@ def source():
     actor = (ROOT/'mm/src/code/z_actor.c').read_text()
     custom = (ROOT/'mm/2s2h/CustomItem/CustomItem.cpp').read_text()
     player = (ROOT/'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
+    spells = (ROOT/'mm/mods/items/logic/item_oot_spells.c').read_text()
     data = (ROOT/'mm/src/code/z_camera_data.inc').read_text()
     camera_data = data[:data.index('} CameraSetting;')+len('} CameraSetting;')]
     camera_data += '\n#define CAM_SETTING_MODE_ENTRY(func, data) {func, ARRAY_COUNT(data), data}\n'
@@ -57,6 +58,11 @@ def source():
     # if/else has two blocks.
     transform += actor[end:actor.index('    Actor_SetObjectDependency', end)]
     pieces.append('void DrawReceiptTransform(Actor* actor, PlayState* play) {\n'+transform+'\n}')
+    # z_player.c obtains this static dependency through custom_items.c's unity include.
+    # Keep its real ownership/cast gates; only its final renderer is controlled by the fixture.
+    for name in ('sDinsFireRemakeCast', 'sDinsFireRemakeCastTicks'):
+        pieces.append(re.search(r'^static[^\n;]*\b'+name+r'\s*=[^\n;]*;', spells, re.M).group(0))
+    pieces.append(re.sub(r'\bthis\b', 'self', function(spells, 'Player_DrawDinsFireRemakeCharge')))
     adult_branch = player.index('if (AdultLink_ShouldHide())', player.index('void Player_Draw('))
     pieces.append('void DrawAdultBranch(PlayState* play, Player* self) {\n' +
                   re.sub(r'\bthis\b', 'self', block_from(player, adult_branch)) + '\n}')
@@ -90,7 +96,7 @@ def main():
         binary=temp/'test'
         subprocess.run([os.environ.get('CXX','g++-14'),'-std=c++20',*flags,'-Wno-narrowing','-Wno-write-strings',str(temp/'test.cpp'),str(obj),'-Wl,--gc-sections','-no-pie','-lm','-o',str(binary)],check=True)
         failed=[]
-        for case in ('controls','held','item0','chest','native','eligibility','overhead','scale','scope'):
+        for case in ('controls','held','item0','chest','native','eligibility','overhead','scale','scope','charge'):
             print('CASE '+case,flush=True)
             result=subprocess.run([str(binary),case],env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
             if result.returncode: failed.append(case)
