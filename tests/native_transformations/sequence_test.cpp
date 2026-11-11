@@ -231,6 +231,10 @@ void gSPDisplayList(Gfx* packet, Gfx* target) { packet->words.w0 = 0xDE000000; p
 
 /* DONOR_CAMERA_REFERENCE */
 
+// Bubble state/audio is verified by tests/deku_bubble. This fixture keeps the
+// unrelated projectile service outside the native mask-camera boundary.
+static void MmForm_ResetDekuBubble(PlayState*) {}
+
 static u8 MmForm_LoadFormSkeleton(PlayState* p, MmPlayerTransformation form) {
     ++loadCount;
     if (skeletonFailure) return 0;
@@ -434,7 +438,8 @@ int main(int argc, char** argv) {
         assert(!gFormState.bubbleCameraState.firstPersonActive && player.unk_6AD == 0);
         assert(!(player.stateFlags1 & (PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_ITEM_IN_HAND | PLAYER_STATE1_READY_TO_FIRE)));
         assert(player.heldItemAction == PLAYER_IA_NONE);
-        assert(std::find(stopped.begin(), stopped.end(), MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH) != stopped.end());
+        // The native MM bank uses an unflagged, refresh-driven charge loop.
+        assert(std::find(stopped.begin(), stopped.end(), MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG) != stopped.end());
         while (gFormState.state != MMFORM_STATE_INACTIVE && frame < 140) Tick(true);
         assert(gFormState.state == MMFORM_STATE_INACTIVE);
     } else if (test == "mask-off") {

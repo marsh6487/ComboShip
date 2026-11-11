@@ -26,6 +26,7 @@
 #include "soh/Enhancements/Graphics/WWSkyFileSelect.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/FleetShipCombo/FleetShipCombo.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include <assert.h>
 #include "z64save.h"
 #include "variables.h"
@@ -2914,6 +2915,10 @@ void FileChoose_LoadGame(GameState* thisx) {
     if (!ComboStartupOot_PrepareContextChange())
         return;
 #endif
+    // File selection starts a new session, including a reload of the same slot.
+    // Do this before replacing the slot/save, not on the generic exit/load hooks
+    // that same-session cross-game returns also fire.
+    MmForm_DiscardSaveSession();
     gSaveContext.fileNum = this->buttonIndex;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     Randomizer_WaitForGeneration();

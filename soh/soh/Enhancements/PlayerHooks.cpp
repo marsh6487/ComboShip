@@ -113,8 +113,7 @@ static s32 ResolveItemOnButton(PlayState* play, s32 index, s32 item) {
     if (index != 0) {
         return item;
     }
-    if (MasterCycle_IsRiding() || MmMaskWear_BlocksSword() ||
-        (TransformMasks_IsTransformed() && MmForm_GetCurrentForm() == MM_PLAYER_FORM_DEKU)) {
+    if (MasterCycle_IsRiding() || MmMaskWear_BlocksSword()) {
         return ITEM_NONE;
     }
     // Aim phase only: once the fins are in the air the flag is cleared, so B goes back to punching.
@@ -123,6 +122,11 @@ static s32 ResolveItemOnButton(PlayState* play, s32 index, s32 item) {
     }
     if (Player_IsDekuBubbleActive()) {
         return ITEM_SLINGSHOT;
+    }
+    // The active bubble borrows B as a slingshot. Only the idle Deku sword
+    // press is empty; blocking the alias above strands the charge in aim.
+    if (TransformMasks_IsTransformed() && MmForm_GetCurrentForm() == MM_PLAYER_FORM_DEKU) {
+        return ITEM_NONE;
     }
     return item;
 }

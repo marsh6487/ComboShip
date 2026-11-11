@@ -46,6 +46,8 @@ def main():
     if deferred_signature in mm:
         mm_bodies += '\n' + function(mm, deferred_signature)
     mm_bodies += '\n' + '\n'.join(line for line in skip.splitlines() if line.startswith('#define '))
+    helper_signature = 'static void ApplyDeferredComboPortalAfterIntroSkip('
+    mm_bodies += '\n' + function(skip, helper_signature)
     mm_bodies += '\n' + function(skip, 'void RegisterSkipIntroSequence(')
     mm_bodies = mm_bodies.replace('this->', 'self->')
     oot_title = read('soh/src/code/title_setup.c')
@@ -53,7 +55,7 @@ def main():
     oot_bodies = '\n'.join(function(entrances, signature) for signature in (
         's16 Entrance_GetOverride(', 'static s16 Entrance_TraceResolved(', 's16 Entrance_OverrideNextIndex('))
     oot_bodies += '\n' + function(oot_title, 'void TitleSetup_InitImpl(')
-    flags = ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
+    flags = ['-std=c++20', '-Wall', '-Wextra', '-Wpedantic', '-Werror', '-Wno-unused-parameter',
              '-DCOMBO_BUILD', '-I', str(ROOT)]
     if args.sanitize:
         flags += ['-fsanitize=address,undefined', '-fno-sanitize-recover=all',
@@ -75,6 +77,7 @@ def main():
             # the new bridge symbol nor change standalone MM's native landing.
             fixture = read('tests/combo_vanilla/portal_startup_mm_test.cpp').split('/* PRODUCTION_BODIES */')[0]
             native_skip = '\n'.join(line for line in skip.splitlines() if line.startswith('#define '))
+            native_skip += '\n' + function(skip, helper_signature)
             native_skip += '\n' + function(skip, 'void RegisterSkipIntroSequence(')
             fixture += native_skip + r'''
 int main() {

@@ -15,6 +15,16 @@ void Flags_SetWeekEventReg(s32 flag);
 #define FIRST_CYCLE_CVAR_NAME "gEnhancements.Cutscenes.SkipFirstCycle"
 #define FIRST_CYCLE_CVAR CVarGetInteger(FIRST_CYCLE_CVAR_NAME, 0)
 
+// Keep conditional directives outside hook macro arguments for MSVC's
+// preprocessor. The bridge still runs only after native grants and saving.
+static void ApplyDeferredComboPortalAfterIntroSkip() {
+#ifdef COMBO_BUILD
+    if (FIRST_CYCLE_CVAR) {
+        MM_ApplyComboPortalAfterIntroSkip();
+    }
+#endif
+}
+
 void RegisterSkipIntroSequence() {
     COND_VB_SHOULD(VB_PLAY_TRANSITION_CS, INTRO_CVAR, {
         // Intro cutscene
@@ -65,11 +75,7 @@ void RegisterSkipIntroSequence() {
         }
         // Persist this modified state so moon crashes without saving keep it
         Sram_SaveSpecialEnterClockTown(gPlayState);
-#ifdef COMBO_BUILD
-        if (FIRST_CYCLE_CVAR) {
-            MM_ApplyComboPortalAfterIntroSkip();
-        }
-#endif
+        ApplyDeferredComboPortalAfterIntroSkip();
     });
 }
 

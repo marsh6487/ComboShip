@@ -322,6 +322,32 @@ u8 TransformMasks_TryPlayMmStepSfx(u16 ootStepSfxId, Vec3f* pos) {
     return 1;
 }
 
+u8 TransformMasks_TryPlayMmStepSfxWithSpeed(u16 ootStepSfxId, Vec3f* pos, f32 speed) {
+    if (MmForm_GetCurrentForm() != MM_PLAYER_FORM_DEKU) {
+        return TransformMasks_TryPlayMmStepSfx(ootStepSfxId, pos);
+    }
+    if (!MmSfx_IsAvailable()) {
+        return 0;
+    }
+
+    // Native MM Audio_SetSyncedSfxFreqAndVolume. The request queue retains
+    // these pointers after this call, just like MM's shared synced parameters.
+    static f32 sDekuStepFreq = 1.0f;
+    static f32 sDekuStepVolume = 1.0f;
+    if (speed > 6.0f) {
+        sDekuStepFreq = 1.1f;
+        sDekuStepVolume = 1.0f;
+    } else {
+        f32 ratio = speed / 6.0f;
+        sDekuStepFreq = (ratio * 0.2f) + 0.9f;
+        sDekuStepVolume = ratio * (1.0f - 0.775f) + 0.775f;
+    }
+
+    // Keep the existing floor slot, Deku bank and one-shot flag. Cadence is
+    // owned by Player_PlaySteppingSfx; jump and land keep their own entrypoints.
+    return MmSfx_PlayEx(ootStepSfxId + 0xF0, pos, 4, &sDekuStepFreq, &sDekuStepVolume, NULL) != 0;
+}
+
 u8 TransformMasks_HasSkeleton(void) {
     return MmForm_HasSkeleton();
 }

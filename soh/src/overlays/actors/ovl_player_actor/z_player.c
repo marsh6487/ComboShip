@@ -2089,7 +2089,8 @@ void Player_PlaySteppingSfx(Player* this, f32 pitchAdjustment) {
     // (NA_SE_PL_WALK_GROUND + floor offset + per-form offset: Deku +0xF0,
     // Zora +0x120, Goron +0x150, FD +0x80). Play that instead of Link's walk.
     // Returns 0 for Human/Garo/Gerudo/Pikachu so OOT's footstep still plays.
-    if (TransformMasks_TryPlayMmStepSfx(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
+    if (TransformMasks_TryPlayMmStepSfxWithSpeed(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos,
+                                                 pitchAdjustment)) {
         // form footstep played; fall through to the stats counter below
     } else if (this->currentBoots != PLAYER_BOOTS_IRON && stepOffset == 0xE &&
                MmSfx_PlayAtPos(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
@@ -7815,7 +7816,7 @@ void Player_StartDekuBubble(Player* this, PlayState* play) {
     this->heldItemAction = PLAYER_IA_SLINGSHOT;
     this->itemAction = PLAYER_IA_SLINGSHOT;
     this->stateFlags1 |= PLAYER_STATE1_ITEM_IN_HAND;
-    this->unk_860 = -2; // slingshot
+    this->unk_860 = 2; // This B press already armed the shot; -2 is the post-release re-nock state.
     this->stateFlags3 &= ~PLAYER_STATE3_PAUSE_ACTION_FUNC;
 
     // Cancel any sword/melee action OOT may have started this frame from the same B press.
@@ -12601,6 +12602,11 @@ void Player_Init(Actor* thisx, PlayState* play2) {
     // element is a flag. Without this sweep a pre-refactor save reloads with a dead id sitting on a
     // button. Runs here because Player_Init is guaranteed to fire once per file load.
     Sw97_MigrateLayout(play);
+
+    // Aim aliases belong to the departed player, even if its logical form
+    // persists through this scene transition. The new actor starts unarmed.
+    sDekuBubbleActive = 0;
+    sZoraBoomerangActive = 0;
 
     // TRANSFORMATION MASKS: Init BEFORE Player_UseItem so IsTransformed() returns false.
     // Reset transformation state before Player_UseItem to avoid stale state from old scene

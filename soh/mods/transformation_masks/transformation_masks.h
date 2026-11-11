@@ -218,11 +218,13 @@ void TransformMasks_PlayMmVoice(u16 ootVoiceSfxId, Vec3f* pos);
 // OOT *base* (adult) voice id — the _KID ids at 0x6820+ are out of range here.
 u8 TransformMasks_TryPlayMmVoice(u16 ootVoiceSfxId, Vec3f* pos);
 
-// Redirect OOT step/walk SFX to MM form-specific sample (Deku/Zora/Goron).
+// Redirect OOT step/walk SFX to MM form-specific sample (FD/Deku/Zora/Goron).
 // Returns 1 if the MM SFX was played and the OOT step should be skipped;
-// returns 0 for FD/Garo/Gerudo/Human so OOT handles it normally. Called from
-// Player_PlaySteppingSfx and Player_PlayFloorSfxByAge in z_player.c.
+// returns 0 for Human/custom forms so OOT handles it normally.
 u8 TransformMasks_TryPlayMmStepSfx(u16 ootStepSfxId, Vec3f* pos);
+// The existing stepping event supplies native speed-dependent Deku pitch.
+// Other forms and the two-argument entrypoint retain their current behavior.
+u8 TransformMasks_TryPlayMmStepSfxWithSpeed(u16 ootStepSfxId, Vec3f* pos, f32 speed);
 
 // FD skin mode: returns true when FD is active (OOT handles gameplay, only DLs swapped)
 u8 TransformMasks_IsFDSkinMode(void);
@@ -515,6 +517,10 @@ u8 TransformMasks_TryFormFromItem(PlayState* play, Player* player, s32 item);
 void MmForm_DevTransformTo(PlayState* play, Player* player, MmPlayerTransformation form);
 
 void TransformMasks_Init(PlayState* play, Player* player);
+// A real file selection or new-save creation starts a new session. Discard
+// imported form state without restoring equipment or using the departed scene.
+// Scene transitions and same-session cross-game returns keep their form state.
+void MmForm_DiscardSaveSession(void);
 void TransformMasks_Update(PlayState* play, Player* player);
 void TransformMasks_Draw(PlayState* play, Player* player);
 void MmForm_DrawNativeTransformationLimb(PlayState* play, Player* player, s32 limbIndex);

@@ -2159,5 +2159,30 @@
     "native_abi": "explicit",
     "name": "Spring blossom texture factories, identical hosts and owned-texture fade combiner",
     "run": "python3 -B tools/spring_blossoms/pack_textures.py --check\npython3 -B tests/seasons/run_spring_texture_tests.py\npython3 -B tests/seasons/run_spring_combiner_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Imported form save-session ownership and native aim reset",
+    "run": "python3 -B tests/form_session/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/form_session/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Deku spin travel yaw, render rotation and trail ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_spin/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Deku bubble item handoff, native-header flight and splat lifecycle",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_bubble/run_tests.py --native-headers"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Deku footsteps: native pitch, floor routing and existing cadence",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_footsteps/run_tests.py --sanitize"
   }
 ]

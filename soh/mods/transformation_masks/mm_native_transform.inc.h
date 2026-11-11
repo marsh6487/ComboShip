@@ -128,6 +128,7 @@ static void MmForm_InterruptNativeMaskForScene(Player* player, PlayState* play, 
 }
 
 extern "C" void MmForm_OnPlayDestroy(PlayState* play, Player* player) {
+    MmForm_ResetDekuBubble(play);
     MmForm_GakkiVoiceOff();
     FormJingle_Stop();
     gFormState.gakkiActive = 0;
@@ -404,7 +405,7 @@ static u8 MmForm_BeginNativeMaskCutscene(Player* player, PlayState* play, u8 rem
         gFormState.bubbleCharge = 0.0f;
         gFormState.bubbleChargeTimer = 0;
         gFormState.dekuCheekScale = 1.0f;
-        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
     }
     FirstPerson_Exit(player, play);
     // Player_UseItem only queues a sword-to-empty change, whose upper action
