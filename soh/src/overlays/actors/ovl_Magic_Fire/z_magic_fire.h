@@ -16,6 +16,13 @@ typedef struct MagicFire {
     /* 0x01A6 */ s16 screenTintBehaviour;
     /* 0x01A8 */ s16 actionTimer;
     /* 0x01AA */ s16 screenTintBehaviourTimer;
-} MagicFire; // size = 0x01AC
+    s16 nativeFrame;
+    u8 nativeActive;
+    u8 nativePendingTicks;
+    u8 nativeLightAttempted;
+    LightInfo nativeLightInfo;
+    LightNode* nativeLightNode;
+    uint32_t nativeAudioHandle;
+} MagicFire;
 
 #endif

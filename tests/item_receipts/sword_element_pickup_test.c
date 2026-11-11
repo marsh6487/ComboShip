@@ -8,6 +8,15 @@
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+bool ComboStartupOot_IsReceipt(const GetItemEntry* entry) {
+    return entry && (entry->comboMarketReceipt & CW_STARTUP_RECEIPT_TOKEN_BIT) != 0;
+}
+void ComboStartupOot_TextStarted(PlayState* play, const GetItemEntry* entry) {
+    (void)play; (void)entry;
+}
+#endif
 #endif
 
 SaveContext gSaveContext;

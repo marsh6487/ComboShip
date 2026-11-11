@@ -23,6 +23,10 @@
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "soh/ResourceManagerHelpers.h"
 #include <libultraship/bridge/resourcebridge.h>
+#include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
+#define CW_DINS_HOST_MM
+#include "../../../../../combo/render/DinsFireRemakeDraw.h"
+#undef CW_DINS_HOST_MM
 
 // ============================================================
 // Struct (real OoT ovl_Magic_Fire layout)
@@ -42,7 +46,18 @@ typedef struct MagicFire {
     /*        */ f32 screenTintIntensity;      // Din's Fire (sphere) only
     /*        */ SkelCurve skelCurve;          // Fire Medallion (SkelCurve dome) only
     /*        */ Vec3f colliderScale;          // Fire Medallion (SkelCurve dome) only
+    s16 nativeFrame;
+    u8 nativeActive;
+    u8 nativePendingTicks;
+    u8 nativeLightAttempted;
+    LightInfo nativeLightInfo;
+    LightNode* nativeLightNode;
+    uint32_t nativeAudioHandle;
 } MagicFire;
+
+#define CW_DINS_HOST_MM
+#include "../../../../../combo/render/DinsFireNativeActor.h"
+#undef CW_DINS_HOST_MM
 
 // Runtime actor ID (assigned by ActorDB in sw97_init.cpp)
 extern s16 gSw97ActorId_MagicFire;
@@ -163,6 +178,7 @@ static Vtx* MagicFire_GetOotSphereVtx(void) {
 static void MagicFireDins_Init(Actor* thisx, PlayState* play) {
     MagicFire* this = THIS;
 
+    CwDinsNativeActor_Init(this, play);
     this->action = 0;
     this->screenTintBehaviour = 0;
     this->actionTimer = 0;
@@ -178,6 +194,12 @@ static void MagicFireDins_Init(Actor* thisx, PlayState* play) {
 }
 
 static void MagicFireDins_Destroy(Actor* thisx, PlayState* play) {
+    MagicFire* this = THIS;
+    if (this->nativeActive) {
+        CwDinsNativeActor_StopAudio(this);
+        CwDinsNativeActor_RemoveLight(this, play);
+        Collider_DestroyCylinder(play, &this->collider);
+    }
     func_800876C8(play);
 }
 
@@ -189,6 +211,11 @@ static void MagicFireDins_UpdateBeforeCast(Actor* thisx, PlayState* play) {
     MagicFire* this = THIS;
     Player* player = GET_PLAYER(play);
 
+    if (CwDinsNativeActor_Update(this, play)) {
+        if (this->nativeFrame >= 0 && this->actor.update != NULL)
+            this->actor.update = MagicFireDins_Update;
+        return;
+    }
     if ((play->msgCtx.msgMode == 0xD) || (play->msgCtx.msgMode == 0x11)) {
         Actor_Kill(&this->actor);
         return;
@@ -207,6 +234,9 @@ static void MagicFireDins_Update(Actor* thisx, PlayState* play) {
     Player* player = GET_PLAYER(play);
     s32 pad;
 
+    if (CwDinsNativeActor_Update(this, play)) {
+        return;
+    }
     this->actor.world.pos = player->actor.world.pos;
     if ((play->msgCtx.msgMode == 0xD) || (play->msgCtx.msgMode == 0x11)) {
         Actor_Kill(&this->actor);
@@ -317,6 +347,16 @@ static void MagicFireDins_Draw(Actor* thisx, PlayState* play) {
     Gfx* modelDL;
     void* tex;
     Vtx* vertices;
+
+    // The shared Fire Medallion actor retains its own complete native path.
+    if (this->nativeActive) {
+        if (CwDinsFireRemake_DrawNativeActor(play, thisx, this->nativeFrame,
+                                             CwDins_RGB(primary.r, primary.g, primary.b),
+                                             CwDins_RGB(secondary.r, secondary.g, secondary.b))) {
+            return;
+        }
+        // Resource loss falls back to the companion sphere for this same actor age.
+    }
 
     if (this->action <= 0) {
         return;

@@ -1,4 +1,7 @@
 #include "../../../../../combo/vanilla/ComboVanillaMode.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 #include "file_choose.h"
 #include "textures/title_static/title_static.h"
 #include "assets/overlays/ovl_File_Choose/ovl_file_choose.h"
@@ -706,6 +709,10 @@ void FileChoose_DrawNameEntryNES(GameState* thisx) {
                                 Audio_PlaySfxGeneral(NA_SE_SY_FSEL_DECIDE_L, &gSfxDefaultPos, 4,
                                                      &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
                                                      &gSfxDefaultReverb);
+#ifdef COMBO_BUILD
+                                if (!ComboStartupOot_PrepareContextChange())
+                                    return;
+#endif
                                 gSaveContext.fileNum = this->buttonIndex;
                                 dayTime = ((void)0, gSaveContext.dayTime);
                                 Sram_InitSave(this);

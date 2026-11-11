@@ -1,4 +1,7 @@
 #include "soh/unbound/UnboundExporter.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 #include "soh/unbound/SceneDB.h"
 #include "debugconsole.h"
 #include <ship/utils/Utils.h>
@@ -240,6 +243,10 @@ extern "C" void FleetCombo_DoLocalReset(void) {
     if (gGameState == nullptr) {
         return;
     }
+#ifdef COMBO_BUILD
+    if (!ComboStartupOot_PrepareContextChange())
+        return;
+#endif
     SET_NEXT_GAMESTATE(gGameState, TitleSetup_Init, GameState);
     gGameState->running = false;
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);

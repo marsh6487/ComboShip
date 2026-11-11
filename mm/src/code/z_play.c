@@ -1,3 +1,6 @@
+#define CW_DINS_HOST_MM
+#include "../../../combo/audio/DinsFireSfx.h"
+#undef CW_DINS_HOST_MM
 #include "../../../combo/emotes/EmoteBridge.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
@@ -422,6 +425,7 @@ Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+    DinsFireSfx_UpdateContext(NULL);
     ComboEmotes_Reset();
 #ifdef COMBO_BUILD
     extern void Combo_MM_CancelCrossDungeonTransition(void);
@@ -1115,6 +1119,8 @@ void Play_UpdateMain(PlayState* this) {
                 KaleidoSetup_Update(this);
             }
 
+            /* Kaleido may change pause state during this update. */
+            DinsFireSfx_UpdateContext(this);
             sp5C = IS_PAUSED(&this->pauseCtx);
 
             AnimTaskQueue_Reset(&this->animTaskQueue);
@@ -1211,6 +1217,7 @@ void Play_UpdateMain(PlayState* this) {
 }
 
 void Play_Update(PlayState* this) {
+    DinsFireSfx_UpdateContext(this);
     ComboEmotes_BeginUpdate(this);
     if (!sBombersNotebookOpen) {
         if (this->pauseCtx.bombersNotebookOpen) {

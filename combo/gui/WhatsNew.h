@@ -307,6 +307,8 @@ inline constexpr Entry kControls[]{
       "Adult Zora's Domain can retain flowing water and installed water textures without changing progression." },
     { "gEnhancements.MmIceArrows", Kind::New,
       "OoT Ice Arrows can create MM-style water platforms and frozen Octorok blocks." },
+    { "gEnhancements.Graphics.ItemGetLightShaft", Kind::New,
+      "Optional warm, gently scrolling light above Link during held-item presentations in both games." },
     { "gEnhancements.DinFireShield", Kind::Updated,
       "Fire-shield stance, orientation and ground clearance have been refined in both games." },
     { "gEnhancements.DinFireShieldSfx", Kind::Updated, "The fire shield retains its optional guarding sound." },
@@ -437,6 +439,9 @@ inline constexpr Entry kControls[]{
       "Select Native, Fire, Ice, Light, Lightning, Arcane, Astral or Dark Energy sword-spin appearance." },
     { "gEnhancements.Graphics.ElementalSpinEffects", Kind::New,
       "Independently enable Fire, Ice and Light effects on powered sword spins." },
+    { "gEnhancements.DinsFireRemake", Kind::New,
+      "Revised Din's Fire cast with the normal gameplay camera, earlier control and lingering luminous fire that "
+      "lights held Deku Sticks and ordinary arrows. Applies to the next cast; off by default." },
     { "gEnhancements.Graphics.UseOotSkyTextures", Kind::New, "Use OoT sky textures in Majora's Mask." },
     { "gEnhancements.HideBackEquipment", Kind::Updated,
       "Hide stowed swords, shields and the scabbard in either game." },

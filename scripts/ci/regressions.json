@@ -1,5 +1,19 @@
 [
   {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Impa startup receipt: paired save, both native GI policies and presentation-only delivery",
+    "run": "python3 -B tests/startup_receipt/run_tests.py --sanitize --native --json-include /usr/include"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Optional held-item light shaft: native receipts, lifecycle and bounded renderer",
+    "run": "python3 -B tests/gi_light_shaft/run_tests.py\npython3 -B tests/gi_light_shaft/run_tests.py --sanitize\npython3 -B tests/gi_light_shaft/run_native_tests.py\npython3 -B tests/gi_light_shaft/run_native_tests.py --sanitize\npython3 -B tests/gi_light_shaft/run_renderer_tests.py\npython3 -B tests/gi_light_shaft/run_renderer_tests.py --sanitize"
+  },
+  {
     "suite": "equipment",
     "origin": "gate",
     "name": "Native OoT form instruments, note gestures and independent song voices",
@@ -188,6 +202,17 @@
   {
     "suite": "render",
     "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Din's Fire remake visuals, charge handoff, native textures and audio",
+    "run": "python3 -B tests/dins_fire_assets/test_resources.py\npython3 -B scripts/assets/build_dins_fire_remake.py --check-native\npython3 -B scripts/assets/build_dins_fire_audio.py --check\npython3 -B scripts/diagnostics/check_dins_fire_native_geometry.py\npython3 -B scripts/diagnostics/run_dins_fire_native_actor_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_actor_tests.py --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --standalone\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --standalone --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_remake_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_remake_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_magic_fire_bindings_tests.py\npython3 -B scripts/diagnostics/run_dins_fire_native_texture_tests.py\npython3 -B tests/dins_fire_audio/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/dins_fire_audio/run_tests.py --sanitize\npython3 -B tests/dins_fire_audio/run_override_tests.py --build-starter\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/dins_fire_audio/run_override_tests.py --build-starter --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0",
+      "UBSAN_OPTIONS": "halt_on_error=1"
+    }
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
     "name": "Native OoT and MM cape visibility during shop camera ownership",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_cape/run_visibility_tests.py"
   },
@@ -349,6 +374,12 @@
     "origin": "nei",
     "name": "scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "MM forest companion arrival timing and native placement",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/forest_actor_spawn_latency/run_tests.py --sanitize\npython3 -B tests/native_forest/test_placements.py"
   },
   {
     "suite": "world",
@@ -1249,6 +1280,12 @@
   },
   {
     "suite": "render",
+    "origin": "gate",
+    "name": "Whip native aiming reticle and extended traversal reach",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/whip_traversal/run_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
     "origin": "nei",
     "name": "tests/nei_lantern_grip/run_tests.py",
     "run": "python3 -B tests/nei_lantern_grip/run_tests.py"
@@ -1746,8 +1783,14 @@
   {
     "suite": "items",
     "origin": "gate",
+    "name": "MM randomizer native queue and item presentation timing",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_rando_queue_timing/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
     "name": "Combo Vanilla OoT fixed native rewards, earned availability and atomic receipts",
-    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_mode_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_tests.py --sanitize"
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_mode_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_pickup_flow_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_spawn_tests.py --sanitize"
   },
   {
     "suite": "items",

@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 from run_mm_scene_randomization_tests import function
-from foreign_gi_fixture_dependencies import clock_descriptor
+from foreign_gi_fixture_dependencies import clock_descriptor, startup_foreign_receipt_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 foreign = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
@@ -23,7 +23,7 @@ mirror_helper += function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_tex
 # here is a dispatch error, not a renderer dependency to silently accept.
 key_ring_boundary = 'namespace ComboMmKeyRing { template<class... Args> bool Draw(Args...) { assert(false && "unexpected key-ring dispatch"); return false; } }\n'
 anim_path = function((ROOT/'combo/menu/ComboForeignAnim.h').read_text(),'CfaIsOtrPath')
-handlers = anim_path + '\n' + function(foreign,'ComboInternRoutedPath') + '\n' + key_ring_boundary + macros + '\n' + mirror_helper + '\nvoid OOT_DrawForeignNativeEquipment(PlayState*,GetItemEntry*,const ComboForeignDrawInfo*){assert(false && "sword fixture dispatched native equipment");}\n' + '\n'.join(function(foreign,name) for name in [
+handlers = startup_foreign_receipt_boundary(ROOT) + anim_path + '\n' + function(foreign,'ComboInternRoutedPath') + '\n' + key_ring_boundary + macros + '\n' + mirror_helper + '\nvoid OOT_DrawForeignNativeEquipment(PlayState*,GetItemEntry*,const ComboForeignDrawInfo*){assert(false && "sword fixture dispatched native equipment");}\n' + '\n'.join(function(foreign,name) for name in [
     'OOT_RestoreForeignSegs','OOT_DrawForeignGoronSword','OOT_DrawForeignWeaponFlame',
     'OOT_DrawForeignMasterSword','OOT_DrawForeignCustomGi','OOT_DrawForeignSimple','OOT_DrawComboForeign'])
 flags=['-std=gnu++20','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DLOG_LEVEL_GAME_PRINTS=0',

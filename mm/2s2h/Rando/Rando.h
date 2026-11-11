@@ -4,6 +4,9 @@
 #include "../../../combo/ComboGameMode.h"
 
 #include "StaticData/StaticData.h"
+#ifdef COMBO_BUILD
+#include "rando/StartupCheckReceipt.h"
+#endif
 #include "Types.h"
 #include "variables.h"
 
@@ -33,6 +36,8 @@ void GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 // ComboShip: freeze a foreign check's model at the tier it grants, before the cross-grant that
 // follows mutates OOT's dormant save and a live re-resolve flips the held-up model next frame.
 void LatchComboForeign(RandoCheckId randoCheckId);
+// A durable receipt names its already-awarded concrete owner tier; no check or conversion.
+void DrawFrozenForeignItem(const CwStartupReceipt& receipt, Actor* actor);
 uint8_t ComboForeignMessageIcon(RandoCheckId randoCheckId);
 // ComboShip: junk rotation pool minus RI_NONE, dumped for the combo generator's junk bake.
 std::vector<RandoItemId> ComboJunkPool();

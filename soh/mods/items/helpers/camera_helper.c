@@ -3,6 +3,9 @@
  */
 
 #include "camera_helper.h"
+#include "../custom_items.h"
+#include "../logic/item_whip_constants.h"
+#include "../../extended_player.h"
 #include "../../../../combo/gui/UiVisibility.h"
 #include "functions.h"
 #include "macros.h"
@@ -61,6 +64,10 @@ void FirstPerson_DrawReticle(Player* player, PlayState* play, f32 range, u8 r, u
         return;
     }
 
+    // Keep the whip marker within the same reach as its traveling tip.
+    u8 whipAiming = player->heldItemAction == PLAYER_IA_WHIP && gCustomItemState.whipActive &&
+                    gCustomItemState.whipState == WHIP_STATE_EQUIP && gCustomItemState.whipFirstPersonActive;
+
     if (!(player->stateFlags1 & PLAYER_STATE1_ITEM_IN_HAND) || player->unk_834 == 0)
         return;
 
@@ -79,7 +86,7 @@ void FirstPerson_DrawReticle(Player* player, PlayState* play, f32 range, u8 r, u
     f32 cosX = Math_CosS(player->actor.focus.rot.x);
     f32 sinX = Math_SinS(player->actor.focus.rot.x);
 
-    f32 maxRange = (range > 0) ? range : 10000.0f;
+    f32 maxRange = whipAiming ? WHIP_RANGE : ((range > 0) ? range : 10000.0f);
 
     rayEnd.x = rayStart.x + (sinY * cosX * maxRange);
     rayEnd.y = rayStart.y + (-sinX * maxRange);

@@ -1,0 +1,29 @@
+{
+  "accepted_reference_files": {
+    "build_polish.py": {
+      "bytes": 9716,
+      "sha256": "512feb487dcc83ad8a7ed97360b4246482855984e5119a7aa535da879894e9e2"
+    },
+    "flame_ribbons_luminous_prompt.txt": {
+      "bytes": 2700,
+      "sha256": "32242a01d924dfdad99d54b545da089364212f0514c69f31c11b3d7d9432488a"
+    },
+    "flame_ribbons_luminous_rgba.png": {
+      "bytes": 2241653,
+      "sha256": "9705407ffa7226f6d4f704a7b20575d66e4aa704759ef3a0670309de78fc186e"
+    },
+    "render_cpu_study.py": {
+      "bytes": 18026,
+      "sha256": "f6b9d0eb9a0cd9121b0a6318259347dc918b219952da7df1e329d19a75d7736d"
+    }
+  },
+  "accepted_source_archive": {
+    "bytes": 12137723,
+    "name": "Dins_Fire_Burnout_and_Light_Study_Recipe.zip",
+    "sha256": "365c4fefb7c2ec00cc35009eceb8fdd26adc7fe13ac850677f1e4696a4f4ac6f"
+  },
+  "atlas_source_preserved_unchanged": true,
+  "native_gameplay_acceptance": false,
+  "preview_camera_is_not_gameplay_camera": true,
+  "source_native_commit": "cd12567fe1c0d64a205e1d360165cb000166f159"
+}

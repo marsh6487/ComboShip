@@ -1,0 +1,14 @@
+Use case: precise-object-edit.
+Asset type: a transparent RGBA three-row flame texture atlas for wrapping onto open sweeping arcs in an offline animation study.
+
+Input images: Image 1 is the EDIT TARGET: the existing three horizontal flame ribbons. Image 2 is a REFERENCE ONLY from the user's video: use only its incandescent pale-yellow flame fullness, density, and broad turbulent lobes. Do not reproduce the scene, character, perspective, environment, camera, screen, or interface.
+
+Primary edit: preserve the target atlas layout and its three independently selectable horizontal rows, but make the actual flame bodies substantially brighter, fuller, broader and denser. These should be broad sideways sweeping fire plumes, with cream-white and pale lemon incandescent cores covering much more of each plume body. Orange belongs mainly on the irregular curling edges. Replace most of the thin hair, web, gauze and fibrous fabric detail with larger turbulent flame lobes and fluid flame tongues. Keep a luminous soft translucent fringe.
+
+Composition: landscape 1536 by 1024 canvas. Exactly three separate horizontal flame plumes, one per row, with fully transparent gutters near y=343 and y=668. Keep each row within its own roughly one-third-height band, with clear transparent spacing between rows and transparent canvas margins. Each plume sweeps across most of the width with tapered, irregular, fading transparent ends. Preserve the useful open-arc texture character and asymmetry of the target; no repeating tile pattern, no geometrically uniform sine-wave line.
+
+Material: the light cream-white / pale-lemon cores should occupy most of the substantial flame body, with strong luminous density and softer translucent yellow edges. Include a few irregular, ragged translucent holes and curling negative spaces, but no giant uniformly transparent middle and no long solid rectangular opaque banner. The fire should read as hot fluid flame with broad overlapping lobes rather than smoke, gauze, silk, ribbons of cloth, filaments or electricity.
+
+Transparency invariant: output a genuine RGBA PNG with an actual fully transparent background and fully transparent gutters; no painted backdrop, brown haze across the canvas, black background, checkerboard pixels or ambient-colored rectangle. Keep graduated alpha only where the flames and their small luminous fringes actually exist. The cream-white cores may be dense while the ends, holes and fringes remain transparent.
+
+Only the three flame plumes. No characters, scenery, environments, UI, labels, text, logos, objects, circles, scene effects, or border. This is a targeted luminosity-and-body edit of the supplied atlas, not an effect scene.

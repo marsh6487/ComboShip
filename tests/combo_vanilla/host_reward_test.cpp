@@ -1,9 +1,11 @@
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaRewards.h"
+#include "combo/rando/StartupCheckReceiptState.h"
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <ctime>
 #include <vector>
@@ -15,6 +17,8 @@ static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
+static std::map<int, uint32_t> g_startupAckRetries;
 static std::vector<int> g_evictedSlots;
 static int g_comboCompletionSlot = -1, completionLoads, completionSaves;
 static bool g_comboCompletion[2];

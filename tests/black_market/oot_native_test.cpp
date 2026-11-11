@@ -1,4 +1,6 @@
 #include "global.h"
+#include "audio/DinsFireSfx.h"
+#include "render/DinsFireNative.h"
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/BlackMarketEntrance.h"
@@ -17,6 +19,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string_view>
 #include "entry_diagnostics_fixture.h"
@@ -83,6 +86,16 @@ extern "C" void Player_Action_80845EF8(Player*, PlayState*) {}
 void Player_Action_Idle(Player*, PlayState*) {}
 void Player_Action_8084E3C4(Player*, PlayState*) {}
 void Player_Action_808507F4(Player*, PlayState*) {}
+// These cases change door actions, never a pending Din cast. The real native
+// action body and ownership helper remain in the fixture.
+extern "C" void DinsFireSfx_CancelCast(uint32_t) {
+    std::fputs("door fixture unexpectedly cancelled a Din cast\n", stderr);
+    std::abort();
+}
+extern "C" void Magic_Reset(PlayState*) {
+    std::fputs("door fixture unexpectedly reset spell magic\n", stderr);
+    std::abort();
+}
 extern "C" void AudioOcarina_SetInstrument(u8) {}
 void func_80832340(PlayState*, Player*) {}
 extern "C" void func_8008EC70(Player*) {}

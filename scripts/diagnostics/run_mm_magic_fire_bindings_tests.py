@@ -25,7 +25,8 @@ def main():
                ("MagicFire_GetOotMaterialDL", "MagicFire_GetOotModelDL", "MagicFire_GetOotTex",
                 "MagicFire_GetOotSphereVtx", "MagicFireDins_Draw")]
     with tempfile.TemporaryDirectory(prefix="mm-magic-fire-bindings-") as temp:
-        (Path(temp) / "magic_fire_draw_production.inc").write_text("\n".join([struct, indices, *names, *helpers]))
+        remake = '#define CW_DINS_HOST_MM\n#include "render/DinsFireRemakeDraw.h"\n#undef CW_DINS_HOST_MM'
+        (Path(temp) / "magic_fire_draw_production.inc").write_text("\n".join([struct, indices, *names, remake, *helpers]))
         flags += ["-I" + temp]
         binary = Path(temp) / "test"
         compiled = subprocess.run([*shlex.split(os.environ.get("CC", "cc")), *flags,

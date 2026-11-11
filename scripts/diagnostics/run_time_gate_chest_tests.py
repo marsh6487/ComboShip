@@ -9,7 +9,7 @@ import re
 import subprocess
 import tempfile
 
-from run_time_pedestal_tests import functions
+from run_time_pedestal_tests import block_from, functions
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -50,10 +50,13 @@ def main():
             "GiveItemEntryFromActorWithFixedRange", "Actor_OfferGetItem", "Actor_OfferGetItemNearby")]
         selected += [player["func_8083A434"]]
         selected += [functions(parameter_source)[name] for name in ("Item_GetSlot", "Item_CheckObtainability")]
+        inventory = (ROOT / "soh/mods/extended_inventory.c").read_text()
+        selected += [functions(inventory)["TravelTools_IsOwned"]]
         # Keep the real receipt branch and its one-shot guard. The remaining
         # function handles subsequent textbox/equip input, outside this probe.
         receive = player["func_8084DFF4"]
-        receive = receive[:receive.index(" else if (equipNow")]
+        receipt_start = receive.index("    if (this->av1.actionVar1 == 0)")
+        receive = receive[:receipt_start] + block_from(receive, receipt_start)
         selected += [receive.replace("func_8084DFF4", "Fixture_ReceiveItem", 1) + "\nreturn 0;\n}"]
         prototypes = "\n".join(body[:body.index("{")] + ";" for body in selected)
         (build / "time_gate_chest_production.inc").write_text(

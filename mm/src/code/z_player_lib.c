@@ -6,6 +6,7 @@
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 #include "../../../combo/render/sword_element_aura_identity.h"
+#include "../../../combo/render/ItemGetLightShaftBridge.h"
 #include "mods/items/logic/adult_link_render.h"
 #include "mods/items/logic/weapon_upgrades.h"
 #include "mods/forms/custom_forms.h"
@@ -3743,6 +3744,7 @@ void Player_DrawGetItem(PlayState* play, Player* player) {
 
         drawIdPlusOne = ABS_ALT(player->getItemDrawIdPlusOne);
         Player_DrawGetItemImpl(play, player, &refPos, drawIdPlusOne);
+        MMItemGetLightShaft_MarkNative(play, player, refPos.y + 14.0f);
     }
 }
 

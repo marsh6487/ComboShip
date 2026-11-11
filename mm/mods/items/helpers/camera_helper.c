@@ -4,6 +4,9 @@
 
 #include "gui/UiVisibility.h"
 #include "camera_helper.h"
+#include "../custom_items.h"
+#include "../logic/item_whip_constants.h"
+#include "../../extended_player.h"
 #include "functions.h"
 #include "macros.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -75,7 +78,12 @@ void FirstPerson_DrawReticle(Player* player, PlayState* play, f32 range, u8 r, u
         return;
     }
 
-    if (!(player->stateFlags1 & PLAYER_STATE1_ITEM_IN_HAND) || sFpAimTimer == 0)
+    // MM uses native bow aim for the whip; its legacy helper timer stays zero.
+    u8 whipAiming = player->heldItemAction == PLAYER_IA_WHIP && gCustomItemState.whipActive &&
+                    gCustomItemState.whipState == WHIP_STATE_EQUIP && gCustomItemState.whipFirstPersonActive &&
+                    player->unk_AA5 == PLAYER_UNKAA5_3 && player->unk_ACC != 0;
+
+    if (!(player->stateFlags1 & PLAYER_STATE1_ITEM_IN_HAND) || (sFpAimTimer == 0 && !whipAiming))
         return;
 
     CollisionPoly* colPoly;
@@ -93,7 +101,7 @@ void FirstPerson_DrawReticle(Player* player, PlayState* play, f32 range, u8 r, u
     f32 cosX = Math_CosS(player->actor.focus.rot.x);
     f32 sinX = Math_SinS(player->actor.focus.rot.x);
 
-    f32 maxRange = (range > 0) ? range : 10000.0f;
+    f32 maxRange = whipAiming ? WHIP_RANGE : ((range > 0) ? range : 10000.0f);
 
     rayEnd.x = rayStart.x + (sinY * cosX * maxRange);
     rayEnd.y = rayStart.y + (-sinX * maxRange);

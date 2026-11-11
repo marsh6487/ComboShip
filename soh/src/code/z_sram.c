@@ -1,4 +1,7 @@
 #include "../../../combo/vanilla/ComboVanillaMode.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 #include <stdlib.h>
 #include "../../../combo/ComboGameMode.h"
 #include "global.h"
@@ -91,6 +94,10 @@ void Sram_OpenSave() {
     u16 j;
     u8* ptr;
 
+#ifdef COMBO_BUILD
+    if (!ComboStartupOot_PrepareContextChange())
+        return;
+#endif
     Save_LoadFile();
 
     switch (gSaveContext.savedSceneNum) {

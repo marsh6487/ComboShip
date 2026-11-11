@@ -26,6 +26,7 @@ static std::map<int,nlohmann::json> containers;
 static std::vector<int> effects;
 static int flushes=0,loads=0;
 static bool loadFails=false;
+static bool Combo_PreserveStartupMmState(){return true;}
 static bool ComboIsValidSlot(int slot){return slot>=0&&slot<3;}
 static nlohmann::json& LoadOrCreateContainer(int slot){return containers[slot];}
 static void FlushContainer(int){++flushes;}

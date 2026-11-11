@@ -180,7 +180,11 @@ ComboForeignDrawInfo FairyDrawInfo() {
 using ComboForeignDrawInfoOOT = ComboForeignDrawInfo;
 using RandomizerCheck = int;
 constexpr int RC_UNKNOWN_CHECK = -1;
-struct GetItemEntry { int comboForeignCheck = 1, gid = GID_FAIRY; };
+struct GetItemEntry {
+    int comboForeignCheck = 1, gid = GID_FAIRY;
+#include "fairy_receipt_field.inc"
+    GetItemEntry() : comboMarketReceipt(0) {}
+};
 const ComboForeignDrawInfo* selectedForeign = nullptr;
 RandomizerCheck OOT_GetQueuedDrawCheck() { return 1; }
 const ComboForeignDrawInfo* ComboResolveForeignDrawInfo(int) { return selectedForeign; }

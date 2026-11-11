@@ -5,10 +5,17 @@
  */
 
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 
 void Sram_InitDebugSave(void);
 
 void Opening_SetupTitleScreen(OpeningContext* this) {
+#ifdef COMBO_BUILD
+    if (!ComboStartupOot_PrepareContextChange())
+        return;
+#endif
     gSaveContext.gameMode = GAMEMODE_TITLE_SCREEN;
     this->state.running = false;
     gSaveContext.linkAge = 0;

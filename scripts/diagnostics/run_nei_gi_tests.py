@@ -11,6 +11,7 @@ import sys
 import struct
 import xml.etree.ElementTree as ET
 from run_time_pedestal_tests import block_from, functions
+from foreign_gi_fixture_dependencies import startup_foreign_receipt_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0", "-I" + str(ROOT)]
@@ -402,7 +403,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
             custom_flags='namespace CustomItem {\n'+re.search(r'enum CustomItemFlags.*?\n\};',flags_source,re.S)[0]+'\n}\n'
             tested_bridge = (form_enum + '\nint fixtureMmForm=PLAYER_FORM_HUMAN;\n#define GET_PLAYER_FORM fixtureMmForm\n' + custom_flags + shim + route + "\n" + item_enum + "\n" + spell_producer + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
-                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
+                             startup_foreign_receipt_boundary(ROOT) + foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
             tested_bridge = ('#include "ComboBottleContents.h"\n'
                              'int ComboBottleContents_Draw(PlayState*,int) {assert(false);return 0;}\n' + tested_bridge)
             # The production renderer now includes the real runtime resolver.

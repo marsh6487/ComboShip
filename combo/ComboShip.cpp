@@ -1,6 +1,7 @@
 #include "vanilla/ComboVanillaSave.h"
 #include "vanilla/ComboVanillaFile.h"
 #include "vanilla/ComboVanillaRewards.h"
+#include "rando/StartupCheckReceiptState.h"
 // ComboShip - Unified Launcher for OOT (soh.dll) + MM (2ship.dll)
 //
 // Select Combo/OoT/MM before ROM setup. Solo sessions enter the selected
@@ -22,6 +23,7 @@
 #include <unordered_map>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <thread>
 #include <mutex>
 #include <queue>
@@ -471,6 +473,11 @@ static std::mutex g_containerMutex;
 static std::map<int, nlohmann::json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
+static std::map<int, uint32_t> g_startupAckRetries;
+static uint32_t g_startupGeneration = 0;
+static CwFinishMmStartupReceipt MM_FinishStartupReceipt = nullptr;
+static int32_t (*SOH_CaptureStartupReceiptSave)(int32_t) = nullptr;
 // Slots whose container was backed up for a COMBO_RELEASE_VERSION mismatch; guarded by g_containerMutex.
 // OOT drains it on the main thread (Combo_TakeEvictionNotice) to surface a popup.
 static std::vector<int> g_evictedSlots;
@@ -591,6 +598,8 @@ static void EraseComboContainer(int slot) {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         g_containerCache.erase(slot);
         g_vanillaReceipts.erase(slot);
+        g_startupCompletions.erase(slot);
+        g_startupAckRetries.erase(slot);
         // MM's dormant save is now stale: leave it marked resident and the next load skips re-reading it,
         // and any dormant MM write would put the erased save back into the slot.
         if (g_MmSaveInMemorySlot == slot)
@@ -617,6 +626,8 @@ static void Combo_CopyContainer(int from, int to) {
         // A receipt's native grant has not reached disk until its atomic
         // commit. Copy only that durable state, including recoverable pending.
         g_vanillaReceipts.erase(to);
+        g_startupCompletions.erase(to);
+        g_startupAckRetries.erase(to);
         copy["slot"] = to;
         g_containerCache[to] = std::move(copy);
         if (g_MmSaveInMemorySlot == to)
@@ -639,6 +650,16 @@ static const char* Combo_ReadGameSave(int game, int fileNum) {
     const auto pending = g_vanillaCreations.find(fileNum);
     const auto& c = pending != g_vanillaCreations.end() && pending->second.Active() ? pending->second.Document()
                                                                                     : LoadOrCreateContainer(fileNum);
+    const auto startup = g_startupCompletions.find(fileNum);
+    if (startup != g_startupCompletions.end() && startup->second->Ready() && startup->second->Matches(c)) {
+        // A failed disk commit must not reload pre-award memory and then persist
+        // the awarded snapshot behind it. A process restart still uses durable pending.
+        const auto& staged = game == ComboRando::GAME_MM ? startup->second->nativeSave : startup->second->nativeOotSave;
+        if (staged.is_object() && (game == ComboRando::GAME_MM || startup->second->peerCaptureComplete)) {
+            buf = staged.dump();
+            return buf.c_str();
+        }
+    }
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
     auto it = c.find(key);
     buf = (it == c.end() || it->is_null()) ? std::string() : it->dump();
@@ -676,12 +697,251 @@ static void Combo_WriteGameSave(int game, int fileNum, const char* json) {
         } catch (...) {}
         return; // Native state and its permanent check are one atomic write.
     }
+    const auto startup = g_startupCompletions.find(fileNum);
+    if (startup != g_startupCompletions.end() && (startup->second->running || startup->second->Ready()) &&
+        startup->second->Matches(LoadOrCreateContainer(fileNum))) {
+        try {
+            const auto native = nlohmann::json::parse(json);
+            if (game == ComboRando::GAME_MM) {
+                if (startup->second->receipt.state == CW_STARTUP_READY)
+                    startup->second->Stage(native);
+            } else
+                startup->second->StagePeer(native);
+        } catch (...) {}
+        return; // The MM award, its OoT shared effect and READY receipt are one write.
+    }
     auto& c = LoadOrCreateContainer(fileNum);
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
     try {
         c[key] = nlohmann::json::parse(json);
     } catch (...) { return; }
     FlushContainer(fileNum);
+}
+
+// Complete an MM-owned startup award only against the matching initialized
+// save. Native callbacks run without the container mutex: their save callback
+// re-enters Combo_WriteGameSave and stages the post-award snapshot above.
+static void Combo_CompleteStartupReceipt(int slot, bool allowGrant) {
+    if (!ComboIsValidSlot(slot) || g_MmSaveInMemorySlot != slot || !MM_FinishStartupReceipt ||
+        !SOH_CaptureStartupReceiptSave)
+        return;
+    std::shared_ptr<ComboStartupReceipt::MmCompletion> completion;
+    CwStartupReceipt nativeResult{};
+    try {
+        {
+            std::lock_guard<std::mutex> lock(g_containerMutex);
+            auto& document = LoadOrCreateContainer(slot);
+            CwStartupReceipt pending{};
+            if (!ComboStartupReceipt::PendingMm(document, pending)) {
+                g_startupCompletions.erase(slot);
+                return;
+            }
+            auto found = g_startupCompletions.find(slot);
+            if (found == g_startupCompletions.end() || !found->second->Matches(document)) {
+                if (!allowGrant)
+                    return;
+                completion = std::make_shared<ComboStartupReceipt::MmCompletion>();
+                if (!completion->Begin(document))
+                    return;
+                g_startupCompletions[slot] = completion;
+            } else {
+                completion = found->second;
+            }
+            if (completion->running || (!allowGrant && !completion->Ready()))
+                return;
+            if (completion->Ready() && completion->nativeSave.is_object() && completion->peerCaptureComplete) {
+                if (completion->Commit(
+                        document, [&](const nlohmann::json& draft) { return WriteContainerDocument(slot, draft); }))
+                    g_startupCompletions.erase(slot);
+                return;
+            }
+            completion->running = true;
+            nativeResult = completion->receipt;
+        }
+        if (nativeResult.state == CW_STARTUP_WAIT_MM) {
+            try {
+                // The native grant writes a local result, never the shared
+                // completion that OoT save workers inspect under the mutex.
+                MM_FinishStartupReceipt(&nativeResult);
+            } catch (const std::exception& error) {
+                std::cerr << "[ComboShip] startup MM award failed: " << error.what() << '\n';
+            } catch (...) { std::cerr << "[ComboShip] startup MM award failed\n"; }
+        }
+        bool captureNative = false;
+        {
+            std::lock_guard<std::mutex> lock(g_containerMutex);
+            const auto current = g_startupCompletions.find(slot);
+            if (current == g_startupCompletions.end() || current->second != completion)
+                return;
+            if (nativeResult.state != CW_STARTUP_READY || !ComboStartupReceipt::Valid(nativeResult) ||
+                nativeResult.generation != completion->receipt.generation || nativeResult.itemGame != 1) {
+                completion->running = false;
+                if (nativeResult.state == CW_STARTUP_WAIT_MM)
+                    g_startupCompletions.erase(current);
+                return;
+            }
+            completion->receipt = nativeResult; // Publish READY while synchronized with save workers.
+            captureNative = !completion->nativeSave.is_object();
+        }
+        if (captureNative) {
+            try {
+                // READY captures native state only: no conversion, award or
+                // shared pickup is repeated after a failed snapshot.
+                MM_FinishStartupReceipt(&nativeResult);
+            } catch (const std::exception& error) {
+                std::cerr << "[ComboShip] startup MM receipt capture failed: " << error.what() << '\n';
+            } catch (...) { std::cerr << "[ComboShip] startup MM receipt capture failed\n"; }
+        }
+        if (nativeResult.state == CW_STARTUP_READY) {
+            try {
+                // Native shared pickup fan-out can enqueue an OoT writer.
+                // Capture/drain it before either native award reaches disk.
+                SOH_CaptureStartupReceiptSave(slot);
+            } catch (const std::exception& error) {
+                std::cerr << "[ComboShip] startup OoT shared snapshot failed: " << error.what() << '\n';
+            } catch (...) { std::cerr << "[ComboShip] startup OoT shared snapshot failed\n"; }
+        }
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        completion->running = false;
+        const auto current = g_startupCompletions.find(slot);
+        if (current == g_startupCompletions.end() || current->second != completion)
+            return; // A replacement/deletion invalidated this transaction.
+        auto& document = LoadOrCreateContainer(slot);
+        if (!completion->Matches(document)) {
+            g_startupCompletions.erase(current);
+            return;
+        }
+        if (completion->Commit(document,
+                               [&](const nlohmann::json& draft) { return WriteContainerDocument(slot, draft); }) ||
+            completion->receipt.state == CW_STARTUP_WAIT_MM)
+            g_startupCompletions.erase(current);
+    } catch (const std::exception& error) {
+        if (completion) {
+            std::lock_guard<std::mutex> lock(g_containerMutex);
+            completion->running = false;
+        }
+        std::cerr << "[ComboShip] startup receipt completion failed: " << error.what() << '\n';
+    }
+}
+
+// MM setup clears the live SaveContext before asking for its disk save. If an
+// award outlived a failed snapshot, seal that old context before any load/init
+// or handoff can replace it. A staged pair is safe even if disk is still busy.
+static bool Combo_PreserveStartupMmState() {
+    const int resident = g_MmSaveInMemorySlot;
+    if (!ComboIsValidSlot(resident))
+        return true;
+    Combo_CompleteStartupReceipt(resident, false);
+    std::lock_guard<std::mutex> lock(g_containerMutex);
+    const auto completion = g_startupCompletions.find(resident);
+    if (completion == g_startupCompletions.end() || !completion->second->Matches(LoadOrCreateContainer(resident)))
+        return true;
+    if (!completion->second->running &&
+        (completion->second->receipt.state == CW_STARTUP_WAIT_MM ||
+         (completion->second->nativeSave.is_object() && completion->second->peerCaptureComplete)))
+        return true;
+    std::cerr << "[ComboShip] MM context replacement deferred: startup reward snapshot is not ready for slot "
+              << resident << '\n';
+    return false;
+}
+
+static int32_t Combo_StartupReceipt(int32_t action, int32_t game, int32_t slot, CwStartupReceipt* receipt) {
+    if (action == CW_STARTUP_PREPARE_CONTEXT_CHANGE) {
+        try {
+            return game == 0 && Combo_PreserveStartupMmState() ? 1 : 0;
+        } catch (...) { return 0; }
+    }
+    if (!ComboIsValidSlot(slot) || game < 0 || game > 1 ||
+        ((action == CW_STARTUP_BEGIN_FILE || action == CW_STARTUP_CAPTURE) && game != 0) ||
+        (action != CW_STARTUP_BEGIN_FILE && action != CW_STARTUP_PREPARE_PEER_SNAPSHOT && !receipt))
+        return -1;
+    try {
+        // Gameplay polling may finish persistence after a failed write, but
+        // only explicit save initialization/loading can begin a native award.
+        if (action == CW_STARTUP_PEEK)
+            Combo_CompleteStartupReceipt(slot, false);
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        const auto creation = g_vanillaCreations.find(slot);
+        if (creation != g_vanillaCreations.end() && creation->second.Active())
+            return 0;
+        auto& document = LoadOrCreateContainer(slot);
+        if (action == CW_STARTUP_PREPARE_PEER_SNAPSHOT) {
+            const auto pending = g_startupCompletions.find(slot);
+            if (game != 0 || pending == g_startupCompletions.end() || !pending->second->running ||
+                !pending->second->Ready() || !pending->second->Matches(document))
+                return 0;
+            pending->second->PreparePeerCapture();
+            return 1;
+        }
+        if (action == CW_STARTUP_BEGIN_FILE) {
+            const auto combo = document.find("combo");
+            if (combo != document.end() && combo->is_object()) {
+                const auto previous = combo->find("startupReceiptGeneration");
+                if (previous != combo->end() && previous->is_number_unsigned() &&
+                    previous->get<uint64_t>() <= std::numeric_limits<uint32_t>::max() &&
+                    previous->get<uint32_t>() > g_startupGeneration)
+                    g_startupGeneration = previous->get<uint32_t>();
+            }
+            if (++g_startupGeneration == 0)
+                ++g_startupGeneration;
+            if (!ComboStartupReceipt::BeginFile(document, g_startupGeneration))
+                return -1;
+            g_startupCompletions.erase(slot);
+            g_startupAckRetries.erase(slot);
+            if (receipt)
+                receipt->generation = g_startupGeneration;
+            return 1; // The first native OoT save persists this metadata.
+        }
+        if (action == CW_STARTUP_CAPTURE) {
+            if (!ComboStartupReceipt::Valid(*receipt))
+                return -1;
+            if (!ComboStartupReceipt::Capture(document, *receipt))
+                return 0;
+            receipt->generation = document["combo"]["startupReceiptGeneration"].get<uint32_t>();
+            return 1;
+        }
+        if (action == CW_STARTUP_PEEK) {
+            const auto visible = g_startupAckRetries.find(slot);
+            if (visible != g_startupAckRetries.end()) {
+                CwStartupReceipt pending{};
+                if (ComboStartupReceipt::Peek(document, pending) && pending.generation == visible->second) {
+                    auto draft = document;
+                    ComboStartupReceipt::Acknowledge(draft, visible->second);
+                    if (WriteContainerDocument(slot, draft)) {
+                        document = std::move(draft);
+                        g_startupAckRetries.erase(visible);
+                    }
+                    return 0; // Already visible this process, including after a game/scene change.
+                }
+                g_startupAckRetries.erase(visible);
+            }
+            return ComboStartupReceipt::Peek(document, *receipt) ? 1 : 0;
+        }
+        if (action == CW_STARTUP_ACKNOWLEDGE) {
+            auto draft = document;
+            if (receipt->version != CW_STARTUP_RECEIPT_VERSION)
+                return -1;
+            if (!ComboStartupReceipt::Acknowledge(draft, receipt->generation)) {
+                CwStartupReceipt current{};
+                const auto* saved = ComboStartupReceipt::Record(document);
+                return saved && ComboStartupReceipt::Decode(*saved, current) &&
+                               current.generation == receipt->generation && saved->at("shown").get<bool>()
+                           ? 1
+                           : -1; // A removed/replaced generation must release its old presentation.
+            }
+            if (!WriteContainerDocument(slot, draft)) {
+                g_startupAckRetries[slot] = receipt->generation;
+                return 0;
+            }
+            document = std::move(draft);
+            g_startupAckRetries.erase(slot);
+            return 1;
+        }
+        return -1;
+    } catch (const std::exception& error) {
+        std::cerr << "[ComboShip] startup receipt request failed: " << error.what() << '\n';
+        return 0;
+    }
 }
 
 static int Combo_VanillaReward(int action, int game, int slot, const char* checkId, const char* nativeJson) {
@@ -1533,7 +1793,7 @@ static void Combo_OnCrossBossDefeated(int physicalBoss) try {
     if (!g_ApplyCrossBossClear[owner])
         throw std::runtime_error("cross-boss source effect export missing");
     if (owner == 1 && g_MmSaveInMemorySlot != g_comboCompletionSlot) {
-        if (!MM_LoadSaveForCombo || MM_LoadSaveForCombo(g_comboCompletionSlot) != 0)
+        if (!Combo_PreserveStartupMmState() || !MM_LoadSaveForCombo || MM_LoadSaveForCombo(g_comboCompletionSlot) != 0)
             throw std::runtime_error("cross-boss source MM save could not be loaded");
         g_MmSaveInMemorySlot = g_comboCompletionSlot;
     }
@@ -3108,6 +3368,8 @@ static int Combo_OnReloadRequest(const char* path) {
 // entry-time repair below, so a rebuilt half is the one creation would have written. False = nothing
 // was written; each caller logs it, since each has its own context.
 static bool Combo_WriteMMSaveForSlot(int fileNum, const nlohmann::json& seed) {
+    if (!Combo_PreserveStartupMmState())
+        return false;
     if (!MM_InitRandoSaveFile || seed.is_null()) {
         return false;
     }
@@ -3144,6 +3406,7 @@ static bool Combo_WriteMMSaveForSlot(int fileNum, const nlohmann::json& seed) {
         return false;
     }
     g_MmSaveInMemorySlot = fileNum; // the build path leaves the save live in MM's gSaveContext
+    Combo_CompleteStartupReceipt(fileNum, true);
     return true;
 }
 
@@ -3201,8 +3464,13 @@ static int Combo_VanillaCreation(int slot, int phase) try {
     if (phase == 0) {
         if (!MM_InitVanillaSaveFile || !MM_DiscardVanillaSaveCreation || !SOH_GetCurrentPlayerName)
             return 0;
+        if (!Combo_PreserveStartupMmState())
+            return 0;
         std::lock_guard<std::mutex> lock(g_containerMutex);
-        return g_vanillaCreations[slot].Begin(slot, LoadOrCreateContainer(slot)) ? 1 : 0;
+        const bool began = g_vanillaCreations[slot].Begin(slot, LoadOrCreateContainer(slot));
+        if (began)
+            g_startupCompletions.erase(slot);
+        return began ? 1 : 0;
     }
     if (phase == 2) {
         if (MM_DiscardVanillaSaveCreation)
@@ -3220,6 +3488,8 @@ static int Combo_VanillaCreation(int slot, int phase) try {
             return 0;
     }
     unsigned char name[8];
+    if (!Combo_PreserveStartupMmState())
+        return 0;
     SOH_GetCurrentPlayerName(name);
     const int nativeResult = MM_InitVanillaSaveFile(slot, name);
     bool committed = false;
@@ -3262,6 +3532,8 @@ static int Combo_VanillaCreation(int slot, int phase) try {
 
 static void Combo_OnOOTSaveInit(int fileNum) {
     if (!ComboIsValidSlot(fileNum))
+        return;
+    if (!Combo_PreserveStartupMmState())
         return;
     if (g_ConsolidatedJson.empty() && !Combo_BindCrossDungeonRuntime(nullptr))
         return;
@@ -3382,6 +3654,7 @@ static void Combo_OnOOTSaveLoad(int fileNum) {
     }
     Combo_PushHintTrackerData(fileNum); // #164: this slot's hints + persisted read state
     if (!MM_LoadSaveForCombo || g_MmSaveInMemorySlot == fileNum) {
+        Combo_CompleteStartupReceipt(fileNum, true);
         Combo_OnTriforceProgress(0, fileNum);
         Combo_SharedReconcileNow(); // Shared Items: full reconcile at slot bind (see the invariant note)
         Combo_ResumeMMIfLastSavedThere(fileNum);
@@ -3390,8 +3663,9 @@ static void Combo_OnOOTSaveLoad(int fileNum) {
     std::cout << "[ComboShip] Loading MM save for OOT slot " << fileNum << " (tracker peek)" << std::endl;
     // Read-only peek: on failure nothing was loaded, so the slot must NOT be marked resident — stale
     // dormant memory would otherwise pose as this slot's save (and a dormant write would persist it).
-    if (MM_LoadSaveForCombo(fileNum) == 0) {
+    if (Combo_PreserveStartupMmState() && MM_LoadSaveForCombo(fileNum) == 0) {
         g_MmSaveInMemorySlot = fileNum;
+        Combo_CompleteStartupReceipt(fileNum, true);
         // A dormant slot load is exactly the moment MM can finally consume a team-state resync —
         // ask now instead of waiting for foreground entry (MMAnchor::OnSaveLoad is isActive-gated).
         if (MM_Anchor_RequestResync)
@@ -3417,6 +3691,8 @@ static void Combo_ResumeMMIfLastSavedThere(int fileNum) {
     if (Combo_GetLastGame(fileNum) != ComboRando::GAME_MM) {
         return;
     }
+    if (!Combo_PreserveStartupMmState())
+        return;
     std::cout << "[ComboShip] Slot " << fileNum << " was last saved in MM — resuming MM" << std::endl;
     if (MM_SetComboEntryIsResume)
         MM_SetComboEntryIsResume(1); // a real save load: honors MM's Remember Save Location
@@ -4208,6 +4484,14 @@ int main(int argc, char** argv) {
         setOotReward(Combo_VanillaReward);
         setMmReward(Combo_VanillaReward);
     }
+    auto setOotStartup = (CwSetStartupReceiptHost)GetSym(sohModule, "SOH_SetStartupReceiptHost");
+    auto setMmStartup = (CwSetStartupReceiptHost)GetSym(mmModule, "MM_SetStartupReceiptHost");
+    MM_FinishStartupReceipt = (CwFinishMmStartupReceipt)GetSym(mmModule, "MM_FinishStartupReceipt");
+    SOH_CaptureStartupReceiptSave = (int32_t(*)(int32_t))GetSym(sohModule, "SOH_CaptureStartupReceiptSave");
+    if (setOotStartup && setMmStartup && MM_FinishStartupReceipt && SOH_CaptureStartupReceiptSave) {
+        setOotStartup(Combo_StartupReceipt);
+        setMmStartup(Combo_StartupReceipt);
+    }
     if (SOH_SetOnNewSaveCallback && MM_InitRandoSaveFile) {
         SOH_SetOnNewSaveCallback(Combo_OnOOTSaveInit);
         std::cout << "[ComboShip] OOT new-save callback registered." << std::endl;
@@ -4271,10 +4555,18 @@ int main(int argc, char** argv) {
                 ootBooted = true;
             } else {
                 std::cout << "[ComboShip] OOT resume\n";
+                if (!Combo_PreserveStartupMmState()) {
+                    std::cerr << "[ComboShip] cannot reset OoT while its startup shared snapshot is unavailable\n";
+                    break;
+                }
                 if (SOH_ResumeGame)
                     SOH_ResumeGame();
             }
             if (g_PendingMMFileNum >= 0 && MM_RunGame) {
+                if (!Combo_PreserveStartupMmState()) {
+                    g_PendingMMFileNum = -1;
+                    continue; // Resume OoT without destroying the awarded MM context.
+                }
                 if (SOH_PrepareForTransition)
                     SOH_PrepareForTransition();
                 if (MM_NotifyComboTransition)

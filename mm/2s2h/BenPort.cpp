@@ -43,6 +43,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/FleetShipCombo/FleetSharedItems.h"
 #include "vanilla/ComboVanillaPolicy.h"
 #include "vanilla/ComboVanillaMode.h"
+#include "rando/StartupCheckReceipt.h"
 #include "mods/combo_rpg.h"
 
 #include <ship/resource/CrossRMRegistry.h>
@@ -5497,7 +5498,7 @@ void Combo_MM_FlushAccumulators(void) {
     }
 }
 
-void Combo_MM_GiveDormantResolved(RandoItemId rid) {
+static void Combo_MM_GiveDormantResolvedInternal(RandoItemId rid, bool persist) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM dormant-resolved");
     // ComboShip (#84): drop a bottle refill when no bottle is free. Callers convert first, so this is
     // a backstop — Item_Give's bottle-contents branch overwrites bottle #1. Keep it either way.
@@ -5516,9 +5517,119 @@ void Combo_MM_GiveDormantResolved(RandoItemId rid) {
         Rando::GiveItem(rid);
     }
     Combo_MM_FlushAccumulators();
-    if (gSaveContext.fileNum != 0xFF) {
+    if (persist && gSaveContext.fileNum != 0xFF) {
         SaveManager_SaveCurrentForCombo(); // persist NOW
     }
+}
+
+void Combo_MM_GiveDormantResolved(RandoItemId rid) {
+    Combo_MM_GiveDormantResolvedInternal(rid, true);
+}
+
+static int StartupImportance(RandoItemType type) {
+    switch (type) {
+        case RITYPE_JUNK:
+            return CW_STARTUP_JUNK;
+        case RITYPE_HEALTH:
+        case RITYPE_LESSER:
+        case RITYPE_STRAY_FAIRY:
+        case RITYPE_SKULLTULA_TOKEN:
+        case RITYPE_SMALL_KEY:
+            return CW_STARTUP_MINOR;
+        default:
+            return CW_STARTUP_MAJOR;
+    }
+}
+
+// Called only after the launcher has initialized the matching MM save and its
+// starting inventory. Never resolve against the previous/dormant file.
+extern "C" COMBO_EXPORT int32_t MM_FinishStartupReceipt(CwStartupReceipt* receipt) {
+    if (!receipt || !Combo_IsCombinedGame() || Combo_IsVanilla() || !IS_RANDO || gSaveContext.fileNum > 2 ||
+        receipt->version != CW_STARTUP_RECEIPT_VERSION || !receipt->generation || receipt->itemGame != 1 ||
+        !receipt->itemName[0] || !std::memchr(receipt->itemName, 0, sizeof(receipt->itemName)) ||
+        !std::memchr(receipt->displayName, 0, sizeof(receipt->displayName)))
+        return -1;
+    if (receipt->state == CW_STARTUP_READY) {
+        // An earlier award succeeded but its save callback failed before staging
+        // a snapshot. Retrying is save-only, including shared-item delivery.
+        if (!Rando::StaticData::Items.contains(static_cast<RandoItemId>(receipt->getItemId)) ||
+            !receipt->displayName[0] || receipt->importance < CW_STARTUP_JUNK || receipt->importance > CW_STARTUP_MAJOR)
+            return -1;
+        SaveManager_SaveCurrentForCombo();
+        return 1;
+    }
+    if (receipt->state != CW_STARTUP_WAIT_MM)
+        return -1;
+    const auto& names = Combo_MM_SpoilerNameToItemId();
+    const auto placed = names.find(receipt->itemName);
+    if (placed == names.end())
+        return -1;
+    RandoItemId resolved = Rando::ConvertItem(placed->second);
+    if (resolved == RI_JUNK)
+        resolved = RI_RUPEE_RED;
+    const auto found = Rando::StaticData::Items.find(resolved);
+    if (found == Rando::StaticData::Items.end() || resolved == RI_UNKNOWN || resolved == RI_NONE ||
+        resolved == RI_COMBO_FOREIGN)
+        return -1;
+    const auto& item = found->second;
+    const std::string& name = Rando::StaticData::GetItemDisplayName(resolved);
+    const std::string display = item.name && item.name[0] ? item.name : name;
+    if (name.empty() || name.size() >= sizeof(receipt->itemName) || display.empty() ||
+        display.size() >= sizeof(receipt->displayName))
+        return -1;
+    CwStartupReceipt ready = *receipt;
+    ready.getItemId = resolved;
+    ready.itemId = item.itemId;
+    ready.drawItemId = item.drawId;
+    // OoT's foreground adapter consumes its native ItemCategory numbering.
+    // Match ForeignCategoryFromName, including major disguised traps/fairies.
+    ready.category = 6;
+    if (resolved != RI_TRAP) {
+        switch (item.randoItemType) {
+            case RITYPE_JUNK:
+                ready.category = 0;
+                break;
+            case RITYPE_LESSER:
+                ready.category = 1;
+                break;
+            case RITYPE_HEALTH:
+                ready.category = 2;
+                break;
+            case RITYPE_BOSS_KEY:
+                ready.category = 3;
+                break;
+            case RITYPE_SMALL_KEY:
+                ready.category = 4;
+                break;
+            case RITYPE_SKULLTULA_TOKEN:
+                ready.category = 5;
+                break;
+            default:
+                break;
+        }
+    }
+    ready.importance = StartupImportance(item.randoItemType);
+    ready.dungeonInfo = resolved == RI_WOODFALL_MAP || resolved == RI_SNOWHEAD_MAP || resolved == RI_GREAT_BAY_MAP ||
+                        resolved == RI_STONE_TOWER_MAP || resolved == RI_WOODFALL_COMPASS ||
+                        resolved == RI_SNOWHEAD_COMPASS || resolved == RI_GREAT_BAY_COMPASS ||
+                        resolved == RI_STONE_TOWER_COMPASS;
+    ready.trap = resolved == RI_TRAP;
+    std::memset(ready.itemName, 0, sizeof(ready.itemName));
+    std::memcpy(ready.itemName, name.c_str(), name.size());
+    std::memset(ready.displayName, 0, sizeof(ready.displayName));
+    std::memcpy(ready.displayName, display.c_str(), display.size());
+    {
+        FleetSharedReceiveGuard receiveGuard;
+        Combo_MM_GiveDormantResolvedInternal(resolved, false);
+    }
+    ready.state = CW_STARTUP_READY;
+    *receipt = ready; // Award succeeded: set before ANY subsequent callback can throw.
+    // The launcher stages both native saves and commits them with READY, so
+    // the normal native-sharing fan-out is part of this same startup award.
+    FleetShared_OnNativeObtained(static_cast<int>(resolved));
+    // The launcher publishes READY under its mutex, then calls the READY path
+    // to capture MM's snapshot. No save callback observes an unpublished state.
+    return 1;
 }
 
 // Save-direct grant by spoiler name. Bracketed as a receive so the give choke does not share it back

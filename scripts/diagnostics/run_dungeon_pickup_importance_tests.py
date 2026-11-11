@@ -63,7 +63,7 @@ namespace Rando {
 struct Context {
  static Context* GetInstance() {static Context instance;return &instance;}
  Location* GetItemLocation(int) {return &location;}
- GetItemEntry GetFinalGIEntry(int,bool,GetItemID) {return entry;}
+ GetItemEntry GetFinalGIEntry(int,bool,GetItemID,bool=false) {return entry;}
 };
 namespace StaticData {
  Location* GetLocation(int) {return &location;}
@@ -81,12 +81,14 @@ auto* gPlayState=&play;
 #define SPDLOG_INFO(...) ((void)0)
 enum {PLAYER_STATE1_IN_ITEM_CS=1,PLAYER_STATE1_GETTING_ITEM=2,PLAYER_STATE1_CARRYING_ACTOR=4,
  RC_UNKNOWN_CHECK,RC_HF_OCARINA_OF_TIME_ITEM,RC_SPIRIT_TEMPLE_SILVER_GAUNTLETS_CHEST,
+ RC_LOST_WOODS_MAGIC_MIRROR_STUMP,
  RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE,RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE,
  ITEM00_SOH_GIVE_ITEM_ENTRY};
 bool Player_InBlockingCsMode(decltype(gPlayState),Player*) {return false;}
 namespace ComboCapeReceiptChoice {bool IsCape(const char*) {return false;}}
 const ComboRando::ForeignItem* OOT_LookupForeign(int,const std::string&) {return &foreign;}
 std::queue<int> randomizerQueuedChecks;
+struct { void Acknowledge(const std::string&) {} } sCrossDungeonPendingChecks;
 int randomizerQueuedCheck=RC_UNKNOWN_CHECK;
 GetItemEntry randomizerQueuedItemEntry{};
 float iceTrapScale=0;

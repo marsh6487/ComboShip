@@ -4869,6 +4869,7 @@ s32 Player_SetAction(PlayState* play, Player* this, PlayerActionFunc actionFunc,
         return false;
     }
 
+    OotSpells_ReleasePendingDinMagic(play, this);
     play->actorCtx.flags &= ~ACTORCTX_FLAG_PICTO_BOX_ON;
 
     if (this->actor.flags & ACTOR_FLAG_OCARINA_INTERACTION) {
@@ -14691,6 +14692,7 @@ void Player_Draw(Actor* thisx, PlayState* play) {
                 Player_DrawGetItem(play, this);
             }
             DinFireSword_DrawAfterPlayer(play, this);
+            Player_DrawDinsFireRemakeCharge(this, play);
             return;
         }
     }
@@ -14992,6 +14994,8 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     }
 
     DinFireSword_DrawAfterPlayer(play, this);
+
+    Player_DrawDinsFireRemakeCharge(this, play);
 
     play->actorCtx.flags &= ~ACTORCTX_FLAG_3;
 }
