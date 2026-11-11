@@ -69,6 +69,8 @@ struct FileChooseContext { int buttonIndex=0,n64ddFlag=0,speedrunIndex=0; u8 que
 struct SaveFileMetaInfo { u8 playerName[8]; } metadata{};
 auto Save_GetSaveMetaInfo(int) { return &metadata; }
 int randos=0,peers=0,saves=0,created=0;
+int formSessionDiscards=0;
+extern "C" void MmForm_DiscardSaveSession(void) { ++formSessionDiscards; }
 bool seed=true,spoiler=false;
 void Sram_InitNewSave(){} void Sram_InitDebugSave(){}
 bool Ship_QuestDebugEnabled(int){ return false; }
@@ -134,14 +136,16 @@ int main(){
   integers["enh.FileSelect.HideMasterQuest"]=1;
   check(SohFileSelect_IsQuestHidden(QUEST_MASTER),"solo native hide preference"); integers.clear();
   for (int quest : {QUEST_NORMAL,QUEST_MASTER,QUEST_RANDOMIZER}) {
-    FileChooseContext fc; fc.questType[0]=quest; randos=peers=saves=created=0;
+    FileChooseContext fc; fc.questType[0]=quest; randos=peers=saves=created=formSessionDiscards=0;
     Sram_InitSave(&fc);
+    check(formSessionDiscards==1,"accepted solo creation discards the departed form session once");
     check(gSaveContext.ship.quest.id==quest,"solo creates chosen vanilla/MQ/rando quest");
     check(randos==(quest==QUEST_RANDOMIZER),"solo vanilla avoids randomizer initialization");
     check(saves==1 && peers==0 && created==0,"solo save never dispatches peer creation callback");
   }
-  { FileChooseContext stale;stale.questType[0]=QUEST_OOTXMM;randos=peers=saves=created=0;Sram_InitSave(&stale);
-    check(randos==0 && peers==0 && saves==0 && created==0,"solo rejects direct stale paired quest creation"); }
+  { FileChooseContext stale;stale.questType[0]=QUEST_OOTXMM;randos=peers=saves=created=formSessionDiscards=0;Sram_InitSave(&stale);
+    check(randos==0 && peers==0 && saves==0 && created==0,"solo rejects direct stale paired quest creation");
+    check(formSessionDiscards==0,"rejected stale paired creation preserves the current form session"); }
   std::ofstream("native.json")<<R"({"version":"x","finalSeed":123})";
   std::ofstream("combo.json")<<R"({"fileType":"ComboShipRandomizer","version":"x","finalSeed":123})";
   char native[]="native.json",combo[]="combo.json";
@@ -156,7 +160,8 @@ int main(){
   gComboGameMode=COMBO_GAME_BOTH;
   check(manager.GetFileName(0)==std::filesystem::path("Save/file1.sav"),"combined native fallback unchanged");
   check(SohFileSelect_IsQuestHidden(QUEST_NORMAL) && !SohFileSelect_IsQuestHidden(QUEST_RANDOMIZER),"combined remains randomizer only");
-  randos=created=0;FileChooseContext fc;fc.questType[0]=QUEST_NORMAL;Sram_InitSave(&fc);
+  randos=created=formSessionDiscards=0;FileChooseContext fc;fc.questType[0]=QUEST_NORMAL;Sram_InitSave(&fc);
+  check(formSessionDiscards==1,"accepted combined creation discards the departed form session once");
   check(gSaveContext.ship.quest.id==QUEST_RANDOMIZER && randos==1 && created==1,"combined creation callback unchanged");
   check(!Rando_HandleSpoilerDrop(native) && Rando_HandleSpoilerDrop(combo),"combined accepts only combined spoilers");
   crossCalls=0;check(Entrance_OverrideNextIndex(10)==999 && crossCalls==1,"combined entrance adapter retained");

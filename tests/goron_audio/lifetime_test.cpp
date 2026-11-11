@@ -77,6 +77,11 @@ static u16 channelSfx[16];
 // this fixture keeps the real bank/dispatcher and Goron lifetime entrypoints.
 static void MmForm_InterruptNativeMaskForScene(Player*, PlayState*, u8) {}
 static void MmForm_CancelNativeMaskCutscene(u8) {}
+// Deku projectile/effect teardown has its own native-header lifecycle suite.
+// Goron entrypoints may abandon a scene or use the fixture's live play only.
+static void MmForm_ResetDekuBubble(PlayState* state) {
+    assert(state == nullptr || state == &play);
+}
 // The form-instrument suite owns these independent voices. Keep this fixture
 // focused on the native Goron rolling bank and its existing lifetime assertions.
 static void MmForm_GakkiVoiceOff() {}

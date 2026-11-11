@@ -2,6 +2,7 @@
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/RegionalPassages.h"
 #include "gameplay/MagicMirrorArrival.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "global.h"
 #include <algorithm>
 #include <cstdio>
