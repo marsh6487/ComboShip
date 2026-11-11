@@ -5,6 +5,7 @@ import os, re, subprocess, sys, tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import functions
+from foreign_gi_fixture_dependencies import startup_foreign_receipt_boundary
 from run_mm_nei_tests import flags as mm_flags, write_graph_helpers
 
 def struct(source,name):
@@ -64,6 +65,10 @@ with tempfile.TemporaryDirectory(prefix='authored-clock-') as folder:
                       {prefix+'_DrawForeignCustomGi',prefix+'_DrawForeignWeaponFlame'})
         boundaries='\n'.join('template<class... A> static bool '+fn+'(A&&...) { assert(false && "unrelated foreign item draw"); return false; }'
                              for fn in unused)
+        if host=='oot':
+            # Retain the real receipt classifier; ordinary Clock draws must not
+            # enter the separately tested frozen startup-receipt path.
+            boundaries=startup_foreign_receipt_boundary(ROOT)+'\n'+boundaries
         (temp/f'clock_{host}_compositor.inc').write_text(boundaries+'\n'+compositor)
     # MM's real wrapper preserves explicit @owner routes as deferred filepath
     # commands. The old fixture's no-op wrapper cannot prove submission order.
