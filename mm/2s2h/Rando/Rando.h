@@ -5,7 +5,7 @@
 
 #include "StaticData/StaticData.h"
 #ifdef COMBO_BUILD
-#include "rando/StartupCheckReceipt.h"
+#include "../../../combo/rando/StartupCheckReceipt.h"
 #endif
 #include "Types.h"
 #include "variables.h"

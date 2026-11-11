@@ -55,7 +55,9 @@ if args.source_only:raise SystemExit(0)
 # Use real installed native headers, including configured compiler include roots
 # and the adjacent recovery dependency cache. Never generate substitutes/fetch.
 candidates=[*args.dependency_root]
-for variable in ('DINS_AUDIO_DEPENDENCY_ROOTS','CPATH','CPLUS_INCLUDE_PATH','NLOHMANN_JSON_INCLUDE_DIR'):
+# Direct gate tasks receive the prepared CI headers through the same variable
+# used by the override runner, without the NEI umbrella's CPATH assignment.
+for variable in ('DINS_AUDIO_DEPENDENCY_ROOTS','CPATH','CPLUS_INCLUDE_PATH','COMBO_NEI_FIXTURE_CPATH','NLOHMANN_JSON_INCLUDE_DIR'):
     candidates += [Path(value) for value in os.environ.get(variable,'').split(os.pathsep) if value]
 candidates += [ROOT.parent/'dins_audio_native_dependencies',ROOT/'deps',Path('/usr/include'),Path('/usr/local/include')]
 candidates += [p.parents[1] for p in sorted(ROOT.parents[1].glob('*/deps/nlohmann/json.hpp'))]
