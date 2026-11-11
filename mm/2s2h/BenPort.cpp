@@ -26,6 +26,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include "entrances/RegionalPassages.h"
 #include "../../combo/gameplay/MagicMirrorArrival.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
@@ -70,6 +71,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "variables.h"
 #include "z64.h"
+#include "z64save.h"
 #include "macros.h"
 #include <ship/utils/StringHelper.h>
 #include <nlohmann/json.hpp>
@@ -267,10 +269,17 @@ extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(int route) {
 extern "C" void MM_ApplyComboPortalArrival(void) {
     if (!sComboPortalArrivalPending || !ComboPassages_IsRoute(sComboPortalRoute))
         return;
-    sComboPortalArrivalPending = false;
     if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
-        return; // Consume the route without replacing native opening/first-cycle state.
+        // The native skip runs later in Play_Init. Keep its destination until
+        // after it grants and saves the post-first-cycle state; an unskipped
+        // introduction or an existing first-cycle save keeps its native route.
+        sComboPortalArrivalPending = gSaveContext.save.entrance == ENTRANCE(CUTSCENE, 0) &&
+                                     !gSaveContext.save.isFirstCycle &&
+                                     CVarGetInteger("gEnhancements.Cutscenes.SkipIntroSequence", 0) &&
+                                     CVarGetInteger("gEnhancements.Cutscenes.SkipFirstCycle", 0);
+        return;
     }
+    sComboPortalArrivalPending = false;
     // Native opening-forest entrances include instant prologue transitions.
     // Stage the exploration arrival after save loading; Play_Init consumes it
     // once and the existing title-card hook waits for the native fade to end.
@@ -320,6 +329,25 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     arrival->data = 1;
     gSaveContext.respawnFlag = 2;
     ComboForestArrivalCamera_Queue(sComboPortalRoute);
+}
+
+// Called by the native intro skip after its save, before the destination scene
+// loads. Ordinary skips have no pending passage and retain their native landing.
+extern "C" void MM_ApplyComboPortalAfterIntroSkip(void) {
+    if (!sComboPortalArrivalPending ||
+        ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount))
+        return;
+    // Clock Town normally starts Day 1 through its time actor and day screen.
+    // Finish that native dawn before loading a different scene, so a hidden
+    // day-screen reload cannot consume the passage's positioned spawn/card.
+    if (Combo_IsVanilla() && gSaveContext.save.day == 0) {
+        Sram_ClearFlagsAtDawnOfTheFirstDay();
+        Sram_IncrementDay();
+        gSaveContext.save.time = CLOCK_TIME(6, 0);
+        gSaveContext.skyboxTime = gSaveContext.save.time;
+    }
+    MM_ApplyComboPortalArrival();
+    Combo_MM_RequestCrossGameTitleCard();
 }
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.

@@ -1763,6 +1763,12 @@
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_opening_tests.py --sanitize"
   },
   {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Vanilla NEI first portal startup and native Market returns",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_portal_startup_tests.py --sanitize"
+  },
+  {
     "suite": "systems",
     "origin": "gate",
     "name": "Combo Vanilla exact reward journal and atomic paired-native receipts",

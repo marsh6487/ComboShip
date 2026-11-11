@@ -1,6 +1,9 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#ifdef COMBO_BUILD
+#include "2s2h/BenPort.h"
+#endif
 
 extern "C" {
 #include "variables.h"
@@ -62,6 +65,11 @@ void RegisterSkipIntroSequence() {
         }
         // Persist this modified state so moon crashes without saving keep it
         Sram_SaveSpecialEnterClockTown(gPlayState);
+#ifdef COMBO_BUILD
+        if (FIRST_CYCLE_CVAR) {
+            MM_ApplyComboPortalAfterIntroSkip();
+        }
+#endif
     });
 }
 
