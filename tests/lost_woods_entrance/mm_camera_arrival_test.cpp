@@ -9,6 +9,7 @@
 #include "entrances/RegionalPassages.h"
 #include "vanilla/ComboVanillaMode.h"
 #include "vanilla/ComboVanillaPolicy.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -22,6 +23,11 @@ MtxF* sCurrentMatrix = &sMatrix;
 static s16 sCameraInterfaceFlags;
 extern "C" void ComboForestArrivalCamera_Queue(int) {}
 extern "C" void MagicMirror_QueueArrival(void) {}
+// This camera/geometry probe uses default configuration. The native first-cycle
+// skip combinations are covered by portal_startup_mm_test.cpp.
+extern "C" int32_t CVarGetInteger(const char*, int32_t defaultValue) {
+    return defaultValue;
+}
 extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) {
     assert(false && "forest arrival must retain its native route");
     return 0;
