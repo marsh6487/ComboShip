@@ -18,6 +18,8 @@ p.add_argument('--json-include', type=Path, default=Path('/usr/include'))
 p.add_argument('--sanitize',action='store_true')
 p.add_argument('--fixture', type=Path, default=Path(__file__).with_name('native_test.cpp'),
                help='native pool fixture using the same production catalogues and services')
+p.add_argument('--fixture-provides-nei-save', action='store_true',
+               help='fixture already supplies the native Nei_Save accessor')
 args = p.parse_args()
 with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
     build = Path(td)
@@ -29,8 +31,18 @@ with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
     (build / 'starting.inc').write_text('\n'.join(function(source,n) for n in (
         'GetComputedStartingItems','GetStartingItemsFromSave','SetStartingItemsInSave')))
     source = (ROOT / 'mm/2s2h/Rando/MiscBehavior/OnCycleSave.cpp').read_text()
-    (build / 'cycle.inc').write_text('\n'.join(function(source,n) for n in (
+    grant_declaration = re.search(r'^void TradeAdult_GiveIndex\([^;]+\);$', source, re.M)[0]
+    (build / 'cycle.inc').write_text('extern "C" {\n'+grant_declaration+'\n}\n'+'\n'.join(function(source,n) for n in (
         'IsRenewable','Rando::MiscBehavior::BeforeEndOfCycleSave','Rando::MiscBehavior::AfterEndOfCycleSave')))
+    # Keep cycle restoration's real C dependency closure. A composed fixture
+    # may already bind Nei_Save to the same native state; only that accessor
+    # is optional, never the consumption predicate or grant implementation.
+    trade = (ROOT / 'mm/mods/items/logic/trade_items.c').read_text()
+    trade_services = '\n'.join(re.search(r'^#define '+name+r'\s+.*$', trade, re.M)[0]
+                               for name in ('TRADE_ADULT_COUNT','TRADE_ADULT_PENDANT'))
+    if not args.fixture_provides_nei_save:
+        trade_services += '\n'+function((ROOT / 'mm/mods/nei_save.cpp').read_text(), 'Nei_Save').removeprefix('extern "C" ')
+    trade_services += '\n'+'\n'.join(function(trade,n) for n in ('TradeAdult_IsConsumedIndex','TradeAdult_GiveIndex'))
     inventory = (ROOT / 'mm/src/code/z_inventory.c').read_text()
     tables = '\n'.join(re.search(r'^(?:u16|u8) '+name+r'\[\] = \{.*?^\};',inventory,re.M|re.S)[0]
                        for name in ('gEquipMasks','gEquipNegMasks','gEquipShifts'))
@@ -38,7 +50,8 @@ with tempfile.TemporaryDirectory(prefix='mm-native-key-rings-') as td:
     (build / 'cycle_services.c').write_text('#include "global.h"\n#include "2s2h/GameInteractor/GameInteractor.h"\n'+tables+
         '\nvoid GameInteractor_ExecuteOnFlagSet(FlagType type, u32 flag) {}\n'
         'void GameInteractor_ExecuteOnFlagUnset(FlagType type, u32 flag) {}\n'+
-        '\n'.join(function(actors,n) for n in ('Flags_SetWeekEventReg','Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf')))
+        '\n'.join(function(actors,n) for n in ('Flags_SetWeekEventReg','Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf'))+
+        '\n'+trade_services)
     flags = ['-std=c++20','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX',
              '-DCONTROLLERBUTTONS_T=uint32_t','-include',str(ROOT / 'tests/shuffle_parity/souls/headless.h'),
              '-I'+str(ROOT),'-I'+str(build),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections']
