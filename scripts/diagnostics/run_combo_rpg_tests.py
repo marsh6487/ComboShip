@@ -60,6 +60,11 @@ def main():
         production += "\nvoid GiveRpg(PlayState* play, RandomizerGet item) { switch (item) {\n" + give + "default: break; } }\n"
         production += "void GiveNativeOotMagic(PlayState* play, RandomizerGet item) { switch (item) {\n" + native_give + "default: break; } }\n"
         production += "void GenerateRpgPool() { auto ctx = Rando::Context::GetInstance();\n" + pools[start:end] + "}\n"
+        dump = (ROOT / "soh/soh/OTRGlobals.cpp").read_text()
+        start = dump.index("        rpgMagic = {")
+        end = dump.index(";", start) + 1
+        production += "nlohmann::json FreezeMagicRules() { auto ctx = Rando::Context::GetInstance();\n"
+        production += "nlohmann::json rpgMagic;\n" + dump[start:end] + "\nreturn rpgMagic; }\n"
         (path / "rpg_soh_bridge_production.inc").write_text(production)
         soh_binary = path / "rpg_soh_bridge_test"
         subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O1", "-g",

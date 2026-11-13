@@ -2240,5 +2240,45 @@
     "origin": "gate",
     "name": "Deku footsteps: native pitch, floor routing and existing cadence",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_footsteps/run_tests.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Bowling native actors wait for absent and late attendant dependencies",
+    "run": "python3 -B tests/bowling_dependencies/run_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM pause ammo colors follow effective item restrictions",
+    "run": "python3 -B tests/mm_pause_inventory/run_ammo_color_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Independent Bombchu capacity across native use, refill, grants and editors",
+    "run": "python3 -B tests/bombchu_capacity/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native host ammo round trips, local bags, capacity and deferred receipts",
+    "run": "python3 -B tests/ammo_sync/run_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "FleetNet ammo authority, capacity packet order and canonical cache",
+    "run": "python3 -B tests/ammo_sync_network/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "RPG magic frozen supply, exact MM oracle capacity and replay",
+    "run": "python3 -B scripts/diagnostics/run_combo_rpg_magic_tests.py"
   }
 ]

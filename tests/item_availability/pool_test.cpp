@@ -117,6 +117,20 @@ int main() {
                 };
                 const bool unified = FleetCombo_UnifiedPoolActive();
                 const int density = plentiful ? 2 : 1;
+                // The modern combined fill takes native Roc's Feather only from
+                // OoT's setting-controlled pool. MM-only and legacy transport
+                // retain their existing supply; the NEI Roc chain is separate.
+#ifdef COMBO_BUILD
+                const int nativeFeathers = paired ? 0 : int(gear) * density + int(nei);
+#else
+                const int nativeFeathers = paired ? density : int(gear) * density + int(nei);
+#endif
+                expect(count(RI_OOT_ROCS_FEATHER) == nativeFeathers,
+                       "native Roc's Feather respects combined pool ownership "
+                       "without changing solo/legacy supply");
+                expect(count(RI_OOT_PROGRESSIVE_ROC) == int(nei) * 2,
+                       "NEI progressive Roc retains both levels independently "
+                       "of native Feather and pool density");
                 expect(count(RI_OOT_SONG_FUGUE_OF_HOME) == 0 &&
                            count(RI_OOT_SONG_BALLAD_OF_THE_HERO) == 0,
                        "unfinished songs never enter a new pool");

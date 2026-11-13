@@ -32,6 +32,7 @@
 
 #include "SharedItems.h"
 #include "NativeRandoDump.h"
+#include "RpgMagicRules.h"
 
 namespace ComboRando {
 
@@ -582,11 +583,9 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
 // must never flow back into the pickup vectors or progressive tiers inflate on the next sphere.
 inline void SharedOwnedViews(const std::vector<CwSharedGroup>& groups, const std::vector<std::string>& ootOwned,
                              const std::vector<std::string>& mmOwned, std::vector<std::string>& ootSeen,
-                             std::vector<std::string>& mmSeen) {
+                             std::vector<std::string>& mmSeen, const RpgMagicRules& rpgMagic = {}) {
     ootSeen = ootOwned;
     mmSeen = mmOwned;
-    if (groups.empty())
-        return;
     std::unordered_map<std::string, size_t> counts[2];
     for (const auto& n : ootOwned)
         ++counts[GAME_OOT][n];
@@ -607,6 +606,7 @@ inline void SharedOwnedViews(const std::vector<CwSharedGroup>& groups, const std
                 seen.insert(seen.end(), target - native, n.name);
         }
     }
+    AddRpgMagicOracleView(rpgMagic, ootOwned, mmSeen);
 }
 
 // Suffix cross-game ITEM-name collisions in the consolidated placements so a name like "Mirror Shield"

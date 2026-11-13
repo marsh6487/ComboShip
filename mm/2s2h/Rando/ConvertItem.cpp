@@ -127,7 +127,7 @@ void RefreshObtainableJunkItems() {
                     }
                     break;
                 case RI_BOMBCHU_5:
-                    if (AMMO(ITEM_BOMBCHU) < CUR_CAPACITY(UPG_BOMB_BAG)) {
+                    if (AMMO(ITEM_BOMBCHU) < RandoCapacity_BombchuCapacity()) {
                         obtainableJunkItems.push_back(junkItem);
                     }
                     break;
@@ -492,12 +492,12 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         case RI_BOMBCHU:
         case RI_BOMBCHU_5:
         case RI_BOMBCHU_10:
-            if (CUR_UPG_VALUE(UPG_BOMB_BAG) == 0) {
+            if (RandoCapacity_BombchuCapacity() == 0) {
                 return false;
             }
 #ifdef COMBO_BUILD
             // Shared Bombchu Bag family effective and not yet owned: chu ammo is not a valid source.
-            if (Combo_MM_BombchuBagShared() && INV_CONTENT(ITEM_BOMBCHU) == ITEM_NONE) {
+            if (Combo_MM_BombchuBagShared() && !RandoCapacity_HasIndependentBombchuBag()) {
                 return false;
             }
 #endif

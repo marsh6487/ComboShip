@@ -2949,12 +2949,21 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, RSK_MAGIC_STAT_UPGRADE_TOTAL,
                                                    RSK_MAGIC_STAT_UPGRADE_REQUIRED);
             uint8_t lvl = gSaveContext.ship.quest.data.randomizer.magicStatUpgrades;
-            if (lvl < required) {
-                gSaveContext.ship.quest.data.randomizer.magicStatUpgrades++;
-                lvl++;
-            }
-            gSaveContext.isMagicAcquired = true;
             bool adjustable = (bool)RAND_GET_OPTION(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE);
+            // Older combined seeds can contain native magic alongside RPG upgrades.
+            // Credit the minimum equivalent RPG progress before this real pickup,
+            // so earned native capacity survives and does not mask future upgrades.
+            // Snapshot imports never take this path and cannot grant another level.
+            const uint8_t nativeFloor =
+                std::min<int>(gSaveContext.ship.quest.data.randomizer.comboNativeMagicLevel, 2) * MAGIC_NORMAL_METER;
+            while (lvl < required && MagicStatCapacity(lvl, required, adjustable, 0) < nativeFloor) {
+                ++lvl;
+            }
+            if (lvl < required) {
+                ++lvl;
+            }
+            gSaveContext.ship.quest.data.randomizer.magicStatUpgrades = lvl;
+            gSaveContext.isMagicAcquired = true;
             uint8_t fillCap = MagicStatCapacity(lvl, required, adjustable,
                                                 gSaveContext.ship.quest.data.randomizer.comboNativeMagicLevel);
             if (fillCap > MAGIC_NORMAL_METER) {

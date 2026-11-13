@@ -145,7 +145,11 @@ typedef enum {
     // the tunics/boots above: the cell records the level so the ext-equipment kaleido and the combo
     // sync can see it. Appended at the first free index, so no existing cell moves. Skijer's NEI
     FC_OOT_STRENGTH = 94,
-    // 95..127 free for future assignments (NEVER renumber the above).
+    // OoT's Bombchu bag is independent of MM's native Bomb Bag. Capacity is the
+    // earned 20/30/50 ceiling, not consumable ammo; both cells merge monotonically.
+    FC_OOT_BOMBCHU_CAPACITY = 95,
+    FC_OOT_INFINITE_BOMBCHUS = 96,
+    // 97..127 free for future assignments (NEVER renumber the above).
     FC_MAX = FC_COMBO_OBTAINED_SIZE
 } FleetComboId;
 

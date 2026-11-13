@@ -311,10 +311,10 @@ s32 EnGirlA_CanBuyBombBag30BombShop(PlayState* play, EnGirlA* this) {
 }
 
 s32 EnGirlA_CanBuyBombchus(PlayState* play, EnGirlA* this) {
-    if (GET_CUR_UPG_VALUE(UPG_BOMB_BAG) == 0) {
+    if (RandoCapacity_BombchuCapacity() == 0) {
         return CANBUY_RESULT_CANNOT_GET_NOW;
     }
-    if (AMMO(ITEM_BOMBCHU) >= CUR_CAPACITY(UPG_BOMB_BAG)) {
+    if (AMMO(ITEM_BOMBCHU) >= RandoCapacity_BombchuCapacity()) {
         return CANBUY_RESULT_NO_ROOM;
     }
     if (gSaveContext.save.saveInfo.playerData.rupees < play->msgCtx.unk1206C) {

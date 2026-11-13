@@ -366,6 +366,7 @@ int main(int argc, char** argv) {
 
         bool entranceRestoreFailed = false; // set inside runPass; a wrong graph makes any verdict meaningless
         std::vector<ComboRando::CwSharedGroup> affordabilitySharedGroups;
+        ComboRando::RpgMagicRules affordabilityMagicRules;
         // One traversal pass. Forces real-logic evaluation (ignore the seed's No-Logic/Glitchless flag).
         // Tricks are set via SOH_SetEnabledTricks/SetAllTricks BEFORE SOH_Dump, whose SOH_PrepRandoContext
         // pushes them into the Context (Combo_ApplyEnabledTricks). SOH_Dump (+seed) sets the OOT/MM contexts
@@ -424,6 +425,7 @@ int main(int argc, char** argv) {
             const std::string sharedPairs = SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "";
             affordabilitySharedGroups =
                 ComboRando::BuildSharedItemGroups(ComboRando::ResolveSharedPairs(sharedPairs, mmDump), sharedMask);
+            affordabilityMagicRules = ComboRando::ParseRpgMagicRules(sohDump);
             // NOW force glitchless for traversal (real gates); the dump above froze the seed's slot
             // set in the DLL-side cache, so this re-prep can't shrink it.
             nlohmann::json os = ootSettings;
@@ -490,7 +492,7 @@ int main(int argc, char** argv) {
                 // Use the traversal's ownership rules, including native NEI sharing when the
                 // optional Shared Items mask is off. Same-sphere pickups remain unavailable.
                 ComboRando::SharedOwnedViews(affordabilitySharedGroups, ownedOotWallets, ownedMmWallets, ootWalletView,
-                                             mmWalletView);
+                                             mmWalletView, affordabilityMagicRules);
                 const int owS =
                     static_cast<int>(std::count(ootWalletView.begin(), ootWalletView.end(), "Progressive Wallet"));
                 const int mwS =

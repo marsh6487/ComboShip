@@ -5874,6 +5874,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
 
     nlohmann::json startingSouls = nlohmann::json::array();
     nlohmann::json soulOptions = nlohmann::json::object();
+    nlohmann::json rpgMagic = { { "enabled", false } };
     nlohmann::json checks = nlohmann::json::array();
     nlohmann::json pool = nlohmann::json::array();
     nlohmann::json fixed = nlohmann::json::array();
@@ -6077,6 +6078,10 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         accessibility["maskQuestShuffle"] = static_cast<bool>(ctx->GetOption(RSK_SHUFFLE_MASKS));
         // ComboShip: read by AssignTrapDisguises to name every foreign trap.
         accessibility["iceTrapNames"] = static_cast<int>(ctx->GetOption(RSK_ICE_TRAP_NAMES).Get());
+        rpgMagic = { { "enabled", static_cast<bool>(ctx->GetOption(RSK_MAGIC_STAT_UPGRADE)) },
+                     { "required", StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE,
+                                                       RSK_MAGIC_STAT_UPGRADE_TOTAL, RSK_MAGIC_STAT_UPGRADE_REQUIRED) },
+                     { "total", ctx->GetOption(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE) ? 100 : 96 } };
 
         GenerateStartingInventory();
         for (RandomizerGet item : StartingInventory)
@@ -6234,6 +6239,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         { "iceTrapModels", std::move(iceTrapModels) },
         { "startingSouls", std::move(startingSouls) },
         { "soulOptions", std::move(soulOptions) },
+        { "rpgMagic", std::move(rpgMagic) },
         { "accessibility", std::move(accessibility) }
     }.dump();
     return cached.c_str();

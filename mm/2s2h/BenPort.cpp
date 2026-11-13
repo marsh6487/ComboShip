@@ -46,6 +46,7 @@ extern "C" void Partners_Reset(void);
 #include "vanilla/ComboVanillaMode.h"
 #include "rando/StartupCheckReceipt.h"
 #include "mods/combo_rpg.h"
+#include "../../combo/rando/RpgMagicRules.h"
 
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -4953,6 +4954,9 @@ static void GiveItemForOracle(RandoItemId ri) {
             break;
 
         // Magic
+        case RI_OOT_EXT_MAGIC_CAPE:
+            Nei_Save()->capeOwned = 1;
+            break;
         case RI_SINGLE_MAGIC:
             gSaveContext.save.saveInfo.playerData.isMagicAcquired = true;
             gSaveContext.save.saveInfo.playerData.magic = MAGIC_NORMAL_METER;
@@ -5480,11 +5484,31 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_SetOwnedItems(const char* itemNamesJ
     try {
         auto items = nlohmann::json::parse(itemNamesJson);
         const auto& nameToId = Combo_MM_SpoilerNameToItemId();
+        ComboRpgState rpgMagic{};
+        bool hasRpgMagic = false;
         for (const auto& name : items) {
-            auto it = nameToId.find(name.get<std::string>());
+            const auto item = name.get<std::string>();
+            if (ComboRando::ParseRpgMagicOracleItem(item, rpgMagic)) {
+                hasRpgMagic = true;
+                continue;
+            }
+            auto it = nameToId.find(item);
             if (it != nameToId.end()) {
                 GiveItemForOracle(it->second);
             }
+        }
+        if (hasRpgMagic) {
+            // Reset + SetOwnedItems rebuilds a temporary oracle save. Apply
+            // frozen RPG rules after native grants so fixed/starting magic is
+            // retained regardless of input ordering. This is not a pickup.
+            auto& player = gSaveContext.save.saveInfo.playerData;
+            rpgMagic.nativeMagicLevel = player.isMagicAcquired + player.isDoubleMagicAcquired;
+            Nei_Save()->comboRpg = rpgMagic;
+            const int16_t capacity = ComboRpg_MagicCapacity(0);
+            player.isMagicAcquired = capacity > 0;
+            player.isDoubleMagicAcquired = capacity > MAGIC_NORMAL_METER;
+            player.magic = capacity;
+            gSaveContext.magicCapacity = capacity;
         }
     } catch (...) {}
 }
@@ -5808,7 +5832,7 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
         case ComboRando::SF_BOMB_BAG:
             return CUR_UPG_VALUE(UPG_BOMB_BAG);
         case ComboRando::SF_BOMBCHU_BAG:
-            return INV_CONTENT(ITEM_BOMBCHU) != ITEM_NONE ? 1 : 0;
+            return RandoCapacity_HasIndependentBombchuBag() ? 1 : 0;
         case ComboRando::SF_MAGIC:
             return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
                                             gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired);
@@ -5864,8 +5888,10 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
             return;
         // SF_BOMBCHU_BAG has no RandoItemId (MM has no bombchu-bag item) — poke the save directly.
         if (family == ComboRando::SF_BOMBCHU_BAG) {
+            RandoCapacity_GrantBombchuBag();
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
-            AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+            if (AMMO(ITEM_BOMBCHU) < 20)
+                AMMO(ITEM_BOMBCHU) = 20;
             if (gSaveContext.fileNum != 0xFF)
                 SaveManager_SaveCurrentForCombo(); // persist dormant grants too (gPlayState is NULL then)
             if (MM_GetSharedTier(family) <= cur)

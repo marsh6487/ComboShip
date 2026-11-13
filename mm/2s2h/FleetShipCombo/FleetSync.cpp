@@ -328,29 +328,72 @@ constexpr int kPostFlipTraceFrames = 180; // ~3s; the observed crash lands withi
         }                                             \
     } while (0)
 
+void RepairBombchuCapacity() {
+    auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    // Old foreign-bag receipts predate the independent capacity cell. Do not
+    // infer a foreign bag from ordinary MM Bombchu inventory or raw ammo.
+    if (nei.comboObtainedFc[FCI_BOMBCHU_BAG] && nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 0)
+        nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 20;
+}
+
+void ApplyBombchuCapacity(const nlohmann::json& sh) {
+    auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    if (sh.contains("comboObtained") && sh["comboObtained"].is_array()) {
+        const auto& cells = sh["comboObtained"];
+        for (const int id : { FC_OOT_BOMBCHU_CAPACITY, FC_OOT_INFINITE_BOMBCHUS }) {
+            if (id < (int)cells.size() && cells[id].is_number_integer()) {
+                const int value = std::clamp(cells[id].get<int>(), 0, id == FC_OOT_BOMBCHU_CAPACITY ? 50 : 1);
+                nei.comboObtained[id] = (uint8_t)std::max<int>(nei.comboObtained[id], value);
+            }
+        }
+    }
+    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array()) {
+        const auto& cells = sh["comboObtainedFc"];
+        if (FCI_BOMBCHU_BAG < (int)cells.size() && cells[FCI_BOMBCHU_BAG].is_number_integer() &&
+            cells[FCI_BOMBCHU_BAG].get<int>() > 0 && nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 0)
+            nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 20;
+    }
+    RepairBombchuCapacity();
+}
+
+int SyncAmmoCapacity(int slot) {
+    if (slot == SLOT(ITEM_DEKU_STICK))
+        return CUR_CAPACITY(UPG_DEKU_STICKS);
+    if (slot == SLOT(ITEM_DEKU_NUT))
+        return CUR_CAPACITY(UPG_DEKU_NUTS);
+    if (slot == SLOT(ITEM_BOMBCHU))
+        return RandoCapacity_BombchuCapacity();
+    return 127;
+}
+
 void PutInvItem(nlohmann::json& inv, const char* key, int slot, bool withAmmo) {
     uint8_t item = MM_INV.items[slot];
     inv[key] = (item != 0xFF);
-    if (withAmmo) {
+    if (withAmmo && item != 0xFF && SyncAmmoCapacity(slot) > 0) {
         inv[std::string(key) + "Ammo"] = (int)MM_INV.ammo[slot];
+    } else if (withAmmo) {
+        // A shuffled bag can be missing here even when OoT has its own bag.
+        // This host cannot author that ammo count. Remove any previous leaf
+        // instead of exporting the zero imposed by MM's local bag repair.
+        inv.erase(std::string(key) + "Ammo");
     }
 }
 
 void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t itemId, bool withAmmo) {
-    if (!inv.contains(key)) {
-        return;
-    }
-    if (inv[key].get<bool>()) {
+    // An ammo-only network delta can update existing ownership, but cannot
+    // create an item or override an explicit unowned source.
+    const bool sourceOwnsItem = inv.value(key, MM_INV.items[slot] != 0xFF);
+    if (sourceOwnsItem) {
         if (MM_INV.items[slot] == 0xFF) {
             SPDLOG_INFO("[ItemGrantAudit] MM shared-state grant: file={} key={} inventorySlot={} item={}",
                         (int)gSaveContext.fileNum, key, slot, (int)itemId);
             MM_INV.items[slot] = itemId;
         }
     }
-    if (withAmmo) {
+    if (withAmmo && sourceOwnsItem && SyncAmmoCapacity(slot) > 0) {
         std::string ak = std::string(key) + "Ammo";
         if (inv.contains(ak) && MM_INV.items[slot] != 0xFF) {
-            MM_INV.ammo[slot] = (int8_t)inv[ak].get<int>();
+            MM_INV.ammo[slot] = (int8_t)std::clamp(inv[ak].get<int>(), 0, SyncAmmoCapacity(slot));
         }
     }
 }
@@ -501,6 +544,13 @@ void ApplyFcRegistryToNatives() {
         if (ComboTrade::AcknowledgeConsumedGrant(*nei, fcId)) {
             continue;
         }
+        // Stick/nut tiers, item slots and exact ammo already travel in the
+        // native snapshot. Replaying their progressive receipt would add a
+        // second tier and refill spent ammo, including when packets split.
+        if (fcId == FCI_STICK_CAPACITY || fcId == FCI_NUT_CAPACITY) {
+            nei->comboAppliedFc[fcId] = nei->comboObtainedFc[fcId];
+            continue;
+        }
         // Both games publish exact caneSkills. Replaying the old progressive counter
         // after applying that mask would grant an unrelated extra power. Acknowledge
         // counts here even when counter and mask arrive in separate FleetNet deltas.
@@ -515,6 +565,8 @@ void ApplyFcRegistryToNatives() {
         uint8_t obtained = nei->comboObtainedFc[fcId];
         uint8_t applied = nei->comboAppliedFc[fcId];
         if (obtained > applied) {
+            const bool preserveBombchuAmmo = fcId == FCI_BOMBCHU_BAG && INV_CONTENT(ITEM_BOMBCHU) == ITEM_BOMBCHU;
+            const int8_t bombchuAmmo = AMMO(ITEM_BOMBCHU);
             gFcCombo_SuppressRecord++; // don't let these grants re-record into comboObtainedFc
             for (int k = applied; k < (int)obtained; k++) {
                 // Logged UNCONDITIONALLY, not just during the post-flip trace. This is the ONLY
@@ -534,6 +586,8 @@ void ApplyFcRegistryToNatives() {
                 FS_TRACE("3b. grant fcId={} OK", fcId);
             }
             gFcCombo_SuppressRecord--;
+            if (preserveBombchuAmmo)
+                AMMO(ITEM_BOMBCHU) = bombchuAmmo;
             nei->comboAppliedFc[fcId] = obtained;
         }
     }
@@ -684,6 +738,7 @@ void ExtractShared(nlohmann::json& sh) {
     NeiSaveData* nei = Nei_Save();
     HealLeakedOwnedItems();
     FoldNativesIntoRegistry();
+    RepairBombchuCapacity();
 
     sh["schema"] = 1;
     sh["vitals"] = { { "health", MM_PD.health },
@@ -895,6 +950,9 @@ void ApplyShared(const nlohmann::json& sh) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM ApplyShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     HealLeakedOwnedItems();
+    // This dependency must precede inventory import; the generic registry
+    // merge later in this function is too late for Bombchu ammo capacity.
+    ApplyBombchuCapacity(sh);
 
     if (sh.contains("vitals")) {
         const auto& v = sh["vitals"];
@@ -1857,6 +1915,23 @@ std::string NetArrayRootOf(const std::string& key) {
 // can never be split. An array too big even for one packet is dropped with a loud log rather than
 // sent half-formed -- a half-formed one is precisely what corrupts the save.
 void NetSendDelta(const NetDelta& delta) {
+    auto sendArray = [](const std::string& key, const nlohmann::json& value) {
+        nlohmann::json pkt = { { "op", "delta" }, { "a", { { key, value } } } };
+        const size_t size = pkt.dump().size();
+        if (size > kNetBatchBytes) {
+            SPDLOG_ERROR("[FleetNet] array {} is {} bytes and does not fit a packet -- not sent", key, size);
+            return;
+        }
+        NetSend(pkt);
+    };
+    // Capacity and receipt arrays authorize the ammo in the scalar packets below.
+    // Deliver them first; other arrays keep their original position after scalars.
+    for (const char* key : { "/comboObtained", "/comboObtainedFc" }) {
+        if (delta.arrays.contains(key)) {
+            sendArray(key, delta.arrays[key]);
+        }
+    }
+
     nlohmann::json batch = nlohmann::json::object();
     auto flush = [&]() {
         if (!batch.empty()) {
@@ -1877,13 +1952,9 @@ void NetSendDelta(const NetDelta& delta) {
     flush();
 
     for (auto it = delta.arrays.begin(); it != delta.arrays.end(); ++it) {
-        nlohmann::json pkt = { { "op", "delta" }, { "a", { { it.key(), it.value() } } } };
-        const size_t size = pkt.dump().size();
-        if (size > kNetBatchBytes) {
-            SPDLOG_ERROR("[FleetNet] array {} is {} bytes and does not fit a packet -- not sent", it.key(), size);
-            continue;
+        if (it.key() != "/comboObtained" && it.key() != "/comboObtainedFc") {
+            sendArray(it.key(), it.value());
         }
-        NetSend(pkt);
     }
 }
 
@@ -1914,6 +1985,17 @@ NetDelta NetRescan() {
     NetPoisonScan("extract");
     nlohmann::json flat = sNetShared.flatten();
     const bool active = FleetShipCombo_IsThisGameActive();
+
+    // Missing ammo means this host cannot author it (for example, a shuffled
+    // base bag is absent). Keep the last peer count in the network cache only;
+    // fresh shared extraction still omits it, and no count or delta is invented.
+    for (auto it = sNetFlat.begin(); it != sNetFlat.end(); ++it) {
+        const std::string& key = it.key();
+        if (key.rfind("/inv/", 0) == 0 && key.size() > 9 && key.compare(key.size() - 4, 4, "Ammo") == 0 &&
+            !flat.contains(key)) {
+            flat[key] = it.value();
+        }
+    }
 
     NetDelta out;
     out.leaves = nlohmann::json::object();

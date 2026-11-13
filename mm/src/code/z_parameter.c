@@ -4551,8 +4551,8 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             AMMO(ITEM_BOMBCHU) = 10;
             return ITEM_NONE;
         }
-        if ((AMMO(ITEM_BOMBCHU) += 10) > CUR_CAPACITY(UPG_BOMB_BAG)) {
-            AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+        if ((AMMO(ITEM_BOMBCHU) += 10) > RandoCapacity_BombchuCapacity()) {
+            AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
         }
         return ITEM_NONE;
 
@@ -4561,14 +4561,14 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
             AMMO(ITEM_BOMBCHU) += sBombchuRefillCounts[item - ITEM_BOMBCHUS_20];
 
-            if (AMMO(ITEM_BOMBCHU) > CUR_CAPACITY(UPG_BOMB_BAG)) {
-                AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+            if (AMMO(ITEM_BOMBCHU) > RandoCapacity_BombchuCapacity()) {
+                AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
             }
             return ITEM_NONE;
         }
 
-        if ((AMMO(ITEM_BOMBCHU) += sBombchuRefillCounts[item - ITEM_BOMBCHUS_20]) > CUR_CAPACITY(UPG_BOMB_BAG)) {
-            AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+        if ((AMMO(ITEM_BOMBCHU) += sBombchuRefillCounts[item - ITEM_BOMBCHUS_20]) > RandoCapacity_BombchuCapacity()) {
+            AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
         }
         return ITEM_NONE;
 
@@ -4805,7 +4805,8 @@ u8 Item_CheckObtainabilityImpl(u8 item) {
         return ITEM_NONE;
     }
 
-    slot = SLOT(item);
+    // Refill ids lie beyond gItemSlots; map them before any native slot lookup.
+    slot = item < ITEM_DEKU_STICKS_5 ? SLOT(item) : 0;
     if (item >= ITEM_DEKU_STICKS_5) {
         slot = SLOT(sExtraItemBases[item - ITEM_DEKU_STICKS_5]);
     }
@@ -4849,7 +4850,7 @@ u8 Item_CheckObtainabilityImpl(u8 item) {
         return 0;
 
     } else if ((item >= ITEM_BOMBCHUS_20) && (item <= ITEM_BOMBCHUS_5)) {
-        if (CUR_UPG_VALUE(UPG_BOMB_BAG) == 0) {
+        if (RandoCapacity_BombchuCapacity() == 0) {
             return ITEM_NONE;
         }
         return 0;
@@ -5413,7 +5414,7 @@ void Inventory_ChangeAmmo(s16 item, s16 ammoChange) {
                       : item == ITEM_DEKU_NUT   ? UPG_DEKU_NUTS
                                                 : UPG_BOMB_BAG;
         // Clamp before the native s8 store, including large foreign refills.
-        s32 capacity = CUR_CAPACITY(upgrade);
+        s32 capacity = item == ITEM_BOMBCHU ? RandoCapacity_BombchuCapacity() : CUR_CAPACITY(upgrade);
         s32 next = (s32)AMMO(item) + ammoChange;
         AMMO(item) = CLAMP(next, 0, capacity);
     } else if (item == ITEM_MAGIC_BEANS) {
@@ -6495,7 +6496,7 @@ void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
             ((i == ITEM_BOMB) && (AMMO(i) == CUR_CAPACITY(UPG_BOMB_BAG))) ||
             ((i == ITEM_DEKU_STICK) && (AMMO(i) == CUR_CAPACITY(UPG_DEKU_STICKS))) ||
             ((i == ITEM_DEKU_NUT) && (AMMO(i) == CUR_CAPACITY(UPG_DEKU_NUTS))) ||
-            ((i == ITEM_BOMBCHU) && (AMMO(i) == CUR_CAPACITY(UPG_BOMB_BAG))) ||
+            ((i == ITEM_BOMBCHU) && (AMMO(i) == RandoCapacity_BombchuCapacity())) ||
             ((i == ITEM_POWDER_KEG) && GameInteractor_Should(VB_POWDER_KEG_AMMO_AT_CAPACITY, ammo == 1)) ||
             ((i == ITEM_PICTOGRAPH_BOX) && (ammo == 1)) || ((i == ITEM_MAGIC_BEANS) && (ammo == 20)) ||
             ((i == ITEM_FAIRY_SLINGSHOT) && (ammo != 0) && (ammo == Nei_SlingshotCapacity()))) { // Skijer's NEI
@@ -6924,7 +6925,7 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
                    ((i == ITEM_BOMB) && (AMMO(i) == CUR_CAPACITY(UPG_BOMB_BAG))) ||
                    ((i == ITEM_DEKU_STICK) && (AMMO(i) == CUR_CAPACITY(UPG_DEKU_STICKS))) ||
                    ((i == ITEM_DEKU_NUT) && (AMMO(i) == CUR_CAPACITY(UPG_DEKU_NUTS))) ||
-                   ((i == ITEM_BOMBCHU) && (AMMO(i) == CUR_CAPACITY(UPG_BOMB_BAG))) ||
+                   ((i == ITEM_BOMBCHU) && (AMMO(i) == RandoCapacity_BombchuCapacity())) ||
                    ((i == ITEM_POWDER_KEG) && GameInteractor_Should(VB_POWDER_KEG_AMMO_AT_CAPACITY, ammo == 1)) ||
                    ((i == ITEM_PICTOGRAPH_BOX) && (ammo == 1)) || ((i == ITEM_MAGIC_BEANS) && (ammo == 20)) ||
                    // Skijer's NEI: seeds at bullet-bag capacity — OoT green (soh z_parameter.c:5183)

@@ -18,7 +18,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(PIRATES_FORTRESS, 2),             ENTRANCE(PIRATES_FORTRESS_INTERIOR, 1), true),
         },
         .events = {
-            EVENT(RE_PIRATE_FORTRESS_BEEHIVE_HIT, (HAS_ITEM(ITEM_BOW) || (CAN_BE_DEKU && HAS_MAGIC))),
+            EVENT(RE_PIRATE_FORTRESS_BEEHIVE_HIT, (HAS_ITEM(ITEM_BOW) || CAN_USE_DEKU_BUBBLE)),
         },
     };
     Regions[RR_PIRATES_FORTRESS_CAPTAIN_ROOM] = RandoRegion{ .name = "Captain Room", .sceneId = SCENE_PIRATE,
@@ -285,7 +285,7 @@ static RegisterShipInitFunc initFunc([]() {
             // Outside of using Stones Mask you have to deal with this guard in some way.
             CONNECTION(RR_PIRATES_FORTRESS_PLAZA_TOWER, (
                 (HAS_ITEM(ITEM_DEKU_NUT) || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || HAS_ITEM(ITEM_MASK_STONE)) ||
-                (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA
+                CAN_USE_DEKU_BUBBLE || CAN_BE_ZORA
             )),
         },
         .events = {

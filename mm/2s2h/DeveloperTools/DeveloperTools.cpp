@@ -73,7 +73,8 @@ void SetSaveFileInfo() {
 
         gSaveContext.save.saveInfo.playerData.rupees = CUR_CAPACITY(UPG_WALLET);
         AMMO(ITEM_BOW) = CUR_CAPACITY(UPG_QUIVER);
-        AMMO(ITEM_BOMB) = AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+        AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
+        AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
         AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         AMMO(ITEM_MAGIC_BEANS) = 20;

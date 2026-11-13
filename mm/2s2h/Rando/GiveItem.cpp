@@ -325,13 +325,12 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             // Shared Bombchu Bag family effective: bag grants bombs only, chus come from that family.
             if (!Combo_MM_BombchuBagShared())
                 INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
-            AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
-            if (INV_CONTENT(ITEM_BOMBCHU) != ITEM_NONE)
-                AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
 #else
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
-            AMMO(ITEM_BOMB) = AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
 #endif
+            AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
+            if (!RandoCapacity_HasIndependentBombchuBag() && INV_CONTENT(ITEM_BOMBCHU) == ITEM_BOMBCHU)
+                AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
             break;
         case RI_WALLET_ADULT:
         case RI_WALLET_GIANT:
@@ -1113,8 +1112,9 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             Nei_Save()->comboObtained[FC_FISHING_ROD] = 1;
             break;
         case RI_OOT_BOMBCHU_BAG:
-            // MM relative: carrying bombchus. Grant the bombchu inventory item + 20 chus (ammo only
-            // topped up, never reduced).
+            // Persist independent capacity before granting ammo; the native
+            // Bomb Bag must not clamp these Bombchus on their next use.
+            RandoCapacity_GrantBombchuBag();
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
             if (AMMO(ITEM_BOMBCHU) < 20) {
                 AMMO(ITEM_BOMBCHU) = 20;

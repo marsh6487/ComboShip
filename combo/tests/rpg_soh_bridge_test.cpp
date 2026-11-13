@@ -136,8 +136,8 @@ int main() {
     FleetRpg::Apply({ { "rpgStats", { { "nativeMagicLevel", 2 } } } });
     check(gSaveContext.magic == 7, "returning native floor snapshot cannot refill OoT twice");
     GiveRpg(nullptr, RG_MAGIC_STAT_UPGRADE);
-    check(gSaveContext.magicFillTarget == 96 && gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == 2,
-          "later OoT stat pickup preserves native MM capacity and counts only once");
+    check(gSaveContext.magicFillTarget == 100 && gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == 5,
+          "real stat pickup credits legacy native capacity before advancing to the saved RPG cap");
     FleetRpg::Extract(shared);
     ComboRpg::MergeJson(mm, shared.at("rpgStats"));
     check(mm.nativeMagicLevel == 2, "native magic floor returns from OoT without an additive grant");
@@ -159,8 +159,8 @@ int main() {
             check(gSaveContext.ship.quest.data.randomizer.comboNativeMagicLevel == tier,
                   "native OoT grant records its capacity floor independently of RPG ownership");
             GiveRpg(nullptr, RG_MAGIC_STAT_UPGRADE);
-            check(gSaveContext.magicFillTarget == tier * 48,
-                  "native OoT capacity survives later fractional RPG pickups in either order");
+            check(gSaveContext.magicFillTarget == (tier == 1 ? 80 : 100),
+                  "later real RPG pickup grows from the minimum equivalent native capacity in either order");
             FleetRpg::Extract(shared);
             mm = {};
             ComboRpg::MergeJson(mm, shared.at("rpgStats"));
@@ -171,6 +171,47 @@ int main() {
                       "duplicate first-tier magic cannot downgrade a native double-magic floor");
             }
         }
+    }
+    struct LegacyCase {
+        bool adjustable;
+        uint8_t required, nativeTier, before, after, capacity;
+    };
+    const LegacyCase legacyCases[] = {
+        { false, 8, 0, 0, 1, 12 },   { false, 8, 1, 0, 5, 60 },   { false, 8, 1, 1, 5, 60 },
+        { false, 8, 1, 4, 5, 60 },   { false, 8, 1, 5, 6, 72 },   { false, 8, 2, 1, 8, 96 },
+        { true, 25, 0, 1, 2, 8 },    { true, 25, 1, 0, 13, 52 },  { true, 25, 1, 12, 13, 52 },
+        { true, 25, 2, 1, 25, 100 }, { true, 100, 1, 1, 49, 49 }, { true, 100, 2, 1, 97, 97 },
+        { true, 3, 1, 0, 3, 100 },   { true, 1, 2, 0, 1, 100 },
+    };
+    for (const auto& test : legacyCases) {
+        gSaveContext = {};
+        ctx->GetOption(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE).value = test.adjustable;
+        ctx->GetOption(RSK_MAGIC_STAT_UPGRADE_TOTAL).value = test.required - 1;
+        ctx->GetOption(RSK_MAGIC_STAT_UPGRADE_REQUIRED).value = 99;
+        const auto frozen = FreezeMagicRules();
+        check(frozen.at("enabled") == true && frozen.at("required") == test.required &&
+                  frozen.at("total") == (test.adjustable ? 100 : 96),
+              "native static dump freezes the exact seed rules used by pickup capacity");
+        gSaveContext.ship.quest.data.randomizer.magicStatUpgrades = test.before;
+        FleetRpg::Apply({ { "rpgStats", { { "nativeMagicLevel", test.nativeTier } } } });
+        check(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == test.before,
+              "native floor synchronization alone never credits RPG pickups");
+        const auto before = FleetRpg::Read();
+        const int capacityBefore = ComboRpgState_MagicCapacity(&before, 0);
+        GiveRpg(nullptr, RG_MAGIC_STAT_UPGRADE);
+        check(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == test.after &&
+                  gSaveContext.magicFillTarget == test.capacity && test.capacity >= capacityBefore,
+              "default and adjustable real pickups backfill the minimum floor then advance once without capacity loss");
+        FleetRpg::Extract(shared);
+        ComboRpgState reloaded{};
+        ComboRpg::MergeJson(reloaded, shared.at("rpgStats"));
+        const int fillsBefore = fills;
+        gSaveContext.magic = 7;
+        for (int repeat = 0; repeat < 3; ++repeat)
+            FleetRpg::Apply({ { "rpgStats", ComboRpg::ToJson(reloaded) } });
+        check(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == test.after && gSaveContext.magic == 7 &&
+                  fills == fillsBefore,
+              "JSON roundtrip and repeated host returns neither backfill nor increment nor refill again");
     }
     isRando = false;
     FleetRpg::Extract(shared);

@@ -298,6 +298,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Set when a dump carries pool[] but no category — a stale DLL, which would otherwise surface as an
     // unbalanceable pool ("no discardable junk") instead of the rebuild it actually needs.
     std::string missingCategory;
+    RpgMagicRules rpgMagic;
 
     auto parsePool = [&](Game game, const std::string& dumpJson) {
         auto d = ParseStaticDataDump(dumpJson, game == GAME_OOT ? "OOT" : "MM");
@@ -320,6 +321,11 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                 CwCat cat = CwCatFromName(it.value("category", std::string{}));
                 ++parsed;
                 withCategory += (cat != CwCat::UNKNOWN) ? 1 : 0;
+                // OoT owns RPG magic for both games. MM's native Fairy source
+                // remains in its solo dump, but is replaced by filler here.
+                // Fixed rewards and configured starting items are left intact.
+                if (rpgMagic.enabled && game == GAME_MM && IsNativeMmMagicItem(name))
+                    continue;
                 (adv ? advItems : junkItems).push_back({ game, name, adv, cat });
             }
             if (parsed > 0 && withCategory == 0)
@@ -330,6 +336,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             for (auto& c : d.value("checks", nlohmann::json::array())) {
                 std::string vi = c.value("vanillaItem", "");
                 if (vi.empty())
+                    continue;
+                if (rpgMagic.enabled && game == GAME_MM && IsNativeMmMagicItem(vi))
                     continue;
                 bool adv = c.value("advancement", true);
                 (adv ? advItems : junkItems).push_back({ game, vi, adv, adv ? CwCat::UNKNOWN : CwCat::JUNK });
@@ -379,6 +387,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     };
 
     try {
+        rpgMagic = ParseRpgMagicRules(sohDumpJson);
         parsePool(GAME_OOT, sohDumpJson);
         parsePool(GAME_MM, mmDumpJson);
         std::unordered_set<std::string> eligible;
@@ -530,6 +539,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // delivery game stays OOT, but MM still needs a logically reachable pickup
     // when OOT uses No Logic or beatable-only accessibility.
     std::unordered_set<std::string> mmSharedOotItems;
+    if (rpgMagic.enabled)
+        mmSharedOotItems.insert(kRpgMagicItem);
     for (const auto& group : sharedGroups) {
         if (!std::any_of(group.names.begin(), group.names.end(),
                          [](const CwSharedName& name) { return name.game == GAME_MM; }))
@@ -746,7 +757,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             std::unordered_set<std::string> mmReach;
             if (crossDungeon) {
                 std::vector<std::string> ootSeen, mmSeen;
-                SharedOwnedViews(sharedGroups, owned, mmOwned, ootSeen, mmSeen);
+                SharedOwnedViews(sharedGroups, owned, mmOwned, ootSeen, mmSeen, rpgMagic);
                 auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen, false, queryReachable);
                 r.reach = std::move(joint.oot);
                 mmReach = std::move(joint.mm);
@@ -859,7 +870,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         bool portalOpen = !portalGated || mmStart;
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
-            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
+            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen, rpgMagic);
             if (crossDungeon) {
                 auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen,
                                                       mmStart || ootAccess == OotAccess::NO_LOGIC, queryReachable);
