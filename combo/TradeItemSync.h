@@ -2,7 +2,11 @@
 
 #include <cstdint>
 #include <nlohmann/json.hpp>
+#if __has_include("FleetShipCombo/FleetComboItems.h")
 #include "FleetShipCombo/FleetComboItems.h"
+#else
+#include "soh/FleetShipCombo/FleetComboItems.h"
+#endif
 
 // Earned-item registries remain monotone. Current copies use their own
 // monotone revision: even means available, odd means consumed. Only gameplay

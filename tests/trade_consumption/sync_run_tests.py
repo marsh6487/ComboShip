@@ -39,7 +39,7 @@ assert(peer.tradeAdultRevision[17]==1 && "hand-in must survive source-to-peer sn
         subprocess.run([os.environ.get('CXX','c++'),'-std=c++17',str(out/'red.cpp'),'-o',str(out/'red')],check=True)
         subprocess.run([str(out/'red')],check=True)
     else:
-        for game, inc in [('oot','soh/soh'), ('mm','mm/2s2h')]:
+        for game, inc in [('oot','soh'), ('mm','mm/2s2h')]:
             flags = ['-std=c++17','-Wall','-Wextra','-Werror']
             if args.sanitize:
                 flags += ['-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-pie','-no-pie']
