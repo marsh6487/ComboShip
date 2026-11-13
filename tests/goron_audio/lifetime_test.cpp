@@ -59,7 +59,7 @@ extern "C" void DinFireSword_FinishForget(PlayState* state, Actor* actor) {
 static struct {
     int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction, gakkiActive;
     int cutsceneTimer, cutscenePhase, flashAlpha, zoraSwimEnabled, groundPoundCrackTimer;
-    int zoraMeleeActive, zoraJumpTrailActive, hazardVoidType;
+    int meleeActive, zoraJumpTrailActive, hazardVoidType;
     void* savedAgeProperties;
     u8 savedTunic, savedTunicEquip;
 } gFormState;
@@ -182,7 +182,7 @@ static void MmForm_UpdateActive(Player*, PlayState*) {
 }
 static void MmForm_UpdateDetransforming(Player*, PlayState*) {
 }
-static void MmForm_UpdateZoraMelee(Player*, PlayState*) {
+static void MmForm_UpdateMelee(Player*, PlayState*) {
 }
 static void MmForm_UpdateZoraSwimTrails(PlayState*) {
 }

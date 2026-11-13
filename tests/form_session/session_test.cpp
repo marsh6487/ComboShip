@@ -135,7 +135,7 @@ static struct {
     int state;
     MmPlayerTransformation currentForm, targetForm;
     int cutsceneTimer, cutscenePhase, flashAlpha;
-    u8 initialized, gakkiActive, skeletonLoaded, zoraMeleeActive, zoraJumpTrailActive;
+    u8 initialized, gakkiActive, skeletonLoaded, meleeActive, zoraJumpTrailActive;
     void* savedAgeProperties;
     struct {
         void *jointTable, *morphTable;
