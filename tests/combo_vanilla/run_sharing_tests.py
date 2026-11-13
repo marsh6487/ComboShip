@@ -45,11 +45,17 @@ for game in ('soh', 'mm'):
             trade = trade[trade.index('#define TRADE_ADULT_COUNT'):trade.index('extern void* MmAssets_LoadResource')]
             declarations = re.findall(r'^(?:s32|u8|void) \w+\([^{};]*\) (?=\{)', trade, re.M)
             snippets.append('extern "C" {\n' + ';\n'.join(declarations) + ';\n}')
+            # Reconciliation uses the inventory/equipment storage supplied by
+            # sharing_test.cpp. Compile its unchanged body in that same TU;
+            # the remaining trade core retains its native C enum semantics.
+            reconcile = extract(trade, 'void TradeAdult_ReconcileConsumed(void)')
+            snippets.append(re.search(r'^#define TRADE_ADULT_PENDANT\s+.*$', trade, re.M).group())
+            snippets.append('extern "C" ' + reconcile)
             equipment = (ROOT / 'soh/mods/extended_equipment.h').read_text()
             trade_source = ('#include "soh/include/z64item.h"\n#include "soh/mods/nei_save.h"\n'
                             'typedef uint8_t u8;\ntypedef int32_t s32;\n' +
                             next(line for line in equipment.splitlines() if line.startswith('#define ITEM_EXT_BOOTS_2 ')) +
-                            '\n' + trade)
+                            '\nvoid TradeAdult_ReconcileConsumed(void);\n' + trade.replace(reconcile, '', 1))
             (Path(tmp) / 'trade.c').write_text(trade_source)
             cflags = [flag for flag in flags if not flag.startswith('-std=')]
             obj = Path(tmp) / 'trade.o'

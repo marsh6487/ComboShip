@@ -43,7 +43,8 @@ def main():
     trade = read("soh/mods/items/logic/trade_items.c")
     production = trade[trade.index("#define TRADE_ADULT_COUNT"):trade.index("s32 TradeAdult_Count(")]
     production += "\n" + "\n".join(function(trade, name) for name in (
-        "TradeAdult_IndexOfItem", "TradeAdult_IsOwnedIndex", "TradeAdult_IsOwnedItem")) + "\n"
+        "TradeAdult_IndexOfItem", "TradeAdult_IsConsumedIndex", "TradeAdult_IsOwnedIndex",
+        "TradeAdult_IsOwnedItem")) + "\n"
     for path, names in (("soh/mods/items/helpers/equip_helper.c", ("ItemInput_ButtonIsClaimed",)),
                         ("soh/mods/extended_equipment.c", ("ExtEquip_IsButtonItem", "ExtEquip_GetLegacyButtonItem"))):
         dependency = read(path)

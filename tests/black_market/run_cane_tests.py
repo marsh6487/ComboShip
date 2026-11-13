@@ -10,6 +10,7 @@ grant = block_from(items, items.index("bool Grant("))
 ids = ["RI_OOT_NEI_CANE_OF_SOMARIA", "RI_OOT_NEI_CANE_SOMARIA_BLOCK", "RI_OOT_NEI_CANE_SOMARIA_PLATFORM", "RI_OOT_NEI_CANE_PACCI_FLIP", "RI_OOT_NEI_CANE_PACCI_STONE", "RI_OOT_NEI_CANE_PACCI_ULTRAHAND", "RI_OOT_EXT_CANE_OF_BYRNA"]
 fixture = r'''
 #include "rando/BlackMarket.h"
+#include "TradeItemSync.h"
 #define COMBO_BUILD
 #include "vanilla/ComboVanillaMode.h"
 #include "vanilla/ComboVanillaPolicy.h"
@@ -22,7 +23,14 @@ using Item = ComboRando::BlackMarket::Item;
 // the native first-cycle service boundary, not another ownership registry.
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 struct { struct { struct { struct { unsigned threeDayResetCount = 0; } playerData; } saveInfo; } save; } gSaveContext;
-struct State { u8 caneSkills = 0; bool cell = false; std::array<u8,2> comboObtainedFc{}, comboAppliedFc{}; } states[2];
+// Real FC identities and the actual consumption helper keep the materializer
+// dependency intact; this fixture grants only Cane and the unrelated sword.
+struct State {
+    u8 caneSkills = 0;
+    bool cell = false;
+    std::array<u8,FCI_MAX> comboObtainedFc{}, comboAppliedFc{};
+    uint32_t tradeAdultRevision[23]{};
+} states[2];
 State* nei = &states[0];
 u8 Cane_GiveSkill(u8 skill) { nei->caneSkills |= 1 << skill; nei->cell = true; return 1; }
 constexpr int SLATE_RUNE_COUNT=5, SEASON_COUNT=4, WAND_MODE_COUNT=6;
@@ -37,8 +45,12 @@ bool Owned(const Item& item) { const int i=Id(item); return i>=0 && i<6 && (nei-
 bool Available(const Item&) { return true; }
 using NeiSaveData = State;
 State* Nei_Save() { return nei; }
-constexpr int FCI_CANE_OF_SOMARIA=0, FCI_MAX=2, FC_COMBO_OBTAINED_FC_SIZE=2, FCI_NO_ITEM=-1;
-int FcCombo_NativeForItem(int id) { return 10+id; }
+constexpr int FC_COMBO_OBTAINED_FC_SIZE=FCI_MAX;
+int FcCombo_NativeForItem(int id) {
+    if(id==FCI_CANE_OF_SOMARIA) return 10;
+    if(id==FCI_KOKIRI_SWORD) return 11;
+    return FCI_NO_ITEM;
+}
 using RandoItemId=int; using RandomizerGet=int;
 int extras=0, otherGrants=0, gFcCombo_SuppressRecord=0;
 bool sApplyingFc=false; void* gPlayState=nullptr;
@@ -78,8 +90,10 @@ int main() {
     // Counter and mask deltas may arrive in either order; neither order may replay a second skill.
     for(int direction=0;direction<2;++direction) for(int order=0;order<2;++order) {
         states[0]={}; states[1]={}; nei=&states[direction];
-        Cane_GiveSkill(0); nei->comboObtainedFc[0]=nei->comboAppliedFc[0]=1;
-        nlohmann::json mask=nlohmann::json::object(), counts={{"comboObtainedFc",std::array<int,2>{1,1}}};
+        Cane_GiveSkill(0); nei->comboObtainedFc[FCI_CANE_OF_SOMARIA]=nei->comboAppliedFc[FCI_CANE_OF_SOMARIA]=1;
+        std::array<int,FCI_MAX> obtained{};
+        obtained[FCI_CANE_OF_SOMARIA]=obtained[FCI_KOKIRI_SWORD]=1;
+        nlohmann::json mask=nlohmann::json::object(), counts={{"comboObtainedFc",obtained}};
         if(direction==0) Extract0(mask); else Extract1(mask);
         nei=&states[1-direction]; extras=otherGrants=0;
         if(order==0) {
@@ -90,7 +104,7 @@ int main() {
         if(direction==0) Merge1(counts); else Merge0(counts);
         if(direction==0) Materialize1(); else Materialize0();
         assert(nei->caneSkills==1 && extras==0 && otherGrants==1);
-        assert(nei->comboAppliedFc[0]==1 && nei->comboAppliedFc[1]==1);
+        assert(nei->comboAppliedFc[FCI_CANE_OF_SOMARIA]==1 && nei->comboAppliedFc[FCI_KOKIRI_SWORD]==1);
     }
     puts("PASS: exact cane grants (including Byrna separation); all bit combinations both native sync directions");
 }
@@ -109,5 +123,8 @@ fixture=fixture.replace("/* SYNC */", "\n".join(blocks))
 with tempfile.TemporaryDirectory(prefix="market-cane-") as temp:
     path=Path(temp)/"test.cpp"; path.write_text(fixture)
     binary=Path(temp)/"test"
-    subprocess.run([os.environ.get("CXX","c++"),"-std=c++20","-I"+str(ROOT/"combo"),str(path),"-o",str(binary)],check=True)
+    flags = ["-std=c++20", "-I"+str(ROOT/"combo"), "-I"+str(ROOT/"soh/soh")]
+    if "--sanitize" in sys.argv:
+        flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-no-pie"]
+    subprocess.run([os.environ.get("CXX","c++"),*flags,str(path),"-o",str(binary)],check=True)
     subprocess.run([str(binary)],check=True)

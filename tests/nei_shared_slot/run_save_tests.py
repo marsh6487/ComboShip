@@ -124,7 +124,15 @@ def production_for(host, serializer_ref, init_ref=None):
     for definition, source in (("TRADE_ADULT_PENDANT", equipment), ("TRADE_ADULT_COUNT", trade)):
         parts.append(re.search(r"^#define " + definition + r"\s+.*$", source, re.M).group())
     if host == "mm":
-        parts.append(extract(trade, "TradeAdult_GiveIndex"))
+        # Legacy Pendant migration observes its native item without reacquiring
+        # a consumed copy. Keep that real lookup/fold dependency and the real
+        # grant revision predicate alongside the existing equipment fixture.
+        start = trade.index("static const u8 sTradeAdultItems[")
+        end = trade.index("\n};", start) + len("\n};")
+        parts.append(trade[start:end])
+        parts.extend(extract(trade, name) for name in
+                     ("TradeAdult_IndexOfItem", "TradeAdult_IsConsumedIndex",
+                      "TradeAdult_GiveIndex", "TradeAdult_FoldCurrent"))
     parts.append(extract(equipment, "ExtEquip_SetCurrentByType"))
     # Keep the real persisted extended-slot writer. Engine behavior cleanup,
     # vanilla-base equipment updates and player/render refresh remain outside

@@ -342,7 +342,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     mm_give = (ROOT / 'mm/2s2h/Rando/GiveItem.cpp').read_text()
     fairy_arms = mm_give[mm_give.index('        case RI_WOODFALL_STRAY_FAIRY:'):
                          mm_give.index('        case RI_GREAT_SPIN_ATTACK:')]
-    fc_grants = 'int gFcCombo_SuppressRecord = 0;\n'
+    fc_grants = '#include "combo/TradeItemSync.h"\nint gFcCombo_SuppressRecord = 0;\n'
     fc_grants += 'void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId) {\n' \
         'assert(gFcCombo_SuppressRecord > 0);\nswitch (randoItemId) {\n' + fairy_arms + \
         'default: assert(false && "unexpected non-fairy FC grant");\n}\n}\n'

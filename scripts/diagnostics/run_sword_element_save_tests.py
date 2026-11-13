@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
-from run_time_pedestal_tests import block_from, functions
+from run_time_pedestal_tests import block_from, functions, trade_reconciliation
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DEPS = Path('/workspace/scratch/27a277416750/music-source/deps')
@@ -49,6 +49,7 @@ static void Init() { Nei_InitNewSave(); }
                 source += 'static NeiSaveData gNeiSave{};\n'
                 source += '#include "macros.h"\n'
                 source += 'SaveContext gSaveContext{};\n' + callbacks['Nei_Save'] + '\n'
+                source += trade_reconciliation()
                 # Native loading also repairs legacy Rito inventory cells and button slots.
                 rito = functions((ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
                                  .replace('extern "C" ', ''))

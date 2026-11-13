@@ -38,10 +38,15 @@ equipment = (ROOT / 'soh/mods/extended_equipment.h').read_text()
 trade = trade[trade.index('#define TRADE_ADULT_COUNT'):trade.index('extern void* MmAssets_LoadResource')]
 trade_declarations = re.findall(r'^(?:s32|u8|void) \w+\([^{};]*\) (?=\{)', trade, re.M)
 blocks += ['extern "C" {\n' + ';\n'.join(trade_declarations) + ';\n}']
+# The reward fixture owns its inventory/equipment storage. Keep the unchanged
+# reconciler in that TU while the remaining helpers keep native C enum rules.
+reconcile = function('soh/mods/items/logic/trade_items.c', 'void TradeAdult_ReconcileConsumed(void)')
+blocks += [re.search(r'^#define TRADE_ADULT_PENDANT\s+.*$', trade, re.M).group(),
+           'extern "C" ' + reconcile]
 trade_source = ('#include "soh/include/z64item.h"\n#include "soh/mods/nei_save.h"\n'
                 'typedef uint8_t u8;\ntypedef int32_t s32;\n' +
                 next(line for line in equipment.splitlines() if line.startswith('#define ITEM_EXT_BOOTS_2 ')) +
-                '\n' + trade)
+                '\nvoid TradeAdult_ReconcileConsumed(void);\n' + trade.replace(reconcile, '', 1))
 blocks += [function(forms, name) for name in [
     'extern "C" uint8_t RitoMask_IsOwned(void)',
     'extern "C" u8 RitoItem_FormEnabled(void)',

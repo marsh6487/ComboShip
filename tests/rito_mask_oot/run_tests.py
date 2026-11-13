@@ -24,7 +24,19 @@ args = p.parse_args()
 forms = (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
 inv = (ROOT / 'soh/mods/extended_inventory.c').read_text()
 controller = (ROOT / 'soh/mods/transformation_masks/mm_player_form.cpp').read_text()
-blocks = [function(controller, 'MmForm_OnRitoMaskRemoved')]
+trade = (ROOT / 'soh/mods/items/logic/trade_items.c').read_text()
+equipment = (ROOT / 'soh/mods/extended_equipment.h').read_text()
+# Migration now clears consumed trade copies before normalizing the mask cell.
+# Use the actual dependency closure against this fixture's existing inventory
+# and all three equipment banks, without introducing another trade model.
+blocks = [next(line for line in equipment.splitlines() if line.startswith('#define ITEM_EXT_BOOTS_2 '))]
+blocks += [re.search(r'^#define ' + name + r'\s+.*$', trade, re.M).group()
+           for name in ('TRADE_ADULT_COUNT', 'TRADE_ADULT_PENDANT')]
+start = trade.index('static const u8 sTradeAdultItems[')
+blocks.append(trade[start:trade.index('\n};', start) + len('\n};')])
+blocks += [function(trade, name) for name in
+           ('TradeAdult_IndexOfItem', 'TradeAdult_IsConsumedIndex', 'TradeAdult_ReconcileConsumed')]
+blocks += [function(controller, 'MmForm_OnRitoMaskRemoved')]
 blocks += [function(forms, n) for n in (
     'RitoMask_IsOwned', 'RitoItem_NoteCellItem', 'OotMaskWheel_OwnsItem', 'OotMaskWheel_Neighbor',
     'RitoMask_MigrateLegacy', 'RitoMask_Grant', 'RitoMask_Remove', 'RitoItem_SyncCell',
