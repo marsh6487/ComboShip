@@ -77,7 +77,7 @@ extern void MmForm_DragonScaleExitSwim(Player* player);
 extern void MmMaskWear_Toggle(PlayState* play, Player* player, s32 itemId);
 extern void MmMaskWear_Draw(PlayState* play, Player* player);
 extern void MmMaskWear_Update(PlayState* play, Player* player);
-extern void MmMaskWear_FilterBlastA(PlayState* play, Player* player, Input* input);
+extern void MmMaskWear_FilterBlastB(PlayState* play, Player* player, Input* input);
 extern s32 MmMaskWear_GetCurrent(void);
 extern void MmMaskWear_Clear(void);
 extern void MmMaskWear_DeactivateChateauRomani(void);
@@ -384,7 +384,7 @@ void TransformMasks_FilterB(Input* input) {
     if (input == NULL)
         return;
 
-    MmMaskWear_FilterBlastA(gPlayState, gPlayState != NULL ? GET_PLAYER(gPlayState) : NULL, input);
+    MmMaskWear_FilterBlastB(gPlayState, gPlayState != NULL ? GET_PLAYER(gPlayState) : NULL, input);
 
     // ── One rule for every form: while a message or the ocarina is up, NO form eats input ──
     // Those buttons belong to the textbox/ocarina — OoT suppresses its own item pipeline in
@@ -403,7 +403,7 @@ void TransformMasks_FilterB(Input* input) {
         return;
     }
 
-    // Blast Mask + Great Fairy Mask: B handled by MmMaskWear_Update on raw input.
+    // Blast Mask snapshots B above; Great Fairy Mask reads it in MmMaskWear_Update.
     s32 wornMask = MmMaskWear_GetCurrent();
     if (wornMask == ITEM_MM_MASK_BLAST || wornMask == ITEM_MM_MASK_GREAT_FAIRY) {
         input->cur.button &= ~BTN_B;

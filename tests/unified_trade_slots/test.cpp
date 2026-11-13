@@ -19,6 +19,34 @@ static void AssertNoMaskTrade() {
 }
 int main() {
     PlayState play{};
+    // A consumed copy can arrive while this peer still has old possession flags
+    // and native selections. Pause/load normalization is observation, not pickup.
+    for (int child = ITEM_CHICKEN; child <= ITEM_LETTER_ZELDA; ++child) {
+        Reset();
+        const int index = 20 + child - ITEM_WEIRD_EGG;
+        nei.tradeAdultOwned = (1u << index) | (1u << 2);
+        nei.tradeAdultRevision[index] = 1;
+        randomizerFlags[RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + child - ITEM_WEIRD_EGG] = true;
+        gSaveContext.inventory.items[SLOT_TRADE_CHILD] = child;
+        gSaveContext.inventory.items[SLOT_TRADE_ADULT] = child;
+        for (auto* equip : {&gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips}) {
+            for (int b = 1; b < 8; ++b) {
+                equip->buttonItems[b] = child;
+                equip->cButtonSlots[b - 1] = SLOT_TRADE_CHILD;
+            }
+        }
+        for (int repeat = 0; repeat < 3; ++repeat) {
+            RitoMask_MigrateLegacy();
+            assert(nei.tradeAdultRevision[index] == 1 && !TradeAdult_IsOwnedItem(child));
+            assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD] != child);
+            assert(gSaveContext.inventory.items[SLOT_TRADE_ADULT] != child);
+            for (auto* equip : {&gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips})
+                for (int b = 1; b < 8; ++b) assert(equip->buttonItems[b] != child);
+        }
+        TradeAdult_GiveItem(child);
+        RitoMask_MigrateLegacy();
+        assert(nei.tradeAdultRevision[index] == 2 && TradeAdult_IsOwnedItem(child));
+    }
     // Regression: one shared bit + legacy child selection must expose one trade cell.
     if (Combined()) {
         Reset(); nei.tradeAdultOwned=1u<<22;

@@ -36,6 +36,26 @@ static void HealBogusOwnedItems(){}
 static void FoldExtEquipmentIntoRegistry(NeiSaveData*){}
 // PRODUCTION
 int main(){
+    // Hatching is a genuine new bird after an earlier copy was turned in.
+    // Native and rando paths must grant it independently of pause migration.
+    for (bool rando : {false, true}) {
+        for (bool pocket : {false, true}) {
+            nei = {}; gSaveContext = {}; randomizer = rando;
+            memset(randomizerFlags, 0, sizeof(randomizerFlags));
+            memset(gSaveContext.inventory.items, ITEM_NONE, sizeof(gSaveContext.inventory.items));
+            gSaveContext.linkAge = LINK_AGE_CHILD;
+            const uint8_t egg = pocket ? ITEM_POCKET_EGG : ITEM_WEIRD_EGG;
+            const uint8_t bird = pocket ? ITEM_POCKET_CUCCO : ITEM_CHICKEN;
+            const int index = pocket ? 1 : 21;
+            nei.tradeAdultOwned = 1u << index;
+            nei.tradeAdultRevision[index] = 1;
+            gSaveContext.inventory.items[pocket ? SLOT_TRADE_ADULT : SLOT_TRADE_CHILD] = egg;
+            randomizerFlags[pocket ? RAND_INF_ADULT_TRADES_HAS_POCKET_EGG : RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG] = true;
+            assert(pocket ? Inventory_HatchPocketCucco(nullptr) : Inventory_HatchWeirdEgg(nullptr));
+            assert(nei.tradeAdultRevision[index] == 2 && TradeAdult_IsOwnedItem(bird));
+        }
+    }
+    randomizer = true;
     static_assert(sizeof(gSaveContext.equips.buttonItems)==8);
     static_assert(sizeof(gSaveContext.equips.cButtonSlots)==7);
     for(int age : {LINK_AGE_CHILD,LINK_AGE_ADULT}) {

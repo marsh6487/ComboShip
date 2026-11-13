@@ -84,6 +84,7 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "powerKegCount", n.powerKegCount },
         { "powerKegMode", n.powerKegMode },
         { "tradeAdultOwned", n.tradeAdultOwned },
+        { "tradeAdultRevision", n.tradeAdultRevision },
         // OoT page-0 items (Skijer's NEI slingshot pass — these were appended to NeiSaveData but
         // never serialized, so ownership/ammo/upgrades silently reset on save reload).
         { "ootSpellsOwned", n.ootSpellsOwned },
@@ -219,6 +220,15 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.powerKegCount = j.value("powerKegCount", (uint8_t)0);
     n.powerKegMode = j.value("powerKegMode", (uint8_t)0);
     n.tradeAdultOwned = j.value("tradeAdultOwned", (uint32_t)0);
+    if (j.contains("tradeAdultRevision") && j["tradeAdultRevision"].is_array()) {
+        const auto& revisions = j["tradeAdultRevision"];
+        for (size_t i = 0; i < ARRAY_COUNT(n.tradeAdultRevision) && i < revisions.size(); ++i) {
+            const auto& value = revisions[i];
+            if (value.is_number_integer() && value >= 0 && value <= UINT32_MAX) {
+                n.tradeAdultRevision[i] = value.get<uint32_t>();
+            }
+        }
+    }
     // (pictoboxOwned / pictoHasPhoto / pictoFlags0 / pictoFlags1 dropped with the NEI pictobox —
     // saves written before the removal still carry the keys; they are ignored on load.)
     // OoT page-0 items (Skijer's NEI slingshot pass) — absent keys default to "not owned".

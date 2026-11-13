@@ -3,6 +3,9 @@
 extern "C" {
 #include <variables.h>
 #include <functions.h>
+#include "mods/nei_save.h"
+
+void TradeAdult_GiveIndex(s32 index);
 }
 
 SaveContext saveContextCopy;
@@ -70,6 +73,14 @@ void Rando::MiscBehavior::AfterEndOfCycleSave() {
         saveContextCopy.save.saveInfo.inventory.items[SLOT_TRADE_KEY_MAMA];
     gSaveContext.save.saveInfo.inventory.items[SLOT_TRADE_COUPLE] =
         saveContextCopy.save.saveInfo.inventory.items[SLOT_TRADE_COUPLE];
+
+    // Randomizer reuses earned MM trade items each cycle. Restore their copies only
+    // at this explicit boundary; native cycle reset and ordinary save loading do not.
+    for (s32 index = 11; index <= 19; ++index) {
+        if (Nei_Save()->tradeAdultOwned & (1u << index)) {
+            TradeAdult_GiveIndex(index);
+        }
+    }
 
     // Unset any flags used for checks, whether or not they get the item or junk is determined on our end instead.
     for (auto& [randoCheckId, randoStaticCheck] : Rando::StaticData::Checks) {

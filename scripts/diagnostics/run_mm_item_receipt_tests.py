@@ -456,7 +456,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     randomizer_messages = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
     # Copy the real shared-tool rows, including their icon and all locales.
-    for rg in ('RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
+    for rg in ('RG_CLOCK', 'RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
         row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboToolReceiptText::.*?\}',
                         randomizer_messages, re.S)
         assert row, f'Missing shared tool receipt: {rg}'

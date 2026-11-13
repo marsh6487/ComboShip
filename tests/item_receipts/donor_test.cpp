@@ -235,6 +235,7 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Storm Rod", RG_WAND_STORM_ROD},
     {"Shadow Scepter", RG_WAND_SHADOW_SCEPTER},
     {"Sheikah Slate", RG_SHEIKAH_SLATE},
+    {"Clock", RG_CLOCK},
     {"Phantom Hourglass", RG_PHANTOM_HOURGLASS},
     {"Shadow Crystal", RG_SHADOW_CRYSTAL},
     {"Skull Mask", RG_SKULL_MASK},
@@ -1241,6 +1242,60 @@ int main(int argc, char** argv) {
     }
   }
   std::cout << "PASS Hourglass/Crystal OoT tutorials: custom icons, all locales, encoded glyphs/colors and donor export\n";
+  // Clock is passive and has no inventory icon. Accidentally using
+  // AutoFormat(ITEM_CUSTOM) would show the native Heart Piece fallback.
+  const auto clockSaveBefore = gSaveContext;
+  const auto clockNeiBefore = receiptNeiSave;
+  const auto clockForeignBefore = foreign;
+  const auto clockResolvedBefore = resolvedForeign;
+  const int clockLatchesBefore = foreignLatches;
+  std::array<std::string, 3> clockLocales;
+  for (bool liveEntry : {false, true}) {
+    Player player{};
+    player.getItemId = player.getItemEntry.getItemId = RG_CLOCK;
+    player.getItemEntry.objectId = liveEntry ? 0 : OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    foreign.itemGame = ComboRando::GAME_MM;
+    foreign.itemName = "Clock";
+    foreign.displayName = "Clock (MM)";
+    foreign.trap = false;
+    foreign.fakeTrickName.clear();
+    resolvedForeign = "Clock";
+    CustomMessage imported;
+    BuildComboForeignMessage(&player, imported);
+    const auto nativeTexts = std::array{native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW), native.GetFrench(MF_RAW)};
+    const auto importedTexts = std::array{imported.GetEnglish(MF_RAW), imported.GetGerman(MF_RAW), imported.GetFrench(MF_RAW)};
+    for (size_t language = 0; language < nativeTexts.size(); ++language) {
+      const auto& text = nativeTexts[language];
+      assert(text == importedTexts[language] && "foreign prefix replaced the Clock tutorial");
+      unsigned pages = 1;
+      for (size_t i = 0; i < text.size();) {
+        const uint8_t code = text[i];
+        const size_t command = code == 0x15 ? 4 : ComboReceipt_CommandSize(code, false);
+        assert(command <= text.size() - i);
+        assert(code != 0x13 && "passive Clock must not request a native item icon");
+        if (code == 0x04) ++pages;
+        if (command == 1)
+          assert((code < 0x9F || code > 0xAA) && "passive Clock must not teach an equip/button action");
+        i += command;
+      }
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(text, converted));
+      assert(converted.find("Hyrule") != std::string::npos && pages >= 2);
+      assert(converted.find('%') == std::string::npos && converted.size() < sizeof(buffer));
+      clockLocales[language] = converted;
+    }
+  }
+  assert(clockLocales[0] != clockLocales[1] && clockLocales[0] != clockLocales[2] && clockLocales[1] != clockLocales[2]);
+  const auto clockExport = read("Clock");
+  assert(clockExport.find("Hyrule") != std::string::npos && clockExport.find('\x10') != std::string::npos);
+  assert(!std::memcmp(&clockSaveBefore, &gSaveContext, sizeof(clockSaveBefore)));
+  assert(!std::memcmp(&clockNeiBefore, &receiptNeiSave, sizeof(clockNeiBefore)));
+  foreign = clockForeignBefore;
+  resolvedForeign = clockResolvedBefore;
+  foreignLatches = clockLatchesBefore;
+  std::cout << "PASS Clock OoT tutorial: native/imported, both item-entry paths, three locales, no icons/buttons, donor export and save isolation\n";
   const struct { const char* name; const char* detail; int icon; } masks[] = {
       {"Skull Mask", "monster", ITEM_MASK_SKULL},
       {"Spooky Mask", "scare", ITEM_MASK_SPOOKY},

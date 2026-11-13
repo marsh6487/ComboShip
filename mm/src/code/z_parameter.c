@@ -69,6 +69,15 @@ uint8_t Sw97_IsSlingItem(uint16_t item);
 uint16_t Sw97_ElementIcon(uint8_t elem);
 uint8_t Sw97_ItemHasBombs(uint16_t item);
 
+// Query the canonical extended sword IDs without importing the full NEI equipment header.
+u16 ExtEquip_GetItemId(s16 equipType, u8 index);
+
+// Native grants and accepted hand-ins update the unified trade wheel in both MM builds.
+s32 TradeAdult_IndexOfItem(u8 item);
+void TradeAdult_GiveItem(u8 item);
+void TradeAdult_ConsumeItem(u8 item);
+extern int gFcCombo_SuppressRecord;
+
 // 2S2H [Port] This was originally static but needs to be global so it can be accessed in z_kaleido_collect,
 // z_kaleido_debug, and z_kaleido_draw.
 const char* sCounterTextures[] = {
@@ -4777,6 +4786,10 @@ static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {
     }
 
     u8 result = Item_GiveImpl(play, item);
+    // Replaying the shared earned-item registry is not a new copy of a handed-in item.
+    if (gFcCombo_SuppressRecord == 0) {
+        TradeAdult_GiveItem(item);
+    }
     GameInteractor_ExecuteOnItemGive(item);
 
     return result;
@@ -4947,6 +4960,13 @@ u8 Item_CheckObtainability(u8 item) {
 
 void Inventory_DeleteItem(s16 item, s16 slot) {
     s16 btn;
+
+    if (item >= 0 && item <= UINT8_MAX && TradeAdult_IndexOfItem((u8)item) >= 0) {
+        // A trade can occupy any of the three homes. Remove its exact identity, preserving
+        // another item now selected in the caller's slot and making repeated deletes harmless.
+        TradeAdult_ConsumeItem((u8)item);
+        return;
+    }
 
     gSaveContext.save.saveInfo.inventory.items[slot] = ITEM_NONE;
 
@@ -5228,16 +5248,29 @@ void Interface_SetAButtonDoAction(PlayState* play, u16 aButtonDoAction) {
     }
 }
 
+static bool Interface_IsExtraMaskActionSwordItem(ItemId item) {
+    // Tools may borrow a sword item action, so match the actual equipped item IDs.
+    return (item == ITEM_SWORD_MASTER) || (item == ITEM_SWORD_BGS) || (item == ITEM_SWORD_GREAT_FAIRY) ||
+           (item == ExtEquip_GetItemId(EQUIP_TYPE_SWORD, 1)) || (item == ExtEquip_GetItemId(EQUIP_TYPE_SWORD, 2)) ||
+           (item == ExtEquip_GetItemId(EQUIP_TYPE_SWORD, 3));
+}
+
 /**
  * Updates the current B button player do action.
  */
 void Interface_SetBButtonPlayerDoAction(PlayState* play, s16 bButtonDoAction) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    Player* player = GET_PLAYER(play);
+    ItemId bItem = BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B);
 
-    if (((BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) >= ITEM_SWORD_KOKIRI) &&
-         (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) <= ITEM_SWORD_GILDED)) ||
-        (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_NONE) ||
-        (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_DEKU_NUT)) {
+    // Human masks also replace imported/extended swords carried on B as their own IDs.
+    // Keep the native form and temporary B-item rules for all other requests.
+    if (((bItem >= ITEM_SWORD_KOKIRI) && (bItem <= ITEM_SWORD_GILDED)) || (bItem == ITEM_NONE) ||
+        (bItem == ITEM_DEKU_NUT) ||
+        ((player != NULL) && (player->transformation == PLAYER_FORM_HUMAN) &&
+         ((bButtonDoAction == DO_ACTION_EXPLODE) || (bButtonDoAction == DO_ACTION_MARCH) ||
+          (bButtonDoAction == DO_ACTION_DANCE)) &&
+         Interface_IsExtraMaskActionSwordItem(bItem))) {
         if ((CUR_FORM == PLAYER_FORM_DEKU) && !gSaveContext.save.saveInfo.playerData.isMagicAcquired) {
             interfaceCtx->bButtonPlayerDoAction = 0xFD;
         } else {

@@ -269,7 +269,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                               mmOracle.GetDungeonExits;
     const bool portalGated = ootAccess != OotAccess::NO_LOGIC && !crossDungeon;
     const bool mmStart = startingGame == GAME_MM;
-    if (portalGated && ootOracle.GetPortalOpen == nullptr) {
+    // Cross topology can bootstrap MM without the portal, but an MM-start player
+    // must still be able to reopen it after entering OOT without MM inventory.
+    const bool portalRequired = portalGated || (mmStart && ootAccess != OotAccess::NO_LOGIC);
+    if (portalRequired && ootOracle.GetPortalOpen == nullptr) {
         result.error = "OOT oracle is missing Combo_SOH_Rando_GetPortalOpen — rebuild soh.dll (the OOT->MM "
                        "portal cannot be gated without it)";
         return result;
@@ -726,27 +729,39 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         return out;
     };
 
-    // OOT-only, portal SHUT: nothing assumed from the free pool, MM never queried. Credits a placement
-    // only once its check is reachable — reachableFixpoint's rule, so this can't certify what it rejects.
+    // Start from an itemless OOT visit, with only native forced starting items.
+    // In cross mode preserve real foreign dungeon arrivals, but never root MM's
+    // overworld or assume its free pool. Every credited item earns its way in.
     struct OotClosedResult {
         std::unordered_set<std::string> reach;
         bool portalOpen = false;
     };
     auto ootClosedFixpoint = [&](const std::vector<CwPlacement>& pl,
                                  const std::vector<std::string>& extraOwned) -> OotClosedResult {
-        std::vector<std::string> owned = ootForcedOwned;
+        std::vector<std::string> owned = ootForcedOwned, mmOwned = mmForcedOwned;
         owned.insert(owned.end(), extraOwned.begin(), extraOwned.end());
         std::vector<bool> credited(pl.size(), false);
         OotClosedResult r;
         for (;;) {
-            r.reach = queryReachable(ootOracle, owned);
-            r.portalOpen = r.portalOpen || ootOracle.GetPortalOpen == nullptr || ootOracle.GetPortalOpen() != 0;
+            std::unordered_set<std::string> mmReach;
+            if (crossDungeon) {
+                std::vector<std::string> ootSeen, mmSeen;
+                SharedOwnedViews(sharedGroups, owned, mmOwned, ootSeen, mmSeen);
+                auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen, false, queryReachable);
+                r.reach = std::move(joint.oot);
+                mmReach = std::move(joint.mm);
+                r.portalOpen = r.portalOpen || joint.portalOpen;
+            } else {
+                r.reach = queryReachable(ootOracle, owned);
+                r.portalOpen = r.portalOpen || ootOracle.GetPortalOpen == nullptr || ootOracle.GetPortalOpen() != 0;
+            }
             bool changed = false;
             for (size_t i = 0; i < pl.size(); ++i) {
-                if (credited[i] || pl[i].check.game != GAME_OOT || pl[i].item.game != GAME_OOT)
+                if (credited[i] || (!crossDungeon && (pl[i].check.game != GAME_OOT || pl[i].item.game != GAME_OOT)))
                     continue;
-                if (r.reach.count(pl[i].check.name)) {
-                    owned.push_back(pl[i].item.name);
+                const auto& reach = pl[i].check.game == GAME_OOT ? r.reach : mmReach;
+                if (reach.count(pl[i].check.name)) {
+                    (pl[i].item.game == GAME_OOT ? owned : mmOwned).push_back(pl[i].item.name);
                     credited[i] = true;
                     changed = true;
                 }
@@ -759,7 +774,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Portal prerequisites: a SUFFICIENT witness set for the OOT->MM portal, built FORWARD from empty.
     // RNG-free (canonical order) so it can't shift the seeded stream. See docs/deviations/rando.md.
     std::vector<std::string> portalPrereqs;
-    if (portalGated) {
+    if (portalRequired) {
         // Each probe is a fixpoint (several queries), so this bounds queries, not probes.
         const int kMaxDeriveQueries = 1500;
         const uint32_t queries0 = ootStats.count;
@@ -1335,7 +1350,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         }
         // #135: MM start frees the OOT root, so mmAdvUnreachable can't catch a portal that A0's fallback
         // paths left unopenable. Check directly: a strayed itemless player must always be able to walk back in.
-        if (mmStart && portalGated && !ootClosedFixpoint(placements, {}).portalOpen) {
+        if (mmStart && portalRequired && !ootClosedFixpoint(placements, {}).portalOpen) {
             lastPassError = "MM start: the OOT->MM portal is not re-openable from an empty OOT start";
             std::cerr << "[ComboShip] CrossWorldCombinedFill: " << lastPassError << " (pass " << pass << ", "
                       << passMs() << " ms) — retrying\n";

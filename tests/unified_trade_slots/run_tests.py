@@ -109,7 +109,7 @@ for combined in (True,False):
     source=(ROOT/'tests/unified_trade_slots/native_test.cpp').read_text()
     production=re.search(r'^#define ITEM_EXT_BOOTS_2[^\n]*',src['equip'],re.M).group()+'\n'+trade[trade.index('#define TRADE_ADULT_COUNT'):trade.index('extern void* MmAssets_LoadResource')]
     production+='\n'+'\n'.join(func(src['forms'],name) for name in forms_names[:-1])
-    production+='\n'+'\n'.join(func((ROOT/'soh/src/code/z_parameter.c').read_text(),name) for name in ('Rando_Inventory_SwapAgeEquipment','Inventory_ReplaceItem','Inventory_HatchWeirdEgg'))
+    production+='\n'+'\n'.join(func((ROOT/'soh/src/code/z_parameter.c').read_text(),name) for name in ('Rando_Inventory_SwapAgeEquipment','Inventory_ReplaceItem','Inventory_HatchWeirdEgg','Inventory_HatchPocketCucco'))
     production+='\n'+re.search(r'u8 gItemSlots\[\] = \{.*?\n\};',(ROOT/'soh/src/code/z_inventory.c').read_text(),re.S).group()
     production+='\n'+func((ROOT/'soh/mods/extended_inventory.c').read_text(),'ExtInv_GetItemSlot')
     production+='\n'+func((ROOT/'soh/soh/FleetShipCombo/FleetSync.cpp').read_text(),'FoldNativesIntoRegistry')

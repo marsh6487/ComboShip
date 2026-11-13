@@ -18,7 +18,7 @@ struct CatalogEntry {
 };
 #include "pickup_catalog.inc"
 
-static void CheckBody(const std::string &body) {
+static void CheckBody(const std::string &body, bool iconless = false) {
   if (body.size() > 1280)
     throw std::runtime_error("exceeds native message buffer");
   size_t decoded = 0, glyphs = 0;
@@ -28,6 +28,8 @@ static void CheckBody(const std::string &body) {
     const size_t command = c == 0x15 ? 4 : ComboReceipt_CommandSize(c, false);
     if (command > body.size() - i)
       throw std::runtime_error("truncated control operands");
+    if (iconless && c == 0x13)
+      throw std::runtime_error("iconless receipt emitted an item-icon command");
     decoded += command + (c == 0x0F ? 7 : 0);
     if (c == 0x0F)
       glyphs += 8;
@@ -53,7 +55,7 @@ static void CheckBody(const std::string &body) {
 }
 
 int main() {
-  size_t checked = 0, failures = 0;
+  size_t checked = 0, failures = 0, clockLocales = 0;
   auto check = [&](const std::string &label, CustomMessage message,
                    CatalogIconType icon) {
     try {
@@ -71,10 +73,17 @@ int main() {
         ++checked;
         try {
           const auto body = message.GetForLanguage(language, MF_RAW);
-          if (body.size() < 2 || body[0] != '\x13' ||
-              uint8_t(body[1]) != uint8_t(icon))
+          if (icon != ITEM_NONE &&
+              (body.size() < 2 || body[0] != '\x13' ||
+               uint8_t(body[1]) != uint8_t(icon)))
             throw std::runtime_error("receipt changed its icon operand byte");
-          CheckBody(body);
+          CheckBody(body, icon == ITEM_NONE);
+          if (label == "RG_CLOCK") {
+            ++clockLocales;
+            CheckBody(body, true);
+            if (body.find("Hyrule") == std::string::npos)
+              throw std::runtime_error("Clock pickup lost its Hyrule lesson");
+          }
         } catch (const std::exception &error) {
           std::cerr << "FAIL " << label << " language " << int(language) << ": "
                     << error.what() << '\n';
@@ -89,6 +98,10 @@ int main() {
   for (const auto &entry : catalog) {
     check(entry.label, CustomMessage(entry.english, entry.german, entry.french),
           entry.icon);
+  }
+  if (clockLocales != 3) {
+    std::cerr << "FAIL Clock tutorial must format in all three locales\n";
+    ++failures;
   }
   namespace Vanilla = ComboVanillaItemReceiptText;
   for (const auto &entry : Vanilla::entries) {

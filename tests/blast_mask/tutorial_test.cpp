@@ -70,7 +70,7 @@ static std::string Decode() {
     assert(message.msgBufPos < message.font.msgLength);
     MarketTest_RenderControls(&play);
     assert(Message_GetState(&message) == TEXT_STATE_DONE);
-    assert(sawA && sawB);
+    assert(!sawA && sawB && "Blast Mask instructions must teach B, never A");
     return visible;
   }
 }
@@ -79,6 +79,7 @@ int main() {
   play.state.gfxCtx = &graphics;
   const u8 locales[] = {LANGUAGE_ENG, LANGUAGE_FRA, LANGUAGE_GER};
   const char *endings[] = {"1 frame.", "1 frame.", "1 Frame."};
+  const char *shields[] = {"shield", "bouclier", "Schild"};
   bool readable = true;
   for (unsigned language = 0; language < ARRAY_COUNT(locales); ++language) {
     gSaveContext.language = locales[language];
@@ -93,6 +94,7 @@ int main() {
     // A setting's UI label is readable; its internal CVar is developer text.
     readable &= visible.find("gMods.") == std::string::npos;
     assert(visible.find("Instant Blast Mask") != std::string::npos);
+    assert(visible.find(shields[language]) != std::string::npos);
   }
   assert(readable &&
          "the rendered lesson must use the setting's readable UI name");

@@ -13,11 +13,11 @@ static struct {
     int swimPhase, swimPhaseCounter, swimRollSmoothed, boomerangState, comboStep;
     s16 swimPitch, swimRoll;
     f32 swimSpeedB48;
-    f32 zoraPunchCollisionFrame;
+    f32 punchCollisionFrame;
     u8 comboBPressed, comboBufferTimer;
     SkelAnime formSkelAnime;
     LinkAnimationHeader *idleAnim, *fishSwim, *waterRoll, *gerudoPowerJumpMid, *fallAnim, *jumpKick, *cutterAttack;
-    u8 zoraMeleeActive, jumpKickActive, punchTrailActive, wallRecoilActive, zoraJumpTrailActive;
+    u8 meleeActive, jumpKickActive, punchTrailActive, wallRecoilActive, zoraJumpTrailActive;
     u8 zoraSwimTrailActive[2], punchTrailActiveR;
     s32 zoraSwimTrailIndex[2], punchTrailEffectIndex, punchTrailEffectIndexR;
 } gFormState;
@@ -132,7 +132,8 @@ int main(int argc, char** argv) {
         assert(fabsf(recordedSpeed - 2.0f/3.0f) < .00001f && recordedMorph == 0);
         gFormState.currentForm = MM_PLAYER_FORM_GORON;
         MmForm_SetAction(GORON_ACT_PUNCH_A, &play, &clip, 1, ANIMMODE_ONCE);
-        assert(recordedSpeed == 1 && recordedMorph == -8);
+        assert(fabsf(recordedSpeed - 2.0f/3.0f) < .00001f && recordedMorph == 0 &&
+               "Goron punches use the same native MM frame clock and immediate pose");
         gFormState.currentForm = MM_PLAYER_FORM_ZORA;
         MmForm_SetAction(MMFORM_ACT_SHIELD, &play, &clip, 1, ANIMMODE_ONCE);
         assert(recordedSpeed == 1 && recordedMorph == -8);
@@ -153,34 +154,34 @@ int main(int argc, char** argv) {
         gFormState.formSkelAnime.curFrame=8;
         MmForm_Action_JumpKick(&player, &play);
 #ifdef ZORA_COLLISION_FIX
-        MmForm_UpdateZoraMelee(&player, &play);
+        MmForm_UpdateMelee(&player, &play);
 #endif
-        assert(gFormState.zoraMeleeActive && "actual jump action must enable the missing leg collision path");
+        assert(gFormState.meleeActive && "actual jump action must enable the missing leg collision path");
     }
 #ifdef ZORA_COLLISION_FIX
     else if (!strcmp(argv[1], "melee")) {
         gFormState.goronAction=GORON_ACT_PUNCH_C; gFormState.comboStep=2; gFormState.formSkelAnime.curFrame=3;
-        gFormState.zoraPunchCollisionFrame=3;
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(MmForm_ZoraMeleeLimb() == PLAYER_LIMB_R_SHIN);
-        MmForm_DrawZoraMelee(&play, &player, PLAYER_LIMB_R_FOREARM); assert(atCalls==0);
-        MmForm_DrawZoraMelee(&play, &player, PLAYER_LIMB_R_SHIN); assert(atCalls==0);
-        matrixOffset.x=10; MmForm_DrawZoraMelee(&play, &player, PLAYER_LIMB_R_SHIN);
+        gFormState.punchCollisionFrame=3;
+        MmForm_UpdateMelee(&player, &play);
+        assert(MmForm_MeleeLimb() == PLAYER_LIMB_R_SHIN);
+        MmForm_DrawMelee(&play, &player, PLAYER_LIMB_R_FOREARM); assert(atCalls==0);
+        MmForm_DrawMelee(&play, &player, PLAYER_LIMB_R_SHIN); assert(atCalls==0);
+        matrixOffset.x=10; MmForm_DrawMelee(&play, &player, PLAYER_LIMB_R_SHIN);
         assert(atCalls==2 && player.meleeWeaponQuads[0].info.toucher.damage==1);
         assert(player.meleeWeaponQuads[0].info.toucher.dmgFlags==DMG_SLASH_MASTER);
         assert(player.meleeWeaponQuads[0].dim.quad[1].x > 20 && "kick geometry follows right shin");
-        gFormState.formSkelAnime.curFrame=11; gFormState.zoraPunchCollisionFrame=11;
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(!gFormState.zoraMeleeActive && !(player.meleeWeaponQuads[0].base.atFlags & AT_ON) && !(player.meleeWeaponQuads[1].base.atFlags & AT_ON));
+        gFormState.formSkelAnime.curFrame=11; gFormState.punchCollisionFrame=11;
+        MmForm_UpdateMelee(&player, &play);
+        assert(!gFormState.meleeActive && !(player.meleeWeaponQuads[0].base.atFlags & AT_ON) && !(player.meleeWeaponQuads[1].base.atFlags & AT_ON));
         gFormState.goronAction=MMFORM_ACT_JUMP_KICK; gFormState.formSkelAnime.curFrame=8;
-        MmForm_UpdateZoraMelee(&player, &play); assert(gFormState.jumpKickActive);
+        MmForm_UpdateMelee(&player, &play); assert(gFormState.jumpKickActive);
         assert(player.meleeWeaponQuads[0].info.toucher.damage==2 && player.meleeWeaponQuads[1].info.toucher.dmgFlags==DMG_JUMP_MASTER);
-        gFormState.goronAction=MMFORM_ACT_SWIM_IDLE; MmForm_UpdateZoraMelee(&player, &play);
+        gFormState.goronAction=MMFORM_ACT_SWIM_IDLE; MmForm_UpdateMelee(&player, &play);
         assert(!gFormState.jumpKickActive && !player.meleeWeaponInfo[1].active && !player.meleeWeaponInfo[2].active);
         gFormState.goronAction=GORON_ACT_PUNCH_A; gFormState.comboStep=0; gFormState.formSkelAnime.curFrame=2;
-        gFormState.zoraPunchCollisionFrame=2;
-        MmForm_UpdateZoraMelee(&player, &play); assert(gFormState.zoraMeleeActive);
-        gFormState.state=0; MmForm_UpdateZoraMelee(&player, &play); assert(!gFormState.zoraMeleeActive);
+        gFormState.punchCollisionFrame=2;
+        MmForm_UpdateMelee(&player, &play); assert(gFormState.meleeActive);
+        gFormState.state=0; MmForm_UpdateMelee(&player, &play); assert(!gFormState.meleeActive);
     } else if (!strcmp(argv[1], "trails")) {
         gFormState.goronAction=MMFORM_ACT_SWIM_FAST; gFormState.fastSwimActive=1;
         MmForm_UpdateZoraSwimTrails(&play); assert(effectAdds==2);
@@ -200,10 +201,10 @@ int main(int argc, char** argv) {
         assert(!MmForm_ActionTicksAnimation(GORON_ACT_PUNCH_A));
     } else if (!strcmp(argv[1], "landing-trail")) {
         gFormState.goronAction=MMFORM_ACT_JUMP_KICK; gFormState.formSkelAnime.curFrame=8;
-        MmForm_UpdateZoraMelee(&player, &play); assert(gFormState.punchTrailActive);
+        MmForm_UpdateMelee(&player, &play); assert(gFormState.punchTrailActive);
         /* Actual centralized landing clears this before the late ownership update. */
         gFormState.jumpKickActive=0; gFormState.goronAction=GORON_ACT_LAND;
-        MmForm_UpdateZoraMelee(&player, &play);
+        MmForm_UpdateMelee(&player, &play);
         assert(deletes==1 && !gFormState.punchTrailActive && "landing must release the owned jump trail after clearing the kick flag");
     } else if (!strcmp(argv[1], "trail-allocation")) {
         gFormState.goronAction=MMFORM_ACT_SWIM_FAST; gFormState.fastSwimActive=1;
@@ -215,18 +216,18 @@ int main(int argc, char** argv) {
         MmForm_SetAction(GORON_ACT_PUNCH_A, &play, &clip, 1, ANIMMODE_ONCE);
         gFormState.formSkelAnime.curFrame=1;
         MmForm_Action_Punch(&player, &play); LinkAnimation_Update(&play, &gFormState.formSkelAnime);
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(gFormState.formSkelAnime.curFrame==2 && !gFormState.zoraMeleeActive && "native MM latches grounded damage before the animation tick");
+        MmForm_UpdateMelee(&player, &play);
+        assert(gFormState.formSkelAnime.curFrame==2 && !gFormState.meleeActive && "native MM latches grounded damage before the animation tick");
         MmForm_Action_Punch(&player, &play); LinkAnimation_Update(&play, &gFormState.formSkelAnime);
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(gFormState.formSkelAnime.curFrame==3 && gFormState.zoraMeleeActive);
+        MmForm_UpdateMelee(&player, &play);
+        assert(gFormState.formSkelAnime.curFrame==3 && gFormState.meleeActive);
         gFormState.formSkelAnime.curFrame=5;
         MmForm_Action_Punch(&player, &play); LinkAnimation_Update(&play, &gFormState.formSkelAnime);
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(gFormState.formSkelAnime.curFrame==6 && gFormState.zoraMeleeActive);
+        MmForm_UpdateMelee(&player, &play);
+        assert(gFormState.formSkelAnime.curFrame==6 && gFormState.meleeActive);
         MmForm_Action_Punch(&player, &play); LinkAnimation_Update(&play, &gFormState.formSkelAnime);
-        MmForm_UpdateZoraMelee(&player, &play);
-        assert(gFormState.formSkelAnime.curFrame==7 && !gFormState.zoraMeleeActive);
+        MmForm_UpdateMelee(&player, &play);
+        assert(gFormState.formSkelAnime.curFrame==7 && !gFormState.meleeActive);
     } else if (!strcmp(argv[1], "dolphin-landing-tick")) {
         gFormState.goronAction=MMFORM_ACT_DOLPHIN_JUMP; gFormState.fastSwimActive=1;
         player.actor.bgCheckFlags=1; player.actor.velocity.y=-2; player.actor.yDistToWater=-1;

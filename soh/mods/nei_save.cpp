@@ -311,6 +311,9 @@ void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) 
     SaveManager::Instance->SaveData("powerKegCount", gNeiSave.powerKegCount);
     SaveManager::Instance->SaveData("powerKegMode", gNeiSave.powerKegMode);
     SaveManager::Instance->SaveData("tradeAdultOwned", gNeiSave.tradeAdultOwned);
+    SaveManager::Instance->SaveArray("tradeAdultRevision", 23, [](size_t i) {
+        SaveManager::Instance->SaveData("", gNeiSave.tradeAdultRevision[i]);
+    });
     // Pictograph Box (MM-format). Flags are tiny; the 11200-byte I5 photo is only written when the
     // pictobox is owned so non-users don't bloat their save.
     SaveManager::Instance->SaveData("pictoboxOwned", gNeiSave.pictoboxOwned);
@@ -430,6 +433,9 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("powerKegCount", gNeiSave.powerKegCount, (uint8_t)0);
     SaveManager::Instance->LoadData("powerKegMode", gNeiSave.powerKegMode, (uint8_t)0);
     SaveManager::Instance->LoadData("tradeAdultOwned", gNeiSave.tradeAdultOwned, (uint32_t)0);
+    SaveManager::Instance->LoadArray("tradeAdultRevision", 23, [](size_t i) {
+        SaveManager::Instance->LoadData("", gNeiSave.tradeAdultRevision[i], (uint32_t)0);
+    });
     // Pictograph Box (MM-format). Photo array only present when the pictobox is owned.
     SaveManager::Instance->LoadData("pictoboxOwned", gNeiSave.pictoboxOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("pictoHasPhoto", gNeiSave.pictoHasPhoto, (uint8_t)0);

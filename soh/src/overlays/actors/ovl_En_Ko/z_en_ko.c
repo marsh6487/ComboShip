@@ -5,6 +5,7 @@
  */
 
 #include "z_en_ko.h"
+#include "mods/extended_inventory.h"
 #include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 #include "soh/Enhancements/cosmetics/YoungFadoNpc.h"
 #include "objects/object_fa/object_fa.h"
@@ -1237,6 +1238,9 @@ void func_80A99438(EnKo* this, PlayState* play) {
 void func_80A99504(EnKo* this, PlayState* play) {
     if (Actor_HasParent(&this->actor, play) || !GameInteractor_Should(VB_TRADE_ODD_POTION, true, this)) {
         this->actor.parent = NULL;
+        if (!IS_RANDO) {
+            TradeAdult_ConsumeItem(ITEM_ODD_POTION);
+        }
         this->actionFunc = func_80A99560;
     } else {
         Actor_OfferGetItem(&this->actor, play, GI_SAW, 120.0f, 10.0f);

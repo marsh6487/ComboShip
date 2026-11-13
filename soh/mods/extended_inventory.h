@@ -39,6 +39,11 @@ uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanillaMasks);
 
 void TradeAdult_FoldCurrent(uint8_t item);
 void TradeAdult_GiveItem(uint8_t item);
+int32_t TradeAdult_IndexOfItem(uint8_t item);
+void TradeAdult_ConsumeItem(uint8_t item);
+void TradeAdult_ConsumeIndex(int32_t index);
+void TradeAdult_ReconcileConsumed(void);
+uint8_t TradeAdult_IsConsumedIndex(int32_t index);
 uint8_t TradeAdult_NextItem(uint8_t item);
 uint8_t TradeAdult_IsOwnedItem(uint8_t item);
 

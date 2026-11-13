@@ -42,6 +42,23 @@ draw=function(ui,'KaleidoScope_DrawItemSelect')
 production+='\nvoid Step(PlayState* play){\n'+draw[draw.index('    Input* input'):draw.index('    OPEN_DISPS')]+draw[draw.index('    // Update extended inventory pagination timer'):draw.index('    gDPSetCombineLERP(OVERLAY_DISP')]+'}\n'
 checks=base['CHECKS'][:base['CHECKS'].index('int main(')]+r'''
 int main(){
+    // A retired Letter must not be equipped from a stale cursor/native cell
+    // on the same frame that early pause normalization removes it.
+    reset();
+    nei.tradeAdultOwned=(1u<<22)|(1u<<2);
+    nei.tradeAdultRevision[22]=1;
+    gSaveContext.inventory.items[SLOT_TRADE_CHILD]=ITEM_LETTER_ZELDA;
+    gSaveContext.inventory.items[SLOT_TRADE_ADULT]=ITEM_LETTER_ZELDA;
+    play.pauseCtx.cursorPoint[PAUSE_ITEM]=22;
+    play.pauseCtx.cursorSlot[PAUSE_ITEM]=22;
+    play.pauseCtx.cursorX[PAUSE_ITEM]=4;
+    play.pauseCtx.cursorY[PAUSE_ITEM]=3;
+    play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_LETTER_ZELDA;
+    tick(BTN_CLEFT,0);
+    assert(nei.tradeAdultRevision[22]==1);
+    assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD]!=ITEM_LETTER_ZELDA);
+    assert(gSaveContext.inventory.items[SLOT_TRADE_ADULT]==ITEM_COJIRO);
+    assert(equipCalls==1 && equippedItem==ITEM_COJIRO && equippedSlot==SLOT_TRADE_ADULT);
     // A completed native/editor write arrives after load; same-frame C press
     // must see the repaired corner instead of equipping a stale Letter there.
     for(int target=22;target<=23;++target) {
@@ -78,7 +95,7 @@ int main(){
     assert(ExtInv_GetCurrentPage()==0);
     assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD]==ITEM_NONE);
     assert(play.pauseCtx.cursorItem[PAUSE_ITEM]==ITEM_LETTER_ZELDA);
-    puts("PASS native pause: empty/corner same-frame C equip and page return normalize before lookup");
+    puts("PASS native pause: consumed/stale/empty cells and same-frame C equip normalize before lookup");
 }
 '''
 flags=['-std=c++20','-w','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX','-DCOMBO_BUILD','-DCONTROLLERBUTTONS_T=uint32_t','-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"','-DCVAR_PREFIX_SETTING="gSettings"']

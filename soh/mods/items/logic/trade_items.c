@@ -2,12 +2,11 @@
  * trade_items.c - MM adult trade-quest items for the SLOT_TRADE_ADULT 2D-grid wheel (Skijer's NEI).
  *
  * The adult trade slot becomes a grid selector over every adult trade item the player owns: OoT's
- * (Pocket Egg..Claim Check) plus the 9 Majora's Mask ones. Ownership is a bitmask in the nei save
- * (Nei_Save()->tradeAdultOwned), indexed by the NEI trade index below (matches nei_save.h).
+ * (Pocket Egg..Claim Check) plus the 9 Majora's Mask ones. The bitmask records earned history;
+ * tradeAdultRevision separately records whether the current copy is available or consumed.
  *
- * The Pendant of Memories is the combat Ext Boots 2 item (equip_pendant.c). Granting it sets BOTH the
- * trade bit (shows in the wheel + syncs to MM for the Anju exchange) AND the Ext Boots 2 ownership bit
- * (so it's equippable to a C-button as the Mortal Draw / Ground Pound / Parry Leap moveset).
+ * The Pendant of Memories also grants a permanent combat perk. Its separate pendantOwned flag
+ * survives handing away the trade copy; the old Ext Boots 2 ownership bit belongs to Climb Boots.
  *
  * Included by custom_items.c (unity build -> z_player.c). Helpers are non-static so the kaleido grid
  * and the grant menu can call them via extern prototypes.
@@ -60,14 +59,19 @@ s32 TradeAdult_IndexOfItem(u8 item) {
     return -1;
 }
 
+u8 TradeAdult_IsConsumedIndex(s32 index) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return 0;
+    }
+    return (Nei_Save()->tradeAdultRevision[index] & 1u) != 0;
+}
+
 u8 TradeAdult_IsOwnedIndex(s32 index) {
     if (index < 0 || index >= TRADE_ADULT_COUNT) {
         return 0;
     }
-    // The pendant used to also count as owned via the ext BOOTS-2 grid bit. That bit is retired and
-    // nothing clears it, so it kept the pendant alive after the item was lost — and it would now
-    // recurse, since ExtEquip_PendantOwned() asks THIS function. One source of truth: this bitmask.
-    return (Nei_Save()->tradeAdultOwned & (1u << index)) != 0;
+    // Legacy revisions are zero. Earned history alone must not revive a retired copy.
+    return (Nei_Save()->tradeAdultOwned & (1u << index)) != 0 && !TradeAdult_IsConsumedIndex(index);
 }
 
 u8 TradeAdult_IsOwnedItem(u8 item) {
@@ -79,10 +83,16 @@ void TradeAdult_GiveIndex(s32 index) {
     if (index < 0 || index >= TRADE_ADULT_COUNT) {
         return;
     }
-    Nei_Save()->tradeAdultOwned |= (1u << index); // trade flag: wheel + MM sync (Anju exchange)
-    // Skijer 2026-07-29: NOTHING else to set for the Pendant — the ext BOOTS-2 grid slot is the CLIMB
-    // BOOTS now, so touching that bit would hand out a pair of boots. equip_pendant.c's moveset runs
-    // off ExtEquip_PendantActive() (ownership + toggle), dispatched outside the ext grid.
+    NeiSaveData* save = Nei_Save();
+    save->tradeAdultOwned |= (1u << index);
+    // Only a real acquisition advances a consumed copy. Duplicate grants while available are
+    // idempotent. UINT32_MAX is terminal consumed: saturate instead of wrapping below old peers.
+    if (TradeAdult_IsConsumedIndex(index) && save->tradeAdultRevision[index] != UINT32_MAX) {
+        ++save->tradeAdultRevision[index];
+    }
+    if (index == TRADE_ADULT_PENDANT) {
+        save->pendantOwned = 1;
+    }
 }
 
 void TradeAdult_GiveItem(u8 item) {
@@ -90,19 +100,6 @@ void TradeAdult_GiveItem(u8 item) {
     if (idx >= 0) {
         TradeAdult_GiveIndex(idx);
     }
-}
-
-// Set or clear an item's "obtained" flag (the save-editor toggle). Clearing the Pendant also drops its
-// Ext Boots 2 combat ownership so the two stay in lockstep.
-void TradeAdult_SetOwnedIndex(s32 index, u8 on) {
-    if (index < 0 || index >= TRADE_ADULT_COUNT) {
-        return;
-    }
-    if (on) {
-        TradeAdult_GiveIndex(index);
-        return;
-    }
-    Nei_Save()->tradeAdultOwned &= ~(1u << index);
 }
 
 // Owned-item count (drives the 2D-grid layout: rows/cols sized to how many the player holds).
@@ -171,13 +168,78 @@ u8 TradeAdult_PrevItem(u8 cur) {
     return (gi >= 0) ? TradeAdult_ItemId(gi) : ITEM_NONE;
 }
 
-// Fold a trade item the player is holding (a vanilla one obtained the normal way, or the rando-current)
-// into the owned set so it joins the wheel alongside the granted MM items.
+// Observe a native/legacy item without treating a stale slot as a new acquisition. Folding only
+// adds earned history; an odd revision remains consumed until TradeAdult_GiveIndex is called.
 void TradeAdult_FoldCurrent(u8 item) {
     s32 idx = TradeAdult_IndexOfItem(item);
-    if (idx >= 0 && !TradeAdult_IsOwnedIndex(idx)) {
+    if (idx >= 0) {
         Nei_Save()->tradeAdultOwned |= (1u << idx);
     }
+}
+
+void TradeAdult_ReconcileConsumed(void) {
+    NeiSaveData* save = Nei_Save();
+    if ((save->tradeAdultOwned & (1u << TRADE_ADULT_PENDANT)) && TradeAdult_IsConsumedIndex(TRADE_ADULT_PENDANT)) {
+        save->pendantOwned = 1;
+    }
+    const s32 slots[] = { SLOT_TRADE_ADULT, SLOT_TRADE_CHILD };
+    for (s32 i = 0; i < (s32)(sizeof(slots) / sizeof(slots[0])); ++i) {
+        u8* item = &gSaveContext.inventory.items[slots[i]];
+        if (TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem(*item))) {
+            *item = ITEM_NONE;
+        }
+    }
+    // The saved child/adult banks can restore an item after an age change. Retire exact IDs in
+    // all three banks and all seven C/Dpad entries; a shared slot alone is not evidence to clear.
+    ItemEquips* banks[] = { &gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips };
+    for (s32 bank = 0; bank < (s32)(sizeof(banks) / sizeof(banks[0])); ++bank) {
+        ItemEquips* equips = banks[bank];
+        for (s32 button = 1; button < (s32)(sizeof(equips->buttonItems) / sizeof(equips->buttonItems[0])); ++button) {
+            if (TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem(equips->buttonItems[button]))) {
+                equips->buttonItems[button] = ITEM_NONE;
+                equips->cButtonSlots[button - 1] = SLOT_NONE;
+            }
+        }
+    }
+}
+
+void TradeAdult_ConsumeIndex(s32 index) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return;
+    }
+    NeiSaveData* save = Nei_Save();
+    if (index == TRADE_ADULT_PENDANT && (save->tradeAdultOwned & (1u << index))) {
+        save->pendantOwned = 1;
+    }
+    // Every even value has an odd successor, including UINT32_MAX - 1. Repeated callbacks for
+    // this consumed copy are idempotent until a real acquisition advances it again.
+    if (!TradeAdult_IsConsumedIndex(index)) {
+        ++save->tradeAdultRevision[index];
+    }
+    TradeAdult_ReconcileConsumed();
+}
+
+void TradeAdult_ConsumeItem(u8 item) {
+    s32 index = TradeAdult_IndexOfItem(item);
+    if (index >= 0) {
+        // A native legacy hand-in may precede the first pause-menu observation of the item.
+        TradeAdult_FoldCurrent(item);
+        TradeAdult_ConsumeIndex(index);
+    }
+}
+
+// The editor can remove history locally, but must also retire the current copy so an older peer's
+// history merge cannot restore availability. The independently earned Pendant perk remains owned.
+void TradeAdult_SetOwnedIndex(s32 index, u8 on) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return;
+    }
+    if (on) {
+        TradeAdult_GiveIndex(index);
+        return;
+    }
+    TradeAdult_ConsumeIndex(index);
+    Nei_Save()->tradeAdultOwned &= ~(1u << index);
 }
 
 // True for the 8 MM trade-quest items that have no real use in OoT: indices 11..18 (Moon's Tear ..

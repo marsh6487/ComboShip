@@ -5,6 +5,7 @@
  */
 
 #include "z_en_mk.h"
+#include "mods/extended_inventory.h"
 #include "objects/object_mk/object_mk.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 
@@ -93,6 +94,9 @@ void func_80AACA40(EnMk* this, PlayState* play) {
 void func_80AACA94(EnMk* this, PlayState* play) {
     if (Actor_HasParent(&this->actor, play) != 0 || !GameInteractor_Should(VB_TRADE_FROG, true, this)) {
         this->actor.parent = NULL;
+        if (!IS_RANDO) {
+            TradeAdult_ConsumeItem(ITEM_FROG);
+        }
         if (GameInteractor_Should(VB_TRADE_TIMER_EYEDROPS, true, this)) {
             this->actionFunc = func_80AACA40;
             Interface_SetSubTimer(240);

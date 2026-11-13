@@ -22,12 +22,11 @@
 #include "2s2h/FleetShipCombo/FleetComboIds.h"   // Native shield ownership
 #include "2s2h/FleetShipCombo/FleetComboItems.h" // FCI_KOKIRI_SWORD acquisition receipt
 
-// trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
-// Memories lives on the adult trade wheel — that bit is its ONLY ownership flag since the ext
-// BOOTS-2 grid slot became the Climb Boots (Skijer 2026-07-29).
+// Local trade entry points, as in the save editor. Pendant trade history is separate from its
+// permanent equipment perk; migrating the old BOOTS-2 slot must preserve consumed trade copies.
 #define TRADE_ADULT_PENDANT 19
 extern u8 TradeAdult_IsOwnedIndex(s32 index);
-extern void TradeAdult_GiveIndex(s32 index);
+extern void TradeAdult_FoldCurrent(u8 item);
 #include <string.h>
 #include <math.h>
 #include "z64.h"
@@ -207,7 +206,8 @@ void ExtEquip_Init(void) {
     // read as "owns the Roc Boots". Equipped implies owned.
     if (Nei_Save()->extBootsLayoutVersion < 1) {
         if (ExtEquip_HasItem(EQUIP_TYPE_BOOTS, 2) || gExtEquipState.currentExtBoots == 2) {
-            TradeAdult_GiveIndex(TRADE_ADULT_PENDANT); // keep the Pendant owned on the trade wheel
+            TradeAdult_FoldCurrent(ITEM_PENDANT_OF_MEMORIES);
+            Nei_Save()->pendantOwned = 1;
         }
         ExtEquip_RemoveItem(EQUIP_TYPE_BOOTS, 2);
         ExtEquip_RemoveItem(EQUIP_TYPE_BOOTS, 3);

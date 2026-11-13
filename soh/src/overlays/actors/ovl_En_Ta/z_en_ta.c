@@ -5,6 +5,7 @@
  */
 
 #include "z_en_ta.h"
+#include "mods/extended_inventory.h"
 #include "vt.h"
 #include "objects/object_ta/object_ta.h"
 #include "soh/OTRGlobals.h"
@@ -276,6 +277,7 @@ void EnTa_SleepTalkInLonLonHouse(EnTa* this, PlayState* play) {
 void EnTa_SetupAwake(EnTa* this) {
     if (!LINK_IS_ADULT) {
         EnTa_SetupAction(this, EnTa_IdleAwakeInCastle, EnTa_AnimRepeatCurrent);
+        TradeAdult_ConsumeItem(ITEM_CHICKEN);
         Flags_SetEventChkInf(EVENTCHKINF_TALON_WOKEN_IN_CASTLE);
     } else {
         EnTa_SetupAction(this, EnTa_IdleAwakeInKakariko, EnTa_AnimRepeatCurrent);

@@ -8,6 +8,8 @@
 #include "objects/object_dnt/object_dnt.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
+void TradeAdult_ConsumeItem(u8 item);
+
 #define FLAGS                                                                                  \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_DRAW_CULLING_DISABLED)
@@ -1410,6 +1412,9 @@ void func_80BEF20C(EnAkindonuts* this, PlayState* play) {
             this->unk_32C &= ~0x1;
             play->msgCtx.msgMode = MSGMODE_TEXT_CLOSING;
             play->msgCtx.stateTimer = 4;
+            // Params 0..3 accept Land, Swamp, Mountain and Ocean respectively. This is
+            // the committed deed exchange; purchases and canceled dialogue bypass it.
+            TradeAdult_ConsumeItem(ITEM_DEED_LAND + ENAKINDONUTS_GET_3(&this->actor));
             this->actionFunc = func_80BEF360;
         } else {
             this->unk_2DC(this, play);

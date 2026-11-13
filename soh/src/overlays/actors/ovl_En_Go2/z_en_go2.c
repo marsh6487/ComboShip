@@ -1,4 +1,5 @@
 #include "z_en_go2.h"
+#include "mods/extended_inventory.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_oF1d_map/object_oF1d_map.h"
@@ -1817,6 +1818,21 @@ void EnGo2_SetupGetItem(EnGo2* this, PlayState* play) {
 void EnGo2_SetGetItem(EnGo2* this, PlayState* play) {
     if ((Message_GetState(&play->msgCtx) == TEXT_STATE_DONE) && Message_ShouldAdvance(play) ||
         !GameInteractor_Should(VB_GIVE_ITEM_FROM_GORON, true)) {
+        // Randomizer retires the input before its flag queues the shuffled
+        // reward. Only the completed native Biggoron receipt belongs here.
+        if (!IS_RANDO && (this->actor.params & 0x1F) == GORON_DMT_BIGGORON) {
+            switch (this->getItemId) {
+                case GI_PRESCRIPTION:
+                    TradeAdult_ConsumeItem(ITEM_SWORD_BROKEN);
+                    break;
+                case GI_CLAIM_CHECK:
+                    TradeAdult_ConsumeItem(ITEM_EYEDROPS);
+                    break;
+                case GI_SWORD_BGS:
+                    TradeAdult_ConsumeItem(ITEM_CLAIM_CHECK);
+                    break;
+            }
+        }
         this->interactInfo.talkState = NPC_TALK_STATE_IDLE;
         switch (this->getItemId) {
             case GI_CLAIM_CHECK:

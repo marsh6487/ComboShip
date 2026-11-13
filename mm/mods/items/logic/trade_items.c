@@ -2,12 +2,11 @@
  * trade_items.c - MM adult trade-quest items for the SLOT_TRADE_ADULT 2D-grid wheel (Skijer's NEI).
  *
  * The adult trade slot becomes a grid selector over every adult trade item the player owns: OoT's
- * (Pocket Egg..Claim Check) plus the 9 Majora's Mask ones. Ownership is a bitmask in the nei save
- * (Nei_Save()->tradeAdultOwned), indexed by the NEI trade index below (matches nei_save.h).
+ * (Pocket Egg..Claim Check) plus the 9 Majora's Mask ones. The bitmask records earned history;
+ * tradeAdultRevision separately records whether the current copy is available or consumed.
  *
- * The Pendant of Memories is the combat Ext Boots 2 item (equip_pendant.c). Granting it sets BOTH the
- * trade bit (shows in the wheel + syncs to MM for the Anju exchange) AND the Ext Boots 2 ownership bit
- * (so it's equippable to a C-button as the Mortal Draw / Ground Pound / Parry Leap moveset).
+ * The Pendant of Memories also grants a permanent combat perk. Its separate pendantOwned flag
+ * survives handing away the trade copy; the old Ext Boots 2 ownership bit belongs to Climb Boots.
  *
  * Included by custom_items.c (unity build -> z_player.c). Helpers are non-static so the kaleido grid
  * and the grant menu can call them via extern prototypes.
@@ -137,7 +136,7 @@ u8 TradeAdult_ItemId(s32 index) {
 }
 
 s32 TradeAdult_IndexOfItem(u8 item) {
-    // ITEM_NONE never identifies a trade item. In the MM build the 11 OoT trade ids have no MM
+    // ITEM_NONE never identifies a trade item. In the MM build the 14 OoT trade ids have no MM
     // equivalent and alias to ITEM_NONE (nei_oot_compat.h), so without this guard an empty slot
     // (ITEM_NONE) matched entry 0 and every "is this a trade item?" test answered "yes, Pocket Egg" —
     // which is why the wheel behaved as if it held an item it could not draw. Skijer's NEI
@@ -152,14 +151,19 @@ s32 TradeAdult_IndexOfItem(u8 item) {
     return -1;
 }
 
+u8 TradeAdult_IsConsumedIndex(s32 index) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return 0;
+    }
+    return (Nei_Save()->tradeAdultRevision[index] & 1u) != 0;
+}
+
 u8 TradeAdult_IsOwnedIndex(s32 index) {
     if (index < 0 || index >= TRADE_ADULT_COUNT) {
         return 0;
     }
-    // Skijer 2026-07-29: the Pendant used to ALSO count as owned via the ext BOOTS-2 grid bit. That
-    // slot is the CLIMB BOOTS now, so owning boots would have read as owning the Pendant. One source
-    // of truth: this bitmask (mirror of soh).
-    return (Nei_Save()->tradeAdultOwned & (1u << index)) != 0;
+    // Legacy revisions are zero. Earned history alone must not revive a retired copy.
+    return (Nei_Save()->tradeAdultOwned & (1u << index)) != 0 && !TradeAdult_IsConsumedIndex(index);
 }
 
 u8 TradeAdult_IsOwnedItem(u8 item) {
@@ -171,9 +175,16 @@ void TradeAdult_GiveIndex(s32 index) {
     if (index < 0 || index >= TRADE_ADULT_COUNT) {
         return;
     }
-    Nei_Save()->tradeAdultOwned |= (1u << index); // trade flag: wheel + MM sync (Anju exchange)
-    // Nothing else for the Pendant: its moveset runs off ExtEquip_PendantActive() (ownership +
-    // toggle), and the old BOOTS-2 "combat flag" bit belongs to the Climb Boots now.
+    NeiSaveData* save = Nei_Save();
+    save->tradeAdultOwned |= (1u << index);
+    // Only a real acquisition advances a consumed copy. Duplicate grants while available are
+    // idempotent. UINT32_MAX is terminal consumed: saturate instead of wrapping below old peers.
+    if (TradeAdult_IsConsumedIndex(index) && save->tradeAdultRevision[index] != UINT32_MAX) {
+        ++save->tradeAdultRevision[index];
+    }
+    if (index == TRADE_ADULT_PENDANT) {
+        save->pendantOwned = 1;
+    }
 }
 
 void TradeAdult_GiveItem(u8 item) {
@@ -181,19 +192,6 @@ void TradeAdult_GiveItem(u8 item) {
     if (idx >= 0) {
         TradeAdult_GiveIndex(idx);
     }
-}
-
-// Set or clear an item's "obtained" flag (the save-editor toggle). Clearing the Pendant also drops its
-// Ext Boots 2 combat ownership so the two stay in lockstep.
-void TradeAdult_SetOwnedIndex(s32 index, u8 on) {
-    if (index < 0 || index >= TRADE_ADULT_COUNT) {
-        return;
-    }
-    if (on) {
-        TradeAdult_GiveIndex(index);
-        return;
-    }
-    Nei_Save()->tradeAdultOwned &= ~(1u << index);
 }
 
 // Owned-item count (drives the 2D-grid layout: rows/cols sized to how many the player holds).
@@ -262,13 +260,92 @@ u8 TradeAdult_PrevItem(u8 cur) {
     return (gi >= 0) ? TradeAdult_ItemId(gi) : ITEM_NONE;
 }
 
-// Fold a trade item the player is holding (a vanilla one obtained the normal way, or the rando-current)
-// into the owned set so it joins the wheel alongside the granted MM items.
+// Observe a native/legacy item without treating a stale slot as a new acquisition. Folding only
+// adds earned history; an odd revision remains consumed until TradeAdult_GiveIndex is called.
 void TradeAdult_FoldCurrent(u8 item) {
     s32 idx = TradeAdult_IndexOfItem(item);
-    if (idx >= 0 && !TradeAdult_IsOwnedIndex(idx)) {
+    if (idx >= 0) {
         Nei_Save()->tradeAdultOwned |= (1u << idx);
     }
+}
+
+void TradeAdult_ReconcileConsumed(void) {
+    NeiSaveData* save = Nei_Save();
+    if ((save->tradeAdultOwned & (1u << TRADE_ADULT_PENDANT)) && TradeAdult_IsConsumedIndex(TRADE_ADULT_PENDANT)) {
+        save->pendantOwned = 1;
+    }
+    // Resolve the OLD cursor before healing it. Fourteen OoT entries have no native byte ID;
+    // their placeholder bindings must be retired before a new cursor gives them another meaning.
+    const u8 stalePlaceholder = !TradeAdult_IsOwnedIndex((s32)save->tradeAdultCursor);
+    const s32 slots[] = { SLOT_TRADE_DEED, SLOT_TRADE_KEY_MAMA, SLOT_TRADE_COUPLE };
+    for (s32 i = 0; i < (s32)(sizeof(slots) / sizeof(slots[0])); ++i) {
+        u8* item = &gSaveContext.save.saveInfo.inventory.items[slots[i]];
+        if (TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem(*item)) ||
+            (stalePlaceholder && *item == ITEM_TRADE_PLACEHOLDER)) {
+            *item = ITEM_NONE;
+        }
+    }
+    // MM's native C/Dpad macros share bank zero across all forms. B and unused form-bank data
+    // remain untouched; exact item identity, rather than a shared trade-slot binding, selects removal.
+    for (s32 button = EQUIP_SLOT_C_LEFT; button <= EQUIP_SLOT_C_RIGHT; ++button) {
+        u8 item = BUTTON_ITEM_EQUIP(0, button);
+        if (TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem(item)) ||
+            (stalePlaceholder && item == ITEM_TRADE_PLACEHOLDER)) {
+            BUTTON_ITEM_EQUIP(0, button) = ITEM_NONE;
+            C_SLOT_EQUIP(0, button) = SLOT_NONE;
+        }
+    }
+    for (s32 button = EQUIP_SLOT_D_RIGHT; button <= EQUIP_SLOT_D_UP; ++button) {
+        u8 item = DPAD_BUTTON_ITEM_EQUIP(0, button);
+        if (TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem(item)) ||
+            (stalePlaceholder && item == ITEM_TRADE_PLACEHOLDER)) {
+            DPAD_BUTTON_ITEM_EQUIP(0, button) = ITEM_NONE;
+            DPAD_SLOT_EQUIP(0, button) = SLOT_NONE;
+        }
+    }
+    if (stalePlaceholder) {
+        s32 first = TradeAdult_OwnedAt(0);
+        save->tradeAdultCursor = (u8)((first < 0) ? 0 : first);
+    }
+}
+
+void TradeAdult_ConsumeIndex(s32 index) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return;
+    }
+    NeiSaveData* save = Nei_Save();
+    if (index == TRADE_ADULT_PENDANT && (save->tradeAdultOwned & (1u << index))) {
+        save->pendantOwned = 1;
+    }
+    // Every even value has an odd successor, including UINT32_MAX - 1. Repeated callbacks for
+    // this consumed copy are idempotent until a real acquisition advances it again.
+    if (!TradeAdult_IsConsumedIndex(index)) {
+        ++save->tradeAdultRevision[index];
+    }
+    TradeAdult_ReconcileConsumed();
+}
+
+void TradeAdult_ConsumeItem(u8 item) {
+    s32 index = TradeAdult_IndexOfItem(item);
+    if (index >= 0) {
+        // A native legacy hand-in may precede the first pause-menu observation of the item.
+        TradeAdult_FoldCurrent(item);
+        TradeAdult_ConsumeIndex(index);
+    }
+}
+
+// The editor can remove history locally, but must also retire the current copy so an older peer's
+// history merge cannot restore availability. The independently earned Pendant perk remains owned.
+void TradeAdult_SetOwnedIndex(s32 index, u8 on) {
+    if (index < 0 || index >= TRADE_ADULT_COUNT) {
+        return;
+    }
+    if (on) {
+        TradeAdult_GiveIndex(index);
+        return;
+    }
+    TradeAdult_ConsumeIndex(index);
+    Nei_Save()->tradeAdultOwned &= ~(1u << index);
 }
 
 // ── Index cursor (MM) ───────────────────────────────────────────────────────────────────────────────
@@ -281,8 +358,8 @@ void TradeAdult_FoldCurrent(u8 item) {
 s32 TradeAdult_CursorIndex(void) {
     s32 cur = (s32)Nei_Save()->tradeAdultCursor;
     if (cur < 0 || cur >= TRADE_ADULT_COUNT || !TradeAdult_IsOwnedIndex(cur)) {
+        TradeAdult_ReconcileConsumed();
         cur = TradeAdult_OwnedAt(0); // -1 when nothing is owned
-        Nei_Save()->tradeAdultCursor = (u8)((cur < 0) ? 0 : cur);
     }
     return cur;
 }

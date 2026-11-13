@@ -24,7 +24,8 @@
 #include "FleetShipCombo.h"
 #include "FleetOracleClient.h" // pairing MM's derived save files with OoT's (delete/ensure)
 #include "FleetComboIds.h"
-#include "FleetComboItems.h"     // FCI_NO_ITEM, FCI_MAX
+#include "FleetComboItems.h" // FCI_NO_ITEM, FCI_MAX
+#include "../../../combo/TradeItemSync.h"
 #include "FleetComboItemsGlue.h" // FcCombo_NativeForItem (FcComboItemId -> RG)
 #include "FleetComboOptions.h"   // FC_COMBO_OPTION_TABLE (shared NEI options)
 #include "soh/SaveManager.h"
@@ -63,6 +64,9 @@ extern "C" {
 #include "mods/ext_buttons/ext_buttons.h"
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
+void TradeAdult_ReconcileConsumed(void);
+int TradeAdult_IndexOfItem(unsigned char item);
+unsigned char TradeAdult_IsConsumedIndex(int index);
 // Transformation-mask form bridge (mm_player_form.cpp): current MM form (0 FD..4 Human, >4 custom)
 // and a setter that wears/removes the matching transformation mask on next gameplay frame.
 int MmForm_GetCurrentForm(void);
@@ -635,7 +639,7 @@ void ExtractShared(nlohmann::json& sh) {
         }
         sh["ownedItems"] = owned;
     }
-    sh["tradeAdultOwned"] = nei->tradeAdultOwned;
+    ComboTrade::WriteShared(*nei, sh);
     // Elemental Wand rods + Sheikah Slate runes: the cell item travels in ownedItems, but WHICH rods
     // / runes you own lives in these bitmasks, and nothing carried them -- the peer got an empty
     // wand. OR-merged both ways (one-way unlocks); the fcId deficit path still grants the items
@@ -974,8 +978,8 @@ void ApplyShared(const nlohmann::json& sh) {
     }
 
     RepairFlagOwnedCells(nei);
-    if (sh.contains("tradeAdultOwned"))
-        nei->tradeAdultOwned |= sh["tradeAdultOwned"].get<uint32_t>();
+    ComboTrade::ReadShared(*nei, sh);
+    TradeAdult_ReconcileConsumed();
     // ootMasksOwned round-trip (2026-08-07): the field is authored now (child-trade mask fold), so
     // merge it back too — without this, bits earned while playing MM never landed here.
     if (sh.contains("ootMasksOwned"))
@@ -1107,6 +1111,9 @@ void ExtractEquips(nlohmann::json& sh) {
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
 int FindInvSlot(uint16_t item) {
+    if (item < 0xFF && TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem((uint8_t)item))) {
+        return -1;
+    }
     // Ownership survives switching the travel cell to the other tool. Restoring
     // a peer button must not discard an owned item or change the local selection.
     if (item == ITEM_TIME_GATE || item == EXT_ITEM_MAGIC_MIRROR) {
@@ -1225,6 +1232,9 @@ void ApplyFcRegistryToNatives() {
     NeiSaveData* nei = Nei_Save();
     sApplyingFc = true; // suppress the record hook's re-entry for the duration of this pass
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
+        if (ComboTrade::AcknowledgeConsumedGrant(*nei, fcId)) {
+            continue;
+        }
         // Both games publish exact caneSkills. Replaying the old progressive counter
         // after applying that mask would grant an unrelated extra power. Acknowledge
         // counts here even when counter and mask arrive in separate FleetNet deltas.
@@ -2193,6 +2203,7 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.extEquipOwnedBits", nei->extEquipOwnedBits);
     snapshot.Add("nei.weaponUpgrades", nei->weaponUpgrades);
     snapshot.Add("nei.tradeAdultOwned", nei->tradeAdultOwned);
+    snapshot.Array("nei.tradeAdultRevision", nei->tradeAdultRevision);
     snapshot.Add("nei.ootMasksOwned", nei->ootMasksOwned);
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);

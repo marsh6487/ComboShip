@@ -5,6 +5,7 @@
  */
 
 #include "z_en_hs.h"
+#include "mods/extended_inventory.h"
 #include "vt.h"
 #include "objects/object_hs/object_hs.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -157,6 +158,9 @@ void func_80A6E70C(EnHs* this, PlayState* play) {
 void func_80A6E740(EnHs* this, PlayState* play) {
     if (Actor_HasParent(&this->actor, play) || !GameInteractor_Should(VB_TRADE_COJIRO, true, this)) {
         this->actor.parent = NULL;
+        if (!IS_RANDO) {
+            TradeAdult_ConsumeItem(ITEM_COJIRO);
+        }
         Flags_SetRandomizerInf(RAND_INF_ADULT_TRADES_LW_TRADE_COJIRO);
         func_80A6E3A0(this, func_80A6E630);
     } else {

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 static NeiSaveData nei{};
+SaveContext gSaveContext{};
 extern "C" NeiSaveData* Nei_Save(){return &nei;}
 static ExtendedInventoryState sExtInvState{};
 extern "C" uint8_t RitoMask_IsOwned(){return nei.ritoMaskOwned;}

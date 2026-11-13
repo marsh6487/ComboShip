@@ -1135,6 +1135,68 @@ int main(int argc, char** argv) {
   }
   gSaveContext.options.language = LANGUAGE_ENG;
   std::cout << "PASS Hourglass/Crystal MM tutorials: native/foreign, all locales, cold/warm donor, glyphs, colors, pages and save isolation\n";
+  // Clock must teach its passive Hyrule effect even in an MM-first session.
+  // Keep this separate from tools that intentionally require button glyphs.
+  const auto clockSaved = gSaveContext;
+  const auto clockNeiSaved = neiSave;
+  auto* clockPlaySaved = gPlayState;
+  const int clockModeSaved = gComboGameMode;
+  const bool clockDonorSaved = donorReady;
+  const auto clockRequestSaved = requested;
+  std::array<std::string, 3> clockLocales;
+  for (int mode : {COMBO_GAME_MM, COMBO_GAME_BOTH}) {
+    gComboGameMode = mode;
+    for (bool ready : {false, true}) {
+      donorReady = ready;
+      gPlayState = ready ? clockPlaySaved : nullptr;
+      size_t locale = 0;
+      for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = language;
+        for (uint8_t icon : {0xFE, 0xF5}) {
+          CustomMessage::Entry native, imported;
+          native.icon = imported.icon = icon;
+          native.msg = imported.msg = "Generic queue fallback";
+          const auto before = gSaveContext;
+          const int readsBefore = donorReads;
+          requested = "Clock receipt stays local";
+          assert(Rando::ApplyItemReceiptText(RI_OOT_CLOCK, native) && "native Clock kept its generic queue sentence");
+          assert(Rando::ApplyForeignItemReceiptText("Clock", imported) && "imported Clock lost its tutorial");
+          assert(native.msg == imported.msg && !native.autoFormat && !imported.autoFormat);
+          assert(native.icon == icon && imported.icon == icon && "Clock tutorial changed the finder's icon");
+          assert(native.msg.find("Hyrule") != std::string::npos && native.msg.find('%') == std::string::npos);
+          assert(native.msg.size() < BUFFER_SIZE - MESSAGE_HEADER_SIZE);
+          unsigned lines = 1, pages = 1;
+          for (const uint8_t code : native.msg) {
+            if (code == 0x10) { lines = 1; ++pages; }
+            if (code == 0x11) assert(++lines <= 3 && "Clock tutorial exceeds MM line offsets");
+            assert((code < 0xB0 || code > 0xBB) && "passive Clock receipt teaches an equip/button action");
+          }
+          assert(pages == 2 && "Clock lesson spilled outside its two-page layout");
+          assert(donorReads == readsBefore && requested == "Clock receipt stays local" &&
+                 "shared Clock lesson queried the dormant OoT donor");
+          assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
+          assert(!std::memcmp(&clockNeiSaved, &neiSave, sizeof(clockNeiSaved)));
+          clockLocales[locale] = native.msg;
+        }
+        ++locale;
+      }
+    }
+  }
+  assert(clockLocales[0] != clockLocales[1] && clockLocales[0] != clockLocales[2] && clockLocales[1] != clockLocales[2]);
+  donorReady = false;
+  for (auto halfDay : {RI_TIME_DAY_1, RI_TIME_NIGHT_1, RI_TIME_DAY_2, RI_TIME_NIGHT_2,
+                       RI_TIME_DAY_3, RI_TIME_NIGHT_3, RI_TIME_PROGRESSIVE}) {
+    CustomMessage::Entry entry;
+    entry.msg = "MM half-day receipt";
+    Rando::ApplyItemReceiptText(halfDay, entry);
+    assert(entry.msg.find("Hyrule") == std::string::npos && "Termina half-day received the OoT Clock lesson");
+  }
+  gSaveContext = clockSaved;
+  gPlayState = clockPlaySaved;
+  gComboGameMode = clockModeSaved;
+  donorReady = clockDonorSaved;
+  requested = clockRequestSaved;
+  std::cout << "PASS Clock MM tutorial: native/foreign, solo/combined, cold/warm donor, three locales, passive two-page layout, half-day separation and save isolation\n";
   const struct {
     RandoItemId id;
     const char* name;

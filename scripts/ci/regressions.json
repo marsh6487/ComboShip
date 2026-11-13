@@ -198,8 +198,29 @@
   {
     "suite": "equipment",
     "origin": "gate",
-    "name": "Native OoT Blast Mask tutorial and A-action arbitration",
+    "name": "Native OoT Blast Mask B action, tutorial and shielded explosion collision",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/blast_mask/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Trade hand-in cleanup, current-copy availability, native save codecs and cross-game sync",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/trade_consumption/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM human mask actions with imported and extended swords",
+    "run": "python3 -B tests/mm_mask_actions/run_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "OoT Goron and Zora native melee geometry and contact controls",
+    "run": "python3 -B tests/form_melee/run_tests.py --sanitize"
   },
   {
     "suite": "equipment",

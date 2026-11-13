@@ -36,6 +36,7 @@
 #include "soh/ObjectExtension/ActorMaximumHealth.h"
 #include "mods/extended_inventory.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/transformation_masks/mm_mask_wear.h"
 #include "mods/transformation_masks/kafei_form.h"
 #include "mods/transformation_masks/gerudo_form.h" // GerudoForm_IsActive (rage meter)
 #include "mods/ext_buttons/ext_buttons.h"
@@ -2580,6 +2581,11 @@ static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {
             return Return_Item(item, MOD_NONE, ITEM_NONE);
         }
     } else if ((item >= ITEM_WEIRD_EGG) && (item <= ITEM_CLAIM_CHECK)) {
+        // This is a real receipt. Pause selection and shared history folding
+        // must not revive a consumed trade item, but a newly granted copy can.
+        if (item <= ITEM_LETTER_ZELDA || item >= ITEM_POCKET_EGG) {
+            TradeAdult_GiveItem(item);
+        }
         if (GameInteractor_Should(VB_POACHERS_SAW_SET_DEKU_NUT_UPGRADE_FLAG, item == ITEM_SAW)) {
             Flags_SetItemGetInf(ITEMGETINF_OBTAINED_NUT_UPGRADE_FROM_STAGE);
         }
@@ -2788,6 +2794,13 @@ u8 Item_CheckObtainability(u8 item) {
 void Inventory_DeleteItem(u16 item, u16 invSlot) {
     s16 i;
 
+    if (item <= UINT8_MAX && TradeAdult_IndexOfItem((u8)item) >= 0) {
+        // A shared trade cell may currently show another owned item. Retire
+        // the requested item without deleting that unrelated selection.
+        TradeAdult_ConsumeItem((u8)item);
+        return;
+    }
+
     if (item == ITEM_BEAN) {
         BEANS_BOUGHT = 0;
     }
@@ -2927,7 +2940,11 @@ s32 Inventory_ConsumeFairy(PlayState* play) {
 // SOH helper
 bool Inventory_HatchWeirdEgg(PlayState* play) {
     if (!IS_RANDO) {
-        return Inventory_ReplaceItem(play, ITEM_WEIRD_EGG, ITEM_CHICKEN);
+        const bool hatched = Inventory_ReplaceItem(play, ITEM_WEIRD_EGG, ITEM_CHICKEN);
+        if (hatched) {
+            TradeAdult_GiveItem(ITEM_CHICKEN);
+        }
+        return hatched;
     }
 
     if (!LINK_IS_CHILD || !Flags_GetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG)) {
@@ -2936,11 +2953,11 @@ bool Inventory_HatchWeirdEgg(PlayState* play) {
 
     Flags_UnsetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG);
     Flags_SetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_CHICKEN);
+    TradeAdult_GiveItem(ITEM_CHICKEN);
 #ifdef COMBO_BUILD
     // This is the actual native hatch, so the unified wheel must also know
     // about Cucco before an immediate age switch restores independently bound
     // trade items. Historical Egg ownership remains unchanged.
-    TradeAdult_GiveItem(ITEM_CHICKEN);
     Inventory_ReplaceItem(play, ITEM_WEIRD_EGG, ITEM_CHICKEN);
     // These bindings previously picked up Cucco from the child slot on age
     // restore. The migrated slot can hold another trade; repair all three
@@ -2965,7 +2982,11 @@ bool Inventory_HatchWeirdEgg(PlayState* play) {
 // SOH helper
 bool Inventory_HatchPocketCucco(PlayState* play) {
     if (!IS_RANDO) {
-        return Inventory_ReplaceItem(play, ITEM_POCKET_EGG, ITEM_POCKET_CUCCO);
+        const bool hatched = Inventory_ReplaceItem(play, ITEM_POCKET_EGG, ITEM_POCKET_CUCCO);
+        if (hatched) {
+            TradeAdult_GiveItem(ITEM_POCKET_CUCCO);
+        }
+        return hatched;
     }
 
     if (!Flags_GetRandomizerInf(RAND_INF_ADULT_TRADES_HAS_POCKET_EGG)) {
@@ -2974,6 +2995,7 @@ bool Inventory_HatchPocketCucco(PlayState* play) {
 
     Flags_UnsetRandomizerInf(RAND_INF_ADULT_TRADES_HAS_POCKET_EGG);
     Flags_SetRandomizerInf(RAND_INF_ADULT_TRADES_HAS_POCKET_CUCCO);
+    TradeAdult_GiveItem(ITEM_POCKET_CUCCO);
     Inventory_ReplaceItem(play, ITEM_POCKET_EGG, ITEM_POCKET_CUCCO);
     return 1;
 }
@@ -6317,7 +6339,9 @@ void Interface_Draw(PlayState* play) {
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
         gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
 
-        if (!(interfaceCtx->unk_1FA)) {
+        // Keep the native B prompt's priority without touching A's transition textures.
+        s32 blastMaskB = !interfaceCtx->unk_1FA && MmMaskWear_CanUseBlastB(play, player);
+        if (!interfaceCtx->unk_1FA && !blastMaskB) {
             // B Button Icon & Ammo Count
             if (gSaveContext.equips.buttonItems[0] != ITEM_NONE) {
                 if (fullUi && !TransformMasks_IsTransformed()) {
@@ -6395,9 +6419,11 @@ void Interface_Draw(PlayState* play) {
                               PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
 
-            gDPLoadTextureBlock_4b(OVERLAY_DISP++, interfaceCtx->doActionSegment[1], G_IM_FMT_IA, DO_ACTION_TEX_WIDTH(),
-                                   DO_ACTION_TEX_HEIGHT(), 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP,
-                                   G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+            gDPLoadTextureBlock_4b(
+                OVERLAY_DISP++,
+                blastMaskB ? "__OTR__do_action_static/gDoActionExplodeENGTex" : interfaceCtx->doActionSegment[1],
+                G_IM_FMT_IA, DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(), 0, G_TX_NOMIRROR | G_TX_WRAP,
+                G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
 
             R_B_LABEL_DD = (1 << 10) / (WREG(37 + languageOffset) / 100.0f);
             gSPWideTextureRectangle(OVERLAY_DISP++, BbtnPosX << 2, BbtnPosY << 2,

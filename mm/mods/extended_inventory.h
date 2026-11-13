@@ -160,6 +160,12 @@ uint8_t ExtInv_GetItemIconSize(uint16_t itemId); // 24 for SW97 medallion/arrow 
 extern "C" {
 #endif
 
+int32_t TradeAdult_IndexOfItem(uint8_t item);
+void TradeAdult_ConsumeItem(uint8_t item);
+void TradeAdult_ConsumeIndex(int32_t index);
+void TradeAdult_ReconcileConsumed(void);
+uint8_t TradeAdult_IsConsumedIndex(int32_t index);
+
 // Skijer's NEI — custom inventory slots 24..71 live in gNeiSave (NOT in the
 // vanilla SaveContext, which only has items[0..23]). These dispatch helpers
 // read/write the right backing store by slot index. Use them anywhere a slot
@@ -209,6 +215,10 @@ static inline uint16_t ExtInv_GetSlotItem(int slot) {
         // kaleido's cursor SKIPS empty cells (z_kaleido_item.c:1320), so the cell was unreachable and
         // everything in the wheel stayed hidden until a native deed happened to land here. Seeding it
         // from the wheel handler was too late: the cursor test runs first. Skijer 2026-07-30
+        if (slot == SLOT_TRADE_DEED && item == ITEM_TRADE_PLACEHOLDER) {
+            extern u8 TradeAdult_CellItem(void);
+            return TradeAdult_CellItem(); // resolve the effective selection, including a retired cursor
+        }
         if (slot == SLOT_TRADE_DEED && item == ITEM_NONE) {
             extern s32 TradeAdult_OwnedCount(void);
             extern u8 TradeAdult_CellItem(void);

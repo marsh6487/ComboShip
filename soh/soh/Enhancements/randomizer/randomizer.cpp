@@ -158,6 +158,10 @@ static const CustomItemMessageEntry customItemMessages[] = {
     // messages into the unified registry (sNeiItems[] in extended_player.c). GetCustomItemMessage
     // falls back to those rows via Nei_FindByRg. Only items NOT in that registry remain below.
 
+    // The Clock has no custom icon; keep its passive tutorial iconless.
+    { RG_CLOCK, ITEM_NONE, ComboToolReceiptText::kClock.english, ComboToolReceiptText::kClock.german,
+      ComboToolReceiptText::kClock.french },
+
     // ITEM_CUSTOM stages the catalog's custom icon. Extended item IDs would
     // truncate in the one-byte pickup icon command.
     { RG_PHANTOM_HOURGLASS, ITEM_CUSTOM, ComboToolReceiptText::kPhantomHourglass.english,
@@ -1027,6 +1031,9 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
             }
 
         // Bottles
+        case RG_CHATEAU_ROMANI:
+            // The wheel owns this new container; an empty projected slot is not extra capacity.
+            return Bottle_HasFreeSlot() ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         case RG_EMPTY_BOTTLE:
         case RG_BOTTLE_WITH_MILK:
         case RG_BOTTLE_WITH_RED_POTION:
@@ -1919,11 +1926,13 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
                 INV_CONTENT(ITEM_TRADE_CHILD) = (int)ITEM_MASK_KEATON + (item - RG_KEATON_MASK);
             }
         } else if (item == RG_WEIRD_EGG) {
+            TradeAdult_GiveItem(ITEM_WEIRD_EGG);
             Flags_SetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG);
             if (!ChildTradeSlotOccupied()) {
                 INV_CONTENT(ITEM_TRADE_CHILD) = ITEM_WEIRD_EGG;
             }
         } else if (item == RG_ZELDAS_LETTER) {
+            TradeAdult_GiveItem(ITEM_LETTER_ZELDA);
             Flags_SetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_LETTER_ZELDA);
             if (!ChildTradeSlotOccupied()) {
                 INV_CONTENT(ITEM_TRADE_CHILD) = ITEM_LETTER_ZELDA;
@@ -2019,6 +2028,13 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
                 return Return_Item_Entry(giEntry, RG_NONE);
             }
         }
+    }
+
+    // A Chateau receipt grants a new bottle, including the automatic first-bottle tools. Treating
+    // it as a plain content/refill grant loses the pickup when the player has no empty bottle yet.
+    if (item == RG_CHATEAU_ROMANI) {
+        Bottle_GiveBottle(ITEM_CHATEAU_ROMANI);
+        return Return_Item_Entry(giEntry, RG_NONE); // full inventory: never overwrite an existing bottle
     }
 
     // dungeon items

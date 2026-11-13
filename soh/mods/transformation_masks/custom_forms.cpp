@@ -408,6 +408,9 @@ extern "C" uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanilla
 }
 
 extern "C" void RitoMask_MigrateLegacy(void) {
+    // A loaded peer or saved age bank can still contain an older physical copy.
+    // Retire it before this normalization moves native cells or bindings.
+    TradeAdult_ReconcileConsumed();
     uint8_t& spell = gSaveContext.inventory.items[SLOT_FARORES_WIND];
     RitoItem_NoteCellItem(spell);
     if (spell == ITEM_RITO_MASK)
@@ -427,7 +430,7 @@ extern "C" void RitoMask_MigrateLegacy(void) {
         for (uint8_t item = ITEM_WEIRD_EGG; item <= ITEM_LETTER_ZELDA; ++item) {
             if (Flags_GetRandomizerInf(
                     static_cast<RandomizerInf>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + item - ITEM_WEIRD_EGG)))
-                TradeAdult_GiveItem(item);
+                TradeAdult_FoldCurrent(item); // possession history is not a new acquisition
         }
         if (legacy >= ITEM_WEIRD_EGG && legacy <= ITEM_LETTER_ZELDA)
             mask = OotMaskWheel_Neighbor(1, 0);

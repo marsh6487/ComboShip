@@ -297,13 +297,10 @@ typedef enum {
  * @param isGoron   1 = Goron heavy-recoil path, 0 = Zora light-recoil path
  * @param curFrame  Animation curFrame (gFormState.formSkelAnime.curFrame)
  * @param minFrame  Earliest curFrame the check is allowed to fire. MM's
- *                  func_808401F4 gates on `meleeWeaponState >= 1`, which is
- *                  only set AFTER the quad has fired once. We emulate that by
- *                  requiring the caller to pass `earlyStart + 1.0f` so the
- *                  quad has had at least one frame to register an AT_HIT —
- *                  this is what lets the Goron dyna-actor exception fire on
- *                  breakables like Bg_Hidan_Dalm (otherwise the very first
- *                  frame would always recoil before the quad could hit).
+ *                  func_808401F4 gates on the previous update's active melee
+ *                  state. The caller passes `hitStart + 1.0f` to defer this
+ *                  check until after the first active pose. DynaPoly grace
+ *                  below allows the swept quads time to hit breakable actors.
  */
 static MmFormWallHitResult MmForm_CheckWallHit(Player* player, PlayState* play, u8 step, u8 isGoron, f32 curFrame,
                                                f32 minFrame) {
@@ -324,8 +321,8 @@ static MmFormWallHitResult MmForm_CheckWallHit(Player* player, PlayState* play, 
         step = 0;
     }
 
-    // Use the same quad geometry the puñetazo uses, so the wall ray matches
-    // the fist position (sGoronPunchQuadParams is defined above).
+    // Retain the existing actor-relative wall probe. Goron/Zora damage now
+    // follows native limb sweeps; this probe's recoil policy is independent.
     const f32* params = sGoronPunchQuadParams[step];
     f32 farDist = params[1];
     f32 yMid = (params[4] + params[5]) * 0.5f;

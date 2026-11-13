@@ -54,6 +54,11 @@ def main():
     builder_type = re.search(r'struct CustomItemMessageEntry\s*\{\s*s16 rgId;\s*(\w+) itemId;', builder)[1]
     assert registry_type == builder_type, "Receipt registry declarations must agree"
     format_call = re.search(r'msg\.AutoFormat\([^;]*customMsg->itemId[^;]*;', builder)[0]
+    # Execute the production no-icon branch too. Without it ITEM_NONE becomes
+    # a real 0x13/0xFF icon command, which the formatter fixture must reject.
+    iconless = re.search(r'if\s*\(customMsg->itemId == ITEM_NONE\)\s*\{[^{}]*\}', builder)
+    if iconless:
+        format_call = iconless[0] + ' else { ' + format_call + ' }'
     custom = initializer(registry, "customItemMessages[] =")
     for row in fields(custom):
         rg, icon, english, german, french = fields(row[1:-1])

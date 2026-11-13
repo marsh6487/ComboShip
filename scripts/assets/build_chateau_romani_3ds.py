@@ -132,6 +132,10 @@ def emit_material(files, role, entry, tex_name, dimensions, alpha=255, reflectio
     d.raw(0xE7000000, 0)
     d.raw(0xE3000A01, 0)  # G_CYC_1CYCLE
     d.raw(0xE3001001, 0)  # G_TT_NONE
+    # Setup25 is fogged/opaque even on the XLU stream. Own the blender state:
+    # G_RM_AA_ZB_OPA_SURF{,2} for solids, G_RM_AA_ZB_XLU_SURF{,2} for glass/sheen.
+    translucent = reflection or role == 'GlassSurface'
+    d.raw(0xE200001C, 0x005049D8 if translucent else 0x00552078)
     d.raw(0xD9000000, 0x00220405 | (0x40000 if reflection else 0))
     # Texture generation spans [0, scale/2] in s10.5 coordinates.
     s, t = ((w - 1) * 64, (h - 1) * 64) if reflection else (65535, 65535)

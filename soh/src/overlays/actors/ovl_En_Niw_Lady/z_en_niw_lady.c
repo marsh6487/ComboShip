@@ -1,4 +1,5 @@
 #include "z_en_niw_lady.h"
+#include "mods/extended_inventory.h"
 #include "objects/object_ane/object_ane.h"
 #include "objects/object_os_anime/object_os_anime.h"
 #include "overlays/actors/ovl_En_Niw/z_en_niw.h"
@@ -471,6 +472,9 @@ void func_80ABAC84(EnNiwLady* this, PlayState* play) {
         if (!Flags_GetItemGetInf(ITEMGETINF_2C)) {
             Flags_SetItemGetInf(ITEMGETINF_2C);
         } else {
+            if (!IS_RANDO) {
+                TradeAdult_ConsumeItem(ITEM_POCKET_CUCCO);
+            }
             Flags_SetItemGetInf(ITEMGETINF_2E);
         }
         this->actionFunc = func_80ABA778;

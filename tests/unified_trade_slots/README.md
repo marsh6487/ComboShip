@@ -25,6 +25,10 @@ Coverage:
 - Repeated normalization, an occupied different unified selection, unchanged
   ownership counts, the eight existing masks plus Rito, and refilling the corner
   from an already owned mask. Off-page and solo/nonrandomizer controls remain.
+- Consumed child trades with stale possession flags/native cells remain absent
+  through repeated normalization; a genuine pickup can restore availability.
+- A freshly hatched Cucco restores availability after an older copy was handed
+  in, through both native and randomizer hatch functions in both build modes.
 - Eight-button/seven-slot live, child, and adult binding banks; real native OoT
   SaveContext and ItemEquips in the native fixture; both complete native age
   restore branches; native Egg replacement and hatch with another trade selected;
@@ -38,7 +42,8 @@ Coverage:
 - The actual native pause input block is compiled as C and linked with the
   production C++ normalizer using matching native ABI flags. Same-frame C equip,
   empty unified-cell materialization, imported-bit-only Letter and return from
-  page two normalize before cursor/equip lookup. External rendering, wheel
+  page two normalize before cursor/equip lookup. A stale consumed Letter is
+  removed before a same-frame C press equips the remaining trade. External rendering, wheel
   animation and audio remain controlled boundaries.
 
 All native objects explicitly share F3DEX_GBI_2, GBI_FLOAT_MTX and GBI_S32_VTX.
@@ -49,7 +54,8 @@ These are source-level behavior and native compilation checks. They do not run
 the configured game, load an actual save, render pause/HUD graphics, or establish
 runtime acceptance of guard/Talon exchanges. Native/editor writes can still land
 in the legacy child slot transiently; the shared load and early page-zero pause
-boundary normalizes completed writes. Historical trade ownership bits and
-unselected bit-only Egg lifecycle semantics remain the existing unified-wheel
-policy. The native hatch synchronization is bounded to the real Egg-to-Cucco
-hatch event and migrated bindings.
+boundary normalizes completed writes. Historical trade ownership bits remain
+earned history; current availability is filtered by the saved consumption
+revision. Unselected bit-only Egg expiry behavior remains outside this change.
+The native hatch synchronization is bounded to the real Egg-to-Cucco hatch
+event and migrated bindings.

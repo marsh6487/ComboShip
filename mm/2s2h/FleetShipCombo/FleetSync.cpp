@@ -23,6 +23,7 @@
 #include "FleetComboItemsGlue.h" // FcCombo_NativeForItem (fcId -> native RI)
 #include "FleetComboOptions.h"   // FC_COMBO_OPTION_TABLE (shared NEI options)
 #include "FleetComboItems.h"     // FCI_MAX, FCI_NO_ITEM
+#include "../../../combo/TradeItemSync.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/BenJsonConversions.hpp"
@@ -60,6 +61,9 @@ extern "C" {
 #include "mods/ext_buttons/ext_buttons.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
+void TradeAdult_ReconcileConsumed(void);
+int TradeAdult_IndexOfItem(unsigned char item);
+unsigned char TradeAdult_IsConsumedIndex(int index);
 // The combo's single shared pictograph (FleetPicto.cpp) — pulled in on arrival.
 void FleetPicto_Import(void);
 // Nonzero while ApplyFcRegistryToNatives is materializing an FC deficit through the game's native
@@ -494,6 +498,9 @@ void ApplyFcRegistryToNatives() {
     }
     NeiSaveData* nei = Nei_Save();
     for (int fcId = 0; fcId < FCI_MAX && fcId < FC_COMBO_OBTAINED_FC_SIZE; fcId++) {
+        if (ComboTrade::AcknowledgeConsumedGrant(*nei, fcId)) {
+            continue;
+        }
         // Both games publish exact caneSkills. Replaying the old progressive counter
         // after applying that mask would grant an unrelated extra power. Acknowledge
         // counts here even when counter and mask arrive in separate FleetNet deltas.
@@ -823,7 +830,7 @@ void ExtractShared(nlohmann::json& sh) {
         ownedItems.push_back(canon);
     }
     sh["ownedItems"] = ownedItems;
-    sh["tradeAdultOwned"] = nei->tradeAdultOwned;
+    ComboTrade::WriteShared(*nei, sh);
     // Elemental Wand rods + Sheikah Slate runes: the cell item travels in ownedItems, but WHICH rods
     // / runes you own lives in these bitmasks, and nothing carried them -- the peer got an empty
     // wand. OR-merged both ways (one-way unlocks); the fcId deficit path still grants the items
@@ -1259,21 +1266,10 @@ void ApplyShared(const nlohmann::json& sh) {
     }
 
     RepairFlagOwnedCells(nei);
-    if (sh.contains("tradeAdultOwned")) {
-        if (sh["tradeAdultOwned"].is_null()) {
-            // unflatten() fills gaps in a sparse index set with null (see the note further down); the
-            // null guard is what keeps .get<uint32_t>() from throwing here — and a throw is not local,
-            // it is caught way out at the delta level and ABORTS THE WHOLE REMAINING APPLY.
-            SPDLOG_WARN("[FleetSync] trade: key present but NULL (own=0x{:08X})", nei->tradeAdultOwned);
-        } else {
-            uint32_t incoming = sh["tradeAdultOwned"].get<uint32_t>();
-            SPDLOG_INFO("[FleetSync] trade: incoming=0x{:08X} own=0x{:08X} -> 0x{:08X}", incoming, nei->tradeAdultOwned,
-                        nei->tradeAdultOwned | incoming);
-            nei->tradeAdultOwned |= incoming;
-        }
-    }
+    ComboTrade::ReadShared(*nei, sh);
+    TradeAdult_ReconcileConsumed();
 
-    // Reconcile the two stores that both describe "you own this MM trade item".
+    // Reconcile the two stores that both describe "you earned this MM trade item".
     //
     //   tradeAdultOwned  — the wheel bitmask, set by TradeAdult_GiveItem in OoT.
     //   comboObtainedFc  — the fcId counter, set by Randomizer_Item_Give's record hook, and the ONLY
@@ -1298,11 +1294,11 @@ void ApplyShared(const nlohmann::json& sh) {
             { 17, FCI_MM_LETTER_TO_KAFEI }, { 18, FCI_MM_LETTER_TO_MAMA },
         };
         for (const auto& e : kMmTradeFc) {
-            bool ownedByWheel = (nei->tradeAdultOwned & (1u << e.tradeIndex)) != 0;
-            if (ownedByWheel && e.fcId < FC_COMBO_OBTAINED_FC_SIZE && nei->comboObtainedFc[e.fcId] == 0) {
-                nei->comboObtainedFc[e.fcId] = 1; // ApplyFcRegistryToNatives grants the native item next tick
-                SPDLOG_INFO("[FleetSync] trade: healed fcId={} from wheel bit {} (native grant pending)", e.fcId,
-                            e.tradeIndex);
+            bool earnedByWheel = (nei->tradeAdultOwned & (1u << e.tradeIndex)) != 0;
+            if (earnedByWheel && e.fcId < FC_COMBO_OBTAINED_FC_SIZE && nei->comboObtainedFc[e.fcId] == 0) {
+                // ApplyFcRegistryToNatives acknowledges a consumed copy without regranting it.
+                nei->comboObtainedFc[e.fcId] = 1;
+                SPDLOG_INFO("[FleetSync] trade: healed fcId={} from earned wheel bit {}", e.fcId, e.tradeIndex);
             }
         }
     }
@@ -1465,6 +1461,9 @@ void ExtractEquips(nlohmann::json& sh) {
 // Inventory slot holding `item`, or -1 if this save does not have it. The ocarina is looked up by its
 // own slot rather than by scanning: its id is 0x00, so a scan would match the first zeroed byte.
 int FindInvSlot(uint16_t item) {
+    if (item < 0xFF && TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem((uint8_t)item))) {
+        return -1;
+    }
     // Ownership survives switching the travel cell to the other tool. Restoring
     // a peer button must not discard an owned item or change the local selection.
     if (item == ITEM_TIME_GATE || item == EXT_ITEM_MAGIC_MIRROR) {
@@ -2593,6 +2592,7 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.extEquipOwnedBits", nei->extEquipOwnedBits);
     snapshot.Add("nei.weaponUpgrades", nei->weaponUpgrades);
     snapshot.Add("nei.tradeAdultOwned", nei->tradeAdultOwned);
+    snapshot.Array("nei.tradeAdultRevision", nei->tradeAdultRevision);
     snapshot.Add("nei.ootMasksOwned", nei->ootMasksOwned);
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
