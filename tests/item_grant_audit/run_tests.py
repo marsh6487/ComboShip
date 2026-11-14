@@ -259,6 +259,7 @@ void Grant(RandoItemId randoItemId) {
 #include <cassert>
 #include <iostream>
 #include "ItemGrantAuditBridge.h"
+#include "mm/2s2h/FleetShipCombo/FleetComboIds.h"
 namespace ComboRando {
 '''
     shared = comments(read('combo/rando/SharedItems.h'))
@@ -274,9 +275,14 @@ int inventory[256]{};
 #define CHECK_QUEST_ITEM(quest) 0
 struct { struct {
     struct { struct { int isMagicAcquired=0, isDoubleMagicAcquired=0; } playerData; } saveInfo;
-    struct { int saveType=0; } shipSaveInfo;
+    struct {
+        int saveType=0;
+        struct { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE]{}; } nei;
+    } shipSaveInfo;
 } save; } gSaveContext;
 '''
+    fixture += function(read('mm/include/rando_capacity.h'),
+                        'static inline int RandoCapacity_HasIndependentBombchuBag(void) {') + '\n'
     fixture += '''
 constexpr int COMBO_RPG_MAGIC=3;
 bool rpgMagicEnabled=false;
@@ -296,6 +302,12 @@ int main() {
         MM_RaiseSharedTier(family, 1);
     }
     assert(downstreamGrants == 0);
+    auto& registry = gSaveContext.save.shipSaveInfo.nei.comboObtained;
+    registry[FC_OOT_BOMBCHU_CAPACITY] = 50;
+    assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 0);
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+    assert(downstreamGrants == 0 && registry[FC_OOT_BOMBCHU_CAPACITY] == 50);
+    registry[FC_OOT_BOMBCHU_CAPACITY] = 0;
     // A loaded dormant save is valid even when no PlayState exists.
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
     MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
@@ -308,6 +320,19 @@ int main() {
             assert(MM_GetSharedTier(families[i]) == (value == items[i]));
         }
     }
+    // Native ammo and the foreign infinite flag alone do not own a shared bag.
+    inventory[ITEM_BOMBCHU] = ITEM_BOMBCHU;
+    registry[FC_OOT_INFINITE_BOMBCHUS] = 1;
+    assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 0);
+    registry[FC_OOT_INFINITE_BOMBCHUS] = 0;
+    for (int capacity : {20, 30, 50}) {
+        for (int item : {0, static_cast<int>(ITEM_NONE), static_cast<int>(ITEM_BOMBCHU)}) {
+            registry[FC_OOT_BOMBCHU_CAPACITY] = capacity;
+            inventory[ITEM_BOMBCHU] = item;
+            assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 1);
+            assert(registry[FC_OOT_BOMBCHU_CAPACITY] == capacity && inventory[ITEM_BOMBCHU] == item);
+        }
+    }
     auto& player = gSaveContext.save.saveInfo.playerData;
     player.isMagicAcquired = player.isDoubleMagicAcquired = 1;
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
@@ -317,7 +342,7 @@ int main() {
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 1);
     nei.comboRpg.nativeMagicLevel = 2;
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
-    std::cout << "MM shared tiers: cleared save rejected, dormant arrow ownership and native RPG magic exact PASS\\n";
+    std::cout << "MM shared tiers: cleared save rejected, independent Bombchu ownership, dormant arrows and native RPG magic exact PASS\\n";
 }
 '''
     run_cpp('mm_shared_tiers', fixture)

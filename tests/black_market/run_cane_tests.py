@@ -4,7 +4,7 @@ from pathlib import Path
 import os, subprocess, sys, tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
-from run_time_pedestal_tests import block_from
+from run_time_pedestal_tests import block_from, functions
 items = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarketItems.cpp").read_text()
 grant = block_from(items, items.index("bool Grant("))
 ids = ["RI_OOT_NEI_CANE_OF_SOMARIA", "RI_OOT_NEI_CANE_SOMARIA_BLOCK", "RI_OOT_NEI_CANE_SOMARIA_PLATFORM", "RI_OOT_NEI_CANE_PACCI_FLIP", "RI_OOT_NEI_CANE_PACCI_STONE", "RI_OOT_NEI_CANE_PACCI_ULTRAHAND", "RI_OOT_EXT_CANE_OF_BYRNA"]
@@ -25,13 +25,21 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }
 struct { struct { struct { struct { unsigned threeDayResetCount = 0; } playerData; } saveInfo; } save; } gSaveContext;
 // Real FC identities and the actual consumption helper keep the materializer
 // dependency intact; this fixture grants only Cane and the unrelated sword.
+// Inventory is a service boundary here, as are native grants below. Keep its
+// storage visible so the complete materializer may inspect unrelated ammo.
+enum class InventoryItem { Bombchu, None };
+constexpr auto ITEM_BOMBCHU = InventoryItem::Bombchu;
 struct State {
     u8 caneSkills = 0;
     bool cell = false;
     std::array<u8,FCI_MAX> comboObtainedFc{}, comboAppliedFc{};
     uint32_t tradeAdultRevision[23]{};
+    InventoryItem bombchuItem = InventoryItem::None;
+    int8_t bombchuAmmo = 7;
 } states[2];
 State* nei = &states[0];
+#define INV_CONTENT(item) (assert((item) == ITEM_BOMBCHU), nei->bombchuItem)
+#define AMMO(item) (assert((item) == ITEM_BOMBCHU), nei->bombchuAmmo)
 u8 Cane_GiveSkill(u8 skill) { nei->caneSkills |= 1 << skill; nei->cell = true; return 1; }
 constexpr int SLATE_RUNE_COUNT=5, SEASON_COUNT=4, WAND_MODE_COUNT=6;
 void Slate_GrantRune(u8) {} void Seasons_GrantRod() {} void Seasons_GrantSeason(u8) {} void Wand_GrantMode(u8) {}
@@ -105,6 +113,7 @@ int main() {
         if(direction==0) Materialize1(); else Materialize0();
         assert(nei->caneSkills==1 && extras==0 && otherGrants==1);
         assert(nei->comboAppliedFc[FCI_CANE_OF_SOMARIA]==1 && nei->comboAppliedFc[FCI_KOKIRI_SWORD]==1);
+        assert(nei->bombchuItem==InventoryItem::None && nei->bombchuAmmo==7);
     }
     puts("PASS: exact cane grants (including Byrna separation); all bit combinations both native sync directions");
 }
@@ -113,10 +122,14 @@ fixture=fixture.replace("/* IDS */", "enum {"+",".join(ids)+"};").replace("/* NA
 blocks=[]
 for i,game in enumerate(("soh/soh", "mm/2s2h")):
     source=(ROOT / game / "FleetShipCombo/FleetSync.cpp").read_text()
-    extract=next(line for line in source.splitlines() if 'sh["caneSkills"] =' in line)
-    apply=block_from(source,source.index('if (sh.contains("caneSkills")'))
-    materialize=block_from(source,source.index("void ApplyFcRegistryToNatives()")).replace("ApplyFcRegistryToNatives", f"Materialize{i}")
-    merge=block_from(source,source.index('if (sh.contains("comboObtainedFc")'))
+    bodies=functions(source, {"ExtractShared", "ApplyShared", "ApplyFcRegistryToNatives"})
+    # Capacity helpers inspect the same receipt key. Select sync fields within
+    # their owning definitions instead of taking the first whole-file match.
+    extract=next(line for line in bodies["ExtractShared"].splitlines() if 'sh["caneSkills"] =' in line)
+    shared=bodies["ApplyShared"]
+    apply=block_from(shared,shared.index('if (sh.contains("caneSkills")'))
+    materialize=bodies["ApplyFcRegistryToNatives"].replace("ApplyFcRegistryToNatives", f"Materialize{i}")
+    merge=block_from(shared,shared.index('if (sh.contains("comboObtainedFc")'))
     blocks.extend([materialize, f"void Merge{i}(const nlohmann::json& sh) {{{merge}}}"])
     blocks.extend([f"void Extract{i}(nlohmann::json& sh) {{{extract}}}",f"void Apply{i}(const nlohmann::json& sh) {{{apply}}}"])
 fixture=fixture.replace("/* SYNC */", "\n".join(blocks))

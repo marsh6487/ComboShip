@@ -223,6 +223,20 @@ int main() {
     Randomizer_Item_Give(&play, row.GetGIEntry_Copy()); // defensive native bypass also cannot overwrite
     assert(std::memcmp(before.bottleSlots, saved.bottleSlots, sizeof(saved.bottleSlots)) == 0);
     assert(!GrantOotItemByName("Unknown bottle", nullptr));
+
+    // A fresh peer receipt must reach the registry even before native materialization.
+    // Re-importing only already-owned receipts would not detect a missing merge block.
+    Reset();
+    auto incoming = SharedSnapshot();
+    incoming["comboObtainedFc"][FCI_BOTTLE_CHATEAU] = 2;
+    ApplySharedBottles(incoming);
+    assert(saved.comboObtainedFc[FCI_BOTTLE_CHATEAU] == 2);
+    assert(saved.comboAppliedFc[FCI_BOTTLE_CHATEAU] == 0 && CountBottles() == 0);
+    ApplySharedBottles(incoming);
+    incoming["comboObtainedFc"][FCI_BOTTLE_CHATEAU] = 1;
+    ApplySharedBottles(incoming);
+    assert(saved.comboObtainedFc[FCI_BOTTLE_CHATEAU] == 2);
+    assert(saved.comboAppliedFc[FCI_BOTTLE_CHATEAU] == 0 && CountBottles() == 0);
     std::cout << "PASS Chateau peer/native grant, immediate wheel/Bottomless projection, no echo, "
-                 "repeated sync, distinct bottles, consumption and full inventory\n";
+                 "repeated sync, distinct bottles, consumption, full inventory and fresh receipt merge\n";
 }

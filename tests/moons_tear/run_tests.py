@@ -51,21 +51,27 @@ def production(host, grant_ref=None):
     parts.append("#define SPDLOG_INFO(...) ((void)0)\n#define SPDLOG_WARN(...) ((void)0)\n")
     # Relevant ExtractShared assignments and ApplyShared blocks remain production
     # code. Other shared vitals, UI settings and engine refresh are not exercised.
-    assignments = [re.search(r'^    ComboTrade::WriteShared\(\*nei, sh\);$', fleet, re.M).group(),
-                   re.search(r'^    sh\["comboObtainedFc"\] = [^\n]+', fleet, re.M).group()]
+    # Capacity helpers also inspect comboObtainedFc. Bound each selection to its
+    # owning function so a repeated condition cannot capture unrelated helpers.
+    extract_shared = extract(fleet, "ExtractShared")
+    apply_shared = extract(fleet, "ApplyShared")
+    assignments = [re.search(r'^    ComboTrade::WriteShared\(\*nei, sh\);$', extract_shared, re.M).group(),
+                   re.search(r'^    sh\["comboObtainedFc"\] = [^\n]+', extract_shared, re.M).group()]
     parts.append("static json ExportTrade() { auto* nei = Nei_Save(); json sh;\n" +
                  "\n".join(assignments) + "\nreturn json::parse(sh.dump()); }")
     if host == "mm":
         trade_merge = between(
-            fleet, '    ComboTrade::ReadShared(*nei, sh);', '    if (sh.contains("ootQuestItems"))')
+            apply_shared, '    ComboTrade::ReadShared(*nei, sh);', '    if (sh.contains("ootQuestItems"))')
     else:
-        trade_merge = between(fleet, '    ComboTrade::ReadShared(*nei, sh);',
+        trade_merge = between(apply_shared, '    ComboTrade::ReadShared(*nei, sh);',
                               '    // ootMasksOwned round-trip')
-    receipts = between(fleet, '    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array())',
-                       '    if (sh.contains("comboGoalFlags"))')
+    receipts = block(apply_shared, '    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array())')
     parts.append("static void ImportTrade(const json& sh) { auto* nei = Nei_Save();\n" +
                  trade_merge + receipts + "\n}")
     if host == "soh":
+        # The complete FC materializer preserves existing Bombchu ammo. Retain
+        # its native slot lookup even though this probe grants only trade items.
+        parts.append(array(source_at("soh/src/code/z_inventory.c"), "u8 gItemSlots[]"))
         grant = source_at("soh/soh/Enhancements/randomizer/randomizer.cpp", grant_ref)
         cases = between(grant, "        case RG_MM_SMALL_KEY_WOODFALL:", "        case RG_MM_PICTOGRAPH_BOX:")
         noops = re.findall(r"case (RG_MM_\w+):", cases[:cases.index("case RG_MM_MOONS_TEAR:")])

@@ -72,11 +72,14 @@ def main():
     fixture = fixture.replace("/* PROJECTION */", "\n".join(block(projection, marker) for marker in (
         "static void BottleItems_SyncSlot(", "static u8 BottleItems_IsVanillaBottle(",
         "static u8 BottleItems_MigrateToWheel(", "static void BottleItems_Enforce(")))
-    tools_start = sync.index('        if (inv.value("net", false))')
-    tools_end = sync.index('\n    }\n\n    if (sh.contains("bottleSlots")', tools_start)
-    fixture = fixture.replace("/* SHARED_BOTTLES */", sync[tools_start:tools_end] + "\n" +
-                              block(sync, 'if (sh.contains("bottleSlots") &&') +
-                              block(sync, 'if (sh.contains("comboObtainedFc") &&'))
+    # Receipt-validation helpers can inspect the same JSON key before ApplyShared.
+    # Extract the actual import blocks from their enclosing function.
+    shared_apply = block(sync, "void ApplyShared(")
+    tools_start = shared_apply.index('        if (inv.value("net", false))')
+    tools_end = shared_apply.index('\n    }\n\n    if (sh.contains("bottleSlots")', tools_start)
+    fixture = fixture.replace("/* SHARED_BOTTLES */", shared_apply[tools_start:tools_end] + "\n" +
+                              block(shared_apply, 'if (sh.contains("bottleSlots") &&') +
+                              block(shared_apply, 'if (sh.contains("comboObtainedFc") &&'))
 
     with tempfile.TemporaryDirectory(prefix="combo-chateau-grant-") as tmp:
         path = Path(tmp)

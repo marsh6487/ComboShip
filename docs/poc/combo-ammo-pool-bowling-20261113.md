@@ -113,12 +113,41 @@ action-pool fills, the existing RPG and infinite-capacity suites, 35 CI handling
 tests and eight native-ABI adapter tests. Changed production sources pass
 clang-format 14 and whitespace checks.
 
-The complete adjacent capacity suite cannot compile in the sparse local checkout
-without additional tracked asset headers; this is left to the full hosted gate.
+The complete adjacent capacity suite also passes in original and combined builds
+with ASan and UBSan. Its initial sparse-checkout compilation boundary was resolved
+by supplying six additional exact, Git-blob-verified asset headers outside the
+checkout; no production change was needed. This adds native bag gates, imports,
+refills, starting items, saved ownership, wallet progression and foreign grants.
 The separate cross-dungeon structural validator retains its existing all-items
 inventory policy and is outside the new fractional-oracle fixture. Review found
 no demonstrated seed failure from that separate path. Hosted builds and actual
 configured gameplay are distinct from the native fixtures above.
+
+### Hosted diagnostic follow-up
+
+The first hosted run exposed missing dependencies in older extracted-source
+fixtures: shared-item grants lacked the new capacity helpers, trade/cane receipt
+selectors matched an earlier JSON condition, and the affordability canary lacked
+its captured frozen magic rules. The follow-up changes only tests and this record.
+The fixtures retain the actual production bodies, select shared fields inside
+their owning functions, and supply the real helper definitions and frozen-rule
+assignment. No existing behavior assertions or hosted checks were removed.
+
+The complete six-command shared-item integration group passes. Moon's Tear passes
+its complete normal and ASan/UBSan runs, including four 4,203-scenario paired
+sync/materializer/save/reload roundtrips; cane passes normally and with ASan/UBSan.
+Chateau now has a fresh-receipt control that failed before its extraction repair
+and passes on both the preserved baseline and current source. The affordability
+canary retains all original wallet/sphere controls under five frozen-rule cases;
+its adjacent RPG magic suite also passes. Independent reviews and focused reruns
+found no weakened assertions or remaining repair blocker.
+
+One optional unchanged receipt-catalog probe reached a local OoT/MM enum include
+conflict after thin asset headers were supplied. It has no baseline reproduction
+or production-defect conclusion; its source is unchanged and the hosted full
+checkout remains the authoritative check. Leak detection was disabled for the
+local trade/cane sanitizer runs because this environment uses ptrace; address
+and undefined-behavior checks remained enabled.
 
 ## Verification contract
 

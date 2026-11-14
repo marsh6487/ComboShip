@@ -3,6 +3,8 @@
 
 This does not boot either game. --control combines the pre-merge NEI helpers with
 upstream tier raises to demonstrate the integration regressions.
+The independent Bombchu registry helpers and tier query execute unchanged from
+production; the surrounding native save fields and grant services are modeled.
 """
 import argparse
 import os
@@ -38,6 +40,14 @@ mm_helper = between(source(mm_path, helper_ref), 'static bool GrantMmItemByName'
 oot_raise = between(source(oot_path, tier_ref), 'extern "C" COMBO_EXPORT void SOH_RaiseSharedTier', '// Shared Items pokes')
 mm_raise = between(source(mm_path, tier_ref), 'extern "C" COMBO_EXPORT void MM_RaiseSharedTier', '// Shared Items pokes')
 production = oot_helper + mm_helper + oot_raise + mm_raise
+capacity_helpers = between(source('mm/include/rando_capacity.h'),
+    'static inline int RandoCapacity_HasIndependentBombchuBag',
+    'static inline int RandoCapacity_InfiniteAmmo')
+mm_get = between(source(mm_path), 'extern "C" COMBO_EXPORT int MM_GetSharedTier',
+    'extern "C" COMBO_EXPORT void MM_RaiseSharedTier')
+mm_get_guard = between(mm_get, '    if (!IS_RANDO', '    switch (')
+mm_bombchu_tier = between(mm_get, '        case ComboRando::SF_BOMBCHU_BAG:',
+    '        case ComboRando::SF_MAGIC:')
 rg_names = sorted(set(re.findall(r'\bRG_[A-Z_0-9]+', production)) | {'RG_PROGRESSIVE_MAGIC_METER', 'RG_NONE'})
 ri_names = sorted(set(re.findall(r'\bRI_[A-Z_0-9]+', production)) | {'RI_NONE'})
 preamble = r'''
@@ -48,6 +58,7 @@ preamble = r'''
 #include <stdexcept>
 #include "rando/SharedItems.h"
 #include "rando/RpgStats.h"
+#include "FleetComboIds.h"
 #include "FleetSharedItems.h"
 #define COMBO_EXPORT
 #define SPDLOG_INFO(...) ((void)0)
@@ -69,7 +80,13 @@ extern "C" void FleetShared_BeginReceive() { ++depth; }
 extern "C" void FleetShared_EndReceive() { --depth; }
 extern "C" int FleetShared_IsReceiving() { return depth > 0; }
 extern "C" void FleetShared_OnNativeObtained(int) { if (!depth) ++echoes; }
-struct { bool isMagicAcquired = false, isDoubleMagicAcquired = false; int fileNum = 0; } gSaveContext;
+struct {
+    bool isMagicAcquired = false, isDoubleMagicAcquired = false;
+    int fileNum = 0;
+    struct { struct {
+        struct { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE]{}; } nei;
+    } shipSaveInfo; } save;
+} gSaveContext;
 ComboRpgState ootRpg{};
 namespace FleetRpg { ComboRpgState Read() { return ootRpg; } }
 int gComboSuppressAnchorSend = 0;
@@ -139,8 +156,11 @@ void GiveItem(RandoItemId id) { Combo_MM_GiveDormantResolved(id); }
 }
 void SaveManager_SaveCurrentForCombo() { ++persisted; }
 int SOH_GetSharedTier(int) { return ootTier; }
-int MM_GetSharedTier(int family) { return family == ComboRando::SF_BOMBCHU_BAG ? bombchu == ITEM_BOMBCHU : mmTier; }
 '''
+preamble += capacity_helpers
+preamble += ('int MM_GetSharedTier(int family) {\n' + mm_get_guard +
+             '    switch (static_cast<ComboRando::SharedFamily>(family)) {\n' + mm_bombchu_tier +
+             '        default: return mmTier;\n    }\n}\n')
 checks = r'''
 int failures = 0;
 void check(bool condition, const char* label) {
@@ -151,12 +171,54 @@ void reset() { depth = echoes = ootTier = mmTier = persisted = 0; throwGrant = f
     mmSaveLoaded = true;
     obtainable = mmForeground = true;
     blueRupees = parkedFlushes = 0;
-    gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = false; gComboSuppressAnchorSend = 0; }
+    gSaveContext = {}; bombchu = -1; ammo = 0; gComboSuppressAnchorSend = 0; }
 int main() {
     reset(); mmSaveLoaded = false;
     MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
     check(mmTier == 0 && persisted == 0 && depth == 0 && echoes == 0,
           "cleared MM quit save rejects shared grants without persistence");
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+    check(!RandoCapacity_HasIndependentBombchuBag() && bombchu == -1 && ammo == 0 && persisted == 0,
+          "cleared MM quit save cannot acquire an independent Bombchu Bag");
+    reset();
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 0);
+    check(!RandoCapacity_HasIndependentBombchuBag() && bombchu == -1 && ammo == 0 && persisted == 0,
+          "zero shared Bombchu tier leaves unowned capacity and ammo unchanged");
+    reset();
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+    check(gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 20 &&
+          MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 1 && bombchu == ITEM_BOMBCHU && ammo == 20 &&
+          persisted == 1 && mmTier == 0 && echoes == 0 && depth == 0,
+          "first dormant shared Bombchu Bag records capacity, supplies ammo and persists once");
+    for (int remaining : {0, 19}) {
+        ammo = remaining;
+        MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+        check(ammo == remaining && persisted == 1 && echoes == 0 && depth == 0,
+              "shared Bombchu replay preserves spent ammo and does not persist again");
+    }
+    for (int remaining : {0, 7, 35}) {
+        reset(); bombchu = ITEM_BOMBCHU; ammo = remaining;
+        check(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 0,
+              "ordinary native Bombchu inventory is not independent bag ownership");
+        MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+        check(gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 20 &&
+              ammo == std::max(20, remaining) && persisted == 1,
+              "shared bag grants independent ownership over native ammo without reducing it");
+    }
+    for (int capacity : {20, 30, 50}) {
+        for (int remaining : {0, 19, capacity}) {
+            reset(); bombchu = ITEM_BOMBCHU; ammo = remaining;
+            gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] = capacity;
+            MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+            check(gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] == capacity &&
+                  ammo == remaining && persisted == 0 && echoes == 0 && depth == 0,
+                  "existing independent capacity and remaining ammo survive shared convergence");
+        }
+    }
+    reset(); gSaveContext.fileNum = 0xFF;
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+    check(RandoCapacity_HasIndependentBombchuBag() && ammo == 20 && persisted == 0,
+          "shared Bombchu grant respects the no-file persistence guard");
     reset();
     SOH_RaiseSharedTier(ComboRando::SF_BOW, 1);
     check(ootTier == 1 && echoes == 0 && depth == 0, "OoT convergence raises once without NEI echo");
