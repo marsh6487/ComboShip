@@ -109,6 +109,14 @@ static void GrantOotItemByName(const char* name, void*) { assert(name && *name);
 #ifndef TEST_MM
 using s32 = int32_t;
 using u8 = uint8_t;
+// Engine mode/flag services remain mutable; the actual trade and mask
+// ownership/migration bodies are linked by the extraction runner.
+static bool fixtureRandomizer{};
+#define IS_RANDO fixtureRandomizer
+static bool fixtureRandomizerFlags[RAND_INF_MAX]{};
+static s32 Flags_GetRandomizerInf(RandomizerInf flag) {
+    return fixtureRandomizerFlags[flag];
+}
 struct Player { uint16_t heldItemId; };
 static u8 TwilightUpgrade_IsClawshotActive() { return 0; }
 #endif
@@ -580,5 +588,19 @@ int main() {
     TestHashPolicy();
     TestNativeAdapters(incoming);
     TestSharedSoulRouting();
+#ifndef TEST_MM
+    // A seeded migration after the Vanilla cases keeps the mode service live
+    // and verifies that shared Rito ownership cannot retain a child trade cell.
+    live = {};
+    live.ritoMaskFlags = RITO_FLAG_MASK_OWNED;
+    std::fill(std::begin(gSaveContext.inventory.items), std::end(gSaveContext.inventory.items), ITEM_NONE);
+    gSaveContext.inventory.items[SLOT_TRADE_CHILD] = ITEM_WEIRD_EGG;
+    fixtureRandomizerFlags[RAND_INF_CHILD_TRADES_HAS_CHICKEN] = true;
+    fixtureRandomizer = true;
+    RitoMask_MigrateLegacy();
+    assert(gSaveContext.inventory.items[SLOT_TRADE_ADULT] == ITEM_WEIRD_EGG);
+    assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD] == ITEM_RITO_MASK);
+    assert(live.tradeAdultOwned == ((1u << 20) | (1u << 21)));
+#endif
     std::cout << "PASS NEI-only ownership, native progression isolation, first-cycle quarantine, exact aliases, sword prerequisites, full-width cells and idempotent grants\n";
 }

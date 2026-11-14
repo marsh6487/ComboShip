@@ -17,7 +17,7 @@ def extract(source,name):
  return source[start:pos]
 names=['Player_OverrideLimbDrawGameplayDefault','Player_OverrideLimbDrawGameplayFirstPerson','Player_ApplyNeiHeldHand']
 nf={n:extract(native,n) for n in names}
-af={n:extract(adult.replace('extern "C" ',''),n) for n in ['AdultLink_UsesAdultPresentation','AdultLink_ApplyNeiHeldHand','AdultLink_OverrideLimb']}
+af={n:extract(adult.replace('extern "C" ',''),n) for n in ['AdultLink_UsesAdultPresentation','AdultLink_ApplyNeiHeldHand','AdultLink_ApplyRootTransform','AdultLink_OverrideLimb']}
 native_start=native.index('            u8 handIsSpokenFor =')
 native_end=native.index('            // ⚠️ ESTE OCULTADO',native_start)
 native_sword=native[native_start:native_end]
@@ -38,7 +38,7 @@ SaveContext gSaveContext{};
 PlayState* gPlayState=nullptr;
 u16 gEquipMasks[4]{};u8 gEquipShifts[4]{};
 bool mode=false,lantern=false,hook=true,hasHand=true,claimedHand=false;
-int form=CUSTOM_FORM_NONE, sPlayerLod=0,sPlayerLeftHandType=0;
+int form=CUSTOM_FORM_NONE, sPlayerLod=0,sPlayerLeftHandType=0,sPlayerRightHandType=0;
 u8 sReady=0,sIsChildRig=0,sIsMod=0,sIsForm=0;
 bool extOwnsSwordDL=false,odwalda=false,goht=false,gold=false,customBody=false,heldEnabled=false,dinSelected=false;
 int heldCalls=0,tunicR=30,tunicG=105,tunicB=27;
@@ -67,6 +67,7 @@ u8 Trident_GoldenArmor(){return gold;}
 u8 Player_IsCustomLinkModel(Player*){return customBody;}
 // Active Four Sword is covered by the dedicated Four Sword visibility fixture.
 u8 FourSword_IsEquipped(){return 0;}
+u8 WeaponUpgrade_HasGreatFairy(){return 0;}
 s32 CVarGetInteger(const char* name,s32 fallback){
  if(std::strstr(name,"TunicR"))return tunicR;
  if(std::strstr(name,"TunicG"))return tunicG;
@@ -82,6 +83,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dl,void* hand,Player* p,u8 r,u8 g,u8 b){
  heldScratch[3].words.w0=G_SETENVCOLOR<<24;heldScratch[3].words.w1=(uint32_t(r)<<24)|(uint32_t(g)<<16)|(uint32_t(b)<<8);
  heldScratch[5].words.w0=G_ENDDL<<24;*dl=heldScratch;return 1;
 }
+u8 WeaponUpgrade_ApplyHeldSwordDLForModel(Gfx** dl,void* hand,Player* p,u8 r,u8 g,u8 b){return WeaponUpgrade_ApplyHeldSwordDL(dl,hand,p,r,g,b);}
 void* DinFireSword_HandDL(PlayState*,Player*,Gfx*){return dinSelected?&dinHand:nullptr;}
 void DinFireSword_SetHandModel(Player*,void*,int){}
 void DinFireSword_CopyHandModel(Player*,void*,void*){}
@@ -93,7 +95,7 @@ Gfx* capturedHand=nullptr;
 bool NeiArticulated_ApplySwitchHookHand(PlayState*,Player*,Gfx** dl,Gfx* hand){if(!hook||!hand)return false;capturedHand=hand;*dl=&replacement;return true;}
 u8 ResourceMgr_FileExists(const char*){return hasHand;}
 Gfx* ResourceMgr_LoadGfxByName(const char* p){resolved=p;return resolved=="human_left"?&nativeLeft:&nativeRight;}
-s32 Player_OverrideLimbDrawGameplayDefault(PlayState*,s32,Gfx** dl,Vec3f*,Vec3s*,Actor*){*dl=&vanillaHook;return 0;}
+s32 Player_OverrideLimbDrawGameplayDefault(PlayState*,s32,Gfx** dl,Vec3f*,Vec3s*,Actor* actor){auto p=(Player*)actor;sPlayerLeftHandType=p->leftHandType;sPlayerRightHandType=p->rightHandType;*dl=&vanillaHook;return 0;}
 '''
 prefix+='\n'.join(re.findall(r'^static Gfx\* sDL_\w+;',adult,re.M))+'\n'
 checks=r'''
@@ -138,11 +140,13 @@ int main(){
  mode=true;sDL_RHClosed=&adultRight;sDL_LHClosed=&adultLeft;sDL_RHHookshot=&vanillaHook;
  p.rightHandType=PLAYER_MODELTYPE_RH_HOOKSHOT;
  for(bool mod:{false,true})for(bool child:{false,true}){
- sIsMod=mod;sIsChildRig=child;Gfx* limb=&customHand;
+ sIsMod=mod;sIsChildRig=child;
+ sDL_RHClosed=mod?&customHand:&adultRight;sDL_LHClosed=mod?&customHand:&adultLeft;Gfx* limb=&customHand;
  AdultLink_OverrideLimb(&play,PLAYER_LIMB_RIGHT_HAND,&limb,&pos,&rot,&p.actor);
  assert(limb==&replacement&&capturedHand==((mod||child)?&customHand:&adultRight));
  lantern=true;limb=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&limb,&pos,&rot,&p.actor);assert(limb==((mod||child)?&customHand:&adultLeft));lantern=false;
  }
+ sDL_RHClosed=&adultRight;sDL_LHClosed=&adultLeft;
  claimedHand=true;Gfx* limb=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_RIGHT_HAND,&limb,&pos,&rot,&p.actor);assert(limb==&replacement&&capturedHand==&customHand);
  assert(gSaveContext.save.linkAge==0);
  // Execute the native sword seam and the full adult override. Deferred clones
@@ -181,14 +185,14 @@ int main(){
   sIsMod=owner==0;sIsForm=owner==1;sIsChildRig=owner==2;
   form=owner==3?CUSTOM_FORM_KEATON:CUSTOM_FORM_NONE;extOwnsSwordDL=owner==4;odwalda=owner==5;goht=owner==6;
   p.actor.scale.y=owner==7?-.01f:.01f;heldCalls=0;second=&customHand;
-  AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(heldCalls==0);
+  AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(heldCalls==(owner==0?1:0));
  }
  sIsMod=sIsForm=sIsChildRig=0;extOwnsSwordDL=odwalda=goht=false;p.actor.scale.y=.01f;form=CUSTOM_FORM_NONE;
  dinSelected=true;second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(second==&dinHand);
  std::cout<<"PASS native/adult held sword fists, isolated frame compounds/colors, form/equipment/Din priority and original final hand selectors\n";
 }
 '''
-parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_OverrideLimb'],
+parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_ApplyRootTransform'],af['AdultLink_OverrideLimb'],
        'static void ApplyNativeSwordStage(PlayState* play,Player* player,Gfx** dList){\n'+native_sword+'\n}']
 with tempfile.TemporaryDirectory(prefix='mm-nei-hands-') as td:
  path=Path(td)/'hands.cpp';path.write_text(prefix+'\n'.join(parts)+checks);binary=Path(td)/'hands'

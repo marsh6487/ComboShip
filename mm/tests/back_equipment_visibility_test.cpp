@@ -58,6 +58,9 @@ u8 WeaponUpgrade_HasGreatFairy(void) {
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx**, void*, Player*, u8, u8, u8) {
     return 0;
 }
+u8 WeaponUpgrade_ApplyHeldSwordDLForModel(Gfx**, void*, Player*, u8, u8, u8) {
+    return 0;
+}
 
 u8 Trident_GoldenArmor(void) {
     return 0;
@@ -155,6 +158,8 @@ u8 Player_ShouldHideBackEquipment(s32 limbIndex);
 extern Vec3f* sPlayerCurBodyPartPos;
 extern s32 sPlayerLod;
 extern s32 D_801F59E0;
+extern PlayerModelType sPlayerLeftHandType;
+extern PlayerModelType sPlayerRightHandType;
 extern Gfx* D_801C018C[];
 extern Gfx* gPlayerSheathedSwords[];
 extern Gfx* gPlayerSwordSheaths[];
@@ -169,6 +174,7 @@ static Gfx* sDL_LHBgs;
 static Gfx* sDL_RHClosed;
 static Gfx* sDL_RHShield;
 static Gfx* sDL_RHBow;
+static Gfx* sDL_RHSlingshot;
 static Gfx* sDL_RHOcarina;
 static Gfx* sDL_RHHookshot;
 static Gfx* sDL_SheathEmpty;
@@ -253,6 +259,8 @@ static Gfx* DrawAdult(Player* player, s32 limbIndex, Gfx* incoming) {
     sPlayerCurBodyPartPos = &player->bodyPartsPos[0];
     sPlayerLod = 0;
     D_801F59E0 = 0;
+    sPlayerLeftHandType = static_cast<PlayerModelType>(player->leftHandType);
+    sPlayerRightHandType = static_cast<PlayerModelType>(player->rightHandType);
     AdultLink_OverrideLimb(&play, limbIndex, &dList, &pos, &rot, &player->actor);
     return dList;
 }
@@ -318,8 +326,12 @@ static void AdultSheathAndHandsFollowPolicy(void) {
     CHECK(DrawAdult(&player, PLAYER_LIMB_SHEATH, &skeleton) == nullptr);
 
     player.leftHandType = PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
-    player.heldItemId = ITEM_SWORD_KOKIRI;
+    player.heldItemId = ITEM_SWORD_MASTER;
+    player.heldItemAction = static_cast<PlayerItemAction>(PLAYER_IA_SWORD_MASTER);
     CHECK(DrawAdult(&player, PLAYER_LIMB_LEFT_HAND, &skeleton) == &adultLeft);
+    player.heldItemId = ITEM_SWORD_KOKIRI;
+    player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
+    CHECK(DrawAdult(&player, PLAYER_LIMB_LEFT_HAND, &skeleton) != &adultLeft);
 
     player.rightHandType = PLAYER_MODELTYPE_RH_SHIELD;
     player.currentShield = PLAYER_SHIELD_HEROS_SHIELD;

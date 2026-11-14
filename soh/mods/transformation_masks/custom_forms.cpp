@@ -374,6 +374,12 @@ extern "C" void RitoItem_NoteCellItem(s32 item) {
 static uint8_t OotMaskWheel_OwnsItem(s32 item, uint8_t allowVanillaMasks) {
     if (item == ITEM_RITO_MASK)
         return RitoMask_IsOwned();
+#ifdef COMBO_BUILD
+    // The unified trade wheel owns the child chain in Combo randomizer too.
+    // Reject it before the raw-current shortcut, including old duplicated saves.
+    if (IS_RANDO && item < ITEM_MASK_KEATON)
+        return 0;
+#endif
     if (item < ITEM_WEIRD_EGG || item > ITEM_MASK_TRUTH)
         return 0;
     if (gSaveContext.inventory.items[SLOT_TRADE_CHILD] == item)
@@ -402,6 +408,9 @@ extern "C" uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanilla
 }
 
 extern "C" void RitoMask_MigrateLegacy(void) {
+    // A loaded peer or saved age bank can still contain an older physical copy.
+    // Retire it before this normalization moves native cells or bindings.
+    TradeAdult_ReconcileConsumed();
     uint8_t& spell = gSaveContext.inventory.items[SLOT_FARORES_WIND];
     RitoItem_NoteCellItem(spell);
     if (spell == ITEM_RITO_MASK)
@@ -409,6 +418,26 @@ extern "C" void RitoMask_MigrateLegacy(void) {
 
     uint8_t& mask = gSaveContext.inventory.items[SLOT_TRADE_CHILD];
     RitoItem_NoteCellItem(mask);
+#ifdef COMBO_BUILD
+    if (IS_RANDO) {
+        // Native grants/editor writes can still use the child slot. Fold before
+        // clearing it, at this shared load/pause boundary; keep another selected
+        // trade item and every existing ownership bit intact.
+        uint8_t& trade = gSaveContext.inventory.items[SLOT_TRADE_ADULT];
+        const uint8_t legacy = mask;
+        TradeAdult_FoldCurrent(trade);
+        TradeAdult_FoldCurrent(legacy);
+        for (uint8_t item = ITEM_WEIRD_EGG; item <= ITEM_LETTER_ZELDA; ++item) {
+            if (Flags_GetRandomizerInf(
+                    static_cast<RandomizerInf>(RAND_INF_CHILD_TRADES_HAS_WEIRD_EGG + item - ITEM_WEIRD_EGG)))
+                TradeAdult_FoldCurrent(item); // possession history is not a new acquisition
+        }
+        if (legacy >= ITEM_WEIRD_EGG && legacy <= ITEM_LETTER_ZELDA)
+            mask = OotMaskWheel_Neighbor(1, 0);
+        if (trade == ITEM_NONE)
+            trade = (legacy >= ITEM_WEIRD_EGG && legacy <= ITEM_LETTER_ZELDA) ? legacy : TradeAdult_NextItem(ITEM_NONE);
+    }
+#endif
     if (mask == ITEM_NONE && RitoMask_IsOwned())
         mask = ITEM_RITO_MASK;
 
@@ -416,6 +445,12 @@ extern "C" void RitoMask_MigrateLegacy(void) {
     ItemEquips* const equips[] = { &gSaveContext.equips, &gSaveContext.childEquips, &gSaveContext.adultEquips };
     for (ItemEquips* equip : equips) {
         for (unsigned button = 1; button < ARRAY_COUNT(equip->buttonItems); ++button) {
+#ifdef COMBO_BUILD
+            const uint8_t item = equip->buttonItems[button];
+            if (IS_RANDO && item >= ITEM_WEIRD_EGG && item <= ITEM_LETTER_ZELDA &&
+                equip->cButtonSlots[button - 1] == SLOT_TRADE_CHILD && TradeAdult_IsOwnedItem(item))
+                equip->cButtonSlots[button - 1] = SLOT_TRADE_ADULT;
+#endif
             if (equip->buttonItems[button] == ITEM_RITO_MASK)
                 equip->cButtonSlots[button - 1] = SLOT_TRADE_CHILD;
         }

@@ -552,14 +552,17 @@ static const NeiItem sNeiItems[] = {
     { ITEM_MM_MASK_BLAST, PLAYER_IA_MM_MASK_BLAST, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL,
       func_8083485C, Player_InitDefaultIA, Randomizer_DrawMmMask, RG_MM_MASK_BLAST,
       "You got the %yBlast Mask%w!&A mask of explosive power born&of pure detonation.^Equip from the mask "
-      "page.^Press %y\x9F%w to %rExplode%w when free.&%y\xA0%w also detonates the mask.&No bombs are needed.^"
+      "page.^Press %y\xA0%w to %rExplode%w.&Raise your shield to avoid&damage from your own blast.&No bombs are "
+      "needed.^"
       "Cooldown: about %g16 seconds%w.&Enable %cInstant Blast Mask%w and&the cooldown drops to 1 frame.",
       "Vous obtenez le %yMasque d'Explosion%w!&Un masque de pure détonation&aux pouvoirs explosifs.^Équipez depuis la "
-      "page des masques.^%y\x9F%w déclenche l'%rexplosion%w si libre.&%y\xA0%w fait aussi exploser le masque.&Aucune "
+      "page des masques.^%y\xA0%w déclenche l'%rexplosion%w.&Levez le bouclier pour éviter&les dégâts de votre "
+      "explosion.&Aucune "
       "bombe nécessaire.^Recharge: environ %g16 secondes%w.&Activez %cInstant Blast Mask%w pour&une recharge de 1 "
       "frame.",
       "Du hast die %yExplosionsmaske%w!&Eine Maske explosiver Kraft,&geboren aus reiner Detonation.^Aufsetzen auf der "
-      "Maskenseite.^%y\x9F%w löst eine %rExplosion%w aus,&wenn frei. %y\xA0%w zündet sie auch.&Keine Bomben nötig.^"
+      "Maskenseite.^%y\xA0%w löst eine %rExplosion%w aus.&Hebe den Schild, um dich vor&deiner Explosion zu "
+      "schützen.&Keine Bomben nötig.^"
       "Abklingzeit: etwa %g16 Sekunden%w.&Aktiviere %cInstant Blast Mask%w für&eine Abklingzeit von 1 Frame." },
     { ITEM_MM_MASK_STONE, PLAYER_IA_MM_MASK_STONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL,
       func_8083485C, Player_InitDefaultIA, Randomizer_DrawMmMask, RG_MM_MASK_STONE,

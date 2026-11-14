@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SeedContext.h"
+#include <array>
 #include <stdint.h>
 
 namespace Rando {
@@ -198,5 +199,15 @@ class Logic {
   private:
     std::shared_ptr<Context> ctx;
     bool inLogic[LOGIC_MAX];
+
+    // Seed searches own their custom inventory just as they own their native SaveContext.
+    // SetSaveContext opts gameplay/tracker callers into the live NEI view, even when
+    // their native save is a copy (MMHintReachableChecks).
+    bool useLiveInventory = false;
+    std::array<uint16_t, 48> extendedInventory;
+    std::map<RandomizerGet, uint32_t> customItemCounts;
+    uint32_t CustomItemCount(RandomizerGet itemName) const;
+    bool ApplyCustomItemEffect(Item& item, bool state);
+    bool HasWandMode(uint8_t mode);
 }; // class Logic
 } // namespace Rando

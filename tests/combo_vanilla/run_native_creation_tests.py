@@ -37,6 +37,10 @@ struct SaveFileMetaInfo { bool valid=false; uint8_t playerName[8]{}; } metadata;
 struct FileChooseContext { int buttonIndex=0,questType[3]{QUEST_RANDOMIZER},n64ddFlag=0,speedrunIndex=0; int prevConfigMode=99,configMode=99,nameBoxAlpha[3]{},nameAlpha[3]{},connectorAlpha[3]{}; } file;
 static bool combined=true, vanilla=true, seed=false, beginOk=true, finishOk=true;
 static int initCount=0,randoCount=0,saveCount=0,legacyCount=0,beginCount=0,endCount=0,abortCount=0;
+// The form-session suite executes the cleanup body. This creation fixture owns
+// its C-ABI handoff and whether accepted/rejected native creation reaches it.
+static int sessionDiscardCount=0;
+extern "C" void MmForm_DiscardSaveSession(void) { ++sessionDiscardCount; }
 int gComboVanillaMode=0,gComboVanillaCreationFailed=0;
 static int Creation(int slot,int phase) {
     assert(slot==0);
@@ -51,7 +55,7 @@ void (*gComboGenerateCallback)(int)=nullptr;
 int Combo_IsCombinedGame(){return combined;}
 int CVarGetInteger(const char*,int){return vanilla;}
 int Ship_QuestDebugEnabled(int){return false;}
-void Sram_InitNewSave(){++initCount;gSaveContext.health=48;}
+void Sram_InitNewSave(){assert(sessionDiscardCount==1);++initCount;gSaveContext.health=48;}
 void Sram_InitDebugSave(){assert(false);}
 int ResourceMgr_GetGameRegion(int){return GAME_REGION_PAL;}
 SaveFileMetaInfo* Save_GetSaveMetaInfo(int){return &metadata;}
@@ -77,6 +81,7 @@ code += r'''
 static void Reset() {
     gSaveContext=SaveContext{}; metadata=SaveFileMetaInfo{}; file=FileChooseContext{};
     initCount=randoCount=saveCount=legacyCount=beginCount=endCount=abortCount=0;
+    sessionDiscardCount=0;
     gComboVanillaCreationFailed=0;gComboVanillaMode=0;
     combined=true;vanilla=true;seed=false;beginOk=finishOk=true;
     std::memcpy(metadata.playerName,"NAME1234",8);
@@ -84,25 +89,34 @@ static void Reset() {
 int main() {
     for(bool loadedSeed:{false,true}) {
         Reset();seed=loadedSeed;Sram_InitSave(&file);
+        assert(sessionDiscardCount==1);
         assert(initCount==1&&saveCount==1&&randoCount==0&&legacyCount==0);
         assert(beginCount==1&&endCount==1&&gComboVanillaMode==1&&!gComboVanillaCreationFailed);
         assert(gSaveContext.ship.quest.id==QUEST_NORMAL&&metadata.valid);
         assert(!std::memcmp(gSaveContext.playerName,"NAME1234",8));
     }
     Reset();beginOk=false;Sram_InitSave(&file);
+    assert(sessionDiscardCount==0);
     assert(gComboVanillaCreationFailed&&initCount==0&&saveCount==0&&!metadata.valid);
     assert(gSaveContext.health==77);
     Reset();finishOk=false;Sram_InitSave(&file);
+    assert(sessionDiscardCount==1);
     assert(gComboVanillaCreationFailed&&saveCount==1&&!metadata.valid&&abortCount==1);
     assert(gSaveContext.health==77&&gComboVanillaMode==0);
     Reset();vanilla=false;seed=true;Sram_InitSave(&file);
+    assert(sessionDiscardCount==1);
     assert(randoCount==1&&saveCount==1&&legacyCount==1&&beginCount==0);
     Reset();combined=false;file.questType[0]=QUEST_NORMAL;Sram_InitSave(&file);
+    assert(sessionDiscardCount==1);
     assert(randoCount==0&&saveCount==1&&legacyCount==0&&beginCount==0);
+    Reset();combined=false;file.questType[0]=QUEST_OOTXMM;Sram_InitSave(&file);
+    assert(sessionDiscardCount==0&&initCount==0&&saveCount==0&&randoCount==0&&legacyCount==0&&beginCount==0);
     for(auto commit:{CommitPAL,CommitNES}) {
         Reset();finishOk=false;rumbles=0;commit(&file);
+        assert(sessionDiscardCount==1);
         assert(gComboVanillaCreationFailed&&file.configMode==99&&rumbles==0);
         Reset();rumbles=0;commit(&file);
+        assert(sessionDiscardCount==1);
         assert(!gComboVanillaCreationFailed&&file.configMode==CM_NAME_ENTRY_TO_MAIN&&rumbles==1);
     }
     std::cout<<"PASS actual OoT creation: seed-independent Vanilla, names, paired-failure rollback, Randomizer and Solo controls\n";

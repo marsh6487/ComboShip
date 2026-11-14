@@ -269,7 +269,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                               mmOracle.GetDungeonExits;
     const bool portalGated = ootAccess != OotAccess::NO_LOGIC && !crossDungeon;
     const bool mmStart = startingGame == GAME_MM;
-    if (portalGated && ootOracle.GetPortalOpen == nullptr) {
+    // Cross topology can bootstrap MM without the portal, but an MM-start player
+    // must still be able to reopen it after entering OOT without MM inventory.
+    const bool portalRequired = portalGated || (mmStart && ootAccess != OotAccess::NO_LOGIC);
+    if (portalRequired && ootOracle.GetPortalOpen == nullptr) {
         result.error = "OOT oracle is missing Combo_SOH_Rando_GetPortalOpen — rebuild soh.dll (the OOT->MM "
                        "portal cannot be gated without it)";
         return result;
@@ -295,6 +298,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Set when a dump carries pool[] but no category — a stale DLL, which would otherwise surface as an
     // unbalanceable pool ("no discardable junk") instead of the rebuild it actually needs.
     std::string missingCategory;
+    RpgMagicRules rpgMagic;
 
     auto parsePool = [&](Game game, const std::string& dumpJson) {
         auto d = ParseStaticDataDump(dumpJson, game == GAME_OOT ? "OOT" : "MM");
@@ -317,6 +321,11 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                 CwCat cat = CwCatFromName(it.value("category", std::string{}));
                 ++parsed;
                 withCategory += (cat != CwCat::UNKNOWN) ? 1 : 0;
+                // OoT owns RPG magic for both games. MM's native Fairy source
+                // remains in its solo dump, but is replaced by filler here.
+                // Fixed rewards and configured starting items are left intact.
+                if (rpgMagic.enabled && game == GAME_MM && IsNativeMmMagicItem(name))
+                    continue;
                 (adv ? advItems : junkItems).push_back({ game, name, adv, cat });
             }
             if (parsed > 0 && withCategory == 0)
@@ -327,6 +336,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             for (auto& c : d.value("checks", nlohmann::json::array())) {
                 std::string vi = c.value("vanillaItem", "");
                 if (vi.empty())
+                    continue;
+                if (rpgMagic.enabled && game == GAME_MM && IsNativeMmMagicItem(vi))
                     continue;
                 bool adv = c.value("advancement", true);
                 (adv ? advItems : junkItems).push_back({ game, vi, adv, adv ? CwCat::UNKNOWN : CwCat::JUNK });
@@ -376,6 +387,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     };
 
     try {
+        rpgMagic = ParseRpgMagicRules(sohDumpJson);
         parsePool(GAME_OOT, sohDumpJson);
         parsePool(GAME_MM, mmDumpJson);
         std::unordered_set<std::string> eligible;
@@ -523,6 +535,23 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     } catch (...) {} // Old/malformed dump fields leave categories disabled.
     const auto sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
     const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask, sohDumpJson, mmDumpJson);
+    // Sharing can retain an OOT pool item as MM's only progression source. Its
+    // delivery game stays OOT, but MM still needs a logically reachable pickup
+    // when OOT uses No Logic or beatable-only accessibility.
+    std::unordered_set<std::string> mmSharedOotItems;
+    if (rpgMagic.enabled)
+        mmSharedOotItems.insert(kRpgMagicItem);
+    for (const auto& group : sharedGroups) {
+        if (!std::any_of(group.names.begin(), group.names.end(),
+                         [](const CwSharedName& name) { return name.game == GAME_MM; }))
+            continue;
+        for (const auto& name : group.names)
+            if (name.game == GAME_OOT)
+                mmSharedOotItems.insert(name.name);
+    }
+    auto requiresMmLogic = [&](const CwItem& item) {
+        return item.game == GAME_MM || mmSharedOotItems.count(item.name) != 0;
+    };
     size_t dedupedCopies = 0;
     for (const auto& group : sharedGroups) {
         size_t target = 0, fixedCopies = 0;
@@ -711,27 +740,39 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         return out;
     };
 
-    // OOT-only, portal SHUT: nothing assumed from the free pool, MM never queried. Credits a placement
-    // only once its check is reachable — reachableFixpoint's rule, so this can't certify what it rejects.
+    // Start from an itemless OOT visit, with only native forced starting items.
+    // In cross mode preserve real foreign dungeon arrivals, but never root MM's
+    // overworld or assume its free pool. Every credited item earns its way in.
     struct OotClosedResult {
         std::unordered_set<std::string> reach;
         bool portalOpen = false;
     };
     auto ootClosedFixpoint = [&](const std::vector<CwPlacement>& pl,
                                  const std::vector<std::string>& extraOwned) -> OotClosedResult {
-        std::vector<std::string> owned = ootForcedOwned;
+        std::vector<std::string> owned = ootForcedOwned, mmOwned = mmForcedOwned;
         owned.insert(owned.end(), extraOwned.begin(), extraOwned.end());
         std::vector<bool> credited(pl.size(), false);
         OotClosedResult r;
         for (;;) {
-            r.reach = queryReachable(ootOracle, owned);
-            r.portalOpen = r.portalOpen || ootOracle.GetPortalOpen == nullptr || ootOracle.GetPortalOpen() != 0;
+            std::unordered_set<std::string> mmReach;
+            if (crossDungeon) {
+                std::vector<std::string> ootSeen, mmSeen;
+                SharedOwnedViews(sharedGroups, owned, mmOwned, ootSeen, mmSeen, rpgMagic);
+                auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen, false, queryReachable);
+                r.reach = std::move(joint.oot);
+                mmReach = std::move(joint.mm);
+                r.portalOpen = r.portalOpen || joint.portalOpen;
+            } else {
+                r.reach = queryReachable(ootOracle, owned);
+                r.portalOpen = r.portalOpen || ootOracle.GetPortalOpen == nullptr || ootOracle.GetPortalOpen() != 0;
+            }
             bool changed = false;
             for (size_t i = 0; i < pl.size(); ++i) {
-                if (credited[i] || pl[i].check.game != GAME_OOT || pl[i].item.game != GAME_OOT)
+                if (credited[i] || (!crossDungeon && (pl[i].check.game != GAME_OOT || pl[i].item.game != GAME_OOT)))
                     continue;
-                if (r.reach.count(pl[i].check.name)) {
-                    owned.push_back(pl[i].item.name);
+                const auto& reach = pl[i].check.game == GAME_OOT ? r.reach : mmReach;
+                if (reach.count(pl[i].check.name)) {
+                    (pl[i].item.game == GAME_OOT ? owned : mmOwned).push_back(pl[i].item.name);
                     credited[i] = true;
                     changed = true;
                 }
@@ -744,7 +785,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Portal prerequisites: a SUFFICIENT witness set for the OOT->MM portal, built FORWARD from empty.
     // RNG-free (canonical order) so it can't shift the seeded stream. See docs/deviations/rando.md.
     std::vector<std::string> portalPrereqs;
-    if (portalGated) {
+    if (portalRequired) {
         // Each probe is a fixpoint (several queries), so this bounds queries, not probes.
         const int kMaxDeriveQueries = 1500;
         const uint32_t queries0 = ootStats.count;
@@ -829,7 +870,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         bool portalOpen = !portalGated || mmStart;
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
-            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
+            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen, rpgMagic);
             if (crossDungeon) {
                 auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen,
                                                       mmStart || ootAccess == OotAccess::NO_LOGIC, queryReachable);
@@ -940,9 +981,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             bool placedAll = true;
             for (const auto& item : prereq) {
                 auto fr = ootClosedFixpoint(placements, {});
+                const auto confined = confinedChecks.find(itemKey(item));
                 std::vector<size_t> cands;
                 for (size_t ci = 0; ci < allChecks.size(); ++ci) {
                     if (allChecks[ci].game != GAME_OOT || filledChecks.count(checkKey(allChecks[ci])))
+                        continue;
+                    if (confined != confinedChecks.end() && !confined->second.count(allChecks[ci].name))
                         continue;
                     if (fr.reach.count(allChecks[ci].name))
                         cands.push_back(ci);
@@ -969,11 +1013,12 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         }
 
         // Phase A: place advancement items with logic, assuming only UNPLACED ones are owned. NO_LOGIC
-        // assumed-fills only MM adv (OOT adv rides Phase B's fast fill); other modes keep advItems as-is.
+        // still places every MM progression source, including retained OOT shared items. Only OOT-only,
+        // unconfined advancement may wait for Phase B; other modes keep advItems as-is.
         std::vector<CwItem> toPlace;
         if (ootAccess == OotAccess::NO_LOGIC) {
             for (const auto& it : advRest)
-                if (it.game == GAME_MM || confinedChecks.count(itemKey(it)))
+                if (requiresMmLogic(it) || confinedChecks.count(itemKey(it)))
                     toPlace.push_back(it);
         } else {
             toPlace = advRest;
@@ -1008,6 +1053,51 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             if (GenCancelled(progress)) {
                 result.error = "cancelled";
                 return result;
+            }
+            // Items sharing a native domain can have different logical access:
+            // a stone may need an early boss while a medallion can use any boss.
+            // Place the least flexible item first so broad access cannot consume
+            // the scarce checks. Keep shuffled order for ties and avoid extra
+            // queries when a domain contains only one distinct remaining item.
+            if (const auto current = confinedChecks.find(itemKey(toPlace.back())); current != confinedChecks.end()) {
+                const auto game = toPlace.back().game;
+                std::vector<size_t> group;
+                std::unordered_set<std::string> seen;
+                for (size_t cursor = toPlace.size(); cursor > 0; --cursor) {
+                    const size_t index = cursor - 1;
+                    const auto& item = toPlace[index];
+                    const auto key = itemKey(item);
+                    const auto domain = confinedChecks.find(key);
+                    if (item.game == game && domain != confinedChecks.end() && domain->second == current->second &&
+                        seen.insert(key).second)
+                        group.push_back(index);
+                }
+                if (group.size() > 1) {
+                    size_t best = group.front(), bestCount = allChecks.size() + 1;
+                    for (size_t index : group) {
+                        if (GenCancelled(progress)) {
+                            result.error = "cancelled";
+                            return result;
+                        }
+                        const auto& item = toPlace[index];
+                        auto ootProbe = ootRemaining, mmProbe = mmRemaining;
+                        removeOne(game == GAME_OOT ? ootProbe : mmProbe, item.name);
+                        const auto reachable = reachableFixpoint(ootProbe, mmProbe);
+                        const auto& reach = game == GAME_OOT ? reachable.ootReachable : reachable.mmReachable;
+                        size_t count = 0;
+                        for (const auto& check : allChecks)
+                            count += check.game == game && !filledChecks.count(checkKey(check)) &&
+                                     current->second.count(check.name) && reach.count(check.name);
+                        if (count < bestCount) {
+                            best = index;
+                            bestCount = count;
+                        }
+                        if (bestCount == 0)
+                            break;
+                    }
+                    if (best != toPlace.size() - 1)
+                        std::swap(toPlace[best], toPlace.back());
+                }
             }
             size_t k = std::min({ batchCap, std::max<size_t>(1, toPlace.size() / 4), toPlace.size() });
             if (confinedChecks.count(itemKey(toPlace.back())))
@@ -1044,10 +1134,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             }
 
             if (candidates.size() < batch.size()) {
-                // BEATABLE_ONLY: a single OOT advancement item with no reachable check may strand
+                // BEATABLE_ONLY: an OOT-only advancement item with no reachable check may strand
                 // off-path — move it to the junk fast-fill and continue (already removed from
-                // toPlace/ootRemaining above). MM items and ALL_REACHABLE always retry instead.
-                if (batch.size() == 1 && ootAccess == OotAccess::BEATABLE_ONLY && batch.front().game == GAME_OOT &&
+                // toPlace/ootRemaining above). MM progression sources and ALL_REACHABLE retry instead.
+                if (batch.size() == 1 && ootAccess == OotAccess::BEATABLE_ONLY && !requiresMmLogic(batch.front()) &&
                     !confinedChecks.count(itemKey(batch.front()))) {
                     relaxedToJunk.push_back(batch.front());
                     continue;
@@ -1090,7 +1180,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<CwItem> fastFillItems = junkItems;
         if (ootAccess == OotAccess::NO_LOGIC) {
             for (const auto& it : advRest)
-                if (it.game == GAME_OOT && !confinedChecks.count(itemKey(it)))
+                if (!requiresMmLogic(it) && !confinedChecks.count(itemKey(it)))
                     fastFillItems.push_back(it);
         }
         fastFillItems.insert(fastFillItems.end(), relaxedToJunk.begin(), relaxedToJunk.end());
@@ -1191,9 +1281,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         auto vf = reachableFixpoint({}, {});
         auto& ootFinal = vf.ootReachable;
         auto& mmFinal = vf.mmReachable;
-        // Classify unreachable advancement by ITEM game: MM adv unreachable is always fatal (MM must
-        // stay all-reachable); OOT adv unreachable is fatal only under ALL_REACHABLE, tolerated under
-        // the relaxed modes (it was placed off-logic on purpose).
+        // MM progression must stay reachable even when its retained shared source is tagged OOT.
+        // Only OOT-only advancement may be unreachable under the relaxed modes.
         size_t mmAdvUnreachable = 0, ootAdvUnreachable = 0, junkUnreachable = 0, junkUnreachableOot = 0;
         for (const auto& p : placements) {
             // Randomly confined native items still need a from-scratch check:
@@ -1207,7 +1296,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             if (reach.count(p.check.name))
                 continue;
             if (p.item.advancement) {
-                (p.item.game == GAME_MM ? mmAdvUnreachable : ootAdvUnreachable)++;
+                (requiresMmLogic(p.item) ? mmAdvUnreachable : ootAdvUnreachable)++;
                 std::cerr << "[ComboShip] unreachable advancement: item=" << static_cast<int>(p.item.game) << ":"
                           << p.item.name << " check=" << static_cast<int>(p.check.game) << ":" << p.check.name
                           << " nativeFixed=" << lockedCheckKeys.count(key) << "\n";
@@ -1272,7 +1361,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         }
         // #135: MM start frees the OOT root, so mmAdvUnreachable can't catch a portal that A0's fallback
         // paths left unopenable. Check directly: a strayed itemless player must always be able to walk back in.
-        if (mmStart && portalGated && !ootClosedFixpoint(placements, {}).portalOpen) {
+        if (mmStart && portalRequired && !ootClosedFixpoint(placements, {}).portalOpen) {
             lastPassError = "MM start: the OOT->MM portal is not re-openable from an empty OOT start";
             std::cerr << "[ComboShip] CrossWorldCombinedFill: " << lastPassError << " (pass " << pass << ", "
                       << passMs() << " ms) — retrying\n";

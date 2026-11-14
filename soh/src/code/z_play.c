@@ -1,3 +1,4 @@
+#include "../../../combo/audio/DinsFireSfx.h"
 #include "combo/rando/SongEventsBridge.h"
 #include "../../../combo/emotes/EmoteBridge.h"
 #include "ui_visibility.h"
@@ -265,6 +266,7 @@ Gfx* Play_SetFog(PlayState* play, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+    DinsFireSfx_UpdateContext(NULL);
     ComboEmotes_Reset();
 #ifdef COMBO_BUILD
     Combo_SOH_CancelCrossDungeonTransition();
@@ -790,6 +792,7 @@ void BoxMenu_Update(PlayState* play);
 void BoxMenu_Draw(PlayState* play);
 
 void Play_Update(PlayState* play) {
+    DinsFireSfx_UpdateContext(play);
     ComboEmotes_BeginUpdate(play);
     Input* input = play->state.input;
     s32 isPaused;
@@ -1270,6 +1273,8 @@ void Play_Update(PlayState* play) {
             }
 
             PLAY_LOG(3551);
+            /* Kaleido may change pause state during this update. */
+            DinsFireSfx_UpdateContext(play);
             isPaused = (play->pauseCtx.state != 0) || (play->pauseCtx.debugState != 0);
 
             PLAY_LOG(3555);

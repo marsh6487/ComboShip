@@ -44,6 +44,7 @@
  */
 
 #include "global.h"
+#include "mods/items/logic/adult_link_render.h"
 #include "libc/string.h"
 #include "z64malloc.h"
 #include "z64quake.h"
@@ -4529,6 +4530,13 @@ s32 Camera_KeepOn4(Camera* camera) {
     KeepOn4ReadOnlyData* roData = &camera->paramData.keep4.roData;
     KeepOn4ReadWriteData* rwData = &camera->paramData.keep4.rwData;
     f32 focalActorHeight;
+    f32 adultItemYOffset = 0.0f;
+    s32 adultItemPresentation = camera->setting == CAM_SET_ITEM0 &&
+                                camera->focalActor == &GET_PLAYER(camera->play)->actor &&
+                                AdultLink_UsesAdultItemPresentation((Player*)camera->focalActor);
+    s32 localOcarinaCamera = camera->setting == CAM_SET_ITEM1 && camera->focalActor == &GET_PLAYER(camera->play)->actor;
+    s32 adultOcarinaPresentation =
+        localOcarinaCamera && AdultLink_UsesAdultItemPresentation((Player*)camera->focalActor);
     s32 bgId;
     s16 camMode;
     Player* player;
@@ -4579,6 +4587,17 @@ s32 Camera_KeepOn4(Camera* camera) {
         focalActorHeight = Camera_GetFocalActorHeight(camera);
     }
 
+    if (adultItemPresentation || adultOcarinaPresentation) {
+        focalActorHeight = AdultLink_GetItemPresentationHeight();
+        adultItemYOffset = AdultLink_GetItemPresentationYOffset();
+        if (adultOcarinaPresentation) {
+            // The overlay draws the adult rig while MM still reports Human height (44).
+            // Keep native state height, sinking displacement and the ocarina table/lifecycle.
+            focalActorHeight += Player_GetHeight((Player*)camera->focalActor) - 44.0f;
+            focalActorHeight -= ((Player*)camera->focalActor)->unk_AB8 * camera->focalActor->scale.y;
+        }
+    }
+
     if (rwData->unk_18 != *sp44) {
         camera->animState = 20;
         Camera_SetStateFlag(camera, CAM_STATE_DISABLE_MODE_CHANGE);
@@ -4588,7 +4607,9 @@ s32 Camera_KeepOn4(Camera* camera) {
     }
 
     Camera_UnsetStateFlag(camera, CAM_STATE_4);
-    if (RELOAD_PARAMS(camera)) {
+    // ITEM1 dimensions may change with the local adult toggle/scale while open.
+    // Refresh read-only framing without restarting the native transition timer.
+    if (RELOAD_PARAMS(camera) || localOcarinaCamera) {
         values = sCameraSettings[camera->setting].cameraModes[camMode].values;
         new_var = -0.5f;
         roData->unk_00 = GET_NEXT_SCALED_RO_DATA(values) * focalActorHeight *
@@ -4602,6 +4623,19 @@ s32 Camera_KeepOn4(Camera* camera) {
         roData->interfaceFlags = GET_NEXT_RO_DATA(values);
         roData->unk_14 = GET_NEXT_SCALED_RO_DATA(values);
         roData->timer = GET_NEXT_RO_DATA(values);
+        if (adultItemPresentation) {
+            // SoH CAM_ITEM_TYPE_9. Keep MM's HUD/letterbox and lifecycle flags.
+            f32 normalizedHeight = 0.5f * (focalActorHeight + 68.0f);
+            roData->unk_00 = 0.1f * normalizedHeight;
+            roData->unk_04 = 0.5f * normalizedHeight;
+            roData->unk_08 = -20.0f;
+            roData->unk_0C = 0.0f;
+            roData->unk_10 = 0.0f;
+            roData->unk_18 = 60.0f;
+            roData->interfaceFlags |= KEEPON4_FLAG_3 | KEEPON4_FLAG_2 | KEEPON4_FLAG_1;
+            roData->unk_14 = 0.25f;
+            roData->timer = 6;
+        }
     }
 
     sUpdateCameraDirection = true;
@@ -4611,7 +4645,7 @@ s32 Camera_KeepOn4(Camera* camera) {
     data = &D_801EDDD0;
     spA8 = OLib_Vec3fDiffToVecGeo(at, eyeNext);
     D_801EDDD0 = focalActorPosRot->pos;
-    D_801EDDD0.y = data->y + focalActorHeight;
+    D_801EDDD0.y = data->y + focalActorHeight + adultItemYOffset;
     temp_f0_2 = BgCheck_CameraRaycastFloor2(&camera->play->colCtx, &spC0, &bgId, &D_801EDDD0);
 
     if ((roData->unk_00 + data->y) < temp_f0_2) {
@@ -5973,12 +6007,19 @@ s32 Camera_Demo2(Camera* camera) {
     s32 pad;
     u8 skipUpdateEye = false;
     f32 playerHeight = Player_GetHeight((Player*)camera->focalActor);
+    f32 adultItemYOffset = 0.0f;
     s16 angle;
     VecGeo* sp4C = D_801B9E64;
     Vec3f* sp48 = D_801B9E84;
     Actor* focalActor = camera->focalActor;
     Demo2ReadOnlyData* roData = &camera->paramData.demo2.roData;
     Demo2ReadWriteData* rwData = &camera->paramData.demo2.rwData;
+
+    if (camera->setting == CAM_SET_LONG_CHEST_OPENING && focalActor == &GET_PLAYER(camera->play)->actor &&
+        AdultLink_UsesAdultItemPresentation((Player*)focalActor)) {
+        playerHeight = AdultLink_GetItemPresentationHeight();
+        adultItemYOffset = AdultLink_GetItemPresentationYOffset();
+    }
 
     if (((focalActor == &GET_PLAYER(camera->play)->actor) &&
          (((Player*)focalActor)->transformation == PLAYER_FORM_GORON))) {
@@ -6065,8 +6106,8 @@ s32 Camera_Demo2(Camera* camera) {
             sp60 = (rwData->animFrame - 148) * 0.1f;
 
             sp64.x = LERPIMP(sp48[1].x, sp48[2].x, sp60);
-            sp64.y = LERPIMP((sp48[1].y - playerHeight), sp48[2].y, sp60);
-            sp64.y += playerHeight;
+            sp64.y = LERPIMP((sp48[1].y - playerHeight - adultItemYOffset), sp48[2].y, sp60);
+            sp64.y += playerHeight + adultItemYOffset;
             sp64.z = LERPIMP(sp48[1].z, sp48[2].z, sp60);
 
             atOffset = OLib_Vec3fToVecGeo(&sp64);
@@ -6089,7 +6130,7 @@ s32 Camera_Demo2(Camera* camera) {
 
             sp64.x = LERPIMP(sp48[2].x, sp48[3].x, sp60);
             sp64.y = LERPIMP(sp48[2].y, sp48[3].y, sp60);
-            sp64.y += playerHeight;
+            sp64.y += playerHeight + adultItemYOffset;
             sp64.z = LERPIMP(sp48[2].z, sp48[3].z, sp60);
 
             atOffset = OLib_Vec3fToVecGeo(&sp64);

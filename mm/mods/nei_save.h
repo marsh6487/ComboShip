@@ -125,8 +125,8 @@ typedef struct NeiSaveData {
     // MM adult trade-quest items (Skijer's NEI). Bitmask over a NEI trade index: 0-10 = the OoT items
     // (ITEM_POCKET_EGG..ITEM_CLAIM_CHECK), 11 = Moon's Tear, 12-15 = the four Title Deeds, 16 = Room Key,
     // 17 = Letter to Kafei, 18 = Special Delivery to Mama, 19 = Pendant of Memories. The 2D-grid wheel on
-    // SLOT_TRADE_ADULT shows every owned entry. This bitmask is the Pendant's ONLY ownership flag
-    // (2026-07-29: the ext BOOTS-2 bit it used to shadow belongs to the Climb Boots). See trade_items.c.
+    // 20-22 = Weird Egg, Chicken, Zelda's Letter. This is earned history; current availability
+    // also checks tradeAdultRevision. Pendant's permanent perk uses pendantOwned separately.
     uint32_t tradeAdultOwned;
     // (The NEI Pictograph Box block lived here — pictoboxOwned / pictoHasPhoto / pictoFlags0/1 /
     // pictoPhotoI5[11200]. REMOVED in 2ship: MM stores all of it natively, in this very layout, at
@@ -344,6 +344,11 @@ typedef struct NeiSaveData {
     uint8_t ritoMaskOwned;
     uint8_t ootWeaponUpgradesOwned; // only Hammer Axe (bit 0), True Master Sword (bit 3)
     uint8_t ritoMaskSelected;       // Solo MM's Bremen/Rito selector; ownership remains independent
+    // Current trade-copy availability, separate from earned/progression history.
+    // Even = available, odd = consumed; zero preserves legacy owned bits. Each
+    // real consume/reacquire advances the revision; peers merge by max so old
+    // ownership cannot resurrect a handed-in item. Append to preserve offsets.
+    uint32_t tradeAdultRevision[23];
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

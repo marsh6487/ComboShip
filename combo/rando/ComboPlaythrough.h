@@ -298,6 +298,7 @@ inline RequirednessResult PareDownPlaythrough(const std::string& spoilerJson, co
                                               const std::string& sharedPairsJson = "") {
     RequirednessResult result;
     auto placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
+    const auto rpgMagic = ParseRpgMagicRules(sohDumpJson);
     const auto sharedGroups =
         BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
                               SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
@@ -325,7 +326,7 @@ inline RequirednessResult PareDownPlaythrough(const std::string& spoilerJson, co
         bool portalOpen = !portalGated || mmStart;
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
-            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
+            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen, rpgMagic);
             if (ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess) {
                 const auto joint = jointMemo.Query(ootSeen, mmSeen);
                 ootReach = joint.oot;
@@ -476,6 +477,7 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
 
     using Placed = CwPlacedItem;
     std::vector<Placed> placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
+    const auto rpgMagic = ParseRpgMagicRules(sohDumpJson);
     const auto sharedGroups =
         BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
                               SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
@@ -500,7 +502,7 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
     bool portalOpen = !portalGated || mmStart;
     std::vector<std::string> ootSeen, mmSeen;
     for (int sphere = 0; sphere < kMaxSpheres; ++sphere) {
-        SharedOwnedViews(sharedGroups, ownedOot, ownedMm, ootSeen, mmSeen);
+        SharedOwnedViews(sharedGroups, ownedOot, ownedMm, ootSeen, mmSeen, rpgMagic);
         std::unordered_set<std::string> ootReach, mmReach;
         if (ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess) {
             auto joint =
@@ -572,7 +574,7 @@ inline PlaythroughResult RunPlaythrough(const std::string& spoilerJson, const Or
     std::vector<std::string> allOot, allMm;
     for (auto& p : placements)
         (p.itemGame == GAME_OOT ? allOot : allMm).push_back(p.item);
-    SharedOwnedViews(sharedGroups, allOot, allMm, ootSeen, mmSeen);
+    SharedOwnedViews(sharedGroups, allOot, allMm, ootSeen, mmSeen, rpgMagic);
     std::unordered_set<std::string> everReachOot, everReachMm;
     if (ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess) {
         auto joint =
@@ -678,13 +680,14 @@ inline nlohmann::json FindSariaMagicSphere(const std::string& spoilerJson, const
                                            const std::string& mmDumpJson, bool portalGated, bool mmStart,
                                            uint32_t sharedMask, const std::string& sharedPairsJson) {
     const auto placements = ParseSpoilerPlacements(spoilerJson, sohDumpJson, mmDumpJson);
+    const auto rpgMagic = ParseRpgMagicRules(sohDumpJson);
     const auto groups = BuildSharedItemGroups(ResolveSharedPairs(sharedPairsJson, mmDumpJson),
                                               SharedMaskForSpoiler(spoilerJson, sharedMask), sohDumpJson, mmDumpJson);
     std::vector<std::string> ownedOot, ownedMm, ootSeen, mmSeen;
     std::unordered_set<std::string> collected;
     bool portalOpen = !portalGated || mmStart;
     for (int sphere = 0; sphere < 200; ++sphere) {
-        SharedOwnedViews(groups, ownedOot, ownedMm, ootSeen, mmSeen);
+        SharedOwnedViews(groups, ownedOot, ownedMm, ootSeen, mmSeen, rpgMagic);
         std::unordered_set<std::string> ootReach, mmReach;
         if (ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess) {
             auto joint =

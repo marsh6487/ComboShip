@@ -19,6 +19,7 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
 #include "../ComboDoorKeyGi.h"
 #include "../NeiClockGI.h"
 #include "ComboSoulMiniOOT.h"
@@ -1037,9 +1038,9 @@ static int32_t OOT_FillSongDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     return 1;
 }
 
-static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
+static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out, const GetItemEntry* frozen = nullptr) {
     RandomizerGet actual = RG_NONE;
-    GetItemEntry gi = *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
+    GetItemEntry gi = frozen ? *frozen : *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
     // Self/base tiers also need a frozen name (Cane, Roc, Stone of Agony).
     // Otherwise a repeat receipt could ask the donor to describe its next tier.
     out->resolvedName = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg).GetName().english.c_str();
@@ -1242,6 +1243,46 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
         // Keep appearance-only refreshes live after acquisition freezes progressive tiers.
         out->stateDependent = OOT_DrawDependency(rg, *out);
         return 1;
+    } catch (...) { return 0; }
+}
+
+// Startup receipts describe the captured entry even when its canonical name
+// also names a progressive base tier (Cane, Roc or Stone of Agony).
+extern "C" COMBO_EXPORT int32_t OOT_GetFrozenItemDrawInfo(const CwStartupReceipt* receipt, CwItemDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT frozen startup-DrawInfo", -1, -1, true);
+    try {
+        if (!receipt || !out || receipt->version != CW_STARTUP_RECEIPT_VERSION || receipt->state != CW_STARTUP_READY ||
+            receipt->itemGame != 0 || !std::memchr(receipt->itemName, 0, sizeof(receipt->itemName)))
+            return 0;
+        const auto named = Rando::StaticData::itemNameToEnum.find(receipt->itemName);
+        if (named == Rando::StaticData::itemNameToEnum.end())
+            return 0;
+        const auto rg = named->second;
+        const auto drawRg =
+            receipt->drawModIndex == MOD_RANDOMIZER ? static_cast<RandomizerGet>(receipt->drawItemId) : rg;
+        if (rg == RG_NONE || rg == RG_COMBO_FOREIGN || rg == RG_SOLD_OUT || rg == RG_HINT ||
+            OOT_BossSoulUsesSkeleton(drawRg) || ComboSoulMiniOOT::UsesDetailed(static_cast<int32_t>(drawRg)))
+            return 0;
+        if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandomizer || !OTRGlobals::Instance->gRandoContext)
+            return CW_DRAW_NOT_READY;
+        const auto raw = Rando::StaticData::RetrieveItem(rg).GetGIEntryUnresolved();
+        if (!raw || raw->modIndex != receipt->modIndex || raw->tableId != receipt->tableId ||
+            raw->getItemId != receipt->getItemId || raw->itemId != receipt->itemId)
+            return 0;
+        GetItemEntry frozen = *raw;
+        frozen.objectId = receipt->objectId;
+        frozen.field = receipt->field;
+        frozen.gi = receipt->gi;
+        frozen.gid = receipt->gid;
+        frozen.drawItemId = receipt->drawItemId;
+        frozen.drawModIndex = receipt->drawModIndex;
+        if (!ComboStartupOot_RestoreFrozenDraw(receipt, &frozen))
+            return 0;
+        *out = CwItemDrawInfo{};
+        const auto result = OOT_FillItemDrawInfo(rg, out, &frozen);
+        if (result == 1)
+            out->stateDependent = OOT_DrawDependency(rg, *out) ? 2 : 0;
+        return result;
     } catch (...) { return 0; }
 }
 
@@ -1549,6 +1590,23 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemAnimDrawInfo(const char* itemName, Cw
             return 0;
         *out = CwItemAnimDrawInfo{};
         return OOT_FillBossSoulAnim((int)it->second - (int)RG_GOHMA_SOUL, out);
+    } catch (...) { return 0; }
+}
+
+// Animated startup disguises are addressed by the captured draw identity,
+// rather than the owner item's name (for example Ice Trap -> Gohma Soul).
+// The animated owner catalog has no progressive conversion path.
+extern "C" COMBO_EXPORT int32_t OOT_GetFrozenItemAnimDrawInfo(const CwStartupReceipt* receipt,
+                                                              CwItemAnimDrawInfo* out) {
+    try {
+        if (!receipt || !out || receipt->version != CW_STARTUP_RECEIPT_VERSION || receipt->state != CW_STARTUP_READY ||
+            receipt->itemGame != 0 || receipt->drawModIndex != MOD_RANDOMIZER || receipt->drawItemId <= RG_NONE ||
+            receipt->drawItemId >= RG_MAX)
+            return 0;
+        const auto& draw = Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(receipt->drawItemId));
+        if (!draw.GetGIEntryUnresolved() || draw.GetName().english.empty())
+            return 0;
+        return OOT_GetItemAnimDrawInfo(draw.GetName().english.c_str(), out);
     } catch (...) { return 0; }
 }
 

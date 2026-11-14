@@ -58,12 +58,12 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .events = {
             // Can either play the song for the Goron child to light torches then use sticks, or shoot the chandelier with fire arrows to skip needing the song(or I guess the small torches themselves, same result)
-            EVENT(RE_SPAWN_SIRLOIN, ((SoulItemRequirement(RI_SOUL_NPC_GORON_CHILD) && CAN_PLAY_SONG(LULLABY) && HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))) && CAN_BE_GORON && HAS_MAGIC),
+            EVENT(RE_SPAWN_SIRLOIN, ((SoulItemRequirement(RI_SOUL_NPC_GORON_CHILD) && CAN_PLAY_SONG(LULLABY) && HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))) && CAN_GORON_SPIKE_ROLL),
         },
     };
     Regions[RR_GORON_RACETRACK] = RandoRegion{ .sceneId = SCENE_GORONRACE,
         .checks = {
-            CHECK(RC_GORON_RACETRACK_GOLD_DUST, CAN_BE_GORON && HAS_MAGIC && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            CHECK(RC_GORON_RACETRACK_GOLD_DUST, CAN_GORON_SPIKE_ROLL && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
             CHECK(RC_GORON_RACETRACK_POT_01, true),
             CHECK(RC_GORON_RACETRACK_POT_02, true),
             CHECK(RC_GORON_RACETRACK_POT_03, true),
@@ -109,7 +109,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(PATH_TO_GORON_VILLAGE_WINTER, 2),     ENTRANCE(GORON_RACETRACK, 0), true),
         },
         .events = {
-            EVENT(RE_ACCESS_GOLD_DUST, CAN_BE_GORON && HAS_MAGIC && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
+            EVENT(RE_ACCESS_GOLD_DUST, CAN_GORON_SPIKE_ROLL && Combo_MM_CrossBossLogicalClear(9, RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE])),
         }
     };
     Regions[RR_GORON_SHOP] = RandoRegion{ .sceneId = SCENE_GORONSHOP,
@@ -541,7 +541,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 4),      ENTRANCE(PATH_TO_SNOWHEAD, 0), true),
         },
         .connections = {
-            CONNECTION(RR_PATH_TO_SNOWHEAD_MIDDLE, CAN_BE_GORON && HAS_MAGIC),
+            CONNECTION(RR_PATH_TO_SNOWHEAD_MIDDLE, CAN_GORON_SPIKE_ROLL),
         },
     };
     Regions[RR_PATH_TO_SNOWHEAD_MIDDLE] = RandoRegion{ .sceneId = SCENE_14YUKIDAMANOMITI,
@@ -552,8 +552,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ENEMY_DROP_KEESE, CanKillEnemy(ACTOR_EN_FIREFLY)),
         },
         .connections = {
-            CONNECTION(RR_PATH_TO_SNOWHEAD_LOWER, CAN_BE_GORON && HAS_MAGIC),
-            CONNECTION(RR_PATH_TO_SNOWHEAD_UPPER, CAN_BE_GORON && HAS_MAGIC),
+            CONNECTION(RR_PATH_TO_SNOWHEAD_LOWER, CAN_GORON_SPIKE_ROLL),
+            CONNECTION(RR_PATH_TO_SNOWHEAD_UPPER, CAN_GORON_SPIKE_ROLL),
         },
     };
     Regions[RR_PATH_TO_SNOWHEAD_UPPER] = RandoRegion{ .sceneId = SCENE_14YUKIDAMANOMITI,
@@ -572,7 +572,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(GROTTOS, 25),                     ENTRANCE(PATH_TO_SNOWHEAD, 1), CAN_USE_EXPLOSIVE),
         },
         .connections = {
-            CONNECTION(RR_PATH_TO_SNOWHEAD_MIDDLE, CAN_BE_GORON && HAS_MAGIC),
+            CONNECTION(RR_PATH_TO_SNOWHEAD_MIDDLE, CAN_GORON_SPIKE_ROLL),
         },
     };
     Regions[RR_SNOWHEAD_GREAT_FAIRY_FOUNTAIN] = RandoRegion{ .sceneId = SCENE_YOUSEI_IZUMI,

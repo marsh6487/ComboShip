@@ -38,6 +38,22 @@ extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { nei.ownedItems[s
 static uint16_t ExtInv_GetSlotItem(int slot) { return Nei_GetOwnedItem(slot); }
 '''
 
+TRADE_BOUNDARY = r'''
+// These button-transfer cases own only the listed non-trade items. Fail if a
+// later case reaches this boundary with another identity; trade mapping and
+// consumed-copy revisions are exercised by tests/trade_consumption.
+int TradeAdult_IndexOfItem(uint8_t item) {
+    assert((item == NATIVE_STICK || item == NATIVE_BOW || item == NATIVE_BOMB ||
+            item == ITEM_TIME_GATE || item == 0xD0) &&
+           "unexpected item at the button-transfer non-trade boundary");
+    return -1;
+}
+uint8_t TradeAdult_IsConsumedIndex(int index) {
+    assert(index == -1 && "trade state is outside the button-transfer fixture");
+    return 0;
+}
+'''
+
 COMMON_CHECKS = r'''
 static void own() {
     nei.ownedItems[3]=0xD0; // elemental-wand cell 27 in both games
@@ -315,7 +331,7 @@ def main():
                 production += "\n"+function(inventory,"TravelTools_IsOwned")
             if host=="mm": production += "\n"+function(sync,"MmButtonCanonical")
             production += "\n"+"\n".join(function(sync,n) for n in ("ExtractEquips","FindInvSlot","ApplyOneButton","ApplyEquips","NetResetBaseline"))
-            code=PREFIX+(MM if host=="mm" else OOT)+production+COMMON_CHECKS
+            code=PREFIX+(MM if host=="mm" else OOT)+TRADE_BOUNDARY+production+COMMON_CHECKS
             flags=["-std=c++20","-w","-DF3DEX_GBI_2","-DCOMBO_BUILD","-DCONTROLLERBUTTONS_T=uint32_t"]
             flags += ["-I"+str(ROOT/p) for p in (host,host+"/include",host+"/include/PR",host+"/src",host+"/assets",host+"/2s2h","libultraship/include","combo","combo/menu",fleet)]
             flags += ["-I"+str(args.json_include)]

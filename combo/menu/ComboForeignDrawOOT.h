@@ -19,6 +19,7 @@
 #ifndef COMBO_FOREIGN_DRAW_OOT_H
 #define COMBO_FOREIGN_DRAW_OOT_H
 #include "ComboMagicMirrorForeign.h"
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
 #include "ComboSoulModelSettings.h"
 #include "../NeiClockGI.h"
 
@@ -102,11 +103,14 @@ inline const char* ComboInternRoutedPath(const std::string& s) {
 // not resident, foreign map not built, MM's rando state null), which must NEVER be negative-cached.
 enum class ComboForeignResolve { Ok, Unknown, NotReady };
 
-inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot, ComboForeignDrawInfo& info) {
-    const std::string checkName = Rando::StaticData::GetLocation(rc)->GetName();
-    const ComboRando::ForeignItem* fi = OOT_LookupForeign(slot, checkName);
-    if (fi == nullptr || fi->itemGame != ComboRando::GAME_MM) {
-        return ComboForeignResolve::Unknown;
+inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot, ComboForeignDrawInfo& info,
+                                                    const char* frozenName = nullptr) {
+    const ComboRando::ForeignItem* fi = nullptr;
+    if (!frozenName) {
+        const std::string checkName = Rando::StaticData::GetLocation(rc)->GetName();
+        fi = OOT_LookupForeign(slot, checkName);
+        if (fi == nullptr || fi->itemGame != ComboRando::GAME_MM)
+            return ComboForeignResolve::Unknown;
     }
 
     static Fn_GetItemDrawInfo sGetItemDrawInfo = nullptr;
@@ -119,7 +123,9 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     }
     // A disguised trap must draw the item it pretends to be. Same namespace, so the itemGame dispatch
     // above is unaffected. Not state-dependent: like OOT, the disguise holds until the get-item cutscene.
-    const char* drawName = fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str();
+    const char* drawName = frozenName          ? frozenName
+                           : fi->HasDisguise() ? fi->fakeItemName.c_str()
+                                               : fi->itemName.c_str();
     CwItemDrawInfo raw{};
     int32_t rcStatic = sGetItemDrawInfo(drawName, &raw);
     const int32_t baseChoice = ComboSwordGi_SelectBaseAssets(raw, ResourceMgr_IsAltAssetsEnabled());
@@ -225,6 +231,23 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     }
     info.ok = true;
     return ComboForeignResolve::Ok;
+}
+
+// Startup receipts carry a concrete owner name. This cache never reads the
+// originating check or the grant-time latch; changed inventory cannot advance it.
+inline const ComboForeignDrawInfo* ComboResolveFrozenForeignDrawInfo(const char* name) {
+    if (!name || !*name)
+        return nullptr;
+    static std::unordered_map<std::string, ComboForeignDrawInfo> recipes;
+    auto it = recipes.find(name);
+    if (it != recipes.end() && !it->second.appearanceDependent)
+        return &it->second;
+    ComboForeignDrawInfo info{};
+    if (ComboFillForeignDrawInfo(RC_UNKNOWN_CHECK, gSaveContext.fileNum, info, name) != ComboForeignResolve::Ok)
+        return nullptr;
+    // Only concrete names reach this path. Palette/Alt state may remain live.
+    recipes[name] = std::move(info);
+    return &recipes.at(name);
 }
 
 // Recipe cache, swept per save slot and per foreign-map generation. Shared by the resolver and the
@@ -1070,14 +1093,16 @@ inline void OOT_DrawForeignNativeEquipment(PlayState* play, GetItemEntry* entry,
 // failure falls back to the sentinel (the RG_COMBO_FOREIGN entry's blue rupee), so we never draw
 // blank. Mirror of MM_DrawComboForeign (combo/menu/ComboForeignDrawMM.h).
 inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bool shop = false) {
-    RandomizerCheck rc = (RandomizerCheck)getItemEntry->comboForeignCheck;
-    if (rc == RC_UNKNOWN_CHECK) {
-        // Defensive: entries not built via GetFinalGIEntry carry no check; the queued get-item
-        // check is the only other identity source.
-        rc = OOT_GetQueuedDrawCheck();
+    const ComboForeignDrawInfo* info = nullptr;
+    if (ComboStartupOot_IsReceipt(getItemEntry)) {
+        const char* frozen = ComboStartupOot_FrozenForeignName(getItemEntry);
+        info = frozen ? ComboResolveFrozenForeignDrawInfo(frozen) : nullptr;
+    } else {
+        RandomizerCheck rc = (RandomizerCheck)getItemEntry->comboForeignCheck;
+        if (rc == RC_UNKNOWN_CHECK)
+            rc = OOT_GetQueuedDrawCheck();
+        info = rc != RC_UNKNOWN_CHECK ? ComboResolveForeignDrawInfo(rc) : nullptr;
     }
-
-    const ComboForeignDrawInfo* info = (rc != RC_UNKNOWN_CHECK) ? ComboResolveForeignDrawInfo(rc) : nullptr;
     if (info == nullptr) {
         GetItem_Draw(play, getItemEntry->gid);
         return;

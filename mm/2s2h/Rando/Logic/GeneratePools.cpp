@@ -391,7 +391,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L1 Goron Bracelet
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L2 Silver Gauntlets
             itemPool.push_back(RI_OOT_PROGRESSIVE_STRENGTH); // L3 Gold Gauntlets
-            itemPool.push_back(RI_OOT_ROCS_FEATHER);         // ship-vanilla feather (Nayru's slot)
+            // Modern combined seeds get the native Feather from OoT's own
+            // setting-controlled pool. Keep this fallback for MM-only seeds.
+            if (!Combo_IsCombinedGame()) {
+                itemPool.push_back(RI_OOT_ROCS_FEATHER); // ship-vanilla feather (Nayru's slot)
+            }
         }
         if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_EQUIPMENT] == RO_GENERIC_YES) {
             itemPool.push_back(RI_OOT_EXT_CANE_OF_BYRNA);
@@ -740,24 +744,14 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_NEI_HYLIAS_GRACE);
         }
 
-        // BOTH Roc's Feathers. They are DIFFERENT items sharing nothing but a name, and each has to
-        // be findable on its own:
-        //
-        //   RI_OOT_PROGRESSIVE_ROC -> Skijer's feather, page 2 / SLOT_ROCS, 2 levels (feather -> cape)
-        //   RI_OOT_ROCS_FEATHER    -> the ship-vanilla one that shares the Nayru's Love cell
-        //
-        // Neither could be placed before this. The Skijer Roc was fully plumbed (item table, GiveItem,
-        // DrawItem, an FC row) but appeared in no pool at all, so no seed ever contained it. The
-        // vanilla one was pooled only inside the combo-only branch above, so a solo-MM seed never had
-        // it either. Two copies for the Skijer Roc, matching its two chain levels — same shape as the
-        // Dual Cane below. Skijer's NEI
+        // The NEI Roc chain is separate from SoH's native Feather in Nayru's
+        // Love slot. Preserve both progressive levels in every NEI item pool.
         itemPool.push_back(RI_OOT_PROGRESSIVE_ROC); // L1 Roc's Feather (Skijer)
         itemPool.push_back(RI_OOT_PROGRESSIVE_ROC); // L2 Roc's Cape
 
-        // The combo branch above already puts the ship-vanilla feather in MM's pool (it is an OoT-side
-        // item that has to be there for cross-placement), so only add it here when running solo —
-        // otherwise a combo seed would place two of them.
-        if (!FleetCombo_UnifiedPoolActive()) {
+        // The modern combined fill takes native Feather supply from OoT's
+        // setting-controlled pool; legacy unified supply is already above.
+        if (!Combo_IsCombinedGame() && !FleetCombo_UnifiedPoolActive()) {
             itemPool.push_back(RI_OOT_ROCS_FEATHER);
         }
 

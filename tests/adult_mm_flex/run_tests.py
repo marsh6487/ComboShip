@@ -152,7 +152,8 @@ def main():
     graphics = (ROOT / "mm/src/code/stubs.c").read_text()
     production = re.search(r"static const char\* sLimbNearDL\[.*?\n};", adult, re.S)[0] + "\n"
     production += "\n".join(re.findall(r"^static Gfx\* sDL_\w+;[^\n]*", adult, re.M)) + "\n"
-    for name in ("AdultLink_LoadDL", "AdultLink_Setup", "AdultLink_ApplyNeiHeldHand", "AdultLink_OverrideLimb"):
+    for name in ("AdultLink_LoadDL", "AdultLink_LoadModelDL", "AdultLink_Setup", "AdultLink_ApplyNeiHeldHand",
+                 "AdultLink_ApplyRootTransform", "AdultLink_OverrideLimb"):
         production += function(adult, name) + "\n"
     production += 'extern "C" {\n'
     for name in ("Player_ShouldHideBackEquipment", "Player_ApplyBackEquipmentVisibility"):

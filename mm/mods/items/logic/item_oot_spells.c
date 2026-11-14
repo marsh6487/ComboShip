@@ -41,6 +41,11 @@
 #include "expansions/sw97/sw97_config.h" // SW97_MEDALLIONS_ENABLED
 #include "../../extended_equipment.h"    // MAGIC_REQ (Magic Cape halves spell cost)
 #include "gameplay/ComboFaroresWind.h"
+#define CW_DINS_HOST_MM
+#include "../../../../combo/render/DinsFireRemakeDraw.h"
+#include "../../../../combo/render/DinsFireNative.h"
+#include "../../../../combo/audio/DinsFireSfx.h"
+#undef CW_DINS_HOST_MM
 
 // ---------------------------------------------------------------------------
 // z_player.c internals (defined later in this TU) — forward declarations
@@ -127,6 +132,11 @@ static u8 sOotMagicSpellCosts[] = { 12, 24, 24, 12, 24, 12 };
 
 // Whether the pending/active cast came from an SW97 medallion (OoT fork sSw97SpellActive).
 static u8 sOotSw97SpellActive = false;
+// The chosen cast path survives live setting/resource changes until recovery.
+static s32 sDinsFireRemakeCast = false;
+static s16 sDinsFireRemakeCastTicks = 0;
+static s32 sDinsFireRemakePendingMagic = false;
+static uint32_t sDinsFireRemakeAudioHandle = 0;
 
 // Set while a Farore's Wind "Return" transition is in flight; consumed by OotSpells_OnPlayerInit
 // to run the warp-in arrival on the other side.
@@ -238,6 +248,15 @@ static OotSpellsAnimSfx sOotSpellVoiceSfx[6][2] = {
       { NA_SE_VO_LI_MAGIC_NALE, OOT_SPELL_ANIMSFX_END(OOT_SPELL_SFXTYPE_VOICE, 44) } },
 };
 
+/* Remake-only lists preserve MM's native voice and floor callbacks. */
+static OotSpellsAnimSfx sDinsFireRemakeChargeSfx[] = {
+    { NA_SE_VO_LI_SWORD_N, OOT_SPELL_ANIMSFX_GO(OOT_SPELL_SFXTYPE_VOICE, 20) },
+    { NA_SE_PL_WALK_GROUND, OOT_SPELL_ANIMSFX_END(OOT_SPELL_SFXTYPE_FLOOR, 26) },
+};
+static OotSpellsAnimSfx sDinsFireRemakeStrikeSfx[] = {
+    { NA_SE_VO_LI_MAGIC_ATTACK, OOT_SPELL_ANIMSFX_END(OOT_SPELL_SFXTYPE_VOICE, 20) },
+};
+
 // Chain forward declarations.
 void Player_Action_OotMagicSpell(Player* this, PlayState* play);
 void Player_Action_OotFwMenu(Player* this, PlayState* play);
@@ -268,8 +287,16 @@ Actor* OotSpells_SpawnMagicSpell(PlayState* play, Player* this, s32 spell) {
 
     // params only matters for Farore's Wind (0 = cast-grow swirl, 1 = warp shrink-in). Din's / Nayru's
     // ignore params (they branch on actor id). Farore's cast = spell 0 = params 0.
-    return Actor_Spawn(&play->actorCtx, play, sMagicSpellActorIds[spell], this->actor.world.pos.x,
-                       this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, (spell == 0) ? 0 : 1);
+    s32 nativeDin = sDinsFireRemakeCast && this->actionFunc == Player_Action_OotMagicSpell && spell == 2;
+    Actor* actor = Actor_Spawn(&play->actorCtx, play, sMagicSpellActorIds[spell], this->actor.world.pos.x,
+                               this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0,
+                               nativeDin      ? CW_DINS_NATIVE_CAST_PARAMS
+                               : (spell == 0) ? 0
+                                              : 1);
+    if (actor != NULL && nativeDin) {
+        actor->parent = &this->actor;
+    }
+    return actor;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,10 +312,12 @@ s32 OotSpells_TryUseItem(PlayState* play, Player* this, s32 itemAction, s32 item
 
     // Self-heal a cast that was cut short before releasing its magic/CS state (e.g. a scene load or
     // death mid-animation): TryUseItem is only reached when Link has NORMAL control, so a lingering
-    // non-IDLE magic state is always stale here and would otherwise error-lock every future spell.
-    // The Lens of Truth drain (CONSUME_LENS) is a legitimate ongoing state — leave it be.
+    // non-IDLE magic state can be stale. The Lens drain and a live lingering Din
+    // actor legitimately own magic after Link regains control; leave both intact.
+    // A linked killed actor keeps ownership until its destroy callback resets it.
     if ((this->actionFunc != Player_Action_OotMagicSpell) && (gSaveContext.magicState != MAGIC_STATE_IDLE) &&
-        (gSaveContext.magicState != MAGIC_STATE_CONSUME_LENS)) {
+        (gSaveContext.magicState != MAGIC_STATE_CONSUME_LENS) &&
+        !CwDinsNative_HasMagicOwner(play, &this->actor, ACTOR_OOT_DINS_FIRE)) {
         Magic_Reset(play);
         sOotSw97SpellActive = false;
         this->stateFlags1 &= ~(PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
@@ -336,6 +365,38 @@ s32 OotSpells_TryUseItem(PlayState* play, Player* this, s32 itemAction, s32 item
 // ---------------------------------------------------------------------------
 // Cast setup — OoT func_8083AF44 (z_player.c:6614)
 // ---------------------------------------------------------------------------
+static void OotSpells_ReleasePendingDinMagic(PlayState* play, Player* this) {
+    // A forced action change can precede actor spawn. Only release a reservation
+    // this native cast actually obtained; linked actors retain cleanup ownership.
+    if (this->actionFunc == Player_Action_OotMagicSpell) {
+        DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+        sDinsFireRemakeAudioHandle = 0;
+    }
+    if (this->actionFunc == Player_Action_OotMagicSpell && sDinsFireRemakePendingMagic) {
+        sDinsFireRemakePendingMagic = false;
+        if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2 &&
+            !CwDinsNative_HasMagicOwner(play, &this->actor, ACTOR_OOT_DINS_FIRE)) {
+            Magic_Reset(play);
+        }
+    }
+}
+
+static void Player_DinsFireRemakeSetDuration(Player* this, PlayState* play, f32 endFrame, s32 ticks) {
+    f32 updateRate = (s32)play->state.framerateDivisor * 0.5f;
+
+    if (endFrame > this->skelAnime.endFrame) {
+        endFrame = this->skelAnime.endFrame;
+    }
+    this->skelAnime.endFrame = endFrame;
+    this->skelAnime.playSpeed = endFrame / (ticks * ((updateRate > 0.0f) ? updateRate : 1.5f));
+}
+
+static void Player_DinsFireRemakeProtect(Player* this) {
+    if (this->invincibilityTimer >= 0 && this->invincibilityTimer < 2) {
+        this->invincibilityTimer = 2;
+    }
+}
+
 static void OotSpells_SetupCast(PlayState* play, Player* this, s32 magicSpell) {
     // Skijer's NEI safety net: IAs 0x55..0x57 (magicSpell 0..2) exist ONLY as SW97 medallion spells —
     // there is no vanilla av1 slot for them (av1 = magicSpell - 3 would go NEGATIVE and hard-lock the
@@ -347,20 +408,48 @@ static void OotSpells_SetupCast(PlayState* play, Player* this, s32 magicSpell) {
     Player_SetAction_PreserveItemAction(play, this, Player_Action_OotMagicSpell, 0);
     this->av1.actionVar1 = sOotSw97SpellActive ? magicSpell : (magicSpell - 3);
     this->av2.actionVar2 = 0;
+    sDinsFireRemakeCast =
+        !sOotSw97SpellActive && magicSpell == 5 && this->itemAction == PLAYER_IA_DINS_FIRE && CwDins_Ready() &&
+        OotSpells_GetAnim(OOT_SPELL_ANIM_TAME) != (PlayerAnimationHeader*)gPlayerAnim_link_normal_wait &&
+        OotSpells_GetAnim(OOT_SPELL_ANIM_TAMASHII1) != (PlayerAnimationHeader*)gPlayerAnim_link_normal_wait &&
+        OotSpells_GetAnim(OOT_SPELL_ANIM_TAMASHII3) != (PlayerAnimationHeader*)gPlayerAnim_link_normal_wait;
+    sDinsFireRemakeCastTicks = 0;
 
-    // Make the WHOLE cast uninterruptible: IN_ITEM_CS | IN_CUTSCENE make Player_InBlockingCsMode()
+    // Legacy spells keep their existing cast protection. Remake Din uses only
+    // a bounded player timer: these flags also freeze world actor categories.
+    // IN_ITEM_CS | IN_CUTSCENE make Player_InBlockingCsMode()
     // true (z_player_lib.c:662), so the AC-damage gate (z_player.c func_80834600 etc.) skips Link.
     // OoT set these only when the spell spawned (phase B), leaving the "tame" charge (phase A)
     // exposed — a hit there switched Link's action away from the cast before it released the magic +
     // CS state, stranding magicState != IDLE and error-locking every future spell. Released at the
     // end of the cast in Player_Action_OotMagicSpell.
-    this->stateFlags1 |= (PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+    if (sDinsFireRemakeCast) {
+        Player_DinsFireRemakeProtect(this);
+    } else {
+        this->stateFlags1 |= (PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+    }
 
     // OoT Magic_RequestChange(play, cost, MAGIC_CONSUME_WAIT_PREVIEW): reserve + meter flash;
     // the actual drain starts when the spell spawns (MAGIC_STATE_CONSUME_SETUP below).
-    Magic_Consume(play, MAGIC_REQ(sOotMagicSpellCosts[magicSpell]), MAGIC_CONSUME_WAIT_PREVIEW);
+    s32 magicReserved = Magic_Consume(play, MAGIC_REQ(sOotMagicSpellCosts[magicSpell]), MAGIC_CONSUME_WAIT_PREVIEW);
+    sDinsFireRemakePendingMagic = sDinsFireRemakeCast && magicReserved;
+
+    if (sDinsFireRemakeCast && !magicReserved) {
+        this->stateFlags1 &= ~(PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+        sDinsFireRemakeCast = false;
+        func_80836988(this, play);
+        return;
+    }
+
+    if (sDinsFireRemakeCast) {
+        sDinsFireRemakeAudioHandle =
+            DinsFireSfx_Begin(play, this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z);
+    }
 
     PlayerAnimation_PlayOnceSetSpeed(play, &this->skelAnime, OotSpells_GetAnim(OOT_SPELL_ANIM_TAME), 0.83f);
+    if (sDinsFireRemakeCast) {
+        Player_DinsFireRemakeSetDuration(this, play, this->skelAnime.endFrame, CW_DINS_NATIVE_CHARGE_TICKS);
+    }
 
     // OoT: Din's (magicSpell == 5) starts a OnePointCutscene pull-back camera; the other spells
     // call func_80835EA4(play, 10). Neither system exists in MM (CutsceneManager architecture) —
@@ -395,7 +484,70 @@ s32 OotSpells_HandleCsItem(Player* this, PlayState* play) {
 // ---------------------------------------------------------------------------
 // The 4-phase cast action — OoT Player_Action_808507F4 (z_player.c:17044) 1:1.
 // ---------------------------------------------------------------------------
+static void Player_UpdateDinsFireRemakeCast(Player* this, PlayState* play) {
+    const s32 releaseTick = CW_DINS_NATIVE_CHARGE_TICKS + CW_DINS_NATIVE_STRIKE_TICKS;
+
+    sDinsFireRemakeCastTicks++;
+    Player_DinsFireRemakeProtect(this);
+    if (sDinsFireRemakeCastTicks == releaseTick + 1) {
+        PlayerAnimation_PlayOnceSetSpeed(play, &this->skelAnime, OotSpells_GetAnim(sOotSpellLowerAnims[2]), 0.83f);
+        Player_DinsFireRemakeSetDuration(this, play, this->skelAnime.endFrame, CW_DINS_NATIVE_RECOVERY_TICKS);
+        this->av2.actionVar2 = 2;
+    }
+    PlayerAnimation_Update(play, &this->skelAnime);
+
+    if (sDinsFireRemakeCastTicks <= CW_DINS_NATIVE_CHARGE_TICKS) {
+        Player_PlayAnimSfx(this, (struct AnimSfxEntry*)sDinsFireRemakeChargeSfx);
+        if (sDinsFireRemakeCastTicks == CW_DINS_NATIVE_CHARGE_TICKS) {
+            PlayerAnimation_PlayOnceSetSpeed(play, &this->skelAnime, OotSpells_GetAnim(sOotSpellRaiseAnims[2]), 0.83f);
+            Player_DinsFireRemakeSetDuration(this, play, CW_DINS_NATIVE_RELEASE_FRAME, CW_DINS_NATIVE_STRIKE_TICKS - 1);
+            if (OotSpells_SpawnMagicSpell(play, this, 2) == NULL) {
+                DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+                sDinsFireRemakeAudioHandle = 0;
+                sDinsFireRemakePendingMagic = false;
+                Magic_Reset(play);
+                this->stateFlags1 &= ~(PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+                sDinsFireRemakeCast = false;
+                func_80836988(this, play);
+                return;
+            }
+            sDinsFireRemakePendingMagic = false;
+            gSaveContext.magicState = MAGIC_STATE_CONSUME_SETUP;
+            this->av2.actionVar2 = 1;
+        }
+    } else if (sDinsFireRemakeCastTicks <= releaseTick) {
+        Player_PlayAnimSfx(this, (struct AnimSfxEntry*)sDinsFireRemakeStrikeSfx);
+        if (sDinsFireRemakeCastTicks == releaseTick - 1) {
+            CwDinsNative_Contact(CwDinsNative_FindOwner(play, &this->actor, ACTOR_OOT_DINS_FIRE));
+        }
+        if (sDinsFireRemakeCastTicks == releaseTick) {
+            Actor* owner = CwDinsNative_FindOwner(play, &this->actor, ACTOR_OOT_DINS_FIRE);
+            if (owner != NULL) {
+                CwDinsNative_Release(owner);
+            } else {
+                DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+                sDinsFireRemakeAudioHandle = 0;
+                Magic_Reset(play);
+            }
+            // The frame-30 cue is held for one update before independent fire.
+            this->stateFlags1 &= ~(PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+        }
+    } else if (sDinsFireRemakeCastTicks >= releaseTick + CW_DINS_NATIVE_RECOVERY_TICKS) {
+        this->stateFlags1 &= ~(PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000);
+        this->yaw = this->actor.shape.rot.y;
+        sDinsFireRemakeCast = false;
+        func_80836988(this, play);
+        // The persistent actor remains the magic owner; there was no spell camera.
+        return;
+    }
+    Player_DecelerateToZero(this);
+}
+
 void Player_Action_OotMagicSpell(Player* this, PlayState* play) {
+    if (sDinsFireRemakeCast) {
+        Player_UpdateDinsFireRemakeCast(this, play);
+        return;
+    }
     if (PlayerAnimation_Update(play, &this->skelAnime)) { // ---- anim just FINISHED ----
         if (this->av1.actionVar1 < 0) {                   // phase D done → END
             s32 endCast = (this->itemAction == PLAYER_IA_NAYRUS_LOVE) || sOotSw97SpellActive ||
@@ -500,6 +652,15 @@ void Player_Action_OotMagicSpell(Player* this, PlayState* play) {
     }
 
     Player_DecelerateToZero(this);
+}
+
+static void Player_DrawDinsFireRemakeCharge(Player* this, PlayState* play) {
+    if (this != GET_PLAYER(play) || this->actionFunc != Player_Action_OotMagicSpell || !sDinsFireRemakeCast ||
+        sDinsFireRemakeCastTicks >= CW_DINS_NATIVE_CHARGE_TICKS + CW_DINS_NATIVE_STRIKE_TICKS ||
+        (this->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return;
+    }
+    CwDinsFireRemake_DrawNativeCharge(play, this, sDinsFireRemakeCastTicks / 20.0f);
 }
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
 #include "../../../combo/render/sword_element_aura_identity.h"
+#include "../../../combo/render/ItemGetLightShaftBridge.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -2495,6 +2496,7 @@ void Player_DrawGetItem(PlayState* play, Player* this) {
     {
         this->giObjectLoading = false;
         Player_DrawGetItemImpl(play, this, &sGetItemRefPos, ABS(this->unk_862));
+        SoHItemGetLightShaft_MarkNative(play, this, sGetItemRefPos.y + 14.0f);
     }
 }
 

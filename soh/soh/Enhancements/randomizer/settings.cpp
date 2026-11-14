@@ -2288,11 +2288,6 @@ void Settings::CreateOptions() {
                                                                               &mOptions[RSK_BOSS_KEYSANITY],
                                                                               &mOptions[RSK_SHUFFLE_DUNGEON_REWARDS],
                                                                               &mOptions[RSK_GERUDO_KEYS],
-                                                                              &mOptions[RSK_SHUFFLE_BOSS_SOULS],
-                                                                              &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
-                                                                              &mOptions[RSK_SHUFFLE_NPC_SOULS],
-                                                                              &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
-                                                                              &mOptions[RSK_SHUFFLE_MISC_SOULS],
                                                                           },
                                                                           WidgetContainerType::SECTION);
     mOptionGroups[RSG_MENU_COLUMN_DUNGEON_ITEMS] =
@@ -2451,8 +2446,20 @@ void Settings::CreateOptions() {
                                                                                  &mOptions[RSK_SKELETON_KEY],
                                                                              },
                                                                              WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_SECTION_SOULS] = OptionGroup::SubGroup("Souls",
+                                                                  {
+                                                                      &mOptions[RSK_SHUFFLE_BOSS_SOULS],
+                                                                      &mOptions[RSK_SHUFFLE_ENEMY_SOULS],
+                                                                      &mOptions[RSK_SHUFFLE_NPC_SOULS],
+                                                                      &mOptions[RSK_SHUFFLE_ANIMAL_SOULS],
+                                                                      &mOptions[RSK_SHUFFLE_MISC_SOULS],
+                                                                  },
+                                                                  WidgetContainerType::SECTION);
     mOptionGroups[RSG_MENU_COLUMN_ADDITIONAL_ITEMS] =
-        OptionGroup::SubGroup("", { &mOptionGroups[RSG_MENU_SECTION_ADDITIONAL_ITEMS] }, WidgetContainerType::COLUMN);
+        OptionGroup::SubGroup("",
+                              std::vector<OptionGroup*>{ &mOptionGroups[RSG_MENU_SECTION_SOULS],
+                                                         &mOptionGroups[RSG_MENU_SECTION_ADDITIONAL_ITEMS] },
+                              WidgetContainerType::COLUMN);
     mOptionGroups[RSG_MENU_SIDEBAR_SHUFFLES] =
         OptionGroup::SubGroup("Shuffles",
                               {

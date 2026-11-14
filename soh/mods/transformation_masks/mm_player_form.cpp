@@ -380,12 +380,12 @@ static const MmFormProperties sFormProps[MM_PLAYER_FORM_MAX] = {
     // Shadow: 90.0f matches 2Ship DrawFeet. PostLimbDraw updates feetPos[] so DrawFeet works.
     { "objects/object_link_goron/gLinkGoronSkel", MM_FORM_LIMB_COUNT, "misc/link_animetion/gPlayerAnim_pg_wait_Data",
       79, "misc/link_animetion/gPlayerAnim_link_normal_walk_free_Data", 17,
-      "misc/link_animetion/gPlayerAnim_link_normal_run_free_Data", 17, 70.0f, 90.0f, 19.5f, 200, 24.0f, 62.0f, 0.0f,
+      "misc/link_animetion/gPlayerAnim_link_normal_run_free_Data", 17, 70.0f, 90.0f, 19.5f, 200, 12.0f, 62.0f, 0.0f,
       0.74f, 80.0f }, // cameraHeight: MM Player_GetHeight for Goron (34 when curled, handled separately)
     // ZORA (index 2)
     { "objects/object_link_zora/gLinkZoraSkel", MM_FORM_LIMB_COUNT, "misc/link_animetion/gPlayerAnim_pz_wait_Data", 80,
       "misc/link_animetion/gPlayerAnim_link_normal_walk_free_Data", 17,
-      "misc/link_animetion/gPlayerAnim_link_normal_run_free_Data", 17, 56.0f, 90.0f, 18.0f, 80, 20.0f, 58.0f, 0.0f,
+      "misc/link_animetion/gPlayerAnim_link_normal_run_free_Data", 17, 56.0f, 90.0f, 18.0f, 80, 12.0f, 58.0f, 0.0f,
       1.0f, 68.0f }, // cameraHeight: MM Player_GetHeight for Zora
     // DEKU (index 3) - cylinder matches MM default (all forms share radius=12, height=60)
     // From 2Ship z_player.c D_8085C2EC: sCylinderInit = { radius=12, height=60, yShift=0 }
@@ -1147,23 +1147,24 @@ typedef struct {
     f32 dekuSpinSpeed;    // unk_B10[0]: spin angular velocity (starts 20000, decreases -800/frame)
     f32 dekuSpinTimer;    // unk_B10[1]: animation/duration counter (starts 0x30000 as float)
     u8 dekuSpinActive;    // Currently in spin attack
-    s32 dekuSpinRotAccum; // Accumulated visual rotation (OOT's idle resets shape.rot.y, so we track separately)
+    s32 dekuSpinRotAccum; // Render-only rotation; actor shape yaw stays aligned with travel yaw
 
     // === Deku bubble projectile (from 2Ship EN_ARROW ARROW_TYPE_DEKU_BUBBLE) ===
     // Uses MM's actor rotation system: world.rot → Actor_SetSpeeds → Actor_MoveWithGravity
     struct {
-        u8 active;      // Bubble exists in world
-        s8 state;       // unk_149: 0=just fired, 1=flying, -1=bounced
-        Vec3f pos;      // Current world position
-        Vec3f prevPos;  // Previous frame position (for collision line test)
-        s16 rotX;       // world.rot.x (pitch) - wobbled each frame
-        s16 rotY;       // world.rot.y (yaw) - wobbled each frame
-        f32 hSpeed;     // Horizontal speed (from Actor_SetSpeeds: cos(rotX) * totalSpeed)
-        f32 velY;       // Vertical velocity (from Actor_SetSpeeds: -sin(rotX) * totalSpeed)
-        f32 scale;      // unk_144: current size, deflates from charge toward 1.0f
-        s16 timer;      // unk_260: lifetime frames (99 when fired, dies at 0)
-        s16 wobbleAccX; // unk_14A: wobble phase accumulator for rot.x
-        s16 wobbleAccY; // unk_14C: wobble phase accumulator for rot.y
+        u8 active;          // Bubble exists in world
+        s8 state;           // unk_149: 0=just fired, 1=flying, -1=bounced
+        Vec3f pos;          // Current world position
+        Vec3f projectedPos; // Stable view-space flight sound emitter
+        Vec3f prevPos;      // Previous frame position (for collision line test)
+        s16 rotX;           // world.rot.x (pitch) - wobbled each frame
+        s16 rotY;           // world.rot.y (yaw) - wobbled each frame
+        f32 hSpeed;         // Horizontal speed (from Actor_SetSpeeds: cos(rotX) * totalSpeed)
+        f32 velY;           // Vertical velocity (from Actor_SetSpeeds: -sin(rotX) * totalSpeed)
+        f32 scale;          // unk_144: current size, deflates from charge toward 1.0f
+        s16 timer;          // unk_260: lifetime frames (99 when fired, dies at 0)
+        s16 wobbleAccX;     // unk_14A: wobble phase accumulator for rot.x
+        s16 wobbleAccY;     // unk_14C: wobble phase accumulator for rot.y
     } bubble;
     ColliderCylinder bubbleCollider;   // AT collider for bubble projectile (slingshot/deku seed damage)
     u8 bubbleColliderInit;             // Whether collider has been initialized
@@ -1278,10 +1279,10 @@ typedef struct {
 
     // Punch combo state (Phase 4)
     // From 2Ship: unk_ADD = combo counter, av2.actionVar2 = B pressed for combo
-    u8 comboStep;                // 0=PunchA(left), 1=PunchB(right), 2=PunchC(butt)
-    u8 zoraMeleeActive;          // Bone-driven MM punch/kick quads; separate from OoT sword state.
-    f32 zoraPunchCollisionFrame; // MM Action_84 checks the window before ticking its animation.
-    u8 zoraJumpTrailActive;      // Ownership survives the centralized landing/water flag reset.
+    u8 comboStep;            // 0=PunchA(left), 1=PunchB(right), 2=PunchC(butt)
+    u8 meleeActive;          // Goron/Zora bone-driven quads; separate from OoT sword state.
+    f32 punchCollisionFrame; // MM Action_84 checks the window before ticking its animation.
+    u8 zoraJumpTrailActive;  // Ownership survives the centralized landing/water flag reset.
     s32 zoraSwimTrailIndex[2];
     u8 zoraSwimTrailActive[2];
     u8 comboBPressed;    // B button pressed during current punch (for combo continuation)
@@ -1490,6 +1491,7 @@ typedef struct {
     u8 gakkiLastButtonIdx;    // Native gesture identity is independent of pitch modifiers
     u8 gakkiPendingButtonIdx; // An early held note waits for the opening animation
     u8 gakkiDekuNotePulse;
+    u8 gakkiSongPerformance; // Successful song owns a loop until its result is resolved
 
     // Deku cheek inflation during bubble charge (from 2Ship z_player_lib.c:2434-2458)
     f32 dekuCheekScale; // Head limb scale factor (1.0 = normal, up to 1.3 when charging)
@@ -1633,6 +1635,13 @@ static GakkiKeyframe sGakkiDekuStartContainer[] = {
 static GakkiKeyframe sGakkiDekuStartPieces[] = {
     { 0, { 0, 0, 0 } },       { 4, { 0, 0, 0 } },      { 6, { 120, 150, 60 } },   { 8, { 130, 80, 160 } },
     { 9, { 100, 100, 100 } }, { 10, { 90, 100, 90 } }, { 11, { 100, 100, 100 } },
+};
+// Deku Pipes — successful-song performance (MM D_801C03A0).
+static GakkiKeyframe sGakkiDekuPlay[] = {
+    { 0, { 100, 100, 100 } },
+    { 2, { 120, 120, 120 } },
+    { 6, { 90, 90, 90 } },
+    { 7, { 93, 93, 93 } },
 };
 // Goron Drums — start animation: drum body scale (D_801C0428, z_player_lib.c:1283)
 static GakkiKeyframe sGakkiGoronStart[] = {
@@ -3571,7 +3580,10 @@ static void MmForm_RestoreMeleeColliders(Player* player) {
     player->meleeWeaponState = 0;
 }
 
+static void MmForm_ResetDekuBubble(PlayState* play);
+
 static void MmForm_RestoreOotState(Player* player) {
+    MmForm_ResetDekuBubble(gPlayState);
     // Clear Gerudo combat state on every full form-exit so re-equipping the mask
     // starts clean. This is the FULL reset (rage meter included); the yield path
     // uses MmForm_GerudoMhrReset, which only aborts the running clip.
@@ -3590,7 +3602,7 @@ static void MmForm_RestoreOotState(Player* player) {
     if (MmSfx_IsAvailable()) {
         MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
         MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
-        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
         // (no FLOWER_ROLL stop — MM never starts it; see glide block in MmForm_Action_DekuFly)
     }
 
@@ -4087,10 +4099,10 @@ static void MmForm_TickActionAnimation(PlayState* play, s32 dispatchedAction) {
 static void MmForm_SetAction(GoronActionId action, PlayState* play, LinkAnimationHeader* anim, f32 playSpeed, u8 mode) {
     gFormState.goronAction = action;
     gFormState.actionTimer = 0;
-    gFormState.zoraPunchCollisionFrame = 0.0f;
+    gFormState.punchCollisionFrame = 0.0f;
     if (anim != NULL) {
         f32 morphFrames = -8.0f;
-        if (gFormState.currentForm == MM_PLAYER_FORM_ZORA) {
+        if (gFormState.currentForm == MM_PLAYER_FORM_ZORA || gFormState.currentForm == MM_PLAYER_FORM_GORON) {
             // MM's PlayOnceAdjusted advances one keyframe per gameplay update.
             // OoT's LinkAnimation_Update multiplies by 1.5 at R_UPDATE_RATE=3.
             if ((action >= GORON_ACT_PUNCH_A && action <= GORON_ACT_PUNCH_C) || action == MMFORM_ACT_JUMP_KICK) {
@@ -4864,7 +4876,7 @@ static void MmForm_GoronAction_Run(Player* player, PlayState* play) {
 //   Recovery anim selected by Player_CheckHostileLockOn (endR vs end)
 //
 // Our adaptation differences:
-//   - Uses OOT's player->meleeWeaponQuads[0] with directional vertices (same as MM)
+//   - Uses OOT's paired meleeWeaponQuads, swept from MM's attacking limb matrices
 //   - DMG_HAMMER_SWING for damage type (same heavy blunt impact as Megaton Hammer)
 //   - PLAYER_STATE1_HOSTILE_LOCK_ON check (identical to MM's Player_CheckHostileLockOn)
 //   - comboStep/comboBPressed instead of unk_ADD/av2.actionVar2
@@ -4904,7 +4916,7 @@ static const u8 sGerudoStationaryFrames[][2] = {
 };
 
 // Damage values (from 2Ship D_8085D09C collider setup)
-// Goron: { DMG_GORON_PUNCH, 2, 2, 0, 0 } → transformed damage = 0, but vanilla uses 2
+// Goron: { DMG_GORON_PUNCH, 2, 2, 0, 0 } → transformed normal/strong damage = 2
 // Zora: { DMG_ZORA_PUNCH, 1, 2, 0, 0 } → normal=1, strong=2
 // Gerudo: Kokiri Sword tier per the spec. The DMG_SLASH_KOKIRI flag (set on the
 // sword quads) makes each enemy's damage table apply its Kokiri-sword row, so the
@@ -5016,7 +5028,7 @@ static void MmForm_StartPunch(Player* player, PlayState* play) {
     // Wipe stale damage flags on every player collider so a leftover hammer flag
     // (e.g. from a prior Goron roll/spike that ran before transforming to Zora)
     // can't be picked up this frame and break hammer rocks during the combo.
-    // The hit window (MmForm_EnablePunchQuad) re-sets dmgFlags per form right after.
+    // The late melee update restores the current form's flags in its hit window.
     player->meleeWeaponQuads[0].base.atFlags &= ~AT_ON;
     player->meleeWeaponQuads[0].info.toucher.dmgFlags = 0;
     player->meleeWeaponQuads[1].base.atFlags &= ~AT_ON;
@@ -5101,7 +5113,7 @@ static void MmForm_StartPunch(Player* player, PlayState* play) {
 // Replaces: Player_Action_84 (line 18761) for form-specific punches
 //
 // Frame flow per punch:
-//   Goron: frame 0 to 5.0 = wind-up, 5.0 to hitEnd = active (early detection)
+//   Goron: frame 5 starts the visual wind-up; damage starts at hitStart, like MM
 //   Zora:  frame 0 to hitStart = wind-up, hitStart to hitEnd = active (no early detect)
 //   frame > hitEnd:     wind-down
 //   frame >= endFrame:  combo check → next punch or recovery
@@ -5121,44 +5133,19 @@ static void MmForm_Action_Punch(Player* player, PlayState* play) {
     f32 curFrame = skelAnime->curFrame;
     f32 endFrame = Animation_GetLastFrame(skelAnime->animation);
     u8 step = gFormState.comboStep;
-    gFormState.zoraPunchCollisionFrame = curFrame;
+    gFormState.punchCollisionFrame = curFrame;
     u8 isGoron = (gFormState.currentForm == MM_PLAYER_FORM_GORON);
 
     // Hit detection (from 2Ship func_8083FCF0, line 10540-10551)
     // MM calls: func_8083FCF0(play, this,
     //     (this->transformation == PLAYER_FORM_GORON) ? 5.0f : 0.0f,
     //     attackInfoEntry->unk_C, attackInfoEntry->unk_D);
-    // Goron: arg2=5.0f (early start), Zora: arg2=0.0f (no early start)
-    //
-    // Uses directional meleeWeaponQuads (NOT radial cylinder) with DMG_HAMMER_SWING
-    // so enemies that react to hammer blows also react to Goron punches.
-    u8 isGerudo = (gFormState.currentForm == MM_PLAYER_FORM_GERUDO);
-    // Gerudo has its own dedicated combo handler (MmForm_GerudoStartPunch /
-    // MmForm_GerudoActionPunch) that owns the 5-hit stationary + 3-hit cyclic
-    // moving combo. When that handler is in charge it sets currentComboMode
-    // and steps. The fall-through to the generic path below should not happen
-    // for Gerudo — pick the stationary table just in case (no crash).
-    const u8(*punchFrames)[2] = isGerudo ? sGerudoStationaryFrames : (isGoron ? sGoronPunchFrames : sZoraPunchFrames);
+    // Before hitStart MM sets meleeWeaponState=-1 for presentation only.
+    // The late melee update latches this pre-tick frame and the draw submits
+    // paired quads from the actual hand/waist/forearm/shin matrices.
+    const u8(*punchFrames)[2] = isGoron ? sGoronPunchFrames : sZoraPunchFrames;
     u8 hitStart = punchFrames[step][0];
     u8 hitEnd = punchFrames[step][1];
-    f32 earlyStart = isGoron ? 5.0f : (f32)hitStart;
-    // Per-form damage tier:
-    //   Goron  → GORON_PUNCH_DAMAGE  = 2 (hammer-tier blunt)
-    //   Zora   → ZORA_PUNCH_DAMAGE   = 1 (light slash, knockback-only)
-    //   Gerudo → GERUDO_SLASH_DAMAGE = 2 (Kokiri Sword tier)
-    //            GERUDO_FINISHER     = 4 (AOE x2 on the spin)
-    u8 damage;
-    if (isGerudo) {
-        damage = (step == 2) ? GERUDO_FINISHER_DAMAGE : GERUDO_SLASH_DAMAGE;
-    } else {
-        damage = isGoron ? GORON_PUNCH_DAMAGE : ZORA_PUNCH_DAMAGE;
-    }
-    // MM's D_8085D09C: Goron punches use DMG_GORON_PUNCH (mapped to DMG_HAMMER_SWING in OOT
-    // — same heavy blunt impact as the Megaton Hammer). Zora punches use DMG_ZORA_PUNCH;
-    // the closest OOT analog for the combo swing is DMG_SLASH_MASTER (sword slash damage).
-    // Gerudo uses DMG_SLASH_KOKIRI (Kokiri-Sword-equivalent sword damage).
-    // Jump kick keeps DMG_JUMP_MASTER via EnableJumpKickQuad.
-    u32 dmgFlags = isGoron ? DMG_HAMMER_SWING : (isGerudo ? DMG_SLASH_KOKIRI : DMG_SLASH_MASTER);
 
     // MM-style wall recoil check (replica of func_808401F4, z_player.c:10513).
     // Runs every frame of the active swing; if the punch ray hits a wall:
@@ -5170,13 +5157,12 @@ static void MmForm_Action_Punch(Player* player, PlayState* play) {
     //           wallRecoilActive so the AT quad stays disabled for the rest
     //           of the swing — prevents damage-through-wall on combo.
     if (!gFormState.wallRecoilActive) {
-        // Gate the wall check on earlyStart + 1.0f so the quad has had a chance
-        // to register at least one AT_HIT against any breakable DynaPoly in
-        // front of Goron (Bg_Hidan_Dalm, etc.). Without this 1-frame deferral
-        // the very first wall raycast would recoil before AT collision had a
-        // chance to fire, and the breakable would never receive the hit.
+        // Match MM's previous-update active-state gate. The first active draw
+        // only seeds WeaponInfo; MmForm_CheckWallHit's DynaPoly grace gives
+        // the following swept quads time to hit breakable actors.
         u8 wallStep = (!isGoron && step == 2) ? 3 : step;
-        MmFormWallHitResult wallHit = MmForm_CheckWallHit(player, play, wallStep, isGoron, curFrame, earlyStart + 1.0f);
+        MmFormWallHitResult wallHit =
+            MmForm_CheckWallHit(player, play, wallStep, isGoron, curFrame, (f32)hitStart + 1.0f);
         if (wallHit == MMFORM_WALL_HIT_GORON) {
             // Stop root motion and end the punch with the recovery anim.
             MmForm_DisablePunchQuad(player);
@@ -5200,14 +5186,7 @@ static void MmForm_Action_Punch(Player* player, PlayState* play) {
     if (curFrame > (f32)hitEnd) {
         // Past hit window (func_8083FCF0: arg4 < curFrame → func_8082DC38)
         MmForm_DisablePunchQuad(player);
-    } else if (curFrame >= earlyStart && !gFormState.wallRecoilActive) {
-        // In hit detection range - set up directional quad and submit to collision
-        // Zora's real forearm/shin matrices submit its paired MM quads in
-        // PostLimbDraw. The directional approximation remains Goron-only.
-        if (gFormState.currentForm != MM_PLAYER_FORM_ZORA) {
-            MmForm_EnablePunchQuad(player, play, step, damage, dmgFlags);
-        }
-
+    } else if (curFrame >= (f32)hitStart && !gFormState.wallRecoilActive) {
         // Goron butt punch (step 2) ground impact burst (from 2Ship Player_Action_84 line 18788)
         // Spawns debris/dust at impact frame when butt hits ground
         if (isGoron && step == 2 && curFrame >= (f32)hitStart && curFrame < (f32)hitStart + 1.5f &&
@@ -5219,7 +5198,7 @@ static void MmForm_Action_Punch(Player* player, PlayState* play) {
         }
     } else if (gFormState.wallRecoilActive) {
         // While in wall-recoil, make sure AT is off — animation may otherwise
-        // re-cross earlyStart on a slow frame.
+        // re-cross hitStart on a slow frame.
         MmForm_DisablePunchQuad(player);
     }
 
@@ -6012,7 +5991,7 @@ static u8 MmForm_CheckDamage(Player* player, PlayState* play) {
         gFormState.bubbleCharge = 0.0f;
         gFormState.bubbleChargeTimer = 0;
         gFormState.dekuCheekScale = 1.0f;
-        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+        MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
     }
 
     // Set state flags (from 2Ship func_80833B18 line 6015)
@@ -8475,8 +8454,8 @@ static void MmForm_Action_GoronRoll(Player* player, PlayState* play) {
 //
 // Deku spins on the spot, hitting nearby enemies with a cylinder collider.
 // Spin speed (unk_B10[0]) starts at 20000 and decays by -800/frame.
-// Visual rotation accumulated via dekuSpinRotAccum (absolute positioning because
-// OOT's concurrent idle action resets shape.rot.y each frame).
+// Visual rotation is accumulated separately and applied only to the skeleton draw.
+// OOT's camera and concurrent idle action both read shape.rot.y as facing yaw.
 // Ends when timer (unk_B10[1]) reaches 0 via Math_StepToF.
 // ---------------------------------------------------------------------------
 static void MmForm_Action_DekuSpin(Player* player, PlayState* play) {
@@ -8495,9 +8474,6 @@ static void MmForm_Action_DekuSpin(Player* player, PlayState* play) {
     // weapon types from a tiny Deku spin.
     MmForm_SetRollAttack(player, DMG_SPIN_KOKIRI, 1, 30);
     CollisionCheck_SetAT(play, &play->colChkCtx, &player->cylinder.base);
-
-    // Save yaw BEFORE movement update (from 2Ship line 19285: s16 prevYaw = this->yaw)
-    s16 prevYaw = player->yaw;
 
     // Movement during spin (from 2Ship lines 19286-19295: Player_GetMovementSpeedAndYaw + speed multiplier)
     // MM allows full stick-based movement during spin, with speed scaled by spin phase.
@@ -8524,15 +8500,14 @@ static void MmForm_Action_DekuSpin(Player* player, PlayState* play) {
     // Decay spin speed (from 2Ship line 19296: unk_B10[0] += -800.0f)
     gFormState.dekuSpinSpeed += -800.0f;
 
-    // Accumulate visual rotation (from 2Ship line 19297)
-    // MM: shape.rot.y += BINANG_ADD(TRUNCF_BINANG(unk_B10[0]), BINANG_SUB(this->yaw, prevYaw))
-    // OOT FIX: Use accumulator because OOT's concurrent idle action resets shape.rot.y to yaw each frame.
-    // Without this, the spin doesn't visually accumulate and the model trembles.
-    gFormState.dekuSpinRotAccum += (s16)(gFormState.dekuSpinSpeed) + (s16)(player->yaw - prevYaw);
-    player->actor.shape.rot.y = player->yaw + (s16)gFormState.dekuSpinRotAccum;
+    // MM adds spin and the change in travel yaw to its rotating shape. Here the
+    // actor matrix already includes travel yaw, so accumulate only visual spin.
+    // Keep shape yaw free of spin: OOT's camera samples it directly and neutral
+    // idle copies it back into player->yaw on the following frame.
+    gFormState.dekuSpinRotAccum += (s16)(gFormState.dekuSpinSpeed);
+    player->actor.shape.rot.y = player->yaw;
 
-    // Camera fix: OOT copies shape.rot.y → focus.rot.y. Override so camera follows yaw, not spin.
-    // Also clear head/body look rotation (from 2Ship func_80836D8C at spin entry)
+    // Keep focus aligned with travel and clear head/body look rotation.
     player->actor.focus.rot.y = player->yaw;
     player->actor.focus.rot.x = 0;
     player->actor.focus.rot.z = 0;
@@ -8714,9 +8689,9 @@ static void MmForm_DekuWaterHop(Player* player, PlayState* play) {
 // DEKU BUBBLE SYSTEM (from 2Ship func_808306F8 + EN_ARROW ARROW_TYPE_DEKU_BUBBLE)
 //
 // Hold B → enter first-person aim, bubble charges at Deku's mouth
-// Release B → fire bubble projectile with physics (arc, wobble, bounce)
+// Release B → fire bubble projectile with native deflation, wobble and speed
 // Magic: 2 MP to fire. No magic → tiny bubble, pops immediately.
-// Fully charged bubble bounces off walls once before popping.
+// Qualifying hard actor hits reflect it; scene geometry pops it with a splat.
 // Damage: Deku Seed type (dmgFlags = 0x00010000, same as OOT ARROW_SEED/slingshot)
 // ===========================================================================
 
@@ -8752,6 +8727,8 @@ static void MmForm_InitBubbleCollider(Player* player, PlayState* play) {
         gFormState.bubbleColliderInit = 1;
     }
 }
+
+#include "deku_bubble_effect.inc.h"
 
 // Fire bubble projectile from current charge state
 // From 2Ship func_8088A594 (z_en_arrow.c:196) release path + func_8088A514 speed setup
@@ -8798,14 +8775,14 @@ static void MmForm_FireBubble(Player* player, PlayState* play) {
     gFormState.bubble.state = 0;                     // unk_149 = 0 (just fired)
     gFormState.bubble.active = 1;
 
-    // Init AT collider for damage (slingshot/deku seed type)
+    // A rapid re-press can replace the one tracked projectile. Discard its
+    // previous AT result before the newly armed bubble enters collision.
     MmForm_InitBubbleCollider(player, play);
+    Collider_ResetCylinderAT(play, &gFormState.bubbleCollider.base);
+    MmForm_ProjectBubblePosition(play, &gFormState.bubble.pos, &gFormState.bubble.projectedPos);
 
-    // Stop the BREATH charge loop BEFORE the FIRE one-shot. Without this, the
-    // continuous BREATH SFX (in sContinuousSfxIds — never auto-times-out in
-    // our engine) keeps humming after the bubble has been launched. MM's
-    // Actor_PlaySfx_Flagged self-stops when refresh stops; ours doesn't.
-    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+    // End the native refresh-driven charge loop before the launch one-shot.
+    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
 
     // SFX (from 2Ship func_8088A594 line 241: Player_PlaySfx NA_SE_PL_DEKUNUTS_FIRE)
     MmForm_PlaySfx(player, MM_NA_SE_PL_DEKUNUTS_FIRE, 0);
@@ -8833,10 +8810,9 @@ static void MmForm_Action_DekuBubbleAim(Player* player, PlayState* play) {
     // === FIRST FRAME: init camera (auto-detects z-target vs first-person) ===
     if (gFormState.bubbleChargeTimer == 0) {
         ItemCamera_Init(&gFormState.bubbleCameraState, player, play);
-        // KEEP bit 0x800. See GORON_BALL_CHARGE block for the same architectural
-        // reason — stripping the flag bit in our setup routes through the weak
-        // one-shot dedup which stacks new instances at each loop wrap.
-        MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH, &player->actor.projectedPos);
+        // Native refresh-driven loop: the current adapter uses MM's real SFX bank.
+        if (MmSfx_IsAvailable())
+            MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG, &player->actor.projectedPos);
         player->stateFlags3 |= PLAYER_STATE3_PAUSE_ACTION_FUNC;
     }
 
@@ -8879,10 +8855,10 @@ static void MmForm_Action_DekuBubbleAim(Player* player, PlayState* play) {
         // is still holding B = silent gap. Gate on charge value instead: keep refreshing
         // until near-max (15.5 of 16.0), then go silent for the brief plateau before
         // the user releases. This matches what the player expects auditorily.
-        if (gFormState.bubbleCharge < 15.5f) {
-            MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH, &player->actor.projectedPos);
+        if (MmSfx_IsAvailable() && gFormState.bubbleCharge < 15.5f) {
+            MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG, &player->actor.projectedPos);
         } else {
-            MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+            MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
         }
     } else {
         // === B RELEASED → FIRE (stay in aim like MM Player_UpperAction_8) ===
@@ -8909,7 +8885,7 @@ cancel:
     gFormState.bubbleCharge = 0.0f;
     gFormState.bubbleChargeTimer = 0;
     gFormState.dekuCheekScale = 1.0f;
-    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
     MmForm_SetAction(GORON_ACT_IDLE, play, gFormState.idleAnim, 1.0f, ANIMMODE_LOOP);
 }
 
@@ -8947,181 +8923,108 @@ static void MmForm_Action_DekuBubble(Player* player, PlayState* play) {
 //   - Deflation: Math_StepToF(&scale, 1.0, 0.4) — dies when reaching 1.0
 //   - Wobble: sinusoidal oscillation added to rot.x/rot.y, speed recomputed
 //   - Movement: Actor_MoveWithGravity pattern (vel from rot.y + speed)
-//   - Wall collision: BgCheck_ProjectileLineTest → bounce or pop
+//   - World collision: BgCheck_ProjectileLineTest → pop and static surface splat
 // ---------------------------------------------------------------------------
 static void MmForm_KillBubble(Player* player, PlayState* play) {
     gFormState.bubble.active = 0;
-    if (gFormState.bubbleColliderInit) {
+    if (gFormState.bubbleColliderInit)
         Collider_ResetCylinderAT(play, &gFormState.bubbleCollider.base);
-    }
-    // Cut all sounds tied to bubble lifecycle:
-    //   FIRE — INST_74 has a sustain loop that would ring after the pop (MM ends launch
-    //          when bubble dies).
-    //   BUBLE_SHOT_LEVEL — continuous in-flight loop (sContinuousSfxIds), refreshed every
-    //          frame by MmForm_UpdateBubbleProjectile. Without an explicit Stop, the in-flight
-    //          loop keeps droning under the VANISH pop and the next launch starts on top
-    //          of the prior loop's tail.
-    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_FIRE);
-    MmSfx_Stop(MM_NA_SE_IT_DEKUNUTS_BUBLE_SHOT_LEVEL);
+    MmSfx_StopAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_SHOT_LEVEL - SFX_FLAG, &gFormState.bubble.projectedPos);
+    // FIRE and VANISH are native one-shots; let their envelopes finish.
 }
 
 static void MmForm_UpdateBubbleProjectile(Player* player, PlayState* play) {
     if (!gFormState.bubble.active)
         return;
 
-    // === DEATH CHECK: timer expired (from 2Ship line 397: DECR(unk_260) == 0) ===
-    gFormState.bubble.timer--;
-    if (gFormState.bubble.timer <= 0) {
-        // Pop SFX (from 2Ship line 430: NA_SE_IT_DEKUNUTS_BUBLE_VANISH).
-        // Source position is the bubble's world pos (matches MM SoundSource_PlaySfxAtFixedWorldPos
-        // at &actor.world.pos), not the player — spatial cue stays where the burst occurred.
-        MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_VANISH, &gFormState.bubble.pos);
+    // MM EnArrow func_8088ACE0 consumes LAST frame's AT result before drawing
+    // registers another collider. SoH CollisionCheck_SetAT resets the result.
+    if (--gFormState.bubble.timer <= 0) {
+        MmForm_PlayBubblePop(play, &gFormState.bubble.pos);
+        MmForm_KillBubble(player, play);
+        return;
+    }
+    if (gFormState.bubbleColliderInit && (gFormState.bubbleCollider.base.atFlags & AT_HIT)) {
+        ColliderCylinder* cyl = &gFormState.bubbleCollider;
+        if ((cyl->base.atFlags & AT_BOUNCED) && cyl->info.atHitInfo != NULL &&
+            cyl->info.atHitInfo->elemType != ELEMTYPE_UNK4 && cyl->base.at != NULL &&
+            cyl->base.at->id != ACTOR_OBJ_SYOKUDAI) {
+            Math_Vec3f_Copy(&gFormState.bubble.pos, &gFormState.bubble.prevPos);
+            gFormState.bubble.rotY += (s16)(0x8000 + (s16)Rand_CenteredFloat(0x1F40));
+            gFormState.bubble.velY = -gFormState.bubble.velY;
+            gFormState.bubble.state = -1;
+            Collider_ResetCylinderAT(play, &cyl->base);
+            return;
+        }
+        EffectSsStone1_Spawn(play, &gFormState.bubble.pos, 0);
+        MmForm_PlayBubblePop(play, &gFormState.bubble.pos);
         MmForm_KillBubble(player, play);
         return;
     }
 
-    // === FIRST FRAME: set prevPos 10 units behind velocity (from 2Ship line 470-479) ===
+    Math_Vec3f_Copy(&gFormState.bubble.prevPos, &gFormState.bubble.pos);
     if (gFormState.bubble.state == 0) {
-        f32 totalVelMag = sqrtf(SQ(gFormState.bubble.hSpeed) + SQ(gFormState.bubble.velY));
-        f32 velX = Math_SinS(gFormState.bubble.rotY) * gFormState.bubble.hSpeed;
-        f32 velZ = Math_CosS(gFormState.bubble.rotY) * gFormState.bubble.hSpeed;
-
-        if (totalVelMag > 0.001f) {
-            f32 ratio = 10.0f / totalVelMag;
-            gFormState.bubble.prevPos.x = gFormState.bubble.pos.x - (velX * ratio);
-            gFormState.bubble.prevPos.y = gFormState.bubble.pos.y - (gFormState.bubble.velY * ratio);
-            gFormState.bubble.prevPos.z = gFormState.bubble.pos.z - (velZ * ratio);
+        // Preserve MM's first swept segment from ten units behind the muzzle.
+        f32 magnitude = sqrtf(SQ(gFormState.bubble.hSpeed) + SQ(gFormState.bubble.velY));
+        if (magnitude > 0.001f) {
+            f32 ratio = 10.0f / magnitude;
+            gFormState.bubble.prevPos.x -= Math_SinS(gFormState.bubble.rotY) * gFormState.bubble.hSpeed * ratio;
+            gFormState.bubble.prevPos.y -= gFormState.bubble.velY * ratio;
+            gFormState.bubble.prevPos.z -= Math_CosS(gFormState.bubble.rotY) * gFormState.bubble.hSpeed * ratio;
         }
-        gFormState.bubble.state = 1; // unk_149 = 1 (flying)
+        gFormState.bubble.state = 1;
     }
 
-    // === DEFLATION + WOBBLE (from 2Ship line 484-495) ===
+    // Native EnArrow deflation and speed law. A charged bubble starts slowly
+    // and accelerates as it shrinks; gravity is zero.
     if (Math_StepToF(&gFormState.bubble.scale, 1.0f, 0.4f)) {
-        // Fully deflated → force timer to 0 (dies next check, 2Ship line 485: unk_260 = 0)
         gFormState.bubble.timer = 0;
     } else {
-        // Wobble rot.x (from 2Ship line 488-490)
         gFormState.bubble.wobbleAccX += (s16)(gFormState.bubble.scale * (500.0f + Rand_ZeroFloat(1400.0f)));
         gFormState.bubble.rotX += (s16)(500.0f * Math_SinS(gFormState.bubble.wobbleAccX));
-
-        // Wobble rot.y (from 2Ship line 492-494)
         gFormState.bubble.wobbleAccY += (s16)(gFormState.bubble.scale * (500.0f + Rand_ZeroFloat(1400.0f)));
         gFormState.bubble.rotY += (s16)(500.0f * Math_SinS(gFormState.bubble.wobbleAccY));
-
-        // Recompute speed from new rotation + shrinking size (from 2Ship func_8088A514)
-        f32 totalSpeed = 16.0f - gFormState.bubble.scale;
-        totalSpeed = CLAMP(totalSpeed, 1.0f, 80.0f);
-        // Actor_SetSpeeds (z_actor.c:1277): speed = cos(rot.x) * totalSpeed, velY = -sin(rot.x) * totalSpeed
+        f32 totalSpeed = CLAMP(16.0f - gFormState.bubble.scale, 1.0f, 80.0f);
         gFormState.bubble.hSpeed = Math_CosS(gFormState.bubble.rotX) * totalSpeed;
         gFormState.bubble.velY = -Math_SinS(gFormState.bubble.rotX) * totalSpeed;
     }
-
-    // Looping flight SFX — VERBATIM MM z_en_arrow.c:499 calls
-    // Actor_PlaySfx_Flagged(NA_SE_IT_DEKUNUTS_BUBLE_SHOT_LEVEL - SFX_FLAG) every frame while
-    // bubble state >= 7 (flying). 0x185A is in sContinuousSfxIds so per-frame call refreshes
-    // a single sustained instance instead of stacking attacks.
-    if (MmSfx_IsAvailable()) {
-        MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_SHOT_LEVEL, &gFormState.bubble.pos);
-    }
-
-    // Save prevPos for collision line test
-    Math_Vec3f_Copy(&gFormState.bubble.prevPos, &gFormState.bubble.pos);
-
-    // === MOVEMENT: Actor_MoveWithGravity pattern (z_actor.c:1209-1226) ===
-    // vel.x = speed * sin(rot.y), vel.z = speed * cos(rot.y)
-    // vel.y += gravity (gravity = 0 for bubbles, no terminal velocity check needed)
-    f32 velX = gFormState.bubble.hSpeed * Math_SinS(gFormState.bubble.rotY);
-    f32 velZ = gFormState.bubble.hSpeed * Math_CosS(gFormState.bubble.rotY);
-    // Actor_UpdatePos: pos += vel
-    gFormState.bubble.pos.x += velX;
+    gFormState.bubble.pos.x += gFormState.bubble.hSpeed * Math_SinS(gFormState.bubble.rotY);
     gFormState.bubble.pos.y += gFormState.bubble.velY;
-    gFormState.bubble.pos.z += velZ;
+    gFormState.bubble.pos.z += gFormState.bubble.hSpeed * Math_CosS(gFormState.bubble.rotY);
 
-    // === FLOOR COLLISION: pop when touching ground (from 2Ship z_en_arrow.c) ===
-    {
-        CollisionPoly* floorPoly = NULL;
-        s32 floorBgId;
-        Vec3f floorCheckPos = gFormState.bubble.pos;
-        floorCheckPos.y += 20.0f; // Check from slightly above bubble center
-        f32 floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &floorPoly, &floorBgId, &floorCheckPos);
-        if (floorPoly != NULL && gFormState.bubble.pos.y <= floorY + 5.0f) {
-            // Hit floor → pop with effects
-            Vec3f popPos = gFormState.bubble.pos;
-            popPos.y = floorY;
-            EffectSsBubble_Spawn(play, &popPos, 0.0f, 5.0f, 10.0f, 0.13f);
-            // MM z_en_arrow.c:397 plays VANISH (not BROKEN — BROKEN is defined in MM's
-            // SFX table but never dispatched from any .c source). Position at bubble pop,
-            // not at player, matching SoundSource_PlaySfxAtFixedWorldPos(&actor.world.pos).
-            MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_VANISH, &popPos);
-            MmForm_KillBubble(player, play);
-            return;
-        }
+    CollisionPoly* poly = NULL;
+    s32 bgId;
+    Vec3f hit;
+    if (BgCheck_ProjectileLineTest(&play->colCtx, &gFormState.bubble.prevPos, &gFormState.bubble.pos, &hit, &poly, true,
+                                   true, true, true, &bgId)) {
+        // A wall/floor/ceiling pops the bubble. The native bounce belongs to
+        // a qualifying AT_BOUNCED actor, not to ordinary scene geometry.
+        gFormState.bubble.pos = hit;
+        EffectSsStone1_Spawn(play, &hit, 0);
+        if (bgId == BGCHECK_SCENE)
+            MmForm_AddDekuBubbleSplat(&hit, poly, gFormState.bubble.scale);
+        MmForm_PlayBubblePop(play, &hit);
+        MmForm_KillBubble(player, play);
+        return;
     }
 
-    // === WALL COLLISION (from 2Ship line 530-537: BgCheck_ProjectileLineTest) ===
-    {
-        CollisionPoly* wallPoly = NULL;
-        s32 bgId;
-        Vec3f wallHit;
+    MmForm_ProjectBubblePosition(play, &gFormState.bubble.pos, &gFormState.bubble.projectedPos);
+    if (MmSfx_IsAvailable())
+        MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_SHOT_LEVEL - SFX_FLAG, &gFormState.bubble.projectedPos);
 
-        if (BgCheck_EntityLineTest1(&play->colCtx, &gFormState.bubble.prevPos, &gFormState.bubble.pos, &wallHit,
-                                    &wallPoly, true, true, true, true, &bgId)) {
-            // Bounce check (from 2Ship line 404-416: flip rot.y by ~180 + random, flip velY)
-            if (gFormState.bubble.state != -1) {
-                // First bounce: reverse direction like 2Ship
-                Math_Vec3f_Copy(&gFormState.bubble.pos, &gFormState.bubble.prevPos);
-                gFormState.bubble.rotY += (s16)(0x8000 + (s16)(Rand_CenteredFloat(0x1F40)));
-                gFormState.bubble.velY = -gFormState.bubble.velY;
-                gFormState.bubble.state = -1; // unk_149 = -1 (bounced)
-            } else {
-                // Already bounced → pop (from 2Ship line 426-430)
-                MmForm_KillBubble(player, play);
-                EffectSsBubble_Spawn(play, &wallHit, 0.0f, 5.0f, 10.0f, 0.13f);
-                MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_VANISH, &wallHit);
-                return;
-            }
-        }
-    }
-
-    // === AT COLLIDER: submit for damage via OOT collision system ===
-    // Uses slingshot/deku seed damage type (dmgFlags = 0x00010000)
     if (gFormState.bubbleColliderInit) {
         ColliderCylinder* cyl = &gFormState.bubbleCollider;
-
-        // Scale radius by bubble size (min 10, max from scale * 3)
-        s16 radius = (s16)(gFormState.bubble.scale * 3.0f);
-        if (radius < 10)
-            radius = 10;
+        s16 radius = (s16)CLAMP_MIN(gFormState.bubble.scale * 3.0f, 10.0f);
         cyl->dim.radius = radius;
         cyl->dim.height = radius * 2;
         cyl->dim.pos.x = (s16)gFormState.bubble.pos.x;
         cyl->dim.pos.y = (s16)gFormState.bubble.pos.y - radius;
         cyl->dim.pos.z = (s16)gFormState.bubble.pos.z;
-
-        // Only deal damage when not bounced (from 2Ship line 704: unk_149 >= 0)
-        if (gFormState.bubble.state >= 0) {
+        if (gFormState.bubble.state >= 0)
             CollisionCheck_SetAT(play, &play->colChkCtx, &cyl->base);
-        }
-
-        // OC check: physical collision with actors (pop on contact)
-        CollisionCheck_SetOC(play, &play->colChkCtx, &cyl->base);
-
-        // Check if OC hit an actor this frame
-        if (cyl->base.ocFlags1 & OC1_HIT) {
-            MmForm_KillBubble(player, play);
-            EffectSsBubble_Spawn(play, &gFormState.bubble.pos, 0.0f, 5.0f, 15.0f, 0.15f);
-            MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_VANISH, &gFormState.bubble.pos);
-            return;
-        }
-
-        // Check if AT hit an actor this frame (from 2Ship line 397: atFlags & AT_HIT)
-        if (cyl->base.atFlags & AT_HIT) {
-            MmForm_KillBubble(player, play);
-            // Pop effects (from 2Ship line 426-430)
-            EffectSsBubble_Spawn(play, &gFormState.bubble.pos, 0.0f, 5.0f, 15.0f, 0.15f);
-            MmSfx_PlayAtPos(MM_NA_SE_IT_DEKUNUTS_BUBLE_VANISH, &gFormState.bubble.pos);
-            return;
-        }
+        else
+            Collider_ResetCylinderAT(play, &cyl->base);
+        // EnArrow has no OC collider. It receives actor hits through AT/AC.
     }
 }
 
@@ -11995,10 +11898,38 @@ static u8 MmForm_GakkiUsesNativeGestures(void) {
     return gFormState.currentForm >= MM_PLAYER_FORM_GORON && gFormState.currentForm <= MM_PLAYER_FORM_DEKU;
 }
 
+static u8 MmForm_GakkiIsClosing(PlayState* play) {
+    return play->msgCtx.ocarinaMode == OCARINA_MODE_02 || play->msgCtx.ocarinaMode == OCARINA_MODE_04;
+}
+
+// MM func_80851C40 separates live note gestures from a recognized song's
+// continuous performance. OoT later opens an ordinary result/choice textbox,
+// so retain success for this instrument session until it closes or resolves.
+static u8 MmForm_GakkiIsSongPerformance(PlayState* play) {
+    if (play == NULL || gFormState.gakkiActive != 2 || gFormState.gakkiPlayAnim == NULL ||
+        play->msgCtx.msgMode == MSGMODE_NONE || MmForm_GakkiIsClosing(play)) {
+        return 0;
+    }
+    switch (play->msgCtx.msgMode) {
+        case MSGMODE_OCARINA_CORRECT_PLAYBACK:
+        case MSGMODE_SONG_PLAYED:
+        case MSGMODE_SETUP_DISPLAY_SONG_PLAYED:
+        case MSGMODE_DISPLAY_SONG_PLAYED:
+        case MSGMODE_DISPLAY_SONG_PLAYED_TEXT_BEGIN:
+        case MSGMODE_DISPLAY_SONG_PLAYED_TEXT:
+        case MSGMODE_SONG_PLAYED_ACT_BEGIN:
+        case MSGMODE_SONG_PLAYED_ACT:
+            return 1;
+        default:
+            return gFormState.gakkiSongPerformance;
+    }
+}
+
 static void MmForm_GakkiResetVisualState(void) {
     gFormState.gakkiLastButtonIdx = OCARINA_BTN_INVALID;
     gFormState.gakkiPendingButtonIdx = OCARINA_BTN_INVALID;
     gFormState.gakkiDekuNotePulse = 0;
+    gFormState.gakkiSongPerformance = 0;
     gFormState.gakkiDrumButton[0] = gFormState.gakkiDrumButton[1] = -1;
     for (s32 i = 0; i < 5; i++) {
         gFormState.gakkiDrumFrames[i] = 8.0f;
@@ -12083,14 +12014,14 @@ static void MmForm_GakkiInterpScales(f32 curFrame) {
 
         case 2: // gakkiplay — instruments active, rhythmic scaling
             if (form == MM_PLAYER_FORM_GORON) {
-                if (gFormState.gakkiGoronWaitAnim != NULL) {
+                if (gFormState.gakkiGoronWaitAnim != NULL && !gFormState.gakkiSongPerformance) {
                     gFormState.gakkiScale0 = { 1.0f, 1.0f, 1.0f };
                     for (s32 i = 0; i < 5; i++) {
                         GakkiKeyframe_Interp(sGakkiGoronWait, gFormState.gakkiDrumFrames[i],
                                              &gFormState.gakkiDrumScales[i]);
                     }
                 } else {
-                    // Missing optional wait clip: retain the existing full-body play fallback.
+                    // Song performance, or the existing missing-wait full-body fallback.
                     GakkiKeyframe_Interp(sGakkiGoronPlay, curFrame, &gFormState.gakkiScale0);
                     for (s32 i = 0; i < 5; i++) {
                         gFormState.gakkiDrumScales[i] = gFormState.gakkiScale0;
@@ -12100,7 +12031,14 @@ static void MmForm_GakkiInterpScales(f32 curFrame) {
                 // Zora: guitar strum bounce (D_801C0560)
                 GakkiKeyframe_Interp(sGakkiZoraPlay, curFrame, &gFormState.gakkiScale0);
             } else if (form == MM_PLAYER_FORM_DEKU) {
-                // Individual pipe scales belong to the note controller, not the body clip.
+                if (gFormState.gakkiSongPerformance) {
+                    Vec3f pipeScale;
+                    GakkiKeyframe_Interp(sGakkiDekuPlay, curFrame, &pipeScale);
+                    for (s32 i = 0; i < 5; i++) {
+                        gFormState.gakkiPieceScales[i] = pipeScale.x;
+                    }
+                }
+                // Live notes own individual pipes; successful songs inflate them together.
                 gFormState.gakkiScale0.x = 1.0f;
                 gFormState.gakkiScale0.y = 1.0f;
                 gFormState.gakkiScale0.z = 1.0f;
@@ -12296,9 +12234,13 @@ static void MmForm_GakkiDriveNote(uint8_t pitch, float bendFreq, u8 forceAttack)
     const s32 voice = MmGakki_GetVoiceType(gFormState.currentForm);
     const u8 isNewNote = forceAttack || pitch != gFormState.gakkiLastNoteIdx;
 
-    u8 button = forceAttack ? AudioOcarina_GetPlaybackButtonIndex() : AudioOcarina_GetCurrentButtonIndex();
-    if (!MmForm_GakkiDriveNativeNote(button, forceAttack) && isNewNote) {
-        MmForm_GakkiPlayNoteAnim();
+    // Playback still drives exactly the same audio below. Its note events must
+    // not replace the continuous song pose with live-input one-shots or arm hits.
+    if (!gFormState.gakkiSongPerformance && !MmForm_GakkiIsSongPerformance(gPlayState)) {
+        u8 button = forceAttack ? AudioOcarina_GetPlaybackButtonIndex() : AudioOcarina_GetCurrentButtonIndex();
+        if (!MmForm_GakkiDriveNativeNote(button, forceAttack) && isNewNote) {
+            MmForm_GakkiPlayNoteAnim();
+        }
     }
 
     if (voice != GAKKI_VOICE_MM_FONT) {
@@ -12647,6 +12589,21 @@ static void MmForm_EnterGakki(Player* player, PlayState* play) {
 // Update gakki animation each frame while in gakki mode.
 // From MM z_player.c: Player_Action_63 + func_808525C4 + func_8085255C
 static void MmForm_UpdateGakki(Player* player, PlayState* play) {
+    if (gFormState.gakkiActive == 2) {
+        u8 songPerformance = MmForm_GakkiIsSongPerformance(play);
+        if (songPerformance != gFormState.gakkiSongPerformance) {
+            // Discard completed live-note overlays without touching a held voice
+            // or the independent fanfare. The normal player update owns all poses.
+            MmForm_GakkiResetVisualState();
+            gFormState.gakkiSongPerformance = songPerformance;
+            if (songPerformance) {
+                LinkAnimation_Change(play, &gFormState.formSkelAnime, gFormState.gakkiPlayAnim, 1.0f, 0.0f,
+                                     Animation_GetLastFrame(gFormState.gakkiPlayAnim), ANIMMODE_LOOP, -6.0f);
+            } else {
+                MmForm_GakkiStartPlayAnimation(play);
+            }
+        }
+    }
     s32 animDone = LinkAnimation_Update(play, &gFormState.formSkelAnime);
     f32 curFrame = gFormState.formSkelAnime.curFrame;
 
@@ -12669,13 +12626,15 @@ static void MmForm_UpdateGakki(Player* player, PlayState* play) {
             break;
         }
 
-        case 2: { // Instrument out; the clip only moves while notes are played
-            MmForm_GakkiUpdateNativeGestures(play);
+        case 2: { // Live note gestures, or the recognized song's full performance loop
+            if (!gFormState.gakkiSongPerformance) {
+                MmForm_GakkiUpdateNativeGestures(play);
+            }
             MmForm_GakkiInterpScales(curFrame);
             MmForm_GakkiTickVoice();
             // Stop at the end rather than letting it reset: the pose has to stay on the
             // last frame until the next note, not fall back to frame 0.
-            if (gFormState.gakkiPlayAnim != NULL &&
+            if (!gFormState.gakkiSongPerformance && gFormState.gakkiPlayAnim != NULL &&
                 gFormState.formSkelAnime.animation == (void*)gFormState.gakkiPlayAnim &&
                 curFrame >= Animation_GetLastFrame(gFormState.gakkiPlayAnim) - 0.5f) {
                 gFormState.formSkelAnime.playSpeed = 0.0f;
@@ -12831,6 +12790,10 @@ static u8 MmForm_RunFormOwnerUpdate(Player* player, PlayState* play) {
 }
 
 static void MmForm_UpdateActive(Player* player, PlayState* play) {
+    // Projectiles/effects own their world frame, independently of which player
+    // action returns below (aim, damage, dialogue, instrument, climb, etc.).
+    MmForm_UpdateDekuBubbleEffects(play);
+    MmForm_UpdateBubbleProjectile(player, play);
     // Boomerang flight tracking runs FIRST, before every early return and before the
     // OOT-yield block further down (which `return`s and used to skip it entirely).
     //
@@ -12870,14 +12833,20 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
     // instrument pose while Goron/Zora/Deku did. The logs showed it precisely: "Gakki enter"
     // fired for forms 1/2/3 and never for 6/7, with the diagnostic in that block silent
     // because the block itself was unreachable.
-    if (!gFormState.gakkiActive && (player->stateFlags1 & PLAYER_STATE1_IN_ITEM_CS) &&
+    // OoT leaves the prior result mode in place until its fresh opening clip
+    // finishes. actionVar2 distinguishes that intro from a resolved session.
+    u8 ocarinaOpening = player->actionFunc == Player_Action_8084E3C4 && player->av2.actionVar2 == 0;
+    u8 ocarinaClosing = !ocarinaOpening && MmForm_GakkiIsClosing(play);
+    if (!gFormState.gakkiActive && !ocarinaClosing && (player->stateFlags1 & PLAYER_STATE1_IN_ITEM_CS) &&
         (player->actionFunc == Player_Action_8084E3C4) && MmGakki_FormHasOwnInstrument(gFormState.currentForm)) {
         MmForm_EnterGakki(player, play);
     }
 
     if (gFormState.gakkiActive != 0) {
-        // "Still playing" = the ocarina textbox is up, or OOT is still in its ocarina action.
-        u8 ocarinaOpen = (play->msgCtx.msgMode != MSGMODE_NONE) || (player->actionFunc == Player_Action_8084E3C4);
+        // A resolved decision ends the session even while its textbox is closing
+        // or OoT has not yet left the ocarina action on this update.
+        u8 ocarinaOpen = !ocarinaClosing &&
+                         ((play->msgCtx.msgMode != MSGMODE_NONE) || (player->actionFunc == Player_Action_8084E3C4));
 
         // Ocarina gone but instrument still out → begin the put-away animation (gakkiActive 3),
         // which MmForm_UpdateGakki below plays to completion and then clears to 0.
@@ -13016,7 +12985,7 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
                 gFormState.bubbleCharge = 0.0f;
                 gFormState.bubbleChargeTimer = 0;
                 gFormState.dekuCheekScale = 1.0f;
-                MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+                MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
             } else if (CHECK_BTN_ALL(bubInput->cur.button, BTN_B)) {
                 Math_SmoothStepToF(&gFormState.bubbleCharge, 16.0f, 0.07f, 1.8f, 0.01f);
                 gFormState.bubbleChargeTimer++;
@@ -13026,10 +12995,10 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
 
                 // Mirror native action gate (line 7959) — refresh until near-max charge
                 // so the player hears a continuous BREATH while holding B.
-                if (gFormState.bubbleCharge < 15.5f) {
-                    MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH, &player->actor.projectedPos);
+                if (MmSfx_IsAvailable() && gFormState.bubbleCharge < 15.5f) {
+                    MmSfx_PlayAtPos(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG, &player->actor.projectedPos);
                 } else {
-                    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+                    MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
                 }
             }
         } else if (gFormState.bubbleCharging) {
@@ -13038,7 +13007,7 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
             gFormState.bubbleCharge = 0.0f;
             gFormState.bubbleChargeTimer = 0;
             gFormState.dekuCheekScale = 1.0f;
-            MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
+            MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH - SFX_FLAG);
         }
     }
 
@@ -14762,9 +14731,6 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
     }
     MmForm_UpdateBarrier(player, play);
 
-    // Deku bubble projectile: update physics every frame (independent of action state)
-    MmForm_UpdateBubbleProjectile(player, play);
-
     // (Boomerang flight tracking moved to the TOP of MmForm_UpdateActive — here it sat
     // after the OOT-yield `return` and silently stopped running. See the note there.)
 
@@ -15280,10 +15246,50 @@ static void MmForm_GakkiOverrideZoraHand(s32 limbIndex, Gfx** dList) {
     }
 }
 
+static void MmForm_OverrideGoronPunchHand(s32 limbIndex, Vec3f* pos, Vec3s* rot) {
+    if (gFormState.state != MMFORM_STATE_ACTIVE || gFormState.currentForm != MM_PLAYER_FORM_GORON ||
+        gFormState.formSkelAnime.animation == NULL) {
+        return;
+    }
+    u8 left = limbIndex == PLAYER_LIMB_L_HAND && gFormState.goronAction == GORON_ACT_PUNCH_A &&
+              gFormState.formSkelAnime.animation == gFormState.punchA;
+    u8 right = limbIndex == PLAYER_LIMB_R_HAND && gFormState.goronAction == GORON_ACT_PUNCH_B &&
+               gFormState.formSkelAnime.animation == gFormState.punchB;
+    if (!left && !right) {
+        return;
+    }
+
+    // Native MM D_801C0750 / D_801C0784 enlarge the attacking fist before
+    // both its mesh and melee points are transformed (func_80125CE0).
+    static GakkiKeyframe handScales[2][5] = {
+        { { 0, { 100, 100, 100 } },
+          { 5, { 100, 100, 100 } },
+          { 6, { 200, 200, 200 } },
+          { 10, { 200, 200, 200 } },
+          { 11, { 100, 100, 100 } } },
+        { { 0, { 100, 100, 100 } },
+          { 14, { 100, 100, 100 } },
+          { 15, { 200, 200, 200 } },
+          { 16, { 200, 200, 200 } },
+          { 18, { 100, 100, 100 } } },
+    };
+    GakkiKeyframe* frames = handScales[right ? 1 : 0];
+    // Use the rendered, post-tick frame. Clamp at the last key if an asset
+    // replacement extends the clip past the native table's final frame.
+    f32 frame = CLAMP(gFormState.formSkelAnime.curFrame, 0.0f, (f32)frames[ARRAY_COUNT(handScales[0]) - 1].frame);
+    Vec3f scale;
+    Matrix_TranslateRotateZYX(pos, rot);
+    pos->x = pos->y = pos->z = 0.0f;
+    rot->x = rot->y = rot->z = 0;
+    GakkiKeyframe_Interp(frames, frame, &scale);
+    Matrix_Scale(scale.x, scale.y, scale.z, MTXMODE_APPLY);
+}
+
 static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
     Player* player = (Player*)thisx;
 
     MmForm_GakkiOverrideZoraHand(limbIndex, dList);
+    MmForm_OverrideGoronPunchHand(limbIndex, pos, rot);
 
     // Sheik's harp is held in bare wings: both hands go, and with the right one goes OoT's
     // ocarina, which is modelled INTO that hand's list rather than beside it. This is why
@@ -15671,7 +15677,12 @@ extern "C" void MmForm_KillTrail(PlayState* play, s32* effectIndex, u8* active) 
     }
 }
 
-static s32 MmForm_ZoraMeleeLimb(void) {
+static s32 MmForm_MeleeLimb(void) {
+    if (gFormState.currentForm == MM_PLAYER_FORM_GORON) {
+        return gFormState.comboStep == 0   ? PLAYER_LIMB_L_HAND
+               : gFormState.comboStep == 1 ? PLAYER_LIMB_R_HAND
+                                           : PLAYER_LIMB_WAIST;
+    }
     if (gFormState.goronAction == MMFORM_ACT_JUMP_KICK ||
         (gFormState.goronAction == GORON_ACT_PUNCH_C && gFormState.comboStep == 2)) {
         return PLAYER_LIMB_R_SHIN;
@@ -15679,23 +15690,24 @@ static s32 MmForm_ZoraMeleeLimb(void) {
     return gFormState.comboStep == 0 ? PLAYER_LIMB_L_FOREARM : PLAYER_LIMB_R_FOREARM;
 }
 
-static void MmForm_UpdateZoraMelee(Player* player, PlayState* play) {
+static void MmForm_UpdateMelee(Player* player, PlayState* play) {
     u8 active = 0;
-    u8 jump = gFormState.goronAction == MMFORM_ACT_JUMP_KICK;
-    f32 frame = jump ? gFormState.formSkelAnime.curFrame : gFormState.zoraPunchCollisionFrame;
-    if (gFormState.state == MMFORM_STATE_ACTIVE && gFormState.currentForm == MM_PLAYER_FORM_ZORA &&
-        gFormState.formSkelAnime.animation != NULL &&
+    u8 goron = gFormState.currentForm == MM_PLAYER_FORM_GORON;
+    u8 zora = gFormState.currentForm == MM_PLAYER_FORM_ZORA;
+    u8 jump = zora && gFormState.goronAction == MMFORM_ACT_JUMP_KICK;
+    f32 frame = jump ? gFormState.formSkelAnime.curFrame : gFormState.punchCollisionFrame;
+    if (gFormState.state == MMFORM_STATE_ACTIVE && (goron || zora) && gFormState.formSkelAnime.animation != NULL &&
         !(player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_INPUT_DISABLED))) {
         if (jump) {
             active = frame >= 8.0f && frame <= 99.0f && !MMFORM_ON_GROUND(player);
         } else if (gFormState.goronAction >= GORON_ACT_PUNCH_A && gFormState.goronAction <= GORON_ACT_PUNCH_C &&
                    gFormState.comboStep < 3 && !gFormState.wallRecoilActive) {
-            active = frame >= sZoraPunchFrames[gFormState.comboStep][0] &&
-                     frame <= sZoraPunchFrames[gFormState.comboStep][1];
+            const u8(*frames)[2] = goron ? sGoronPunchFrames : sZoraPunchFrames;
+            active = frame >= frames[gFormState.comboStep][0] && frame <= frames[gFormState.comboStep][1];
         }
     }
     if (!active) {
-        if (gFormState.zoraMeleeActive) {
+        if (gFormState.meleeActive) {
             MmForm_DisableJumpKickQuads(player);
             for (s32 i = 0; i < 3; ++i) {
                 player->meleeWeaponInfo[i].active = 0;
@@ -15706,23 +15718,23 @@ static void MmForm_UpdateZoraMelee(Player* player, PlayState* play) {
             MmForm_KillTrail(play, &gFormState.punchTrailEffectIndex, &gFormState.punchTrailActive);
             gFormState.zoraJumpTrailActive = 0;
         }
-        gFormState.zoraMeleeActive = 0;
+        gFormState.meleeActive = 0;
         return;
     }
-    if (!gFormState.zoraMeleeActive) {
+    if (!gFormState.meleeActive) {
         for (s32 i = 0; i < 3; ++i) {
             player->meleeWeaponInfo[i].active = 0;
         }
     }
-    gFormState.zoraMeleeActive = 1;
+    gFormState.meleeActive = 1;
     gFormState.jumpKickActive = jump;
     player->cylinder.base.atFlags &= ~AT_ON;
     player->cylinder.info.toucher.dmgFlags = 0;
     for (s32 i = 0; i < 2; ++i) {
         ColliderQuad* quad = &player->meleeWeaponQuads[i];
         quad->base.atFlags = AT_ON | AT_TYPE_PLAYER;
-        quad->info.toucher.dmgFlags = jump ? DMG_JUMP_MASTER : DMG_SLASH_MASTER;
-        quad->info.toucher.damage = jump ? 2 : ZORA_PUNCH_DAMAGE;
+        quad->info.toucher.dmgFlags = goron ? DMG_HAMMER_SWING : (jump ? DMG_JUMP_MASTER : DMG_SLASH_MASTER);
+        quad->info.toucher.damage = goron ? GORON_PUNCH_DAMAGE : (jump ? 2 : ZORA_PUNCH_DAMAGE);
         quad->info.toucherFlags = TOUCH_ON | TOUCH_NEAREST;
     }
     if (jump && !gFormState.punchTrailActive) {
@@ -15740,28 +15752,51 @@ static void MmForm_UpdateZoraMelee(Player* player, PlayState* play) {
     }
 }
 
-static void MmForm_DrawZoraMelee(PlayState* play, Player* player, s32 limbIndex) {
-    if (!gFormState.zoraMeleeActive || limbIndex != MmForm_ZoraMeleeLimb()) {
+static void MmForm_DrawMelee(PlayState* play, Player* player, s32 limbIndex) {
+    if (!gFormState.meleeActive || limbIndex != MmForm_MeleeLimb()) {
         return;
     }
-    // Native MM func_8012669C uses three swept tip/base pairs in the active
-    // forearm or right-shin matrix. Pair 0 is the trail; pairs 1/2 are damage.
+    // Native MM func_8012669C uses three tip/base pairs in the attacking limb's
+    // matrix. Pair 0 tracks the attack; pairs 1/2 sweep its damage across frames.
+    // Goron: D_801C09B8 / D_801C0970 (hand), D_801C0A90 / D_801C0A6C (waist).
+    // Zora: D_801C0A00 / D_801C09DC (forearm), D_801C0A48 / D_801C0A24 (shin).
+    // These are the authored model-space coordinates, not a world-space range boost.
+    static Vec3f handTip[3] = { { 0, 750, 750 }, { 1500, 1500, 1500 }, { -2500, -2000, -3000 } };
+    static Vec3f handBase[3] = { { 0, 400, 0 }, { 0, 1400, -1000 }, { 0, -400, 1000 } };
+    static Vec3f waistTip[3] = { { -400, 1800, 0 }, { 5000, 8000, 4000 }, { 5000, -500, -4000 } };
+    static Vec3f waistBase[3] = { { -400, 800, 0 }, { -5000, -500, -4000 }, { -5000, 8000, 4000 } };
     static Vec3f forearmTip[3] = { { -2500, 1400, 1100 }, { -2900, 1000, 1500 }, { -2100, 1800, 700 } };
     static Vec3f forearmBase[3] = { { 900, 300, 100 }, { 1300, 700, -300 }, { 500, -100, 500 } };
     static Vec3f shinTip[3] = { { 2000, 0, 0 }, { 2800, -800, -800 }, { 2800, 800, 800 } };
     static Vec3f shinBase[3] = { { 0, 0, 0 }, { -800, 800, 800 }, { -800, -800, -800 } };
     Vec3f* tips = limbIndex == PLAYER_LIMB_R_SHIN ? shinTip : forearmTip;
     Vec3f* bases = limbIndex == PLAYER_LIMB_R_SHIN ? shinBase : forearmBase;
+    if (gFormState.currentForm == MM_PLAYER_FORM_GORON) {
+        tips = limbIndex == PLAYER_LIMB_WAIST ? waistTip : handTip;
+        bases = limbIndex == PLAYER_LIMB_WAIST ? waistBase : handBase;
+    }
     for (s32 i = 0; i < 3; ++i) {
         Vec3f tip, base;
         Matrix_MultVec3f(&tips[i], &tip);
         Matrix_MultVec3f(&bases[i], &base);
         u8 moved =
             func_80090480(play, i ? &player->meleeWeaponQuads[i - 1] : NULL, &player->meleeWeaponInfo[i], &tip, &base);
-        if (i == 0 && moved && gFormState.punchTrailActive) {
+        if (i == 0 && moved && gFormState.currentForm == MM_PLAYER_FORM_ZORA && gFormState.punchTrailActive) {
             EffectBlure_AddVertex((EffectBlure*)Effect_GetByIndex(gFormState.punchTrailEffectIndex), &tip, &base);
         }
     }
+}
+
+// Damage itself yields to OoT through PLAYER_STATE1_DAMAGED. Once a new form
+// attack starts, remaining invulnerability frames must not replace its bones
+// with the host idle/recovery pose: the melee quads use these same matrices.
+static u8 MmForm_OwnsMeleePose(void) {
+    if (gFormState.state != MMFORM_STATE_ACTIVE ||
+        (gFormState.currentForm != MM_PLAYER_FORM_GORON && gFormState.currentForm != MM_PLAYER_FORM_ZORA)) {
+        return 0;
+    }
+    return (gFormState.goronAction >= GORON_ACT_PUNCH_A && gFormState.goronAction <= GORON_ACT_PUNCH_END) ||
+           (gFormState.currentForm == MM_PLAYER_FORM_ZORA && gFormState.goronAction == MMFORM_ACT_JUMP_KICK);
 }
 
 static void MmForm_ClearZoraSwimTrails(PlayState* play) {
@@ -15893,9 +15928,9 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
     Player* player = (Player*)thisx;
     MmForm_DrawNativeTransformationLimb(play, player, limbIndex);
     Vec3f zeroVec = { 0.0f, 0.0f, 0.0f };
-    // Outside the fin-DL block: the third combo hit and jump kick use R_SHIN,
-    // and combat must still work when a cosmetic fin display list is absent.
-    MmForm_DrawZoraMelee(play, player, limbIndex);
+    // Run independently of cosmetic DLs. Goron uses its hands/waist, while
+    // Zora's third combo hit and jump kick use R_SHIN instead of the fins.
+    MmForm_DrawMelee(play, player, limbIndex);
 
     // === 1. Store limb world positions in bodyPartsPos ===
     // Mirrors OOT z_player_lib.c:1842-1844 (D_80160000 system).
@@ -16809,6 +16844,7 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
 // =============================================================================
 
 static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformation form) {
+    MmForm_ResetDekuBubble(NULL);
     MmForm_GakkiVoiceOff();
     FormJingle_Stop();
     // 1. Clear stale pointers from previous scene
@@ -16931,6 +16967,52 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
 
 extern "C" {
 
+void MmForm_DiscardSaveSession(void) {
+    // File selection and creation replace the native save and player. Their
+    // departed actor arenas may already be gone: do not use Reset/RestoreOotState,
+    // native cutscene teardown, or equipment restoration through this boundary.
+    MmForm_ResetDekuBubble(NULL);
+    MmForm_StopNativeMaskSfx();
+    MmForm_GakkiVoiceOff();
+    FormJingle_Stop();
+    MmForm_StopGoronRollSfx();
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
+    sNativeMaskCs = {};
+    sNativeMaskInstantFallback = 0;
+
+    // These own process resources/global animation tables, not the departed
+    // player. Forget scene handles; never call the flight/combat actor cleanup.
+    MmForm_RitoWindClear();
+    MmForm_RitoRestoreLanding();
+    MmForm_RitoBowReset();
+    MmForm_GerudoRestoreAnims();
+    MmForm_FreeRootMotion();
+    MmForm_ClearCachedDLs();
+    MmForm_UnpinFormResources();
+    const char* forced = O2rLoader_GetForcedName();
+    if (forced != NULL && (strcmp(forced, "gerudo") == 0 || strcmp(forced, "rito") == 0 ||
+                           strcmp(forced, "keaton") == 0 || strcmp(forced, "kafei") == 0)) {
+        O2rLoader_ClearForcedModel();
+    }
+
+    sEquipsSaved = 0;
+    memset(&sPreTransformEquips, 0, sizeof(sPreTransformEquips));
+    ExtEquip_ClearTransformBackup();
+    sPendingReactivate = 0;
+    sPendingSoftReload = 0;
+    sPendingReactivateForm = MM_PLAYER_FORM_HUMAN;
+    sFleetPendingForm = -1;
+    sForceInstantTransform = 0;
+    sCutsceneMaskAnim = 0;
+    sRollOwnsPause = 0;
+    memset(&gMmFormPendingDamage, 0, sizeof(gMmFormPendingDamage));
+    memset(&gFormState, 0, sizeof(gFormState));
+    gFormState.state = MMFORM_STATE_INACTIVE;
+    gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
+    gFormState.targetForm = MM_PLAYER_FORM_HUMAN;
+}
+
 // A new scene/file has its own native player and equips. Discard a departed
 // Rito form that this file cannot use without restoring the old player's saved
 // properties or equip backup into the new save.
@@ -16966,6 +17048,7 @@ static void MmForm_DiscardUnownedRitoReload(void) {
 }
 
 void MmForm_Init(PlayState* play, Player* player) {
+    MmForm_ResetDekuBubble(NULL);
     MmForm_InterruptNativeMaskForScene(player, play, 1);
     MmForm_GakkiVoiceOff();
     FormJingle_Stop();
@@ -16976,7 +17059,7 @@ void MmForm_Init(PlayState* play, Player* player) {
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     // The previous scene's effect context was destroyed before this Init.
     MmForm_ClearZoraSwimTrails(NULL);
-    gFormState.zoraMeleeActive = 0;
+    gFormState.meleeActive = 0;
     gFormState.zoraJumpTrailActive = 0;
     // Effects and actors from the old scene are already gone; drop the updraft's
     // handles to them before anything can try to free them a second time.
@@ -17024,6 +17107,7 @@ void MmForm_Init(PlayState* play, Player* player) {
         memset(&gFormState, 0, sizeof(gFormState));
         gFormState.state = MMFORM_STATE_INACTIVE;
         gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
+        gFormState.targetForm = MM_PLAYER_FORM_HUMAN;
     }
 
     gFormState.initialized = 1;
@@ -17620,8 +17704,8 @@ void MmForm_FireDekuBubble(Player* player, PlayState* play) {
     if (gFormState.currentForm == MM_PLAYER_FORM_GARO) {
         return;
     }
-    // MmForm_FireBubble already stops BREATH at its start; the redundant Stop here
-    // was harmless but pointed at a mis-modeled control flow. Single stop is enough.
+    // The native slingshot upper action owns the release edge; this consumes
+    // exactly one shot and resets its charge for the next B press.
     MmForm_FireBubble(player, play);
     gFormState.bubbleCharge = 0.0f;
     gFormState.bubbleChargeTimer = 0;
@@ -18677,7 +18761,7 @@ void MmForm_Update(PlayState* play, Player* player) {
     }
 
     MmForm_UpdateGoronRollSfx(player, play);
-    MmForm_UpdateZoraMelee(player, play);
+    MmForm_UpdateMelee(player, play);
     MmForm_UpdateZoraSwimTrails(play);
     MmForm_UpdateZoraSwimSfx(player);
 
@@ -18778,6 +18862,7 @@ void MmForm_Draw(PlayState* play, Player* player) {
             MmForm_DrawChargingBubble(player, play);
         }
         MmForm_DrawBubbleProjectile(player, play);
+        MmForm_DrawDekuBubbleEffects(play);
         Matrix_Pop();
     }
 
@@ -19175,15 +19260,16 @@ void MmForm_Draw(PlayState* play, Player* player) {
             //   - fallDamageStunTimer > 0: ACTIVE fall damage stun crouch
             //     (link_normal_landing_wait). NOT != 0: OOT uses -1 as a "stun
             //     done" sentinel and that value was wiping the Deku flight pose.
-            //   - invincibilityTimer != 0 (post-damage): keep showing whatever damage/recovery
-            //     anim OOT has on the player rather than the form's idle pose
+            //   - invincibilityTimer != 0 (post-damage): keep the OOT recovery
+            //     pose until a new form melee action owns the animated bones
             // fallDamageStunTimer uses > 0 (active stun countdown), not != 0.
             // OOT sets it to -1 as a sentinel after stun completes/cancels — that's
             // not actually "in stun", just "stun done". Treating -1 as active was
             // wiping the form's flutter pose during Deku flight (every frame copied
             // OOT's idle/walk jointTable on top of the form's batabata pose).
             u8 forceOotCopy = (player->stateFlags1 & PLAYER_STATE1_GETTING_ITEM) != 0 ||
-                              player->av2.fallDamageStunTimer > 0 || player->invincibilityTimer != 0;
+                              player->av2.fallDamageStunTimer > 0 ||
+                              (player->invincibilityTimer != 0 && !MmForm_OwnsMeleePose());
             // Gakki (instrument) wins over EVERY copy path, like MM: there the transformed
             // player simply plays its own pg_/pz_/pn_gakkistart+gakkiplay animations while the
             // ordinary ocarina runs underneath (z_message.c only swaps the instrument via
@@ -19259,9 +19345,17 @@ void MmForm_Draw(PlayState* play, Player* player) {
             }
 
             // Draw the MM form skeleton (with OOT or form-specific joints)
+            u8 isDekuSpinning = MmForm_IsDekuSpinning();
+            if (isDekuSpinning) {
+                Matrix_Push();
+                Matrix_RotateY(BINANG_TO_RAD((s16)gFormState.dekuSpinRotAccum), MTXMODE_APPLY);
+            }
             SkelAnime_DrawFlexOpa(play, gFormState.formSkelAnime.skeleton, gFormState.formSkelAnime.jointTable,
                                   gFormState.formDListCount, MmForm_OverrideLimbDraw, MmForm_PostLimbDraw,
                                   &player->actor);
+            if (isDekuSpinning) {
+                Matrix_Pop();
+            }
         }
     }
 
@@ -19347,9 +19441,6 @@ void MmForm_Draw(PlayState* play, Player* player) {
         }
     }
 
-    // Draw Deku bubble projectile (if active)
-    MmForm_DrawBubbleProjectile(player, play);
-
     // Reset segments that MmForm set to MM-specific values.
     // These persist in the shared POLY_OPA/XLU buffers and will corrupt
     // subsequent actors (e.g. Poe Composer uses segment 0x08 for env color).
@@ -19434,6 +19525,7 @@ void MmForm_Draw(PlayState* play, Player* player) {
 // re-applied, so the player respawns with no Ext sword/shield/tunic/boots and with
 // the form's strength override (Goron=3, Zora=1, Deku=0) baked into the save.
 void MmForm_OnDeath(void) {
+    MmForm_ResetDekuBubble(gPlayState);
     MmForm_CancelNativeMaskCutscene(1);
     MmForm_GakkiVoiceOff();
     FormJingle_Stop();
@@ -19479,6 +19571,7 @@ void MmForm_OnDeath(void) {
 }
 
 void MmForm_Reset(void) {
+    MmForm_ResetDekuBubble(gPlayState);
     MmForm_CancelNativeMaskCutscene(0);
     MmForm_GakkiVoiceOff();
     FormJingle_Stop();
@@ -19487,7 +19580,7 @@ void MmForm_Reset(void) {
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     MmForm_ClearZoraSwimTrails(gPlayState);
-    if (gFormState.zoraMeleeActive && gPlayState != NULL) {
+    if (gFormState.meleeActive && gPlayState != NULL) {
         Player* player = GET_PLAYER(gPlayState);
         if (player != NULL) {
             MmForm_DisableJumpKickQuads(player);
@@ -19496,7 +19589,7 @@ void MmForm_Reset(void) {
             }
         }
     }
-    gFormState.zoraMeleeActive = 0;
+    gFormState.meleeActive = 0;
     if (gFormState.zoraJumpTrailActive && gPlayState != NULL) {
         MmForm_KillTrail(gPlayState, &gFormState.punchTrailEffectIndex, &gFormState.punchTrailActive);
     }

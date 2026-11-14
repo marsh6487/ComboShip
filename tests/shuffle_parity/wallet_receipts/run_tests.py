@@ -189,7 +189,7 @@ namespace Rando {bool gComboDormantGive=false;thread_local bool gItemGrantSimula
  s+='u32 gRandoPickupSerial=0;\nvoid GiveItem(RandoItemId randoItemId,RandoCheckId){'+depth+record+'switch(randoItemId){case RI_WALLET_CHILD:Wallets::Give(randoItemId);break;'+walletcases+'case RI_RUPEE_RED:case RI_JUNK:break;default:assert(false);}}\n}\n'
  a=param.index('    } else if (item == ITEM_WALLET_ADULT)');b=param.index('    } else if',param.index('    } else if (item == ITEM_WALLET_GIANT)',a)+1)
  s+='extern "C" u8 Item_Give(PlayState*,u8 item){if(false){'+param[a:b]+'}else{assert(false);}return ITEM_NONE;}\n'
- for marker in ('static bool Combo_IsBottleRefill(','void Combo_MM_FlushAccumulators(','void Combo_MM_GiveDormantResolved(','static const std::unordered_map<std::string, RandoItemId>& Combo_MM_SpoilerNameToItemId('):
+ for marker in ('static bool Combo_IsBottleRefill(','void Combo_MM_FlushAccumulators(','static void Combo_MM_GiveDormantResolvedInternal(','void Combo_MM_GiveDormantResolved(','static const std::unordered_map<std::string, RandoItemId>& Combo_MM_SpoilerNameToItemId('):
   s+=block(bridge,marker)+'\n'
  for marker in ('static bool GrantMmItemByName(','extern "C" COMBO_EXPORT void MM_GrantCrossItem(','extern "C" COMBO_EXPORT void MM_GrantSharedItem('):s+=block(bridge,marker)+'\n'
  s+=r'''

@@ -55,6 +55,10 @@ def build_source():
     declarations = [body[:body.index("{")].rstrip() + ";" for body in bodies]
     fixture = fixture.replace("/* PRODUCTION_GAKKI_DECLARATIONS */", "\n".join(declarations))
     fixture = fixture.replace("/* PRODUCTION_GAKKI_FUNCTIONS */", "\n".join(bodies))
+    active = function(form, "MmForm_UpdateActive")
+    start = active.index("    // ── Gakki (instrument)")
+    end = active.index("    // ── Unified per-form owner dispatch", start)
+    fixture = fixture.replace("/* PRODUCTION_GAKKI_SESSION */", active[start:end])
     for label, suffix, ending in (
         ("GORON", "Goron Drums", "        } else if"),
         ("ZORA", "Zora Guitar", "            // Initialize shield"),
@@ -80,8 +84,11 @@ def build_source():
     for label, name in (("INIT", "MmForm_Init"), ("RESET", "MmForm_Reset"), ("DEATH", "MmForm_OnDeath")):
         body = function(form, name).split("{", 1)[1].split("    MmForm_StopGoronRollSfx();", 1)[0]
         fixture = fixture.replace("/* PRODUCTION_" + label + "_CLEANUP */", body)
-    reload = function(form, "MmForm_SoftReload").split("{", 1)[1].split("    // 2. Reset stale fields", 1)[0]
-    fixture = fixture.replace("/* PRODUCTION_RELOAD_CLEANUP */", reload)
+    reload = function(form, "MmForm_SoftReload")
+    cleanup = reload.split("{", 1)[1].split("    // 2. Reset stale fields", 1)[0]
+    start = reload.index("    gFormState.gakkiActive = 0;")
+    end = reload.index("    gFormState.formDLsPinned = 0;", start)
+    fixture = fixture.replace("/* PRODUCTION_RELOAD_CLEANUP */", cleanup + reload[start:end])
     native_transform = (ROOT / "soh/mods/transformation_masks/mm_native_transform.inc.h").read_text()
     fixture = fixture.replace("/* PRODUCTION_DESTROY_CLEANUP */", function(native_transform, "MmForm_OnPlayDestroy"))
 
@@ -111,6 +118,8 @@ CASES = (
     "replay-repeat", "held-bend", "late-note-off", "muted-replay", "mute-held",
     "zora-hand", "zora-intro", "fd-ocarina",
     "cleanup-damage", "cleanup-restore", "cleanup-reload", "cleanup-init", "cleanup-reset", "cleanup-death", "cleanup-destroy",
+    "performance-loop", "performance-result-dialogue", "performance-callbacks", "performance-scales",
+    "performance-decision", "performance-close", "performance-unrelated-text", "performance-cleanup", "opening-after-song",
 )
 
 

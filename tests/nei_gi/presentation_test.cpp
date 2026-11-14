@@ -1165,8 +1165,7 @@ int main() {
             const auto &want = arena.front();
             size_t matching = 0;
             for (const auto &got : drawnMeshes)
-              if (got.size() == want.size() &&
-                  !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx))) ++matching;
+              if (SameVertices(got, want)) ++matching;
             assert(matching == 1); // Exactly one shared shimmer, never a duplicate.
           }
         }

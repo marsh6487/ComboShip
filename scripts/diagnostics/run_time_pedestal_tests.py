@@ -47,6 +47,19 @@ def struct_typedef(source, name):
     return re.search(r"typedef struct(?:\s+\w+)?\s*\{[^{}]*\}\s*" + name + r";", source, re.S)[0]
 
 
+def trade_reconciliation():
+    """Real dependency closure for the load-time Rito migration."""
+    trade = (ROOT / "soh/mods/items/logic/trade_items.c").read_text()
+    equipment = (ROOT / "soh/mods/extended_equipment.h").read_text()
+    # Keep the native item ID without importing unrelated equipment state into
+    # the pedestal engine fixture, which supplies its own equipment boundary.
+    result = re.search(r"^#define ITEM_EXT_BOOTS_2[^\n]*", equipment, re.M)[0] + "\n"
+    result += trade[trade.index("#define TRADE_ADULT_COUNT"):trade.index("s32 TradeAdult_Count(")]
+    bodies = functions(trade)
+    return result + "\n".join(bodies[name] for name in (
+        "TradeAdult_IndexOfItem", "TradeAdult_IsConsumedIndex", "TradeAdult_ReconcileConsumed")) + "\n"
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="soh-time-pedestal-") as directory:
         build = pathlib.Path(directory)
@@ -229,6 +242,7 @@ static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
         metadata = functions((ROOT / "soh/mods/nei_save.cpp").read_text())
         rito = functions((ROOT / "soh/mods/transformation_masks/custom_forms.cpp").read_text().replace('extern "C" ', ''))
         (build / "metadata.cpp").write_text('#include "time_pedestal_fixture.h"\n#include "combo/menu/ItemGrantAuditBridge.h"\n' +
+            trade_reconciliation() +
             "\n".join('extern "C" ' + rito[name] for name in
                       ("RitoMask_IsOwned", "RitoItem_NoteCellItem", "RitoMask_MigrateLegacy")) + "\n" +
             "static NeiSaveData& gNeiSave = *Nei_Save();\n" + metadata["NeiSave_Save"] + "\n" + metadata["NeiSave_Load"])

@@ -6,6 +6,8 @@
 
 #include "z_en_sellnuts.h"
 
+void TradeAdult_ConsumeItem(u8 item);
+
 #define FLAGS                                                                                  \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_DRAW_CULLING_DISABLED)
@@ -509,6 +511,8 @@ void func_80ADBAB8(EnSellnuts* this, PlayState* play) {
     if ((talkState == TEXT_STATE_EVENT) && Message_ShouldAdvance(play)) {
         play->msgCtx.msgMode = MSGMODE_TEXT_CLOSING;
         play->msgCtx.stateTimer = 4;
+        // The handoff is accepted here, before randomizer hooks can replace the reward.
+        TradeAdult_ConsumeItem(ITEM_MOONS_TEAR);
         this->actionFunc = func_80ADBBEC;
         Player_SetCsActionWithHaltedActors(play, NULL, PLAYER_CSACTION_19);
     }

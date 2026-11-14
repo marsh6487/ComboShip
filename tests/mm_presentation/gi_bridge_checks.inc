@@ -37,7 +37,7 @@ for (const auto& origin : {std::pair{mmKokiri, 0xA46CFFu}, std::pair{ootKokiri, 
     assert(arena.size() == 1);
     const auto& want = arena.front();
     assert(std::count_if(shown.begin(), shown.end(), [&](const auto& got) {
-        return got.size() == want.size() && !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx));
+        return SameVertices(got, want);
     }) == 1);
     assert(stack.empty() && interpolation == 0 && matrix == 1);
 }
@@ -73,7 +73,7 @@ for (const auto& sword : {
                 NeiGi_CameraBasis(&play), sword.second));
             assert(arena.size() == 1);
             const auto& want = arena.front();
-            assert(got.size() == want.size() && !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx)));
+            assert(SameVertices(got, want));
         }
     }
 }
@@ -97,7 +97,7 @@ for (const auto& item : {
             arena.clear();
             NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play), item.second));
             assert(got.size() == arena.front().size());
-            assert(!std::memcmp(got.data(), arena.front().data(), got.size() * sizeof(Vtx)));
+            assert(SameVertices(got, arena.front()));
         }
         assert(stack.empty());
     }
@@ -186,8 +186,7 @@ for (const auto& item : kPresentations) {
     const auto &want = arena.front();
     size_t matching = 0;
     for (const auto &got : shown)
-      if (got.size() == want.size() &&
-          !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx))) ++matching;
+      if (SameVertices(got, want)) ++matching;
     assert(matching == 1);
     assert(stack.empty() && interpolation == 0 && matrix == 1);
     Reset(); // missing archives: let the original native item render

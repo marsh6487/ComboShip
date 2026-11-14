@@ -1,6 +1,9 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#ifdef COMBO_BUILD
+#include "2s2h/BenPort.h"
+#endif
 
 extern "C" {
 #include "variables.h"
@@ -11,6 +14,16 @@ void Flags_SetWeekEventReg(s32 flag);
 #define INTRO_CVAR CVarGetInteger(INTRO_CVAR_NAME, 0)
 #define FIRST_CYCLE_CVAR_NAME "gEnhancements.Cutscenes.SkipFirstCycle"
 #define FIRST_CYCLE_CVAR CVarGetInteger(FIRST_CYCLE_CVAR_NAME, 0)
+
+// Keep conditional directives outside hook macro arguments for MSVC's
+// preprocessor. The bridge still runs only after native grants and saving.
+static void ApplyDeferredComboPortalAfterIntroSkip() {
+#ifdef COMBO_BUILD
+    if (FIRST_CYCLE_CVAR) {
+        MM_ApplyComboPortalAfterIntroSkip();
+    }
+#endif
+}
 
 void RegisterSkipIntroSequence() {
     COND_VB_SHOULD(VB_PLAY_TRANSITION_CS, INTRO_CVAR, {
@@ -62,6 +75,7 @@ void RegisterSkipIntroSequence() {
         }
         // Persist this modified state so moon crashes without saving keep it
         Sram_SaveSpecialEnterClockTown(gPlayState);
+        ApplyDeferredComboPortalAfterIntroSkip();
     });
 }
 

@@ -58,6 +58,11 @@ extern "C" {
 extern "C" s32 Player_GetMovementSpeedAndYaw(Player* this_, f32* outSpeedTarget, s16* outYawTarget, f32 speedMode,
                                              PlayState* play);
 
+// Native upper-body shield action, installed only after the player accepts a guard.
+extern "C" s32 func_80834B5C(Player* player, PlayState* play);
+// Normal damage recovery permits native action interrupts in its final 16 animation frames.
+extern "C" void Player_Action_8084370C(Player* player, PlayState* play);
+
 // For Great Fairy Mask map overlay (same textures as minish_kaleido)
 #include "textures/map_name_static/map_name_static.h"
 #include "textures/icon_item_static/icon_item_static.h"
@@ -195,7 +200,7 @@ static Gfx sBlastMaskXluSeg9[] = {
 
 static s32 sCurrentMmMask = ITEM_NONE;
 static s32 sBlastMaskCooldown = 0;
-static bool sBlastARequested = false;
+static bool sBlastBRequested = false;
 
 // Don Gero state
 static s32 sDonGeroState = 0; // 0=idle, 1=giving reward
@@ -1137,10 +1142,15 @@ extern "C" void MmMaskWear_Draw(PlayState* play, Player* player) {
 // Per-Mask Effect Update (empty stubs for now)
 // =============================================================================
 
-extern "C" s32 MmMaskWear_CanUseBlastA(PlayState* play, Player* player) {
+extern "C" s32 MmMaskWear_CanUseBlastB(PlayState* play, Player* player) {
     // The worn-mask updater ticks the cooldown before accepting the request.
     if (play == nullptr || player == nullptr || sCurrentMmMask != ITEM_MM_MASK_BLAST ||
-        (sBlastMaskCooldown != 0 && sBlastMaskCooldown != 1)) {
+        gSaveContext.buttonStatus[0] == BTN_DISABLED || (sBlastMaskCooldown != 0 && sBlastMaskCooldown != 1)) {
+        return false;
+    }
+    if ((player->stateFlags1 & PLAYER_STATE1_DAMAGED) &&
+        (player->actionFunc != Player_Action_8084370C ||
+         player->skelAnime.curFrame < player->skelAnime.endFrame - 16.0f)) {
         return false;
     }
     const u32 blockedState1 = PLAYER_STATE1_INPUT_DISABLED | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD |
@@ -1158,30 +1168,45 @@ extern "C" s32 MmMaskWear_CanUseBlastA(PlayState* play, Player* player) {
            player->itemAction != PLAYER_IA_OCARINA_FAIRY && player->itemAction != PLAYER_IA_OCARINA_OF_TIME &&
            play->msgCtx.msgMode == MSGMODE_NONE && play->pauseCtx.state == 0 && play->pauseCtx.debugState == 0 &&
            play->gameOverCtx.state == GAMEOVER_INACTIVE && play->csCtx.state == CS_STATE_IDLE &&
-           play->transitionMode == TRANS_MODE_OFF && !Player_InBlockingCsMode(play, player) &&
-           !TransformMasks_AButtonIsOffered(player);
+           play->transitionMode == TRANS_MODE_OFF && !Player_InBlockingCsMode(play, player);
 }
 
-extern "C" void MmMaskWear_FilterBlastA(PlayState* play, Player* player, Input* input) {
-    sBlastARequested = false;
-    if (input != nullptr && MmMaskWear_CanUseBlastA(play, player)) {
-        // Snapshot ownership before UpdateCommon clears the interaction flags.
+extern "C" void MmMaskWear_FilterBlastB(PlayState* play, Player* player, Input* input) {
+    sBlastBRequested = false;
+    if (input != nullptr && MmMaskWear_CanUseBlastB(play, player)) {
+        // Snapshot the player's filtered input before UpdateCommon changes state.
         // The later worn-mask update owns bomb creation and the cooldown tick.
-        sBlastARequested = CHECK_BTN_ALL(input->press.button, BTN_A);
-        input->cur.button &= ~BTN_A;
-        input->press.button &= ~BTN_A;
+        sBlastBRequested = CHECK_BTN_ALL(input->press.button, BTN_B);
     }
 }
 
+static bool MmMaskWear_BlastShieldRaised(PlayState* play, Player* player) {
+    // Match Player_SetModelsForHoldingShield: a two-handed weapon's guard
+    // animation alone does not raise a shield. Child Hylian uses its back guard.
+    const bool canRaiseShield =
+        Player_IsChildWithHylianShield(player) ||
+        (((player->itemAction < 0) || (player->itemAction == player->heldItemAction)) &&
+         ((CVarGetInteger(CVAR_CHEAT("ShieldTwoHanded"), 0) && player->heldItemAction != PLAYER_IA_DEKU_STICK) ||
+          !Player_HoldsTwoHandedWeapon(player)));
+
+    // Standing guard sets SHIELDING this frame. Targeted guard first installs
+    // its accepted upper action, then sets SHIELDING on the following update.
+    // Requiring current R in that first-frame case also excludes shield release.
+    return player->currentShield != PLAYER_SHIELD_NONE && canRaiseShield &&
+           ((player->stateFlags1 & PLAYER_STATE1_SHIELDING) ||
+            (CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_R) && player->upperActionFunc == func_80834B5C));
+}
+
 static void MmMaskWear_UpdateBlast(PlayState* play, Player* player) {
-    const bool requestedA = sBlastARequested;
-    sBlastARequested = false;
+    const bool requestedB = sBlastBRequested;
+    sBlastBRequested = false;
     if (sBlastMaskCooldown > 0) {
         sBlastMaskCooldown--;
     }
 
-    // B keeps its existing path. A has already yielded to native interactions.
-    if (sBlastMaskCooldown == 0 && (requestedA || CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B))) {
+    // A native action may have started talk, item use or a cutscene after the
+    // input snapshot. Drop that request rather than firing into its new state.
+    if (sBlastMaskCooldown == 0 && requestedB && MmMaskWear_CanUseBlastB(play, player)) {
         Vec3f bombPos = player->actor.world.pos;
 
         EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, bombPos.x, bombPos.y, bombPos.z, 0, 0, 0,
@@ -1196,6 +1221,12 @@ static void MmMaskWear_UpdateBlast(PlayState* play, Player* player) {
             bomb->explosionCollider.elements[0].dim.worldSphere.center.x = (s16)bombPos.x;
             bomb->explosionCollider.elements[0].dim.worldSphere.center.y = (s16)bombPos.y;
             bomb->explosionCollider.elements[0].dim.worldSphere.center.z = (s16)bombPos.z;
+
+            if (MmMaskWear_BlastShieldRaised(play, player)) {
+                // Only this mask-created blast stops attacking Link's body.
+                // Keep its player/other attack types, enemy damage and radius.
+                bomb->explosionCollider.base.atFlags &= ~AT_TYPE_ENEMY;
+            }
 
             sBlastMaskCooldown = CVarGetInteger("gMods.BlastMask.Instant", 0) ? 1 : BLAST_MASK_COOLDOWN;
         }
@@ -1967,7 +1998,7 @@ extern "C" void MmMaskWear_SetCurrent(s32 maskItem) {
 extern "C" void MmMaskWear_Clear(void) {
     sCurrentMmMask = ITEM_NONE;
     sBlastMaskCooldown = 0;
-    sBlastARequested = false;
+    sBlastBRequested = false;
     sDonGeroState = 0;
     sDonGeroReward = GI_NONE;
     sAllNightGsSpawned = 0;

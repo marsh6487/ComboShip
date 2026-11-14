@@ -1,3 +1,6 @@
+#define CW_DINS_HOST_MM
+#include "../../../../combo/audio/DinsFireSfx.h"
+#undef CW_DINS_HOST_MM
 /**
  * @file audio_thread.c
  *
@@ -87,6 +90,7 @@ void AudioMgr_CreateNextAudioBuffer(s16* samples, u32 num_samples) {
     // Mix the Phantom Hourglass Recall cues
     HourglassSfx_MixInto(samples, num_samples);
     MM_WolfLinkSfx_MixInto(samples, num_samples);
+    DinsFireSfx_MixInto(samples, num_samples);
     LinkVoice_MixInto(samples, num_samples);
     gAudioCtx.audioRandom = (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * osGetCount();
 }

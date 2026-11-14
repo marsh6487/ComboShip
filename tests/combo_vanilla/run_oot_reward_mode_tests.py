@@ -3,6 +3,7 @@
 from pathlib import Path
 import argparse
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -29,11 +30,30 @@ blocks = [function(inventory, name) for name in [
     'bool ExtInv_IsOnlyTransformation(void)',
     'uint8_t Wand_RandoMode(void)', 'uint8_t BombArrows_RandoMode(void)']]
 blocks += [function('soh/mods/extended_equipment.c', 'u8 ExtEquip_IsEnabled(void)')]
+# Migration now folds the unified trade selection and chooses a real mask
+# neighbor. Keep those dependencies verbatim; only engine mode/flag queries
+# are supplied by the fixture, which exercises Vanilla and seeded modes.
+trade = (ROOT / 'soh/mods/items/logic/trade_items.c').read_text()
+equipment = (ROOT / 'soh/mods/extended_equipment.h').read_text()
+trade = trade[trade.index('#define TRADE_ADULT_COUNT'):trade.index('extern void* MmAssets_LoadResource')]
+trade_declarations = re.findall(r'^(?:s32|u8|void) \w+\([^{};]*\) (?=\{)', trade, re.M)
+blocks += ['extern "C" {\n' + ';\n'.join(trade_declarations) + ';\n}']
+# The reward fixture owns its inventory/equipment storage. Keep the unchanged
+# reconciler in that TU while the remaining helpers keep native C enum rules.
+reconcile = function('soh/mods/items/logic/trade_items.c', 'void TradeAdult_ReconcileConsumed(void)')
+blocks += [re.search(r'^#define TRADE_ADULT_PENDANT\s+.*$', trade, re.M).group(),
+           'extern "C" ' + reconcile]
+trade_source = ('#include "soh/include/z64item.h"\n#include "soh/mods/nei_save.h"\n'
+                'typedef uint8_t u8;\ntypedef int32_t s32;\n' +
+                next(line for line in equipment.splitlines() if line.startswith('#define ITEM_EXT_BOOTS_2 ')) +
+                '\nvoid TradeAdult_ReconcileConsumed(void);\n' + trade.replace(reconcile, '', 1))
 blocks += [function(forms, name) for name in [
     'extern "C" uint8_t RitoMask_IsOwned(void)',
     'extern "C" u8 RitoItem_FormEnabled(void)',
     'static bool GateOn(const CustomFormDef* def)',
     'extern "C" void RitoItem_NoteCellItem(s32 item)',
+    'static uint8_t OotMaskWheel_OwnsItem(s32 item, uint8_t allowVanillaMasks)',
+    'extern "C" uint8_t OotMaskWheel_Neighbor(int32_t direction, uint8_t allowVanillaMasks)',
     'extern "C" void RitoMask_MigrateLegacy(void)',
     'extern "C" void RitoItem_SyncCell(void)']]
 blocks += [function('soh/soh/Enhancements/randomizer/RocsFeatherCycle.c', name) for name in [
@@ -61,6 +81,13 @@ with tempfile.TemporaryDirectory(prefix='vanilla-oot-modes-') as directory:
              '-I', str(ROOT / 'soh'), '-I', str(temp)]
     if args.sanitize:
         flags += ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-pie', '-no-pie']
+    # These are C helpers in the native unity build. Compile them as C to
+    # preserve their enum conversion rules while keeping -Wextra -Werror.
+    (temp / 'trade.c').write_text(trade_source)
+    cflags = [flag for flag in flags if not flag.startswith('-std=')]
+    subprocess.run([*shlex.split(os.environ.get('CC', 'cc')), '-std=gnu11', *cflags,
+                    '-c', str(temp / 'trade.c'), '-o', str(temp / 'trade.o')], check=True)
     subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), *flags,
-                    str(ROOT / 'tests/combo_vanilla/oot_rewards_mode_test.cpp'), '-o', str(temp / 'test')], check=True)
+                    str(ROOT / 'tests/combo_vanilla/oot_rewards_mode_test.cpp'), str(temp / 'trade.o'),
+                    '-o', str(temp / 'test')], check=True)
     subprocess.run([str(temp / 'test')], check=True)

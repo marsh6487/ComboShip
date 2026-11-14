@@ -56,8 +56,8 @@
 //   mmName: nombre legible SOLO informativo. El spoilerName real de 2ship es el nombre del enum
 //           ("RI_HOOKSHOT") y se deriva automáticamente stringificando el token riToken (#ri) en los
 //           glue — tanto para validar como para emitir el spoiler MM. No puede driftear.
-//   Known-gap: RG_CHATEAU_ROMANI existe como RG pero no tiene fila en itemTable (logic-only) —
-//           el validador OoT lo canta hasta que le demos fila en la fase de draws.
+//   Cada nombre OoT compartido debe tener una fila real en itemTable para la entrega inmediata;
+//           un RG de solo lógica no basta para resolver el objeto por nombre.
 #define FC_COMBO_ITEM_LIST(X)                                                                                          \
     /* ---------- A1: cadenas progresivas ---------- */                                                                \
     X(FCI_HOOKSHOT, 3, FCI_F_NONE, RG_PROGRESSIVE_HOOKSHOT, RI_HOOKSHOT, "Progressive Hookshot",                       \

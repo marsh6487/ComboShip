@@ -15,6 +15,7 @@
 #include "soh/Enhancements/Gameplay/ComboWoodfallPassage.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include "BlackMarketFairy.h"
 #include "entrances/BlackMarketEntrance.h"
@@ -38,6 +39,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "overlays/actors/ovl_En_Fish/z_en_fish.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
+#include "overlays/effects/ovl_Effect_Ss_Dust/z_eff_ss_dust.h"
 #include "overlays/effects/ovl_Effect_Ss_Fhg_Flash/z_eff_ss_fhg_flash.h"
 #include "overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -65,6 +67,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "../../../../../combo/render/DinsFireRemakeDraw.h"
+#include "../../../../../combo/render/DinsFireNative.h"
+#include "../../../../../combo/audio/DinsFireSfx.h"
 
 // Declared up here because the .c files pasted in below use them before their definitions further
 // down this same translation unit.
@@ -654,8 +659,13 @@ static s16 sFloorShapePitch = 0;
 static s32 sUseHeldItem = false; // When true, the current held item is used. Is reset to false every frame.
 static s32 sHeldItemButtonIsHeldDown = false; // Indicates if the button for the current held item is held down.
 static s32 sSw97SpellActive = false;          // True only when the active magic spell came from a SW97 medallion item.
-static u8 sZoraBoomerangActive = 0;           // When true, BTN_B returns ITEM_BOOMERANG for Zora fin boomerang.
-static u8 sDekuBubbleActive = 0;              // When true, BTN_B returns ITEM_SLINGSHOT for Deku bubble attack.
+// Cast selection is immutable through recovery, even if settings/assets change.
+static s32 sDinsFireRemakeCast = false;
+static s16 sDinsFireRemakeCastTicks = 0;
+static s32 sDinsFireRemakePendingMagic = false;
+static uint32_t sDinsFireRemakeAudioHandle = 0;
+static u8 sZoraBoomerangActive = 0; // When true, BTN_B returns ITEM_BOOMERANG for Zora fin boomerang.
+static u8 sDekuBubbleActive = 0;    // When true, BTN_B returns ITEM_SLINGSHOT for Deku bubble attack.
 
 extern u8 gMogmaMittsClimbActive; // Mogma Mitts climb-any-wall flag (defined in item_mitts.c)
 
@@ -1919,7 +1929,7 @@ void func_80832318(Player* this) {
 void func_80832340(PlayState* play, Player* this) {
     Camera* subCam;
 
-    if (this->subCamId != SUBCAM_NONE) {
+    if ((!sDinsFireRemakeCast || this->actionFunc != Player_Action_808507F4) && this->subCamId != SUBCAM_NONE) {
         subCam = play->cameraPtrs[this->subCamId];
         if ((subCam != NULL) && (subCam->csId == 1100)) {
             OnePointCutscene_EndCutscene(play, this->subCamId);
@@ -2080,7 +2090,8 @@ void Player_PlaySteppingSfx(Player* this, f32 pitchAdjustment) {
     // (NA_SE_PL_WALK_GROUND + floor offset + per-form offset: Deku +0xF0,
     // Zora +0x120, Goron +0x150, FD +0x80). Play that instead of Link's walk.
     // Returns 0 for Human/Garo/Gerudo/Pikachu so OOT's footstep still plays.
-    if (TransformMasks_TryPlayMmStepSfx(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
+    if (TransformMasks_TryPlayMmStepSfxWithSpeed(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos,
+                                                 pitchAdjustment)) {
         // form footstep played; fall through to the stats counter below
     } else if (this->currentBoots != PLAYER_BOOTS_IRON && stepOffset == 0xE &&
                MmSfx_PlayAtPos(NA_SE_PL_WALK_GROUND + stepOffset, &this->actor.projectedPos)) {
@@ -3996,7 +4007,16 @@ s32 Player_SetupAction(PlayState* play, Player* this, PlayerActionFunc actionFun
         AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_OFF);
         this->stateFlags2 &= ~(PLAYER_STATE2_ATTEMPT_PLAY_FOR_ACTOR | PLAYER_STATE2_PLAY_FOR_ACTOR);
     } else if (Player_Action_808507F4 == this->actionFunc) {
+        DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+        sDinsFireRemakeAudioHandle = 0;
         func_80832340(play, this);
+        if (sDinsFireRemakePendingMagic) {
+            sDinsFireRemakePendingMagic = false;
+            if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2 &&
+                !CwDinsNative_HasMagicOwner(play, &this->actor, ACTOR_MAGIC_FIRE)) {
+                Magic_Reset(play);
+            }
+        }
     }
 
     this->actionFunc = actionFunc;
@@ -7108,10 +7128,32 @@ void func_8083AE40(Player* this, s16 objectId) {
     }
 }
 
+static void Player_DinsFireRemakeSetDuration(Player* this, PlayState* play, f32 endFrame, s32 ticks) {
+    f32 updateRate = R_UPDATE_RATE * 0.5f;
+
+    if (endFrame > this->skelAnime.endFrame) {
+        endFrame = this->skelAnime.endFrame;
+    }
+    // Keep the loaded animation's frames; map its duration onto native updates.
+    this->skelAnime.endFrame = endFrame;
+    this->skelAnime.playSpeed = endFrame / (ticks * ((updateRate > 0.0f) ? updateRate : 1.5f));
+}
+
+static void Player_DinsFireRemakeProtect(Player* this) {
+    // A short, refreshed player-only protection window leaves the world's actor
+    // categories running and preserves any longer existing invincibility.
+    if (this->invincibilityTimer >= 0 && this->invincibilityTimer < 2) {
+        this->invincibilityTimer = 2;
+    }
+}
+
 void func_8083AF44(PlayState* play, Player* this, s32 magicSpell) {
     Player_SetupActionPreserveItemAction(play, this, Player_Action_808507F4, 0);
 
     this->av1.actionVar1 = sSw97SpellActive ? magicSpell : (magicSpell - 3);
+    sDinsFireRemakeCast =
+        !sSw97SpellActive && magicSpell == 5 && this->itemAction == PLAYER_IA_DINS_FIRE && CwDins_Ready();
+    sDinsFireRemakeCastTicks = 0;
 
     //! @bug `MAGIC_CONSUME_WAIT_PREVIEW` is not guaranteed to succeed.
     //! Ideally, the return value of `Magic_RequestChange` should be checked before allowing the process of
@@ -7122,7 +7164,23 @@ void func_8083AF44(PlayState* play, Player* this, s32 magicSpell) {
     //! magic value, it will be consumed to zero.
     // Magic Cape (Skijer): Din's/Farore's/Nayru's (+ SW97 medallions) cost half. Matches the gate at
     // ~3941 so the spell is castable AND consumes at the halved cost.
-    Magic_RequestChange(play, MAGIC_REQ(sMagicSpellCosts[magicSpell]), MAGIC_CONSUME_WAIT_PREVIEW);
+    s32 magicReserved = Magic_RequestChange(play, MAGIC_REQ(sMagicSpellCosts[magicSpell]), MAGIC_CONSUME_WAIT_PREVIEW);
+    sDinsFireRemakePendingMagic = sDinsFireRemakeCast && magicReserved;
+
+    if (sDinsFireRemakeCast) {
+        if (!magicReserved) {
+            func_80839FFC(this, play);
+            sDinsFireRemakeCast = false;
+            return;
+        }
+        sDinsFireRemakeAudioHandle =
+            DinsFireSfx_Begin(play, this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z);
+        Player_DinsFireRemakeProtect(this);
+        LinkAnimation_PlayOnceSetSpeed(play, &this->skelAnime, &gPlayerAnim_link_magic_tame, 0.83f);
+        Player_DinsFireRemakeSetDuration(this, play, this->skelAnime.endFrame, CW_DINS_NATIVE_CHARGE_TICKS);
+        // This path never takes or returns a spell camera.
+        return;
+    }
 
     u8 isFastFarores = CVarGetInteger(CVAR_ENHANCEMENT("FastFarores"), 0) && this->itemAction == PLAYER_IA_FARORES_WIND;
 
@@ -7759,7 +7817,7 @@ void Player_StartDekuBubble(Player* this, PlayState* play) {
     this->heldItemAction = PLAYER_IA_SLINGSHOT;
     this->itemAction = PLAYER_IA_SLINGSHOT;
     this->stateFlags1 |= PLAYER_STATE1_ITEM_IN_HAND;
-    this->unk_860 = -2; // slingshot
+    this->unk_860 = 2; // This B press already armed the shot; -2 is the post-release re-nock state.
     this->stateFlags3 &= ~PLAYER_STATE3_PAUSE_ACTION_FUNC;
 
     // Cancel any sword/melee action OOT may have started this frame from the same B press.
@@ -8854,6 +8912,12 @@ static s32 D_80854598[] = {
 
 void func_8083E4C4(PlayState* play, Player* this, GetItemEntry* giEntry) {
     s32 dropType = giEntry->field & 0x1F;
+#ifdef COMBO_BUILD
+    // A stale token reaching the fast-drop path still cannot grant inventory.
+    // Its durable receipt remains pending until a visible presentation starts.
+    if (ComboStartupOot_IsReceipt(giEntry))
+        return;
+#endif
 
     if (!(giEntry->field & 0x80)) {
         Item_DropCollectible(play, &this->actor.world.pos, dropType | 0x8000);
@@ -8897,7 +8961,11 @@ s32 Player_ActionHandler_2(Player* this, PlayState* play) {
 
                 iREG(67) = false;
 
-                if (IS_RANDO && giEntry.getItemId == RG_ICE_TRAP && giEntry.getItemFrom == ITEM_FROM_FREESTANDING) {
+                if (IS_RANDO && giEntry.getItemId == RG_ICE_TRAP && giEntry.getItemFrom == ITEM_FROM_FREESTANDING
+#ifdef COMBO_BUILD
+                    && !ComboStartupOot_IsReceipt(&giEntry)
+#endif
+                ) {
                     this->actor.freezeTimer = 30;
                     Player_SetPendingFlag(this, play);
                     Message_StartTextbox(play, 0xF8, NULL);
@@ -12422,8 +12490,15 @@ Actor* Player_SpawnMagicSpell(PlayState* play, Player* this, s32 spell) {
         return NULL;
     }
 
-    return Actor_Spawn(&play->actorCtx, play, sMagicSpellActorIds[spell], this->actor.world.pos.x,
-                       this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, 0);
+    s32 nativeDin =
+        !sSw97SpellActive && sDinsFireRemakeCast && this->actionFunc == Player_Action_808507F4 && spell == 2;
+    Actor* actor =
+        Actor_Spawn(&play->actorCtx, play, sMagicSpellActorIds[spell], this->actor.world.pos.x, this->actor.world.pos.y,
+                    this->actor.world.pos.z, 0, 0, 0, nativeDin ? CW_DINS_NATIVE_CAST_PARAMS : 0);
+    if (actor != NULL && nativeDin) {
+        actor->parent = &this->actor;
+    }
+    return actor;
 }
 
 void Player_StartMode_FaroresWind(PlayState* play, Player* this) {
@@ -12528,6 +12603,11 @@ void Player_Init(Actor* thisx, PlayState* play2) {
     // element is a flag. Without this sweep a pre-refactor save reloads with a dead id sitting on a
     // button. Runs here because Player_Init is guaranteed to fire once per file load.
     Sw97_MigrateLayout(play);
+
+    // Aim aliases belong to the departed player, even if its logical form
+    // persists through this scene transition. The new actor starts unarmed.
+    sDekuBubbleActive = 0;
+    sZoraBoomerangActive = 0;
 
     // TRANSFORMATION MASKS: Init BEFORE Player_UseItem so IsTransformed() returns false.
     // Reset transformation state before Player_UseItem to avoid stale state from old scene
@@ -12797,8 +12877,6 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
                     doAction = sDiveNumberDoActions[sp24];
                 } else if (sp1C && !(this->stateFlags2 & PLAYER_STATE2_UNDERWATER)) {
                     doAction = DO_ACTION_DIVE;
-                } else if (MmMaskWear_CanUseBlastA(play, this)) {
-                    doAction = DO_ACTION_EXPLODE;
                 } else if (!sp1C && (!(this->stateFlags1 & PLAYER_STATE1_SHIELDING) || Player_IsZTargeting(this) ||
                                      !Player_IsChildWithHylianShield(this))) {
                     if ((!(this->stateFlags1 & PLAYER_STATE1_CLIMBING_LEDGE) &&
@@ -13428,8 +13506,8 @@ void Player_UpdateBurningDekuStick(PlayState* play, Player* this) {
         this->unk_85C = temp;
     }
 
-    func_8002836C(play, &this->meleeWeaponInfo[0].tip, &D_808547A4, &D_808547B0, &D_808547BC, &D_808547C0,
-                  temp * 200.0f, 0, 8);
+    EffectSsDust_Spawn(play, 0 | EFFECT_SS_DUST_DRAW_DEKU_STICK_FLAME, &this->meleeWeaponInfo[0].tip, &D_808547A4,
+                       &D_808547B0, &D_808547BC, &D_808547C0, temp * 200.0f, 0, 8, 0);
 }
 
 void Player_UpdateBodyShock(PlayState* play, Player* this) {
@@ -14700,6 +14778,15 @@ void Player_DrawGameplay(PlayState* play, Player* this, s32 lod, Gfx* cullDList,
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void Player_DrawDinsFireRemakeCharge(Player* this, PlayState* play) {
+    if (this != GET_PLAYER(play) || this->actionFunc != Player_Action_808507F4 || !sDinsFireRemakeCast ||
+        sDinsFireRemakeCastTicks >= CW_DINS_NATIVE_CHARGE_TICKS + CW_DINS_NATIVE_STRIKE_TICKS ||
+        (this->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW)) {
+        return;
+    }
+    CwDinsFireRemake_DrawNativeCharge(play, this, sDinsFireRemakeCastTicks / 20.0f);
+}
+
 void Player_Draw(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     Player* this = (Player*)thisx;
@@ -14711,6 +14798,7 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
     // Skijer's NEI: custom-model draw fork (RegisterPlayerDrawForkNEI). false = custom
     // model drawn / Link hidden, skip vanilla draw. Pak/O2r skeleton swap stays inline below.
     if (!GameInteractor_Should(VB_PLAYER_DRAW_BEGIN, true, play, this)) {
+        Player_DrawDinsFireRemakeCharge(this, play);
         return;
     }
 
@@ -14828,6 +14916,8 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
         gSPClearGeometryMode(POLY_XLU_DISP++, G_CULL_BOTH);
 
         Player_DrawGameplay(play, this, lod, gCullBackDList, overrideLimbDraw);
+
+        Player_DrawDinsFireRemakeCharge(this, play);
 
         if (this->invincibilityTimer > 0) {
             POLY_OPA_DISP = Play_SetFog(play, POLY_OPA_DISP);
@@ -16400,6 +16490,10 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
     s32 temp2;
     static s32 equipItem;
     static bool equipNow;
+    bool startupReceipt = false;
+#ifdef COMBO_BUILD
+    startupReceipt = ComboStartupOot_IsReceipt(&this->getItemEntry);
+#endif
 
     if (this->getItemId == GI_NONE && this->getItemEntry.objectId == OBJECT_INVALID) {
         return 1;
@@ -16413,14 +16507,22 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
         }
         this->av1.actionVar1 = 1;
         equipItem = giEntry.itemId;
-        equipNow = CVarGetInteger(CVAR_ENHANCEMENT("AskToEquip"), 0) && giEntry.modIndex == MOD_NONE &&
-                   equipItem >= ITEM_SWORD_KOKIRI && equipItem <= ITEM_TUNIC_ZORA && CHECK_AGE_REQ_ITEM(equipItem);
+        equipNow = !startupReceipt && CVarGetInteger(CVAR_ENHANCEMENT("AskToEquip"), 0) &&
+                   giEntry.modIndex == MOD_NONE && equipItem >= ITEM_SWORD_KOKIRI && equipItem <= ITEM_TUNIC_ZORA &&
+                   CHECK_AGE_REQ_ITEM(equipItem);
 
-        const u8 swordElementTutorial =
-            giEntry.modIndex == MOD_NONE ? SwordElement_MessageElementForPickup(giEntry.itemId) : SWORD_ELEMENT_NONE;
+        const u8 swordElementTutorial = !startupReceipt && giEntry.modIndex == MOD_NONE
+                                            ? SwordElement_MessageElementForPickup(giEntry.itemId)
+                                            : SWORD_ELEMENT_NONE;
         Message_StartTextbox(play, giEntry.textId, &this->actor);
+#ifdef COMBO_BUILD
+        if (startupReceipt)
+            ComboStartupOot_TextStarted(play, &giEntry);
+#endif
+        // The startup item was awarded at save creation. Even stale tokens
+        // retain presentation only; never enter inventory or receive hooks.
         // RANDOTODO: Macro this boolean check.
-        if (!(giEntry.modIndex == MOD_RANDOMIZER && giEntry.itemId == RG_ICE_TRAP)) {
+        if (!startupReceipt && !(giEntry.modIndex == MOD_RANDOMIZER && giEntry.itemId == RG_ICE_TRAP)) {
             if (giEntry.modIndex == MOD_NONE) {
                 // RANDOTOD: Move this into Item_Give() or some other more central location
                 if (giEntry.getItemId == GI_SWORD_BGS) {
@@ -16436,7 +16538,8 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
             }
             Player_SetPendingFlag(this, play);
         }
-        SwordElement_MessageAppend(play, swordElementTutorial);
+        if (!startupReceipt)
+            SwordElement_MessageAppend(play, swordElementTutorial);
 
         // Use this if we do have a getItemEntry
         if (giEntry.modIndex == MOD_NONE) {
@@ -16472,7 +16575,8 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
             // Just in case something weird happens with modIndex.
             Audio_PlayFanfare(NA_BGM_ITEM_GET | 0x900);
         }
-    } else if (equipNow && Message_ShouldAdvanceSilent(play) && Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE) {
+    } else if (!startupReceipt && equipNow && Message_ShouldAdvanceSilent(play) &&
+               Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE) {
         if (play->msgCtx.choiceIndex == 0) { // Equip now? Yes
 
             if (equipItem >= ITEM_SWORD_KOKIRI && equipItem <= ITEM_SWORD_BGS) {
@@ -16496,7 +16600,7 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
         play->msgCtx.msgMode = MSGMODE_TEXT_DONE;
     } else {
         if (Message_GetState(&play->msgCtx) == TEXT_STATE_CLOSING) {
-            if (this->getItemId == GI_GAUNTLETS_SILVER) {
+            if (!startupReceipt && this->getItemId == GI_GAUNTLETS_SILVER) {
                 if (GameInteractor_Should(VB_PLAY_NABOORU_CAPTURED_CS, true)) {
                     play->nextEntranceIndex = ENTR_DESERT_COLOSSUS_EAST_EXIT;
                     play->transitionTrigger = TRANS_TRIGGER_START;
@@ -16515,7 +16619,8 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
             }
 
             // #region SOH [Randomizer] TODO Better Ice trap handling?
-            if (this->getItemEntry.itemId == RG_ICE_TRAP && this->getItemEntry.modIndex == MOD_RANDOMIZER) {
+            if (!startupReceipt && this->getItemEntry.itemId == RG_ICE_TRAP &&
+                this->getItemEntry.modIndex == MOD_RANDOMIZER) {
                 this->unk_862 = 0;
                 gSaveContext.ship.pendingIceTrapCount++;
                 Player_SetPendingFlag(this, play);
@@ -17711,8 +17816,8 @@ void Player_Action_8085076C(Player* this, PlayState* play) {
 
 static LinkAnimationHeader* D_80854A58[] = {
     &gPlayerAnim_link_magic_kaze1,     // 0 = Farore's Wind / SW97: Forest(Wind)
-    &gPlayerAnim_link_magic_honoo1,    // 1 = Din's Fire    / SW97: Spirit(Soul)
-    &gPlayerAnim_link_magic_tamashii1, // 2 = Nayru's Love  / SW97: Shadow(Dark)
+    &gPlayerAnim_link_magic_honoo1,    // 1 = Nayru's Love / SW97: Spirit(Soul)
+    &gPlayerAnim_link_magic_tamashii1, // 2 = Din's Fire   / SW97: Shadow(Dark)
     &gPlayerAnim_link_magic_kaze1,     // 3 = SW97: Water(Ice)
     &gPlayerAnim_link_magic_tamashii1, // 4 = SW97: Light
     &gPlayerAnim_link_magic_honoo1,    // 5 = SW97: Fire
@@ -17751,12 +17856,12 @@ static AnimSfxEntry D_80854A8C[][2] = {
         { NA_SE_VO_LI_MAGIC_FROL, -ANIMSFX_DATA(ANIMSFX_TYPE_VOICE, 30) },
     },
     {
-        // 1 = Din's Fire / SW97: Spirit(Soul)
+        // 1 = Nayru's Love / SW97: Spirit(Soul)
         { 0, ANIMSFX_DATA(ANIMSFX_TYPE_WALKING, 20) },
         { NA_SE_VO_LI_MAGIC_NALE, -ANIMSFX_DATA(ANIMSFX_TYPE_VOICE, 44) },
     },
     {
-        // 2 = Nayru's Love / SW97: Shadow(Dark)
+        // 2 = Din's Fire / SW97: Shadow(Dark)
         { NA_SE_VO_LI_MAGIC_ATTACK, ANIMSFX_DATA(ANIMSFX_TYPE_VOICE, 20) },
         { NA_SE_IT_SWORD_SWING_HARD, -ANIMSFX_DATA(ANIMSFX_TYPE_GENERAL, 20) },
     },
@@ -17777,7 +17882,80 @@ static AnimSfxEntry D_80854A8C[][2] = {
     },
 };
 
+/* The remake retains the native voice/customization and surface routes. */
+static AnimSfxEntry sDinsFireRemakeChargeSfx[] = {
+    { NA_SE_VO_LI_SWORD_N, ANIMSFX_DATA(ANIMSFX_TYPE_VOICE, 20) },
+    { 0, -ANIMSFX_DATA(ANIMSFX_TYPE_RUNNING, 26) },
+};
+static AnimSfxEntry sDinsFireRemakeStrikeSfx[] = {
+    { NA_SE_VO_LI_MAGIC_ATTACK, -ANIMSFX_DATA(ANIMSFX_TYPE_VOICE, 20) },
+};
+
+static void Player_UpdateDinsFireRemakeCast(Player* this, PlayState* play) {
+    const s32 releaseTick = CW_DINS_NATIVE_CHARGE_TICKS + CW_DINS_NATIVE_STRIKE_TICKS;
+
+    sDinsFireRemakeCastTicks++;
+    Player_DinsFireRemakeProtect(this);
+    if (sDinsFireRemakeCastTicks == releaseTick + 1) {
+        LinkAnimation_PlayOnceSetSpeed(play, &this->skelAnime, D_80854A70[2], 0.83f);
+        Player_DinsFireRemakeSetDuration(this, play, this->skelAnime.endFrame, CW_DINS_NATIVE_RECOVERY_TICKS);
+        this->av2.actionVar2 = 2;
+    }
+    LinkAnimation_Update(play, &this->skelAnime);
+
+    if (sDinsFireRemakeCastTicks <= CW_DINS_NATIVE_CHARGE_TICKS) {
+        Player_ProcessAnimSfxList(this, sDinsFireRemakeChargeSfx);
+        if (sDinsFireRemakeCastTicks == CW_DINS_NATIVE_CHARGE_TICKS) {
+            LinkAnimation_PlayOnceSetSpeed(play, &this->skelAnime, D_80854A58[2], 0.83f);
+            Player_DinsFireRemakeSetDuration(this, play, CW_DINS_NATIVE_RELEASE_FRAME, CW_DINS_NATIVE_STRIKE_TICKS - 1);
+            if (Player_SpawnMagicSpell(play, this, 2) == NULL) {
+                DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+                sDinsFireRemakeAudioHandle = 0;
+                sDinsFireRemakePendingMagic = false;
+                Magic_Reset(play);
+                this->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_IN_CUTSCENE);
+                func_80839FFC(this, play);
+                sDinsFireRemakeCast = false;
+                return;
+            }
+            sDinsFireRemakePendingMagic = false;
+            gSaveContext.magicState = MAGIC_STATE_CONSUME_SETUP;
+            this->av2.actionVar2 = 1;
+        }
+    } else if (sDinsFireRemakeCastTicks <= releaseTick) {
+        Player_ProcessAnimSfxList(this, sDinsFireRemakeStrikeSfx);
+        if (sDinsFireRemakeCastTicks == releaseTick - 1) {
+            CwDinsNative_Contact(CwDinsNative_FindOwner(play, &this->actor, ACTOR_MAGIC_FIRE));
+        }
+        if (sDinsFireRemakeCastTicks == releaseTick) {
+            Actor* owner = CwDinsNative_FindOwner(play, &this->actor, ACTOR_MAGIC_FIRE);
+            if (owner != NULL) {
+                CwDinsNative_Release(owner);
+            } else {
+                DinsFireSfx_CancelCast(sDinsFireRemakeAudioHandle);
+                sDinsFireRemakeAudioHandle = 0;
+                Magic_Reset(play);
+            }
+            // Hold the native frame-30 cue for one update before fire release.
+            // Physical hand/ground contact remains a configured pose check.
+            this->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_IN_CUTSCENE);
+        }
+    } else if (sDinsFireRemakeCastTicks >= releaseTick + CW_DINS_NATIVE_RECOVERY_TICKS) {
+        this->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_IN_CUTSCENE);
+        this->yaw = this->actor.shape.rot.y;
+        // The live fire actor owns Magic_Reset through the rest of its lifetime.
+        func_80839FFC(this, play);
+        sDinsFireRemakeCast = false;
+        return;
+    }
+    Player_DecelerateToZero(this);
+}
+
 void Player_Action_808507F4(Player* this, PlayState* play) {
+    if (sDinsFireRemakeCast) {
+        Player_UpdateDinsFireRemakeCast(this, play);
+        return;
+    }
     u8 isFastFarores = CVarGetInteger(CVAR_ENHANCEMENT("FastFarores"), 0) && this->itemAction == PLAYER_IA_FARORES_WIND;
     if (LinkAnimation_Update(play, &this->skelAnime)) {
         if (this->av1.actionVar1 < 0) {

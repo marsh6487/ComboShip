@@ -89,6 +89,27 @@ u32 EffectSsDust_Init(PlayState* play, u32 index, EffectSs* this, void* initPara
 // The eight frames are an optional set, resolved per draw so existing particles
 // follow Alt toggles and archive changes without retaining a resource pointer.
 static const void* EffectSsDust_SelectTexture(u16 drawFlags, s16 frame, const void* fallback) {
+    if (drawFlags & EFFECT_SS_DUST_DRAW_DEKU_STICK_FLAME) {
+        static const char ALIGN_ASSET(2) flame1[] = "__OTR__custom/deku_stick/flame/flame1Tex";
+        static const char ALIGN_ASSET(2) flame2[] = "__OTR__custom/deku_stick/flame/flame2Tex";
+        static const char ALIGN_ASSET(2) flame3[] = "__OTR__custom/deku_stick/flame/flame3Tex";
+        static const char ALIGN_ASSET(2) flame4[] = "__OTR__custom/deku_stick/flame/flame4Tex";
+        static const char ALIGN_ASSET(2) flame5[] = "__OTR__custom/deku_stick/flame/flame5Tex";
+        static const char ALIGN_ASSET(2) flame6[] = "__OTR__custom/deku_stick/flame/flame6Tex";
+        static const char ALIGN_ASSET(2) flame7[] = "__OTR__custom/deku_stick/flame/flame7Tex";
+        static const char ALIGN_ASSET(2) flame8[] = "__OTR__custom/deku_stick/flame/flame8Tex";
+        static const char* flameTextures[] = { flame1, flame2, flame3, flame4, flame5, flame6, flame7, flame8 };
+        if (!ResourceMgr_IsAltAssetsEnabled()) {
+            return fallback;
+        }
+        for (s32 i = 0; i < ARRAY_COUNT(flameTextures); ++i) {
+            if (!ResourceMgr_FileAltExists(flameTextures[i]) || ResourceGetDataByName(flameTextures[i]) == NULL) {
+                return fallback;
+            }
+        }
+        return flameTextures[frame];
+    }
+
     static const char ALIGN_ASSET(2) forest1[] = "__OTR__custom/medallion_magic/spells/forest/dust1Tex";
     static const char ALIGN_ASSET(2) forest2[] = "__OTR__custom/medallion_magic/spells/forest/dust2Tex";
     static const char ALIGN_ASSET(2) forest3[] = "__OTR__custom/medallion_magic/spells/forest/dust3Tex";

@@ -364,6 +364,7 @@ std::string sStatus;
 s16 sActorId = -1;
 Vec3f sEntryPosition{};
 bool sEntryReady = false;
+int sLastSpawnRoom = -1;
 
 struct RewardActor {
     Actor actor;
@@ -397,6 +398,10 @@ static bool Safe(PlayState* play) {
 static RandomizerGet PresentationId(const Reward& reward) {
     switch (reward.kind) {
         case RewardKind::Item: {
+            // This full-width item has a GI table entry but no player-action
+            // registry row; it still needs a native fixed-reward presentation.
+            if (reward.payload == EXT_ITEM_SHADOW_CRYSTAL)
+                return RG_SHADOW_CRYSTAL;
             const auto* item = Nei_FindByItem(reward.payload);
             return item && item->rg != NEI_NO_RG ? static_cast<RandomizerGet>(item->rg) : RG_NONE;
         }
@@ -629,18 +634,36 @@ static const Reward* ActorReward(const Actor* actor) {
     return reward.game == Game::Oot ? &reward : nullptr;
 }
 
+static Actor* CurrentTalkActor(PlayState* play) {
+    const auto* player = play ? GET_PLAYER(play) : nullptr;
+    if (!player || !(player->actor.flags & ACTOR_FLAG_TALK))
+        return nullptr;
+    // Player_StartTalking sets this owner before Message_StartTextbox opens
+    // the text. msgCtx.talkActor still belongs to the previous box at that point.
+    // Check the live list before dereferencing a possibly retired talk owner.
+    for (auto* actor = play->actorCtx.actorLists[ACTORCAT_NPC].head; actor; actor = actor->next) {
+        if (actor == player->talkActor)
+            return actor->update ? actor : nullptr;
+    }
+    return nullptr;
+}
+
 static void RewardText(u16* textId, bool* fromTable) {
-    if (!Active())
+    if (*textId != kOfferText && *textId != kReceiptText && *textId != kResultText)
         return;
     const Reward* reward = nullptr;
-    if (*textId == kReceiptText)
-        reward = sReceiptReward;
-    else if (*textId == kOfferText || *textId == kResultText)
-        reward = ActorReward(gPlayState->msgCtx.talkActor);
-    if (!reward)
-        return;
+    if (Active()) {
+        if (*textId == kReceiptText)
+            reward = sReceiptReward;
+        else
+            reward = ActorReward(CurrentTalkActor(gPlayState));
+    }
+    // These reserved IDs have no native message-table entry. Always consume
+    // them, including cancelled/stale opens, to avoid the Pocket Egg fallback.
     std::string text;
-    if (*textId == kResultText)
+    if (!reward)
+        text = "This reward is unavailable. Try again.";
+    else if (*textId == kResultText)
         text = sStatus;
     else if (*textId == kReceiptText)
         text = std::string("You received %g") + reward->label + "%w!";
@@ -684,7 +707,10 @@ static void RewardUpdate(Actor* actor, PlayState* play) {
         placed->talking = true;
     if (placed->talking) {
         const auto state = Message_GetState(&play->msgCtx);
-        if (state == TEXT_STATE_CHOICE && Message_ShouldAdvance(play)) {
+        if (CurrentTalkActor(play) != actor || state == TEXT_STATE_CLOSING) {
+            placed->talking = false;
+        } else if (state == TEXT_STATE_CHOICE && play->msgCtx.talkActor == actor && play->msgCtx.textId == kOfferText &&
+                   Message_ShouldAdvance(play)) {
             if (play->msgCtx.choiceIndex == 0) {
                 if (BeginReceipt(*reward)) {
                     Message_CloseTextbox(play);
@@ -698,9 +724,9 @@ static void RewardUpdate(Actor* actor, PlayState* play) {
                 Message_CloseTextbox(play);
                 placed->talking = false;
             }
-        } else if (state == TEXT_STATE_CLOSING || state == TEXT_STATE_NONE) {
-            placed->talking = false;
         }
+        // NPC talk can remain TEXT_STATE_NONE while Player waits to put away
+        // an item. Keep the accepted request until that native talk ends.
     } else if (Safe(play) && NativePrerequisite(reward->prerequisite)) {
         actor->textId = kOfferText;
         Actor_OfferTalk(actor, play, 80);
@@ -722,7 +748,17 @@ static bool EntranceMatches(int entrance) {
 
 static bool Anchor(const Reward& reward, const NativeRewardBinding& binding, Vec3f& point) {
     auto* play = gPlayState;
-    if (!sEntryReady || binding.scene != play->sceneNum || !play->linkActorEntry)
+    if (binding.scene != play->sceneNum)
+        return false;
+    if (reward.kind == RewardKind::SeasonRod && std::string_view(reward.location) == "lost_woods_kokiri") {
+        if (play->roomCtx.curRoom.num != 0)
+            return false;
+        // The native room-zero clearing is centered at x/z zero. The loaded
+        // collision still validates the floor and clearance before spawning.
+        point = { 0, 0, 0 };
+        return true;
+    }
+    if (!sEntryReady || !play->linkActorEntry)
         return false;
     const bool forestMeadow = std::string_view(reward.location) == "sacred_forest_meadow";
     if (!forestMeadow && binding.entrance >= 0 && !EntranceMatches(binding.entrance) &&
@@ -760,13 +796,14 @@ static bool Anchor(const Reward& reward, const NativeRewardBinding& binding, Vec
     return true;
 }
 
-static bool SafeRewardPosition(PlayState* play, const Vec3f& anchor, unsigned ordinal, Vec3f& point) {
+static bool SafeRewardPosition(PlayState* play, const Vec3f& anchor, unsigned ordinal, Vec3f& point,
+                               bool preferAnchor = false) {
     auto* player = GET_PLAYER(play);
     if (!player)
         return false;
     // A small set of nearby alternatives keeps the item off the native door,
-    // pedestal and return warp. Each is checked against the actual loaded
-    // floor/water/walls; no archive-specific coordinates are assumed.
+    // pedestal and return warp. The preferred anchor and all alternatives are
+    // checked against the actual loaded floor/water/walls.
     constexpr std::array<Vec3f, 8> offsets = { { { 65, 0, 45 },
                                                  { -65, 0, 45 },
                                                  { 45, 0, -65 },
@@ -775,8 +812,10 @@ static bool SafeRewardPosition(PlayState* play, const Vec3f& anchor, unsigned or
                                                  { -95, 0, 0 },
                                                  { 0, 0, 95 },
                                                  { 0, 0, -95 } } };
-    for (unsigned index = 0; index < offsets.size(); ++index) {
-        const auto offset = offsets[(index + ordinal) % offsets.size()];
+    const unsigned anchorAttempts = preferAnchor ? 1 : 0;
+    for (unsigned index = 0; index < offsets.size() + anchorAttempts; ++index) {
+        const auto offset =
+            index < anchorAttempts ? Vec3f{} : offsets[(index - anchorAttempts + ordinal) % offsets.size()];
         Vec3f probe = { anchor.x + offset.x, anchor.y + 80, anchor.z + offset.z };
         CollisionPoly* floor = nullptr;
         s32 bg = BGCHECK_SCENE;
@@ -788,10 +827,29 @@ static bool SafeRewardPosition(PlayState* play, const Vec3f& anchor, unsigned or
         WaterBox* waterBox = nullptr;
         if (WaterBox_GetSurface1(play, &play->colCtx, probe.x, probe.z, &water, &waterBox) && water > y - 5)
             continue;
-        Vec3f from = { anchor.x, anchor.y + 30, anchor.z }, to = { probe.x, y + 30, probe.z }, hit{};
+        Vec3f hit{};
         CollisionPoly* wall = nullptr;
         s32 wallBg = BGCHECK_SCENE;
-        if (BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &wall, true, false, false, true, &wallBg))
+        bool blocked = false;
+        if (index < anchorAttempts) {
+            // The fixed anchor would otherwise produce a zero-length ray.
+            // Cross the point on both horizontal axes and test both poly faces.
+            constexpr std::array<Vec3f, 2> halfSpans = { { { 20, 0, 0 }, { 0, 0, 20 } } };
+            for (const auto& halfSpan : halfSpans) {
+                Vec3f from = { probe.x - halfSpan.x, y + 30, probe.z - halfSpan.z };
+                Vec3f to = { probe.x + halfSpan.x, y + 30, probe.z + halfSpan.z };
+                if (BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &wall, true, false, false, false,
+                                            &wallBg)) {
+                    blocked = true;
+                    break;
+                }
+            }
+        } else {
+            Vec3f from = { anchor.x, anchor.y + 30, anchor.z }, to = { probe.x, y + 30, probe.z };
+            blocked =
+                BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &wall, true, false, false, true, &wallBg);
+        }
+        if (blocked)
             continue;
         point = { probe.x, y + 22, probe.z };
         return true;
@@ -805,7 +863,7 @@ static void SpawnRewards() {
         return;
     auto* play = gPlayState;
     const auto* player = GET_PLAYER(play);
-    if (play->gameplayFrames % 16 != 0)
+    if (sEntryReady && sLastSpawnRoom == play->roomCtx.curRoom.num && play->gameplayFrames % 16 != 0)
         return;
     if (!sEntryReady) {
         if (!play->linkActorEntry || !player->actor.floorPoly || player->actor.floorBgId != BGCHECK_SCENE ||
@@ -816,6 +874,9 @@ static void SpawnRewards() {
         sEntryPosition = { static_cast<float>(native.x), static_cast<float>(native.y), static_cast<float>(native.z) };
         sEntryReady = true;
     }
+    // Retry first arrival/readiness immediately, then retain the periodic scan
+    // for rewards whose prerequisites become available while staying in a room.
+    sLastSpawnRoom = play->roomCtx.curRoom.num;
     for (unsigned i = 0; i < std::size(kRewards); ++i) {
         const auto& reward = kRewards[i];
         if (reward.game != Game::Oot)
@@ -838,7 +899,9 @@ static void SpawnRewards() {
         if (present)
             continue;
         Vec3f anchor, position;
-        if (!Anchor(reward, binding, anchor) || !SafeRewardPosition(play, anchor, i, position))
+        const bool centerRod =
+            reward.kind == RewardKind::SeasonRod && std::string_view(reward.location) == "lost_woods_kokiri";
+        if (!Anchor(reward, binding, anchor) || !SafeRewardPosition(play, anchor, i, position, centerRod))
             continue;
         Actor_Spawn(&play->actorCtx, play, sActorId, position.x, position.y, position.z, 0, 0, 0, i);
     }
@@ -862,6 +925,7 @@ static void Register() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16) {
         CancelReceipt(true);
         sEntryReady = false;
+        sLastSpawnRoom = -1;
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>([](int) { CancelReceipt(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(RewardText);

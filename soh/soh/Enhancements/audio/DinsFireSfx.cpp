@@ -1,0 +1,5 @@
+#include "z64.h"
+#include "functions.h"
+#include "variables.h"
+#include "macros.h"
+#include "../../../../combo/audio/DinsFireSfxAdapter.inc.cpp"

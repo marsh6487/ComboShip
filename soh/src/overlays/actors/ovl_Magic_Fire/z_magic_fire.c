@@ -6,6 +6,9 @@
 
 #include "z_magic_fire.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
+#include "../../../../../combo/render/DinsFireRemakeDraw.h"
+#include "../../../../../combo/render/DinsFireNativeActor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -79,6 +82,7 @@ static u8 sVertexIndices[] = {
 void MagicFire_Init(Actor* thisx, PlayState* play) {
     MagicFire* this = (MagicFire*)thisx;
 
+    CwDinsNativeActor_Init(this, play);
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->action = 0;
     this->screenTintBehaviour = 0;
@@ -94,6 +98,12 @@ void MagicFire_Init(Actor* thisx, PlayState* play) {
 }
 
 void MagicFire_Destroy(Actor* thisx, PlayState* play) {
+    MagicFire* this = (MagicFire*)thisx;
+    if (this->nativeActive) {
+        CwDinsNativeActor_StopAudio(this);
+        CwDinsNativeActor_RemoveLight(this, play);
+        Collider_DestroyCylinder(play, &this->collider);
+    }
     Magic_Reset(play);
 }
 
@@ -101,6 +111,11 @@ void MagicFire_UpdateBeforeCast(Actor* thisx, PlayState* play) {
     MagicFire* this = (MagicFire*)thisx;
     Player* player = GET_PLAYER(play);
 
+    if (CwDinsNativeActor_Update(this, play)) {
+        if (this->nativeFrame >= 0 && this->actor.update != NULL)
+            this->actor.update = MagicFire_Update;
+        return;
+    }
     if ((play->msgCtx.msgMode == MSGMODE_OCARINA_CORRECT_PLAYBACK) || (play->msgCtx.msgMode == MSGMODE_SONG_PLAYED)) {
         Actor_Kill(&this->actor);
         return;
@@ -119,6 +134,9 @@ void MagicFire_Update(Actor* thisx, PlayState* play) {
     Player* player = GET_PLAYER(play);
     s32 pad;
 
+    if (CwDinsNativeActor_Update(this, play)) {
+        return;
+    }
     this->actor.world.pos = player->actor.world.pos;
     if ((play->msgCtx.msgMode == MSGMODE_OCARINA_CORRECT_PLAYBACK) || (play->msgCtx.msgMode == MSGMODE_SONG_PLAYED)) {
         Actor_Kill(&this->actor);
@@ -222,6 +240,15 @@ void MagicFire_Draw(Actor* thisx, PlayState* play) {
     }
     if (CVarGetInteger(CVAR_COSMETIC("Magic.DinsPrimary.Changed"), 0)) {
         Spell_col = CVarGetColor24(CVAR_COSMETIC("Magic.DinsPrimary.Value"), Spell_col);
+    }
+
+    if (this->nativeActive) {
+        if (CwDinsFireRemake_DrawNativeActor(play, thisx, this->nativeFrame,
+                                             CwDins_RGB(Spell_col.r, Spell_col.g, Spell_col.b),
+                                             CwDins_RGB(Spell_env.r, Spell_env.g, Spell_env.b))) {
+            return;
+        }
+        /* Resource loss falls back to the native sphere for the same actor age. */
     }
 
     if (this->action > 0) {

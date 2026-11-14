@@ -2,6 +2,7 @@
 """Compile the real Vanilla sharing policy with both native NEI save structures."""
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,7 @@ for game in ('soh', 'mm'):
         sync_path = ROOT / game / ('soh' if game == 'soh' else '2s2h') / 'FleetShipCombo/FleetSync.cpp'
         sync = sync_path.read_text()
         snippets = []
+        objects = []
         if game == 'mm':
             inventory = (ROOT / 'mm/mods/extended_inventory.c').read_text()
             snippets.append(extract(inventory, 'void RitoMask_Grant('))
@@ -37,9 +39,35 @@ for game in ('soh', 'mm'):
             snippets += [extract(native_nei, 'extern "C" uint8_t Nei_HookshotLevel('),
                          extract(native_nei, 'extern "C" uint8_t Nei_HookshotVariant(')]
         if game == 'soh':
+            # The load/mask migration calls the unified trade helpers. They are
+            # C in production; keep their native enum rules and strict warnings.
+            trade = (ROOT / 'soh/mods/items/logic/trade_items.c').read_text()
+            trade = trade[trade.index('#define TRADE_ADULT_COUNT'):trade.index('extern void* MmAssets_LoadResource')]
+            declarations = re.findall(r'^(?:s32|u8|void) \w+\([^{};]*\) (?=\{)', trade, re.M)
+            snippets.append('extern "C" {\n' + ';\n'.join(declarations) + ';\n}')
+            # Reconciliation uses the inventory/equipment storage supplied by
+            # sharing_test.cpp. Compile its unchanged body in that same TU;
+            # the remaining trade core retains its native C enum semantics.
+            reconcile = extract(trade, 'void TradeAdult_ReconcileConsumed(void)')
+            snippets.append(re.search(r'^#define TRADE_ADULT_PENDANT\s+.*$', trade, re.M).group())
+            snippets.append('extern "C" ' + reconcile)
+            equipment = (ROOT / 'soh/mods/extended_equipment.h').read_text()
+            trade_source = ('#include "soh/include/z64item.h"\n#include "soh/mods/nei_save.h"\n'
+                            'typedef uint8_t u8;\ntypedef int32_t s32;\n' +
+                            next(line for line in equipment.splitlines() if line.startswith('#define ITEM_EXT_BOOTS_2 ')) +
+                            '\nvoid TradeAdult_ReconcileConsumed(void);\n' + trade.replace(reconcile, '', 1))
+            (Path(tmp) / 'trade.c').write_text(trade_source)
+            cflags = [flag for flag in flags if not flag.startswith('-std=')]
+            obj = Path(tmp) / 'trade.o'
+            subprocess.run([*shlex.split(os.environ.get('CC', 'cc')), '-std=gnu11', *cflags,
+                            '-I', str(ROOT / 'soh'),
+                            '-c', str(Path(tmp) / 'trade.c'), '-o', str(obj)], check=True)
+            objects.append(str(obj))
             forms = (ROOT / 'soh/mods/transformation_masks/custom_forms.cpp').read_text()
             for signature in ('extern "C" uint8_t RitoMask_IsOwned(',
                               'extern "C" void RitoItem_NoteCellItem(',
+                              'static uint8_t OotMaskWheel_OwnsItem(',
+                              'extern "C" uint8_t OotMaskWheel_Neighbor(',
                               'extern "C" void RitoMask_MigrateLegacy(',
                               'extern "C" void RitoMask_Grant('):
                 snippets.append(extract(forms, signature))
@@ -81,5 +109,5 @@ for game in ('soh', 'mm'):
         includes = ['-I', tmp, '-I', str(ROOT / game / 'include'), '-I', str(ROOT / game), '-I', str(ROOT / game / ('soh' if game == 'soh' else '2s2h'))]
         subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), *flags, *includes,
                         *(['-DTEST_MM'] if game == 'mm' else []),
-                        str(ROOT / 'tests/combo_vanilla/sharing_test.cpp'), '-o', str(exe)], check=True)
+                        str(ROOT / 'tests/combo_vanilla/sharing_test.cpp'), *objects, '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)

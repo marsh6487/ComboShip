@@ -194,6 +194,16 @@ s32 Override(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, Actor* actor) 
     return false;
 }
 
+bool ForestSpawnReady(PlayState* play) {
+    // These stationary companions can exist while an incoming fade or native
+    // entrance walk still owns player input. Their interactions remain native.
+    // Reject departures and unknown transition triggers before materializing them.
+    const auto* player = GET_PLAYER(play);
+    return player && !(player->stateFlags1 & PLAYER_STATE1_DEAD) && play->gameOverCtx.state == GAMEOVER_INACTIVE &&
+           (play->transitionTrigger == TRANS_TRIGGER_END ||
+            (play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF));
+}
+
 void SpawnForestSaria() {
     auto* play = gPlayState;
     const bool field = ComboForestActors_IsMmGame() && play && play->sceneId == SCENE_00KEIKOKU &&
@@ -201,10 +211,11 @@ void SpawnForestSaria() {
                        ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) && gSaveContext.save.cutsceneIndex == 0;
     if (sSpawnAttempted || !play || gGameState != &play->state || !play->state.running ||
         (!field && !ComboForestActors_IsExploration(play)) || play->roomCtx.curRoom.num != 0 ||
-        play->roomCtx.status != 0 || !play->roomCtx.curRoom.segment || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-        play->transitionMode != TRANS_MODE_OFF || play->pauseCtx.state != PAUSE_STATE_OFF ||
+        play->roomCtx.status != 0 || !play->roomCtx.curRoom.segment || play->pauseCtx.state != PAUSE_STATE_OFF ||
         play->csCtx.state != CS_STATE_IDLE || gSaveContext.cutsceneTrigger || play->soaringCsOrSoTCsPlaying ||
-        Player_InCsMode(play))
+        (field ? (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
+                  Player_InCsMode(play))
+               : !ForestSpawnReady(play)))
         return;
     // An authored placement wins; room visits never duplicate a placed Saria.
     for (const auto& list : play->actorCtx.actorLists)
@@ -239,10 +250,9 @@ void SpawnForestEpona() {
     auto* play = gPlayState;
     if (sHorseSpawnAttempted || !play || gGameState != &play->state || !play->state.running ||
         !ComboForestActors_IsExploration(play) || play->roomCtx.curRoom.num != 0 || play->roomCtx.status != 0 ||
-        !play->roomCtx.curRoom.segment || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-        play->transitionMode != TRANS_MODE_OFF || play->pauseCtx.state != PAUSE_STATE_OFF ||
+        !play->roomCtx.curRoom.segment || play->pauseCtx.state != PAUSE_STATE_OFF ||
         play->csCtx.state != CS_STATE_IDLE || gSaveContext.cutsceneTrigger || play->soaringCsOrSoTCsPlaying ||
-        Player_InCsMode(play))
+        !ForestSpawnReady(play))
         return;
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
     const s16 yaw = ComboOpeningForest_ReturnYaw(play);
@@ -278,13 +288,24 @@ void SpawnForestEpona() {
     Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE, pos.x, floor, pos.z, 0, yaw, 0, COMBO_FOREST_EPONA_PARAMS);
 }
 
+void SpawnForestCompanions() {
+    if (!ComboForestActors_IsExploration(gPlayState))
+        return;
+    SpawnForestSaria();
+    SpawnForestEpona();
+}
+
 void RegisterSaria() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(
         [](s16, s8) { sSpawnAttempted = sHorseSpawnAttempted = false; });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRoomInit>(
         [](s16, s8) { sSpawnAttempted = sHorseSpawnAttempted = false; });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(SpawnForestSaria);
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(SpawnForestEpona);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(SpawnForestCompanions);
+    // The Termina Field song-giver retains its existing control-ready timing.
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([] {
+        if (gPlayState && gPlayState->sceneId == SCENE_00KEIKOKU)
+            SpawnForestSaria();
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(ResetSariaResources);
     // Window-close shutdown can bypass Play_Destroy. Release foreign objects
     // while both game modules and the owner ResourceManager still exist.

@@ -1771,8 +1771,13 @@ void KaleidoScope_DrawAmmoCount(PauseContext* pauseCtx, GraphicsContext* gfxCtx,
 
     // Skijer's NEI: the slingshot family bypasses the SLOT() lookup (OOB for 0xA3) — it shares
     // MM's native ITEM_SLINGSHOT form restriction (human only) for the grey tint.
-    if ((item == ITEM_FAIRY_SLINGSHOT) ? !gPlayerFormItemRestrictions[GET_PLAYER_FORM][ITEM_SLINGSHOT]
-                                       : !gPlayerFormSlotRestrictions[GET_PLAYER_FORM][SLOT(item)]) {
+    // Apply the same effective restriction hook as the item icon and C-button use.
+    ItemId itemId = (ItemId)item;
+    if (GameInteractor_Should(VB_ITEM_BE_RESTRICTED,
+                              (item == ITEM_FAIRY_SLINGSHOT)
+                                  ? !gPlayerFormItemRestrictions[GET_PLAYER_FORM][ITEM_SLINGSHOT]
+                                  : !gPlayerFormSlotRestrictions[GET_PLAYER_FORM][SLOT(item)],
+                              &itemId)) {
         // Ammo item is restricted
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 100, 100, 100, pauseCtx->alpha);
     } else {
@@ -1785,7 +1790,7 @@ void KaleidoScope_DrawAmmoCount(PauseContext* pauseCtx, GraphicsContext* gfxCtx,
                    ((item == ITEM_BOW) && (AMMO(item) == CUR_CAPACITY(UPG_QUIVER))) ||
                    ((item == ITEM_DEKU_STICK) && (AMMO(item) == CUR_CAPACITY(UPG_DEKU_STICKS))) ||
                    ((item == ITEM_DEKU_NUT) && (AMMO(item) == CUR_CAPACITY(UPG_DEKU_NUTS))) ||
-                   ((item == ITEM_BOMBCHU) && (AMMO(item) == CUR_CAPACITY(UPG_BOMB_BAG))) ||
+                   ((item == ITEM_BOMBCHU) && (AMMO(item) == RandoCapacity_BombchuCapacity())) ||
                    ((item == ITEM_POWDER_KEG) && GameInteractor_Should(VB_POWDER_KEG_AMMO_AT_CAPACITY, ammo == 1)) ||
                    ((item == ITEM_PICTOGRAPH_BOX) && (ammo == 1)) || ((item == ITEM_MAGIC_BEANS) && (ammo == 20)) ||
                    ((item == ITEM_FAIRY_SLINGSHOT) && (ammo == Nei_SlingshotCapacity()))) { // Skijer's NEI

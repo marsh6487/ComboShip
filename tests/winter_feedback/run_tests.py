@@ -148,6 +148,10 @@ u8 TransformMasks_TryPlayMmStepSfx(u16 sfx, Vec3f* pos) {
     if (transformed) {lastSfx = sfx + 0x120; ++mmCalls;}
     return transformed;
 }
+// Deku pitch is covered separately; retain this fixture's form/audio boundary.
+u8 TransformMasks_TryPlayMmStepSfxWithSpeed(u16 sfx, Vec3f* pos, f32 speed) {
+    return TransformMasks_TryPlayMmStepSfx(sfx, pos);
+}
 void func_800F4010(Vec3f* pos, u16 sfx, f32 pitch) {++nativeCalls; lastSfx = sfx;}
 bool WolfLinkHost_PlayFootstep(Player* p) {return false;}
 static int iron;

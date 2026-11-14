@@ -24,6 +24,8 @@ south=(ROOT/'mm/2s2h/Rando/Logic/Regions/South.cpp').read_text()
 moon=(ROOT/'mm/2s2h/Rando/Logic/Regions/Moon.cpp').read_text()
 moonRoutes=[args[-1] for args in calls(moon,'EXIT') if 'SoulItemRequirement(RI_SOUL_NPC_MOON_CHILDREN)' in args[-1]]
 assert len(moonRoutes)==9
+goronTrialRoutes=[route for route in moonRoutes if 'CAN_GORON_SPIKE_ROLL' in route]
+assert len(goronTrialRoutes)==1
 shop=[args[-1] for args in calls(central,'CHECK') if args[0].startswith('RC_TRADING_POST_SHOP_ITEM_')]
 assert len(shop)==8
 meet=next(x[-1] for x in calls(central,'EVENT') if x[0]=='RE_MEET_KAFEI')
@@ -62,7 +64,6 @@ cpp+='''bool capability=true,fire=false,stick=true,afford=true,learnedSong=true;
 #define CAN_BE_DEKU capability
 #define CAN_BE_GORON capability
 #define CAN_BE_ZORA capability
-#define HAS_MAGIC capability
 #define CAN_USE_MAGIC_ARROW(x) fire
 #define CAN_PLAY_SONG(x) song
 #define HAS_ITEM(x) stick
@@ -73,13 +74,63 @@ cpp+='''bool capability=true,fire=false,stick=true,afford=true,learnedSong=true;
 #define CAN_ACCESS(x) capability
 unsigned maskCount=20,remainsCount=4;
 unsigned MoonMaskCount(){return maskCount;}unsigned RemainsCount(){return remainsCount;}
-'''+nativeDungeonEnum+'\nnamespace SE=ComboRando::SongEvents;\nnamespace Rando::Logic {\n'+body(logic,'inline bool CanReturnToHuman(')+'\n}\n'+mm_solver()+body(logic,'inline bool CanAccessDungeon(')+'''
+'''
+# Keep the production one-unit magic and two-unit Goron-start requirements distinct.
+# z64save.h supplies the real RPG state and native infinite-magic dependency closure.
+for macro in ('HAS_MAGIC', 'CAN_GORON_SPIKE_ROLL'):
+ cpp+=next(line for line in logic.splitlines() if line.startswith('#define '+macro+' '))+'\n'
+cpp+=nativeDungeonEnum+'\nnamespace SE=ComboRando::SongEvents;\nnamespace Rando::Logic {\n'+body(logic,'inline bool CanUseMagicAmount(')+'\n'+body(logic,'inline bool CanReturnToHuman(')+'\n}\n'+mm_solver()+body(logic,'inline bool CanAccessDungeon(')+'''
 std::function<bool()> moonRoutes[]={
 '''+',\n'.join('[]{return '+e+';}' for e in moonRoutes)+'};\nstd::function<bool()> shop[]={\n'+',\n'.join('[]{return '+e+';}' for e in shop)+'};\n'
-for name,expr in [('Meet',meet),('Sirloin',sirloin),('Princess',princess),('Hideout',hideout),('Bomber',bomber)]:
+for name,expr in [('Meet',meet),('Sirloin',sirloin),('GoronTrial',goronTrialRoutes[0]),('Princess',princess),('Hideout',hideout),('Bomber',bomber)]:
  if name in ['Meet','Princess']:expr=f'SoulEventRequirement(RE_{"MEET_KAFEI" if name=="Meet" else "RETURN_DEKU_PRINCESS"}) && ({expr})'
  cpp+=f'bool {name}(){{return {expr};}}\n'
-cpp+='''int main(){options[RO_SHUFFLE_NPC_SOULS]=1;
+cpp+='''void MagicRouteControls(){
+ auto& player=gSaveContext.save.saveInfo.playerData;
+ auto& rpg=gSaveContext.save.shipSaveInfo.nei.comboRpg;
+ options[RO_SHUFFLE_NPC_SOULS]=1;owned.clear();
+ Own(RI_SOUL_NPC_MOON_CHILDREN);Own(RI_SOUL_NPC_GORON_CHILD);
+ fire=false;song=stick=capability=true;
+ for(int capacity:{0,1,2}){
+  rpg={};rpg.knownMask=rpg.enabledMask=1<<COMBO_RPG_MAGIC;
+  rpg.required[COMBO_RPG_MAGIC]=100;rpg.magicTotal=100;
+  rpg.level[COMBO_RPG_MAGIC]=capacity;
+  player.isMagicAcquired=capacity!=0;player.isDoubleMagicAcquired=false;
+  gSaveContext.magicCapacity=capacity;
+  REQUIRE(ComboRpgState_MagicCapacity(&rpg,0)==capacity);
+  for(int cape:{0,1})for(int remaining:{0,capacity}){
+   gSaveContext.save.shipSaveInfo.nei.capeOwned=cape;player.magic=remaining;
+   REQUIRE(Rando::Logic::CanUseMagicAmount(1)==(capacity>=1));
+   REQUIRE(Rando::Logic::CanUseMagicAmount(2)==(capacity>=2));
+   REQUIRE(GoronTrial()==(capacity>=2));REQUIRE(Sirloin()==(capacity>=2));
+   // The route fixture's existing capability boundary includes the Goron mask/form.
+   capability=false;REQUIRE(!GoronTrial()&&!Sirloin());capability=true;
+  }
+ }
+ // An actual native pickup remains a floor under a one-unit RPG capacity.
+ rpg.level[COMBO_RPG_MAGIC]=1;player.isMagicAcquired=true;player.magic=0;
+ for(int nativeTier:{1,2}){
+  rpg.nativeMagicLevel=nativeTier;gSaveContext.magicCapacity=nativeTier*MAGIC_NORMAL_METER;
+  for(int cape:{0,1}){
+   gSaveContext.save.shipSaveInfo.nei.capeOwned=cape;
+   REQUIRE(ComboRpgState_MagicCapacity(&rpg,0)==nativeTier*MAGIC_NORMAL_METER);
+   REQUIRE(GoronTrial()&&Sirloin());
+  }
+ }
+ // Ordinary native no/single/double magic, including fully spent meters.
+ rpg={};
+ for(int nativeTier:{0,1,2}){
+  player.isMagicAcquired=nativeTier!=0;player.isDoubleMagicAcquired=nativeTier==2;
+  player.magic=0;gSaveContext.magicCapacity=nativeTier*MAGIC_NORMAL_METER;
+  for(int cape:{0,1}){
+   gSaveContext.save.shipSaveInfo.nei.capeOwned=cape;
+   REQUIRE(GoronTrial()==(nativeTier!=0));REQUIRE(Sirloin()==(nativeTier!=0));
+  }
+ }
+}
+int main(){options[RO_SHUFFLE_NPC_SOULS]=1;
+// Existing route controls assume an ordinary refillable native magic meter.
+gSaveContext.save.saveInfo.playerData.isMagicAcquired=true;
 // Exercise the extracted helper with the fixture's existing capability/item boundaries.
 capability=stick=false;REQUIRE(!Rando::Logic::CanReturnToHuman());
 stick=true;REQUIRE(Rando::Logic::CanReturnToHuman());
@@ -110,7 +161,8 @@ for(int mode:{RO_ACCESS_DUNGEONS_FORM_AND_SONG,RO_ACCESS_DUNGEONS_FORM_OR_SONG,R
 }
 owned.clear();Own(RI_SOUL_NPC_BIGGORON);options[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_SONG_ONLY;learnedSong=false;song=true;REQUIRE(!CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));learnedSong=true;song=false;REQUIRE(!CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));song=true;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));
 owned.clear();options[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_OPEN;song=capability=stick=false;REQUIRE(CanAccessDungeon(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE));
-puts("PASS actual native route predicates: 45 TradingPost slices, 9 Moon NPC routes, Sirloin alternative, Princess and Postman/Kafei/Bomber controls");}
+MagicRouteControls();
+puts("PASS actual native route predicates: 45 TradingPost slices, 9 Moon NPC routes, Sirloin alternative, Princess and Postman/Kafei/Bomber controls; exact 0/1/2 magic, Cape, spent/native and absent-Goron controls");}
 '''
 with tempfile.TemporaryDirectory(prefix='souls-routes-') as t:
  t=Path(t);src=t/'routes.cpp';src.write_text(cpp)

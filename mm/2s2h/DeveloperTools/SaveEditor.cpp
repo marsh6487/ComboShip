@@ -761,10 +761,13 @@ void NextItemInSlot(InventorySlot slot) {
             AMMO(ITEM_BOW) = CUR_CAPACITY(UPG_QUIVER);
         } else if (gSaveContext.save.saveInfo.inventory.items[slot] == ITEM_BOMB ||
                    gSaveContext.save.saveInfo.inventory.items[slot] == ITEM_BOMBCHU) {
-            if (CUR_UPG_VALUE(UPG_BOMB_BAG) == 0) {
+            const bool independentChu = gSaveContext.save.saveInfo.inventory.items[slot] == ITEM_BOMBCHU &&
+                                        RandoCapacity_HasIndependentBombchuBag();
+            if (!independentChu && CUR_UPG_VALUE(UPG_BOMB_BAG) == 0) {
                 Inventory_ChangeUpgrade(UPG_BOMB_BAG, 1);
             }
-            AMMO(gSaveContext.save.saveInfo.inventory.items[slot]) = CUR_CAPACITY(UPG_BOMB_BAG);
+            AMMO(gSaveContext.save.saveInfo.inventory.items[slot]) =
+                independentChu ? RandoCapacity_BombchuCapacity() : CUR_CAPACITY(UPG_BOMB_BAG);
         }
     } else if (currentItemId == ITEM_BOW) {
         if (CUR_UPG_VALUE(UPG_QUIVER) < 3) {
@@ -775,15 +778,32 @@ void NextItemInSlot(InventorySlot slot) {
             Inventory_ChangeUpgrade(UPG_QUIVER, 0);
             AMMO(ITEM_BOW) = 0;
         }
+    } else if (currentItemId == ITEM_BOMBCHU && RandoCapacity_HasIndependentBombchuBag()) {
+        // The foreign bag cycles independently of MM's native Bomb Bag.
+        auto& capacity = gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY];
+        if (capacity < 50) {
+            capacity = capacity < 30 ? 30 : 50;
+            AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
+        } else {
+            Inventory_DeleteItem(ITEM_BOMBCHU, SLOT_BOMBCHU);
+            capacity = 0;
+            gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_INFINITE_BOMBCHUS] = 0;
+            AMMO(ITEM_BOMBCHU) = 0;
+        }
     } else if (currentItemId == ITEM_BOMB || currentItemId == ITEM_BOMBCHU) {
         if (CUR_UPG_VALUE(UPG_BOMB_BAG) < 3) {
             Inventory_ChangeUpgrade(UPG_BOMB_BAG, CUR_UPG_VALUE(UPG_BOMB_BAG) + 1);
-            AMMO(ITEM_BOMB) = AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+            AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
+            if (!RandoCapacity_HasIndependentBombchuBag())
+                AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
         } else {
             Inventory_DeleteItem(ITEM_BOMB, SLOT_BOMB);
-            Inventory_DeleteItem(ITEM_BOMBCHU, SLOT_BOMBCHU);
             Inventory_ChangeUpgrade(UPG_BOMB_BAG, 0);
-            AMMO(ITEM_BOMB) = AMMO(ITEM_BOMBCHU) = 0;
+            AMMO(ITEM_BOMB) = 0;
+            if (!RandoCapacity_HasIndependentBombchuBag()) {
+                Inventory_DeleteItem(ITEM_BOMBCHU, SLOT_BOMBCHU);
+                AMMO(ITEM_BOMBCHU) = 0;
+            }
         }
     } else if (currentItemIndex < safeItemsForInventorySlot[slot].size() - 1) {
         Inventory_ReplaceItem(gPlayState, currentItemId, safeItemsForInventorySlot[slot][currentItemIndex + 1]);
@@ -951,7 +971,8 @@ void DrawItemsAndMasksTab() {
         Inventory_ChangeUpgrade(UPG_BOMB_BAG, 3);
         Inventory_ChangeUpgrade(UPG_QUIVER, 3);
         AMMO(ITEM_BOW) = CUR_CAPACITY(UPG_QUIVER);
-        AMMO(ITEM_BOMB) = AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+        AMMO(ITEM_BOMB) = CUR_CAPACITY(UPG_BOMB_BAG);
+        AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
         AMMO(ITEM_DEKU_STICK) = CUR_CAPACITY(UPG_DEKU_STICKS);
         AMMO(ITEM_DEKU_NUT) = CUR_CAPACITY(UPG_DEKU_NUTS);
         AMMO(ITEM_MAGIC_BEANS) = 20;
@@ -965,6 +986,8 @@ void DrawItemsAndMasksTab() {
             AMMO(ITEM_MAGIC_BEANS) = AMMO(ITEM_POWDER_KEG) = 0;
         Inventory_ChangeUpgrade(UPG_BOMB_BAG, 0);
         Inventory_ChangeUpgrade(UPG_QUIVER, 0);
+        gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 0;
+        gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_INFINITE_BOMBCHUS] = 0;
     }
     UIWidgets::Checkbox("Safe Mode", &safeMode);
 

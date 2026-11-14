@@ -94,7 +94,8 @@ with tempfile.TemporaryDirectory(prefix='mm-environment-') as td:
  (build/'environment_category_indices.inc').write_text(','.join(re.findall(r'/\*(RCTYPE_\w+)\*/',icon_table)))
  env={**os.environ,'CPATH':str(build)+os.pathsep+os.environ.get('CPATH','')}
  if red_spawn: env['MM_ENV_RED_SPAWN']='1'
- result=subprocess.run([sys.executable,str(ROOT/'tests/shuffle_parity/key_rings/run_tests.py'),'--fixture',str(Path(__file__).with_name('native_test.cpp')),*sys.argv[1:]],env=env,capture_output=red_spawn,text=red_spawn)
+ # csmc/native_services.inc already binds Nei_Save to the native save context.
+ result=subprocess.run([sys.executable,str(ROOT/'tests/shuffle_parity/key_rings/run_tests.py'),'--fixture-provides-nei-save','--fixture',str(Path(__file__).with_name('native_test.cpp')),*sys.argv[1:]],env=env,capture_output=red_spawn,text=red_spawn)
  if red_spawn:
   assert result.returncode != 0 and 'SIGSEGV' in result.stderr, 'Historical native null-allocation regression must fail specifically with SIGSEGV: '+result.stderr
   print('EXPECTED RED: unchanged baseline 0c2e93bb CustomItem::Spawn fails actual null allocation fixture',flush=True)

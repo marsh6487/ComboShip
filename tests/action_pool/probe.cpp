@@ -102,7 +102,7 @@ int main(int argc,char** argv)try {
     REQUIRE(std::count(button.begin(),button.end(),Mm::RI_OOT_PROGRESSIVE_STRENGTH)==3);
     REQUIRE(std::count(button.begin(),button.end(),Mm::RI_OOT_PROGRESSIVE_STICK_CAPACITY)==2);
     REQUIRE(std::count(button.begin(),button.end(),Mm::RI_OOT_PROGRESSIVE_NUT_CAPACITY)==2);
-    REQUIRE(std::count(button.begin(),button.end(),Mm::RI_OOT_ROCS_FEATHER)==1);
+    REQUIRE(std::count(button.begin(),button.end(),Mm::RI_OOT_ROCS_FEATHER)==0);
     auto solo=Mm::Generate(true,false,false);REQUIRE(std::count(solo.begin(),solo.end(),Mm::RI_OOT_ABILITY_CHESTS)==0);
     int poolCases=0;
     for(int abundance:{Oot::RO_ITEM_POOL_PLENTIFUL,Oot::RO_ITEM_POOL_BALANCED,Oot::RO_ITEM_POOL_SCARCE,Oot::RO_ITEM_POOL_MINIMAL})for(int climb:{0,1})for(int chest:{Oot::RO_OPEN_CHEST_OFF,Oot::RO_OPEN_CHEST_ON,Oot::RO_OPEN_CHEST_PROGRESSIVE}){

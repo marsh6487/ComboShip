@@ -70,10 +70,14 @@ void TitleSetup_InitImpl(GameState* gameState) {
         s32 crossBossRecovery = Combo_SOH_ConsumeCrossBossRecoveryResume();
         // Native fallback composition can mutate grotto respawn state. Only run it when
         // no already-composed arrival owns the destination and its spawn data.
+        // Vanilla files never initialize the randomizer override table.
+        s32 marketArrival = ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP;
+        if (crossDungeonArrival < 0 && crossBossRecovery < 0 && IS_RANDO) {
+            marketArrival = Entrance_OverrideNextIndex(ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP);
+        }
         gSaveContext.entranceIndex = crossDungeonArrival >= 0 ? crossDungeonArrival
-                                     : crossBossRecovery >= 0
-                                         ? crossBossRecovery
-                                         : Entrance_OverrideNextIndex(ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP);
+                                     : crossBossRecovery >= 0 ? crossBossRecovery
+                                                              : marketArrival;
         SOH_ApplyComboPortalArrival(crossDungeonArrival < 0 && crossBossRecovery < 0);
         // A portal return is never a cutscene arrival: a never-played MM-start save still holds the
         // pending intro (0xFFF1), which would shift Play_Init's entrance lookup onto a garbage layer.

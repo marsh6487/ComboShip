@@ -108,6 +108,17 @@ struct { NativeInventory inventory; } gSaveContext;
 #include "combo/gameplay/MagicMirrorItem.h"
 #define SLOT_PHANTOM_HOURGLASS 41
 #define EXT_ITEM_PHANTOM_HOURGLASS 0x0221
+// These travel-cell cases contain no trade items. Keep the new consumption
+// dependency explicit and reject calls outside this fixture's non-trade domain;
+// tests/trade_consumption owns the real trade mapping and revision behavior.
+int TradeAdult_IndexOfItem(uint8_t item) {
+    assert(item == ITEM_TIME_GATE && "unexpected non-travel item in mirror sync fixture");
+    return -1;
+}
+uint8_t TradeAdult_IsConsumedIndex(int index) {
+    assert(index == -1 && "trade state is outside the mirror sync fixture");
+    return 0;
+}
 '''
     with tempfile.TemporaryDirectory(prefix="mirror-sync-" + host + "-") as td:
         path = Path(td); cpp = path / "test.cpp"; binary = path / "test"

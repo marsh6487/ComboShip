@@ -1,3 +1,4 @@
+#include "../../../combo/audio/DinsFireSfx.h"
 #include "global.h"
 
 #define SAMPLES_TO_OVERPRODUCE 0x10
@@ -102,6 +103,7 @@ void AudioMgr_CreateNextAudioBuffer(s16* samples, u32 num_samples) {
     // Mix the Phantom Hourglass Recall cues
     HourglassSfx_MixInto(samples, num_samples);
     OOT_WolfLinkSfx_MixInto(samples, num_samples);
+    DinsFireSfx_MixInto(samples, num_samples);
 
     gAudioContext.audioRandom = (gAudioContext.audioRandom + gAudioContext.totalTaskCnt) * osGetCount();
 }

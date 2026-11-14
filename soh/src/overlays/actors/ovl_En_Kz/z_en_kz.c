@@ -6,6 +6,7 @@
  */
 
 #include "z_en_kz.h"
+#include "mods/extended_inventory.h"
 #include "objects/object_kz/object_kz.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -474,6 +475,9 @@ void EnKz_SetupGetItem(EnKz* this, PlayState* play) {
 
     if (Actor_HasParent(&this->actor, play) || !GameInteractor_Should(VB_ADULT_KING_ZORA_ITEM_GIVE, true, this)) {
         this->actor.parent = NULL;
+        if (!IS_RANDO && this->isTrading) {
+            TradeAdult_ConsumeItem(ITEM_PRESCRIPTION);
+        }
         this->interactInfo.talkState = NPC_TALK_STATE_TALKING;
         this->actionFunc = EnKz_StartTimer;
     } else {
@@ -482,6 +486,9 @@ void EnKz_SetupGetItem(EnKz* this, PlayState* play) {
         } else {
             getItemId = this->isTrading ? GI_FROG : GI_TUNIC_ZORA;
         }
+        // Remember the accepted reward across the GI handshake, which can clear
+        // the player's exchange item. Early Eyeball Frog also uses this path.
+        this->isTrading = getItemId == GI_FROG;
         yRange = fabsf(this->actor.yDistToPlayer) + 1.0f;
         xzRange = this->actor.xzDistToPlayer + 1.0f;
         Actor_OfferGetItem(&this->actor, play, getItemId, xzRange, yRange);

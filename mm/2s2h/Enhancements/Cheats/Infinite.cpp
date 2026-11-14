@@ -46,7 +46,7 @@ static RegisterShipInitFunc consumeablesInitFunc(
             }
 
             if (INV_CONTENT(ITEM_BOMBCHU) == ITEM_BOMBCHU) {
-                AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+                AMMO(ITEM_BOMBCHU) = RandoCapacity_BombchuCapacity();
             }
 
             if (INV_CONTENT(ITEM_DEKU_STICK) == ITEM_DEKU_STICK) {

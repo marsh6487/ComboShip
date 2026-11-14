@@ -254,7 +254,7 @@ static RegisterShipInitFunc initFunc([]() {
                 // Can they break it, leaving the fairy up high? // TODO: Trick for bombs & chus here
                 ((HAS_ITEM(ITEM_HOOKSHOT) || CAN_BE_ZORA) && HAS_ITEM(ITEM_MASK_GREAT_FAIRY)) ||
                 // Can they break it, making it drop into the water? --- Only if you make the item drop if not it will float
-                (HAS_ITEM(ITEM_BOW) || (CAN_BE_DEKU && HAS_MAGIC))
+                (HAS_ITEM(ITEM_BOW) || CAN_USE_DEKU_BUBBLE)
             )),
         },
         .connections = {

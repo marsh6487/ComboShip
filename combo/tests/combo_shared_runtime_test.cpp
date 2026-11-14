@@ -7,6 +7,11 @@
 #include <stdexcept>
 #include <algorithm>
 static int g_comboCompletionSlot = -1, g_MmSaveInMemorySlot = -1;
+static bool Combo_PreserveStartupMmState() {
+    return true;
+}
+static void Combo_CompleteStartupReceipt(int, bool) {
+}
 static uint32_t g_sharedMask = 0;
 static bool g_sharedReconcilePending = false;
 static int tiers[2][ComboRando::SF_COUNT] = {}, raises = 0;

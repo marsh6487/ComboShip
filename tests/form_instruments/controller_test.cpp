@@ -96,12 +96,16 @@ extern "C" void FormJingle_Stop() { jingleSounding = false; }
 extern "C" void MmSfx_Stop(u16) { sounding = false; }
 extern "C" void Audio_StopSfxById(u32) {}
 extern "C" void AudioOcarina_SetInstrument(u8 instrument) { instrumentChanges++; engineInstrument = instrument; }
-extern "C" s32 MmGakki_GetNativeInstrument(s32 form) { return form == MM_PLAYER_FORM_GERUDO ? 2 : 0; }
+extern "C" s32 MmGakki_GetNativeInstrument(s32 form) {
+    return form == MM_PLAYER_FORM_GERUDO ? 2 : form == MM_PLAYER_FORM_RITO ? 4 : 0;
+}
 extern "C" s32 MmGakki_GetVoiceType(s32 form) {
     if (form >= MM_PLAYER_FORM_GORON && form <= MM_PLAYER_FORM_DEKU) return GAKKI_VOICE_MM_FONT;
-    if (form == MM_PLAYER_FORM_GERUDO) return GAKKI_VOICE_NATIVE;
+    if (form == MM_PLAYER_FORM_GERUDO || form == MM_PLAYER_FORM_RITO) return GAKKI_VOICE_NATIVE;
     return GAKKI_VOICE_NONE;
 }
+extern "C" s32 MmGakki_FormHasOwnInstrument(s32 form) { return MmGakki_GetVoiceType(form) != GAKKI_VOICE_NONE; }
+extern "C" void Player_Action_8084E3C4(Player*, PlayState*) {}
 
 static int ResourceMgr_OTRSigCheck(void* resource) {
     return resource != nullptr && std::memcmp(resource, "__OTR__", 7) == 0;
@@ -195,10 +199,14 @@ static void MmForm_CancelNativeMaskCutscene(u8) {}
 static void MmForm_ClearCachedDLs() {}
 static void MmForm_UnpinFormResources() {}
 static void MmForm_FreeRootMotion() {}
+static void MmForm_ResetDekuBubble(PlayState*) {}
 
 /* PRODUCTION_KEYFRAMES */
 /* PRODUCTION_GAKKI_DECLARATIONS */
 /* PRODUCTION_GAKKI_FUNCTIONS */
+static void UpdateInstrumentSession(Player* player, PlayState* play) {
+    /* PRODUCTION_GAKKI_SESSION */
+}
 /* PRODUCTION_DESTROY_CLEANUP */
 
 static void RunCleanup(const std::string& which) {
@@ -239,6 +247,7 @@ static void DrawInstrument(s32 limbIndex) {
 alignas(16) static Vec3s joints[PLAYER_LIMB_MAX + 1], morph[PLAYER_LIMB_MAX + 1];
 static void DrainQueue() { AnimationContext_Update(&play, &play.animationCtx); }
 static void Tick() { MmForm_UpdateGakki(&player, &play); DrainQueue(); }
+static void TickSession() { UpdateInstrumentSession(&player, &play); DrainQueue(); }
 static void Reset(MmPlayerTransformation form, MmAnimId missingAsset = MM_ANIM_MAX) {
     play = {}; player = {}; graphics = {}; gFormState = {}; registers = {}; gSaveContext = {};
     std::memset(joints, 0, sizeof(joints)); std::memset(morph, 0, sizeof(morph));
@@ -285,11 +294,195 @@ static Gfx* ResolveDraw(Gfx* list) {
     return list;
 }
 
+static void RecognizeSong(MmPlayerTransformation form, MmAnimId missingAsset = MM_ANIM_MAX) {
+    Open(form, missingAsset);
+    if (form == MM_PLAYER_FORM_GERUDO || form == MM_PLAYER_FORM_RITO) {
+        // The real custom forms supply retargeted play clips through the resource table.
+        // Use a tagged, Link-format clip at that resource boundary in this fixture.
+        gFormState.gakkiPlayAnim = MmAnim_Load(MM_ANIM_PZ_GAKKIPLAY);
+        MmForm_GakkiStartPlayAnimation(&play);
+        DrainQueue();
+    }
+    play.msgCtx.ocarinaMode = OCARINA_MODE_01;
+    play.msgCtx.ocarinaAction = OCARINA_ACTION_FREE_PLAY;
+    play.msgCtx.msgMode = MSGMODE_SONG_PLAYED;
+    TickSession();
+}
+static void RequirePerformance() {
+    Require(gFormState.gakkiActive == 2, "successful song left instrument-out state before the player's decision");
+    Require(gFormState.formSkelAnime.animation == gFormState.gakkiPlayAnim,
+            "successful song did not select the form's full performance clip");
+    Require(gFormState.formSkelAnime.mode == ANIMMODE_LOOP && gFormState.formSkelAnime.playSpeed > 0,
+            "successful song froze its one-shot gesture instead of continuing the performance loop");
+}
+static void RequireSeveralPerformanceLoops() {
+    RequirePerformance();
+    int wraps = 0;
+    bool poseChanged = false;
+    auto& animation = gFormState.formSkelAnime;
+    for (int i = 0; i < 80; i++) {
+        float before = animation.curFrame;
+        Vec3s previous = joints[PLAYER_LIMB_ROOT];
+        TickSession();
+        wraps += animation.curFrame < before;
+        poseChanged |= joints[PLAYER_LIMB_ROOT].x != previous.x;
+        RequirePerformance();
+    }
+    Require(wraps >= 3 && poseChanged, "performance did not keep advancing and wrapping through the production frame queue");
+}
+
 int main(int argc, char** argv) {
     Require(argc == 2, "one test case is required");
     InitClips();
     std::string test = argv[1];
-    if (test == "opening-note") {
+    if (test == "performance-loop") {
+        for (int updateRate : {2, 3}) {
+            for (auto form : {MM_PLAYER_FORM_GORON, MM_PLAYER_FORM_ZORA, MM_PLAYER_FORM_DEKU,
+                              MM_PLAYER_FORM_GERUDO, MM_PLAYER_FORM_RITO}) {
+                RecognizeSong(form);
+                R_UPDATE_RATE = updateRate; // Also cover the host's fractional 1.5-frame advance.
+                RequireSeveralPerformanceLoops();
+            }
+        }
+        RecognizeSong(MM_PLAYER_FORM_GORON, MM_ANIM_PG_GAKKIWAIT);
+        RequireSeveralPerformanceLoops();
+    } else if (test == "performance-result-dialogue") {
+        for (auto form : {MM_PLAYER_FORM_GORON, MM_PLAYER_FORM_ZORA, MM_PLAYER_FORM_DEKU}) {
+            RecognizeSong(form);
+            for (auto mode : {MSGMODE_SETUP_DISPLAY_SONG_PLAYED, MSGMODE_DISPLAY_SONG_PLAYED,
+                              MSGMODE_DISPLAY_SONG_PLAYED_TEXT_BEGIN, MSGMODE_DISPLAY_SONG_PLAYED_TEXT,
+                              MSGMODE_SONG_PLAYED_ACT_BEGIN, MSGMODE_SONG_PLAYED_ACT,
+                              MSGMODE_TEXT_START, MSGMODE_TEXT_DISPLAYING, MSGMODE_TEXT_DONE}) {
+                play.msgCtx.msgMode = mode;
+                // Message setup changes this action before it opens the ordinary result box.
+                play.msgCtx.ocarinaAction = OCARINA_ACTION_FREE_PLAY_DONE;
+                TickSession();
+                RequirePerformance();
+            }
+            RequireSeveralPerformanceLoops();
+        }
+    } else if (test == "performance-callbacks") {
+        for (auto form : {MM_PLAYER_FORM_GORON, MM_PLAYER_FORM_ZORA, MM_PLAYER_FORM_DEKU}) {
+            RecognizeSong(form);
+            play.msgCtx.msgMode = MSGMODE_DISPLAY_SONG_PLAYED;
+            for (int i = 0; i < 8; i++) TickSession();
+            float before = gFormState.formSkelAnime.curFrame;
+            Vec3s pose = joints[PLAYER_LIMB_L_SHOULDER];
+            // No player tick occurs during these callbacks: they must retain the pose,
+            // including when native pause stops the owner update but audio emits a release.
+            Replay(0, 2, 1); Replay(0, 2, 1.25f);
+            Require(noteStarts == 2 && Near(lastBend, 1.25f), "performance merged repeated replay onsets or lost their bend");
+            Replay(OCARINA_BTN_INVALID, OCARINA_PITCH_NONE);
+            Require(!sounding, "performance swallowed the direct voice's replay release");
+            instrumentMuted = true;
+            Replay(3, 11);
+            Require(noteStarts == 2 && !sounding, "performance layered a direct note over the muted song fanfare");
+            Require(Near(gFormState.formSkelAnime.curFrame, before) && joints[PLAYER_LIMB_L_SHOULDER].x == pose.x,
+                    "an audio callback advanced or restarted the performance outside its player update");
+            RequirePerformance();
+            DrainQueue();
+            Require(joints[PLAYER_LIMB_L_SHOULDER].x == pose.x, "a replay callback queued a live arm gesture over the song performance");
+            TickSession();
+            RequirePerformance();
+        }
+    } else if (test == "performance-scales") {
+        RecognizeSong(MM_PLAYER_FORM_GORON);
+        RequirePerformance();
+        play.msgCtx.msgMode = MSGMODE_DISPLAY_SONG_PLAYED;
+        Replay(0, 2);
+        while (gFormState.formSkelAnime.curFrame < 7) TickSession();
+        int fullBodyFrame = 100 + (int)gFormState.formSkelAnime.curFrame;
+        CheckArm(PLAYER_LIMB_L_SHOULDER, fullBodyFrame);
+        CheckArm(PLAYER_LIMB_R_SHOULDER, fullBodyFrame);
+        DrawInstrument(PLAYER_LIMB_TORSO);
+        Require(draws.size() == 6, "performance hid a Goron drum");
+        Require(!Near(draws[0].scale.x, 1), "Goron performance retained its static wait-container scale");
+        for (int i = 1; i < 6; i++)
+            Require(Near(draws[i].scale.x, draws[0].scale.x), "Goron performance retained an independent live-note drum deformation");
+        RecognizeSong(MM_PLAYER_FORM_DEKU);
+        RequirePerformance();
+        // Entry starts the loop; two owner updates reach the native inflation keyframe.
+        while (gFormState.formSkelAnime.curFrame < 2) TickSession();
+        Replay(3, 11); DrainQueue();
+        DrawInstrument(PLAYER_LIMB_HEAD);
+        Require(draws.size() == 6 && Near(draws[0].scale.x, 1), "Deku performance lost its full-size pipe container");
+        for (int i = 1; i < 6; i++)
+            Require(Near(draws[i].scale.x, 1.2f), "Deku performance did not inflate all pipes with its native loop curve");
+    } else if (test == "performance-decision") {
+        for (auto mode : {OCARINA_MODE_02, OCARINA_MODE_04}) {
+            RecognizeSong(MM_PLAYER_FORM_ZORA);
+            play.msgCtx.msgMode = MSGMODE_TEXT_DONE;
+            play.msgCtx.ocarinaAction = OCARINA_ACTION_FREE_PLAY_DONE;
+            play.msgCtx.ocarinaMode = mode;
+            player.stateFlags1 |= PLAYER_STATE1_IN_ITEM_CS;
+            player.actionFunc = Player_Action_8084E3C4;
+            player.av2.actionVar2 = 1;
+            TickSession();
+            Require(gFormState.gakkiActive == 3 && gFormState.formSkelAnime.playSpeed < 0,
+                    "a resolved song decision retained the performance while the closing textbox remained up");
+            auto exitAnimation = gFormState.formSkelAnime.animation;
+            Replay(0, 2); DrainQueue();
+            Require(gFormState.formSkelAnime.animation == exitAnimation, "a late replay note interrupted put-away after a song decision");
+            for (int i = 0; i < 30; i++) TickSession();
+            Require(!gFormState.gakkiActive && !sounding, "resolved decision re-entered or stranded the instrument session");
+        }
+    } else if (test == "performance-close") {
+        RecognizeSong(MM_PLAYER_FORM_DEKU);
+        play.msgCtx.msgMode = MSGMODE_NONE;
+        player.actionFunc = nullptr;
+        for (int i = 0; i < 30; i++) TickSession();
+        Require(!gFormState.gakkiActive && !sounding, "a closed successful-song session kept performing");
+        Open(MM_PLAYER_FORM_DEKU);
+        play.msgCtx.msgMode = MSGMODE_TEXT_DONE;
+        play.msgCtx.ocarinaMode = OCARINA_MODE_01;
+        TickSession();
+        Require(gFormState.formSkelAnime.mode == ANIMMODE_ONCE && Near(gFormState.formSkelAnime.playSpeed, 0),
+                "a previous song's performance latch leaked into a new live instrument session");
+    } else if (test == "performance-unrelated-text") {
+        for (auto mode : {MSGMODE_OCARINA_PLAYING, MSGMODE_OCARINA_FAIL, MSGMODE_TEXT_DONE}) {
+            Open(MM_PLAYER_FORM_DEKU);
+            play.msgCtx.msgMode = mode;
+            play.msgCtx.ocarinaMode = OCARINA_MODE_01;
+            TickSession();
+            Require(gFormState.formSkelAnime.mode == ANIMMODE_ONCE && Near(gFormState.formSkelAnime.playSpeed, 0),
+                    "live input, failure, or unrelated dialogue started a successful-song loop");
+        }
+    } else if (test == "performance-cleanup") {
+        for (const char* cleanup : {"cleanup-damage", "cleanup-restore", "cleanup-reload", "cleanup-init",
+                                    "cleanup-reset", "cleanup-death", "cleanup-destroy"}) {
+            RecognizeSong(MM_PLAYER_FORM_GORON); Replay(0, 2);
+            RequirePerformance();
+            RunCleanup(cleanup);
+            Require(!gFormState.gakkiActive && !sounding, "lifecycle interruption left a recognized-song session active");
+            play.msgCtx.msgMode = MSGMODE_OCARINA_PLAYING;
+            play.msgCtx.ocarinaMode = OCARINA_MODE_01;
+            LoadInstrumentAnims(); // Restore/reload legitimately discard the old form's assets.
+            MmForm_EnterGakki(&player, &play);
+            for (int i = 0; gFormState.gakkiActive == 1 && i < 40; i++) Tick();
+            Require(gFormState.formSkelAnime.animation == gFormState.gakkiGoronWaitAnim,
+                    (std::string("lifecycle cleanup leaked the successful-song loop into the next instrument use: ") + cleanup).c_str());
+        }
+    } else if (test == "opening-after-song") {
+        Reset(MM_PLAYER_FORM_DEKU);
+        MmForm_GakkiVoiceOff(); gFormState.gakkiActive = 0;
+        // OoT resets the prior terminal mode only after the fresh intro finishes
+        // and Message_StartOcarina opens the staff. That old result is not a cancel.
+        play.msgCtx.ocarinaMode = OCARINA_MODE_04;
+        player.stateFlags1 |= PLAYER_STATE1_IN_ITEM_CS;
+        player.actionFunc = Player_Action_8084E3C4;
+        player.av2.actionVar2 = 0;
+        TickSession();
+        Require(gFormState.gakkiActive == 1 && gFormState.formSkelAnime.playSpeed > 0,
+                "a previous song's terminal mode prevented the next instrument opening");
+        for (int i = 0; gFormState.gakkiActive == 1 && i < 40; i++) TickSession();
+        Require(gFormState.gakkiActive == 2, "a previous terminal result reversed the new instrument intro");
+        player.av2.actionVar2 = 1;
+        play.msgCtx.ocarinaMode = OCARINA_MODE_01;
+        play.msgCtx.msgMode = MSGMODE_OCARINA_PLAYING;
+        Live(0, 2); TickSession();
+        Require(sounding && noteStarts == 1 && gFormState.formSkelAnime.mode == ANIMMODE_ONCE,
+                "a fresh instrument session did not retain ordinary live-note behavior");
+    } else if (test == "opening-note") {
         for (auto form : {MM_PLAYER_FORM_GORON, MM_PLAYER_FORM_ZORA, MM_PLAYER_FORM_DEKU}) {
             Reset(form);
             auto start = gFormState.formSkelAnime.animation;

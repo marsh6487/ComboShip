@@ -52,7 +52,6 @@ unsigned char TradeAdult_IsOwnedIndex(int index);
 void TradeAdult_SetOwnedIndex(int index, unsigned char on);
 int TradeAdult_Count(void);
 void TradeAdult_GiveIndex(int index);
-void TradeAdult_FoldCurrent(uint16_t item);
 // Skijer's NEI — mods/items/logic/twilight_upgrade.c
 unsigned char TwilightUpgrade_HasClawshot(void);
 unsigned char TwilightUpgrade_HasBombArrows(void);
@@ -2188,18 +2187,29 @@ void DrawInventoryTab() {
             }
         }
 
+        // Keep the mask actions inside the card at the current font and UI scale.
+        const auto sameLineIfButtonFits = [](const char* label) {
+            const auto& style = ImGui::GetStyle();
+            const float buttonWidth = ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f;
+            const float nextButtonRight = ImGui::GetItemRectMax().x + style.ItemSpacing.x + buttonWidth;
+            const float contentRight = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+            if (nextButtonRight <= contentRight) {
+                ImGui::SameLine();
+            }
+        };
+
         if (ImGui::Button("Give All MM Masks")) {
             for (int i = 0; i < 24; i++) {
                 Nei_SetOwnedItem((uint8_t)(48 + i), gPage3MaskItems[i]); // Skijer's NEI
             }
         }
-        ImGui::SameLine();
+        sameLineIfButtonFits("Clear All MM Masks");
         if (ImGui::Button("Clear All MM Masks")) {
             for (int i = 48; i < 72; i++) {
                 Nei_SetOwnedItem((uint8_t)i, ITEM_NONE); // Skijer's NEI
             }
         }
-        ImGui::SameLine();
+        sameLineIfButtonFits("Give Random MM Mask");
         if (ImGui::Button("Give Random MM Mask")) {
             // Find an empty slot and give a random mask
             std::vector<int> emptySlots;

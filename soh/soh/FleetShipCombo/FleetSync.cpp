@@ -24,7 +24,8 @@
 #include "FleetShipCombo.h"
 #include "FleetOracleClient.h" // pairing MM's derived save files with OoT's (delete/ensure)
 #include "FleetComboIds.h"
-#include "FleetComboItems.h"     // FCI_NO_ITEM, FCI_MAX
+#include "FleetComboItems.h" // FCI_NO_ITEM, FCI_MAX
+#include "../../../combo/TradeItemSync.h"
 #include "FleetComboItemsGlue.h" // FcCombo_NativeForItem (FcComboItemId -> RG)
 #include "FleetComboOptions.h"   // FC_COMBO_OPTION_TABLE (shared NEI options)
 #include "soh/SaveManager.h"
@@ -63,6 +64,9 @@ extern "C" {
 #include "mods/ext_buttons/ext_buttons.h"
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
+void TradeAdult_ReconcileConsumed(void);
+int TradeAdult_IndexOfItem(unsigned char item);
+unsigned char TradeAdult_IsConsumedIndex(int index);
 // Transformation-mask form bridge (mm_player_form.cpp): current MM form (0 FD..4 Human, >4 custom)
 // and a setter that wears/removes the matching transformation mask on next gameplay frame.
 int MmForm_GetCurrentForm(void);
@@ -246,19 +250,74 @@ void SetEquippedShieldCanonical(int canon) {
     }
 }
 
+int NativeBombchuCapacity() {
+    if (IS_RANDO && RAND_GET_OPTION(RSK_BOMBCHU_BAG).Is(RO_BOMBCHU_BAG_PROGRESSIVE) &&
+        !Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_BOMBCHUS)) {
+        const int level = gSaveContext.ship.quest.data.randomizer.bombchuUpgradeLevel;
+        return level == 1 ? 20 : level == 2 ? 30 : level >= 3 ? 50 : 0;
+    }
+    return 50;
+}
+
+void ApplyBombchuCapacity(const nlohmann::json& sh) {
+    NeiSaveData* nei = Nei_Save();
+    if (nei->comboObtainedFc[FCI_BOMBCHU_BAG] && nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 0)
+        nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 20;
+    if (sh.contains("comboObtained") && sh["comboObtained"].is_array()) {
+        const auto& cells = sh["comboObtained"];
+        for (const int id : { FC_OOT_BOMBCHU_CAPACITY, FC_OOT_INFINITE_BOMBCHUS }) {
+            if (id < (int)cells.size() && cells[id].is_number_integer()) {
+                const int value = std::clamp(cells[id].get<int>(), 0, id == FC_OOT_BOMBCHU_CAPACITY ? 50 : 1);
+                nei->comboObtained[id] = (uint8_t)std::max<int>(nei->comboObtained[id], value);
+            }
+        }
+    }
+    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array()) {
+        const auto& cells = sh["comboObtainedFc"];
+        if (FCI_BOMBCHU_BAG < (int)cells.size() && cells[FCI_BOMBCHU_BAG].is_number_integer() &&
+            cells[FCI_BOMBCHU_BAG].get<int>() > 0 && nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY] == 0)
+            nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 20;
+    }
+}
+
+int SyncAmmoCapacity(int slot) {
+    if (slot == SLOT_STICK)
+        return CUR_CAPACITY(UPG_STICKS);
+    if (slot == SLOT_NUT)
+        return CUR_CAPACITY(UPG_NUTS);
+    if (slot == SLOT_BOMBCHU) {
+        // The first foreign bag's current ammo may precede deferred native
+        // receipt materialization. Its earned capacity already authorizes it.
+        return std::max(NativeBombchuCapacity(), std::min<int>(Nei_Save()->comboObtained[FC_OOT_BOMBCHU_CAPACITY], 50));
+    }
+    return 127;
+}
+
+void RecordBombchuCapacity() {
+    if (!IS_RANDO || INV_CONTENT(ITEM_BOMBCHU) != ITEM_BOMBCHU)
+        return;
+    NeiSaveData* nei = Nei_Save();
+    nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY] =
+        (uint8_t)std::max<int>(nei->comboObtained[FC_OOT_BOMBCHU_CAPACITY], NativeBombchuCapacity());
+    if (Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_BOMBCHUS))
+        nei->comboObtained[FC_OOT_INFINITE_BOMBCHUS] = 1;
+}
+
 void PutInvItem(nlohmann::json& inv, const char* key, int slot, bool withAmmo) {
     uint8_t item = gSaveContext.inventory.items[slot];
     inv[key] = (item != 0xFF);
-    if (withAmmo) {
+    if (withAmmo && item != 0xFF && SyncAmmoCapacity(slot) > 0) {
         inv[std::string(key) + "Ammo"] = (int)gSaveContext.inventory.ammo[slot];
+    } else if (withAmmo) {
+        inv.erase(std::string(key) + "Ammo");
     }
 }
 
 void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t itemId, bool withAmmo) {
-    if (!inv.contains(key)) {
-        return;
-    }
-    if (inv[key].get<bool>()) {
+    // FleetNet consumption deltas often contain only the ammo leaf. They may
+    // update an already-owned item, but cannot grant one without ownership.
+    const bool sourceOwnsItem = inv.value(key, gSaveContext.inventory.items[slot] != 0xFF);
+    if (sourceOwnsItem) {
         if (gSaveContext.inventory.items[slot] == 0xFF) {
             SPDLOG_INFO("[ItemGrantAudit] OOT shared-state grant: file={} key={} inventorySlot={} item={}",
                         (int)gSaveContext.fileNum, key, slot, (int)itemId);
@@ -266,10 +325,10 @@ void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t 
         }
     }
     // (ownership is additive: an item you have never disappears because the other game lacks it)
-    if (withAmmo) {
+    if (withAmmo && sourceOwnsItem && SyncAmmoCapacity(slot) > 0) {
         std::string ak = std::string(key) + "Ammo";
         if (inv.contains(ak) && gSaveContext.inventory.items[slot] != 0xFF) {
-            gSaveContext.inventory.ammo[slot] = (int8_t)inv[ak].get<int>();
+            gSaveContext.inventory.ammo[slot] = (int8_t)std::clamp(inv[ak].get<int>(), 0, SyncAmmoCapacity(slot));
         }
     }
 }
@@ -371,19 +430,34 @@ void FoldNativesIntoRegistry() {
         nei->comboObtained[FC_OOT_BOOTS_IRON] = 1;
     if (equip & (1 << 14))
         nei->comboObtained[FC_OOT_BOOTS_HOVER] = 1;
-    // Child trade chain: flag at least the currently-held trade item.
-    uint8_t trade = gSaveContext.inventory.items[SLOT_TRADE_CHILD];
-    if (trade >= 0x21 && trade <= 0x23) {
-        nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + (trade - 0x21)] = 1;
-    } else if (trade >= 0x2D && trade <= 0x37) {
-        nei->comboObtained[FC_OOT_TRADE_POCKET_EGG + (trade - 0x2D)] = 1;
-    } else if (trade >= 0x24 && trade <= 0x2B) {
-        // Child-trade MASKS (Keaton..Mask of Truth). They fell in the gap between the two ranges
-        // above, and ootMasksOwned itself was echo-only — nothing ever authored it — so a mask
-        // earned in OoT never reached MM's OoT-mask wheel. Bit order = MM's sOotMaskIconPaths
-        // (Keaton 0 .. Truth 7), which is exactly the item-id order. 2026-08-07, Skijer's NEI
-        nei->ootMasksOwned |= (uint16_t)(1u << (trade - 0x24));
+    // Keep native and normalized unified selections visible to the registry.
+    // Migration may preserve another selected trade, leaving child ownership
+    // only in the unified bitset, so fold those three bits as well.
+    const uint8_t tradeSlots[] = { SLOT_TRADE_CHILD, SLOT_TRADE_ADULT };
+    unsigned tradeSlotCount = 1;
+#ifdef COMBO_BUILD
+    if (IS_RANDO)
+        tradeSlotCount = 2;
+#endif
+    for (unsigned slotIndex = 0; slotIndex < tradeSlotCount; ++slotIndex) {
+        const uint8_t slot = tradeSlots[slotIndex];
+        const uint8_t trade = gSaveContext.inventory.items[slot];
+        if (trade >= 0x21 && trade <= 0x23) {
+            nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + (trade - 0x21)] = 1;
+        } else if (trade >= 0x2D && trade <= 0x37) {
+            nei->comboObtained[FC_OOT_TRADE_POCKET_EGG + (trade - 0x2D)] = 1;
+        } else if (trade >= 0x24 && trade <= 0x2B) {
+            nei->ootMasksOwned |= (uint16_t)(1u << (trade - 0x24));
+        }
     }
+#ifdef COMBO_BUILD
+    if (IS_RANDO) {
+        for (unsigned i = 0; i < 3; ++i) {
+            if (nei->tradeAdultOwned & (1u << (20 + i)))
+                nei->comboObtained[FC_OOT_TRADE_WEIRD_EGG + i] = 1;
+        }
+    }
+#endif
     // Triforce pool: keep registry counter as the max of both stores.
     uint8_t nativeTf = gSaveContext.ship.quest.data.randomizer.triforcePiecesCollected;
     if (nativeTf > nei->comboTriforce) {
@@ -515,6 +589,7 @@ void ExtractShared(nlohmann::json& sh) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT ExtractShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     FoldNativesIntoRegistry();
+    RecordBombchuCapacity();
 
     sh["schema"] = 1;
     sh["vitals"] = { { "health", gSaveContext.health },
@@ -620,7 +695,7 @@ void ExtractShared(nlohmann::json& sh) {
         }
         sh["ownedItems"] = owned;
     }
-    sh["tradeAdultOwned"] = nei->tradeAdultOwned;
+    ComboTrade::WriteShared(*nei, sh);
     // Elemental Wand rods + Sheikah Slate runes: the cell item travels in ownedItems, but WHICH rods
     // / runes you own lives in these bitmasks, and nothing carried them -- the peer got an empty
     // wand. OR-merged both ways (one-way unlocks); the fcId deficit path still grants the items
@@ -696,6 +771,7 @@ void ApplyShared(const nlohmann::json& sh) {
     }
     ItemGrantAudit::Scope itemGrantAuditScope("OOT ApplyShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
+    ApplyBombchuCapacity(sh);
 
     if (sh.contains("vitals")) {
         const auto& v = sh["vitals"];
@@ -959,8 +1035,8 @@ void ApplyShared(const nlohmann::json& sh) {
     }
 
     RepairFlagOwnedCells(nei);
-    if (sh.contains("tradeAdultOwned"))
-        nei->tradeAdultOwned |= sh["tradeAdultOwned"].get<uint32_t>();
+    ComboTrade::ReadShared(*nei, sh);
+    TradeAdult_ReconcileConsumed();
     // ootMasksOwned round-trip (2026-08-07): the field is authored now (child-trade mask fold), so
     // merge it back too — without this, bits earned while playing MM never landed here.
     if (sh.contains("ootMasksOwned"))
@@ -1092,6 +1168,9 @@ void ExtractEquips(nlohmann::json& sh) {
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
 int FindInvSlot(uint16_t item) {
+    if (item < 0xFF && TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem((uint8_t)item))) {
+        return -1;
+    }
     // Ownership survives switching the travel cell to the other tool. Restoring
     // a peer button must not discard an owned item or change the local selection.
     if (item == ITEM_TIME_GATE || item == EXT_ITEM_MAGIC_MIRROR) {
@@ -1210,6 +1289,16 @@ void ApplyFcRegistryToNatives() {
     NeiSaveData* nei = Nei_Save();
     sApplyingFc = true; // suppress the record hook's re-entry for the duration of this pass
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
+        if (ComboTrade::AcknowledgeConsumedGrant(*nei, fcId)) {
+            continue;
+        }
+        // Native tiers and exact consumable counts already arrived through
+        // shared upgrades/inventory. The receipt only acknowledges that state;
+        // it must not resolve another progressive tier or refill the bag.
+        if (fcId == FCI_STICK_CAPACITY || fcId == FCI_NUT_CAPACITY) {
+            nei->comboAppliedFc[fcId] = nei->comboObtainedFc[fcId];
+            continue;
+        }
         // Both games publish exact caneSkills. Replaying the old progressive counter
         // after applying that mask would grant an unrelated extra power. Acknowledge
         // counts here even when counter and mask arrive in separate FleetNet deltas.
@@ -1227,9 +1316,15 @@ void ApplyFcRegistryToNatives() {
         }
         GetItemEntry e = Rando::StaticData::RetrieveItem((RandomizerGet)native).GetGIEntry_Copy();
         if (e.modIndex == MOD_RANDOMIZER) { // valid itemTable row (rowless logic-only RGs would assert)
+            const bool preserveBombchuAmmo = fcId == FCI_BOMBCHU_BAG && INV_CONTENT(ITEM_BOMBCHU) == ITEM_BOMBCHU;
+            const int8_t bombchuAmmo = AMMO(ITEM_BOMBCHU);
             for (int c = 0; c < deficit; c++) {
                 Randomizer_Item_Give(gPlayState, e); // Anchor pattern: one give per missing copy
             }
+            // Capacity receipts may arrive after the current consumable count.
+            // Replaying ownership must not refill ammo already imported/spent.
+            if (preserveBombchuAmmo)
+                AMMO(ITEM_BOMBCHU) = bombchuAmmo;
         }
         // Converge either way so an ungrantable RG doesn't re-run RetrieveItem every frame.
         nei->comboAppliedFc[fcId] = nei->comboObtainedFc[fcId];
@@ -1460,6 +1555,23 @@ std::string NetArrayRootOf(const std::string& key) {
 // can never be split. An array too big even for one packet is dropped with a loud log rather than
 // sent half-formed -- a half-formed one is precisely what corrupts the save.
 void NetSendDelta(const NetDelta& delta) {
+    auto sendArray = [](const std::string& key, const nlohmann::json& value) {
+        nlohmann::json pkt = { { "op", "delta" }, { "a", { { key, value } } } };
+        const size_t size = pkt.dump().size();
+        if (size > kNetBatchBytes) {
+            SPDLOG_ERROR("[FleetNet] array {} is {} bytes and does not fit a packet -- not sent", key, size);
+            return;
+        }
+        NetSend(pkt);
+    };
+    // Capacity and receipt arrays authorize the ammo in the scalar packets below.
+    // Deliver them first; other arrays keep their original position after scalars.
+    for (const char* key : { "/comboObtained", "/comboObtainedFc" }) {
+        if (delta.arrays.contains(key)) {
+            sendArray(key, delta.arrays[key]);
+        }
+    }
+
     nlohmann::json batch = nlohmann::json::object();
     auto flush = [&]() {
         if (!batch.empty()) {
@@ -1480,13 +1592,9 @@ void NetSendDelta(const NetDelta& delta) {
     flush();
 
     for (auto it = delta.arrays.begin(); it != delta.arrays.end(); ++it) {
-        nlohmann::json pkt = { { "op", "delta" }, { "a", { { it.key(), it.value() } } } };
-        const size_t size = pkt.dump().size();
-        if (size > kNetBatchBytes) {
-            SPDLOG_ERROR("[FleetNet] array {} is {} bytes and does not fit a packet -- not sent", it.key(), size);
-            continue;
+        if (it.key() != "/comboObtained" && it.key() != "/comboObtainedFc") {
+            sendArray(it.key(), it.value());
         }
-        NetSend(pkt);
     }
 }
 
@@ -1514,6 +1622,17 @@ NetDelta NetRescan() {
     ExtractShared(sNetShared);
     nlohmann::json flat = sNetShared.flatten();
     const bool active = FleetShipCombo_IsThisGameActive();
+
+    // Missing ammo means this host cannot author it (for example, a shuffled
+    // base bag is absent). Keep the last peer count in the network cache only;
+    // fresh shared extraction still omits it, and no count or delta is invented.
+    for (auto it = sNetFlat.begin(); it != sNetFlat.end(); ++it) {
+        const std::string& key = it.key();
+        if (key.rfind("/inv/", 0) == 0 && key.size() > 9 && key.compare(key.size() - 4, 4, "Ammo") == 0 &&
+            !flat.contains(key)) {
+            flat[key] = it.value();
+        }
+    }
 
     NetDelta out;
     out.leaves = nlohmann::json::object();
@@ -2178,6 +2297,7 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.extEquipOwnedBits", nei->extEquipOwnedBits);
     snapshot.Add("nei.weaponUpgrades", nei->weaponUpgrades);
     snapshot.Add("nei.tradeAdultOwned", nei->tradeAdultOwned);
+    snapshot.Array("nei.tradeAdultRevision", nei->tradeAdultRevision);
     snapshot.Add("nei.ootMasksOwned", nei->ootMasksOwned);
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);

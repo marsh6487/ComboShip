@@ -895,6 +895,12 @@ void SohMenu::AddMenuEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
+    AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Graphics.ItemGetLightShaft")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Shines a soft, gently scrolling warm light down on Link while a received item is held up. "
+            "Applies in both games and follows child, adult and transformation-form heights."));
     AddWidget(path, "Din Fire Shield (POC)", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DinFireShield"))
         .RaceDisable(false)
@@ -936,6 +942,13 @@ void SohMenu::AddMenuEnhancements() {
             "Force light on regular swords, even without Light Arrows. Only one override is active at a time. "
             "Turn off to restore each sword's saved imbue. Light Arrows independently unlock this element in the "
             "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
+    AddWidget(path, "Din's Fire Remake", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("DinsFireRemake"))
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use a revised Din's Fire cast with green trails and luminous flame ribbons. Keep the normal gameplay "
+            "camera and regain control while the fire lingers. The lingering fire lights held Deku Sticks and "
+            "ordinary arrows passing through it. Applies to the next cast. Off by default."));
     AddWidget(path, "MM Ice Arrow Behavior", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MmIceArrows"))
         .Options(CheckboxOptions().Tooltip(

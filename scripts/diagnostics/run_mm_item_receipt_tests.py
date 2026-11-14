@@ -342,7 +342,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     mm_give = (ROOT / 'mm/2s2h/Rando/GiveItem.cpp').read_text()
     fairy_arms = mm_give[mm_give.index('        case RI_WOODFALL_STRAY_FAIRY:'):
                          mm_give.index('        case RI_GREAT_SPIN_ATTACK:')]
-    fc_grants = 'int gFcCombo_SuppressRecord = 0;\n'
+    fc_grants = '#include "combo/TradeItemSync.h"\nint gFcCombo_SuppressRecord = 0;\n'
     fc_grants += 'void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId) {\n' \
         'assert(gFcCombo_SuppressRecord > 0);\nswitch (randoItemId) {\n' + fairy_arms + \
         'default: assert(false && "unexpected non-fairy FC grant");\n}\n}\n'
@@ -456,7 +456,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     randomizer_messages = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
     # Copy the real shared-tool rows, including their icon and all locales.
-    for rg in ('RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
+    for rg in ('RG_CLOCK', 'RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
         row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboToolReceiptText::.*?\}',
                         randomizer_messages, re.S)
         assert row, f'Missing shared tool receipt: {rg}'

@@ -532,13 +532,13 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     // Check if this is a custom item with a detailed message
     const CustomItemMessageEntry* customMsg = GetCustomItemMessage(rgid);
     if (!dungeonKey && customMsg != nullptr) {
-        // Use the detailed custom message. Pass the real ItemID so Message_LoadItemIcon's
-        // ">= ITEM_ROCS_FEATHER_SKIJER" branch fires (z_message_PAL.c:1671) and loads the
-        // 32x32 icon via ExtInv_GetItemIcon(itemId). Without this, AutoFormat() with no
-        // argument leaves the message without an ITEM_OBTAINED token at all, and the
-        // textbox renders with no icon on the left.
+        // Use the detailed custom message and its registered icon, if any.
+        // ITEM_NONE denotes an iconless receipt, not an icon operand.
         msg = CustomMessage(customMsg->english, customMsg->german, customMsg->french, TEXTBOX_TYPE_BLUE);
-        if (rgid == RG_SKULL_MASK || rgid == RG_SPOOKY_MASK || rgid == RG_MASK_OF_TRUTH || rgid == RG_GERUDO_MASK) {
+        if (customMsg->itemId == ITEM_NONE) {
+            msg.AutoFormat();
+        } else if (rgid == RG_SKULL_MASK || rgid == RG_SPOOKY_MASK || rgid == RG_MASK_OF_TRUTH ||
+                   rgid == RG_GERUDO_MASK) {
             // Spooky's icon byte is '&' (0x26), which the markup formatter
             // converts to a newline. Reserve icon width with a safe token,
             // then install the native icon after markup has been encoded.

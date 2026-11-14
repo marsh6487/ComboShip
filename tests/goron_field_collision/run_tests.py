@@ -57,6 +57,7 @@ def main():
     native_bodies = [function(collision, name) for name in collision_names]
     math = (root / "soh/src/code/z_lib.c").read_text()
     native_bodies += [function(math, name) for name in ("Math_Vec3f_Copy", "Math_Vec3s_ToVec3f", "Math_Vec3f_Diff", "Math_Vec3f_DistXYZ")]
+    native_bodies.append(function((root / "soh/src/code/z_player_lib.c").read_text(), "func_80090480"))
     # Run the real body's textbox branch, including its real exit cleanup. The
     # rest of UpdateActive drives unrelated forms, assets, animations and input.
     active = function(form, "MmForm_UpdateActive")
@@ -77,8 +78,9 @@ def main():
     restore = function(form, "MmForm_RestoreOotState")
     restore = restore[restore.index("    // Restore default OOT Link collider"):restore.index("    // Reset boot data REGs")]
     form_bodies.append("static void production_restore_body(Player* player) {\n" + restore + "\n}")
-    form_bodies.extend(function(combat, name) for name in ("MmForm_SetPunchQuadVertices", "MmForm_EnablePunchQuad", "MmForm_DisablePunchQuad"))
+    form_bodies.extend(function(combat, name) for name in ("MmForm_SetPunchQuadVertices", "MmForm_EnablePunchQuad", "MmForm_DisablePunchQuad", "MmForm_DisableJumpKickQuads"))
     form_bodies.append(function(form, "MmForm_Action_Punch"))
+    form_bodies.extend(function(form, name) for name in ("MmForm_MeleeLimb", "MmForm_UpdateMelee", "MmForm_DrawMelee"))
     enum = re.search(r"typedef enum GoronActionId \{.*?\} GoronActionId;", form, re.S).group(0)
     properties = re.search(r"typedef struct \{\n    const char\* skelPath;.*?\} MmFormProperties;", form, re.S).group(0)
     props = re.search(r"static const MmFormProperties sFormProps\[.*?\n\};", form, re.S).group(0)

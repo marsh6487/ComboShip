@@ -37,31 +37,41 @@ def production(host, grant_ref=None):
     fleet = source_at(f"{fleet_dir}/FleetSync.cpp")
     glue = source_at(f"{fleet_dir}/FleetComboItemsGlue.cpp")
     trade = source_at(f"{host}/mods/items/logic/trade_items.c")
-    parts = [array(trade, "static const u8 sTradeAdultItems[")]
-    parts += [extract(trade, name) for name in
-              ("TradeAdult_IndexOfItem", "TradeAdult_IsOwnedIndex", "TradeAdult_GiveItem", "TradeAdult_FoldCurrent")]
+    parts = []
+    # The shared OoT save fixture already includes the complete trade helpers.
+    # MM's save fixture supplies the table, lookup, grant and fold helpers;
+    # add the real availability/reconciliation closure used by FleetSync.
+    if host == "mm":
+        parts += [extract(trade, name) for name in
+                  ("TradeAdult_IsOwnedIndex", "TradeAdult_GiveItem",
+                   "TradeAdult_OwnedAt", "TradeAdult_ReconcileConsumed")]
     parts.append(between(glue, "const int sFcNative[]", "// Tokens stringificados"))
     parts.append(block(glue, "std::unordered_map<int, int>& ReverseMap()"))
     parts += [extract(glue, name) for name in ("FcCombo_NativeForItem", "FcCombo_ItemForNative")]
     parts.append("#define SPDLOG_INFO(...) ((void)0)\n#define SPDLOG_WARN(...) ((void)0)\n")
     # Relevant ExtractShared assignments and ApplyShared blocks remain production
     # code. Other shared vitals, UI settings and engine refresh are not exercised.
-    assignments = []
-    for key in ("tradeAdultOwned", "comboObtainedFc"):
-        assignments.append(re.search(r'^    sh\["' + key + r'"\] = [^\n]+', fleet, re.M).group())
+    # Capacity helpers also inspect comboObtainedFc. Bound each selection to its
+    # owning function so a repeated condition cannot capture unrelated helpers.
+    extract_shared = extract(fleet, "ExtractShared")
+    apply_shared = extract(fleet, "ApplyShared")
+    assignments = [re.search(r'^    ComboTrade::WriteShared\(\*nei, sh\);$', extract_shared, re.M).group(),
+                   re.search(r'^    sh\["comboObtainedFc"\] = [^\n]+', extract_shared, re.M).group()]
     parts.append("static json ExportTrade() { auto* nei = Nei_Save(); json sh;\n" +
                  "\n".join(assignments) + "\nreturn json::parse(sh.dump()); }")
     if host == "mm":
         trade_merge = between(
-            fleet, '    if (sh.contains("tradeAdultOwned"))', '    if (sh.contains("ootQuestItems"))')
+            apply_shared, '    ComboTrade::ReadShared(*nei, sh);', '    if (sh.contains("ootQuestItems"))')
     else:
-        trade_merge = between(fleet, '    if (sh.contains("tradeAdultOwned"))',
+        trade_merge = between(apply_shared, '    ComboTrade::ReadShared(*nei, sh);',
                               '    // ootMasksOwned round-trip')
-    receipts = between(fleet, '    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array())',
-                       '    if (sh.contains("comboGoalFlags"))')
+    receipts = block(apply_shared, '    if (sh.contains("comboObtainedFc") && sh["comboObtainedFc"].is_array())')
     parts.append("static void ImportTrade(const json& sh) { auto* nei = Nei_Save();\n" +
                  trade_merge + receipts + "\n}")
     if host == "soh":
+        # The complete FC materializer preserves existing Bombchu ammo. Retain
+        # its native slot lookup even though this probe grants only trade items.
+        parts.append(array(source_at("soh/src/code/z_inventory.c"), "u8 gItemSlots[]"))
         grant = source_at("soh/soh/Enhancements/randomizer/randomizer.cpp", grant_ref)
         cases = between(grant, "        case RG_MM_SMALL_KEY_WOODFALL:", "        case RG_MM_PICTOGRAPH_BOX:")
         noops = re.findall(r"case (RG_MM_\w+):", cases[:cases.index("case RG_MM_MOONS_TEAR:")])
@@ -173,6 +183,7 @@ def main():
                     '#include "combo/vanilla/ComboVanillaPolicy.h"\n'
                     'extern "C" { int gComboGameMode = COMBO_GAME_BOTH; int gComboVanillaMode = 0; }\n')
             cpp.write_text(common + '\n' + mode + '#include <unordered_map>\n#include "' + fleet_dir + '/FleetComboItems.h"\n' +
+                           '#include "combo/TradeItemSync.h"\n' +
                            ('#include "soh/Enhancements/randomizer/randomizerEnums.h"\n' if host == "soh" else
                             '#include "Rando/KeyRings.h"\n#include "Rando/Wallets.h"\n') +
                            '#include "moons_production.inc"\n' + source_at("tests/moons_tear/test.cpp"))
@@ -180,7 +191,8 @@ def main():
             (host_build / "moons_production.inc").write_text(production(host, args.grant_ref))
             (host_build / "BS_thread_pool.hpp").write_text("#pragma once\nnamespace BS { class thread_pool; }\n")
             includes = ["-I" + str(p) for p in (host_build, ROOT, ROOT / host, ROOT / host / "include",
-                        ROOT / host / "include/PR", ROOT / host / "2s2h", ROOT / host / "assets", ROOT / host / "src",
+                        ROOT / host / "include/PR", ROOT / host / ("2s2h" if host == "mm" else "soh"),
+                        ROOT / host / "assets", ROOT / host / "src",
                         ROOT / "libultraship/include", ROOT / "combo")]
             flags = ["-std=c++20", "-O1", "-g", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                      "-DLOG_LEVEL_GAME_PRINTS=0", "-DHOST_MM=" + str(int(host == "mm"))]

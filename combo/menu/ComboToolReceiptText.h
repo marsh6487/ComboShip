@@ -12,6 +12,28 @@ struct Entry {
     const char* french;
 };
 
+inline constexpr Entry kClock = {
+    "Clock",
+    "You got the %yClock%w!&"
+    "The flow of time has returned&"
+    "to %gHyrule%w.^"
+    "It takes effect %cautomatically%w.&"
+    "Wait in %gHyrule Field%w&"
+    "for %yday or night%w to come.",
+    "Du hast die %yUhr%w erhalten!&"
+    "Die Zeit in %gHyrule%w&"
+    "vergeht nun wieder.^"
+    "Sie wirkt %cautomatisch%w.&"
+    "Warte in der %gHylianischen&"
+    "Steppe%w auf %yTag oder Nacht%w.",
+    "Vous obtenez l'%yHorloge%w !&"
+    "Le temps reprend son cours&"
+    "en %gHyrule%w !^"
+    "Son effet est %cautomatique%w.&"
+    "Dans la %gPlaine d'Hyrule%w,&"
+    "attendez le %yjour ou la nuit%w.",
+};
+
 inline constexpr Entry kPhantomHourglass = {
     "Phantom Hourglass",
     "You got the %yPhantom Hourglass%w!&"
@@ -75,6 +97,8 @@ inline constexpr Entry kShadowCrystal = {
 };
 
 inline constexpr const Entry* Find(std::string_view name) {
+    if (name == kClock.name)
+        return &kClock;
     if (name == kPhantomHourglass.name)
         return &kPhantomHourglass;
     if (name == kShadowCrystal.name)

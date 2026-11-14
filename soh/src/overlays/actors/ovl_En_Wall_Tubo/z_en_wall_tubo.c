@@ -60,7 +60,11 @@ void EnWallTubo_FindGirl(EnWallTubo* this, PlayState* play) {
         }
     }
 
-    this->actionFunc = EnWallTubo_DetectChu;
+    // NPC soul shuffle can leave the Lady absent. Keep looking until she is
+    // available instead of entering a state that dereferences her.
+    if (this->chuGirl != NULL) {
+        this->actionFunc = EnWallTubo_DetectChu;
+    }
 }
 
 void EnWallTubo_DetectChu(EnWallTubo* this, PlayState* play) {

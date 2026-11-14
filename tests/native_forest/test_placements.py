@@ -44,7 +44,7 @@ struct CollisionPoly {};
 struct PlayState {
  struct { bool running=true; } state;
  int sceneId{}, transitionTrigger{}, transitionMode{}, soaringCsOrSoTCsPlaying{};
- struct {int state{};} pauseCtx,csCtx;
+ struct {int state{};} pauseCtx,csCtx,gameOverCtx;
  struct {struct {int num{};void* segment=reinterpret_cast<void*>(1);}curRoom;int status{};}roomCtx;
  ActorContext actorCtx{}; int colCtx{};
 };
@@ -53,8 +53,11 @@ PlayState storage, *gPlayState=&storage;
 void* gGameState=&storage.state;
 bool sSpawnAttempted=false, sHorseSpawnAttempted=false;
 struct {bool Resolve(){return true;}}sBridge;
-constexpr int SCENE_00KEIKOKU=28,GAMEMODE_NORMAL=0,TRANS_TRIGGER_OFF=0,TRANS_MODE_OFF=0;
+constexpr int SCENE_00KEIKOKU=28,GAMEMODE_NORMAL=0,TRANS_TRIGGER_OFF=0,TRANS_TRIGGER_END=-20,TRANS_MODE_OFF=0;
 constexpr int PAUSE_STATE_OFF=0,CS_STATE_IDLE=0,ACTOR_EN_VIEWER=1,ACTOR_EN_HORSE=13,BGCHECK_SCENE=0;
+constexpr int PLAYER_STATE1_DEAD=1,GAMEOVER_INACTIVE=0;
+struct Player {int stateFlags1{};};
+Player* GET_PLAYER(PlayState*) {static Player player;return &player;}
 constexpr float BGCHECK_Y_MIN=-32000;
 constexpr s16 kSongGiftParams=0x7E33,kWaitingParams=0x7F13,COMBO_FOREST_EPONA_PARAMS=0x7E40;
 bool ComboForestActors_IsMmGame(){return true;}
@@ -84,6 +87,7 @@ int main(){
         # Only renderer/scene access, floor raycast and allocation are boundaries;
         # the source's placement, orientation, duplicate checks and actor params run.
         fixture = fixture.replace('/* SPAWN BODIES */',
+                                  body(source, 'bool ForestSpawnReady(') + '\n' +
                                   body(source, 'void SpawnForestSaria()') + '\n' +
                                   body(source, 'void SpawnForestEpona()'))
         with tempfile.TemporaryDirectory(prefix='native-forest-placements-') as folder:

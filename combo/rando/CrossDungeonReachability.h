@@ -8,6 +8,7 @@
 namespace ComboRando::CrossDungeon {
 struct JointReach {
     std::unordered_set<std::string> oot, mm;
+    bool portalOpen = false;
 };
 
 // Re-root both native searches until no additional foreign arrival can be reached.
@@ -68,6 +69,7 @@ JointReach QueryJoint(const Oracle& oot, const Oracle& mm, const std::vector<std
         bool changed = collectBosses(oot);
         const auto ootExits = exits(oot);
         bool portal = !oot.GetPortalOpen || oot.GetPortalOpen() != 0;
+        result.portalOpen = result.portalOpen || portal;
         if (portal && !mmWorld) {
             mmWorld = true;
             changed = true;

@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 
 #include "savefile.h"
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/randomizer/bean_patches.h"
@@ -457,6 +458,9 @@ void SetStartingItems() {
 }
 
 extern "C" void Randomizer_InitSaveFile() {
+#ifdef COMBO_BUILD
+    ComboStartupOot_BeginFile();
+#endif
     auto ctx = Rando::Context::GetInstance();
     ctx->GetLogic()->SetSaveContext(&gSaveContext);
 
@@ -636,7 +640,14 @@ extern "C" void Randomizer_InitSaveFile() {
     if (Randomizer_GetSettingValue(RSK_STARTING_ZELDAS_LETTER) &&
         !Randomizer_GetSettingValue(RSK_SHUFFLE_ZELDAS_LETTER)) {
         GetItemEntry getItemEntry = Randomizer_GetItemFromKnownCheck(RC_SONG_FROM_IMPA, (GetItemID)RG_ZELDAS_LULLABY);
-        StartingItemGive(getItemEntry, RC_SONG_FROM_IMPA);
+#ifdef COMBO_BUILD
+        if (ComboStartupOot_Capture(&getItemEntry, RC_SONG_FROM_IMPA)) {
+            OTRGlobals::Instance->gRandoContext->GetItemLocation(RC_SONG_FROM_IMPA)->SetCheckStatus(RCSHOW_SAVED);
+        } else
+#endif
+        {
+            StartingItemGive(getItemEntry, RC_SONG_FROM_IMPA);
+        }
         getItemEntry = Randomizer_GetItemFromKnownCheck(RC_HC_ZELDAS_LETTER, (GetItemID)RG_ZELDAS_LETTER);
         StartingItemGive(getItemEntry, RC_HC_ZELDAS_LETTER);
 

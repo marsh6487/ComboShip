@@ -884,6 +884,14 @@ void Rando::StaticData::InitItemTable() {
     // GSP_MM_DL; MM-unique folder). Give fills an OoT bottle slot with ITEM_GOLD_DUST (0xEC) — the
     // exact content mm_bottles_behavior.cpp maps to MM_BOTTLE_GOLD_DUST (same store the debug editor uses).
     itemTable[RG_MM_BOTTLE_GOLD_DUST] =       Item(RG_MM_BOTTLE_GOLD_DUST,      Text{ "Bottle With Gold Dust", "Bouteille de Poudre d'Or", "Flasche mit Goldstaub" },                  ITEMTYPE_ITEM, 0x18D, true, LOGIC_BOTTLES, RHT_NONE, RG_MM_BOTTLE_GOLD_DUST,     OBJECT_GI_JEWEL, 0, TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG, ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER).CustomIcon("__OTR__icon_item_static_yar/gItemIconBottledGoldDustTex");
+    // Chateau already has a native bottle action/draw, but needs a real catalog row so MM's shared
+    // receipt can resolve its canonical name immediately. It does not add a bottle to the native pool.
+    itemTable[RG_CHATEAU_ROMANI] = Item(RG_CHATEAU_ROMANI, Text{ "Chateau Romani", "Château Romani", "Chateau Romani" },
+        ITEMTYPE_ITEM, 0x1B5, true, LOGIC_BOTTLES, RHT_NONE, ITEM_CHATEAU_ROMANI, OBJECT_GI_MILK, GID_MILK,
+        TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG, ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER)
+        .CustomIcon("__OTR__icon_item_static_yar/gItemIconChateauRomaniTex");
+    itemTable[RG_CHATEAU_ROMANI].SetCustomDrawFunc(Randomizer_DrawChateauRomani);
+
     // MM Great Spin Attack — custom burst GI attached below; sword GID is the standalone fallback.
     // OoT has no great-spin store (WEEKEVENTREG is MM-side); give remains a no-op.
     itemTable[RG_MM_GREAT_SPIN_ATTACK] =      Item(RG_MM_GREAT_SPIN_ATTACK,     Text{ "Great Spin Attack", "Super Attaque Tornade", "Große Wirbelattacke" },                            ITEMTYPE_ITEM, 0x18E, true, LOGIC_NONE, RHT_NONE, RG_MM_GREAT_SPIN_ATTACK,     OBJECT_GI_SWORD_1, GID_SWORD_KOKIRI, TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG, ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER).CustomIcon("__OTR__icon_item_static_yar/gItemIconKokiriSwordTex");

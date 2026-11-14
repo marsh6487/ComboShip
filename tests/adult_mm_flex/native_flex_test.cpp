@@ -111,6 +111,9 @@ u8 Trident_GoldenArmor(void) { return 0; }
 s32 BossRemains_IsOdolwaWorn(void) { return 0; }
 s32 BossRemains_IsGohtWorn(void) { return 0; }
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx**, void*, Player*, u8, u8, u8) { return 0; }
+u8 WeaponUpgrade_ApplyHeldSwordDLForModel(Gfx**, void*, Player*, u8, u8, u8) { return 0; }
+u8 WeaponUpgrade_HasGreatFairy(void) { return 0; }
+PlayerModelType sPlayerLeftHandType, sPlayerRightHandType;
 void* DinFireSword_HandDL(PlayState*, Player*, void*) { return nullptr; }
 void* DinFireShield_HandDL(PlayState*, Player*, void*) { return nullptr; }
 void DinFireSword_SetHandModel(Player*, void*, int) {}
@@ -118,7 +121,12 @@ void DinFireSword_CopyHandModel(Player*, void*, void*) {}
 void Player_ApplyBackEquipmentVisibility(s32, Gfx**);
 // Gameplay pose/IK is outside this slot-allocation test. Adult's full override
 // still runs against this native equipment boundary and the real hide policy.
-s32 Player_OverrideLimbDrawGameplayDefault(PlayState*, s32, Gfx**, Vec3f*, Vec3s*, Actor*) { return 0; }
+s32 Player_OverrideLimbDrawGameplayDefault(PlayState*, s32, Gfx**, Vec3f*, Vec3s*, Actor* actor) {
+    Player* player = reinterpret_cast<Player*>(actor);
+    sPlayerLeftHandType = static_cast<PlayerModelType>(player->leftHandType);
+    sPlayerRightHandType = static_cast<PlayerModelType>(player->rightHandType);
+    return 0;
+}
 void* Lib_SegmentedToVirtual(void* ptr) { return ptr; }
 f32 Math_SinS(s16 angle) { return std::sin(angle * 3.14159265358979323846f / 32768.0f); }
 f32 Math_CosS(s16 angle) { return std::cos(angle * 3.14159265358979323846f / 32768.0f); }
@@ -154,6 +162,18 @@ static void ResetModel(void) {
     sMeshes.clear();
     sMissingMeshLoads = 0;
     for (const char* path : kArchiveDisplayLists) {
+        Gfx mesh = {};
+        mesh.words.w0 = G_ENDDL << 24;
+        sMeshes.emplace(path, mesh);
+    }
+    // Setup now resolves optional FP poses too. This third-person slot test
+    // never draws them; keep its archive topology/consumer fixture unchanged.
+    // Actual first-person selection is covered by okayu_presentation instead.
+    for (const char* path : { "objects/object_link_boy/gLinkAdultRightArmOutNearDL",
+                              "objects/object_link_boy/gLinkAdultRightHandOutNearDL",
+                              "objects/object_link_boy/gLinkAdultLeftArmOutNearDL",
+                              "objects/object_link_boy/gLinkAdultRightHandHoldingBowFirstPersonDL",
+                              "objects/object_link_boy/gLinkAdultRightHandHoldingHookshotFarDL" }) {
         Gfx mesh = {};
         mesh.words.w0 = G_ENDDL << 24;
         sMeshes.emplace(path, mesh);

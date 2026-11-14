@@ -104,7 +104,7 @@ static const ItemDescEntry sCustomItemDescs[] = {
 static const ItemDescEntry sMaskDescs[] = {
     { ITEM_MM_MASK_ALL_NIGHT, TEXT_DESC_MASK_ALL_NIGHT, "Spawns night-only Gold Skulltulas&during daytime." },
     { ITEM_MM_MASK_BLAST, TEXT_DESC_MASK_BLAST,
-      "Press A when free, or B, for an&explosion at your feet. Has cooldown." },
+      "Press B to explode. Raise your&shield to avoid your own blast.&Has cooldown." },
     { ITEM_MM_MASK_STONE, TEXT_DESC_MASK_STONE, "Enemies ignore you completely." },
     { ITEM_MM_MASK_GREAT_FAIRY, TEXT_DESC_MASK_GREAT_FAIRY,
       "In fountain: A=claim reward.&B=teleport menu between fountains." },

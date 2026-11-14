@@ -79,6 +79,24 @@ void BgBowlWall_SpawnBullseyes(BgBowlWall* this, PlayState* play) {
     Actor* lookForGirl;
     s16 type;
 
+    if (this->chuGirl == NULL) {
+        lookForGirl = play->actorCtx.actorLists[ACTORCAT_NPC].head;
+        while (lookForGirl != NULL) {
+            if (lookForGirl->id != ACTOR_EN_BOM_BOWL_MAN) {
+                lookForGirl = lookForGirl->next;
+            } else {
+                this->chuGirl = (EnBomBowlMan*)lookForGirl;
+                break;
+            }
+        }
+    }
+
+    // Wait before spawning so an absent soul-gated Lady leaves no active or
+    // duplicate targets, and later discovery can start the wall normally.
+    if (this->chuGirl == NULL) {
+        return;
+    }
+
     type = this->dyna.actor.params;
     if (type != 0) {
         type += (s16)Rand_ZeroFloat(2.99f);
@@ -95,17 +113,6 @@ void BgBowlWall_SpawnBullseyes(BgBowlWall* this, PlayState* play) {
         bullseye->explosionCenter = this->bullseyeCenter;
         if (type != 0) {
             bullseye->explosionCenter = this->bullseyeCenter = this->dyna.actor.world.pos;
-        }
-        if (this->chuGirl == NULL) {
-            lookForGirl = play->actorCtx.actorLists[ACTORCAT_NPC].head;
-            while (lookForGirl != NULL) {
-                if (lookForGirl->id != ACTOR_EN_BOM_BOWL_MAN) {
-                    lookForGirl = lookForGirl->next;
-                } else {
-                    this->chuGirl = (EnBomBowlMan*)lookForGirl;
-                    break;
-                }
-            }
         }
         this->actionFunc = BgBowlWall_WaitForHit;
     }

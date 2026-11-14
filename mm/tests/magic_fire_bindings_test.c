@@ -84,6 +84,10 @@ Vtx* ResourceMgr_LoadVtxByName(char* path) {
     return vertices[alt];
 }
 int32_t CVarGetInteger(const char* key, int32_t fallback) {
+    if (!strcmp(key, "gEnhancements.DinsFireRemake")) {
+        REQUIRE(fallback == 0);
+        return fallback; // This regression fixture verifies the unchanged default native path.
+    }
     REQUIRE(strstr(key, medallion ? ".MedallionFire" : ".Dins") != NULL);
     REQUIRE(strstr(key, ".Changed") != NULL);
     return customColors;
@@ -123,6 +127,16 @@ Gfx* Gfx_SetupDL57(Gfx* p) {
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
     REQUIRE(x == 0.15f && y == 0.15f && z == 0.15f && mode == MTXMODE_APPLY);
+}
+void Matrix_Get(MtxF* dest) {
+    REQUIRE(!"disabled remake must not read or allocate private matrices");
+}
+Mtx* Matrix_MtxFToMtx(MtxF* src, Mtx* dest) {
+    REQUIRE(!"disabled remake must not create private matrices");
+    return dest;
+}
+void gSPVertex(Gfx* p, uintptr_t v, int n, int v0) {
+    REQUIRE(!"disabled remake must not submit private vertices");
 }
 Mtx* Matrix_Finalize(GraphicsContext* context) {
     return &matrix;

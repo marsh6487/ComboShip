@@ -47,6 +47,7 @@
 #include "overlays/actors/ovl_En_Zoraegg/z_en_zoraegg.h"
 #include "overlays/actors/ovl_Obj_Aqua/z_obj_aqua.h"
 
+#include "overlays/effects/ovl_Effect_Ss_Dust/z_eff_ss_dust.h"
 #include "overlays/effects/ovl_Effect_Ss_Fhg_Flash/z_eff_ss_fhg_flash.h"
 #include "overlays/effects/ovl_Effect_Ss_G_Splash/z_eff_ss_g_splash.h"
 
@@ -4869,6 +4870,7 @@ s32 Player_SetAction(PlayState* play, Player* this, PlayerActionFunc actionFunc,
         return false;
     }
 
+    OotSpells_ReleasePendingDinMagic(play, this);
     play->actorCtx.flags &= ~ACTORCTX_FLAG_PICTO_BOX_ON;
 
     if (this->actor.flags & ACTOR_FLAG_OCARINA_INTERACTION) {
@@ -13250,8 +13252,9 @@ void func_808442D8(PlayState* play, Player* this) {
     }
 
     if (var_fa0 > 0.0f) {
-        func_800B0EB0(play, &this->meleeWeaponInfo[0].tip, &D_8085D364, &D_8085D370, &D_8085D37C, &D_8085D380,
-                      (var_fa0 * 200.0f), 0, 8);
+        EffectSsDust_Spawn(play, DUST_DRAWFLAG0 | EFFECT_SS_DUST_DRAW_DEKU_STICK_FLAME, &this->meleeWeaponInfo[0].tip,
+                           &D_8085D364, &D_8085D370, &D_8085D37C, &D_8085D380, (var_fa0 * 200.0f), 0, 8,
+                           DUST_UPDATE_NORMAL);
         if (play->roomCtx.curRoom.enablePosLights || (MREG(93) != 0)) {
             temp_fv1 = (Rand_ZeroOne() * 30.0f) + 225.0f;
             Lights_PointSetColorAndRadius(&this->lightInfo, temp_fv1, temp_fv1 * 0.7f, 0, var_fa0 * 300.0f);
@@ -14682,11 +14685,16 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     // mode is ON and oot.o2r is loaded, so it cleanly falls back to vanilla Link when unavailable.
     {
         extern s32 AdultLink_ShouldHide(void);
+        extern s32 AdultLink_UsesAdultItemPresentation(const Player* player);
         extern void AdultLink_Draw(PlayState * play, Player * player);
         if (AdultLink_ShouldHide()) {
             DinFireSword_BeginPlayerDraw(play, this);
             AdultLink_Draw(play, this);
+            if (AdultLink_UsesAdultItemPresentation(this) && this->getItemDrawIdPlusOne > GID_NONE + 1) {
+                Player_DrawGetItem(play, this);
+            }
             DinFireSword_DrawAfterPlayer(play, this);
+            Player_DrawDinsFireRemakeCharge(this, play);
             return;
         }
     }
@@ -14988,6 +14996,8 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     }
 
     DinFireSword_DrawAfterPlayer(play, this);
+
+    Player_DrawDinsFireRemakeCharge(this, play);
 
     play->actorCtx.flags &= ~ACTORCTX_FLAG_3;
 }

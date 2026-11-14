@@ -35,7 +35,15 @@ int Playthrough_Init(uint32_t seed, std::set<RandomizerCheck> excludedLocations,
     std::string settingsStr;
     bool shuffleEnemyDrops = false;
     auto& optionGroups = Rando::Settings::GetInstance()->GetOptionGroups();
-    for (size_t i = 0; i < RSG_MAX; i++) {
+    for (size_t order = 0; order < RSG_MAX; order++) {
+        // Souls moved to Shuffles in the menu, but keep their original hash position
+        // after Dungeon Items. The appended group ID preserves all existing IDs.
+        size_t i = order;
+        if (order == RSG_MENU_SECTION_DUNGEON_ITEMS + 1) {
+            i = RSG_MENU_SECTION_SOULS;
+        } else if (order > RSG_MENU_SECTION_DUNGEON_ITEMS + 1 && order <= RSG_MENU_SECTION_SOULS) {
+            i = order - 1;
+        }
         auto& optionGroup = optionGroups[i];
         // don't go through non-menus
         if (optionGroup.GetContainsType() == Rando::OptionGroupType::SUBGROUP) {

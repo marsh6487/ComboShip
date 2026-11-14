@@ -10,7 +10,8 @@ import tempfile
 import sys
 import struct
 import xml.etree.ElementTree as ET
-from run_time_pedestal_tests import functions
+from run_time_pedestal_tests import block_from, functions
+from foreign_gi_fixture_dependencies import startup_foreign_receipt_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0", "-I" + str(ROOT)]
@@ -326,9 +327,21 @@ Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false)
             # Execute its actual visible pose statements before the queue's
             # draw callback scale so camera framing probes use the active path.
             custom_source=(ROOT/"mm/2s2h/CustomItem/CustomItem.cpp").read_text()
-            pickup_start=custom_source.index('                actor->shape.yOffset = 900.0f;')
-            pickup_end=custom_source.index('                actor->world.pos.y += height;',pickup_start)+len('                actor->world.pos.y += height;')
-            pose_body=custom_source[pickup_start:pickup_end].replace('GET_PLAYER_FORM','form').replace('Actor_SetScale','FixtureActorScale')
+            pickup_block=block_from(custom_source,custom_source.index('            if (enItem00->unk152 >= 20) {'))
+            pickup_start=pickup_block.index('                actor->shape.yOffset = 900.0f;')
+            # Keep the complete visible pose, including both sides of the adult
+            # hand-anchor branch. Its native height statement is now nested.
+            pose_body=pickup_block[pickup_start:pickup_block.rfind('}')].replace('GET_PLAYER_FORM','form').replace('Actor_SetScale','FixtureActorScale')
+            mm_player_header=(ROOT/'mm/include/z64player.h').read_text()
+            receipt_enums=re.search(r'typedef enum PlayerBodyPart \{.*?\} PlayerBodyPart;',mm_player_header,re.S)[0]
+            receipt_enums+='\n'+re.search(r'typedef enum CustomFormId \{.*?\} CustomFormId;',
+                                       (ROOT/'mm/mods/forms/custom_forms.h').read_text(),re.S)[0]
+            (Path(tmp)/'nei_mm_receipt_enums.inc').write_text(receipt_enums)
+            adult_functions=functions((ROOT/'mm/mods/items/logic/adult_link_render.cpp').read_text().replace('extern "C" ',''))
+            receipt_production='\n'.join(adult_functions[name] for name in
+                                       ('AdultLink_UsesAdultPresentation','AdultLink_UsesAdultItemPresentation'))
+            receipt_production+='\nvoid Pose(Actor* actor,Player* player,int form) {\n'+pose_body+'\n}\n'
+            (Path(tmp)/'nei_mm_receipt_production.inc').write_text(receipt_production)
             form_enum=re.search(r'typedef enum PlayerTransformation \{.*?\} PlayerTransformation;',
                                 (ROOT/'mm/include/z64player.h').read_text(),re.S)[0]
             queue_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp').read_text()
@@ -355,11 +368,15 @@ Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false)
                 height_case=re.search(r'case '+form+r':.*?return ([^;]+);',height_function,re.S)
                 height_values=re.findall(r'(\d+)\.0f',height_case[0])
                 camera_rows.append('{'+','.join(str(v)+'f' for v in [float(height_values[-1]),*camera_values])+'}')
-            pickup_support='''\nvoid FixtureActorScale(Actor* actor,float s) {actor->scale.x=actor->scale.y=actor->scale.z=s;}
+            pickup_support='''\n#include "tests/mm_presentation/receipt_pose_fixture.inc"
 std::pair<float,float> FixtureMmReceiptPose(int form=PLAYER_FORM_HUMAN) {
  fixtureMmForm=form;
- Actor storage{};Actor* actor=&storage;
-'''+pose_body+'''\n Fixture::matrix=actor->scale.x;
+ auto* player=&MmReceiptFixture::player;
+ player->transformation=form;
+ Actor* actor=&MmReceiptFixture::receipt;
+ *actor={};
+ MmReceiptFixture::Pose(actor,player,form);
+ Fixture::matrix=actor->scale.x;
  Fixture::matrixY=actor->world.pos.y+actor->shape.yOffset*actor->scale.y;
 '''+queue_scale+'''\n return {Fixture::matrix,Fixture::matrixY};
 }\n'''+f'constexpr float kMmPickupCamera[PLAYER_FORM_MAX][6]={{{",".join(camera_rows)}}};\n'+'''
@@ -386,7 +403,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
             custom_flags='namespace CustomItem {\n'+re.search(r'enum CustomItemFlags.*?\n\};',flags_source,re.S)[0]+'\n}\n'
             tested_bridge = (form_enum + '\nint fixtureMmForm=PLAYER_FORM_HUMAN;\n#define GET_PLAYER_FORM fixtureMmForm\n' + custom_flags + shim + route + "\n" + item_enum + "\n" + spell_producer + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
-                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
+                             startup_foreign_receipt_boundary(ROOT) + foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
             tested_bridge = ('#include "ComboBottleContents.h"\n'
                              'int ComboBottleContents_Draw(PlayState*,int) {assert(false);return 0;}\n' + tested_bridge)
             # The production renderer now includes the real runtime resolver.

@@ -10,6 +10,7 @@
 #include "sword_element_message.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "mods/extended_inventory.h"
+#include "mods/nei_save.h"
 #include "vt.h"
 
 SaveContext gSaveContext;
@@ -23,6 +24,10 @@ static int customGives, vanillaGives, vanillaFallbacks;
 static u16 receiptText;
 static GetItemEntry receivedEntry;
 static u16 ownedTimeGate;
+static NeiSaveData nei;
+NeiSaveData* Nei_Save(void) {
+    return &nei;
+}
 
 uint16_t Nei_GetOwnedItem(uint8_t slot) {
     return slot == SLOT_TIME_GATE ? ownedTimeGate : ITEM_NONE;
@@ -202,6 +207,7 @@ static void Reset(PlayState* play, Player* player, bool randomizer) {
     customGives = vanillaGives = vanillaFallbacks = 0;
     receiptText = 0;
     ownedTimeGate = ITEM_NONE;
+    memset(&nei, 0, sizeof(nei));
     knownRandoChest = false;
 }
 
@@ -216,6 +222,11 @@ int main(void) {
         REQUIRE(Item_CheckObtainability(ITEM_TIME_GATE) == ITEM_NONE);
         ownedTimeGate = ITEM_TIME_GATE;
         REQUIRE(Item_CheckObtainability(ITEM_TIME_GATE) == ITEM_TIME_GATE);
+        ownedTimeGate = EXT_ITEM_MAGIC_MIRROR;
+        nei.timeGateOwned = 1;
+        REQUIRE(Item_CheckObtainability(ITEM_TIME_GATE) == ITEM_TIME_GATE);
+        nei.timeGateOwned = 0;
+        REQUIRE(Item_CheckObtainability(ITEM_TIME_GATE) == ITEM_NONE);
         ownedTimeGate = ITEM_NONE;
         REQUIRE(Item_CheckObtainability(ITEM_BOW) == ITEM_NONE);
         gSaveContext.inventory.items[SLOT_STICK] = ITEM_STICK;

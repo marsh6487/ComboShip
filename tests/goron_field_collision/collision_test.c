@@ -19,12 +19,13 @@
 
 static struct {
     MmPlayerTransformation currentForm;
-    s32 goronAction, actionTimer, comboStep, boomerangState;
+    s32 state, goronAction, actionTimer, comboStep, boomerangState;
     u8 comboBPressed, comboBufferTimer, wallRecoilActive, punchTrailActive, punchTrailActiveR;
+    u8 meleeActive, jumpKickActive, zoraJumpTrailActive;
     s32 punchTrailEffectIndex, punchTrailEffectIndexR;
     SkelAnime formSkelAnime;
     LinkAnimationHeader *idleAnim, *cutterAttack;
-    f32 savedShadowScale, zoraPunchCollisionFrame;
+    f32 savedShadowScale, punchCollisionFrame;
 } gFormState;
 static u8 sRollOwnsPause;
 static PlayState play;
@@ -32,6 +33,8 @@ static Player player;
 static ObjBombiwa boulder;
 static DoorAna grotto;
 static LinkAnimationHeader idle;
+static Vec3f matrixOffset;
+static EffectBlure effect;
 static s32 textState, boulderBreaks;
 static s32 finishAcceptedCalls;
 static const void* finishReceiver;
@@ -39,6 +42,7 @@ static const ColliderInfo* finishHit;
 static uint32_t finishFlags, finishDamage;
 
 #define MM_FORM_LIMB_COUNT 22
+#define MMFORM_STATE_ACTIVE 2
 #define MMFORM_GRAVITY_NORMAL 0
 #define MMFORM_ON_GROUND(p) ((p)->actor.bgCheckFlags & BGCHECKFLAG_GROUND)
 #define GORON_PUNCH_DAMAGE 2
@@ -104,6 +108,18 @@ static void MmForm_PlaySfx(Player* p, u16 mmSfx, u16 ootSfx) {
 }
 void MmForm_KillTrail(PlayState* state, s32* index, u8* active) {
     *active = 0;
+}
+void Matrix_MultVec3f(Vec3f* from, Vec3f* to) {
+    *to = (Vec3f){ from->x * .01f + matrixOffset.x, from->y * .01f + matrixOffset.y,
+                   from->z * .01f + matrixOffset.z };
+}
+void Effect_Add(PlayState* state, s32* index, s32 type, u8 arg3, u8 arg4, void* init) {
+    *index = SPARK_COUNT;
+}
+void* Effect_GetByIndex(s32 index) {
+    return &effect;
+}
+void EffectBlure_AddVertex(EffectBlure* blure, Vec3f* tip, Vec3f* base) {
 }
 void Player_PlaySfx(Actor* actor, u16 sfx) {
 }
@@ -230,6 +246,7 @@ static void reset(MmPlayerTransformation form) {
     memset(&grotto, 0, sizeof(grotto));
     memset(&gFormState, 0, sizeof(gFormState));
     gFormState.currentForm = form;
+    gFormState.state = MMFORM_STATE_ACTIVE;
     gFormState.idleAnim = &idle;
     idle.common.frameCount = 25;
     gFormState.savedShadowScale = 90;
@@ -243,12 +260,14 @@ static void reset(MmPlayerTransformation form) {
     player.cylinder.base.acFlags = AC_ON | AC_TYPE_ENEMY;
     player.cylinder.base.shape = COLSHAPE_CYLINDER;
     player.cylinder.info.ocElemFlags = OCELEM_ON;
-    player.cylinder.dim = (Cylinder16){ 24, 62, 0, { 0, 0, 0 } };
+    player.cylinder.dim = (Cylinder16){ sFormProps[form].cylinderRadius, sFormProps[form].cylinderHeight, 0,
+                                       { 0, 0, 0 } };
     boulder.actor.id = ACTOR_OBJ_BOMBIWA;
     boulder.actor.update = actor_update;
     boulder.actor.colChkInfo.mass = MASS_IMMOVABLE;
-    boulder.actor.world.pos.z = 70;
-    boulder.actor.xzDistToPlayer = 70;
+    /* The native 12-radius body overlaps the 50-radius boulder at distance 60. */
+    boulder.actor.world.pos.z = 60;
+    boulder.actor.xzDistToPlayer = 60;
     boulder.actor.params = 3;
     Collider_SetCylinder(&play, &boulder.collider, &boulder.actor, &boulderCylinderInit);
     Collider_UpdateCylinder(&boulder.actor, &boulder.collider);
@@ -257,9 +276,12 @@ static void reset(MmPlayerTransformation form) {
     grotto.actor.world.pos.z = 5;
     Collider_SetCylinder(&play, &grotto.collider, &grotto.actor, &grottoCylinderInit);
     Collider_UpdateCylinder(&grotto.actor, &grotto.collider);
-    player.meleeWeaponQuads[0].base.actor = &player.actor;
-    player.meleeWeaponQuads[0].base.shape = COLSHAPE_QUAD;
-    player.meleeWeaponQuads[0].dim.acDist = FLT_MAX;
+    for (s32 i = 0; i < 2; ++i) {
+        player.meleeWeaponQuads[i].base.actor = &player.actor;
+        player.meleeWeaponQuads[i].base.shape = COLSHAPE_QUAD;
+        player.meleeWeaponQuads[i].dim.acDist = FLT_MAX;
+    }
+    matrixOffset = (Vec3f){ 0, 30, 30 };
 }
 
 static void collide_body(void) {
@@ -286,6 +308,25 @@ static void collide_attack(Collider* at, Collider* ac) {
         CollisionCheck_AC_CylVsCyl(&play, &play.colChkCtx, at, ac);
 }
 
+static void punch_boulder(void) {
+    gFormState.goronAction = GORON_ACT_PUNCH_A;
+    gFormState.formSkelAnime.animation = &idle;
+    /* Native MM seeds the sweep at hitStart, then submits both moved pairs. */
+    gFormState.formSkelAnime.curFrame = 6;
+    MmForm_Action_Punch(&player, &play);
+    MmForm_UpdateMelee(&player, &play);
+    MmForm_DrawMelee(&play, &player, PLAYER_LIMB_L_HAND);
+    gFormState.formSkelAnime.curFrame = 7;
+    MmForm_Action_Punch(&player, &play);
+    MmForm_UpdateMelee(&player, &play);
+    matrixOffset.z += 10;
+    MmForm_DrawMelee(&play, &player, PLAYER_LIMB_L_HAND);
+    assert(play.colChkCtx.colATCount == 2 && "Both native Goron punch sweeps must be registered");
+    for (s32 i = 0; i < 2; ++i) {
+        collide_attack(&player.meleeWeaponQuads[i].base, &boulder.collider.base);
+    }
+}
+
 int main(int argc, char** argv) {
     assert(argc == 2);
     reset(MM_PLAYER_FORM_GORON);
@@ -296,11 +337,7 @@ int main(int argc, char** argv) {
         assert(boulderBreaks == 0 && boulder.actor.update != NULL);
     } else if (!strcmp(argv[1], "punch")) {
         ObjBombiwa_Update(&boulder.actor, &play);
-        gFormState.goronAction = GORON_ACT_PUNCH_A;
-        gFormState.formSkelAnime.animation = &idle;
-        gFormState.formSkelAnime.curFrame = 5;
-        MmForm_Action_Punch(&player, &play);
-        collide_attack(&player.meleeWeaponQuads[0].base, &boulder.collider.base);
+        punch_boulder();
         assert((boulder.collider.base.acFlags & AC_HIT) && "Real Goron punch quad must hit a nearby bombable rock");
         ObjBombiwa_Update(&boulder.actor, &play);
         assert(boulderBreaks == 1 && boulder.actor.update == NULL);
@@ -351,10 +388,7 @@ int main(int argc, char** argv) {
         assert(!(player.cylinder.base.atFlags & AT_ON));
         if (!strcmp(argv[1], "post-textbox-punch")) {
             ObjBombiwa_Update(&boulder.actor, &play);
-            gFormState.goronAction = GORON_ACT_PUNCH_A;
-            gFormState.formSkelAnime.curFrame = 5;
-            MmForm_Action_Punch(&player, &play);
-            collide_attack(&player.meleeWeaponQuads[0].base, &boulder.collider.base);
+            punch_boulder();
             ObjBombiwa_Update(&boulder.actor, &play);
             assert(boulderBreaks == 1 && "After the interruption, a new Goron punch "
                                          "must break the rock normally");
@@ -363,7 +397,6 @@ int main(int argc, char** argv) {
         production_pound_0(&player);
         production_restore_body(&player);
         assert(!(player.cylinder.base.atFlags & AT_ON) && "A human body must not retain the Goron pound attack");
-        player.actor.world.pos.z = 10; /* Human radius 12 reaches the rock at distance 60. */
         expect_solid();
     } else if (!strcmp(argv[1], "controls")) {
         for (int form = MM_PLAYER_FORM_GORON; form <= MM_PLAYER_FORM_HUMAN; ++form) {

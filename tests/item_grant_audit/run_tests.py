@@ -44,6 +44,36 @@ def function(text, signature):
     return text[start:end]
 
 
+def native_body_without_trade_hook(game, candidate):
+    # These two approved reacquisition hooks postdate the pinned native bodies.
+    # Require their exact guards, calls and placement before excluding them from
+    # the historical comparison; every other byte remains covered by its old hash.
+    before, hook, after = {
+        'soh': (
+            '    } else if ((item >= ITEM_WEIRD_EGG) && (item <= ITEM_CLAIM_CHECK)) {\n',
+            '''        // This is a real receipt. Pause selection and shared history folding
+        // must not revive a consumed trade item, but a newly granted copy can.
+        if (item <= ITEM_LETTER_ZELDA || item >= ITEM_POCKET_EGG) {
+            TradeAdult_GiveItem(item);
+        }
+''',
+            '        if (GameInteractor_Should(VB_POACHERS_SAW_SET_DEKU_NUT_UPGRADE_FLAG, item == ITEM_SAW)) {\n',
+        ),
+        'mm': (
+            '    u8 result = Item_GiveImpl(play, item);\n',
+            '''    // Replaying the shared earned-item registry is not a new copy of a handed-in item.
+    if (gFcCombo_SuppressRecord == 0) {
+        TradeAdult_GiveItem(item);
+    }
+''',
+            '    GameInteractor_ExecuteOnItemGive(item);\n',
+        ),
+    }[game]
+    approved = before + hook + after
+    assert candidate.count(approved) == 1, f'{game}: approved native trade hook changed, missing or moved'
+    return candidate.replace(approved, before + after, 1)
+
+
 with tempfile.TemporaryDirectory(prefix='item_grant_audit_') as td:
     td = Path(td)
     flags = ['-std=c++17', '-Wall', '-Wextra', '-Werror', '-O1', '-I', str(ROOT / 'combo/menu'), '-I', str(ROOT), '-I', str(ROOT / 'mm/2s2h/Rando')]
@@ -229,6 +259,7 @@ void Grant(RandoItemId randoItemId) {
 #include <cassert>
 #include <iostream>
 #include "ItemGrantAuditBridge.h"
+#include "mm/2s2h/FleetShipCombo/FleetComboIds.h"
 namespace ComboRando {
 '''
     shared = comments(read('combo/rando/SharedItems.h'))
@@ -244,9 +275,14 @@ int inventory[256]{};
 #define CHECK_QUEST_ITEM(quest) 0
 struct { struct {
     struct { struct { int isMagicAcquired=0, isDoubleMagicAcquired=0; } playerData; } saveInfo;
-    struct { int saveType=0; } shipSaveInfo;
+    struct {
+        int saveType=0;
+        struct { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE]{}; } nei;
+    } shipSaveInfo;
 } save; } gSaveContext;
 '''
+    fixture += function(read('mm/include/rando_capacity.h'),
+                        'static inline int RandoCapacity_HasIndependentBombchuBag(void) {') + '\n'
     fixture += '''
 constexpr int COMBO_RPG_MAGIC=3;
 bool rpgMagicEnabled=false;
@@ -266,6 +302,12 @@ int main() {
         MM_RaiseSharedTier(family, 1);
     }
     assert(downstreamGrants == 0);
+    auto& registry = gSaveContext.save.shipSaveInfo.nei.comboObtained;
+    registry[FC_OOT_BOMBCHU_CAPACITY] = 50;
+    assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 0);
+    MM_RaiseSharedTier(ComboRando::SF_BOMBCHU_BAG, 1);
+    assert(downstreamGrants == 0 && registry[FC_OOT_BOMBCHU_CAPACITY] == 50);
+    registry[FC_OOT_BOMBCHU_CAPACITY] = 0;
     // A loaded dormant save is valid even when no PlayState exists.
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
     MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
@@ -278,6 +320,19 @@ int main() {
             assert(MM_GetSharedTier(families[i]) == (value == items[i]));
         }
     }
+    // Native ammo and the foreign infinite flag alone do not own a shared bag.
+    inventory[ITEM_BOMBCHU] = ITEM_BOMBCHU;
+    registry[FC_OOT_INFINITE_BOMBCHUS] = 1;
+    assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 0);
+    registry[FC_OOT_INFINITE_BOMBCHUS] = 0;
+    for (int capacity : {20, 30, 50}) {
+        for (int item : {0, static_cast<int>(ITEM_NONE), static_cast<int>(ITEM_BOMBCHU)}) {
+            registry[FC_OOT_BOMBCHU_CAPACITY] = capacity;
+            inventory[ITEM_BOMBCHU] = item;
+            assert(MM_GetSharedTier(ComboRando::SF_BOMBCHU_BAG) == 1);
+            assert(registry[FC_OOT_BOMBCHU_CAPACITY] == capacity && inventory[ITEM_BOMBCHU] == item);
+        }
+    }
     auto& player = gSaveContext.save.saveInfo.playerData;
     player.isMagicAcquired = player.isDoubleMagicAcquired = 1;
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
@@ -287,7 +342,7 @@ int main() {
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 1);
     nei.comboRpg.nativeMagicLevel = 2;
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
-    std::cout << "MM shared tiers: cleared save rejected, dormant arrow ownership and native RPG magic exact PASS\\n";
+    std::cout << "MM shared tiers: cleared save rejected, independent Bombchu ownership, dormant arrows and native RPG magic exact PASS\\n";
 }
 '''
     run_cpp('mm_shared_tiers', fixture)
@@ -307,10 +362,11 @@ int main(void) {
     subprocess.run([CC, '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'combo/menu'),
                     str(path), '-o', str(td / 'stock')], check=True)
     run_cpp('stock_cpp', '#include "ItemGrantAuditBridge.h"\nint main(){ ItemGrantAudit::Scope s("stock"); }')
-    # Original native give bodies remain byte-for-byte identical after renaming the wrapper.
+    # Preserve the original native bodies, allowing only the exact approved trade hooks.
     for game in ['soh', 'mm']:
         path = f'{game}/src/code/z_parameter.c'
         candidate = function(read(path), 'static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {')
+        candidate = native_body_without_trade_hook(game, candidate)
         preserved_hash = {'soh': 'ccf744c9d538e4fbe619b1479369dbd6a158578944f35123f2c5ed19d697541f', 'mm': '6e67d423b5c2a26b4614dbd68081d51ef2a9fd44dc28cbf1ce895209c230d437'}
         assert hashlib.sha256(candidate[candidate.index('{'):].encode()).hexdigest() == preserved_hash[game], path
         wrapper = function(read(path), 'u8 Item_Give(PlayState* play, u8 item) {')

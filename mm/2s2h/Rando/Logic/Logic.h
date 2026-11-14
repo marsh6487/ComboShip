@@ -7,6 +7,7 @@
 #include "Rando/ActorBehavior/Souls.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipUtils.h"
+#include "mods/combo_rpg.h"
 
 #include <set>
 #include <cassert>
@@ -220,7 +221,24 @@ inline bool CanReturnToHuman() {
            (!IS_DEITY && (HAS_ITEM(ITEM_MASK_DEKU) || HAS_ITEM(ITEM_MASK_GORON) || HAS_ITEM(ITEM_MASK_ZORA)));
 }
 #define CHECK_MAX_HP(TARGET_HP) ((TARGET_HP * 16) <= gSaveContext.save.saveInfo.playerData.healthCapacity)
-#define HAS_MAGIC (gSaveContext.save.saveInfo.playerData.isMagicAcquired)
+// RPG magic can start below a native 48-unit meter. Logic reasons about
+// refillable capacity; spending current magic must not remove reachability.
+inline bool CanUseMagicAmount(int amount) {
+    const auto& player = gSaveContext.save.saveInfo.playerData;
+    return player.isMagicAcquired &&
+           (RandoCapacity_InfiniteMagic() ||
+            ComboRpgState_MagicCapacity(&gSaveContext.save.shipSaveInfo.nei.comboRpg,
+                                        player.isDoubleMagicAcquired ? MAGIC_DOUBLE_METER : MAGIC_NORMAL_METER) >=
+                amount);
+}
+inline bool CanUseMagicArrowAmount(int amount) {
+    // Magic Cape is a passive owned upgrade. Arrow draw/consume uses MAGIC_REQ;
+    // the independent Deku bubble and Goron-start gates still require two units.
+    return CanUseMagicAmount(gSaveContext.save.shipSaveInfo.nei.capeOwned ? amount / 2 : amount);
+}
+#define HAS_MAGIC Rando::Logic::CanUseMagicAmount(1)
+#define CAN_USE_DEKU_BUBBLE (CAN_BE_DEKU && Rando::Logic::CanUseMagicAmount(2))
+#define CAN_GORON_SPIKE_ROLL (CAN_BE_GORON && Rando::Logic::CanUseMagicAmount(2))
 #define CAN_HOOK_SCARECROW \
     (HAS_ITEM(ITEM_OCARINA_OF_TIME) && HAS_ITEM(ITEM_HOOKSHOT) && canPlaySong(OCARINA_SONG_SCARECROW_SPAWN))
 // Any equipped shield the combo can grant — the native equip nibble (Hero/Mirror) OR an NEI
@@ -266,7 +284,7 @@ inline bool CanReturnToHuman() {
 #define CAN_BREAK_ENVIRONMENT_ICICLE                                                                           \
     (CAN_USE_SWORD || CAN_USE_EXPLOSIVE || CAN_BE_GORON || CAN_BE_ZORA || CAN_BE_DEKU || HAS_ITEM(ITEM_BOW) || \
      HAS_ITEM(ITEM_HOOKSHOT) || HAS_ITEM(ITEM_DEKU_NUT) || HAS_ITEM(ITEM_DEKU_STICK))
-#define CAN_USE_PROJECTILE (HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA)
+#define CAN_USE_PROJECTILE (HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || CAN_USE_DEKU_BUBBLE || CAN_BE_ZORA)
 #define CAN_ACCESS(access) (RANDO_EVENTS[RE_ACCESS_##access])
 #define CAN_GROW_BEAN_PLANT        \
     (HAS_ITEM(ITEM_MAGIC_BEANS) && \
@@ -275,7 +293,9 @@ inline bool CanReturnToHuman() {
 // Rain only occurs Day 2 from 7:00 AM to 5:30 PM (not Night 2)
 // Requires magic beans and (Day 2 OR manual watering)
 #define CAN_USE_DAY2_RAIN_BEAN (CAN_GROW_BEAN_PLANT || (HAS_ITEM(ITEM_MAGIC_BEANS) && CLOCK_DAY2()))
-#define CAN_USE_MAGIC_ARROW(arrowType) (HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_##arrowType) && HAS_MAGIC)
+#define CAN_USE_MAGIC_ARROW(arrowType)                         \
+    (HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_##arrowType) && \
+     Rando::Logic::CanUseMagicArrowAmount(ITEM_ARROW_##arrowType == ITEM_ARROW_LIGHT ? 8 : 4))
 #define CAN_LIGHT_TORCH_NEAR_ANOTHER (HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))
 #define KEY_COUNT(dungeon) (gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_##dungeon])
 #define CAN_PAY_FEE(price) ((price) <= CUR_CAPACITY(UPG_WALLET))
@@ -745,11 +765,11 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         case ACTOR_EN_SW: // Gold Skulltula & Skullwalltula
             return (CAN_USE_PROJECTILE || CAN_BE_DEKU || CAN_BE_GORON || CAN_USE_SWORD || CAN_USE_EXPLOSIVE);
         case ACTOR_EN_DINOFOS: // Dinolfos
-            return (CAN_USE_SWORD || CAN_BE_GORON || HAS_ITEM(ITEM_BOW) || (CAN_BE_DEKU && HAS_MAGIC));
+            return (CAN_USE_SWORD || CAN_BE_GORON || HAS_ITEM(ITEM_BOW) || CAN_USE_DEKU_BUBBLE);
         case ACTOR_EN_WIZ: // Wizrobe
             return (HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || CAN_USE_SWORD || CAN_BE_GORON);
         case ACTOR_EN_WF: // Wolfos
-            return (CAN_USE_SWORD || (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_GORON || CAN_BE_ZORA);
+            return (CAN_USE_SWORD || CAN_USE_DEKU_BUBBLE || CAN_BE_GORON || CAN_BE_ZORA);
         case ACTOR_EN_JSO: // Garo
             return (HAS_ITEM(ITEM_MASK_GARO) && (HAS_ITEM(ITEM_BOW) || CAN_BE_GORON || CAN_USE_SWORD));
         case ACTOR_EN_JSO2: // Garo Master
@@ -757,10 +777,10 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         case ACTOR_EN_IK: // Iron Knuckle
             return (CAN_USE_SWORD || CAN_BE_GORON);
         case ACTOR_EN_GRASSHOPPER: // Dragonfly
-            return ((CAN_BE_DEKU && HAS_MAGIC) || CAN_USE_EXPLOSIVE || HAS_ITEM(ITEM_DEKU_NUT) || CAN_USE_SWORD ||
+            return (CAN_USE_DEKU_BUBBLE || CAN_USE_EXPLOSIVE || HAS_ITEM(ITEM_DEKU_NUT) || CAN_USE_SWORD ||
                     CAN_BE_ZORA);
         case ACTOR_EN_MKK: // Boe
-            return ((CAN_BE_DEKU && HAS_MAGIC) || CAN_USE_EXPLOSIVE || HAS_ITEM(ITEM_DEKU_NUT) || CAN_USE_SWORD ||
+            return (CAN_USE_DEKU_BUBBLE || CAN_USE_EXPLOSIVE || HAS_ITEM(ITEM_DEKU_NUT) || CAN_USE_SWORD ||
                     CAN_BE_ZORA || CAN_BE_GORON);
         case ACTOR_EN_BIGPAMET: // Snapper
             return (CAN_BE_DEKU || CAN_USE_EXPLOSIVE || CAN_BE_GORON);
@@ -787,10 +807,10 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         case ACTOR_EN_FAMOS: // Death Armos
             return (CAN_USE_MAGIC_ARROW(LIGHT));
         case ACTOR_EN_DODONGO: // Dodongo
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC));
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE);
         case ACTOR_EN_FLOORMAS: // Floormaster
         case ACTOR_EN_WALLMAS:  // Wallmaster
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK));
         case ACTOR_EN_FZ: // Freezard
             return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_MAGIC_ARROW(FIRE) ||
@@ -802,7 +822,7 @@ inline bool CanKillEnemy(ActorId EnemyId) {
             return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_BE_DEKU || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK) || HAS_ITEM(ITEM_HOOKSHOT));
         case ACTOR_EN_RR: // Like Like
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK));
         case ACTOR_EN_DEKUNUTS: // Mad Scrub
             return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_BE_DEKU || HAS_ITEM(ITEM_BOW) ||
@@ -818,14 +838,14 @@ inline bool CanKillEnemy(ActorId EnemyId) {
             return (HAS_ITEM(ITEM_BOW) &&
                     (CAN_USE_SWORD || HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_EXPLOSIVE || CAN_BE_GORON || CAN_BE_ZORA));
         case ACTOR_EN_SKB: // Stalchild
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK) || HAS_ITEM(ITEM_HOOKSHOT));
         case ACTOR_EN_TITE: // Tektite
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW));
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW));
         case ACTOR_EN_SLIME: // Chuchus
             return (CAN_USE_SWORD || CAN_BE_ZORA || CAN_BE_DEKU || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_DEKU_STICK));
         case ACTOR_EN_SNOWMAN: // Eeno
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK) || HAS_ITEM(ITEM_HOOKSHOT));
         case ACTOR_EN_WDHAND: // Dexihand (Basic kill method, seems like a pain to require other things)
             return (CAN_BE_ZORA && HAS_MAGIC);
@@ -837,10 +857,10 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         case ACTOR_EN_BAGUO: // Nejiron
             return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_HOOKSHOT));
         case ACTOR_EN_NEO_REEBA: // Leever
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK));
         case ACTOR_EN_PP: // Hiploop
-            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || (CAN_BE_DEKU && HAS_MAGIC) || HAS_ITEM(ITEM_BOW) ||
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_DEKU_BUBBLE || HAS_ITEM(ITEM_BOW) ||
                     HAS_ITEM(ITEM_DEKU_STICK) || HAS_ITEM(ITEM_HOOKSHOT));
         case ACTOR_EN_PR:  // Desbreko
         case ACTOR_EN_PR2: // Skull fish
@@ -865,7 +885,7 @@ inline bool CanKillEnemy(ActorId EnemyId) {
             return (CAN_USE_PROJECTILE || CAN_BE_GORON || CAN_BE_ZORA || CAN_USE_EXPLOSIVE || CAN_USE_SWORD);
         case ACTOR_EN_DEATH: // Gomess
             return (CAN_USE_SWORD || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || CAN_BE_ZORA || CAN_BE_GORON ||
-                    (CAN_BE_DEKU && HAS_MAGIC));
+                    CAN_USE_DEKU_BUBBLE);
         default: // Incorrect actor ID inputed.
             assert(false);
             return false;

@@ -61,6 +61,7 @@
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
+#include "rando/StartupCheckReceipt.h"
 #include "2s2h/Rando/MiscBehavior/MiscBehavior.h" // Rando::MiscBehavior::MM_LookupForeign
 #include "rando/CrossForeign.h"                   // ComboRando::ForeignItem / GAME_OOT
 #include "ComboResolve.h"                         // Combo_ResolveSym (process-wide combo-ABI resolution)
@@ -130,7 +131,8 @@ inline const char* ComboInternRoutedPathOOT(const std::string& s) {
 enum class ComboForeignResolveOOT { Ok, Unknown, NotReady };
 
 inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, ComboForeignDrawInfoOOT& info,
-                                                          const char* namedItem = nullptr) {
+                                                          const char* namedItem = nullptr,
+                                                          const struct CwStartupReceipt* frozen = nullptr) {
     const ComboRando::ForeignItem* fi = namedItem ? nullptr : Rando::MiscBehavior::MM_LookupForeign(rc);
     if (!namedItem && (fi == nullptr || fi->itemGame != ComboRando::GAME_OOT)) {
         return ComboForeignResolveOOT::Unknown;
@@ -138,7 +140,9 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
 
     const char* drawName =
         namedItem ? namedItem : (fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str());
-    const int32_t nativeItem = ComboNativeMmImport(drawName);
+    // Frozen receipts must use their captured entry fields, including base
+    // progressive tiers. Ordinary native imports retain their existing shortcut.
+    const int32_t nativeItem = frozen ? -1 : ComboNativeMmImport(drawName);
     if (nativeItem >= 0) {
         info.nativeMmItem = nativeItem;
         info.resolvedName = drawName;
@@ -147,12 +151,18 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     }
 
     static Fn_GetItemDrawInfo sGetItemDrawInfo = nullptr;
-    if (sGetItemDrawInfo == nullptr) {
-        // soh already loaded by the exe (ComboMenuModel pattern); resolution is process-wide.
-        sGetItemDrawInfo = (Fn_GetItemDrawInfo)Combo_ResolveSym("soh", "OOT_GetItemDrawInfo");
-    }
-    if (sGetItemDrawInfo == nullptr) {
-        return ComboForeignResolveOOT::NotReady; // soh.dll may simply not be resident yet
+    using FrozenDraw = int32_t (*)(const struct CwStartupReceipt*, CwItemDrawInfo*);
+    static FrozenDraw sGetFrozenItemDrawInfo = nullptr;
+    if (frozen) {
+        if (!sGetFrozenItemDrawInfo)
+            sGetFrozenItemDrawInfo = reinterpret_cast<FrozenDraw>(Combo_ResolveSym("soh", "OOT_GetFrozenItemDrawInfo"));
+        if (!sGetFrozenItemDrawInfo)
+            return ComboForeignResolveOOT::NotReady;
+    } else {
+        if (!sGetItemDrawInfo)
+            sGetItemDrawInfo = (Fn_GetItemDrawInfo)Combo_ResolveSym("soh", "OOT_GetItemDrawInfo");
+        if (!sGetItemDrawInfo)
+            return ComboForeignResolveOOT::NotReady; // soh.dll may simply not be resident yet
     }
     static Fn_SetGiCosmeticFrame sSetGiCosmeticFrame = nullptr;
     if (!sSetGiCosmeticFrame)
@@ -162,7 +172,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     // A disguised trap must draw the item it pretends to be. Same namespace, so the itemGame dispatch
     // above is unaffected. Not state-dependent: like OOT, the disguise holds until the get-item cutscene.
     CwItemDrawInfo raw{};
-    int32_t rcStatic = sGetItemDrawInfo(drawName, &raw);
+    int32_t rcStatic = frozen ? sGetFrozenItemDrawInfo(frozen, &raw) : sGetItemDrawInfo(drawName, &raw);
     const int32_t baseChoice = ComboSwordGi_SelectBaseAssets(raw, ResourceMgr_IsAltAssetsEnabled());
     if (baseChoice == CW_DRAW_NOT_READY)
         return ComboForeignResolveOOT::NotReady;
@@ -177,13 +187,22 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
-        if (sGetItemAnimDrawInfo == nullptr) {
-            sGetItemAnimDrawInfo = (Fn_GetItemAnimDrawInfo)Combo_ResolveSym("soh", "OOT_GetItemAnimDrawInfo");
+        using FrozenAnim = int32_t (*)(const struct CwStartupReceipt*, CwItemAnimDrawInfo*);
+        static FrozenAnim sGetFrozenItemAnimDrawInfo = nullptr;
+        if (frozen) {
+            if (!sGetFrozenItemAnimDrawInfo)
+                sGetFrozenItemAnimDrawInfo =
+                    reinterpret_cast<FrozenAnim>(Combo_ResolveSym("soh", "OOT_GetFrozenItemAnimDrawInfo"));
+            if (!sGetFrozenItemAnimDrawInfo)
+                return ComboForeignResolveOOT::NotReady;
+        } else {
+            if (!sGetItemAnimDrawInfo)
+                sGetItemAnimDrawInfo = (Fn_GetItemAnimDrawInfo)Combo_ResolveSym("soh", "OOT_GetItemAnimDrawInfo");
+            if (!sGetItemAnimDrawInfo)
+                return ComboForeignResolveOOT::NotReady;
         }
-        if (sGetItemAnimDrawInfo == nullptr) {
-            return ComboForeignResolveOOT::NotReady;
-        }
-        int32_t rcAnim = sGetItemAnimDrawInfo(drawName, &info.anim);
+        int32_t rcAnim =
+            frozen ? sGetFrozenItemAnimDrawInfo(frozen, &info.anim) : sGetItemAnimDrawInfo(drawName, &info.anim);
         if (rcAnim == CW_DRAW_NOT_READY) {
             return ComboForeignResolveOOT::NotReady;
         }
@@ -1330,10 +1349,11 @@ inline bool MM_DrawForeignSilverRupee(const ComboForeignDrawInfoOOT* info) {
 // Draw a foreign (OOT-bound) item's real OOT model at the current model matrix. Any resolution
 // failure falls back to the sentinel blue rupee (the RI_COMBO_FOREIGN item's GID_RUPEE_BLUE), so we
 // never draw blank. Mirrors Randomizer_DrawComboForeign (soh/.../draw.cpp).
-inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, int mmPickup = 0,
-                                Actor* actor = nullptr) {
-    const ComboForeignDrawInfoOOT* info =
-        (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId) : nullptr;
+inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, int mmPickup = 0, Actor* actor = nullptr,
+                                const ComboForeignDrawInfoOOT* frozen = nullptr) {
+    const ComboForeignDrawInfoOOT* info = frozen                         ? frozen
+                                          : (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId)
+                                                                         : nullptr;
     if (info == nullptr) {
         GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
         return;
@@ -1597,6 +1617,19 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         Matrix_Pop();
     if (fitModel && swordIdentity)
         Matrix_Pop();
+}
+
+// Durable named receipts retain the same full renderer as ordinary check pickups.
+inline void MM_DrawFrozenForeign(const CwStartupReceipt& receipt, Actor* actor) {
+    const char* concreteName = receipt.itemName;
+    ComboForeignDrawInfoOOT info{};
+    const bool ready =
+        concreteName && concreteName[0] &&
+        ComboFillForeignDrawInfoOOT(RC_UNKNOWN, info, concreteName, &receipt) == ComboForeignResolveOOT::Ok;
+    const bool heldReceipt = actor && actor->id == ACTOR_EN_ITEM00 && (actor->home.rot.x & CustomItem::CALLED_ACTION) &&
+                             (actor->home.rot.x & (CustomItem::GIVE_ITEM_CUTSCENE | CustomItem::GIVE_OVERHEAD));
+    const int pickup = heldReceipt ? (GET_PLAYER_FORM == PLAYER_FORM_GORON ? 2 : 1) : 0;
+    MM_DrawComboForeign(RC_UNKNOWN, false, pickup, actor, ready ? &info : nullptr);
 }
 
 #undef MM_FOREIGN_PIN_OPA

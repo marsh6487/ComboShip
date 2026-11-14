@@ -63,7 +63,7 @@
       "donor_region": "Moon Trial Goron Exit",
       "rule": "break_icicle",
       "source": "data/checks/mm/dungeons/moon.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_MOON_TRIAL_GORON_ICICLE_2",
@@ -73,7 +73,7 @@
       "donor_region": "Moon Trial Goron Exit",
       "rule": "break_icicle",
       "source": "data/checks/mm/dungeons/moon.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_MOON_TRIAL_GORON_ICICLE_3",
@@ -83,7 +83,7 @@
       "donor_region": "Moon Trial Goron Exit",
       "rule": "break_icicle",
       "source": "data/checks/mm/dungeons/moon.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_MOON_TRIAL_GORON_ICICLE_4",
@@ -93,7 +93,7 @@
       "donor_region": "Moon Trial Goron Exit",
       "rule": "break_icicle",
       "source": "data/checks/mm/dungeons/moon.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_SECRET_SHRINE_SOIL_ITEM_1",
@@ -223,7 +223,7 @@
       "donor_region": "Snowhead Temple Center Level 4",
       "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
       "source": "data/checks/mm/dungeons/snowhead_temple.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_2",
@@ -233,7 +233,7 @@
       "donor_region": "Snowhead Temple Center Level 4",
       "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
       "source": "data/checks/mm/dungeons/snowhead_temple.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_3",
@@ -243,7 +243,7 @@
       "donor_region": "Snowhead Temple Center Level 4",
       "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
       "source": "data/checks/mm/dungeons/snowhead_temple.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_4",
@@ -253,7 +253,7 @@
       "donor_region": "Snowhead Temple Center Level 4",
       "rule": "(goron_fast_roll || hookshot_anywhere) && break_icicle",
       "source": "data/checks/mm/dungeons/snowhead_temple.xml",
-      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_BE_GORON && HAS_MAGIC"
+      "condition": "CAN_BREAK_ENVIRONMENT_ICICLE && CAN_GORON_SPIKE_ROLL"
     },
     {
       "id": "RC_SNOWHEAD_TEMPLE_ICICLE_SNOW_ROOM_1",

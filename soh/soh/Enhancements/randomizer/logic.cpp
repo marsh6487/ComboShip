@@ -383,12 +383,13 @@ bool Logic::HasItem(RandomizerGet itemName) {
         // ───── Custom Items (RSK_SKIJER_CUSTOM_ITEMS) ─────
         // Rehoused as the slate's Sensor rune, so ownership is the rune bit, not an inventory cell.
         case RG_DESIRE_SENSOR:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Slate_RuneOwned(SLATE_RUNE_SENSOR);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) &&
+                   (useLiveInventory ? Slate_RuneOwned(SLATE_RUNE_SENSOR) : CustomItemCount(itemName) != 0);
         case RG_HYLIAS_GRACE:
             // Gated Grace remains a useful optional spell, but cannot be assumed
             // by this game's solver before cross-game reward ownership is known.
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && ctx->GetOption(RSK_HYLIAS_GRACE).Is(NEI_GRACE_ON) &&
-                   GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE);
+                   (useLiveInventory ? GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) : CustomItemCount(itemName) != 0);
         case RG_ZONAI_PERMAFROST:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_ZONAI_PERMAFROST, true);
         case RG_DEKU_LEAF:
@@ -410,31 +411,36 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_DOMINION_ROD:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_DOMINION_ROD, true);
         case RG_RITO_MASK:
-            return RitoMask_IsOwned();
+            return useLiveInventory ? RitoMask_IsOwned() : CustomItemCount(itemName) != 0;
         case RG_MAGIC_MIRROR:
-            return MagicMirror_IsOwned();
+            return useLiveInventory ? MagicMirror_IsOwned() : CustomItemCount(itemName) != 0;
         case RG_TIME_GATE:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_TIME_GATE, true);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) &&
+                   (useLiveInventory ? CheckInventory(ITEM_TIME_GATE, true) : CustomItemCount(itemName) != 0);
         // Bomb Arrows has no inventory cell any more (it is the bow's element flag), so
         // CheckInventory can never see it — ask the ownership helper instead. Skijer's NEI
         case RG_BOMB_ARROWS:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Sw97_BombArrowsOwned();
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) &&
+                   (useLiveInventory ? Sw97_BombArrowsOwned()
+                                     : CustomItemCount(itemName) != 0 ||
+                                           (ctx->GetOption(RSK_SHUFFLE_BOMB_ARROWS).Is(RO_BOMB_ARROWS_BOMB_BAG) &&
+                                            CurrentUpgrade(UPG_BOMB_BAG) != 0));
         // Elemental Wand: all seven RGs answer for the same slot. The rods additionally require
         // their own mode, which is what makes "Elemental shuffle" six real logical items.
         case RG_ELEMENTAL_WAND:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_ELEMENTAL_WAND, true);
         case RG_WAND_SAND_ROD:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_SAND);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_SAND);
         case RG_WAND_TORNADO_ROD:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_TORNADO);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_TORNADO);
         case RG_WAND_WATER_ROD:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_WATER);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_WATER);
         case RG_WAND_METEOR_ROD:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_METEOR);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_METEOR);
         case RG_WAND_STORM_ROD:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_STORM);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_STORM);
         case RG_WAND_SHADOW_SCEPTER:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Wand_ModeOwned(WAND_MODE_SCEPTER);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && HasWandMode(WAND_MODE_SCEPTER);
         case RG_FIRE_ROD:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_ROD_FIRE, true);
         case RG_ICE_ROD:
@@ -516,9 +522,13 @@ bool Logic::HasItem(RandomizerGet itemName) {
 
         // ───── Extended Equipment (RSK_EXT_EQUIPMENT) ─────
         case RG_EXT_CANE_OF_BYRNA:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_1);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_1)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_FOUR_SWORD:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_2);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_2)
+                                     : CustomItemCount(itemName) != 0);
         // ───── NEI Weapon Upgrades (progressive) ─────
         // These REPLACE the vanilla weapon in the pool; level 1 = the vanilla weapon (set by
         // ApplyItemEffect). For logic they are exactly their base weapon — the combat upgrade
@@ -532,41 +542,54 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_PROGRESSIVE_BGS:
             return CanUse(RG_BIGGORON_SWORD);
         case RG_EXT_DIVINE_SHIELD:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_1);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_1)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_SHEIKAH_SHIELD:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_2);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_2)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_SHIELD_OF_IKANA:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_3);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SHIELD, EXT_EQUIP_3)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_MAGIC_CAPE:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_CapeOwned();
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_CapeOwned() : CustomItemCount(itemName) != 0);
         case RG_EXT_SPIRIT_BREASTPLATE:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_2);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_2)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_CHAMPIONS_TUNIC:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_1);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_1)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_PEGASUS_ANKLET:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_1);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_1)
+                                     : CustomItemCount(itemName) != 0);
         // The last three grid cells (Skijer's NEI). Ownership only — none of them gates reachability,
         // so no location logic references them; this just answers "do I have it" consistently.
         case RG_EXT_TRIDENT:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_3);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_SWORD, EXT_EQUIP_3)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_CLIMB_BOOTS:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_2);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_2)
+                                     : CustomItemCount(itemName) != 0);
         case RG_EXT_ROC_BOOTS:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_3);
-        // PENDANT OF MEMORIES — ONE item, TWO slots. Getting it grants the adult trade-wheel entry
-        // (index 19, which is what MM's logic gates RE_DELIVER_PENDANT and the Couple's Mask on) AND
-        // the C-equippable ExtEquip boots-2 moveset. Both give paths set both bits, so ownership is
-        // whichever bit is present.
-        //
-        // Two holes this closes: RG_MM_PENDANT_OF_MEMORIES had NO logic case at all (it fell through
-        // to the default and read as "not owned"), and the ext-equipment gate made the ext RG read
-        // false whenever RSK_EXT_EQUIPMENT was off — even though the trade identity exists regardless
-        // of that option. Skijer's NEI
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_BOOTS, EXT_EQUIP_3)
+                                     : CustomItemCount(itemName) != 0);
+        // Both reward identities grant adult trade entry 19 independently of extended equipment.
         case RG_EXT_PENDANT_OF_MEMORIES:
         case RG_MM_PENDANT_OF_MEMORIES:
-            return TradeAdult_IsOwnedIndex(19) != 0;
+            return useLiveInventory ? TradeAdult_IsOwnedIndex(19) != 0 : CustomItemCount(itemName) != 0;
         case RG_EXT_WATER_DRAGON_SCALE:
-            return ctx->GetOption(RSK_EXT_EQUIPMENT) && ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_3);
+            return ctx->GetOption(RSK_EXT_EQUIPMENT) &&
+                   (useLiveInventory ? ExtEquip_HasItem(EQUIP_TYPE_TUNIC, EXT_EQUIP_3)
+                                     : CustomItemCount(itemName) != 0);
 
         case RG_SW97_FIRE_PROJECTILE:
         case RG_SW97_FIRE_SPELL:
@@ -1774,6 +1797,7 @@ bool Logic::WaterLevel(RandoWaterLevel level) {
 }
 
 Logic::Logic() {
+    extendedInventory.fill(ITEM_NONE);
 }
 
 uint8_t Logic::BottleCount() {
@@ -2687,6 +2711,204 @@ std::set<RandomizerGet> StaticData::allowBottleMaskTrade = { RG_KEATON_MASK,
                                                              RG_RUTOS_LETTER,
                                                              RG_BOTTLE_WITH_BIG_POE };
 
+// Solver inventory helpers begin
+// These are inventory identities, not resolved GI entries: progressive/custom GI
+// resolution may consult a different Logic instance or the live presentation state.
+static const std::map<RandomizerGet, uint16_t> solverCustomInventoryItems = {
+    { RG_PROGRESSIVE_ROCS, ITEM_ROCS_FEATHER_SKIJER },
+    { RG_ROCS_CAPE, ITEM_ROCS_CAPE },
+    { RG_ZONAI_PERMAFROST, ITEM_ZONAI_PERMAFROST },
+    { RG_DEMISE_DESTRUCTION, ITEM_DEMISE_DESTRUCTION },
+    { RG_DEKU_LEAF, ITEM_DEKU_LEAF },
+    { RG_SWITCH_HOOK, ITEM_SWITCH_HOOK },
+    { RG_MOGMA_MITTS, ITEM_MOGMA_MITTS },
+    { RG_GUST_JAR, ITEM_GUST_JAR },
+    { RG_BALL_AND_CHAIN, ITEM_BALL_AND_CHAIN },
+    { RG_WHIP, ITEM_WHIP },
+    { RG_SPINNER, ITEM_SPINNER },
+    { RG_CANE_OF_SOMARIA, ITEM_CANE_OF_SOMARIA },
+    { RG_DOMINION_ROD, ITEM_DOMINION_ROD },
+    { RG_TIME_GATE, ITEM_TIME_GATE },
+    { RG_ELEMENTAL_WAND, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_SAND_ROD, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_TORNADO_ROD, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_WATER_ROD, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_METEOR_ROD, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_STORM_ROD, ITEM_ELEMENTAL_WAND },
+    { RG_WAND_SHADOW_SCEPTER, ITEM_ELEMENTAL_WAND },
+    { RG_FIRE_ROD, ITEM_ROD_FIRE },
+    { RG_ICE_ROD, ITEM_ROD_ICE },
+    { RG_LIGHT_ROD, ITEM_ROD_LIGHT },
+    { RG_BEETLE, ITEM_BEETLE },
+    { RG_SHOVEL, ITEM_SHOVEL },
+    { RG_MINISH_CAP, ITEM_MINISH_CAP },
+    { RG_LANTERN, ITEM_LANTERN },
+    { RG_CHATEAU_ROMANI, ITEM_CHATEAU_ROMANI },
+    { RG_MM_MASK_POSTMAN, ITEM_MM_MASK_POSTMAN },
+    { RG_MM_MASK_ALL_NIGHT, ITEM_MM_MASK_ALL_NIGHT },
+    { RG_MM_MASK_BLAST, ITEM_MM_MASK_BLAST },
+    { RG_MM_MASK_STONE, ITEM_MM_MASK_STONE },
+    { RG_MM_MASK_GREAT_FAIRY, ITEM_MM_MASK_GREAT_FAIRY },
+    { RG_MM_MASK_DEKU, ITEM_MM_MASK_DEKU },
+    { RG_MM_MASK_KEATON, ITEM_MM_MASK_KEATON },
+    { RG_MM_MASK_BREMEN, ITEM_MM_MASK_BREMEN },
+    { RG_MM_MASK_BUNNY, ITEM_MM_MASK_BUNNY },
+    { RG_MM_MASK_DON_GERO, ITEM_MM_MASK_DON_GERO },
+    { RG_MM_MASK_SCENTS, ITEM_MM_MASK_SCENTS },
+    { RG_MM_MASK_GORON, ITEM_MM_MASK_GORON },
+    { RG_MM_MASK_ROMANI, ITEM_MM_MASK_ROMANI },
+    { RG_MM_MASK_CIRCUS_LEADER, ITEM_MM_MASK_CIRCUS_LEADER },
+    { RG_MM_MASK_KAFEI, ITEM_MM_MASK_KAFEI },
+    { RG_MM_MASK_COUPLE, ITEM_MM_MASK_COUPLE },
+    { RG_MM_MASK_TRUTH, ITEM_MM_MASK_TRUTH },
+    { RG_MM_MASK_ZORA, ITEM_MM_MASK_ZORA },
+    { RG_MM_MASK_KAMARO, ITEM_MM_MASK_KAMARO },
+    { RG_MM_MASK_GIBDO, ITEM_MM_MASK_GIBDO },
+    { RG_MM_MASK_GARO, ITEM_MM_MASK_GARO },
+    { RG_MM_MASK_CAPTAIN, ITEM_MM_MASK_CAPTAIN },
+    { RG_MM_MASK_GIANT, ITEM_MM_MASK_GIANT },
+    { RG_MM_MASK_FIERCE_DEITY, ITEM_MM_MASK_FIERCE_DEITY },
+};
+
+static constexpr std::array<RandomizerGet, WAND_MODE_COUNT> solverWandItems = {
+    RG_WAND_SAND_ROD,   RG_WAND_TORNADO_ROD, RG_WAND_WATER_ROD,
+    RG_WAND_METEOR_ROD, RG_WAND_STORM_ROD,   RG_WAND_SHADOW_SCEPTER,
+};
+
+static RandomizerGet SolverCustomIdentity(RandomizerGet itemName) {
+    if (itemName == RG_MM_PENDANT_OF_MEMORIES) {
+        return RG_EXT_PENDANT_OF_MEMORIES;
+    }
+    if (itemName == RG_ELEMENTAL_WAND) {
+        return RG_WAND_SAND_ROD;
+    }
+    return itemName;
+}
+
+uint32_t Logic::CustomItemCount(RandomizerGet itemName) const {
+    const auto it = customItemCounts.find(SolverCustomIdentity(itemName));
+    return it == customItemCounts.end() ? 0 : it->second;
+}
+
+bool Logic::HasWandMode(uint8_t mode) {
+    if (mode >= WAND_MODE_COUNT) {
+        return false;
+    }
+    if (useLiveInventory) {
+        return Wand_ModeOwned(mode);
+    }
+    switch (ctx->GetOption(RSK_ELEMENTAL_WAND_SHUFFLE).Get()) {
+        case RO_WAND_SINGLE_ITEM:
+            for (const auto rod : solverWandItems) {
+                if (CustomItemCount(rod) != 0) {
+                    return true;
+                }
+            }
+            return false;
+        case RO_WAND_ELEMENTAL_SHUFFLE:
+            return CustomItemCount(solverWandItems[mode]) != 0;
+        case RO_WAND_MEDALLIONS:
+        default: {
+            static constexpr std::array<uint8_t, WAND_MODE_COUNT> quests = {
+                QUEST_MEDALLION_SPIRIT, QUEST_MEDALLION_FOREST, QUEST_MEDALLION_WATER,
+                QUEST_MEDALLION_FIRE,   QUEST_MEDALLION_LIGHT,  QUEST_MEDALLION_SHADOW,
+            };
+            return CheckQuestItem(quests[mode]);
+        }
+    }
+}
+
+bool Logic::ApplyCustomItemEffect(Item& item, bool state) {
+    if (useLiveInventory) {
+        return false;
+    }
+
+    const auto randoGet = item.GetRandomizerGet();
+    const auto inventoryItem = solverCustomInventoryItems.find(randoGet);
+    if (inventoryItem == solverCustomInventoryItems.end()) {
+        // These rewards have independent runtime flags rather than inventory cells.
+        // Only explicit grants to this search may supply their solver ownership.
+        switch (randoGet) {
+            case RG_DESIRE_SENSOR:
+            case RG_HYLIAS_GRACE:
+            case RG_RITO_MASK:
+            case RG_MAGIC_MIRROR:
+            case RG_BOMB_ARROWS:
+            case RG_EXT_CANE_OF_BYRNA:
+            case RG_EXT_FOUR_SWORD:
+            case RG_EXT_DIVINE_SHIELD:
+            case RG_EXT_SHEIKAH_SHIELD:
+            case RG_EXT_SHIELD_OF_IKANA:
+            case RG_EXT_MAGIC_CAPE:
+            case RG_EXT_SPIRIT_BREASTPLATE:
+            case RG_EXT_CHAMPIONS_TUNIC:
+            case RG_EXT_PEGASUS_ANKLET:
+            case RG_EXT_TRIDENT:
+            case RG_EXT_CLIMB_BOOTS:
+            case RG_EXT_ROC_BOOTS:
+            case RG_EXT_WATER_DRAGON_SCALE:
+            case RG_EXT_PENDANT_OF_MEMORIES:
+            case RG_MM_PENDANT_OF_MEMORIES:
+                break;
+            default:
+                return false;
+        }
+    }
+
+    auto& count = customItemCounts[SolverCustomIdentity(randoGet)];
+    if (state) {
+        ++count;
+    } else if (count != 0) {
+        --count;
+    }
+    const bool owned = count != 0;
+
+    if (inventoryItem != solverCustomInventoryItems.end()) {
+        uint16_t value = owned ? inventoryItem->second : static_cast<uint16_t>(ITEM_NONE);
+        if (randoGet == RG_PROGRESSIVE_ROCS || randoGet == RG_ROCS_CAPE) {
+            // Recompute after removal as well: another copy or the direct Cape
+            // reward must retain the remaining progression level.
+            const auto rocs = CustomItemCount(RG_PROGRESSIVE_ROCS);
+            value = CustomItemCount(RG_ROCS_CAPE) != 0 || rocs >= 2
+                        ? ITEM_ROCS_CAPE
+                        : (rocs != 0 ? ITEM_ROCS_FEATHER_SKIJER : ITEM_NONE);
+        } else if (inventoryItem->second == ITEM_ELEMENTAL_WAND) {
+            value = ITEM_NONE;
+            for (const auto rod : solverWandItems) {
+                if (CustomItemCount(rod) != 0) {
+                    value = ITEM_ELEMENTAL_WAND;
+                    break;
+                }
+            }
+        }
+        SetInventory(inventoryItem->second, value);
+    }
+
+    // Match the runtime MM mask grants' OoT trade counterparts, without changing
+    // the player's trade wheel or dropping a still-owned duplicate on removal.
+    switch (randoGet) {
+        case RG_MM_MASK_KEATON:
+            SetRandoInf(RAND_INF_CHILD_TRADES_HAS_MASK_KEATON, owned);
+            break;
+        case RG_MM_MASK_BUNNY:
+            SetRandoInf(RAND_INF_CHILD_TRADES_HAS_MASK_BUNNY, owned);
+            break;
+        case RG_MM_MASK_GORON:
+            SetRandoInf(RAND_INF_CHILD_TRADES_HAS_MASK_GORON, owned);
+            break;
+        case RG_MM_MASK_ZORA:
+            SetRandoInf(RAND_INF_CHILD_TRADES_HAS_MASK_ZORA, owned);
+            break;
+        case RG_MM_MASK_TRUTH:
+            SetRandoInf(RAND_INF_CHILD_TRADES_HAS_MASK_TRUTH, owned);
+            break;
+        default:
+            break;
+    }
+    return true;
+}
+// Solver inventory helpers end
+
 void Logic::ApplyItemEffect(Item& item, bool state) {
     auto randoGet = item.GetRandomizerGet();
     if (const auto* key = RustyDoorKeys::Find(randoGet)) {
@@ -2699,6 +2921,10 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
         return;
     }
     // Soul catalog oot_effect end
+
+    if (ApplyCustomItemEffect(item, state)) {
+        return;
+    }
 
     if (item.GetGIEntry()->objectId == OBJECT_GI_STICK) {
         SetInventory(ITEM_STICK, (!state ? ITEM_NONE : ITEM_STICK));
@@ -2977,6 +3203,8 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
                 case RG_FIRE_ARROWS:
                 case RG_ICE_ARROWS:
                 case RG_LIGHT_ARROWS:
+                case RG_SHOVEL:
+                case RG_DEMISE_DESTRUCTION:
                     SetInventory(item.GetGIEntry()->itemId, (!state ? (uint16_t)ITEM_NONE : item.GetGIEntry()->itemId));
                     break;
                 case RG_MAGIC_BEAN:
@@ -2985,8 +3213,6 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
                     auto current = GetAmmo(ITEM_BEAN);
                     SetAmmo(ITEM_BEAN, current + (!state ? -change : change));
                 } break;
-                case RG_SHOVEL:
-                case RG_DEMISE_DESTRUCTION:
                 case RG_EMPTY_BOTTLE:
                 case RG_BOTTLE_WITH_MILK:
                 case RG_BOTTLE_WITH_RED_POTION:
@@ -3291,6 +3517,8 @@ SaveContext* Logic::GetSaveContext() {
 
 void Logic::SetSaveContext(SaveContext* context) {
     mSaveContext = context;
+    // Both gameplay and copied-save hint searches borrow the live NEI ownership.
+    useLiveInventory = true;
 }
 
 void Logic::InitSaveContext() {
@@ -3434,9 +3662,12 @@ void Logic::InitSaveContext() {
 }
 
 void Logic::NewSaveContext() {
-    if (mSaveContext != nullptr && mSaveContext != &gSaveContext) {
+    if (mSaveContext != nullptr && !useLiveInventory && mSaveContext != &gSaveContext) {
         delete mSaveContext;
     }
+    useLiveInventory = false;
+    extendedInventory.fill(ITEM_NONE);
+    customItemCounts.clear();
     mSaveContext = new SaveContext();
     InitSaveContext();
 }
@@ -3444,9 +3675,9 @@ void Logic::NewSaveContext() {
 uint8_t Logic::InventorySlot(uint32_t item) {
     // Custom items (>= ITEM_ROCS_FEATHER_SKIJER) use extended inventory slots
     if (item >= ITEM_ROCS_FEATHER_SKIJER) {
-        return ExtInv_GetItemSlot(item);
+        return item <= UINT16_MAX ? ExtInv_GetItemSlot(static_cast<uint16_t>(item)) : 0xFF;
     }
-    return gItemSlots[item];
+    return item < ARRAY_COUNT(gItemSlots) ? gItemSlots[item] : 0xFF;
 }
 
 uint32_t Logic::CurrentUpgrade(uint32_t upgrade) {
@@ -3454,8 +3685,14 @@ uint32_t Logic::CurrentUpgrade(uint32_t upgrade) {
 }
 
 uint32_t Logic::CurrentInventory(uint32_t item) {
-    uint8_t slot = InventorySlot(item); // Skijer's NEI: custom slots (>=24) live in gNeiSave
-    return (slot < 24) ? mSaveContext->inventory.items[slot] : Nei_GetOwnedItem(slot);
+    const uint8_t slot = InventorySlot(item);
+    if (slot < 24) {
+        return mSaveContext->inventory.items[slot];
+    }
+    if (slot >= 24 + extendedInventory.size()) {
+        return ITEM_NONE;
+    }
+    return useLiveInventory ? Nei_GetOwnedItem(slot) : extendedInventory[slot - 24];
 }
 
 void Logic::SetUpgrade(uint32_t upgrade, uint8_t level) {
@@ -3471,17 +3708,23 @@ void Logic::SetUpgrade(uint32_t upgrade, uint8_t level) {
 }
 
 bool Logic::CheckInventory(uint32_t item, bool exact) {
-    uint8_t slot = InventorySlot(item); // Skijer's NEI
-    auto current = (slot < 24) ? mSaveContext->inventory.items[slot] : Nei_GetOwnedItem(slot);
-    return exact ? (current == item) : (current != ITEM_NONE);
+    const auto current = CurrentInventory(item);
+    return current != ITEM_NONE && (!exact || current == item);
 }
 
 void Logic::SetInventory(uint32_t itemSlot, uint32_t item) {
-    uint8_t slot = InventorySlot(itemSlot); // Skijer's NEI
-    if (slot < 24)
-        mSaveContext->inventory.items[slot] = item;
-    else
-        Nei_SetOwnedItem(slot, (uint8_t)item);
+    const uint8_t slot = InventorySlot(itemSlot);
+    if (slot < 24) {
+        if (item <= UINT8_MAX) {
+            mSaveContext->inventory.items[slot] = static_cast<uint8_t>(item);
+        }
+    } else if (slot < 24 + extendedInventory.size() && item <= UINT16_MAX) {
+        if (useLiveInventory) {
+            Nei_SetOwnedItem(slot, static_cast<uint16_t>(item));
+        } else {
+            extendedInventory[slot - 24] = static_cast<uint16_t>(item);
+        }
+    }
 }
 
 bool Logic::CheckEquipment(uint32_t equipFlag) {

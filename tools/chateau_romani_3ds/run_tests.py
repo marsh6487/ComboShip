@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='chateau-romani-') as temporary:
         run(sys.executable, '-B', 'scripts/assets/build_chateau_romani_3ds.py', '--output', path)
     assert first.read_bytes() == second.read_bytes(), 'Archive rebuild is not deterministic'
     run(sys.executable, '-B', 'tools/chateau_romani_3ds/verify.py', '--archive', first)
+    run(sys.executable, '-B', 'tests/chateau_romani_3ds/render_state_test.py')
     binary = output / 'shimmer'
     run(*shlex.split(os.environ.get('CXX', 'c++')), '-std=c++20', '-I' + str(ROOT),
         'tests/nei_gi/chateau_shimmer_test.cpp', '-o', binary)

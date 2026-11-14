@@ -27,7 +27,7 @@ def function(source, name):
 source = (ROOT / "soh/mods/transformation_masks/mm_player_form.cpp").read_text()
 names = ["MmForm_SetAction", "MmForm_CheckDolphinJump", "MmForm_Action_DolphinJump",
          "MmForm_Action_JumpKick", "MmForm_Action_Punch"]
-for name in ["MmForm_ZoraMeleeLimb", "MmForm_UpdateZoraMelee", "MmForm_DrawZoraMelee",
+for name in ["MmForm_MeleeLimb", "MmForm_UpdateMelee", "MmForm_DrawMelee",
              "MmForm_ClearZoraSwimTrails", "MmForm_UpdateZoraSwimTrails", "MmForm_DrawZoraSwimTrail",
              "MmForm_ActionTicksAnimation", "MmForm_TickActionAnimation"]:
     if re.search(r"^static [^\n]+\b" + name + r"\(", source, re.M):
@@ -47,12 +47,12 @@ with tempfile.TemporaryDirectory(prefix="oot-zora-") as temp:
     compiler_flags = [*flags(), "-I" + temp, "-g", "-O1", "-fno-pie", "-no-pie",
                       "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                       "-Werror=implicit-function-declaration"]
-    if "MmForm_UpdateZoraMelee" in names:
+    if "MmForm_UpdateMelee" in names:
         compiler_flags.append("-DZORA_COLLISION_FIX")
     subprocess.run([os.environ.get("CC", "cc"), *compiler_flags,
                     str(ROOT / "tests/oot_zora/actions_test.c"), "-lm", "-o", binary], check=True)
     cases = sys.argv[1:] or ["timing", "dolphin", "jump"]
-    if not sys.argv[1:] and "MmForm_UpdateZoraMelee" in names:
+    if not sys.argv[1:] and "MmForm_UpdateMelee" in names:
         cases += ["melee", "trails", "ticks", "landing-trail", "trail-allocation", "punch-order", "dolphin-landing-tick"]
     for case in cases:
         subprocess.run([binary, case], check=True, timeout=10,

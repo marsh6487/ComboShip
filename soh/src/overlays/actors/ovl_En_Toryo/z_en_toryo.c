@@ -5,6 +5,7 @@
  */
 
 #include "z_en_toryo.h"
+#include "mods/extended_inventory.h"
 #include "objects/object_toryo/object_toryo.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 
@@ -311,6 +312,9 @@ void EnToryo_HandleTalking(EnToryo* this, PlayState* play) {
     if (this->messageState == 4) {
         if (Actor_HasParent(&this->actor, play) || !GameInteractor_Should(VB_TRADE_SAW, true, this)) {
             this->actor.parent = NULL;
+            if (!IS_RANDO) {
+                TradeAdult_ConsumeItem(ITEM_SAW);
+            }
             this->messageState = 5;
             Flags_SetRandomizerInf(RAND_INF_ADULT_TRADES_GV_TRADE_SAW);
         } else {

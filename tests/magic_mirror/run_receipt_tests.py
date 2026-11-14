@@ -9,9 +9,12 @@ from pathlib import Path
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
+from foreign_gi_fixture_dependencies import startup_receipt_classifier
 
 
 def block(source, marker):
@@ -53,6 +56,10 @@ def main():
     draw = re.sub(r"Audio_PlaySfxGeneral\([^;]*;", "TestAudio();", draw)
     player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
     player_source = block(player_source, "s32 func_8084DFF4(")
+    # The closing block depends on this outer native classification. Preserve
+    # its COMBO_BUILD guard and real predicate in both host configurations.
+    startup = player_source[player_source.index("    bool startupReceipt ="):
+                            player_source.index("    if (this->getItemId == GI_NONE")]
     closing = block(player_source, "if (Message_GetState(&play->msgCtx) == TEXT_STATE_CLOSING)")
     completed = block(player_source, "if (this->getItemId == GI_NONE && this->getItemEntry.objectId == OBJECT_INVALID)")
     source = r'''
@@ -60,6 +67,7 @@ def main():
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <string>
 using namespace std::literals::string_literals;
@@ -126,6 +134,7 @@ constexpr int MOD_NONE=0, MOD_RANDOMIZER=1, RG_ICE_TRAP=99, ITEM_NONE=255;
 #include "soh/soh/Enhancements/item-tables/ItemTableTypes.h"
 struct Player {int getItemId=GI_MAX,unk_862=1;unsigned stateFlags1=0;
     GetItemEntry getItemEntry=GET_ITEM_NONE;};
+/* STARTUP_CLASSIFIER */
 constexpr int VB_PLAY_NABOORU_CAPTURED_CS=0,ENTR_DESERT_COLOSSUS_EAST_EXIT=0;
 constexpr int TRANS_TRIGGER_START=1,TRANS_TYPE_SANDSTORM_END=0,PLAYER_STATE1_IN_CUTSCENE=1;
 #define IS_RANDO false
@@ -167,6 +176,9 @@ void RunReceipt() {
     current.getItemEntry.objectId=1;
     current.getItemEntry.getItemId=GI_MAX;
     current.getItemEntry.drawFunc=+[](PlayState*,GetItemEntry*){};
+#ifdef COMBO_BUILD
+    assert(!ComboStartupOot_IsReceipt(&current.getItemEntry));
+#endif
     play.msgCtx.msgLength=loaded.size();
     NativeReceiveClosing(&current,&play); // Closing timer=2 is still native-owned.
     assert(!NativeReceiptFinished(&current));
@@ -188,16 +200,22 @@ int main(){RunReceipt();}
     source = source.replace("/* DRAW */", draw.replace("MESSAGE_END:", "0x02:"))
     source = source.replace("/* UPDATE */", update)
     source = source.replace("/* GETSTATE */", block(native, "u8 Message_GetState("))
-    source = source.replace("/* CLOSE_RECEIPT */", re.sub(r"\bthis\b", "current", closing))
+    source = source.replace("/* STARTUP_CLASSIFIER */", "#ifdef COMBO_BUILD\n" + startup_receipt_classifier(ROOT) + "#endif\n")
+    source = source.replace("/* CLOSE_RECEIPT */", re.sub(r"\bthis\b", "current", startup + closing))
     source = source.replace("/* COMPLETED */", re.sub(r"\bthis\b", "current", completed))
     with tempfile.TemporaryDirectory(prefix="mirror-receipt-") as folder:
         path = Path(folder)
         (path / "test.cpp").write_text(source)
-        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                        "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
-                        "-I" + str(ROOT), str(path / "test.cpp"), "-o", str(path / "test")], check=True)
-        subprocess.run([str(path / "test")], check=True,
-                       env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+        # GET_ITEM_NONE intentionally zero-fills the native Combo trailing fields.
+        # Keep those diagnostics visible without promoting them to errors.
+        for mode, definitions in (("original", []),
+                                  ("combo", ["-DCOMBO_BUILD", "-Wno-error=missing-field-initializers"])):
+            binary = path / ("test-" + mode)
+            subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
+                            *definitions, "-I" + str(ROOT), str(path / "test.cpp"), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True,
+                           env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
 
 
 if __name__ == "__main__":

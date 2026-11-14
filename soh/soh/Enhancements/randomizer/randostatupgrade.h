@@ -49,8 +49,8 @@ inline uint8_t MagicStatLogicThreshold() {
     return (uint8_t)std::ceil(23.5f * required / magicTotal);
 }
 
-// Native MM magic remains a guaranteed capacity floor: its logic oracle still
-// models those pickups as 48/96 units when the OoT pool uses fractional magic.
+// Preserve earned native magic in older combined saves and fixed native rewards.
+// Real RPG pickups credit that floor before advancing; snapshot reads stay pure.
 inline uint8_t MagicStatCapacity(uint8_t level, uint8_t required, bool adjustable, uint8_t nativeMagicLevel) {
     const int stat =
         (int)std::round(std::min<int>(level, required) * (adjustable ? 100.0f : 96.0f) / std::max<int>(required, 1));

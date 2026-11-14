@@ -23,9 +23,15 @@ jobs:
 
       # Upstream 2ship's apt-deps.txt set, plus libzip + tools for the ZAPD/o2r pipeline.
       - name: Install dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          # Use Ubuntu's primary archive; MIT returned 404s for current glibc packages.
+          # APT retains its normal signature checks.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' https://archive.ubuntu.com/ubuntu | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o APT::Update::Error-Mode=any update
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y \
             libusb-dev libusb-1.0-0-dev libsdl2-dev libsdl2-net-dev libpng-dev libglew-dev \
             nlohmann-json3-dev libtinyxml2-dev libspdlog-dev ninja-build \
             libogg-dev libopus-dev opus-tools libopusfile-dev libvorbis-dev \
@@ -52,6 +58,17 @@ jobs:
 
       - name: Verify all bundled emotes and shared playback
         run: python3 -B tests/emotes/run_tests.py
+
+      - name: Verify shared progression with relaxed OoT logic
+        run: >
+          python3 -B tests/shared_progression_logic/run_tests.py
+          --output-dir "$RUNNER_TEMP/shared-progression-unit"
+
+      - name: Verify native settings sweep verdicts
+        run: python3 -B tests/shared_progression_logic/native_sweep.py --self-test
+
+      - name: Verify saved native entrance reload
+        run: python3 -B scripts/diagnostics/run_cross_dungeon_reload_test.py
 
       - name: Configure
         run: >
@@ -121,7 +138,7 @@ jobs:
           --case off --case mixed-decoupled --seed 20261110
 
       - name: Preserve native Solo MM entrance evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-solo-mm-entrances-linux
@@ -141,7 +158,7 @@ jobs:
           --case vanilla-off --case vanilla-on --case vanilla-on-excluded
 
       - name: Preserve native seed evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-first-drops-linux
@@ -160,13 +177,34 @@ jobs:
           --output "$RUNNER_TEMP/native-boss-keys"
 
       - name: Preserve native parity seed evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: native-boss-keys-linux
           path: |
             ${{ runner.temp }}/native-boss-keys
             !${{ runner.temp }}/native-boss-keys/runtime/**
+          if-no-files-found: warn
+
+      - name: Sweep native combined seed settings
+        if: ${{ !cancelled() && steps.native_runtime.outcome == 'success' }}
+        timeout-minutes: 45
+        run: >
+          python3 -B tests/shared_progression_logic/native_sweep.py
+          --runtime-dir "$PWD/_packages/stage"
+          --driver "$PWD/_packages/stage/comborando"
+          --output "$RUNNER_TEMP/native-shared-progression"
+          --jobs 3 --timeout 300
+
+      - name: Preserve shared progression regression evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-shared-progression-linux
+          path: |
+            ${{ runner.temp }}/shared-progression-unit
+            ${{ runner.temp }}/native-shared-progression
+            !${{ runner.temp }}/native-shared-progression/**/runtime/**
           if-no-files-found: warn
 
       # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
@@ -178,7 +216,7 @@ jobs:
         run: ./scripts/linux/make-appimage.sh build-cmake _packages 2>&1 | tee "$RUNNER_TEMP/linux-packaging.log"
 
       - name: Preserve packaging diagnostics
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: linux-packaging-log

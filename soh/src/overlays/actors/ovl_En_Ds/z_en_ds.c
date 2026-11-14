@@ -5,6 +5,7 @@
  */
 
 #include "z_en_ds.h"
+#include "mods/extended_inventory.h"
 #include "objects/object_ds/object_ds.h"
 #include "soh/OTRGlobals.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -90,6 +91,9 @@ void EnDs_DisplayOddPotionText(EnDs* this, PlayState* play) {
 void EnDs_GiveOddPotion(EnDs* this, PlayState* play) {
     if (Actor_HasParent(&this->actor, play) || !GameInteractor_Should(VB_TRADE_ODD_MUSHROOM, true, this)) {
         this->actor.parent = NULL;
+        if (!IS_RANDO) {
+            TradeAdult_ConsumeItem(ITEM_ODD_MUSHROOM);
+        }
         this->actionFunc = EnDs_DisplayOddPotionText;
         gSaveContext.subTimerState = SUBTIMER_STATE_OFF;
     } else {

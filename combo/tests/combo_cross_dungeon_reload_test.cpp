@@ -2,6 +2,9 @@
 #include "rando/CrossWorldRando.h"
 #include "rando/CrossForeign.h"
 #include "rando/OotDungeonLayouts.h"
+#include "rando/BlackMarket.h"
+#include "rando/MagicMirrorSettingsJson.h"
+#include "rando/RitoMaskSettingsJson.h"
 #include <atomic>
 #include <cstring>
 #include <filesystem>
@@ -21,6 +24,7 @@ static Json native = Json::object(), installed[2];
 static std::map<std::string, Json> files;
 static std::string remembered;
 static bool rejectMm = false;
+static bool rejectNativeLayout = false;
 static int pureCatalogueCalls = 0;
 
 static std::filesystem::path ResolveComboSeedPath(const char* path) {
@@ -80,6 +84,9 @@ static const char* StubSOH_DumpRandoSettings() {
 static const char* StubMM_DumpRandoSettings() {
     return DumpSettings("mmSettings");
 }
+static std::string Combo_UserRandoSettingsSnapshot(const char* (*dump)()) {
+    return dump ? dump() : "";
+}
 static void StubSOH_RestoreRandoSettings(const char* raw) {
     native["ootSettings"] = Json::parse(raw);
 }
@@ -106,6 +113,8 @@ static void StubSOH_PrepRandoContext() {
                           native["ootSeed"] };
 }
 static int StubSOH_ApplyEntranceOverridesForCombo(const char* raw) {
+    if (rejectNativeLayout)
+        return 0;
     native["entrances"] = Json::parse(raw);
     return 1;
 }
@@ -262,5 +271,51 @@ int main() {
     const int pureCalls = pureCatalogueCalls;
     Check(Combo_OnReloadRequest("legacy") == 1 && pureCatalogueCalls == pureCalls,
           "disabled legacy reload must preserve its path without querying cross-dungeon catalogues");
+    Check(native.at("entrances") == Json::array({ { { "index", 2 }, { "override", 13 } } }),
+          "native-only reload must restore the recorded layout instead of re-deriving it from seed 3");
+
+    auto vanilla = Seed(4);
+    vanilla.erase("crossDungeonEntrances");
+    vanilla["entrances"]["oot"] = Json::array();
+    files["vanilla"] = vanilla;
+    Check(Combo_OnReloadRequest("vanilla") == 1 && native.at("entrances") == Json::array(),
+          "an explicitly empty recorded native layout must restore vanilla entrances");
+
+    auto withoutNativeLayout = Seed(5);
+    withoutNativeLayout.erase("crossDungeonEntrances");
+    withoutNativeLayout.erase("entrances");
+    files["withoutNativeLayout"] = withoutNativeLayout;
+    Check(Combo_OnReloadRequest("withoutNativeLayout") == 1 &&
+              native.at("entrances") == Json::array({ { { "index", 2 }, { "override", 5 } } }),
+          "legacy seeds without recorded native entrances must retain deterministic re-derivation");
+
+    const auto acceptedLegacyNative = native;
+    const auto acceptedLegacyJson = g_ConsolidatedJson;
+    auto applyEntrances = SOH_ApplyEntranceOverridesForCombo;
+    SOH_ApplyEntranceOverridesForCombo = nullptr;
+    const int missingApplyResult = Combo_OnReloadRequest("legacy");
+    SOH_ApplyEntranceOverridesForCombo = applyEntrances;
+    Check(missingApplyResult == 0 && native == acceptedLegacyNative && g_ConsolidatedJson == acceptedLegacyJson,
+          "recorded native entrances require their apply export before changing the accepted seed");
+
+    for (const auto& malformed : { Json(nullptr), Json::object(), Json("invalid") }) {
+        files["malformedNative"] = legacy;
+        files["malformedNative"]["entrances"]["oot"] = malformed;
+        Check(Combo_OnReloadRequest("malformedNative") == 0 && native == acceptedLegacyNative &&
+                  g_ConsolidatedJson == acceptedLegacyJson,
+              "malformed native entrance metadata must reject before changing the accepted seed");
+    }
+    files["malformedNative"] = legacy;
+    files["malformedNative"]["entrances"] = Json::array();
+    Check(Combo_OnReloadRequest("malformedNative") == 0 && native == acceptedLegacyNative &&
+              g_ConsolidatedJson == acceptedLegacyJson,
+          "a malformed native entrance container must reject before changing the accepted seed");
+
+    rejectNativeLayout = true;
+    const int rejectedApplyResult = Combo_OnReloadRequest("legacy");
+    rejectNativeLayout = false;
+    Check(rejectedApplyResult == 0 && native.at("entrances") == acceptedLegacyNative.at("entrances") &&
+              g_ConsolidatedJson == acceptedLegacyJson,
+          "a rejected recorded layout must not fall back to regeneration or commit the candidate seed");
     std::cout << "cross-dungeon production reload preflight: PASS\n";
 }

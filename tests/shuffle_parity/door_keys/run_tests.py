@@ -55,8 +55,16 @@ with tempfile.TemporaryDirectory(prefix='mm-native-rusty-keys-') as td:
     dampe=[line.split('//')[0].strip().rstrip(',') for line in east.splitlines() if 'EXIT(ENTRANCE(IKANA_GRAVEYARD, 4)' in line]
     assert len(dampe)==1
     (build/'dampe_exit.inc').write_text(dampe[0])
-    (build / 'cycle.inc').write_text('\n'.join(function(source,n) for n in (
+    grant_declaration = re.search(r'^void TradeAdult_GiveIndex\([^;]+\);$', source, re.M)[0]
+    (build / 'cycle.inc').write_text('extern "C" {\n'+grant_declaration+'\n}\n'+'\n'.join(function(source,n) for n in (
         'IsRenewable','Rando::MiscBehavior::BeforeEndOfCycleSave','Rando::MiscBehavior::AfterEndOfCycleSave')))
+    # The complete cycle body now restores earned trade copies. Compile its
+    # actual accessor/revision/grant dependency in the existing native C TU.
+    trade = (ROOT / 'mm/mods/items/logic/trade_items.c').read_text()
+    trade_services = '\n'.join(re.search(r'^#define '+name+r'\s+.*$', trade, re.M)[0]
+                               for name in ('TRADE_ADULT_COUNT','TRADE_ADULT_PENDANT'))
+    trade_services += '\n'+function((ROOT / 'mm/mods/nei_save.cpp').read_text(), 'Nei_Save').removeprefix('extern "C" ')
+    trade_services += '\n'+'\n'.join(function(trade,n) for n in ('TradeAdult_IsConsumedIndex','TradeAdult_GiveIndex'))
     inventory = (ROOT / 'mm/src/code/z_inventory.c').read_text()
     tables = '\n'.join(re.search(r'^(?:u16|u8) '+name+r'\[\] = \{.*?^\};',inventory,re.M|re.S)[0]
                        for name in ('gEquipMasks','gEquipNegMasks','gEquipShifts'))
@@ -65,7 +73,8 @@ with tempfile.TemporaryDirectory(prefix='mm-native-rusty-keys-') as td:
     (build / 'cycle_services.c').write_text('#include "global.h"\n#include "2s2h/GameInteractor/GameInteractor.h"\n'+tables+
         '\nvoid GameInteractor_ExecuteOnFlagSet(FlagType type, u32 flag) {}\n'
         'void GameInteractor_ExecuteOnFlagUnset(FlagType type, u32 flag) {}\n'+
-        '\n'.join(function(actors,n) for n in ('Flags_SetWeekEventReg','Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf')))
+        '\n'.join(function(actors,n) for n in ('Flags_SetWeekEventReg','Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf'))+
+        '\n'+trade_services)
     flags = ['-DFMT_HEADER_ONLY','-std=c++20','-DF3DEX_GBI_2','-DGBI_FLOAT_MTX','-DGBI_S32_VTX',
              '-DCONTROLLERBUTTONS_T=uint32_t','-include',str(ROOT / 'tests/shuffle_parity/souls/headless.h'),
              '-I'+str(ROOT),'-I'+str(build),'-ffunction-sections','-fdata-sections','-Wl,--gc-sections']

@@ -141,6 +141,8 @@ static void MmForm_ApplyFormProperties(Player*,MmPlayerTransformation) {}
 static void MmForm_RestoreOotState(Player*) {}
 // Independent instrument voices have their own production-controller tests.
 static void MmForm_GakkiVoiceOff() {}
+// Deku projectile teardown is covered by its own production lifecycle tests.
+static void MmForm_ResetDekuBubble(PlayState* state) {assert(state==nullptr||state==&play);}
 static void FormJingle_Stop() {}
 static void MmForm_EnterSwimIdle(Player*,PlayState*) {}
 static s16 Animation_GetLastFrame(LinkAnimationHeader* a) {return a->frames-1;}

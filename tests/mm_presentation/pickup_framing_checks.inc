@@ -3,6 +3,42 @@
 // serialized OPA/XLU asset, independently of the runtime frame-fit catalog.
 const auto receiptPose=FixtureMmReceiptPose();
 assert(std::abs(receiptPose.first-.21f)<.00001f && std::abs(receiptPose.second-53.3f)<.00001f);
+{
+ using namespace MmReceiptFixture;
+ ResetEligibility();adultMode=true;
+ const auto adultPose=FixtureMmReceiptPose();
+ assert(std::abs(adultPose.first-.21f)<.00001f && std::abs(adultPose.second-187.f)<.00001f);
+ assert(std::abs(receipt.world.pos.x-10.f)<.00001f && std::abs(receipt.world.pos.z-28.3f)<.00001f);
+ assert(AdultLink_UsesAdultItemPresentation(&MmReceiptFixture::player));
+ MmReceiptFixture::Player peer{};
+ assert(!AdultLink_UsesAdultItemPresentation(nullptr) && !AdultLink_UsesAdultItemPresentation(&peer));
+ // Every disqualifier must select the complete native pose branch, rather
+ // than making the fixture silently disable the new adult branch.
+ for(int blocker=0;blocker<8;++blocker) {
+  ResetEligibility();adultMode=true;
+  switch(blocker) {
+   case 0:adultMode=false;break;
+   case 1:sReady=0;break;
+   case 2:sSkel=nullptr;break;
+   case 3:sIsChildRig=1;break;
+   case 4:activeForm=CUSTOM_FORM_RITO;break;
+   case 5:mario=true;break;
+   case 6:wolf=true;break;
+   case 7:MmReceiptFixture::gPlayState=nullptr;break;
+  }
+  const auto nativePose=FixtureMmReceiptPose();
+  assert(std::abs(nativePose.first-.21f)<.00001f && std::abs(nativePose.second-53.3f)<.00001f);
+ }
+ for(int form:{PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY}) {
+  ResetEligibility();adultMode=true;
+  const auto nativePose=FixtureMmReceiptPose(form);
+  assert(!AdultLink_UsesAdultItemPresentation(&MmReceiptFixture::player));
+  const float height=form==PLAYER_FORM_GORON?90.f:form==PLAYER_FORM_ZORA?75.f:form==PLAYER_FORM_DEKU?35.f:100.f;
+  assert(std::abs(nativePose.second-(height+8.3f))<.00001f);
+ }
+ ResetEligibility();
+ std::cout<<"PASS real MM adult receipt hand-anchor eligibility and native child/transformed pose controls\n";
+}
 const auto pickupVertices=FixtureMmPickupVertices();
 size_t nativePickupBindings=0;
 for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY}) {

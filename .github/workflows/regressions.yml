@@ -25,7 +25,15 @@ jobs:
           python3 -B scripts/assets/prepare_lake_tunnel_sand.py
 
       - name: Install regression dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build nlohmann-json3-dev libtinyxml2-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pycparser python3-venv
+        timeout-minutes: 10
+        run: |
+          # Use Ubuntu's primary archive; the pinned MIT mirror timed out before tests.
+          # APT retains its normal signature checks.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' https://archive.ubuntu.com/ubuntu | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o APT::Update::Error-Mode=any update
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y cmake ninja-build nlohmann-json3-dev libtinyxml2-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libzip-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pycparser python3-venv
 
       - name: Install pinned UI rasterizer
         run: |

@@ -16,6 +16,9 @@ static int loadHooks, exitHooks;
 static int crossArrival = -1, bossRecovery = -1, fwArrival = -1;
 static int fallbackLookups;
 static bool fallbackMutatesRespawn;
+// Sram_OpenSave loads quest metadata along with progress; the original cases
+// exercise seeded entrance composition.
+static Quest loadedQuest = QUEST_RANDOMIZER;
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
     int value = crossArrival; crossArrival = -1; return value;
 }
@@ -32,6 +35,7 @@ static void require(bool condition, const char* message) {
 }
 extern "C" void SaveContext_Init(void) { std::memset(&gSaveContext, 0, sizeof(gSaveContext)); }
 extern "C" void Sram_OpenSave(void) {
+    gSaveContext.ship.quest.id = loadedQuest;
     gSaveContext.linkAge = 1;
     gSaveContext.health = 0x50;
     gSaveContext.respawn[RESPAWN_MODE_TOP].pos = { 111, 222, 333 };
@@ -105,5 +109,35 @@ int main() {
     require(gSaveContext.entranceIndex == ENTR_LINKS_HOUSE_CHILD_SPAWN &&
             sComboReturnPortalRoute == COMBO_PORTAL_MARKET,
             "an explicit Farore recall must take precedence and consume the forest route");
+    struct QuestControl {
+        Quest quest;
+        int expectedLookups;
+    };
+    const QuestControl controls[] = { { QUEST_NORMAL, 0 }, { QUEST_RANDOMIZER, 1 }, { QUEST_OOTXMM, 1 } };
+    for (const auto& control : controls) for (bool forestRoute : {false, true}) {
+        loadedQuest = control.quest;
+        sComboReturnPortalRoute = forestRoute ? COMBO_PORTAL_LOST_WOODS : COMBO_PORTAL_MARKET;
+        gComboReturnFileNum = 1;
+        const int before = fallbackLookups;
+        TitleSetup_InitImpl(&state);
+        require(gSaveContext.ship.quest.id == control.quest &&
+                fallbackLookups == before + control.expectedLookups,
+                "native quests must bypass the override table; Randomizer and legacy Combo quests must compose once");
+        require(gSaveContext.entranceIndex == (forestRoute ? ENTR_LOST_WOODS_SOUTH_EXIT
+                                                          : ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP) &&
+                gSaveContext.respawnFlag == (forestRoute ? 2 : 0),
+                "native and seeded quests must preserve the correct forest or Market arrival");
+        if (forestRoute) {
+            require(gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex == 0 &&
+                    gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.z == -280 &&
+                    gSaveContext.respawn[RESPAWN_MODE_RETURN].yaw == 0,
+                    "every quest must retain the same positioned forest return");
+        }
+        require(gSaveContext.respawn[RESPAWN_MODE_TOP].pos.y == 222 &&
+                gSaveContext.linkAge == 1 && gSaveContext.health == 0x50 &&
+                gComboReturnFileNum == -1 && sComboReturnPortalRoute == COMBO_PORTAL_MARKET,
+                "quest-specific composition must preserve paired progress and consume the return exactly once");
+    }
     std::puts("PASS: native OoT boot returns to the same tunnel; original portal and paired save state preserved");
+    std::puts("PASS: native, Randomizer and legacy Combo quests retain their fallback policy for forest and Market returns");
 }

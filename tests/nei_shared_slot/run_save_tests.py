@@ -102,8 +102,16 @@ def production_for(host, serializer_ref, init_ref=None):
         parts.append(extract(initializers, "NeiSave_Init"))
         # The native load path also repairs legacy Rito cells and button slots.
         rito = source_at("soh/mods/transformation_masks/custom_forms.cpp")
+        parts.append(extract(source_at("soh/src/code/z_actor.c"), "Flags_GetRandomizerInf"))
+        # Loading now normalizes the unified trade selection as well as the
+        # mask cell. Keep the actual ownership helpers in this persistence
+        # fixture; the native randomizer flag service is supplied separately.
+        trade = source_at("soh/mods/items/logic/trade_items.c")
+        parts.append(trade[trade.index('#define TRADE_ADULT_COUNT'):
+                           trade.index('extern void* MmAssets_LoadResource')])
         parts.extend(extract(rito, name) for name in
-                     ("RitoMask_IsOwned", "RitoItem_NoteCellItem", "RitoMask_MigrateLegacy"))
+                     ("RitoMask_IsOwned", "RitoItem_NoteCellItem", "OotMaskWheel_OwnsItem",
+                      "OotMaskWheel_Neighbor", "RitoMask_MigrateLegacy"))
         serializers = source_at("soh/mods/nei_save.cpp", serializer_ref)
         parts.extend(extract(serializers, name) for name in
                      ("Nei_SidecarPath", "TradeItems_SyncWrite", "TradeItems_SyncRead"))
@@ -115,7 +123,16 @@ def production_for(host, serializer_ref, init_ref=None):
     trade = source_at(f"{host}/mods/items/logic/trade_items.c")
     for definition, source in (("TRADE_ADULT_PENDANT", equipment), ("TRADE_ADULT_COUNT", trade)):
         parts.append(re.search(r"^#define " + definition + r"\s+.*$", source, re.M).group())
-    parts.append(extract(trade, "TradeAdult_GiveIndex"))
+    if host == "mm":
+        # Legacy Pendant migration observes its native item without reacquiring
+        # a consumed copy. Keep that real lookup/fold dependency and the real
+        # grant revision predicate alongside the existing equipment fixture.
+        start = trade.index("static const u8 sTradeAdultItems[")
+        end = trade.index("\n};", start) + len("\n};")
+        parts.append(trade[start:end])
+        parts.extend(extract(trade, name) for name in
+                     ("TradeAdult_IndexOfItem", "TradeAdult_IsConsumedIndex",
+                      "TradeAdult_GiveIndex", "TradeAdult_FoldCurrent"))
     parts.append(extract(equipment, "ExtEquip_SetCurrentByType"))
     # Keep the real persisted extended-slot writer. Engine behavior cleanup,
     # vanilla-base equipment updates and player/render refresh remain outside

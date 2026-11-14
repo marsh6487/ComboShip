@@ -154,6 +154,10 @@ uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
     return 0xF5;
 }
 
+void Rando::DrawFrozenForeignItem(const CwStartupReceipt& receipt, Actor* actor) {
+    MM_DrawFrozenForeign(receipt, actor);
+}
+
 void Rando::LatchComboForeign(RandoCheckId randoCheckId) {
     ComboLatchForeignDrawOOT(randoCheckId);
 }

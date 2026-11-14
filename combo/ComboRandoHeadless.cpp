@@ -9,6 +9,8 @@
 //   comborando.exe --playthrough <spoiler.json>    forward-traverse a finished seed to judge beatability
 //
 // --starting-game <oot|mm|random> overrides the menu's Starting Game CVar for generate mode (#135).
+// --fill-only runs native generation and its reachability validation for regression sweeps, skipping
+// optional hint analysis and spoiler output. It cannot be combined with --playthrough.
 //
 // Exact-seed repro (generate mode): --settings <consolidated.json> restores that seed's OOT/MM settings
 // and tricks, and --master-seed <n> uses n directly instead of hashing --seed. Together they reproduce a
@@ -134,6 +136,7 @@ int main(int argc, char** argv) {
     int count = 1;
     std::string playthroughFile;
     std::string settingsFile; // consolidated spoiler to restore settings/tricks from (exact-seed repro)
+    bool fillOnly = false;
     bool haveMasterSeed = false;
     uint32_t masterSeedArg = 0;
     // #136: combined goal. Absent => read the menu CVars (matches in-game); 0 => force bosses.
@@ -180,6 +183,8 @@ int main(int argc, char** argv) {
             seed = argv[++i];
         else if (a == "--count" && i + 1 < argc)
             count = std::max(1, std::atoi(argv[++i]));
+        else if (a == "--fill-only")
+            fillOnly = true;
         else if (a == "--playthrough" && i + 1 < argc)
             playthroughFile = argv[++i];
         else if (a == "--settings" && i + 1 < argc)
@@ -188,6 +193,11 @@ int main(int argc, char** argv) {
             masterSeedArg = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
             haveMasterSeed = true;
         }
+    }
+
+    if (fillOnly && !playthroughFile.empty()) {
+        std::cerr << "[comborando] --fill-only cannot be combined with --playthrough\n";
+        return 2;
     }
 
 #ifdef _WIN32
@@ -306,9 +316,11 @@ int main(int argc, char** argv) {
             return 2;
         }
         nlohmann::json crossSeed;
+        nlohmann::json recordedForcedOot = nlohmann::json::object();
         try {
             crossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(spoiler);
-            ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed);
+            if (ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed))
+                recordedForcedOot = ComboRando::CrossDungeon::RecordedForcedOot(spoiler);
         } catch (const std::exception& e) {
             std::cerr << "[playthrough] invalid cross-dungeon seed: " << e.what() << "\n";
             return 2;
@@ -354,6 +366,7 @@ int main(int argc, char** argv) {
 
         bool entranceRestoreFailed = false; // set inside runPass; a wrong graph makes any verdict meaningless
         std::vector<ComboRando::CwSharedGroup> affordabilitySharedGroups;
+        ComboRando::RpgMagicRules affordabilityMagicRules;
         // One traversal pass. Forces real-logic evaluation (ignore the seed's No-Logic/Glitchless flag).
         // Tricks are set via SOH_SetEnabledTricks/SetAllTricks BEFORE SOH_Dump, whose SOH_PrepRandoContext
         // pushes them into the Context (Combo_ApplyEnabledTricks). SOH_Dump (+seed) sets the OOT/MM contexts
@@ -398,6 +411,12 @@ int main(int argc, char** argv) {
             try {
                 ComboRando::ParseStaticDataDump(sohDump, "OOT replay");
                 ComboRando::ParseStaticDataDump(mmDump, "MM replay");
+                if (ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed)) {
+                    // Read before PrepContext resets native placements. This only checks that
+                    // the regenerated supply matches; the saved seed supplies the actual starts.
+                    const std::string preparedForced = SOH_GetForced ? SOH_GetForced(masterSeed) : "";
+                    ComboRando::CrossDungeon::ValidateRecordedForcedOot(preparedForced, recordedForcedOot, sohDump);
+                }
             } catch (const std::exception& e) {
                 std::cerr << "[playthrough] native preparation failed: " << e.what() << "\n";
                 entranceRestoreFailed = true;
@@ -406,6 +425,7 @@ int main(int argc, char** argv) {
             const std::string sharedPairs = SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "";
             affordabilitySharedGroups =
                 ComboRando::BuildSharedItemGroups(ComboRando::ResolveSharedPairs(sharedPairs, mmDump), sharedMask);
+            affordabilityMagicRules = ComboRando::ParseRpgMagicRules(sohDump);
             // NOW force glitchless for traversal (real gates); the dump above froze the seed's slot
             // set in the DLL-side cache, so this re-prep can't shrink it.
             nlohmann::json os = ootSettings;
@@ -433,7 +453,7 @@ int main(int argc, char** argv) {
             }
             try {
                 ComboRando::CrossDungeon::ValidateSavedStructure(crossDungeons, crossSeed, sohDump, mmDump, oot, mmO,
-                                                                 mmStart);
+                                                                 mmStart, recordedForcedOot.dump());
             } catch (const std::exception& e) {
                 std::cerr << "[playthrough] cross-dungeon replay rejected: " << e.what() << "\n";
                 entranceRestoreFailed = true;
@@ -472,7 +492,7 @@ int main(int argc, char** argv) {
                 // Use the traversal's ownership rules, including native NEI sharing when the
                 // optional Shared Items mask is off. Same-sphere pickups remain unavailable.
                 ComboRando::SharedOwnedViews(affordabilitySharedGroups, ownedOotWallets, ownedMmWallets, ootWalletView,
-                                             mmWalletView);
+                                             mmWalletView, affordabilityMagicRules);
                 const int owS =
                     static_cast<int>(std::count(ootWalletView.begin(), ootWalletView.end(), "Progressive Wallet"));
                 const int mwS =
@@ -603,6 +623,7 @@ int main(int argc, char** argv) {
     std::optional<nlohmann::json> settingsCrossSeed;
     std::optional<nlohmann::json> settingsBlackMarket;
     std::optional<nlohmann::json> settingsOotEntrances;
+    std::optional<nlohmann::json> settingsForcedOot;
     nlohmann::json settingsOotLayouts = nlohmann::json::object();
     if (!settingsFile.empty()) {
         if (!SOH_RestoreSettings || !MM_RestoreSettings) {
@@ -616,7 +637,8 @@ int main(int argc, char** argv) {
                 settingsBlackMarket = sj["blackMarketOptions"];
             }
             settingsCrossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(sj);
-            ComboRando::CrossDungeon::Coordinator::Enabled(*settingsCrossSeed);
+            if (ComboRando::CrossDungeon::Coordinator::Enabled(*settingsCrossSeed))
+                settingsForcedOot = ComboRando::CrossDungeon::RecordedForcedOot(sj);
             if (sj.contains("entrances") && sj.at("entrances").contains("oot"))
                 settingsOotEntrances = sj.at("entrances").at("oot");
             if (sj.contains("sharedItems"))
@@ -711,6 +733,8 @@ int main(int argc, char** argv) {
                   : startCfg == 2 ? ", starting game random"
                                   : "")
               << "\n";
+    if (fillOnly)
+        std::cout << "[comborando] fill-only: native fill validation enabled; hints and spoiler output skipped\n";
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
     if (SOH_NormalizeComboGraceFromMM)
@@ -777,12 +801,15 @@ int main(int argc, char** argv) {
             }
             try {
                 if (replayCrossMap) {
+                    ComboRando::CrossDungeon::ValidateRecordedForcedOot(forced, *settingsForcedOot, sohDump);
+                    forced = settingsForcedOot->dump();
                     ComboRando::CrossDungeon::ValidateSavedStructure(crossDungeons, *settingsCrossSeed, sohDump, mmDump,
-                                                                     oot, mmO, mmStart);
+                                                                     oot, mmO, mmStart, forced);
                     crossDungeonSeed = *settingsCrossSeed;
                 } else {
                     crossDungeonSeed = ComboRando::CrossDungeon::GenerateValidatedSeed(
-                        crossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, oot, mmO, mmStart);
+                        crossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, oot, mmO, mmStart,
+                        ComboRando::CrossDungeon::kStructuralLayoutAttempts, nullptr, forced);
                 }
             } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
                 r.error = e.what();
@@ -802,8 +829,9 @@ int main(int argc, char** argv) {
             r = ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, oot, mmO, nullptr, forced, ootAccess,
                                                    goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
                                                    SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "", sharedMask);
-            if (r.success) {
+            if (r.success)
                 resolvedMmStart = mmStart;
+            if (r.success && !fillOnly) {
                 // Cross-hint data (Phase 2/3 mirror of RunComboFill, incl. the same area maps so the
                 // WotH/Foolish rollup matches in-game): needs this attempt's still-live oracle session.
                 sohHintDump = SOH_DumpRandoHintData ? SOH_DumpRandoHintData() : "";
@@ -863,7 +891,7 @@ int main(int argc, char** argv) {
                       << " cross-game placements)\n";
             // For a single-seed run, emit a consolidated spoiler (settings + placements) so it can be fed
             // straight back to --playthrough. Mirrors ComboShip.cpp's consolidated shape.
-            if (count == 1 && SOH_DumpSettings && MM_DumpSettings) {
+            if (!fillOnly && count == 1 && SOH_DumpSettings && MM_DumpSettings) {
                 try {
                     auto fillSpoiler = nlohmann::json::parse(r.spoilerJson);
                     auto pricesOf = [](const std::string& dump) {

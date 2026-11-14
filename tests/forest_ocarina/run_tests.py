@@ -53,6 +53,15 @@ def build_source():
     trig = (ROOT / "mm/src/code/stubs.c").read_text()
     native += array(trig, "static s16 sintable[")
     native += "\n".join(functions(trig, {"sins", "coss"}).values())
+    # KeepOn4 also serves adult item receipts. Link its actual eligibility and
+    # dimensions queries; this ocarina fixture controls rig readiness/renderer
+    # services and verifies adult ITEM1 framing with native session ownership.
+    adult = (ROOT / "mm/mods/items/logic/adult_link_render.cpp").read_text()
+    native += "\n" + re.search(r"^#define ADULT_LINK_SCALE_DEFAULT[^\n]*", adult, re.M)[0] + "\n"
+    for name in ("AdultLink_IsActive", "AdultLink_UsesAdultPresentation", "AdultLink_UsesAdultItemPresentation",
+                 "AdultLink_GetItemPresentationHeight", "AdultLink_GetItemPresentationYOffset"):
+        native += block_from(adult, adult.index('extern "C" ' +
+                            ('f32 ' if name.startswith('AdultLink_GetItem') else 's32 ') + name + '(')) + "\n"
     for path, names in (
         ("mm/src/code/z_lib.c", ("Math_SinS", "Math_CosS", "Math_Vec3f_Copy", "Lib_SegmentedToVirtual")),
         ("mm/src/code/z_olib.c", ("OLib_Vec3fDist", "OLib_VecSphToVec3f", "OLib_VecGeoToVec3f",

@@ -31,7 +31,7 @@ static PlayState* sRitoPlay;
 static Player* sRitoPlayer;
 static u32 sRitoLastFrame;
 '''
-for source,name in ((f,'MmRitoWindClear'),(b,'MmRitoBowClearArrows'),(b,'MmRitoBowReset'),(c,'RitoForm_ForgetContext'),(c,'RitoForm_SyncContext')):
+for source,name in ((f,'MmRitoWindClear'),(f,'MmRitoClearFlightState'),(b,'MmRitoBowClearArrows'),(b,'MmRitoBowReset'),(c,'RitoForm_ForgetContext'),(c,'RitoForm_SyncContext')):
  code+='\n'+function(source,name)
 code+=r'''
 static void poison(){

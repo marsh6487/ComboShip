@@ -6,6 +6,8 @@
 #include "tests/custom_encounters/disabled_spawn_boundary.h"
 #include "global.h"
 #include "mods/nei_save.h"
+#include "mods/forms/custom_forms.h"
+#include "mods/items/logic/adult_link_render.h"
 #if __has_include("2s2h/Enhancements/Camera/ComboForestOcarina.h")
 #include "2s2h/Enhancements/Camera/ComboForestOcarina.h"
 #endif
@@ -27,6 +29,10 @@ int gComboVanillaMode = 0;
 }
 static PlayState play;
 static Player player;
+// Asset loading and competing renderers are explicit service boundaries; the
+// production adult eligibility queries run against this native rig state.
+static FlexSkeletonHeader adultSkeleton{}, *sSkel;
+static u8 sReady, sIsChildRig;
 using DisabledEncounterFixture::recordedEntries;
 using DisabledEncounterFixture::replacementEntries;
 static int letterbox;
@@ -42,6 +48,10 @@ extern "C" NeiSaveData *Nei_Save() {
   return &state;
 }
 extern "C" s32 CVarGetInteger(const char *, s32 fallback) { return fallback; }
+extern "C" f32 CVarGetFloat(const char *, f32 fallback) { return fallback; }
+extern "C" s32 CustomForms_ActiveForm(void) { return CUSTOM_FORM_NONE; }
+extern "C" u8 Sm64Mario_ShouldHideLink(void) { return false; }
+extern "C" u8 WolfLinkForm_IsSelected(void) { return false; }
 #define lusprintf(...) ((void)0)
 extern "C" OcarinaStaff *AudioOcarina_GetRecordingStaff() {
   static OcarinaStaff staff{};
@@ -271,6 +281,9 @@ static void Reset(int mode = COMBO_GAME_BOTH, s16 scene = SCENE_LOST_WOODS) {
   play = {};
   player = {};
   gSaveContext = {};
+  Nei_Save()->timeGateAdultMode = 0;
+  sReady = sIsChildRig = 0;
+  sSkel = nullptr;
   gPlayState = &play;
   gGameState = &play.state;
   gComboGameMode = mode;
@@ -608,6 +621,31 @@ int main() {
     PlayAndCancel(PLAYER_FORM_HUMAN);
   }
 #endif
+  OcarinaView humanControl{};
+  for (int readiness = 0; readiness < 3; ++readiness) {
+    Reset();
+    ActorEntry spawn = combinedSpawn;
+    spawn.rot.y &= ~0x7F;
+    auto chain = nativeChain;
+    SOH::Scene scene{&spawn, chain.data(), (s16)chain.size()};
+    Load(scene);
+    Nei_Save()->timeGateAdultMode = readiness != 0;
+    sReady = readiness == 2;
+    sSkel = sReady ? &adultSkeleton : nullptr;
+    Require(bool(AdultLink_UsesAdultItemPresentation(&player)) == (readiness == 2),
+            "ordinary, unavailable and ready adult rigs use actual presentation eligibility");
+    const auto view = PlayAndCancel(PLAYER_FORM_HUMAN);
+    if (readiness == 0)
+      humanControl = view;
+    else if (readiness == 1)
+      SameView(view, humanControl);
+    else
+      Require(view.at.y > humanControl.at.y &&
+                  std::memcmp(&view.eye, &humanControl.eye, sizeof(Vec3f)) &&
+                  view.fov == humanControl.fov && view.setting == humanControl.setting &&
+                  view.mode == humanControl.mode,
+              "ready adult ocarina uses adult framing with native setting/mode/FOV");
+  }
   for (int form = 0; form < PLAYER_FORM_MAX; ++form) {
     Reset();
     ActorEntry nativeSpawn = combinedSpawn;

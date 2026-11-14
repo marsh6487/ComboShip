@@ -2,6 +2,55 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM Rito default adult gait contact, native pose controls and floor safety",
+    "run": "python3 -B tests/mm_rito_feet/run_tests.py --sanitize --mode original\npython3 -B tests/mm_rito_feet/run_tests.py --sanitize --mode combo"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM adult model first-person visibility, authored grips and exact sword selection",
+    "run": "python3 -B tests/okayu_presentation/test_mm_adult_renderer.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM adult ocarina framing and native first-person focus",
+    "run": "python3 -B tests/mm_adult_camera/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM Rito airborne held input, transient state and authored animation fallback",
+    "run": "python3 -B tests/mm_rito_flight/run_tests.py\npython3 -B tests/mm_rito_flight/run_animation_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Deku Stick private flame family and native burn behavior in both games",
+    "run": "python3 -B tests/deku_stick_flame/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Impa startup receipt: paired save, both native GI policies and presentation-only delivery",
+    "run": "python3 -B tests/startup_receipt/run_tests.py --sanitize --native --json-include /usr/include"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Optional held-item light shaft: native receipts, lifecycle and bounded renderer",
+    "run": "python3 -B tests/gi_light_shaft/run_tests.py\npython3 -B tests/gi_light_shaft/run_tests.py --sanitize\npython3 -B tests/gi_light_shaft/run_native_tests.py\npython3 -B tests/gi_light_shaft/run_native_tests.py --sanitize\npython3 -B tests/gi_light_shaft/run_renderer_tests.py\npython3 -B tests/gi_light_shaft/run_renderer_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "name": "Native OoT form instruments, note gestures and independent song voices",
     "run": "python3 -B tests/form_instruments/button_state_test.py\npython3 -B tests/form_instruments/run_controller_tests.py\npython3 -B tests/form_instruments/run_audio_tests.py"
   },
@@ -149,8 +198,29 @@
   {
     "suite": "equipment",
     "origin": "gate",
-    "name": "Native OoT Blast Mask tutorial and A-action arbitration",
+    "name": "Native OoT Blast Mask B action, tutorial and shielded explosion collision",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/blast_mask/run_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Trade hand-in cleanup, current-copy availability, native save codecs and cross-game sync",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/trade_consumption/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM human mask actions with imported and extended swords",
+    "run": "python3 -B tests/mm_mask_actions/run_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "OoT Goron and Zora native melee geometry and contact controls",
+    "run": "python3 -B tests/form_melee/run_tests.py --sanitize"
   },
   {
     "suite": "equipment",
@@ -184,6 +254,17 @@
     "origin": "gate",
     "name": "Complete spin style native rendering and combat, normal and sanitized",
     "run": "python3 -B scripts/diagnostics/run_spin_style_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_spin_style_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Din's Fire remake visuals, charge handoff, native textures and audio",
+    "run": "python3 -B tests/dins_fire_assets/test_resources.py\npython3 -B scripts/assets/build_dins_fire_remake.py --check-native\npython3 -B scripts/assets/build_dins_fire_audio.py --check\npython3 -B scripts/diagnostics/check_dins_fire_native_geometry.py\npython3 -B scripts/diagnostics/run_dins_fire_native_actor_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_actor_tests.py --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --standalone\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_native_gameplay_tests.py --standalone --sanitize\npython3 -B scripts/diagnostics/run_dins_fire_remake_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_dins_fire_remake_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_magic_fire_bindings_tests.py\npython3 -B scripts/diagnostics/run_dins_fire_native_texture_tests.py\npython3 -B tests/dins_fire_audio/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/dins_fire_audio/run_tests.py --sanitize\npython3 -B tests/dins_fire_audio/run_override_tests.py --build-starter\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/dins_fire_audio/run_override_tests.py --build-starter --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0",
+      "UBSAN_OPTIONS": "halt_on_error=1"
+    }
   },
   {
     "suite": "render",
@@ -349,6 +430,12 @@
     "origin": "nei",
     "name": "scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "name": "MM forest companion arrival timing and native placement",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/forest_actor_spawn_latency/run_tests.py --sanitize\npython3 -B tests/native_forest/test_placements.py"
   },
   {
     "suite": "world",
@@ -1249,6 +1336,12 @@
   },
   {
     "suite": "render",
+    "origin": "gate",
+    "name": "Whip native aiming reticle and extended traversal reach",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/whip_traversal/run_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
     "origin": "nei",
     "name": "tests/nei_lantern_grip/run_tests.py",
     "run": "python3 -B tests/nei_lantern_grip/run_tests.py"
@@ -1451,6 +1544,20 @@
     "origin": "gate",
     "name": "2Ship back equipment and OoT sky compatibility",
     "run": "python3 scripts/diagnostics/run_mm_back_equipment_tests.py\npython3 scripts/diagnostics/run_mm_oot_sky_tests.py\npython3 -B tests/adult_mm_flex/run_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native MM adult Link item framing, receipt placement and draw ownership",
+    "run": "python3 -B tests/adult_mm_item_presentation/run_tests.py\npython3 -B tests/adult_mm_item_presentation/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Unified trade selection migration, mask separation and equipment bindings",
+    "run": "python3 -B tests/unified_trade_slots/run_tests.py\npython3 -B tests/unified_trade_slots/run_tests.py --sanitize"
   },
   {
     "suite": "equipment",
@@ -1712,6 +1819,12 @@
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_opening_tests.py --sanitize"
   },
   {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Vanilla NEI first portal startup and native Market returns",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_portal_startup_tests.py --sanitize"
+  },
+  {
     "suite": "systems",
     "origin": "gate",
     "name": "Combo Vanilla exact reward journal and atomic paired-native receipts",
@@ -1732,8 +1845,14 @@
   {
     "suite": "items",
     "origin": "gate",
+    "name": "MM randomizer native queue and item presentation timing",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_rando_queue_timing/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
     "name": "Combo Vanilla OoT fixed native rewards, earned availability and atomic receipts",
-    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_mode_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_tests.py --sanitize"
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_mode_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_pickup_flow_tests.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/combo_vanilla/run_oot_reward_spawn_tests.py --sanitize"
   },
   {
     "suite": "items",
@@ -2096,5 +2215,77 @@
     "native_abi": "explicit",
     "name": "Spring blossom texture factories, identical hosts and owned-texture fade combiner",
     "run": "python3 -B tools/spring_blossoms/pack_textures.py --check\npython3 -B tests/seasons/run_spring_texture_tests.py\npython3 -B tests/seasons/run_spring_combiner_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Imported form save-session ownership and native aim reset",
+    "run": "python3 -B tests/form_session/run_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/form_session/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Deku spin travel yaw, render rotation and trail ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_spin/run_tests.py --sanitize"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Deku bubble item handoff, native-header flight and splat lifecycle",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_bubble/run_tests.py --native-headers"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Deku footsteps: native pitch, floor routing and existing cadence",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/deku_footsteps/run_tests.py --sanitize"
+  },
+  {
+    "suite": "world",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Bowling native actors wait for absent and late attendant dependencies",
+    "run": "python3 -B tests/bowling_dependencies/run_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "MM pause ammo colors follow effective item restrictions",
+    "run": "python3 -B tests/mm_pause_inventory/run_ammo_color_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Independent Bombchu capacity across native use, refill, grants and editors",
+    "run": "python3 -B tests/bombchu_capacity/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Native host ammo round trips, local bags, capacity and deferred receipts",
+    "run": "python3 -B tests/ammo_sync/run_tests.py --sanitize"
+  },
+  {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "FleetNet ammo authority, capacity packet order and canonical cache",
+    "run": "python3 -B tests/ammo_sync_network/run_tests.py --sanitize"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "name": "RPG magic frozen supply, exact MM oracle capacity and replay",
+    "run": "python3 -B scripts/diagnostics/run_combo_rpg_magic_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "OoT solver inventory isolation and progression lock rejection",
+    "run": "python3 -B tests/oot_solver_inventory/run_tests.py --sanitize"
   }
 ]

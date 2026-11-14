@@ -12,6 +12,14 @@ from run_mm_din_fire_tests import FLAGS as MM_FLAGS
 ROOT = Path(__file__).resolve().parents[2]
 
 def function(source, name):
+    if name == "WeaponUpgrade_ApplyHeldSwordDL" and "WeaponUpgrade_ApplyHeldSwordDLImpl(" in source:
+        return "\n".join(function(source, dependency) for dependency in
+                         ("WeaponUpgrade_ModelSwordSelected", "WeaponUpgrade_ApplyHeldSwordDLImpl",
+                          "WeaponUpgrade_ApplyHeldSwordDLForModel")) + "\n" + _function(source, name)
+    return _function(source, name)
+
+
+def _function(source, name):
     start = source.index(name + "(")
     start = source.rfind("\n", 0, start) + 1
     brace = source.index("{", start)

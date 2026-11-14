@@ -47,6 +47,15 @@ static inline int RandoCapacity_InfiniteFlag(RandoInf flag) {
            (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
 }
 
+static inline int RandoCapacity_HasIndependentBombchuBag(void) {
+    return gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] > 0;
+}
+
+static inline void RandoCapacity_GrantBombchuBag(void) {
+    if (gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] < 20)
+        gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY] = 20;
+}
+
 static inline int RandoCapacity_InfiniteAmmo(int item) {
     RandoInf flag;
     int upgrade;
@@ -55,8 +64,15 @@ static inline int RandoCapacity_InfiniteAmmo(int item) {
             flag = RANDO_INF_INFINITE_BOW;
             upgrade = UPG_QUIVER;
             break;
-        case ITEM_BOMB:
         case ITEM_BOMBCHU:
+            // An imported Bombchu Bag has its own capacity and infinite flag.
+            // Native MM Bombchus still use the native Bomb Bag when no such
+            // independent bag has been obtained.
+            if (RandoCapacity_HasIndependentBombchuBag())
+                return gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_INFINITE_BOMBCHUS] != 0 &&
+                       INV_CONTENT(ITEM_BOMBCHU) == ITEM_BOMBCHU;
+            // fallthrough
+        case ITEM_BOMB:
             flag = RANDO_INF_INFINITE_BOMB_BAG;
             upgrade = UPG_BOMB_BAG;
             break;
@@ -104,11 +120,17 @@ static inline int RandoCapacity_Current(int upgrade) {
     }
     if ((upgrade == UPG_QUIVER && RandoCapacity_InfiniteAmmo(ITEM_BOW)) ||
         (upgrade == UPG_BOMB_BAG &&
-         (RandoCapacity_InfiniteAmmo(ITEM_BOMB) || RandoCapacity_InfiniteAmmo(ITEM_BOMBCHU))) ||
+         (RandoCapacity_InfiniteAmmo(ITEM_BOMB) ||
+          (!RandoCapacity_HasIndependentBombchuBag() && RandoCapacity_InfiniteAmmo(ITEM_BOMBCHU)))) ||
         (upgrade == UPG_DEKU_STICKS && RandoCapacity_InfiniteAmmo(ITEM_DEKU_STICK)) ||
         (upgrade == UPG_DEKU_NUTS && RandoCapacity_InfiniteAmmo(ITEM_DEKU_NUT)))
         return gUpgradeCapacities[upgrade][3];
     return RandoCapacity_HasBag(upgrade) ? gUpgradeCapacities[upgrade][CUR_UPG_VALUE(upgrade)] : 0;
+}
+
+static inline int RandoCapacity_BombchuCapacity(void) {
+    const int independent = gSaveContext.save.shipSaveInfo.nei.comboObtained[FC_OOT_BOMBCHU_CAPACITY];
+    return independent > 0 ? (independent > 50 ? 50 : independent) : RandoCapacity_Current(UPG_BOMB_BAG);
 }
 
 static inline void RandoCapacity_RepairBagAmmo(void) {
@@ -131,7 +153,8 @@ static inline void RandoCapacity_RepairInfinite(void) {
     int i;
     for (i = 0; i < 5; ++i)
         if (RandoCapacity_InfiniteAmmo(items[i]))
-            AMMO(items[i]) = RandoCapacity_Current(upgrades[i]);
+            AMMO(items[i]) =
+                items[i] == ITEM_BOMBCHU ? RandoCapacity_BombchuCapacity() : RandoCapacity_Current(upgrades[i]);
     if (RandoCapacity_InfiniteMagic())
         gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicCapacity;
     if (RandoCapacity_InfiniteWallet()) {

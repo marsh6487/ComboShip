@@ -15,11 +15,16 @@ u8 gUpgradeShifts[8]{};
 uintptr_t gSegments[16]{};
 static PlayState play;
 static Player player;
+static GameInfo registers;
+GameInfo *gGameInfo = &registers;
+static GraphicsContext graphics;
+static Gfx commands[64];
 PlayState *gPlayState = &play;
 static char *actionSegments[4];
 static s32 sCurrentMmMask = ITEM_MM_MASK_BLAST;
 static s32 sBlastMaskCooldown;
 static bool sBlastARequested;
+static bool sBlastBRequested;
 #define BLAST_MASK_COOLDOWN 310
 static bool instant, spawnFails;
 static int explosions, scales;
@@ -45,7 +50,10 @@ extern "C" s32 Player_CheckHostileLockOn(Player *current) {
   return (current->stateFlags1 & PLAYER_STATE1_HOSTILE_LOCK_ON) != 0;
 }
 extern "C" s32 Player_IsChildWithHylianShield(Player *) { return 0; }
+extern "C" s32 Player_HoldsTwoHandedWeapon(Player *) { return 0; }
 extern "C" s32 Player_IsFDHoldingSword(Player *) { return 0; }
+extern "C" s32 func_80834B5C(Player *, PlayState *) { return 0; }
+extern "C" void Player_Action_8084370C(Player *, PlayState *) {}
 s32 CustomItems_HasStowableHeldItem(Player *) { return 0; }
 extern "C" s32 func_8002DD78(Player *) { return 0; }
 static s32 func_808332B8(Player *) { return submerged; }
@@ -53,8 +61,18 @@ static s32 func_8083A0D4(Player *) { return 0; }
 static s32 Player_CanThrowCarriedActor(Player *, Actor *) { return 0; }
 static void Player_Action_8084E3C4(Player *, PlayState *) {}
 static void Player_Action_8084D3E4(Player *, PlayState *) {}
+static void Player_Action_Talk(Player *, PlayState *) {}
+static void Player_SetupActionPreserveAnimMovement(PlayState *, Player *current,
+                                                  PlayerActionFunc action, s32) {
+  current->actionFunc = action;
+}
+extern "C" void Message_StartTextbox(PlayState *current, u16, Actor *) {
+  current->msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+}
 extern "C" void Interface_SetNaviCall(PlayState *, u16) {}
 extern "C" void Interface_LoadActionLabel(InterfaceContext *, u16, s16);
+extern "C" void BlastTest_DrawB(PlayState *);
+extern "C" int BlastTest_BIconCount;
 extern "C" void GameInteractor_ExecuteOnSetDoAction(u16) {}
 extern "C" Actor *Actor_Spawn(ActorContext *context, PlayState *current, s16 id,
                               f32 x, f32 y, f32 z, s16 rx, s16 ry, s16 rz,
@@ -86,6 +104,14 @@ extern "C" void Actor_SetScale(Actor *actor, f32 scale) {
 static void Reset() {
   play = {};
   player = {};
+  graphics = {};
+  registers = {};
+  play.state.gfxCtx = &graphics;
+  for (int language = 0; language < 3; ++language) {
+    WREG(37 + language) = 100;
+    R_B_LABEL_X(language) = 160;
+    R_B_LABEL_Y(language) = 20;
+  }
   play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
   play.interfaceCtx.doActionSegment = actionSegments;
   play.interfaceCtx.unk_1F0 = 0xFFFF;
@@ -99,6 +125,7 @@ static void Reset() {
   sCurrentMmMask = ITEM_MM_MASK_BLAST;
   sBlastMaskCooldown = 0;
   sBlastARequested = false;
+  sBlastBRequested = false;
   instant = spawnFails = submerged = false;
   explosions = scales = 0;
   gSaveContext = {};
@@ -132,11 +159,94 @@ static void AssertDetonation() {
   assert(center.x == 123 && center.y == 456 && center.z == -789);
 }
 
+static const char *DrawB() {
+  const char *segments[] = {"native A current", "native A pending / B label",
+                            "native third segment", "native fourth segment"};
+  for (int i = 0; i < 4; ++i)
+    actionSegments[i] = const_cast<char *>(segments[i]);
+  graphics.overlay.p = commands;
+  BlastTest_DrawB(&play);
+  assert(graphics.overlay.p < commands + ARRAY_COUNT(commands));
+  for (int i = 0; i < 4; ++i)
+    assert(actionSegments[i] == segments[i] && "B drawing must preserve A transition textures");
+  const char *texture = nullptr;
+  for (Gfx *command = commands; command < graphics.overlay.p; ++command) {
+    if ((command->words.w0 >> 24) == G_SETTIMG) {
+      assert(texture == nullptr && "B must emit exactly one label texture");
+      texture = reinterpret_cast<const char *>(command->words.w1);
+    }
+  }
+  return texture;
+}
+
+static void AssertBTexture(const char *expected) {
+  const char *texture = DrawB();
+  assert(texture != nullptr && std::strcmp(texture, expected) == 0);
+  assert(BlastTest_BIconCount == 0);
+}
+
 int main() {
   Reset();
+  Input simultaneous = Press(BTN_A | BTN_B);
+  play.state.input[0] = simultaneous;
+  TransformMasks_FilterB(&simultaneous);
+  assert((simultaneous.press.button & BTN_A) && !(simultaneous.press.button & BTN_B));
+  assert(sBlastBRequested && "B starts as an eligible request before the A action");
+  player.actor.textId = 0x1234;
+  Player_SetupTalk(&play, &player);
+  assert(player.stateFlags1 & PLAYER_STATE1_TALKING);
+  assert(play.msgCtx.msgMode == MSGMODE_TEXT_DISPLAYING);
+  MmMaskWear_UpdateBlast(&play, &player);
+  assert(explosions == 0 && "An A interaction begun this frame must suppress the queued B blast");
+  player.stateFlags1 = 0;
+  play.msgCtx.msgMode = MSGMODE_NONE;
+  MmMaskWear_UpdateBlast(&play, &player);
+  assert(explosions == 0 && "A discarded request must not detonate after the interaction ends");
+
+  Reset();
+  gSaveContext.buttonStatus[0] = BTN_DISABLED;
+  assert(DrawB() == nullptr && BlastTest_BIconCount == 1 &&
+         "A disabled native B button must not advertise Explode");
+  Tick(Press(BTN_B));
+  assert(explosions == 0 && "A disabled native B button must not detonate");
+  Reset();
+  Input restricted = Press(BTN_B);
+  play.state.input[0] = restricted;
+  TransformMasks_FilterB(&restricted);
+  assert(sBlastBRequested);
+  gSaveContext.buttonStatus[0] = BTN_DISABLED;
+  MmMaskWear_UpdateBlast(&play, &player);
+  assert(explosions == 0 && "A newly disabled B button must discard its queued request");
+  gSaveContext.buttonStatus[0] = BTN_ENABLED;
   Tick(Press(0));
-  assert(play.interfaceCtx.unk_1F0 == 0x1F &&
-         "ready Blast Mask advertises Explode on native A HUD");
+  assert(explosions == 0);
+
+  Reset();
+  auto input = Tick(Press(BTN_A | BTN_R));
+  assert((input.cur.button & BTN_A) && (input.press.button & BTN_A) &&
+         "Blast Mask must leave the native A action available");
+  assert(input.cur.button & BTN_R);
+  assert(explosions == 0 && "A must never detonate the Blast Mask");
+  assert(play.interfaceCtx.unk_1F0 != 0x1F &&
+         "Blast Mask must never advertise Explode on the A button");
+  for (u8 locale : {u8(LANGUAGE_ENG), u8(LANGUAGE_FRA), u8(LANGUAGE_GER),
+                    u8(LANGUAGE_JPN)}) {
+    Reset();
+    gSaveContext.language = locale;
+    AssertBTexture("__OTR__do_action_static/gDoActionExplodeENGTex");
+    play.interfaceCtx.unk_1FA = 1;
+    // An existing native B action keeps priority over the mask label.
+    AssertBTexture("native A pending / B label");
+  }
+  Reset();
+  sBlastMaskCooldown = 2;
+  assert(DrawB() == nullptr && BlastTest_BIconCount == 1);
+  Reset();
+  sCurrentMmMask = ITEM_MM_MASK_STONE;
+  assert(DrawB() == nullptr && BlastTest_BIconCount == 1);
+  Reset();
+  play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+  assert(DrawB() == nullptr && BlastTest_BIconCount == 1);
   for (u8 locale : {u8(LANGUAGE_ENG), u8(LANGUAGE_FRA), u8(LANGUAGE_GER),
                     u8(LANGUAGE_JPN)}) {
     gSaveContext.language = locale;
@@ -152,19 +262,19 @@ int main() {
     assert(std::strcmp(actionSegments[0], gEmptyTexture) == 0);
   }
   Reset();
-  auto input = Tick(Press(BTN_A | BTN_R));
-  assert(!(input.cur.button & BTN_A) && !(input.press.button & BTN_A));
+  input = Tick(Press(BTN_B | BTN_R));
+  assert(!(input.cur.button & BTN_B) && !(input.press.button & BTN_B));
   assert(input.cur.button & BTN_R);
   AssertDetonation();
   assert(sBlastMaskCooldown == 310);
   assert(play.state.input[0].press.button &
-         BTN_A); // no mutation of shared raw controls
-  Input heldA = Press(BTN_A);
-  heldA.press.button = 0;
+         BTN_B); // no mutation of shared raw controls
+  Input heldB = Press(BTN_B);
+  heldB.press.button = 0;
   for (int i = 0; i < 309; ++i)
-    Tick(heldA);
+    Tick(heldB);
   assert(sBlastMaskCooldown == 1 && explosions == 1);
-  Tick(Press(BTN_A));
+  Tick(Press(BTN_B));
   assert(sBlastMaskCooldown == 310 && explosions == 2);
 
   Reset();
@@ -173,17 +283,19 @@ int main() {
   AssertDetonation();
   Reset();
   instant = true;
-  Tick(Press(BTN_A | BTN_B));
+  input = Tick(Press(BTN_A | BTN_B));
+  assert(input.press.button & BTN_A);
   AssertDetonation();
   assert(sBlastMaskCooldown == 1);
   Tick(Press(BTN_A));
-  assert(explosions ==
-         2); // the native updater decrements before accepting a press
-  Tick(Press(BTN_A));
+  assert(explosions == 1 && sBlastMaskCooldown == 0);
+  Tick(Press(BTN_B));
+  assert(explosions == 2);
+  Tick(Press(BTN_B));
   assert(explosions == 3);
   Reset();
   spawnFails = true;
-  Tick(Press(BTN_A));
+  Tick(Press(BTN_B));
   assert(explosions == 0 && sBlastMaskCooldown == 0);
 
   // Higher-priority native prompts own both the label and A input.
@@ -268,7 +380,7 @@ int main() {
   }
   Reset();
   player.stateFlags1 = PLAYER_STATE1_SHIELDING;
-  input = Tick(Press(BTN_A | BTN_R));
+  input = Tick(Press(BTN_B | BTN_R));
   AssertDetonation();
   assert(player.stateFlags1 & PLAYER_STATE1_SHIELDING);
   assert(input.press.button & BTN_R);
@@ -304,6 +416,35 @@ int main() {
   input = Tick(Press(BTN_A));
   assert(play.interfaceCtx.unk_1F0 != 0x1F && (input.press.button & BTN_A) &&
          explosions == 0);
-  puts("PASS OoT native A-label/locale arbitration, input consumption, "
-       "interactions, shields, blast collider and normal/instant cooldown");
+  // B must obey gameplay ownership as well. The legacy raw-pad path could
+  // detonate while B belonged to a textbox or blocked player state.
+  for (u32 state :
+       {u32(PLAYER_STATE1_INPUT_DISABLED), u32(PLAYER_STATE1_DEAD),
+        u32(PLAYER_STATE1_TALKING), u32(PLAYER_STATE1_GETTING_ITEM),
+        u32(PLAYER_STATE1_IN_ITEM_CS), u32(PLAYER_STATE1_IN_CUTSCENE),
+        u32(PLAYER_STATE1_FIRST_PERSON), u32(PLAYER_STATE1_IN_WATER)}) {
+    Reset();
+    player.stateFlags1 = state;
+    Tick(Press(BTN_B));
+    assert(explosions == 0);
+  }
+  Reset();
+  play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+  Tick(Press(BTN_B));
+  assert(explosions == 0);
+  Reset();
+  play.pauseCtx.state = 6;
+  Tick(Press(BTN_B));
+  assert(explosions == 0);
+  Reset();
+  player.textboxBtnCooldownTimer = 1;
+  Tick(Press(BTN_B));
+  assert(explosions == 0);
+  Reset();
+  sCurrentMmMask = ITEM_MM_MASK_STONE;
+  input = Tick(Press(BTN_B));
+  assert((input.press.button & BTN_B) && explosions == 0);
+
+  puts("PASS OoT B-only Blast Mask, native B HUD commands and A interactions, "
+       "late context/disabled-B ownership, blast collider and normal/instant cooldown");
 }

@@ -1,4 +1,7 @@
 #include "../../../../../combo/ComboGameMode.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 #include "../../../../../combo/vanilla/ComboVanillaPolicy.h"
 #include "file_choose.h"
 
@@ -23,6 +26,7 @@
 #include "soh/Enhancements/Graphics/WWSkyFileSelect.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/FleetShipCombo/FleetShipCombo.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include <assert.h>
 #include "z64save.h"
 #include "variables.h"
@@ -2776,6 +2780,10 @@ void FileChoose_ConfirmFile(GameState* thisx) {
 
     if (CHECK_BTN_ALL(input->press.button, BTN_START) || (CHECK_BTN_ALL(input->press.button, BTN_A))) {
         if (this->confirmButtonIndex == FS_BTN_CONFIRM_YES) {
+#ifdef COMBO_BUILD
+            if (!ComboStartupOot_PrepareContextChange())
+                return;
+#endif
             Rumble_Request(300.0f, 180, 20, 100);
             Audio_PlaySfxGeneral(NA_SE_SY_FSEL_DECIDE_L, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                  &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
@@ -2903,6 +2911,14 @@ void FileChoose_LoadGame(GameState* thisx) {
 
     Audio_PlaySfxGeneral(NA_SE_SY_FSEL_DECIDE_L, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                          &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+#ifdef COMBO_BUILD
+    if (!ComboStartupOot_PrepareContextChange())
+        return;
+#endif
+    // File selection starts a new session, including a reload of the same slot.
+    // Do this before replacing the slot/save, not on the generic exit/load hooks
+    // that same-session cross-game returns also fire.
+    MmForm_DiscardSaveSession();
     gSaveContext.fileNum = this->buttonIndex;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     Randomizer_WaitForGeneration();

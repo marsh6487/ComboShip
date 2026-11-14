@@ -27,6 +27,8 @@
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static nlohmann::json config = nlohmann::json::object();
 static int appliedMode, appliedRewards, creationResult, g_MmSaveInMemorySlot = -1;
+static bool Combo_PreserveStartupMmState() { return true; }
+static void Combo_CompleteStartupReceipt(int, bool) {}
 
 extern "C" {
 int32_t CVarGetInteger(const char* key, int32_t fallback) { return config.value(key, fallback); }

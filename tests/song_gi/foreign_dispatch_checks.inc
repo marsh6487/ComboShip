@@ -52,8 +52,7 @@
         }
         if(!expected.empty()) {
             size_t copies=0;
-            for(const auto& packed:arena)if(packed.size()==expected.front().size() &&
-                !memcmp(packed.data(),expected.front().data(),packed.size()*sizeof(Vtx)))++copies;
+            for(const auto& packed:arena)if(SameVertices(packed,expected.front()))++copies;
             assert(copies==1 && "foreign songs must render their required shared shimmer or rain exactly once");
         }
         if(song.profile==CW_SONG_OOT_EPONA || song.profile==CW_SONG_SUN || song.profile==CW_SONG_STORMS)assert(arena.size()==1);
@@ -105,8 +104,7 @@
                 assert(envColor==(song.hue<<8|255u) && "foreign MM notes must submit their original or explicitly requested hue");
             }
         }
-        for(size_t i=0;i<expected.size();++i)assert(arena[i].size()==expected[i].size() &&
-              !memcmp(arena[i].data(),expected[i].data(),expected[i].size()*sizeof(Vtx)));
+        for(size_t i=0;i<expected.size();++i)assert(SameVertices(arena[i],expected[i]));
         assert(song.overlay || arena.empty());
         if(song.profile==CW_SONG_OOT_BOLERO)ExpectBoleroShimmerOnly();
     }

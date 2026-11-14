@@ -1,6 +1,7 @@
 #include "CustomItem.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "mods/items/logic/adult_link_render.h"
 
 extern "C" {
 #include "z64actor.h"
@@ -184,6 +185,12 @@ void CustomItem00_Update(Actor* actor, PlayState* play) {
                     break;
             }
 
+            if (AdultLink_UsesAdultItemPresentation(player)) {
+                // SoH's adult overhead lift is 20 at the default model scale.
+                height =
+                    65.0f * (AdultLink_GetItemPresentationHeight() / 68.0f) + AdultLink_GetItemPresentationYOffset();
+            }
+
             // Bob the item up and down
             actor->world.pos.y += (height + (Math_SinS(enItem00->unk152 * 15000) * (enItem00->unk152 * 0.3f)));
         }
@@ -240,7 +247,19 @@ void CustomItem00_Update(Actor* actor, PlayState* play) {
                 // Keep the accepted model scale and lift the receipt pose a
                 // little above the hands for every player form.
                 height += 2.0f;
-                actor->world.pos.y += height;
+                if (AdultLink_UsesAdultItemPresentation(player)) {
+                    // Read the last rendered adult pose: GI_SHIP has no native GI reference update.
+                    const Vec3f* rightHand = &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
+                    const Vec3f* leftHand = &player->leftHandWorld.pos;
+                    actor->world.pos.x =
+                        (leftHand->x + rightHand->x) * 0.5f + 3.3f * Math_SinS(player->actor.shape.rot.y);
+                    actor->world.pos.y =
+                        (leftHand->y + rightHand->y) * 0.5f + 14.0f - actor->shape.yOffset * actor->scale.y;
+                    actor->world.pos.z =
+                        (leftHand->z + rightHand->z) * 0.5f + 3.3f * Math_CosS(player->actor.shape.rot.y);
+                } else {
+                    actor->world.pos.y += height;
+                }
             }
 
             // Once the player is no longer in the "Give Item" state, kill the actor

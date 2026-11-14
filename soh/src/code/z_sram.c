@@ -1,4 +1,7 @@
 #include "../../../combo/vanilla/ComboVanillaMode.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboStartupReceipt.h"
+#endif
 #include <stdlib.h>
 #include "../../../combo/ComboGameMode.h"
 #include "global.h"
@@ -15,6 +18,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/FleetShipCombo/FleetShipCombo.h"
 #include "mods/nei_save.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #define NUM_DUNGEONS 8
@@ -91,6 +95,10 @@ void Sram_OpenSave() {
     u16 j;
     u8* ptr;
 
+#ifdef COMBO_BUILD
+    if (!ComboStartupOot_PrepareContextChange())
+        return;
+#endif
     Save_LoadFile();
 
     switch (gSaveContext.savedSceneNum) {
@@ -272,6 +280,10 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
     u16* ptr;
     u16 checksum;
 
+    // Creation is a new session even when a deleted slot number is reused.
+    // Discard before native initialization; old equip backups must never restore
+    // into the new file. Refused vanilla preflight above keeps the current state.
+    MmForm_DiscardSaveSession();
     if (fileChooseCtx->buttonIndex != 0 ||
         !Ship_QuestDebugEnabled(fileChooseCtx->questType[fileChooseCtx->buttonIndex])) {
         Sram_InitNewSave();

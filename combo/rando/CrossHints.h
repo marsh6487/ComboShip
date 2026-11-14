@@ -339,8 +339,8 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
         return h;
     };
 
-    // Family-B upgrade data (Phase 4 consumes this): MM items placed at an OOT check, keyed by the
-    // MM item's own friendly name -> "in <area> (OOT)".
+    // Static MM hints for items placed at an OOT check, keyed by the MM item's own friendly name.
+    // First-drop areas are tracker/exclusion buckets; use the actual enemy source in the hint.
     for (auto& fm : foreignArray) {
         if (fm.value("checkGame", "") != "oot" || fm.value("itemGame", "") != "mm")
             continue;
@@ -348,6 +348,14 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
         std::string checkName = fm.value("checkName", "");
         // Area from the hint dump's own per-check table (foreign[] no longer persists checkArea).
         auto ca = ootChecks.find(checkName);
+        if (ca != ootChecks.end() && !ca->second.enemyDropName.empty()) {
+            std::string source = ca->second.enemyDropSource.en.empty()
+                                     ? "the first " + ca->second.enemyDropName + " drop"
+                                     : ca->second.enemyDropSource.en;
+            if (!itemName.empty())
+                mmItemLocations[itemName] = "at " + source + " (OOT)";
+            continue;
+        }
         std::string area = (ca != ootChecks.end() && !ca->second.area.empty()) ? ca->second.area : checkName;
         if (!itemName.empty())
             mmItemLocations[itemName] = "in " + area + " (OOT)";

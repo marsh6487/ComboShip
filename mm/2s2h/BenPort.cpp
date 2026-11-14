@@ -26,6 +26,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include "entrances/RegionalPassages.h"
 #include "../../combo/gameplay/MagicMirrorArrival.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
@@ -43,7 +44,9 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/FleetShipCombo/FleetSharedItems.h"
 #include "vanilla/ComboVanillaPolicy.h"
 #include "vanilla/ComboVanillaMode.h"
+#include "rando/StartupCheckReceipt.h"
 #include "mods/combo_rpg.h"
+#include "../../combo/rando/RpgMagicRules.h"
 
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -69,6 +72,7 @@ extern "C" void Partners_Reset(void);
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "variables.h"
 #include "z64.h"
+#include "z64save.h"
 #include "macros.h"
 #include <ship/utils/StringHelper.h>
 #include <nlohmann/json.hpp>
@@ -266,10 +270,17 @@ extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(int route) {
 extern "C" void MM_ApplyComboPortalArrival(void) {
     if (!sComboPortalArrivalPending || !ComboPassages_IsRoute(sComboPortalRoute))
         return;
-    sComboPortalArrivalPending = false;
     if (ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount)) {
-        return; // Consume the route without replacing native opening/first-cycle state.
+        // The native skip runs later in Play_Init. Keep its destination until
+        // after it grants and saves the post-first-cycle state; an unskipped
+        // introduction or an existing first-cycle save keeps its native route.
+        sComboPortalArrivalPending = gSaveContext.save.entrance == ENTRANCE(CUTSCENE, 0) &&
+                                     !gSaveContext.save.isFirstCycle &&
+                                     CVarGetInteger("gEnhancements.Cutscenes.SkipIntroSequence", 0) &&
+                                     CVarGetInteger("gEnhancements.Cutscenes.SkipFirstCycle", 0);
+        return;
     }
+    sComboPortalArrivalPending = false;
     // Native opening-forest entrances include instant prologue transitions.
     // Stage the exploration arrival after save loading; Play_Init consumes it
     // once and the existing title-card hook waits for the native fade to end.
@@ -319,6 +330,25 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     arrival->data = 1;
     gSaveContext.respawnFlag = 2;
     ComboForestArrivalCamera_Queue(sComboPortalRoute);
+}
+
+// Called by the native intro skip after its save, before the destination scene
+// loads. Ordinary skips have no pending passage and retain their native landing.
+extern "C" void MM_ApplyComboPortalAfterIntroSkip(void) {
+    if (!sComboPortalArrivalPending ||
+        ComboVanilla_MMFirstCycle(Combo_IsVanilla(), gSaveContext.save.saveInfo.playerData.threeDayResetCount))
+        return;
+    // Clock Town normally starts Day 1 through its time actor and day screen.
+    // Finish that native dawn before loading a different scene, so a hidden
+    // day-screen reload cannot consume the passage's positioned spawn/card.
+    if (Combo_IsVanilla() && gSaveContext.save.day == 0) {
+        Sram_ClearFlagsAtDawnOfTheFirstDay();
+        Sram_IncrementDay();
+        gSaveContext.save.time = CLOCK_TIME(6, 0);
+        gSaveContext.skyboxTime = gSaveContext.save.time;
+    }
+    MM_ApplyComboPortalArrival();
+    Combo_MM_RequestCrossGameTitleCard();
 }
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.
@@ -4924,6 +4954,9 @@ static void GiveItemForOracle(RandoItemId ri) {
             break;
 
         // Magic
+        case RI_OOT_EXT_MAGIC_CAPE:
+            Nei_Save()->capeOwned = 1;
+            break;
         case RI_SINGLE_MAGIC:
             gSaveContext.save.saveInfo.playerData.isMagicAcquired = true;
             gSaveContext.save.saveInfo.playerData.magic = MAGIC_NORMAL_METER;
@@ -5451,11 +5484,31 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_SetOwnedItems(const char* itemNamesJ
     try {
         auto items = nlohmann::json::parse(itemNamesJson);
         const auto& nameToId = Combo_MM_SpoilerNameToItemId();
+        ComboRpgState rpgMagic{};
+        bool hasRpgMagic = false;
         for (const auto& name : items) {
-            auto it = nameToId.find(name.get<std::string>());
+            const auto item = name.get<std::string>();
+            if (ComboRando::ParseRpgMagicOracleItem(item, rpgMagic)) {
+                hasRpgMagic = true;
+                continue;
+            }
+            auto it = nameToId.find(item);
             if (it != nameToId.end()) {
                 GiveItemForOracle(it->second);
             }
+        }
+        if (hasRpgMagic) {
+            // Reset + SetOwnedItems rebuilds a temporary oracle save. Apply
+            // frozen RPG rules after native grants so fixed/starting magic is
+            // retained regardless of input ordering. This is not a pickup.
+            auto& player = gSaveContext.save.saveInfo.playerData;
+            rpgMagic.nativeMagicLevel = player.isMagicAcquired + player.isDoubleMagicAcquired;
+            Nei_Save()->comboRpg = rpgMagic;
+            const int16_t capacity = ComboRpg_MagicCapacity(0);
+            player.isMagicAcquired = capacity > 0;
+            player.isDoubleMagicAcquired = capacity > MAGIC_NORMAL_METER;
+            player.magic = capacity;
+            gSaveContext.magicCapacity = capacity;
         }
     } catch (...) {}
 }
@@ -5497,7 +5550,7 @@ void Combo_MM_FlushAccumulators(void) {
     }
 }
 
-void Combo_MM_GiveDormantResolved(RandoItemId rid) {
+static void Combo_MM_GiveDormantResolvedInternal(RandoItemId rid, bool persist) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM dormant-resolved");
     // ComboShip (#84): drop a bottle refill when no bottle is free. Callers convert first, so this is
     // a backstop — Item_Give's bottle-contents branch overwrites bottle #1. Keep it either way.
@@ -5516,9 +5569,119 @@ void Combo_MM_GiveDormantResolved(RandoItemId rid) {
         Rando::GiveItem(rid);
     }
     Combo_MM_FlushAccumulators();
-    if (gSaveContext.fileNum != 0xFF) {
+    if (persist && gSaveContext.fileNum != 0xFF) {
         SaveManager_SaveCurrentForCombo(); // persist NOW
     }
+}
+
+void Combo_MM_GiveDormantResolved(RandoItemId rid) {
+    Combo_MM_GiveDormantResolvedInternal(rid, true);
+}
+
+static int StartupImportance(RandoItemType type) {
+    switch (type) {
+        case RITYPE_JUNK:
+            return CW_STARTUP_JUNK;
+        case RITYPE_HEALTH:
+        case RITYPE_LESSER:
+        case RITYPE_STRAY_FAIRY:
+        case RITYPE_SKULLTULA_TOKEN:
+        case RITYPE_SMALL_KEY:
+            return CW_STARTUP_MINOR;
+        default:
+            return CW_STARTUP_MAJOR;
+    }
+}
+
+// Called only after the launcher has initialized the matching MM save and its
+// starting inventory. Never resolve against the previous/dormant file.
+extern "C" COMBO_EXPORT int32_t MM_FinishStartupReceipt(CwStartupReceipt* receipt) {
+    if (!receipt || !Combo_IsCombinedGame() || Combo_IsVanilla() || !IS_RANDO || gSaveContext.fileNum > 2 ||
+        receipt->version != CW_STARTUP_RECEIPT_VERSION || !receipt->generation || receipt->itemGame != 1 ||
+        !receipt->itemName[0] || !std::memchr(receipt->itemName, 0, sizeof(receipt->itemName)) ||
+        !std::memchr(receipt->displayName, 0, sizeof(receipt->displayName)))
+        return -1;
+    if (receipt->state == CW_STARTUP_READY) {
+        // An earlier award succeeded but its save callback failed before staging
+        // a snapshot. Retrying is save-only, including shared-item delivery.
+        if (!Rando::StaticData::Items.contains(static_cast<RandoItemId>(receipt->getItemId)) ||
+            !receipt->displayName[0] || receipt->importance < CW_STARTUP_JUNK || receipt->importance > CW_STARTUP_MAJOR)
+            return -1;
+        SaveManager_SaveCurrentForCombo();
+        return 1;
+    }
+    if (receipt->state != CW_STARTUP_WAIT_MM)
+        return -1;
+    const auto& names = Combo_MM_SpoilerNameToItemId();
+    const auto placed = names.find(receipt->itemName);
+    if (placed == names.end())
+        return -1;
+    RandoItemId resolved = Rando::ConvertItem(placed->second);
+    if (resolved == RI_JUNK)
+        resolved = RI_RUPEE_RED;
+    const auto found = Rando::StaticData::Items.find(resolved);
+    if (found == Rando::StaticData::Items.end() || resolved == RI_UNKNOWN || resolved == RI_NONE ||
+        resolved == RI_COMBO_FOREIGN)
+        return -1;
+    const auto& item = found->second;
+    const std::string& name = Rando::StaticData::GetItemDisplayName(resolved);
+    const std::string display = item.name && item.name[0] ? item.name : name;
+    if (name.empty() || name.size() >= sizeof(receipt->itemName) || display.empty() ||
+        display.size() >= sizeof(receipt->displayName))
+        return -1;
+    CwStartupReceipt ready = *receipt;
+    ready.getItemId = resolved;
+    ready.itemId = item.itemId;
+    ready.drawItemId = item.drawId;
+    // OoT's foreground adapter consumes its native ItemCategory numbering.
+    // Match ForeignCategoryFromName, including major disguised traps/fairies.
+    ready.category = 6;
+    if (resolved != RI_TRAP) {
+        switch (item.randoItemType) {
+            case RITYPE_JUNK:
+                ready.category = 0;
+                break;
+            case RITYPE_LESSER:
+                ready.category = 1;
+                break;
+            case RITYPE_HEALTH:
+                ready.category = 2;
+                break;
+            case RITYPE_BOSS_KEY:
+                ready.category = 3;
+                break;
+            case RITYPE_SMALL_KEY:
+                ready.category = 4;
+                break;
+            case RITYPE_SKULLTULA_TOKEN:
+                ready.category = 5;
+                break;
+            default:
+                break;
+        }
+    }
+    ready.importance = StartupImportance(item.randoItemType);
+    ready.dungeonInfo = resolved == RI_WOODFALL_MAP || resolved == RI_SNOWHEAD_MAP || resolved == RI_GREAT_BAY_MAP ||
+                        resolved == RI_STONE_TOWER_MAP || resolved == RI_WOODFALL_COMPASS ||
+                        resolved == RI_SNOWHEAD_COMPASS || resolved == RI_GREAT_BAY_COMPASS ||
+                        resolved == RI_STONE_TOWER_COMPASS;
+    ready.trap = resolved == RI_TRAP;
+    std::memset(ready.itemName, 0, sizeof(ready.itemName));
+    std::memcpy(ready.itemName, name.c_str(), name.size());
+    std::memset(ready.displayName, 0, sizeof(ready.displayName));
+    std::memcpy(ready.displayName, display.c_str(), display.size());
+    {
+        FleetSharedReceiveGuard receiveGuard;
+        Combo_MM_GiveDormantResolvedInternal(resolved, false);
+    }
+    ready.state = CW_STARTUP_READY;
+    *receipt = ready; // Award succeeded: set before ANY subsequent callback can throw.
+    // The launcher stages both native saves and commits them with READY, so
+    // the normal native-sharing fan-out is part of this same startup award.
+    FleetShared_OnNativeObtained(static_cast<int>(resolved));
+    // The launcher publishes READY under its mutex, then calls the READY path
+    // to capture MM's snapshot. No save callback observes an unpublished state.
+    return 1;
 }
 
 // Save-direct grant by spoiler name. Bracketed as a receive so the give choke does not share it back
@@ -5669,7 +5832,7 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
         case ComboRando::SF_BOMB_BAG:
             return CUR_UPG_VALUE(UPG_BOMB_BAG);
         case ComboRando::SF_BOMBCHU_BAG:
-            return INV_CONTENT(ITEM_BOMBCHU) != ITEM_NONE ? 1 : 0;
+            return RandoCapacity_HasIndependentBombchuBag() ? 1 : 0;
         case ComboRando::SF_MAGIC:
             return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
                                             gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired);
@@ -5725,8 +5888,10 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
             return;
         // SF_BOMBCHU_BAG has no RandoItemId (MM has no bombchu-bag item) — poke the save directly.
         if (family == ComboRando::SF_BOMBCHU_BAG) {
+            RandoCapacity_GrantBombchuBag();
             INV_CONTENT(ITEM_BOMBCHU) = ITEM_BOMBCHU;
-            AMMO(ITEM_BOMBCHU) = CUR_CAPACITY(UPG_BOMB_BAG);
+            if (AMMO(ITEM_BOMBCHU) < 20)
+                AMMO(ITEM_BOMBCHU) = 20;
             if (gSaveContext.fileNum != 0xFF)
                 SaveManager_SaveCurrentForCombo(); // persist dormant grants too (gPlayState is NULL then)
             if (MM_GetSharedTier(family) <= cur)

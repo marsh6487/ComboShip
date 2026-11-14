@@ -28,6 +28,10 @@ PREFIX = PREFIX.replace(
 PREFIX = PREFIX.replace(
     "void KaleidoScope_SetCursorVtx(PauseContext* pause, u16 index, Vtx* vertices) {}\n", ""
 )
+# These navigation cases contain no trade items. Trade normalization is a
+# controlled service here; unified_trade_slots runs the real normalizer with
+# this same production pause input boundary and native save structures.
+PREFIX += "\nvoid RitoMask_MigrateLegacy(void) {}\n"
 SETUP = CHECKS[:CHECKS.index("int main(")].replace("cursorVertices[4]", "cursorVertices[20]")
 
 CASES = r'''

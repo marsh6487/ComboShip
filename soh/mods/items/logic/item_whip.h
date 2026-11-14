@@ -12,41 +12,23 @@
 #include "z64.h"
 #include "../custom_items.h"
 
-// =============================================================================
-// States
-// =============================================================================
-#define WHIP_STATE_INACTIVE 0   // Not active
-#define WHIP_STATE_EQUIP 1      // Held, coiled rope visible in hand
-#define WHIP_STATE_EXTENDING 2  // Rope traveling forward
-#define WHIP_STATE_HIT_ENEMY 3  // Hit enemy, processing interaction
-#define WHIP_STATE_ATTACHED 4   // Attached to surface/actor, preparing swing
-#define WHIP_STATE_SWINGING 5   // Pendulum swing active
-#define WHIP_STATE_RETRACTING 6 // Rope returning to Link
-#define WHIP_STATE_LAUNCHED 7   // Post-release momentum coast (keeps whip active briefly)
-
-// =============================================================================
-// Range (matches longshot: 26 frames * 20.0f speed = 520 units)
-// =============================================================================
-#define WHIP_RANGE 520.0f
-#define WHIP_EXTEND_SPEED 20.0f
-#define WHIP_RETRACT_SPEED 25.0f
-#define WHIP_TIMER_MAX 26
+#include "item_whip_constants.h"
 
 // =============================================================================
 // Swing Physics
 // =============================================================================
-#define WHIP_GRAVITY 0.018f           // Angular acceleration from gravity
-#define WHIP_DAMPING 0.998f           // Angular velocity damping per frame
-#define WHIP_INPUT_FORCE 0.006f       // Stick input angular acceleration
-#define WHIP_MAX_ANGLE 1.2f           // Max swing angle radians (~69 deg)
-#define WHIP_RELEASE_BOOST 2.0f       // Velocity multiplier on release
-#define WHIP_ROPE_LENGTH_MIN 80.0f    // Min rope length for swing
-#define WHIP_ROPE_LENGTH_MAX 520.0f   // Max rope = range
-#define WHIP_FIXED_ROPE_LENGTH 136.0f // Fixed swing length = 2 adult Links (68 * 2)
-#define WHIP_MAX_RELEASE_SPEED 25.0f  // Max horizontal speed on swing release
-#define WHIP_MIN_LAUNCH_VY 1.0f       // Minimum upward velocity on release
-#define WHIP_A_RELEASE_VY_FRAC 0.25f  // A-release keeps forward momentum but only 1/4 of the vertical
-#define WHIP_SWING_BOUNCE 0.3f        // Velocity retention factor on angle clamp bounce
+#define WHIP_GRAVITY 0.018f             // Angular acceleration from gravity
+#define WHIP_DAMPING 0.998f             // Angular velocity damping per frame
+#define WHIP_INPUT_FORCE 0.006f         // Stick input angular acceleration
+#define WHIP_MAX_ANGLE 1.2f             // Max swing angle radians (~69 deg)
+#define WHIP_RELEASE_BOOST 2.0f         // Velocity multiplier on release
+#define WHIP_ROPE_LENGTH_MIN 80.0f      // Min rope length for swing
+#define WHIP_ROPE_LENGTH_MAX WHIP_RANGE // Max rope = range
+#define WHIP_FIXED_ROPE_LENGTH 136.0f   // Fixed swing length = 2 adult Links (68 * 2)
+#define WHIP_MAX_RELEASE_SPEED 25.0f    // Max horizontal speed on swing release
+#define WHIP_MIN_LAUNCH_VY 1.0f         // Minimum upward velocity on release
+#define WHIP_A_RELEASE_VY_FRAC 0.25f    // A-release keeps forward momentum but only 1/4 of the vertical
+#define WHIP_SWING_BOUNCE 0.3f          // Velocity retention factor on angle clamp bounce
 #define WHIP_YAW_TURN_RATE \
     1536                            // Swing-plane turn rate: s16 units/frame at full lateral stick
                                     // (~8.4 deg/frame). Steering the plane (not the absolute dir)
@@ -103,7 +85,7 @@
 // Rope Visual
 // =============================================================================
 #define WHIP_ROPE_SEGMENT 15.0f  // Units per segment
-#define WHIP_ROPE_MAX_SEGS 40    // Max visual segments
+#define WHIP_ROPE_MAX_SEGS 70    // Max visual segments
 #define WHIP_ROPE_SCALE 0.015f   // Segment model scale
 #define WHIP_COIL_SEGMENTS 6     // Segments for coiled equip visual
 #define WHIP_COIL_SCALE 0.008f   // Scale for coil segments

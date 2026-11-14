@@ -14,6 +14,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 from run_mm_scene_randomization_tests import function
+from foreign_gi_fixture_dependencies import startup_foreign_receipt_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -115,7 +116,7 @@ def main():
     bodies += 'template<class...T>void ComboSwordGi_ApplyEffectFit(T...) { assert(false); }\n'
     bodies += 'template<class...T>void ComboSwordGi_ApplyPresentationSize(T...) { assert(false); }\n'
     bodies += 'template<class...T>float ComboSwordGi_ParticleScale(T...) { assert(false); return 1.f; }\n'
-    bodies += dispatch + '\n'
+    bodies += startup_foreign_receipt_boundary(ROOT) + dispatch + '\n'
     source = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'
     with tempfile.TemporaryDirectory(prefix='fairy-bottle-test-') as temporary:
@@ -127,6 +128,9 @@ def main():
         if len(foreign_info) != 1:
             raise RuntimeError('Expected one owning foreign draw-info definition')
         (build / 'fairy_draw_info.inc').write_text(foreign_info[0] + '\n')
+        token_field = re.search(r'^    int32_t comboMarketReceipt;',
+                                (ROOT / 'soh/soh/Enhancements/item-tables/ItemTableTypes.h').read_text(), re.M)[0]
+        (build / 'fairy_receipt_field.inc').write_text(token_field + '\n')
         gbi = (ROOT / 'libultraship/include/libultraship/libultra/gbi.h').read_text()
         vertex_start = gbi.index('typedef struct {', gbi.index('Vertex (set up for use with colors)'))
         vertex_end = gbi.index('} Vtx;', vertex_start) + len('} Vtx;')

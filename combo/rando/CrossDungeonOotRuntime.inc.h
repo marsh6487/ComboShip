@@ -10,6 +10,8 @@ extern "C" int32_t Combo_SOH_GrottoScene(int32_t index);
 namespace ComboCrossOotRuntime {
 using namespace ComboRando::CrossDungeon;
 static RuntimeState state(0);
+static std::vector<Dungeon> trackerCatalogue;
+static uint64_t trackerRevision = 0;
 static std::optional<RuntimeState::Transition> pending;
 static bool departureFadeComplete = false;
 static std::optional<Endpoint> pendingBossRecovery;
@@ -118,6 +120,7 @@ static bool PrepareSwitch() {
     return true;
 }
 } // namespace ComboCrossOotRuntime
+#include "rando/CrossDungeonTracker.h"
 // Native Play keeps drawing its entrance effect until completion.
 extern "C" int Combo_SOH_CrossDungeonTransitionPending(void) {
     return ComboCrossOotRuntime::pending.has_value();
@@ -164,7 +167,13 @@ extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try 
                  (dungeon.deathCheckpoint && !ComboCrossOotRuntime::ValidEntrance(dungeon.deathCheckpoint->index))))
                 throw std::invalid_argument("unknown OoT boss source recovery entrance");
         }
+    std::vector<ComboRando::CrossDungeon::Dungeon> trackerCatalogue;
+    if (!routes.empty())
+        for (const auto& entry : seed.at("dungeons"))
+            trackerCatalogue.push_back(ComboRando::CrossDungeon::ParseDungeon(entry));
     ComboCrossOotRuntime::state.Install(seed);
+    ComboCrossOotRuntime::trackerCatalogue = std::move(trackerCatalogue);
+    ++ComboCrossOotRuntime::trackerRevision;
     SPDLOG_INFO("[EntranceTrace] oot-runtime-install routes={} checkpoint={:#x}", routes.size(),
                 ComboCrossOotRuntime::checkpoint.Saved());
     Combo_SOH_CancelCrossDungeonTransition();
@@ -177,6 +186,49 @@ extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try 
 }
 extern "C" COMBO_EXPORT int Combo_SOH_CrossDungeonRuntimeEnabled(void) {
     return Combo_IsCombinedGame() && ComboCrossOotRuntime::state.Enabled();
+}
+// Read-only tracker bridge. Indices stay logical, including synthetic grottos.
+extern "C" uint64_t Combo_SOH_TrackerSeedRevision(void) {
+    return ComboCrossOotRuntime::trackerRevision;
+}
+extern "C" int32_t Combo_SOH_TrackerSource(size_t ordinal) {
+    using namespace ComboCrossOotRuntime;
+    if (!Combo_IsCombinedGame() || !state.Enabled())
+        return -1;
+    for (const auto& portal : trackerCatalogue) {
+        if (portal.entrance.game != 0)
+            continue;
+        std::vector<Endpoint> sources = { portal.entrance };
+        if (portal.hasReverse)
+            sources.push_back(portal.exit);
+        sources.insert(sources.end(), portal.escapeExits.begin(), portal.escapeExits.end());
+        for (const auto source : sources) {
+            if (ordinal-- == 0)
+                return source.index;
+        }
+    }
+    return -1;
+}
+extern "C" int Combo_SOH_GetTrackerDestination(int32_t source, int32_t nativeOverride, int* game, int32_t* index,
+                                               const char** id, int* pool, int32_t* reverse, int* ingress) {
+    using namespace ComboCrossOotRuntime;
+    if (!Combo_IsCombinedGame() || !state.Enabled())
+        return 0;
+    const auto endpoint = ComposeTrackerDestination(state, true, { 0, source }, nativeOverride);
+    *game = endpoint.game;
+    *index = endpoint.index;
+    *id = nullptr;
+    *pool = -1;
+    *reverse = -1;
+    *ingress = 1;
+    if (const auto* portal = FindTrackerPortal(trackerCatalogue, endpoint)) {
+        *id = portal->id.c_str();
+        *ingress = endpoint == portal->entrance;
+        *pool = static_cast<int>(portal->pool);
+        if (endpoint == portal->entrance && portal->hasReverse)
+            *reverse = portal->exit.index;
+    }
+    return 1;
 }
 extern "C" int Combo_SOH_CrossBossEnabled(void) {
     return Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum <= 2 &&

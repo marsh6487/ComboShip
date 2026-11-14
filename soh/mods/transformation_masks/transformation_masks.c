@@ -77,7 +77,7 @@ extern void MmForm_DragonScaleExitSwim(Player* player);
 extern void MmMaskWear_Toggle(PlayState* play, Player* player, s32 itemId);
 extern void MmMaskWear_Draw(PlayState* play, Player* player);
 extern void MmMaskWear_Update(PlayState* play, Player* player);
-extern void MmMaskWear_FilterBlastA(PlayState* play, Player* player, Input* input);
+extern void MmMaskWear_FilterBlastB(PlayState* play, Player* player, Input* input);
 extern s32 MmMaskWear_GetCurrent(void);
 extern void MmMaskWear_Clear(void);
 extern void MmMaskWear_DeactivateChateauRomani(void);
@@ -322,6 +322,32 @@ u8 TransformMasks_TryPlayMmStepSfx(u16 ootStepSfxId, Vec3f* pos) {
     return 1;
 }
 
+u8 TransformMasks_TryPlayMmStepSfxWithSpeed(u16 ootStepSfxId, Vec3f* pos, f32 speed) {
+    if (MmForm_GetCurrentForm() != MM_PLAYER_FORM_DEKU) {
+        return TransformMasks_TryPlayMmStepSfx(ootStepSfxId, pos);
+    }
+    if (!MmSfx_IsAvailable()) {
+        return 0;
+    }
+
+    // Native MM Audio_SetSyncedSfxFreqAndVolume. The request queue retains
+    // these pointers after this call, just like MM's shared synced parameters.
+    static f32 sDekuStepFreq = 1.0f;
+    static f32 sDekuStepVolume = 1.0f;
+    if (speed > 6.0f) {
+        sDekuStepFreq = 1.1f;
+        sDekuStepVolume = 1.0f;
+    } else {
+        f32 ratio = speed / 6.0f;
+        sDekuStepFreq = (ratio * 0.2f) + 0.9f;
+        sDekuStepVolume = ratio * (1.0f - 0.775f) + 0.775f;
+    }
+
+    // Keep the existing floor slot, Deku bank and one-shot flag. Cadence is
+    // owned by Player_PlaySteppingSfx; jump and land keep their own entrypoints.
+    return MmSfx_PlayEx(ootStepSfxId + 0xF0, pos, 4, &sDekuStepFreq, &sDekuStepVolume, NULL) != 0;
+}
+
 u8 TransformMasks_HasSkeleton(void) {
     return MmForm_HasSkeleton();
 }
@@ -358,7 +384,7 @@ void TransformMasks_FilterB(Input* input) {
     if (input == NULL)
         return;
 
-    MmMaskWear_FilterBlastA(gPlayState, gPlayState != NULL ? GET_PLAYER(gPlayState) : NULL, input);
+    MmMaskWear_FilterBlastB(gPlayState, gPlayState != NULL ? GET_PLAYER(gPlayState) : NULL, input);
 
     // ── One rule for every form: while a message or the ocarina is up, NO form eats input ──
     // Those buttons belong to the textbox/ocarina — OoT suppresses its own item pipeline in
@@ -377,7 +403,7 @@ void TransformMasks_FilterB(Input* input) {
         return;
     }
 
-    // Blast Mask + Great Fairy Mask: B handled by MmMaskWear_Update on raw input.
+    // Blast Mask snapshots B above; Great Fairy Mask reads it in MmMaskWear_Update.
     s32 wornMask = MmMaskWear_GetCurrent();
     if (wornMask == ITEM_MM_MASK_BLAST || wornMask == ITEM_MM_MASK_GREAT_FAIRY) {
         input->cur.button &= ~BTN_B;

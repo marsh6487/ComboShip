@@ -129,8 +129,8 @@ typedef struct NeiSaveData {
     // MM adult trade-quest items (Skijer's NEI). Bitmask over a NEI trade index: 0-10 = the OoT items
     // (ITEM_POCKET_EGG..ITEM_CLAIM_CHECK), 11 = Moon's Tear, 12-15 = the four Title Deeds, 16 = Room Key,
     // 17 = Letter to Kafei, 18 = Special Delivery to Mama, 19 = Pendant of Memories. The 2D-grid wheel on
-    // SLOT_TRADE_ADULT shows every owned entry. The Pendant's bit is set alongside its combat ownership
-    // (extEquipOwnedBits, Ext Boots 2) — both flags on grant. See trade_items.c.
+    // 20-22 = Weird Egg, Chicken, Zelda's Letter. This is earned history; current availability
+    // also checks tradeAdultRevision. Pendant's permanent perk uses pendantOwned separately.
     uint32_t tradeAdultOwned;
     // Pictograph Box (Skijer's NEI). Stored in Majora's Mask's EXACT save layout so a 2Ship bridge
     // can consume it: pictoFlags0/1 are the 64 PICTO_VALID_* bits (set by Snap_SetFlag when a mapped
@@ -266,6 +266,11 @@ typedef struct NeiSaveData {
     // Local optional-reward milestones; bit 0 records a completed native
     // bowling prize, including its consumable prizes. Never shared as story.
     uint8_t vanillaRewardEvents;
+    // Current trade-copy availability, separate from earned/progression history.
+    // Even = available, odd = consumed; zero preserves legacy owned bits. Each
+    // real consume/reacquire advances the revision; peers merge by max so old
+    // ownership cannot resurrect a handed-in item. Append to preserve offsets.
+    uint32_t tradeAdultRevision[23];
 } NeiSaveData;
 
 #define RITO_FLAG_MASK_OWNED (1 << 0)

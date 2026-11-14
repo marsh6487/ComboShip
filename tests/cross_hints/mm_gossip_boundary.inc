@@ -30,21 +30,26 @@ u32 forcedRoll=0,lastSeed=0,lastTotal=0,drawCalls=0;
 void Ship_Random_Seed(u32 seed){lastSeed=seed;}
 u32 Ship_Random(u32 low,u32 high){++drawCalls;lastTotal=high;return low+forcedRoll%(high-low);}
 bool Ship_IsCStringEmpty(const char* value){return !value||!*value;}
+bool Combo_IsCombinedGame(){return true;}
 struct Reveal {int kind,index;std::string key,text;};
 std::vector<Reveal> reveals;
 void RevealSink(int,int kind,int index,const char* key,const char* text){reveals.push_back({kind,index,key,text});}
 void (*gMMComboHintReveal)(int,int,int,const char*,const char*)=RevealSink;
 namespace Rando {
 namespace StaticData {
-    struct Item {const char* name="unknown";const char* article="";RandoItemType randoItemType=RITYPE_JUNK;};
+    struct Item {const char* name="unknown";const char* article="";RandoItemType randoItemType=RITYPE_JUNK;u32 itemId=uint32_t(-1);};
     struct Check {RandoCheckType randoCheckType=RCTYPE_CHEST;};
     std::map<RandoItemId,Item> Items;
     std::map<RandoCheckId,Check> Checks;
     std::map<RandoCheckId,std::string> CheckNames;
+    std::map<RandoItemId,std::string> ItemDisplayNames;
+    std::map<RandoCheckId,std::string> locationNames;
     std::unordered_map<RandoItemId,std::vector<std::string>> fakeItemNames;
     std::string GetItemName(RandoItemId,bool=false,RandoCheckId=RC_UNKNOWN,bool=true);
     const std::string& GetCheckDisplayName(RandoCheckId id){return CheckNames[id];}
-    std::string GetLocationNameForHint(RandoCheckId,bool){return "in Fixture Native Area";}
+    const std::string& GetItemDisplayName(RandoItemId id){return ItemDisplayNames[id];}
+    // Native world-graph lookup is an input boundary; consumers and color encoding stay real.
+    std::string GetLocationNameForHint(RandoCheckId id,bool){auto it=locationNames.find(id);return it==locationNames.end()?"in Fixture Native Area":it->second;}
 }
 namespace MiscBehavior {
     uint64_t generation=1;
@@ -57,6 +62,8 @@ RandoItemId CurrentJunkItem(RandoCheckId){return RI_RUPEE_GREEN;}
 RandoItemId CurrentTrapItem(RandoCheckId){return RI_MASK_DEKU;}
 const char* ComboForeignLiveName(RandoCheckId){return nullptr;}
 RandoItemType GetItemTypeForCheck(RandoItemId,RandoCheckId=RC_UNKNOWN);
+RandoCheckId FindItemPlacement(RandoItemId);
+std::string GetItemLocationHintName(RandoItemId,bool);
 std::string GetHintLocationText(RandoItemId,RandoCheckId,bool){return "in Fixture Paid Area";}
 }
 namespace CustomMessage {
@@ -89,6 +96,7 @@ std::string VisibleHintWords(const std::string& text) {
 void Reset(const json& hints) {
     options={{RO_HINTS_GOSSIP_STONE_STRENGTH,50},{RO_HINTS_GOSSIP_STONES,1},{RO_HINTS_PURCHASEABLE,0},{RO_HINTS_MOON_GOSSIP_STONES,0}};
     Rando::StaticData::Checks.clear();Rando::StaticData::Items.clear();saveChecks.clear();
+    Rando::StaticData::CheckNames.clear();Rando::StaticData::ItemDisplayNames.clear();Rando::StaticData::locationNames.clear();
     auto add=[](RandoCheckId rc,RandoItemId ri,bool shuffled,bool obtained){Rando::StaticData::Checks[rc]={};saveChecks[rc]={ri,shuffled,obtained};Rando::StaticData::CheckNames[rc]="Fixture Native Check";};
     add(RC_ANCIENT_CASTLE_OF_IKANA_BOSS,RI_MASK_DEKU,true,false);
     add(RC_ANCIENT_CASTLE_OF_IKANA_PIECE_OF_HEART,RI_REMAINS_GOHT,true,true);
@@ -103,10 +111,72 @@ void Reset(const json& hints) {
     Rando::MiscBehavior::foreign={{RC_ASTRAL_OBSERVATORY_PASSAGE_CHEST,fi}};
     ComboRando::g_comboForeignJson=json{{"hints",hints}}.dump();++Rando::MiscBehavior::generation;
     player.talkActor=&stone.actor;stone.actor.params=1;stone.unk_195=0;
-    gSaveContext.rupeeAccumulator=0;gSaveContext.save.saveInfo.playerData.rupees=500;
+    gSaveContext.fileNum=0;gSaveContext.rupeeAccumulator=0;gSaveContext.save.saveInfo.playerData.rupees=500;
     drawCalls=0;forcedRoll=0;reveals.clear();
 }
+void CheckStaticFirstDrop(const json& hints) {
+    Reset(hints);
+    Rando::StaticData::Items[RI_MASK_TRUTH]={"Mask of Truth","the",RITYPE_MASK,ITEM_MASK_TRUTH};
+    Rando::StaticData::ItemDisplayNames[RI_MASK_TRUTH]="Mask of Truth";
+    options[RO_HINTS_MOON_GOSSIP_STONES]=1;stone.actor.params=ENGS_0;stone.unk_195=1;
+    const auto saved=ComboRando::g_comboForeignJson;
+    bool table=true;u16 id=0x20d4;
+    MoonMessage(&id,&table);
+    Check(!table&&CustomMessage::font.msg==
+          "They say \x02" "Mask of Truth\x00" " is hidden \x04" "at the first Stalfos drop (OOT)\x00..."s,
+          "static MM Moon hint must name the Stalfos source with green item/yellow source/white reset");
+    Check(CustomMessage::font.msg.find("Hyrule Field")==std::string::npos,
+          "static MM Moon hint exposed the first-drop tracker bucket as a physical source");
+    Check(reveals.size()==1&&reveals[0].kind==2&&reveals[0].key=="Mask of Truth"&&
+          reveals[0].text=="at the first Stalfos drop (OOT)",
+          "static MM first-drop reveal lost its item identity or plain enemy source");
+    Check(drawCalls==0&&ComboRando::g_comboForeignJson==saved,
+          "static MM first-drop presentation must not draw RNG or rewrite saved hints");
+
+    // A native placement takes precedence over stale foreign metadata for the same item.
+    const auto nativeCheck=RC_SWAMP_SPIDER_HOUSE_MASK_OF_TRUTH;
+    Rando::StaticData::Checks[nativeCheck]={RCTYPE_NPC};saveChecks[nativeCheck]={RI_MASK_TRUTH,true,false};
+    Rando::StaticData::CheckNames[nativeCheck]="Swamp Spider House Mask of Truth";
+    Rando::StaticData::locationNames[nativeCheck]="in Southern Swamp";
+    table=true;reveals.clear();MoonMessage(&id,&table);
+    Check(!table&&CustomMessage::font.msg==
+          "They say \x02" "Mask of Truth\x00" " is hidden \x04" "in Southern Swamp\x00..."s,
+          "static MM Moon hint lost native placement priority or native colors");
+    Check(reveals.size()==1&&reveals[0].kind==1&&reveals[0].key=="Swamp Spider House Mask of Truth",
+          "native Moon hint must reveal its local check rather than the foreign item map");
+    options[RO_HINTS_MOON_GOSSIP_STONES]=0;table=true;reveals.clear();CustomMessage::font.msg="unchanged";
+    MoonMessage(&id,&table);
+    Check(table&&reveals.empty()&&CustomMessage::font.msg=="unchanged",
+          "disabled Moon hints displayed or revealed a static first-drop hint");
+    std::cout<<"PASS native static MM lookup/Moon callback: generated Stalfos source, final green/yellow/white bytes, native priority and disabled control\n";
+}
+void CheckNewCheckColors() {
+    struct Case {RandoCheckId check;RandoCheckType type;RandoItemId item;const char* name;RandoItemType itemType;
+                 const char* location;std::string expected;};
+    const Case cases[]={
+        {RC_SNOWHEAD_TEMPLE_ICICLE_ENTRANCE_1,RCTYPE_ICICLE,RI_HOOKSHOT,"Hookshot",RITYPE_MAJOR,"in Snowhead Temple",
+         "They say \x02" "the Hookshot\x00" " is hidden \x04" "in Snowhead Temple\x00."s},
+        {RC_CLOCK_TOWN_WEST_LOTTERY_NIGHT_2,RCTYPE_NPC,RI_MASK_GORON,"Goron Mask",RITYPE_MASK,"in West Clock Town",
+         "They say \x02" "the Goron Mask\x00" " is hidden \x04" "in West Clock Town\x00."s},
+        {RC_DEKU_PALACE_SOIL_ITEM_1,RCTYPE_SOIL,RI_SOUL_NPC_KAFEI,"Kafei NPC Soul",RITYPE_MAJOR,"in Deku Palace",
+         "They say \x02" "the Kafei NPC Soul\x00" " is hidden \x04" "in Deku Palace\x00."s}
+    };
+    for(const auto& row:cases) {
+        Reset(json::object());Rando::StaticData::Checks.clear();saveChecks.clear();
+        Rando::StaticData::Checks[row.check]={row.type};saveChecks[row.check]={row.item,true,false};
+        Rando::StaticData::Items[row.item]={row.name,"the",row.itemType};
+        Rando::StaticData::CheckNames[row.check]="Selected new check";
+        Rando::StaticData::locationNames[row.check]=row.location;
+        u16 id=0x20d1;bool table=true;FirstMessage(&id,&table);
+        Check(!table&&CustomMessage::font.msg==row.expected,
+              "environment/lottery/soul gossip must display its actual item green and source yellow with white resets");
+        Check(reveals.size()==1&&reveals[0].kind==1&&reveals[0].key=="Selected new check",
+              "new check gossip revealed the wrong selected check");
+    }
+    std::cout<<"PASS native MM environmental/lottery/soul gossip: actual item names and final green/yellow/white bytes\n";
+}
 json Run(const json& hints) {
+    CheckNewCheckColors();
     const json weighted={{"mm",{{"gossipPool",json::array({{{"weight",1},{"text","One-weight rumor"}},
                                                            {{"weight",3},{"text","Three-weight rumor"}}})},
                                 {"itemLocations",{{"Fixture Mask","in OOT Fixture Area (OOT)"}}}}}};

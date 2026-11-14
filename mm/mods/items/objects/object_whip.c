@@ -24,7 +24,7 @@
 
 // Visual constants
 #define WHIP_BODY_SEGMENT 15.0f // World units per body segment
-#define WHIP_BODY_MAX_SEGS 40
+#define WHIP_BODY_MAX_SEGS 70
 #define WHIP_BODY_SCALE 0.015f  // Body segment render scale
 #define WHIP_HEAD_SCALE 0.022f  // Snake head render scale
 #define WHIP_TAIL_SCALE 0.018f  // Tail crystal render scale

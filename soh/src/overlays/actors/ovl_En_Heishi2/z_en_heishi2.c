@@ -7,6 +7,7 @@
 
 #include "vt.h"
 #include "z_en_heishi2.h"
+#include "mods/extended_inventory.h"
 extern int Randomizer_RustyCastleGateEnabled(PlayState* play);
 extern int Randomizer_RustyCastleGateLocked(PlayState* play);
 #include "objects/object_sd/object_sd.h"
@@ -566,6 +567,7 @@ void func_80A53F30(EnHeishi2* this, PlayState* play) {
 void func_80A54038(EnHeishi2* this, PlayState* play) {
     SkelAnime_Update(&this->skelAnime);
     if ((Message_GetState(&play->msgCtx) == TEXT_STATE_EVENT) && Message_ShouldAdvance(play)) {
+        TradeAdult_ConsumeItem(ITEM_LETTER_ZELDA);
         Flags_SetInfTable(INFTABLE_SHOWED_ZELDAS_LETTER_TO_GATE_GUARD);
         Message_CloseTextbox(play);
         Player_SetCsActionWithHaltedActors(play, 0, 7);

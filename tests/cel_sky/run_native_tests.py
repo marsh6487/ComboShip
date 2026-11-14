@@ -40,5 +40,5 @@ with tempfile.TemporaryDirectory(prefix='cel-native-') as temporary:
   cpp=build/(name+'.cpp')
   cpp.write_text((ROOT/'tests/cel_sky'/(name+'_test.cpp')).read_text().replace('/* '+marker+' */',production).replace('/* NATIVE_FAIRY_UPDATE */',fairy_update).replace('/* PRODUCTION_UI_DRAW_SCOPE */',ui_scope))
   binary=build/name
-  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable',*flags,'-I'+str(ROOT/'libultraship/include'),str(cpp),'-o',str(binary)],check=True)
+  subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable',*flags,'-I'+str(ROOT),'-I'+str(ROOT/'libultraship/include'),str(cpp),'-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)

@@ -1555,8 +1555,9 @@ byte-identical or headless seeds stop reproducing in-game ones.
 **Forced settings.** `Context::FinalizeSettings` (`#ifdef COMBO_BUILD`, reading `gComboStartingGameMM`)
 forces, when the resolved start is MM:
 
-- `RSK_STARTING_AGE` → Child. The Clock Tower door lands the player outside the Happy Mask Shop, and a
-  child there can always walk back in.
+- `RSK_STARTING_AGE` → Child. The Clock Tower door lands the player outside the Happy Mask Shop.
+  Its daytime requirement is also enforced by the portal-prerequisite proof below when Clock shuffle
+  holds OoT at night.
 - `RSK_FOREST` Closed → Closed Deku (Closed Deku / Open untouched), so an itemless child who saved and
   quit in OOT can always leave the forest and reach the Market.
 - `RSK_EXCLUDE_MASK_SHOP_KEY` ON when Lock Overworld Doors is on, and `RSK_EXCLUDE_MASK_SHOP_ENTRANCE`
@@ -1594,6 +1595,61 @@ keeping the seed escapable is generation's job, not the hint layer's.
 
 **Residual:** NO_LOGIC + MM start has no re-entry guarantee — that mode's point. No MM-side setter
 exists (nothing in MM reads the value); add one when a consumer appears.
+
+### MM-start return proof with cross-game entrance shuffle (2026-11-12)
+
+Cross entrance access uses a joint native search rather than the ordinary portal bootstrap. That
+choice must not disable the MM-start re-entry guarantee. `CrossWorldCombinedFill` now keeps the
+bootstrap gate separate from the requirement to prove the portal for a logical MM start. Both the
+prerequisite placement and final check apply when cross entrance oracles are active. A missing
+required portal export fails before filling.
+
+The return probe starts from OoT with MM's overworld closed. It follows real shuffled foreign
+arrivals, credits only placements at reached checks, and applies the existing shared-item views.
+`QueryJoint` reports native OoT portal reachability independently from whether MM's overworld was
+initially rooted. Reaching a foreign room or the Magic Mirror stump does not grant all of Termina.
+This makes an early Clock a required witness when it is needed to reopen the shop at a night start;
+a Clock available only through the freely rooted MM world cannot certify the return path.
+
+Ordinary OoT-start cross topology and the No Logic exception remain as before. This is a generation
+safeguard: loading an existing seed preserves its exact items, entrances, Clock ownership and time.
+The change adds no authored-bridge or Song of Time reset edge to the solver. The production fill
+regression lives in `tests/cross_dungeon/clock_return_test.cpp`.
+
+### Clock pickup tutorial in either game (2026-11-12)
+
+The passive OoT Clock has a shared English, German and French pickup tutorial in
+`ComboToolReceiptText.h`. It names Hyrule explicitly, explains that time resumes automatically,
+and points to Hyrule Field as a place to wait for day or night. This does not describe MM's separate
+half-day Clock items. Native OoT, native MM and foreign MM receipt paths use the same authored
+text, including an MM-first pickup when the OoT donor is not loaded.
+
+The OoT catalogue registers the Clock with `ITEM_NONE` because it has no custom pickup icon.
+`BuildCustomItemMessage` treats that value as an iconless receipt and calls the no-argument
+formatter; it must not encode `ITEM_NONE` as an item-icon operand or use a stale custom texture.
+This change affects receipt text only, not time progression, ownership or reachability.
+
+### Entrance tracker follows the composed destination (2026-11-12)
+
+The OoT tracker resolves the same single transition as the runtime: a BeforeNative route of the
+physical source wins; otherwise native shuffle runs once and an AfterNative route runs once. The
+result remains a game-qualified logical endpoint. It is not recursively fed through another route
+or materialized into a temporary cross-game handoff entrance. For the reported seed this displays
+Ice Cavern's physical entrance as Fire Temple, not the intermediate native GTG destination.
+
+`CrossDungeonTracker.h` supplies the pure composition helper. The OoT host exposes read-only route
+and catalogue metadata; viewing the tracker cannot queue an arrival or own a return checkpoint.
+Destination labels, search tags, groups and sort order use that metadata. MM destinations have a
+separate area group and game-qualified names; unknown metadata gets a safe fallback. Cross-only
+sources missing from native shuffle are added as tracker-owned identity rows, bounded by the
+existing array capacity, without rewriting native overrides. Counts and offsets support that full
+capacity. The installed seed revision refreshes derived rows before drawing the next frame.
+
+Discovery checks remain keyed to the physical source, with the existing reveal controls. Old
+discovery flags are not migrated, and runtime-disabled/solo tracking retains native sort behavior.
+`tracker_destination_test.cpp` checks routing phases and purity; `tracker_behavior_test.py` executes
+the production host bridge and UI metadata, grouping, sort and row construction boundaries. These
+fixtures do not establish configured on-screen gameplay acceptance.
 
 ## Combo-owned unified Hint Tracker (#164) (2026-08-20)
 

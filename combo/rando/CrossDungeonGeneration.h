@@ -24,6 +24,119 @@ inline std::vector<std::string> StructuralOwned(const nlohmann::json& dump) {
     return owned;
 }
 
+// Forced checks are granted at save creation. Reserve copies already represented by the
+// free pool or movable native placements; native Pocket rewards can instead be omitted
+// from both sources. A category-only force draws from that same inventory during fill.
+inline void AddStructuralForcedItems(const nlohmann::json& dump, const std::string& forcedJson,
+                                     std::vector<std::string>& owned) {
+    if (forcedJson.empty())
+        return;
+    const auto forced = nlohmann::json::parse(forcedJson);
+    if (!forced.is_object())
+        throw std::invalid_argument("invalid structural forced-placement object");
+    std::unordered_map<std::string, size_t> available;
+    std::unordered_set<std::string> known;
+    for (const auto& name : owned) {
+        ++available[name];
+        known.insert(name);
+    }
+    for (const auto& item : dump.value("items", nlohmann::json::array()))
+        known.insert(item.at("name").get<std::string>());
+    for (const auto& item : dump.value("fixed", nlohmann::json::array()))
+        known.insert(item.at("item").get<std::string>());
+    for (const auto& [check, spec] : forced.items()) {
+        if (!spec.is_object())
+            throw std::invalid_argument("invalid structural forced placement at " + check);
+        if (!spec.contains("item"))
+            continue;
+        const auto name = spec.at("item").get<std::string>();
+        if (name.empty() || !known.count(name))
+            throw std::invalid_argument("unknown native structural forced item at " + check + ": " + name);
+        if (available[name])
+            --available[name];
+        else
+            owned.push_back(name);
+    }
+}
+
+// startKnown stores check identities, not item values. Resolve those identities from
+// the recorded placements, including foreign ownership; never roll another Pocket.
+// Older consolidated spoilers omit startKnown but retain the native Pocket placement.
+inline nlohmann::json RecordedForcedOot(const nlohmann::json& spoiler) {
+    auto forced = nlohmann::json::object();
+    const auto oot = spoiler.value("oot", nlohmann::json::object());
+    const auto placements = oot.contains("placements") ? oot.at("placements") : oot;
+    if (!placements.is_object())
+        throw std::invalid_argument("invalid recorded OOT placement object");
+    const auto foreign = spoiler.value("foreign", nlohmann::json::array());
+    if (!foreign.is_array())
+        throw std::invalid_argument("invalid recorded foreign-placement array");
+    const auto add = [&](const std::string& game, const std::string& check) {
+        if (game != "oot")
+            throw std::invalid_argument("unsupported recorded forced check game: " + game);
+        if (check.empty() || !placements.contains(check) || !placements.at(check).is_string())
+            throw std::invalid_argument("missing recorded forced placement at " + check);
+        auto item = placements.at(check).get<std::string>();
+        std::string owner = "oot";
+        bool foreignFound = false;
+        for (const auto& entry : foreign) {
+            if (entry.value("checkGame", std::string()) != game || entry.value("checkName", std::string()) != check)
+                continue;
+            if (foreignFound)
+                throw std::invalid_argument("duplicate recorded foreign placement at " + check);
+            foreignFound = true;
+            owner = entry.at("itemGame").get<std::string>();
+            item = entry.at("itemName").get<std::string>();
+        }
+        if (owner != "oot" || (!foreignFound && item.size() >= 5 && item.substr(item.size() - 5) == " (MM)"))
+            throw std::invalid_argument("recorded forced item is not native OOT at " + check);
+        item = StripGameSuffix(std::move(item));
+        if (item.empty())
+            throw std::invalid_argument("empty recorded forced item at " + check);
+        forced[check] = { { "item", item } };
+    };
+    if (spoiler.contains("startKnown")) {
+        if (!spoiler.at("startKnown").is_array())
+            throw std::invalid_argument("invalid recorded startKnown array");
+        for (const auto& entry : spoiler.at("startKnown"))
+            add(entry.at("checkGame").get<std::string>(), entry.at("checkName").get<std::string>());
+    } else if (placements.contains("Link's Pocket")) {
+        add("oot", "Link's Pocket");
+    }
+    return forced;
+}
+
+// Regenerating the native dump can remove its chosen Pocket from the pool. If that
+// concrete choice differs from the recorded start, the dump no longer describes the
+// saved seed's supply. Reject instead of silently adding one reward and losing another.
+inline void ValidateRecordedForcedOot(const std::string& nativeJson, const nlohmann::json& recorded,
+                                      const std::string& ootDump) {
+    const auto native = nativeJson.empty() ? nlohmann::json::object() : nlohmann::json::parse(nativeJson);
+    if (!native.is_object() || !recorded.is_object() || native.size() != recorded.size())
+        throw std::invalid_argument("recorded forced placements differ from the prepared native pool");
+    const auto dump = nlohmann::json::parse(ootDump);
+    std::vector<std::pair<std::string, bool>> sources;
+    for (const auto& item : dump.at("pool"))
+        sources.emplace_back(item.at("name").get<std::string>(), item.value("advancement", true));
+    for (const auto& item : dump.value("fixed", nlohmann::json::array()))
+        if (item.contains("allowedChecks"))
+            sources.emplace_back(item.at("item").get<std::string>(), item.value("advancement", true));
+    for (const auto& [check, spec] : native.items()) {
+        if (!spec.is_object() || !recorded.contains(check) || !recorded.at(check).contains("item") ||
+            (spec.contains("item") && spec.at("item") != recorded.at(check).at("item")))
+            throw std::invalid_argument("recorded forced placement differs from the prepared native pool at " + check);
+        const auto item = recorded.at(check).at("item").get<std::string>();
+        const auto category = spec.value("category", std::string("any"));
+        const auto source = std::find_if(sources.begin(), sources.end(), [&](const auto& source) {
+            return source.first == item && (spec.contains("item") || category == "any" || source.second);
+        });
+        if (!spec.contains("item") && ((category != "any" && category != "advancement") || source == sources.end()))
+            throw std::invalid_argument("recorded forced category item is absent from the native pool at " + check);
+        if (source != sources.end())
+            sources.erase(source);
+    }
+}
+
 inline std::unordered_set<std::string> StructuralQuery(const OracleFns& oracle, const std::vector<std::string>& owned) {
     if (!oracle.Reset || !oracle.SetOwnedItems || !oracle.GetReachableChecks)
         throw std::runtime_error("cross-dungeon structural oracle exports missing");
@@ -49,7 +162,7 @@ struct StructureProbe {
     const ComboGenProgress* progress = nullptr;
 
     StructureProbe(const std::string& ootDump, const std::string& mmDump, const OracleFns& oot, const OracleFns& mm,
-                   bool mmStart, const ComboGenProgress* progress = nullptr)
+                   bool mmStart, const ComboGenProgress* progress = nullptr, const std::string& forcedOotJson = "")
         : progress(progress) {
         const auto od = nlohmann::json::parse(ootDump), md = nlohmann::json::parse(mmDump);
         ootOwned = StructuralOwned(od);
@@ -61,6 +174,7 @@ struct StructureProbe {
             for (const auto& entry : dump->value("fixed", nlohmann::json::array()))
                 if (entry.contains("allowedChecks"))
                     owned->push_back(entry.at("item").get<std::string>());
+        AddStructuralForcedItems(od, forcedOotJson, ootOwned);
         auto fixed = [](const nlohmann::json& dump) {
             std::vector<Fixed> placements;
             for (const auto& entry : dump.value("fixed", nlohmann::json::array()))
@@ -206,7 +320,8 @@ std::optional<nlohmann::json> GenerateConstrainedSeed(const std::vector<Dungeon>
 inline nlohmann::json GenerateValidatedSeed(Coordinator& coordinator, bool enabled, uint64_t masterSeed,
                                             const std::string& ootDump, const std::string& mmDump, OracleFns& oot,
                                             OracleFns& mm, bool mmStart, size_t maxAttempts = kStructuralLayoutAttempts,
-                                            const ComboGenProgress* progress = nullptr) {
+                                            const ComboGenProgress* progress = nullptr,
+                                            const std::string& forcedOotJson = "") {
     CheckStructuralCancellation(progress);
     if (!enabled) {
         auto seed = coordinator.GenerateAndInstall(false, masterSeed);
@@ -218,7 +333,7 @@ inline nlohmann::json GenerateValidatedSeed(Coordinator& coordinator, bool enabl
         const auto dungeons = coordinator.Catalogue();
         coordinator.InstallLogic(nullptr);
         coordinator.ConfigureOracles(oot, mm);
-        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart, progress);
+        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart, progress, forcedOotJson);
         std::string missing;
         for (size_t attempt = 0; attempt < maxAttempts; ++attempt) {
             const uint64_t layoutSeed = masterSeed + static_cast<uint64_t>(attempt) * 0x9E3779B97F4A7C15ULL;
@@ -263,7 +378,8 @@ inline nlohmann::json GenerateValidatedSeed(Coordinator& coordinator, bool enabl
 
 // Replay is an exact-map operation: never replace an incompatible recorded layout with a new roll.
 inline void ValidateSavedStructure(Coordinator& coordinator, const nlohmann::json& seed, const std::string& ootDump,
-                                   const std::string& mmDump, OracleFns& oot, OracleFns& mm, bool mmStart) {
+                                   const std::string& mmDump, OracleFns& oot, OracleFns& mm, bool mmStart,
+                                   const std::string& forcedOotJson = "") {
     if (!Coordinator::Enabled(seed)) {
         coordinator.InstallLogic(seed);
         coordinator.ConfigureOracles(oot, mm);
@@ -274,7 +390,7 @@ inline void ValidateSavedStructure(Coordinator& coordinator, const nlohmann::jso
         coordinator.ValidateCatalogue(seed);
         coordinator.InstallLogic(nullptr);
         coordinator.ConfigureOracles(oot, mm);
-        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart);
+        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart, nullptr, forcedOotJson);
         coordinator.InstallLogic(seed, false);
         coordinator.ConfigureOracles(oot, mm);
         const auto missing = probe.Missing(oot, mm);

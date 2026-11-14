@@ -38,7 +38,12 @@ player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").r
 cleanup_signatures = ["BAD_RETURN(s32) Player_ZeroSpeedXZ(Player* this) {", "void Player_ApplyYawFromAnim(",
                       "void Player_ResetAnimMovement(", "void Player_FinishAnimMovement(",
                       "s32 Player_SetupAction(", "void func_8083C0E8(Player* this, PlayState* play) {"]
-cleanup = "\n".join(block_from(player_source, player_source.index(s)) for s in cleanup_signatures)
+# Native action changes also own Din cancellation state. Door fixtures keep
+# the exact inactive initializers and fail if they enter the spell boundary.
+cleanup = "\n".join(re.search(r"^static [^\n;]*\b" + name + r" = [^\n;]+;",
+                              player_source, re.M)[0] for name in
+                    ("sDinsFireRemakeAudioHandle", "sDinsFireRemakePendingMagic"))
+cleanup += "\n" + "\n".join(block_from(player_source, player_source.index(s)) for s in cleanup_signatures)
 fixture = fixture.replace("/* NATIVE_DOOR_CLEANUP */", re.sub(r"\bthis\b", "current", cleanup))
 hook_signature = "                    s32 marketDoor = ComboBlackMarketOot_TryDoorEntrance("
 start = player_source.index(hook_signature)
