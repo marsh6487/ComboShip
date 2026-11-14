@@ -2280,5 +2280,12 @@
     "origin": "gate",
     "name": "RPG magic frozen supply, exact MM oracle capacity and replay",
     "run": "python3 -B scripts/diagnostics/run_combo_rpg_magic_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "OoT solver inventory isolation and progression lock rejection",
+    "run": "python3 -B tests/oot_solver_inventory/run_tests.py --sanitize"
   }
 ]
