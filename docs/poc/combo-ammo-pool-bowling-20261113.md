@@ -142,6 +142,16 @@ canary retains all original wallet/sphere controls under five frozen-rule cases;
 its adjacent RPG magic suite also passes. Independent reviews and focused reruns
 found no weakened assertions or remaining repair blocker.
 
+The strict environmental catalog audit also exposed eight stale icicle
+expectations for the former boolean magic rule. Only those expected conditions
+were aligned with the actual two-unit Goron startup gate; identities, regions,
+donor metadata and the strict audit are unchanged. Five environmental gate
+commands pass locally. A bounded native RPG probe passes 208 comparisons across
+the eight actual CHECK bodies at capacities zero, one and two, with native magic,
+Cape, spent-magic and missing-mask controls. The full environmental native
+sanitizer gate requires real SDL2 headers absent locally and remains a hosted
+check; unrelated SDL stubs were not used.
+
 One optional unchanged receipt-catalog probe reached a local OoT/MM enum include
 conflict after thin asset headers were supplied. It has no baseline reproduction
 or production-defect conclusion; its source is unchanged and the hosted full

@@ -9,6 +9,31 @@ static void TestAllNativeEnvironmentRules(){
  reset();REQUIRE(!rules.at(RC_DEKU_PALACE_RED_BOULDER_1).first());INV_CONTENT(ITEM_MASK_GORON)=ITEM_MASK_GORON;REQUIRE(rules.at(RC_DEKU_PALACE_RED_BOULDER_1).first());REQUIRE(!rules.at(RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_1).first());RANDO_EVENTS[RE_CLEARED_SNOWHEAD_TEMPLE]=true;REQUIRE(rules.at(RC_MOUNTAIN_VILLAGE_SPRING_RED_BOULDER_1).first());
  reset();REQUIRE(!rules.at(RC_SECRET_SHRINE_SOIL_ITEM_1).first());INV_CONTENT(ITEM_BOTTLE)=ITEM_BOTTLE;REQUIRE(!rules.at(RC_SECRET_SHRINE_SOIL_ITEM_1).first());RANDO_EVENTS[RE_ACCESS_BUGS]=true;REQUIRE(rules.at(RC_SECRET_SHRINE_SOIL_ITEM_1).first());RANDO_EVENTS[RE_ACCESS_BUGS]=false;REQUIRE(!rules.at(RC_SECRET_SHRINE_SOIL_ITEM_1).first());
  reset();INV_CONTENT(ITEM_BOW)=ITEM_BOW;REQUIRE(!rules.at(RC_MOON_TRIAL_GORON_ICICLE_1).first());INV_CONTENT(ITEM_MASK_GORON)=ITEM_MASK_GORON;gSaveContext.save.saveInfo.playerData.isMagicAcquired=true;REQUIRE(rules.at(RC_MOON_TRIAL_GORON_ICICLE_1).first());
+ // All eight source CHECKs require the native two-unit Goron spike start.
+ // Cape does not lower that precheck; spent magic does not remove capacity.
+ const RandoCheckId spikeRollChecks[]={
+  RC_MOON_TRIAL_GORON_ICICLE_1,RC_MOON_TRIAL_GORON_ICICLE_2,
+  RC_MOON_TRIAL_GORON_ICICLE_3,RC_MOON_TRIAL_GORON_ICICLE_4,
+  RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_1,
+  RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_2,
+  RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_3,
+  RC_SNOWHEAD_TEMPLE_ICICLE_CENTRAL_ROOM_NEAR_BOSS_4,
+ };
+ for(auto check:spikeRollChecks)REQUIRE(rules.at(check).first()); // ordinary native magic
+ for(bool cape:{false,true})for(int capacity:{0,1,2})for(int remaining:{0,capacity}) {
+  reset();INV_CONTENT(ITEM_BOW)=ITEM_BOW;INV_CONTENT(ITEM_MASK_GORON)=ITEM_MASK_GORON;
+  auto& player=gSaveContext.save.saveInfo.playerData;
+  auto& nei=gSaveContext.save.shipSaveInfo.nei;
+  auto& magic=nei.comboRpg;
+  magic.knownMask=magic.enabledMask=1<<COMBO_RPG_MAGIC;
+  magic.required[COMBO_RPG_MAGIC]=100;magic.magicTotal=100;
+  magic.level[COMBO_RPG_MAGIC]=capacity;
+  player.isMagicAcquired=capacity>0;player.magic=remaining;nei.capeOwned=cape;
+  if(capacity>0)REQUIRE(ComboRpgState_MagicCapacity(&magic,MAGIC_NORMAL_METER)==capacity);
+  for(auto check:spikeRollChecks)REQUIRE(rules.at(check).first()==(capacity>=2));
+  INV_CONTENT(ITEM_MASK_GORON)=ITEM_NONE;
+  for(auto check:spikeRollChecks)REQUIRE(!rules.at(check).first());
+ }
  reset();INV_CONTENT(ITEM_BOW)=ITEM_BOW;REQUIRE(!rules.at(RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_1).first());INV_CONTENT(ITEM_ARROW_ICE)=ITEM_ARROW_ICE;gSaveContext.save.saveInfo.playerData.isMagicAcquired=true;REQUIRE(rules.at(RC_GREAT_BAY_TEMPLE_ICICLE_COMPASS_ROOM_1).first());
  // The native C/table suite proves all nine ordinary form/mask routes to
  // Human. Check the consequence against EVERY real CHECK, with actual native
