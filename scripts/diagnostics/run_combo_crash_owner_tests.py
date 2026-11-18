@@ -11,9 +11,9 @@ sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_mm_nei_tests import flags
 
 
-def resume_body(path, name):
+def function_body(path, signature):
     source = (ROOT / path).read_text(encoding="utf-8-sig")
-    start = source.index('extern "C" COMBO_EXPORT void ' + name + '(')
+    start = source.index(signature)
     brace = source.index('{', start)
     depth = 1
     end = brace + 1
@@ -60,12 +60,16 @@ static int sMMResourceManager, gComboStartFileNum, gComboReturnFileNum;
 static bool sComboResetPending;
 static struct { int fileNum; } gSaveContext = { 2 };
 static int mmLoops, ootLoops, exitCalls, exitedSlot = -1;
+static s32 gHorseIsMounted, D_801BDAA0, gHorsePlayedEponasSong;
 void GameInteractor_ExecuteOnExitGame(int slot) {
     assert(activeCallback == CrashHandler_PrintSohData);
     ++exitCalls;
     exitedSlot = slot;
 }
-void OTRAudio_Init() { assert(activeCallback == CrashHandler_PrintExt); }
+void OTRAudio_Init() {
+    assert(activeCallback == CrashHandler_PrintExt);
+    assert(!gHorseIsMounted && !D_801BDAA0 && !gHorsePlayedEponasSong);
+}
 void MM_ResetSystemHeapForResume() {}
 void MM_ResetFrameLoopForResume() {}
 void SOH_ResetFrameLoopForResume() {}
@@ -81,11 +85,13 @@ def main():
         source = Path(td) / "owner.cpp"
         binary = Path(td) / "owner"
         source.write_text(HARNESS + "\n" +
-                          resume_body("mm/2s2h/BenPort.cpp", "MM_ResumeGame") + "\n" +
-                          resume_body("soh/soh/OTRGlobals.cpp", "SOH_ResumeGame") + r'''
+                          function_body("mm/src/code/z_horse.c", "void Horse_ResetMountState(") + "\n" +
+                          function_body("mm/2s2h/BenPort.cpp", 'extern "C" COMBO_EXPORT void MM_ResumeGame(') + "\n" +
+                          function_body("soh/soh/OTRGlobals.cpp", 'extern "C" COMBO_EXPORT void SOH_ResumeGame(') + r'''
 int main() {
     activeCallback = CrashHandler_PrintSohData;
     for (int i = 0; i < 4; ++i) {
+        gHorseIsMounted = D_801BDAA0 = gHorsePlayedEponasSong = true;
         MM_ResumeGame(i);
         assert(gComboStartFileNum == i);
         SOH_ResumeGame();

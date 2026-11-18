@@ -104,6 +104,9 @@ u8 PakLoader_HasActiveModel(void) {
 u8 PakLoader_HasActiveBodyModel(void) {
     return pakBodyModel;
 }
+const char* PakLoader_GetSeasonalSkeletonPath(void) {
+    return nullptr;
+}
 u8 O2rLoader_HasActiveModel(void) {
     return o2rModel;
 }

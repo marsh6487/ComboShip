@@ -2,12 +2,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 #include "glass_commands.h"
+#include "combo/actors/ComboOwlEffects.h"
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemDrawABI.h"
@@ -37,6 +39,10 @@ struct PlayState {
     MtxF billboardMtxF;
 };
 #include "combo/menu/ComboCollectibleShimmerDraw.h"
+extern "C" void ComboOwl_DrawEffects(PlayState*, const char*) {
+    std::fputs("fairy fixture unexpectedly dispatched owl effects\n", stderr);
+    std::abort();
+}
 extern "C" void OOT_SampleCollectibleShimmerColor(int32_t, uint8_t[4]) {
     assert(false && "fairy fixture unexpectedly sampled collectible colors");
 }

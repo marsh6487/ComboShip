@@ -33,6 +33,7 @@ using u8 = unsigned char;
 struct Player {};
 struct Save { u8 pendantOwned = 1; u8 pendantEffectOff = 0; } save;
 static u8 selected, otherForm, mario, pakBody, o2rBody, beetle, kite, trident, customAction;
+static const char* seasonalSkeleton;
 constexpr int CUSTOM_FORM_NONE = 0;
 Save* Nei_Save() { return &save; }
 u8 ExtEquip_PendantOwned() { return save.pendantOwned; }
@@ -41,6 +42,7 @@ int CustomForms_ActiveForm() { return otherForm; }
 u8 Sm64Mario_IsActive() { return mario; }
 int CVarGetInteger(const char*, int) { return 0; }
 u8 PakLoader_HasActiveBodyModel() { return pakBody; }
+const char* PakLoader_GetSeasonalSkeletonPath() { return seasonalSkeleton; }
 u8 O2rLoader_HasActiveModel() { return o2rBody; }
 u8 Beetle_IsFlying() { return beetle; }
 u8 KiteSurf_IsActive() { return kite; }
@@ -73,7 +75,15 @@ int main() {
         check(OwnerRejection(&player) != nullptr, "active body/tool actions must retain ownership");
         *owner = 0;
     }
-    std::puts("PASS MM Wolf equipment activation, moveset suspension and saved-toggle restoration");
+    pakBody = 1;
+    seasonalSkeleton = "__OTR__objects/object_link_child/gLinkChildSkel";
+    check(OwnerRejection(&player) == nullptr, "installed seasonal outfit must allow Wolf activation");
+    for (u8* owner : { &otherForm, &mario, &o2rBody, &beetle, &kite, &trident, &customAction }) {
+        *owner = 1;
+        check(OwnerRejection(&player) != nullptr, "seasonal outfit must preserve other body/tool ownership");
+        *owner = 0;
+    }
+    std::puts("PASS MM Wolf equipment activation, moveset suspension, saved toggles and seasonal ownership");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='wolf-equipment-') as directory:
