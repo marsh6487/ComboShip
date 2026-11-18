@@ -13,7 +13,7 @@ from run_mm_nei_tests import flags
 
 source = (ROOT / 'mm/mods/pak_loader/pak_loader.cpp').read_text()
 def body(name):
-    match = re.search(r'^(?:extern "C" |static inline )?(?:u8|s32) ' + name + r'\(void\) \{.*?^}',
+    match = re.search(r'^(?:extern "C" |static (?:inline )?)?(?:bool|u8|s32) ' + name + r'\(void\) \{.*?^}',
                       source, re.M | re.S)
     return match[0] if match else None
 start = source.index('struct PakModel {')
@@ -25,9 +25,14 @@ if owner is None:
 
 with tempfile.TemporaryDirectory(prefix='mm-wolf-owner-') as temporary:
     build = Path(temporary)
-    (build / 'pak-owner.inc').write_text(source[start:end] + '\n' +
-                                       body('sGetActiveIndex') + '\n' +
-                                       body('PakLoader_HasActiveModel') + '\n' + owner)
+    (build / 'pak-owner.inc').write_text('\n'.join([
+        source[start:end],
+        body('PakLoader_IsRemoteRenderActive'),
+        body('sBodySelectionEnabled'),
+        body('sGetActiveIndex'),
+        body('PakLoader_HasActiveModel'),
+        owner,
+    ]))
     binary = build / 'owner'
     result = subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', *flags(), '-I' + str(build),
                              '-O1', '-g', '-fsanitize=undefined', '-fno-sanitize-recover=all',

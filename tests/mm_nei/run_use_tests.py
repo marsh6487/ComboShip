@@ -296,8 +296,21 @@ run('native_stow_ownership',r'''
 #include "mods/items/logic/item_rod_light.h"
 CustomItemState gCustomItemState{};ItemEquipState sMittsEquipState{};int stops=0,suppress=0;
 u8 seasonsDrawn=0;
+static u8 slateDrawn;
+static PlayState* slateStowPlay;
+static Player* slateStowPlayer;
 u8 Seasons_IsDrawn(){return seasonsDrawn;}
 void Seasons_Stow(PlayState*,Player*){seasonsDrawn=0;}
+// The dedicated Slate stow fixture runs the full teardown. Model its drawn
+// state here so this fixture can check the classifier and dispatch boundary.
+u8 Slate_IsDrawn(){return slateDrawn;}
+void Slate_PutAway(PlayState* play,Player* player){
+    if (slateDrawn) {
+        slateStowPlay=play;
+        slateStowPlayer=player;
+        slateDrawn=0;
+    }
+}
 void Lantern_PutAway(Player*,PlayState*){gCustomItemState.lanternEquipped=gCustomItemState.lanternSwinging=0;}
 void FireRod_PutAway(Player*,PlayState*){fireRodActive=fireRodFirstPerson=0;}
 void IceRod_PutAway(Player*,PlayState*){iceRodActive=iceRodFirstPerson=0;}
@@ -311,6 +324,15 @@ void DekuLeaf_Stop(Player*,PlayState*){gCustomItemState.dekuLeafActive=0;}
 void Shovel_Stop(Player*,PlayState*){gCustomItemState.shovelActive=0;}
 ''',[body('mm/mods/items/custom_items_stow.c',n) for n in ['CustomItems_CanStowWhip','CustomItems_HasStowableHeldItem','CustomItems_PutAwayHeldItems']],r'''
 Player p{},remote{};PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
+assert(!CustomItems_HasStowableHeldItem(&p));
+slateDrawn=1;
+assert(CustomItems_HasStowableHeldItem(&p));
+CustomItems_PutAwayHeldItems(&remote,&play);
+CustomItems_PutAwayHeldItems(nullptr,&play);
+CustomItems_PutAwayHeldItems(&p,nullptr);
+assert(slateDrawn&&!slateStowPlay&&!slateStowPlayer);
+CustomItems_PutAwayHeldItems(&p,&play);
+assert(!CustomItems_HasStowableHeldItem(&p)&&slateStowPlay==&play&&slateStowPlayer==&p);
 gCustomItemState.lanternEquipped=fireRodActive=iceRodFirstPerson=lightRodActive=seasonsDrawn=1;
 CustomItems_PutAwayHeldItems(&remote,&play);assert(gCustomItemState.lanternEquipped&&fireRodActive);
 gCustomItemState.ballAndChainThrown=whipActive=1;whipState=WHIP_STATE_EQUIP;
