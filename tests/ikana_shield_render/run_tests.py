@@ -77,6 +77,11 @@ def main():
                         source_path.write_text((ROOT / source).read_text() +
                             '\nvoid IkanaTest_SetMatrixStack(MtxF* stack) { sMatrixStack = sCurrentMatrix = stack; }\n')
                     source_flags = list(native_flags)
+                    if source.endswith("/Skeleton.cpp"):
+                        # Native Skeleton resources include ResourceManager's pinned
+                        # fixture headers; gate tests do not inherit the NEI CPATH.
+                        source_flags += ["-I" + path for path in os.environ.get(
+                            "COMBO_NEI_FIXTURE_CPATH", "").split(os.pathsep) if path]
                     if args.sanitize and source.endswith("gu_pc.c"):
                         # Both unchanged native guMtxF2L implementations rely on
                         # signed fixed-point shifts (e.g. 65536 << 16). Keep all
