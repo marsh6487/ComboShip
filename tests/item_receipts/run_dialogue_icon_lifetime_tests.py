@@ -36,6 +36,7 @@ code = r'''
 #include <string>
 #include <vector>
 #include "combo/menu/ComboItemReceiptPresentation.h"
+#include "combo/menu/ComboSoulReceiptText.h"
 #include "soh/include/z64item.h"
 using u8 = uint8_t;
 constexpr int TEXTBOX_TYPE_BLUE = 2;
@@ -47,20 +48,18 @@ struct CustomMessage {
     CwItemReceiptPresentation receiptPresentation{};
     std::vector<std::string> text;
     CustomMessage() = default;
-    CustomMessage(const char* en, const char* de, const char* fr, int) : text{en,de,fr} {}
+    CustomMessage(std::string en, std::string de, std::string fr, int) : text{en,de,fr} {}
     void AutoFormat() {}
     void AutoFormat(ItemID) {}
     void LoadIntoFont() { emitted = receiptPresentation; emittedText = text; }
 };
-namespace ComboBossSoulReceiptText {
-enum class Language { German, French };
-struct Soul {};
-static Soul soul;
-static const Soul* Find(const std::string&) { return &soul; }
-static const char* Body(const Soul&, Language = Language::German) { return "A boss soul"; }
-}
 namespace Rando::StaticData {
-struct Name { std::string GetEnglish() const { return "Gohma's Soul"; } };
+static std::string itemName = "Gohma's Soul";
+struct Name {
+    std::string GetEnglish() const { return itemName; }
+    std::string GetGerman() const { return "Seele von Wolfos"; }
+    std::string GetFrench() const { return "Âme de Wolfos"; }
+};
 struct Item {
     Name GetName() const { return {}; }
     bool HasCustomIcon() const { return true; }
@@ -88,16 +87,28 @@ code += '\nvoid Lantern_OpenCatchTextbox(void) ' + body(mm, 'void Lantern_OpenCa
 code += r'''
 int main(int argc, char**) {
     if (argc > 1) {
-        CustomMessage message;
-        BuildSoul(message, 0x1E0);
-        // No get-item actor is available to the receipt renderer after this point.
-        // Its complete resource identity must travel with the built message.
-        assert(ComboReceipt_HasIcon(&message.receiptPresentation));
-        assert(!std::strcmp(message.receiptPresentation.iconPath,
-                            "__OTR__textures/parameter_static/gBossSoul"));
-        assert(message.receiptPresentation.iconWidth == 32 &&
-               message.receiptPresentation.iconHeight == 32 && !message.receiptPresentation.iconIA8);
-        std::cout << "PASS boss-soul receipt owns its RGBA32 image independently of get-item lifetime\n";
+        for (const char* name : {"Gohma's Soul", "Soul of Wolfos"}) {
+            Rando::StaticData::itemName = name;
+            CustomMessage message;
+            BuildSoul(message, 0x1E0);
+            // No get-item actor is available to the receipt renderer after this point.
+            // Its complete resource identity must travel with the built message.
+            assert(ComboReceipt_HasIcon(&message.receiptPresentation));
+            assert(!std::strcmp(message.receiptPresentation.iconPath,
+                                "__OTR__textures/parameter_static/gBossSoul"));
+            assert(message.receiptPresentation.iconWidth == 32 &&
+                   message.receiptPresentation.iconHeight == 32 && !message.receiptPresentation.iconIA8);
+            assert(message.text.size() == 3 && message.text[0].find(name) != std::string::npos);
+            if (Rando::StaticData::itemName == "Soul of Wolfos") {
+                assert(message.text[1].find("Seele von Wolfos") != std::string::npos);
+                assert(message.text[2].find("Âme de Wolfos") != std::string::npos);
+            }
+        }
+        Rando::StaticData::itemName = "Unrelated NPC Soul Costume";
+        CustomMessage unknown;
+        BuildSoul(unknown, 0x1E0);
+        assert(!ComboReceipt_HasIcon(&unknown.receiptPresentation) && unknown.text.empty());
+        std::cout << "PASS boss and enemy soul receipts own RGBA32 images independently of get-item lifetime; unknown names stay untouched\n";
         return 0;
     }
     const char* expected[] = {
