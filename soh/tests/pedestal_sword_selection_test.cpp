@@ -18,13 +18,11 @@ struct PakModel {
 };
 static std::vector<PakModel> sModels(6);
 static s32 sSelectedAdultIndex = 0, sSelectedEquipIndex = -1, sForcedEquipIndex = -1, sForcedModelIndex = -1;
+static s32 sSeasonalModelIndex = -1;
 static s32 sSlotMix[] = { -1, -1, -1 };
 static std::vector<Gfx*> sRuntimeCombinedDLs;
-static bool enabled = true, remote = false;
+static bool enabled = true, sRemoteRenderActive = false;
 static void EnsureSlotMixLoaded() {
-}
-static bool PakLoader_IsRemoteRenderActive() {
-    return remote;
 }
 static int CVarGetInteger(const char*, int) {
     return enabled;
@@ -63,9 +61,9 @@ int main() {
     sModels[3].adultEquipDLs = { { 0x50E0, &blades[8] }, { 0x50F8, &blades[9] } };
     sForcedEquipIndex = 3;
     ExpectSword(&blades[8], &blades[9]);
-    remote = true;
+    sRemoteRenderActive = true;
     REQUIRE(PakLoader_GetTimePedestalSwordDL() == nullptr);
-    remote = false;
+    sRemoteRenderActive = false;
     sForcedEquipIndex = -1;
     sSlotMix[1] = -1;
     sSelectedEquipIndex = -1;
