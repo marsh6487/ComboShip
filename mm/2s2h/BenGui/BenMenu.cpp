@@ -1634,8 +1634,8 @@ void BenMenu::AddEnhancements() {
         .CVar("gWindows.SpinAttackMM")
         .WindowName("Spin Attack##MM")
         .HideInSearch(true)
-        .Options(WindowButtonOptions().EmbedWindow(false).Tooltip(
-            "Keep the spin style and elemental effect controls open while playing."));
+        .Options(std::make_shared<WindowButtonOptions>(WindowButtonOptions().EmbedWindow(false).Tooltip(
+            "Keep the spin style and elemental effect controls open while playing.")));
     AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
         .CVar(CW_SPIN_STYLE_CVAR)
         .Options(ComboboxOptions()
