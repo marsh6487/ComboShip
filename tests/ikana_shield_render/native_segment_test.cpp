@@ -5,13 +5,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <memory>
+#include <string>
 #ifdef HOST_OOT
 #include "global.h"
+#include "soh/resource/type/Array.h"
+#include "soh/resource/type/Skeleton.h"
 #else
 extern "C" {
 #include "global.h"
 }
+#include "2s2h/resource/type/Array.h"
+#include "2s2h/resource/type/Skeleton.h"
 #endif
+#include <fast/lus_gbi.h>
+#include <fast/resource/type/DisplayList.h>
 
 #define CHECK(condition)                                                       \
   do {                                                                         \
@@ -61,6 +70,8 @@ f32 Math_CosS(s16 a) {
 int ResourceMgr_OTRSigCheck(char *) { return 0; }
 Gfx *ResourceMgr_LoadGfxByName(const char *) { return nullptr; }
 char *ResourceMgr_LoadIfDListByName(const char *) { return nullptr; }
+bool ResourceMgr_IsAltAssetsEnabled() { return false; }
+const char *PakLoader_GetSkinSkeletonPath(void **) { return nullptr; }
 void FrameInterpolation_RecordOpenChild(const void *, int) {}
 void FrameInterpolation_RecordCloseChild(void) {}
 void FrameInterpolation_RecordMatrixPush(void) {}
@@ -69,6 +80,15 @@ void FrameInterpolation_RecordMatrixPut(MtxF *) {}
 void FrameInterpolation_RecordMatrixTranslateRotateZYX(Vec3f *, Vec3s *) {}
 void FrameInterpolation_RecordMatrixToMtx(Mtx *, char *, s32) {}
 }
+
+// Replace archive lookup with small in-memory resources while retaining the
+// production plan resolver, matrix blender and limb-selection bridge.
+static std::map<std::string, std::shared_ptr<Ship::IResource>> sSkinResources;
+static std::shared_ptr<Ship::IResource> PlayerFlexSkin_Load(const std::string &path) {
+  const auto found = sSkinResources.find(path);
+  return found == sSkinResources.end() ? nullptr : found->second;
+}
+#include "../../combo/actors/PlayerFlexSkinBridge.inc"
 
 // Only renderer state is local; the resolver body is extracted unchanged.
 class Interpreter {
@@ -79,9 +99,56 @@ public:
 #include "production_helpers.inc"
 
 static Gfx sMesh[1], sShield[2];
+static Gfx *sWeightedMesh;
+static constexpr s32 kNativeMatrixCount = 17;
+static constexpr uintptr_t kWeightedMatrix = 0x0D000001 + kNativeMatrixCount * sizeof(Mtx);
 static bool sRaiseShield;
-static unsigned sShieldReads;
+static unsigned sShieldReads, sWeightedReads;
 static Mtx *sExpectedBase;
+static f32 sExpectedWeightedX;
+
+static void InstallWeightedSkin(SkelAnime &registration, void **limbs) {
+  const std::string rigPath = "objects/object_link_boy/gLinkAdultSkel";
+  registration.skeleton = limbs;
+  SOH::SkeletonPatcher::skeletons.push_back({ &registration, rigPath });
+  auto rig = std::make_shared<SOH::Skeleton>();
+  rig->type = SOH::SkeletonType::Flex;
+  rig->limbType = SOH::LimbType::LOD;
+  rig->limbCount = 21;
+  rig->skeletonData.flexSkeletonHeader.sh.segment = limbs;
+  rig->skeletonData.flexSkeletonHeader.dListCount = kNativeMatrixCount;
+  sSkinResources[rigPath] = rig;
+
+  auto palette = std::make_shared<SOH::Array>();
+  palette->ArrayType = SOH::ArrayResourceType::Scalar;
+  palette->ArrayScalarType = SOH::ScalarType::ZSCALAR_U16;
+  auto appendWord = [&](u16 value) {
+    SOH::ScalarData scalar{};
+    scalar.u16 = value;
+    palette->Scalars.push_back(scalar);
+  };
+  for (u16 word : { 0x4E53, 1, kNativeMatrixCount, 1 })
+    appendWord(word);
+  // Identity inverse binds and one equal-weight blend of native slots 0 and 1.
+  for (int bone = 0; bone < kNativeMatrixCount; ++bone) {
+    for (int component = 0; component < 12; ++component) {
+      appendWord(0);
+      appendWord(component == 0 || component == 5 || component == 10 ? 0x3F80 : 0);
+    }
+  }
+  for (u16 word : { 0, 1, 8 })
+    appendWord(word);
+  palette->ArrayCount = palette->Scalars.size();
+  sSkinResources[rigPath + "/Skin/Palette"] = palette;
+
+  auto mesh = std::make_shared<Fast::DisplayList>();
+  mesh->Instructions.resize(2);
+  sWeightedMesh = mesh->GetPointer();
+  sWeightedMesh[0].words.w0 = 0xDA380002;
+  sWeightedMesh[0].words.w1 = kWeightedMatrix;
+  gSPEndDisplayList(&sWeightedMesh[1]);
+  sSkinResources[rigPath + "/Skin/Limbs/Limb04"] = mesh;
+}
 
 #ifdef HOST_OOT
 static void PostLimb(PlayState *play, s32 limb, Gfx **, Vec3s *, void *) {
@@ -108,8 +175,14 @@ static void Replay(Interpreter &renderer, const Gfx *start, const Gfx *end,
       renderer.mSegmentPointers[segment] = w1;
     } else if (op == G_DL) {
       const Gfx *target = static_cast<const Gfx *>(renderer.SegAddr(w1));
-      CHECK(target == sMesh || target == sShield);
-      Replay(renderer, target, target + (target == sShield ? 2 : 1), depth + 1);
+      CHECK(target == sMesh || target == sShield || (sWeightedMesh && target == sWeightedMesh));
+      Replay(renderer, target, target + (target == sMesh ? 1 : 2), depth + 1);
+    } else if (op == G_MTX && w1 == kWeightedMatrix) {
+      CHECK(renderer.SegAddr(w1) == sExpectedBase + kNativeMatrixCount);
+      float blended[4][4];
+      guMtxL2F(blended, sExpectedBase + kNativeMatrixCount);
+      CHECK(std::fabs(blended[3][0] - sExpectedWeightedX) < 0.001f);
+      ++sWeightedReads;
     } else if (op == G_MTX && w1 == 0x0D000381) {
       const void *resolved = renderer.SegAddr(w1);
       if (resolved != sExpectedBase + 14) {
@@ -125,7 +198,7 @@ static void Replay(Interpreter &renderer, const Gfx *start, const Gfx *end,
 }
 
 static void RunFrame(s16 actorId, s32 lod, unsigned frame, bool raised,
-                     bool nullActor = false) {
+                     bool nullActor = false, bool weighted = false) {
   // Four initial null meshes make RIGHT_HAND (limb 19) use matrix slot 14.
   LodLimb limbs[21] = {};
   void *pointers[21];
@@ -136,6 +209,9 @@ static void RunFrame(s16 actorId, s32 lod, unsigned frame, bool raised,
     limbs[i].dLists[0] = limbs[i].dLists[1] = i < 4 ? nullptr : sMesh;
     pointers[i] = &limbs[i];
   }
+  SkelAnime registration{};
+  if (weighted)
+    InstallWeightedSkin(registration, pointers);
   // Different frame allocations catch a binding accidentally cached from an
   // earlier draw/re-entry, even if a platform reuses the same call stack.
   alignas(16) static std::array<Gfx, 4096> opaFrames[3], xluFrames[3];
@@ -164,9 +240,10 @@ static void RunFrame(s16 actorId, s32 lod, unsigned frame, bool raised,
   sMatrixStack = sCurrentMatrix = stack;
 #endif
   sRaiseShield = raised;
-  sShieldReads = 0;
+  sShieldReads = sWeightedReads = 0;
+  sExpectedWeightedX = 4.5f + 100.0f * frame;
   if (actorId == ACTOR_PLAYER)
-    DrawPlayer(&play, pointers, joints, 17, PostLimb,
+    DrawPlayer(&play, pointers, joints, kNativeMatrixCount, PostLimb,
                nullActor ? nullptr : &actor, lod);
   else
     SkelAnime_DrawFlexLod(&play, pointers, joints, 17, nullptr, PostLimb,
@@ -199,9 +276,15 @@ static void RunFrame(s16 actorId, s32 lod, unsigned frame, bool raised,
         reinterpret_cast<uintptr_t>(otherActor));
   Replay(renderer, xlu.data(), gfx.polyXlu.p);
   CHECK(sShieldReads == (raised ? 1u : 0u));
+  CHECK(sWeightedReads == (weighted ? 1u : 0u));
   CHECK(renderer.mSegmentPointers[13] ==
         reinterpret_cast<uintptr_t>(actorId == ACTOR_PLAYER ? sExpectedBase
                                                             : otherActor));
+  if (weighted) {
+    SOH::SkeletonPatcher::skeletons.clear();
+    sSkinResources.clear();
+    sWeightedMesh = nullptr;
+  }
 }
 
 static void NullSkeleton() {
@@ -231,9 +314,10 @@ int main() {
       RunFrame(ACTOR_PLAYER, lod, frame, false);
       RunFrame(ACTOR_EN_TEST, lod, frame, false);
     }
+  RunFrame(ACTOR_PLAYER, 1, 2, true, false, true);
   NullSkeleton();
   std::puts("PASS native LOD traversal + shield drawer + renderer resolver: 24 "
-            "frames, "
+            "rigid frames and one weighted frame, "
             "cold/stale segments, near/far LOD, re-entry, lowered shield, NPC "
-            "isolation, null inputs");
+            "isolation, null inputs, weighted body with deferred rigid shield");
 }
