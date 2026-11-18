@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "BlackMarketKeeperInteraction.h"
 
 namespace BlackMarketKeeper {
 // The retained Sway resource is the native crossed-arm forward lean. Keep the

@@ -493,3 +493,37 @@ static int32_t MM_FillSpecialEnemySoulAnim(RandoItemId id, CwItemAnimDrawInfo* o
     MM_AnimSoulFlame(out, flame, size, size, size);
     return 1;
 }
+
+// Misc souls use the actual native actor rigs. Keep merchant/collectible
+// ownership separate from enemy and NPC enum ranges.
+static int32_t MM_FillMiscSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
+    if (id != RI_SOUL_MISC_GS && id != RI_SOUL_MISC_BUSINESS_SCRUB)
+        return 0;
+    if (id == RI_SOUL_MISC_GS ? ComboSoulModels::SimplerEnemy() : ComboSoulModels::SimplerNpc())
+        return 0;
+    out->opa = 1;
+    out->hiddenLimb = -1;
+    out->scale = id == RI_SOUL_MISC_GS ? 0.018f : 0.012f;
+    out->translatePre[1] = id == RI_SOUL_MISC_GS ? 0.f : -24.f;
+    if (id == RI_SOUL_MISC_GS) {
+        out->skelPath = "__OTR__objects/object_st/object_st_Skel_005298";
+        out->animPath = "__OTR__objects/object_st/object_st_Anim_000304";
+        out->limbCount = 30;
+        out->nonFlexSkeleton = 1;
+        out->proceduralProfile = CW_ANIM_PROFILE_GOLD_SKULLTULA;
+    } else {
+        out->skelPath = "__OTR__objects/object_dnt/gBusinessScrubSkel";
+        out->animPath = "__OTR__objects/object_dnt/gBusinessScrubBobAnim";
+        out->limbCount = 28;
+        // EnAkindonuts bob state (ANIM_16): hide carried props and scalp/hair;
+        // retain the worn hat, with the ordinary eye mesh.
+        out->hiddenLimbMask = (UINT64_C(1) << 15) | (UINT64_C(1) << 16) | (UINT64_C(1) << 21) | (UINT64_C(1) << 23) |
+                              (UINT64_C(1) << 24) | (UINT64_C(1) << 27);
+        MM_MiniSwapLimb(out, 26, "__OTR__objects/object_dnt/gBusinessScrubEyesDL");
+    }
+    MM_AnimEnv(out, 0, 0, 0, 255);
+    MM_MiniFallback(out);
+    const uint8_t grey[3] = { 155, 155, 155 };
+    MM_AnimSoulFlame(out, grey, .15f / out->scale, .15f / out->scale, .15f / out->scale);
+    return 1;
+}

@@ -1,5 +1,6 @@
 #include "hint.h"
 #include "EnemyFirstDrops.h"
+#include "rando/HintPresentation.h"
 #include "string"
 #include "SeedContext.h"
 #include "static_data.h"
@@ -408,6 +409,15 @@ const CustomMessage Hint::GetHintMessage(MessageFormat format, size_t id) const 
 
     if (num != 0) {
         hintText.InsertNumber(num);
+    }
+
+    if (messageType == HINT_TYPE_MESSAGE && (format == MF_FORMATTED || format == MF_AUTO_FORMAT)) {
+        for (const auto& text :
+             { hintText.GetEnglish(MF_RAW), hintText.GetGerman(MF_RAW), hintText.GetFrench(MF_RAW) }) {
+            auto shown = ComboHintPresentation::PlainPlacement(text);
+            if (shown != text)
+                hintText.Replace(std::string(text), std::move(shown));
+        }
     }
 
     if (format == MF_FORMATTED) {

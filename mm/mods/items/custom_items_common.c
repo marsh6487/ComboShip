@@ -224,7 +224,9 @@ s32 CustomItems_IsBlocked(Player* p, PlayState* play) {
 // CustomItems_Update runs BEFORE native item-button dispatch: locking at StartBlow/Start
 // swallows the press needed to install that upper action and leaves the tool stuck forever.
 s32 CustomItems_BlocksMovement(Player* p) {
-    return p != NULL && ((dlActive && dlBlowing && dlAnimTimer > 0 && p->heldItemAction == PLAYER_IA_DEKU_LEAF &&
+    return p != NULL && ((gCustomItemState.beetleActive && gCustomItemState.beetleState == 2 &&
+                          gCustomItemState.beetleSubCamId != SUBCAM_FREE) ||
+                         (dlActive && dlBlowing && dlAnimTimer > 0 && p->heldItemAction == PLAYER_IA_DEKU_LEAF &&
                           p->upperActionFunc == Player_UpperAction_DekuLeaf) ||
                          (shActive && shAnimating && shAnimTimer > 0 && p->heldItemAction == PLAYER_IA_SHOVEL &&
                           p->upperActionFunc == Player_UpperAction_Shovel));

@@ -4,6 +4,7 @@
 #include "combo/menu/ComboKeyReceiptText.h"
 #include "combo/menu/ComboDungeonKeyReceipt.h"
 #include "combo/menu/ComboBossSoulReceiptText.h"
+#include "combo/menu/ComboSoulReceiptText.h"
 #include "combo/menu/ComboMagicItemReceiptText.h"
 #include "combo/menu/ComboToolReceiptText.h"
 #include "combo/menu/ComboMaskReceiptText.h"
@@ -288,10 +289,14 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Stone Tower Stray Fairy", RG_MM_STRAY_FAIRY_STONE_TOWER},
     {"Ice Trap", RG_ICE_TRAP},
     {"Green Rupee", RG_GREEN_RUPEE},
+    {"Saria NPC Soul", RG_SOUL_NPC_SARIA},
+    {"Stalfos Enemy Soul", RG_SOUL_ENEMY_STALFOS},
     {"None", RG_NONE}};
 struct ReceiptItemName : std::string {
   ReceiptItemName(const std::string& value) : std::string(value) {}
   const std::string& GetEnglish() const { return *this; }
+  const std::string& GetGerman() const { return *this; }
+  const std::string& GetFrench() const { return *this; }
 };
 struct Item {
   RandomizerGet id;
@@ -847,6 +852,20 @@ static void CheckGeneratedCompassRoutes(const char* fixturePath) {
 }
 
 int main(int argc, char** argv) {
+  for (const auto& [name, id] : std::vector<std::pair<const char*,RandomizerGet>> {
+      {"Saria NPC Soul", RG_SOUL_NPC_SARIA}, {"Stalfos Enemy Soul", RG_SOUL_ENEMY_STALFOS}}) {
+    Player player{};
+    player.getItemId = id;
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage message;
+    BuildCustomItemMessage(&player, message);
+    std::string converted;
+    assert(ComboItemReceiptText::FromOotMessage(message.GetEnglish(MF_RAW), converted));
+    assert(converted.find(name) != std::string::npos);
+    assert(converted.find(id == RG_SOUL_NPC_SARIA ? "presence" : "spirit") != std::string::npos);
+    assert(converted.find('%') == std::string::npos);
+  }
+  std::cout << "PASS ordinary OoT native soul receipts use descriptive colored text\n";
   const struct {
     RandomizerGet id;
     const char *name;

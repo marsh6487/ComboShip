@@ -9,7 +9,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 def main():
     source = (ROOT / "soh/mods/pak_loader/pak_loader.cpp").read_text().replace('extern "C" ', '')
-    names = ("IsOtrPathString", "MakeMiniDL", "MergeTimePedestalSwordPieces", "PakLoader_GetTimePedestalSwordDL")
+    names = ("PakLoader_IsRemoteRenderActive", "sBodySelectionEnabled", "IsOtrPathString", "MakeMiniDL",
+             "MergeTimePedestalSwordPieces", "PakLoader_GetTimePedestalSwordDL")
     selected = functions(source, set(names))
     with tempfile.TemporaryDirectory(prefix="pedestal-sword-") as directory:
         directory = pathlib.Path(directory)

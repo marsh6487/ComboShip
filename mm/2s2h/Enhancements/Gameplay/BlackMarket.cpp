@@ -57,6 +57,7 @@ extern "C" {
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"
 #include "black_market_shop_adapter.h"
 #include "z64shrink_window.h"
+bool Message_ShouldAdvanceSilent(PlayState*);
 void EnOssan_Init(Actor*, PlayState*);
 void EnOssan_Update(Actor*, PlayState*);
 void EnOssan_Idle(EnOssan*, PlayState*);
@@ -660,6 +661,12 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
     auto* shop = reinterpret_cast<EnOssan*>(actor);
     if (sNativeShop != shop || sNativeShopPlay != play)
         return;
+    const bool animationFinished = shop->skelAnime.mode == ANIMMODE_ONCE &&
+                                   shop->skelAnime.curFrame == shop->skelAnime.endFrame &&
+                                   shop->skelAnime.morphWeight == 0.f;
+    const auto priorAction = shop->actionFunc;
+    const bool nextPage = NativeShopDialog(shop) && Message_GetState(&play->msgCtx) == TEXT_STATE_NEXT &&
+                          Message_ShouldAdvanceSilent(play);
     if (!Active() && shop->actionFunc != EnOssan_InitShop) {
         EndBrowsing(play);
         actor->textId = BlackMarketEntry::kUnavailableText;
@@ -671,6 +678,24 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
         SkelAnime_Update(&shop->skelAnime);
     } else {
         EnOssan_Update(actor, play);
+    }
+    if (shop->actionFunc != EnOssan_InitShop) {
+        const bool refused = shop->actionFunc == EnOssan_CannotBuy && priorAction != EnOssan_CannotBuy;
+        sKeeperInteraction.Update(NativeShopDialog(shop), animationFinished, nextPage, refused,
+                                  [&](BlackMarketKeeperInteraction::Clip clip, float morph) {
+                                      using BlackMarketKeeperInteraction::Clip;
+                                      auto* animation = reinterpret_cast<AnimationHeader*>(const_cast<char*>(
+                                          clip == Clip::EnterTalk ? object_bg_Anim_00A280
+                                          : clip == Clip::Talk    ? object_bg_Anim_001384
+                                          : clip == Clip::Raise   ? object_bg_Anim_00AD98
+                                          : clip == Clip::Ask     ? object_bg_Anim_000968
+                                          : sCustomKeeper         ? BlackMarketKeeper::kAnimation
+                                                                  : BlackMarketKeeperAssets::kNativeAnimation));
+                                      if (clip == Clip::Idle || clip == Clip::Talk)
+                                          Animation_MorphToLoop(&shop->skelAnime, animation, morph);
+                                      else
+                                          Animation_MorphToPlayOnce(&shop->skelAnime, animation, morph);
+                                  });
     }
     Actor_SetFocus(actor, 55.0f);
     sSelected = shop->cursorIndex;
@@ -711,6 +736,7 @@ void InitKeeper(Actor* actor) {
     }
     auto* gal = reinterpret_cast<EnOssan*>(actor);
     sCustomKeeper = CustomKeeperAvailable();
+    sKeeperInteraction = {};
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
     SkelAnime_InitFlex(
@@ -851,12 +877,26 @@ void PresentTitle() {
     if (ComboPlaceTitleCard_Show(gPlayState, (TexturePtr)kCard, 240, 24) != 0)
         sTitlePending = false;
 }
+std::string NativeKeeperMessageSfx(u16 textId) {
+    if (!gPlayState || !gPlayState->msgCtx.messageTableNES)
+        return {};
+    for (auto* entry = gPlayState->msgCtx.messageTableNES; entry->textId != 0xFFFF; ++entry) {
+        if (entry->textId != textId)
+            continue;
+        if (!entry->segment || entry->msgSize < MESSAGE_HEADER_SIZE)
+            return {};
+        return BlackMarketKeeperInteraction::FirstMessageSfx(
+            std::string_view(entry->segment + MESSAGE_HEADER_SIZE, entry->msgSize - MESSAGE_HEADER_SIZE));
+    }
+    return {};
+}
 void MarketText(u16* textId, bool* fromTable) {
     using BlackMarketText::Page;
     if (Interior() && *textId == BlackMarketEntry::kUnavailableText) {
         CustomMessage::Entry entry;
         entry.autoFormat = false;
-        entry.msg = BlackMarketText::Mm(Page::Unavailable, {}, {}, sNESFontWidths);
+        entry.msg = NativeKeeperMessageSfx(BlackMarketKeeperInteraction::Decline(GET_PLAYER_FORM)) +
+                    BlackMarketText::Mm(Page::Unavailable, {}, {}, sNESFontWidths);
         CustomMessage::LoadCustomMessageIntoFont(entry);
         *fromTable = false;
         return;
@@ -871,6 +911,8 @@ void MarketText(u16* textId, bool* fromTable) {
                               : *textId == kKeeperHelpChoiceText ? Page::KeeperHelpChoice
                                                                  : Page::KeeperHelp;
             entry.msg = BlackMarketText::Mm(page, {}, {}, sNESFontWidths);
+            if (page == Page::KeeperTalk)
+                entry.msg.insert(0, NativeKeeperMessageSfx(BlackMarketKeeperInteraction::Talk(GET_PLAYER_FORM)));
         } else {
             entry.msg = ComboItemReceiptText::FromNeiMarkup(*textId == kContinueText ? "Keep shopping?"
                                                                                      : "Left / Right: browse items");
@@ -918,6 +960,10 @@ void MarketText(u16* textId, bool* fromTable) {
     if (page == Page::Browse || page == Page::Confirm)
         entry.firstItemCost = offer.price;
     entry.msg = BlackMarketText::Mm(page, offer, sStatus, sNESFontWidths);
+    if (page == Page::Welcome)
+        entry.msg.insert(0, NativeKeeperMessageSfx(BlackMarketKeeperInteraction::Greeting(GET_PLAYER_FORM)));
+    else if (page == Page::Result && Status(sSelected) != PurchaseResult::Ready)
+        entry.msg.insert(0, NativeKeeperMessageSfx(0x77B));
     CustomMessage::LoadCustomMessageIntoFont(entry);
     *fromTable = false;
 }

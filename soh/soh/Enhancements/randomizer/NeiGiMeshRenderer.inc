@@ -1,6 +1,9 @@
 #include "NeiElementalArrowGi.h"
 #include "ComboRewardGi.h"
+#include "../../../../combo/actors/ComboOwlEffects.h"
+#include "../../../../combo/actors/ComboOwlEffectPolicy.h"
 extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh);
+extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
 // Shared by the OoT and MM host renderers. The enclosing TU supplies native GBI/matrix APIs.
 void NeiGi_ReportBlackMarketBounds(const NeiGi::Point& minimum, const NeiGi::Point& maximum) {
     if (!BlackMarketVisual::Active())
@@ -333,6 +336,56 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
     return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
+}
+
+extern "C" void ComboOwl_DrawEffects(PlayState* play, const char* owner) {
+    if (!play || !play->state.gfxCtx)
+        return;
+#ifdef NEI_GI_NATIVE_MM
+    const char* resourceOwner = owner ? owner : "mm";
+#else
+    const char* resourceOwner = owner ? owner : "oot";
+#endif
+    // This valid display-list marker belongs to the same archive as the
+    // eye-free model and texture frames. Query its selected resource manager,
+    // including Alt policy, rather than the active host's extension cache.
+    if (!ResourceMgr_IsGiModelAvailableForGame(resourceOwner, ComboOwlEffects::kMarker))
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
+    // Deferred commands retain pointers, so every atlas path has process lifetime.
+    static const auto paths = [] {
+        std::array<std::array<std::string, ComboOwlEffects::kFrames>, 2> result;
+        for (size_t eye = 0; eye < result.size(); ++eye) {
+            for (size_t frame = 0; frame < ComboOwlEffects::kFrames; ++frame) {
+                const auto number = std::to_string(frame + 1000).substr(1);
+                result[eye][frame] = std::string("__OTR__objects/owl_effects_poc4/flames/") +
+                                     (eye ? "right_" : "left_") + number;
+            }
+        }
+        return result;
+    }();
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Push();
+    Matrix_Scale(100.f, 100.f, 100.f, MTXMODE_APPLY);
+    const auto page = ComboOwlEffects::Pages(play->gameplayFrames);
+    NeiGi_DrawMeshMaterial(play, page, Kind::Neutral, nullptr, false, owner);
+    for (size_t eye = 0; eye < 2; ++eye) {
+        const NeiGi::TextureMaterial material{paths[eye][ComboOwlEffects::TextureFrame(play->gameplayFrames)].c_str()};
+        NeiGi_DrawMeshMaterial(play, ComboOwlEffects::Flame(eye != 0), Kind::Neutral, &material, false, owner);
+    }
+    Matrix_Pop();
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static NeiElementalGi::Palette NeiGi_ElementalPalette(PlayState* play, int profile, bool spell, bool mmOwner) {

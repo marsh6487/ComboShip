@@ -80,6 +80,7 @@ assert(Player_SetupWaitForPutAway(&play,&p,func_80837C20)&&stows==4); // inactiv
 
 leaf = 'mm/mods/items/logic/item_dekuleaf.c'
 shovel = 'mm/mods/items/logic/item_shovel.c'
+switchhook = 'mm/mods/items/logic/item_switchhook.c'
 common = 'mm/mods/items/custom_items_common.c'
 # This executes the production input selection expression, rather than duplicating its logic.
 update = body(player, 'Player_Update')
@@ -95,7 +96,9 @@ run('ordinary_tool_camera', r'''
 CustomItemState gCustomItemState{};u8 sDekuLeafBlowEffectFired=0,sDekuLeafColInitialized=1;
 bool done=false,magic=true,asset=true,blocked=false,autoAnimate=false;ItemInputState next{};
 s8 sDekuLeafPrevInvinc=0,sShovelPrevInvinc=0;
+static u8 sShAimManual=0;
 PlayerAnimationHeader anim{};int digs=0,spent=0;
+int beetleLifetimeResets=0;
 #define NEI_ANIM_DEKULEAF_BLOW "leaf"
 #define NEI_ANIM_DAMPE_DIG "dig"
 s32 ItemMagic_HasEnough(PlayState*,s16){return magic;}
@@ -130,6 +133,13 @@ bool leafSlot=true,shovelSlot=true;
 u8 ItemEquip_GetItemOnSlot(u8 slot){return slot==1&&leafSlot?ITEM_DEKU_LEAF:slot==2&&shovelSlot?ITEM_SHOVEL:ITEM_NONE;}
 void DinFireSword_Reset(){}
 void DinFireShield_Reset(){}
+// The Beetle fixture exercises camera teardown. Only the inactive Beetle is
+// expected during these ordinary-tool lifetimes.
+extern "C" void Beetle_ResetTransient(Player* player,PlayState* play){
+ assert(player==GET_PLAYER(play)&&!gCustomItemState.beetleActive&&
+        !gCustomItemState.beetleFirstPersonActive&&!gCustomItemState.beetleGrabbed);
+ ++beetleLifetimeResets;
+}
 void HGrace_ResetTransient(){} // Fairy reset behavior is exercised by tests/mm_grace.
 void WolfLinkHost_Destroy(PlayState*,Player*){}
 void WolfLinkHost_RestorePlayerInput(Player*,Input*){}
@@ -146,6 +156,7 @@ void func_80831454(Player*){}
     [body(leaf, n) for n in ['DekuLeaf_Stop', 'DekuLeaf_StartGlide', 'DekuLeaf_StartBlow', 'Player_UpperAction_DekuLeaf', 'Handle_DekuLeaf']] +
     [body(shovel, n) for n in ['Shovel_Stop', 'Shovel_Start', 'Shovel_UpdateAnimation', 'Player_UpperAction_Shovel', 'Handle_Shovel']] +
     [body(common, n) for n in ['CustomItems_IsBlocked', 'IsItemEquipped']] +
+    [body(switchhook, n) for n in ['SwitchHook_OnFired', 'SwitchHook_CleanupManualAim']] +
     [body('mm/mods/items/custom_items_stow.c', n) for n in ['CustomItems_CleanupTransientTools', 'CustomItems_ResetTransientTools']] +
     ['void InitToolLifetime(Actor* thisx,PlayState* play){' + body(player, 'Player_Init').split('{',1)[1].split('    play->playerInit =')[0] + '}'] +
     [body(player, 'Player_Destroy'), body('mm/src/code/z_camera.c', 'func_800CB854'),
@@ -199,7 +210,9 @@ assert(spent==1);
 for(int tool=0;tool<2;tool++){
  done=false;
  if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+ sShAimManual=1;
  Player_Destroy(&p.actor,&play);
+ assert(!sShAimManual&&beetleLifetimeResets==tool+1);
  assert(!dlActive&&!dlBlowing&&!dlGliding&&!shActive&&!shAnimating);
  p=Player{}; // same address reused for the new Clock Tower entrance Player
  assert(SelectInput(&p,&play).cur.stick_x==40);
@@ -208,6 +221,7 @@ for(int tool=0;tool<2;tool++){
 DekuLeaf_StartGlide(&p,&play);Shovel_Start(&p,&play);
 p=Player{};InitToolLifetime(&p.actor,&play);
 assert(!dlActive&&!dlGliding&&!shActive&&!sDekuLeafColInitialized);
+assert(beetleLifetimeResets==3);
 // Advance real PlayerAnimation_Once at the native 20 Hz rate, without manually forcing completion.
 autoAnimate=true;play.state.framerateDivisor=2;
 for(int tool=0;tool<2;tool++){
@@ -233,13 +247,16 @@ for(int tool=0;tool<2;tool++){
   p.upperActionFunc=tool==0?Player_UpperAction_DekuLeaf:Player_UpperAction_Shovel;
   if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
   p.upperActionFunc(&p,&play);assert(CustomItems_BlocksMovement(&p));
+  sShAimManual=1;
   Player remote{};CustomItems_ResetTransientTools(&remote,&play);
   assert(CustomItems_BlocksMovement(&p));
+  assert(sShAimManual&&beetleLifetimeResets==3);
   if(interruption==0){p.csAction=PLAYER_CSACTION_5;p.stateFlags1|=PLAYER_STATE1_20;}
   else if(interruption==1){p.heldItemAction=PLAYER_IA_NONE;p.upperActionFunc=nullptr;}
   else{leafSlot=shovelSlot=false;}
   CustomItems_CleanupTransientTools(&p,&play);
   assert(!dlActive&&!shActive&&!CustomItems_BlocksMovement(&p));
+  assert(!sShAimManual);
   if(interruption==0)assert(p.stateFlags1&PLAYER_STATE1_20);
   p.csAction=PLAYER_CSACTION_NONE;p.stateFlags1=0;leafSlot=shovelSlot=true;
  }

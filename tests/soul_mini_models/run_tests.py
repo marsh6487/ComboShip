@@ -16,6 +16,7 @@ tests = [
     'tests/soul_mini/run_oot_catalog_tests.py',
     'tests/soul_mini_mm/catalog_test.py',
     'tests/soul_mini_mm/run_recipe_tests.py',
+    'tests/soul_mini_misc/run_native_variant_tests.py',
     'tests/soul_mini_models/resource_validator_test.py',
     'tests/mm_texanim_validation/run_tests.py',
     'tests/soul_mini_models/run_renderer_owner_bridge_tests.py',

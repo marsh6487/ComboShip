@@ -343,6 +343,7 @@ typedef enum {
     CW_ANIM_PROFILE_NONE = 0,
     CW_ANIM_PROFILE_OOT_BARINADE,
     CW_ANIM_PROFILE_MM_TWINMOLD,
+    CW_ANIM_PROFILE_GOLD_SKULLTULA, // native EnSw gold mesh set; ABI layout unchanged
 } CwAnimProceduralProfile;
 
 /* Bounded owner-authored composite geometry. All transforms are relative to the

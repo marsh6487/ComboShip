@@ -1,3 +1,6 @@
+#include "mods/pak_loader/pak_loader.h"
+#include "../../../combo/actors/SeasonalOutfits.h"
+#include "../../../combo/actors/ZeldaRun.h"
 #include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/gameplay/SwordElementOverride.h"
 #include "../../../combo/render/SpinAttackStyle.h"
@@ -6,6 +9,7 @@
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
 #include "BenMenu.h"
+#include "../../../combo/gui/MenuControlPopout.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/ComboGameMode.h"
 #include "../../../combo/emotes/EmoteSettings.h"
@@ -51,6 +55,11 @@
 #include "2s2h/Rando/Rando.h"
 #include "build.h"
 
+static const std::unordered_map<int32_t, const char*> zeldaRunAgeOptions = {
+    { ZELDA_RUN_CHILD, "Child" },
+    { ZELDA_RUN_ADULT, "Adult" },
+    { ZELDA_RUN_BOTH, "Both" },
+};
 static const std::unordered_map<int32_t, const char*> spinStyleOptions = {
     { CW_SPIN_STYLE_NATIVE, "Native" },
     { CW_SPIN_STYLE_FIRE, "Fire" },
@@ -1612,6 +1621,21 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
+    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
+                                  ImVec2(420, 220),
+#ifdef COMBO_BUILD
+                                  Combo_MmIsForeground
+#else
+                                  []() { return true; }
+#endif
+    );
+    AddWidget(path, "Popout Spin Attack", WIDGET_WINDOW_BUTTON)
+        .CVar("gWindows.SpinAttackMM")
+        .WindowName("Spin Attack##MM")
+        .HideInSearch(true)
+        .Options(std::make_shared<WindowButtonOptions>(WindowButtonOptions().EmbedWindow(false).Tooltip(
+            "Keep the spin style and elemental effect controls open while playing.")));
     AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
         .CVar(CW_SPIN_STYLE_CVAR)
         .Options(ComboboxOptions()
@@ -1680,6 +1704,54 @@ void BenMenu::AddEnhancements() {
             "Use the dawn, day, sunset, night, and overcast skies from an OoT sky texture pack. "
             "Place the pack in mods/2ship and enable Alternate Assets. Requires a complete set of clear and "
             "overcast sky faces; takes effect after changing scenes. MM moon is unchanged."));
+    AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
+        .CVar(ZELDA_RUN_CVAR)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use the latest POC7 Zelda-style empty-handed run. Requires the optional animation pack. "
+            "Independent of seasonal outfits; walking and weapon-running animations stay unchanged."));
+    AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
+        .CVar(ZELDA_RUN_AGES_CVAR)
+        .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
+        .Options(
+            ComboboxOptions()
+                .DefaultIndex(ZELDA_RUN_BOTH)
+                .ComboMap(&zeldaRunAgeOptions)
+                .Tooltip(
+                    "Choose which Link ages use the optional run. Transformation forms keep their own animations."));
+    AddWidget(path, "Seasonal Player Outfits", WIDGET_CVAR_CHECKBOX)
+        .CVar(SEASONAL_OUTFITS_CVAR)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip("Automatically use outfits for the current season. Off "
+                                                               "or a missing outfit keeps your normal player model."));
+    static std::unordered_map<int32_t, const char*> seasonalSetOptions = { { -1, "Selected set not installed" } };
+    AddWidget(path, "Outfit Set", WIDGET_CVAR_COMBOBOX)
+        .CVar("gEnhancements.SeasonalOutfits.SetIndex")
+        .PreFunc([](WidgetInfo& info) {
+            auto options = std::static_pointer_cast<UIWidgets::ComboboxOptions>(info.options);
+            seasonalSetOptions.clear();
+            seasonalSetOptions[-1] = "Selected set not installed";
+            const char* selected = CVarGetString(SEASONAL_OUTFITS_SET_CVAR, "din");
+            int selectedIndex = -1;
+            const s32 count = PakLoader_GetOutfitSetCount();
+            for (s32 i = 0; i < count; ++i) {
+                const char* set = PakLoader_GetOutfitSet(i);
+                seasonalSetOptions[i] = set;
+                if (std::strcmp(selected, set) == 0)
+                    selectedIndex = i;
+            }
+            CVarSetInteger("gEnhancements.SeasonalOutfits.SetIndex", selectedIndex);
+            options->disabled = count == 0;
+            options->disabledTooltip = "Install an outfit set for this game, then restart.";
+        })
+        .Callback([](WidgetInfo& info) {
+            if (const char* set = PakLoader_GetOutfitSet(CVarGetInteger(info.cVar, -1)))
+                CVarSetString(SEASONAL_OUTFITS_SET_CVAR, set);
+        })
+        .Options(ComboboxOptions()
+                     .DefaultIndex(-1)
+                     .ComboMap(&seasonalSetOptions)
+                     .Tooltip("Choose an installed outfit set. Your normal model is used when the current age or "
+                              "season has no outfit."));
+
     AddWidget(path, "Hide Back Equipment and Scabbard", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.HideBackEquipment")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(

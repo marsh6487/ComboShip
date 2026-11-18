@@ -65,6 +65,9 @@ static void Whip_Stop(Player *p, PlayState *s) {
 u8 Seasons_IsDrawn(void) { return 0; }
 static void Seasons_Stow(PlayState* play, Player* player) {}
 #endif
+static u8 sSlateFixtureDrawn;
+u8 Slate_IsDrawn(void) { return sSlateFixtureDrawn; }
+void Slate_PutAway(PlayState* s, Player* p) { sSlateFixtureDrawn=0; }
 #include "mods/items/custom_items_stow.c"
 
 s8 Player_ItemToItemAction(s32 item);
@@ -401,6 +404,10 @@ static void TestNativeSoundLifetime(void) {
 }
 
 int main(void) {
+  Reset(); sSlateFixtureDrawn=1;
+  assert(CustomItems_HasStowableHeldItem(&player));
+  assert(Player_PutAwayHeldItem(&play,&player));
+  assert(!Slate_IsDrawn() && player.heldItemAction==PLAYER_IA_NONE);
   TestNativeSoundLifetime();
   TestClassifierAndCleanup();
   TestPlayerEntries();

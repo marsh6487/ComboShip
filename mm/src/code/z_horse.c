@@ -93,6 +93,14 @@ s32 gHorseIsMounted = false;
 s32 D_801BDAA0 = false;
 s32 gHorsePlayedEponasSong = false;
 
+void Horse_ResetMountState(void) {
+    // These are process globals, not saved ownership or Epona's parked position.
+    // A Combo engine resume reconstructs Player and cannot resume its old mount.
+    gHorseIsMounted = false;
+    D_801BDAA0 = false;
+    gHorsePlayedEponasSong = false;
+}
+
 HorseValidScene sHorseValidSceneLayers[] = {
     { SCENE_00KEIKOKU, 5 - 1 },      // Termina Field - First Cycle
     { SCENE_30GYOSON, 1 - 1 },       // Great Bay Coast - Post-Gyorg
@@ -117,8 +125,13 @@ s32 Horse_IsValidSceneLayer(PlayState* play, Player* player) {
 }
 
 void Horse_SpawnOverworld(PlayState* play, Player* player) {
-    if (!Horse_IsValidSceneLayer(play, player)) {
+    if (!Horse_IsValidSpawn(play->sceneId) || !Horse_IsValidSceneLayer(play, player)) {
+        gHorseIsMounted = false;
         return;
+    }
+
+    if ((player->transformation != PLAYER_FORM_HUMAN) || !CHECK_QUEST_ITEM(QUEST_SONG_EPONA)) {
+        gHorseIsMounted = false;
     }
 
     if (gHorseIsMounted && CHECK_QUEST_ITEM(QUEST_SONG_EPONA)) {
@@ -137,6 +150,10 @@ void Horse_SpawnOverworld(PlayState* play, Player* player) {
         player->rideActor = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE, player->actor.world.pos.x, yIntersect,
                                         player->actor.world.pos.z, player->actor.shape.rot.x, player->actor.shape.rot.y,
                                         player->actor.shape.rot.z, ENHORSE_PARAMS(ENHORSE_PARAM_4000, ENHORSE_11));
+        if (player->rideActor == NULL) {
+            gHorseIsMounted = false;
+            return;
+        }
         Player_MountHorse(play, player, player->rideActor);
         Player_SetCameraHorseSetting(play, player);
     } else if ((play->sceneId == gSaveContext.save.saveInfo.horseData.sceneId) && CHECK_QUEST_ITEM(QUEST_SONG_EPONA)) {

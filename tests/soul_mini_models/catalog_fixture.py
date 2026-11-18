@@ -23,7 +23,7 @@ def write_catalog_fixture(build):
     assert len(enemies) == 47 and len(npcs) == 53
     result = ['#include "' + str(ROOT / 'combo/menu/ComboSoulMiniOOT.h') + '"',
               'namespace SoulCatalogMm {',
-              'enum RandoItemId {' + ','.join(enemies + npcs) + ', RI_UNKNOWN};']
+              'enum RandoItemId {' + ','.join(enemies + npcs + ['RI_SOUL_MISC_GS', 'RI_SOUL_MISC_BUSINESS_SCRUB']) + ', RI_UNKNOWN};']
     includes = re.findall(r'#include "((?:assets/)?objects/[^\"]+)"', mm)
     for inc in dict.fromkeys(includes + ['objects/object_bigslime/object_bigslime.h']):
         asset = ROOT / 'mm' / inc if inc.startswith('assets/') else ROOT / 'mm/assets' / inc

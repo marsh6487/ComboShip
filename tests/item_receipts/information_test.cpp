@@ -2,6 +2,7 @@
 // builders and final font formatting are boundaries; seed flags/JSON are real.
 #include "combo/rando/MagicMirrorSettingsSnapshot.h"
 #include "combo/rando/RitoMaskSettingsSnapshot.h"
+#include "combo/rando/HintPresentation.h"
 
 #include <array>
 #include <algorithm>
@@ -48,6 +49,12 @@ struct CustomMessage {
       const auto pos = value.find(key);
       if (pos != std::string::npos)
         value.replace(pos, key.size(), names[i].value);
+    }
+  }
+  void Replace(std::string&& oldText, std::string&& newText) {
+    size_t at=0;
+    while ((at=value.find(oldText, at)) != std::string::npos) {
+      value.replace(at,oldText.size(),newText); at+=newText.size();
     }
   }
   void ReplaceUnfilledNames(const char *) {}
@@ -202,6 +209,13 @@ int main() {
   static_assert(RSK_SHUFFLE_ENEMY_DROPS < RSK_MAX);
   auto ctx = Rando::Context::GetInstance();
   using namespace Rando;
+  const std::string plainPlacement = "They say Saria NPC Soul can be found at Lost Woods.";
+  Hint ordinary(RH_NONE, {CustomMessage(plainPlacement)});
+  assert(ordinary.GetHintMessage(MF_RAW).value == plainPlacement);
+  assert(ordinary.GetHintMessage(MF_AUTO_FORMAT).value == "They say %gSaria NPC Soul%w can be found at %yLost Woods.%w");
+  assert(ordinary.messages[0].value == plainPlacement);
+  Hint obscure(RH_NONE, {CustomMessage("An obscure spirit waits.")});
+  assert(obscure.GetHintMessage(MF_AUTO_FORMAT).value == "An obscure spirit waits.");
   StaticData::hintTextTable[RHT_CHILD_ALTAR_STONES] = {
       CustomMessage("Stone at [[1]];")};
   StaticData::hintTextTable[RHT_ADULT_ALTAR_MEDALLIONS] = {

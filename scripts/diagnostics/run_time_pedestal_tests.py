@@ -202,17 +202,20 @@ static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
             "void Fixture_DrawPostHand(PlayState* play, Player* this, Gfx** dList) {\n"
             "sLeftHandType = this->leftHandType;\n" + post_sword + "\n}\n")
         pak_source = (ROOT / "soh/mods/pak_loader/pak_loader.cpp").read_text().replace('extern "C" ', '')
-        pak = functions(pak_source, {"FindEquip", "PakLoader_GetEquipDL", "PakLoader_UsedCombinedDL"})
+        pak_names = ("PakLoader_IsRemoteRenderActive", "sBodySelectionEnabled", "FindEquip",
+                     "PakLoader_GetEquipDL", "PakLoader_UsedCombinedDL")
+        pak = functions(pak_source, pak_names)
         (build / "pak.cpp").write_text('#include "time_pedestal_fixture.h"\n' +
             "extern std::map<u32, Gfx*> fixturePakEquipment;\n"
             "static int sForcedModelIndex = -1, sSelectedEquipIndex = -1, sForcedEquipIndex = -1;\n"
+            "static s32 sSeasonalModelIndex = -1;\n"
+            "static bool sRemoteRenderActive = false;\n"
             "static u8 sPakLeftHandCombined, sPakRightHandCombined;\n"
             "static void EnsureSlotMixLoaded() {}\n"
             "static bool AnySlotMixActive() { return PakLoader_HasActiveModel(); }\n"
             "static std::map<u32, Gfx*>* sGetEquipDLs() { return &fixturePakEquipment; }\n"
             "static bool IsValidGfxPtrOrOtrPath(Gfx* p) { return (uintptr_t)p > 4096; }\n"
-            "#define PAK_LOG(...) ((void)0)\n" + pak["FindEquip"] + "\n" +
-            pak["PakLoader_GetEquipDL"] + "\n" + pak["PakLoader_UsedCombinedDL"])
+            "#define PAK_LOG(...) ((void)0)\n" + "\n".join(pak[name] for name in pak_names))
         custom = functions((ROOT / "soh/soh/Enhancements/customequipment.cpp").read_text().replace('extern "C" ', ''),
                            {"LoadGfxByName", "LoadCustomGfx", "CustomEquipment_GetTimePedestalSwordDL",
                             "CustomEquipment_OverrideMasterSwordHand"})

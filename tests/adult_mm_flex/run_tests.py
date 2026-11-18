@@ -170,7 +170,8 @@ def main():
         write_fixture(metadata, build / "archive_fixture.inc")
         (build / "adult_production.inc").write_text(production)
         objects = []
-        native_flags = [*flags(), "-O0", "-g", "-ffunction-sections", "-fdata-sections", "-w"]
+        native_flags = [*flags(), "-O0", "-g", "-ffunction-sections", "-fdata-sections", "-w",
+                        "-Wno-int-conversion", "-Wno-incompatible-pointer-types"]
         for path in ("mm/src/code/z_skelanime.c", "mm/src/code/sys_matrix.c", "mm/2s2h/gu_pc.c"):
             output = build / (Path(path).stem + ".o")
             subprocess.run([compiler, "-std=gnu2x", *native_flags, "-c", str(ROOT / path),

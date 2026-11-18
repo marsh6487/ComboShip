@@ -27,6 +27,7 @@
  */
 #ifndef COMBO_FOREIGN_ANIM_H
 #define COMBO_FOREIGN_ANIM_H
+#include "ComboGoldSkulltulaLimbs.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignAnim.h is TU-glue: include the host engine headers (z64.h/macros.h/functions.h) before it"
@@ -657,6 +658,10 @@ inline s32 CfaOverrideLimbDrawOpa(PlayState* play, s32 limbIndex, Gfx** dList, V
     if (info->proceduralProfile == CW_ANIM_PROFILE_OOT_BARINADE) {
         CfaBarinadeOverride(play, limbIndex, dList, rot);
     }
+    if (info->proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA) {
+        if (const char* path = ComboGoldSkulltula::LimbPath(limbIndex))
+            *dList = (Gfx*)path;
+    }
     bool synced = false;
     OPEN_DISPS(play->state.gfxCtx);
     for (int32_t i = 0; i < info->limbColorCount; i++) { // later ranges win, mirroring the real funcs
@@ -832,7 +837,7 @@ inline bool CfaValidateOpaInfo(const CwItemAnimDrawInfo* info) {
     if (info->postModelDlPath != nullptr && !CfaIsOtrPath(info->postModelDlPath)) {
         return false;
     }
-    if (info->proceduralProfile < CW_ANIM_PROFILE_NONE || info->proceduralProfile > CW_ANIM_PROFILE_MM_TWINMOLD ||
+    if (info->proceduralProfile < CW_ANIM_PROFILE_NONE || info->proceduralProfile > CW_ANIM_PROFILE_GOLD_SKULLTULA ||
         (info->freezeLastFrame != 0 && info->freezeLastFrame != 1)) {
         return false;
     }
@@ -841,6 +846,10 @@ inline bool CfaValidateOpaInfo(const CwItemAnimDrawInfo* info) {
          !CfaIsOtrPath(info->proceduralDlPaths[1]))) {
         return false;
     }
+    if (info->proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA &&
+        (info->limbCount != 30 || !info->nonFlexSkeleton || !info->skelPath ||
+         std::strcmp(info->skelPath, "__OTR__objects/object_st/object_st_Skel_005298")))
+        return false;
     if (info->proceduralProfile == CW_ANIM_PROFILE_MM_TWINMOLD &&
         (info->limbCount != 13 || info->segCount != 1 || info->segs[0].kind != CW_ANIM_SEG_PATH ||
          info->segs[0].segment != 8 || !info->segs[0].onOpa)) {

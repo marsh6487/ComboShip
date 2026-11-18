@@ -21,6 +21,7 @@
 
 #include "adult_link_render.h"
 #include "weapon_upgrades.h"
+#include "mods/pak_loader/pak_loader.h"
 
 #include <libultraship/bridge.h>
 #include <spdlog/spdlog.h>
@@ -140,8 +141,9 @@ static const char* sLimbNearDL[ADULT_LINK_LIMB_COUNT] = {
 static FlexSkeletonHeader* sSkel = NULL;
 static u8 sReady = 0;
 static u8 sSetupFailedPermanently = 0;
-static u8 sIsMod = 0;      // 1 = a user alt-assets mod supplied the skeleton (full model replacement)
-static u8 sIsForm = 0;     // 1 = a custom form (objects/forms/<name>/) supplied the skeleton
+static u8 sIsMod = 0;  // 1 = a user alt-assets mod supplied the skeleton (full model replacement)
+static u8 sIsForm = 0; // 1 = a custom form (objects/forms/<name>/) supplied the skeleton
+static u8 sIsSeasonalRig = 0;
 static u8 sIsChildRig = 0; // 1 = the form's object_link_child mirror is loaded (Time Gate off = child age)
 static SkelAnime sGaroSkelAnime;
 static Vec3s sGaroJointTable[GARO_LIMB_MAX];
@@ -284,6 +286,7 @@ extern "C" void AdultLink_OnFormChanged(void) {
     sIsMod = 0;
     sIsForm = 0;
     sIsChildRig = 0;
+    sIsSeasonalRig = 0;
     sRigBase.clear();
     sGaroReady = 0;
     for (int i = 0; i < PLAYER_EYES_MAX; i++) {
@@ -339,10 +342,24 @@ static s32 AdultLink_Setup(void) {
             }
         }
     }
+    // Seasonal outfits reuse this renderer's established private-rig, hand,
+    // first-person and blink paths. They never replace a forced/custom form.
+    if (skel == NULL && formBase == NULL) {
+        if (const char* seasonal = PakLoader_GetSeasonalSkeletonPath()) {
+            skel = (FlexSkeletonHeader*)ResourceMgr_LoadSkeletonByName(seasonal, NULL);
+            if (skel != NULL) {
+                const char* path = std::strncmp(seasonal, "__OTR__", 7) == 0 ? seasonal + 7 : seasonal;
+                formRigBase.assign(path, std::strrchr(path, '/') + 1);
+                sIsForm = 1; // Indexed private resource root; the pose/rig stays unchanged.
+                sIsSeasonalRig = 1;
+                sIsChildRig = !AdultLink_IsActive();
+            }
+        }
+    }
     if (skel == NULL && ResourceMgr_IsAltAssetsEnabled()) {
         skel = (FlexSkeletonHeader*)ResourceMgr_LoadSkeletonByName("objects/object_link_boy/gLinkAdultSkel", NULL);
     }
-    sIsMod = (!sIsForm && skel != NULL) ? 1 : 0;
+    sIsMod = (sIsSeasonalRig || (!sIsForm && skel != NULL)) ? 1 : 0;
 
     if (!sIsMod && !sIsForm) {
         // Base skeleton from the un-indexed oot.o2r (self-recovering archive-scoped load).
@@ -909,6 +926,16 @@ extern "C" void AdultLink_Toggle(void) {
 }
 
 extern "C" s32 AdultLink_ShouldHide(void) {
+    // This is called once from the local Player_Draw path before any adult
+    // overlay is submitted. It also prepares future child outfit selection.
+    PakLoader_FrameBegin();
+    const char* selectedOutfit = PakLoader_GetSeasonalSkeletonPath();
+    static std::string lastOutfit;
+    const std::string outfit = selectedOutfit ? selectedOutfit : "";
+    if (outfit != lastOutfit) {
+        lastOutfit = outfit;
+        AdultLink_OnFormChanged();
+    }
     // The menu's Force Form combobox changes the active form without going through CustomForms_Toggle.
     static s32 sLastForm = CUSTOM_FORM_NONE;
     s32 form = CustomForms_ActiveForm();
@@ -916,7 +943,7 @@ extern "C" s32 AdultLink_ShouldHide(void) {
         sLastForm = form;
         AdultLink_OnFormChanged();
     }
-    if (!AdultLink_IsActive() && form == CUSTOM_FORM_NONE) {
+    if (!AdultLink_IsActive() && form == CUSTOM_FORM_NONE && selectedOutfit == NULL) {
         return 0;
     }
     // Adult Link / a custom form only REPLACES the Human form. When the player is transformed (Deku /

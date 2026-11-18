@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <iostream>
@@ -17,6 +18,11 @@ extern "C" {
 #include "ComboItemDrawABI.h"
 #include "ComboNeiGiResourceOwner.h"
 #include "ComboCollectibleShimmerDraw.h"
+#include "combo/actors/ComboOwlEffects.h"
+extern "C" void ComboOwl_DrawEffects(PlayState*, const char*) {
+  std::cerr << "sword fixture unexpectedly dispatched owl effects\n";
+  std::abort();
+}
 extern "C" void NeiGi_DrawTintedShimmerOverlay(PlayState*, const uint8_t[4], const char*) {
   assert(false && "sword fixture unexpectedly selected collectible shimmer");
 }

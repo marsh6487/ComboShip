@@ -120,6 +120,18 @@ extern "C" s32 Actor_TrackPlayer(PlayState *, Actor *, Vec3s *, Vec3s *,
   return true;
 }
 extern "C" s32 SkelAnime_Update(SkelAnime *) { return true; }
+// Animation resource/frame decoding is a service boundary in this camera suite;
+// native Treasure Gal action parity is covered by black_market_keeper_interaction.
+extern "C" void Animation_MorphToLoop(SkelAnime* skel, AnimationHeader* animation, f32) {
+  ++animationChanges;
+  skel->animation = animation;
+  skel->mode = ANIMMODE_LOOP;
+}
+extern "C" void Animation_MorphToPlayOnce(SkelAnime* skel, AnimationHeader* animation, f32) {
+  ++animationChanges;
+  skel->animation = animation;
+  skel->mode = ANIMMODE_ONCE;
+}
 extern "C" s16 Animation_GetLastFrame(void *) { return 30; }
 extern "C" s32 Animation_OnFrame(SkelAnime *, f32) { return false; }
 extern "C" void Actor_PlaySfx(Actor *, u16) {}

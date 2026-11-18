@@ -605,7 +605,8 @@ void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
         *samples = clamp16((*samples * g) >> 4);
         samples++;
 
-        nbytes -= 8;
+        // Eight s16 samples consume sixteen bytes, as in the MM mixer.
+        nbytes -= 8 * sizeof(int16_t);
     } while (nbytes > 0);
 }
 

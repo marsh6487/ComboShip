@@ -4404,7 +4404,9 @@ u32 SurfaceType_IsWallDamage(CollisionContext* colCtx, CollisionPoly* poly, s32 
 /**
  * Zora's Domain WaterBox in King Zora's Room
  */
-WaterBox zdWaterBox = { -348, 877, -1746, 553, 780, 0x2104 };
+// WaterBox now stores unpacked Unbound fields. The old packed properties 0x2104
+// mean camera 4, lighting 1, room 1 and swimmable, not camera index 8452.
+WaterBox zdWaterBox = { -348, 877, -1746, 553, 780, 4, 1, 1, false };
 
 /**
  * WaterBox's effective bounding box
@@ -4526,7 +4528,8 @@ u16 WaterBox_GetCameraSType(CollisionContext* colCtx, WaterBox* waterBox) {
     s32 camId = WaterBox_GetCamDataIndex(colCtx, waterBox);
     CamData* camData = colCtx->colHeader->cameraDataList;
 
-    if (camData == PHYSICAL_TO_VIRTUAL(gSegments[0])) {
+    if (camData == NULL || camData == PHYSICAL_TO_VIRTUAL(gSegments[0]) || camId < 0 ||
+        (size_t)camId >= colCtx->colHeader->cameraDataListLen) {
         return 0;
     }
 

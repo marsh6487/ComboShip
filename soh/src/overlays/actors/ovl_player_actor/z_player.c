@@ -696,6 +696,7 @@ static u16 D_8085361C[] = {
     NA_SE_VO_LI_FALL_L,
 };
 
+#include "../../../../../combo/actors/ZeldaRun.h"
 #define GET_PLAYER_ANIM(group, type) D_80853914[group][type]
 
 static LinkAnimationHeader* D_80853914[PLAYER_ANIMGROUP_MAX][PLAYER_ANIMTYPE_MAX] = {
@@ -2496,7 +2497,7 @@ LinkAnimationHeader* func_80833438(Player* this) {
                (this->currentBoots == PLAYER_BOOTS_IRON)) {
         return GET_PLAYER_ANIM(PLAYER_ANIMGROUP_heavy_run, this->modelAnimType);
     } else {
-        return GET_PLAYER_ANIM(PLAYER_ANIMGROUP_run, this->modelAnimType);
+        return ZeldaRun_Select(this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_run, this->modelAnimType));
     }
 }
 
@@ -8205,7 +8206,8 @@ void func_8083C858(Player* this, PlayState* play) {
     }
 
     Player_SetupAction(play, this, actionFunc, 1);
-    Player_AnimChangeLoopMorph(play, this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_run, this->modelAnimType));
+    Player_AnimChangeLoopMorph(play, this,
+                               ZeldaRun_Select(this, GET_PLAYER_ANIM(PLAYER_ANIMGROUP_run, this->modelAnimType)));
 
     this->unk_89C = 0;
     this->unk_864 = this->unk_868 = 0.0f;

@@ -9,6 +9,7 @@ void CustomItems_CleanupTransientTools(Player* p, PlayState* play) {
         return;
     }
 
+    SwitchHook_CleanupManualAim(p, play);
     s32 blocked = CustomItems_IsBlocked(p, play) || play->csCtx.state != CS_STATE_IDLE;
     if (dlActive &&
         (blocked || !IsItemEquipped(ITEM_DEKU_LEAF) ||
@@ -28,7 +29,9 @@ void CustomItems_ResetTransientTools(Player* p, PlayState* play) {
         return;
     }
 
+    SwitchHook_OnFired(p);
     // These globals outlive Player/PlayState on an in-process reset or scene load.
+    Beetle_ResetTransient(p, play);
     HGrace_ResetTransient();
     DekuLeaf_Stop(p, play);
     Shovel_Stop(p, play);
@@ -50,7 +53,7 @@ s32 CustomItems_HasStowableHeldItem(Player* p) {
     return gCustomItemState.lanternEquipped || gCustomItemState.lanternSwinging || fireRodActive ||
            fireRodFirstPerson || iceRodActive || iceRodFirstPerson || lightRodActive || lightRodFirstPerson ||
            gCustomItemState.gustJarEquipped || gCustomItemState.mogmaMittsActive ||
-           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn();
+           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn() || Slate_IsDrawn();
 }
 
 void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
@@ -58,6 +61,7 @@ void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
         return;
     }
 
+    Slate_PutAway(play, p);
     Seasons_Stow(play, p);
     Lantern_PutAway(p, play);
     FireRod_PutAway(p, play);

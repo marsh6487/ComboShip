@@ -17,9 +17,9 @@ struct {
     u8 items[16]{};
   } inventory;
   struct {
-    u8 cButtonSlots[3]{}, buttonItems[4]{};
+    u8 cButtonSlots[7]{}, buttonItems[8]{};
   } equips;
-  u8 buttonStatus[4]{};
+  u8 buttonStatus[8]{};
 } gSaveContext;
 #define osSyncPrintf(...) ((void)0)
 #define BUTTON_STATUS_INDEX(x) (x)
@@ -51,6 +51,20 @@ int main() {
   gSaveContext.inventory.items[4] = ITEM_MILK_BOTTLE;
   Inventory_UpdateBottleItem(&play, ITEM_BOTTLE, 1);
   assert(gSaveContext.inventory.items[4] == ITEM_MILK_HALF && activations == 1);
+  // Chateau must use the same native consume/magic activation boundary from
+  // every supported C/D-pad button, not only C-left.
+  for (int button = 1; button < 8; ++button) {
+    const int before = activations;
+    gSaveContext.equips.cButtonSlots[button - 1] = 4;
+    gSaveContext.inventory.items[4] = ITEM_CHATEAU_ROMANI;
+    gSaveContext.equips.buttonItems[button] = ITEM_CHATEAU_ROMANI;
+    Inventory_UpdateBottleItem(&play, ITEM_BOTTLE, button);
+    assert(activations == before + 1);
+    assert(gSaveContext.inventory.items[4] == ITEM_BOTTLE);
+    assert(gSaveContext.equips.buttonItems[button] == ITEM_BOTTLE);
+    Inventory_UpdateBottleItem(&play, ITEM_BOTTLE, button);
+    assert(activations == before + 1);
+  }
   std::cout << "PASS Chateau use, native consumption, infinite-magic "
                "activation and ordinary milk\n";
 }

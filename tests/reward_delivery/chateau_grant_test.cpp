@@ -27,7 +27,7 @@ struct PlayState { struct { int state = 0; } pauseCtx; } play;
 PlayState* gPlayState = &play;
 struct {
     struct { u8 items[24]; } inventory;
-    struct { u8 cButtonSlots[3], buttonItems[4]; } equips;
+    struct { u8 cButtonSlots[7], buttonItems[8]; } equips;
     bool isMagicAcquired = false, isDoubleMagicAcquired = false;
 } gSaveContext;
 NeiSaveData saved{};

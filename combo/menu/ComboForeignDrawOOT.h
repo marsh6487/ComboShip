@@ -1,4 +1,5 @@
 #include "ComboNeiGiResourceOwner.h"
+#include "../actors/ComboOwlEffects.h"
 /* combo/menu/ComboForeignDrawOOT.h — ComboShip: cross-game foreign-item rendering, OOT (host) side.
  * The exact mirror of combo/menu/ComboForeignDrawMM.h in the opposite direction: an OOT check holding
  * RG_COMBO_FOREIGN actually holds an MM item, so we render the REAL MM model by asking 2ship.dll
@@ -1235,9 +1236,19 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         case CW_DRAW_KIND_MM_SOUL_FLAME:
             OOT_DrawForeignSoulFlame(play, info);
             break;
-        case CW_DRAW_KIND_OPS:
+        case CW_DRAW_KIND_OPS: {
+            bool owl = false;
+            for (int32_t i = 0; i < info->count; ++i)
+                owl |= ComboOwl_IsOpenedModel(info->dls[i]) != 0;
+            if (owl)
+                Matrix_Push();
             OOT_DrawForeignOps(play, info);
+            if (owl) {
+                ComboOwl_DrawEffects(play, "mm");
+                Matrix_Pop();
+            }
             break;
+        }
         case CW_DRAW_KIND_BOTTLE_CONTENTS:
             if (!ComboBottleContents_Draw(play, ComboBottleContents_Profile(info->dls[0]))) {
                 OOT_DrawForeignSimple(play, info);

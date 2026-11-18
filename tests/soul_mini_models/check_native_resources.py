@@ -407,7 +407,8 @@ def validate_recipe(recipe, resources):
         visit(0)
         require(len(visited) == len(limbs), 'unreachable skeleton limbs')
         overrides = {}
-        for override in info.get('limbDLs', info.get('limbOverrides', [])):
+        for override in [*info.get('limbDLs', info.get('limbOverrides', [])),
+                         *info.get('proceduralLimbDLs', [])]:
             overrides.setdefault(int(override['limbIndex']), []).append(override)
         hidden_mask = int(info.get('hiddenLimbMask', 0))
         matrix_consumers = 0

@@ -36,6 +36,8 @@ static PlayState play;
 static Mtx matrix;
 static int depth;
 static bool missingSparkle, allocationFailure;
+static bool owlAvailable;
+static std::string owlResourceOwner;
 static int resourceLoads;
 static std::vector<std::vector<Vtx>> arena;
 static std::map<Gfx*, std::vector<Vtx>> vertexLoads;
@@ -49,6 +51,11 @@ static std::string legacyModPath;
 #endif
 
 extern "C" {
+int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path) {
+    assert(!strcmp(path, "__OTR__objects/owl_effects_poc4/Enabled"));
+    owlResourceOwner = game;
+    return owlAvailable;
+}
 #ifdef HOST_MM
 bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
@@ -186,6 +193,7 @@ extern "C" {
 #define Gfx_SetupDL_26Opa Gfx_SetupDL26_Opa
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
 #define Matrix_RotateZ Matrix_RotateZF
+#define NEI_GI_NATIVE_MM 1
 #endif
 #include "soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
 #ifdef HOST_MM
@@ -195,6 +203,7 @@ extern "C" {
 #undef Gfx_SetupDL_26Opa
 #undef NEI_GI_ROTATE_Y
 #undef Matrix_RotateZ
+#undef NEI_GI_NATIVE_MM
 #endif
 }
 
@@ -250,6 +259,7 @@ static void Reset(int frame) {
     play.state.gfxCtx = &gfx; play.gameplayFrames = frame;
     paths.clear(); sparkleTransforms.clear(); stack.clear(); depth = 0; transform = {};
     arena.clear(); vertexLoads.clear(); resourceLoads = 0;
+    owlAvailable = false; owlResourceOwner.clear();
     play.billboardMtxF = {}; play.billboardMtxF.xx = play.billboardMtxF.yy = play.billboardMtxF.zz = 1;
 }
 static std::vector<Vtx> ExpandedVertices(bool foreign, const char* owner = "mm") {
@@ -307,6 +317,61 @@ static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* 
     return actual;
 }
 int main() {
+    // Compile and exercise the actual shared owl renderer in each native host.
+    // The archive gate must preserve vanilla rendering without allocating.
+    Reset(47);
+    ComboOwl_DrawEffects(nullptr, nullptr);
+    assert(owlResourceOwner.empty() && arena.empty() && gfx.polyXlu.p == xlu);
+    ComboOwl_DrawEffects(&play, nullptr);
+#ifdef HOST_MM
+    assert(owlResourceOwner == "mm");
+#else
+    assert(owlResourceOwner == "oot");
+#endif
+    assert(arena.empty() && gfx.polyXlu.p == xlu && depth == 0 && stack.empty());
+    for (const char* owner : {static_cast<const char*>(nullptr), "mm", "oot"}) {
+        for (int frame : {0, 47, 119, 120}) {
+            Reset(frame); owlAvailable = true;
+            transform = {2, 7, 11, .01f};
+            ComboOwl_DrawEffects(&play, owner);
+            assert(owlResourceOwner == (owner ? owner :
+#ifdef HOST_MM
+                                       "mm"
+#else
+                                       "oot"
+#endif
+                                       ));
+            assert(depth == 0 && stack.empty() && transform.x == 2 && transform.y == 7 &&
+                   transform.z == 11 && transform.scale == .01f);
+            const auto actual = ExpandedVertices(owner != nullptr, owner ? owner : "mm");
+            const auto pages = ComboOwlEffects::Pages(frame);
+            assert(actual.size() == pages.count + 12);
+            size_t offset = 0;
+            const auto check = [&](const NeiGi::Mesh& expected) {
+                for (size_t i = 0; i < expected.count; ++i, ++offset) {
+                    const auto& v = expected.vertices[i]; const auto& a = actual[offset];
+                    assert(a.v.ob[0] == std::lround(v.p.x * 16));
+                    assert(a.v.ob[1] == std::lround(v.p.y * 16));
+                    assert(a.v.ob[2] == std::lround(v.p.z * 16));
+                    assert(a.v.cn[0] == (v.rgb >> 16) && a.v.cn[1] == ((v.rgb >> 8) & 255) &&
+                           a.v.cn[2] == (v.rgb & 255) && a.v.cn[3] == v.alpha);
+                }
+            };
+            check(pages); check(ComboOwlEffects::Flame(false)); check(ComboOwlEffects::Flame(true));
+            std::vector<std::string> textures;
+            for (Gfx* cmd = xlu; cmd < gfx.polyXlu.p; ++cmd) {
+                if ((cmd->words.w0 >> 24) == G_SETTIMG) textures.emplace_back((const char*)cmd->words.w1);
+            }
+            const auto number = std::to_string(ComboOwlEffects::TextureFrame(frame) + 1000).substr(1);
+            assert(textures.size() == 2);
+            assert(textures[0] == "__OTR__objects/owl_effects_poc4/flames/left_" + number);
+            assert(textures[1] == "__OTR__objects/owl_effects_poc4/flames/right_" + number);
+        }
+    }
+    Reset(47); owlAvailable = true; allocationFailure = true;
+    ComboOwl_DrawEffects(&play, "mm");
+    assert(ExpandedVertices(true).empty() && depth == 0 && stack.empty()); allocationFailure = false;
+    puts("PASS both-host owl marker fallback, page/flame mesh submission, atlas frame, ownership and matrix restore");
     const uint8_t mmMaskColors[24][3] = {
         {220,65,65},{95,70,140},{64,144,255},{135,95,205},
         {245,145,205},{50,220,90},{255,200,55},{220,225,240},

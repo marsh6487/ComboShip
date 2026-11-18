@@ -33,6 +33,13 @@
 extern bool func_80831010(Player* this, PlayState* play);
 
 static u8 sBeetleColInitialized = 0;
+static PlayState* sBeetleOwner = NULL;
+static Player* sBeetlePlayer = NULL;
+static Camera* sBeetleCamera = NULL;
+static s16 sBeetleCameraUid = 0;
+static s16 sBeetleReturnCamId = CAM_ID_NONE;
+static Camera* sBeetleReturnCamera = NULL;
+static s16 sBeetleReturnCameraUid = 0;
 static s8 sBeetlePrevInvinc = 0;
 static Actor* sBeetleTarget = NULL;    // Z-locked enemy (NULL = no lock). Skijer's NEI
 static Actor* sBeetleCandidate = NULL; // nearest lockable actor each frame (drives the "offer" reticle)
@@ -81,32 +88,68 @@ u8 Beetle_IsFlying(void) {
     return beetleActive && (beetleState == BEETLE_STATE_FLYING || beetleState == BEETLE_STATE_RETURNING);
 }
 
-static void Beetle_DestroySubCam(PlayState* play) {
-    if (beetleSubCamId != SUBCAM_FREE) {
-        // Force MAIN_CAM out of CAM_MODE_FOLLOWBOOMERANG before reactivating it.
-        // While the beetle flew we set PLAYER_STATE1_BOOMERANG_THROWN, which
-        // makes z_player.c put MAIN_CAM into FOLLOWBOOMERANG mode pointed at
-        // a stale Player.boomerangActor. Reactivating in that mode can deref
-        // freed memory (Camera_KeepOn1) and crash — common during Barinade
-        // phase 4 where actor churn fills the freed En_Boom slot with valid-
-        // looking data, defeating the camera->target->update == NULL guard.
-        Camera_ChangeMode(Play_GetCamera(play, MAIN_CAM), CAM_MODE_NORMAL);
-        Play_ChangeCameraStatus(play, MAIN_CAM, CAM_STAT_ACTIVE);
-        Play_ClearCamera(play, beetleSubCamId);
-        beetleSubCamId = SUBCAM_FREE;
+static u8 Beetle_OwnsSubCam(PlayState* play) {
+    return play == sBeetleOwner && beetleSubCamId >= CAM_ID_SUB_FIRST && beetleSubCamId < NUM_CAMS &&
+           play->cameraPtrs[beetleSubCamId] == sBeetleCamera && sBeetleCamera != NULL &&
+           sBeetleCamera->uid == sBeetleCameraUid;
+}
+
+static void Beetle_EndPiloting(Player* p) {
+    p->stateFlags2 &= ~PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET;
+    // Retire only a legacy Beetle self-target, never a real Zora fin actor.
+    if (p->zoraBoomerangActor == &p->actor) {
+        p->stateFlags1 &= ~PLAYER_STATE1_BOOMERANG_THROWN;
+        p->zoraBoomerangActor = NULL;
     }
 }
 
-static void Beetle_CreateSubCam(PlayState* play) {
-    if (beetleSubCamId == SUBCAM_FREE) {
-        beetleSubCamId = Play_CreateSubCamera(play);
-        Play_ChangeCameraStatus(play, MAIN_CAM, CAM_STAT_WAIT);
-        Play_ChangeCameraStatus(play, beetleSubCamId, CAM_STAT_ACTIVE);
+static void Beetle_DestroySubCam(PlayState* play) {
+    if (Beetle_OwnsSubCam(play)) {
+        // A newer cutscene may have taken the view. Retire only our camera;
+        // never reactivate MAIN_CAM over an unrelated native subcamera.
+        u8 wasActive = Play_GetActiveCamId(play) == beetleSubCamId;
+        s16 returnId = sBeetleReturnCamId;
+        if (returnId < CAM_ID_MAIN || returnId >= NUM_CAMS || play->cameraPtrs[returnId] != sBeetleReturnCamera ||
+            sBeetleReturnCamera == NULL || sBeetleReturnCamera->uid != sBeetleReturnCameraUid) {
+            returnId = CAM_ID_MAIN;
+        }
+        Play_ClearCamera(play, beetleSubCamId);
+        if (wasActive && play->cameraPtrs[returnId] != NULL)
+            Play_ChangeCameraStatus(play, returnId, CAM_STATUS_ACTIVE);
     }
+    // Numeric camera slots and even Camera addresses are reused. The native
+    // uid check above also protects a replacement PlayState at the same address.
+    beetleSubCamId = SUBCAM_FREE;
+    sBeetleCamera = NULL;
+    sBeetleReturnCamera = NULL;
+    sBeetleReturnCamId = CAM_ID_NONE;
+}
+
+static u8 Beetle_CreateSubCam(PlayState* play) {
+    s16 returnId;
+    s16 subCamId;
+    if (Beetle_OwnsSubCam(play))
+        return 1;
+    returnId = Play_GetActiveCamId(play);
+    if (returnId < CAM_ID_MAIN || returnId >= NUM_CAMS || play->cameraPtrs[returnId] == NULL)
+        return 0;
+    subCamId = Play_CreateSubCamera(play);
+    if (subCamId < CAM_ID_SUB_FIRST || subCamId >= NUM_CAMS)
+        return 0; // CAM_ID_NONE aliases the active camera in native Play APIs.
+    beetleSubCamId = subCamId;
+    sBeetleOwner = play;
+    sBeetleCamera = play->cameraPtrs[subCamId];
+    sBeetleCameraUid = sBeetleCamera->uid;
+    sBeetleReturnCamId = returnId;
+    sBeetleReturnCamera = play->cameraPtrs[returnId];
+    sBeetleReturnCameraUid = sBeetleReturnCamera->uid;
+    Play_ChangeCameraStatus(play, returnId, CAM_STATUS_WAIT);
+    Play_ChangeCameraStatus(play, subCamId, CAM_STATUS_ACTIVE);
+    return 1;
 }
 
 static void Beetle_UpdateSubCam(PlayState* play) {
-    if (beetleSubCamId == SUBCAM_FREE)
+    if (!Beetle_OwnsSubCam(play))
         return;
 
     f32 sinY = Math_SinS(beetleRot.y);
@@ -132,9 +175,8 @@ static void Beetle_Stop(Player* p, PlayState* play) {
         p->stateFlags1 &= ~PLAYER_STATE1_8; // clear ITEM_IN_HAND
         beetleFirstPerson = 0;
     }
+    Beetle_EndPiloting(p);
     Beetle_DestroySubCam(play);
-    p->stateFlags1 &= ~PLAYER_STATE1_BOOMERANG_THROWN;
-    p->stateFlags2 &= ~PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET;
     beetleCollider.base.atFlags &= ~(AT_ON | AT_HIT);
     beetleActive = 0;
     beetleState = BEETLE_STATE_IDLE;
@@ -191,7 +233,10 @@ static void Beetle_Launch(Player* p, PlayState* play) {
     p->unk_AA5 = PLAYER_UNKAA5_0;       // exit MM's aim camera
     p->stateFlags1 &= ~PLAYER_STATE1_8; // clear ITEM_IN_HAND — beetle is now flying, not aiming
     beetleFirstPerson = 0;
-    Beetle_CreateSubCam(play);
+    if (!Beetle_CreateSubCam(play)) {
+        Beetle_Stop(p, play);
+        return;
+    }
 
     Beetle_PlaySound(&p->actor.world.pos, BEETLE_SFX_LAUNCH);
     ItemVoice_Play(p, NA_SE_VO_LI_SWORD_N, NA_SE_VO_LI_SWORD_N_KID);
@@ -203,9 +248,8 @@ static void Beetle_StartReturn(Player* p, PlayState* play) {
     sBeetleKamikaze = 0;
     sBeetleAutonomous = 0;
     p->focusActor = NULL; // drop the lock-on reticle
+    Beetle_EndPiloting(p);
     Beetle_DestroySubCam(play);
-    p->stateFlags1 &= ~PLAYER_STATE1_BOOMERANG_THROWN;
-    p->stateFlags2 &= ~PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET;
     Beetle_PlaySound(&beetlePos, BEETLE_SFX_RETURN);
 }
 
@@ -487,12 +531,10 @@ static void Beetle_StateFlying(Player* p, PlayState* play) {
 
     // Animation update is handled by Player_UpperAction_Beetle
     Player_ZeroSpeedXZ(p);
-    p->stateFlags1 |= PLAYER_STATE1_BOOMERANG_THROWN;
+    // The native movement bridge holds Link during piloted flight. Advertising
+    // a thrown Zora fin here also changes MAIN_CAM's mode and target while our
+    // subcamera is active, corrupting the view restored when the Beetle returns.
     p->stateFlags2 |= PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET;
-    // Point boomerangActor at Link himself so the FOLLOWBOOMERANG camera path
-    // (z_player.c:12350) never propagates a stale En_Boom pointer through
-    // Camera_SetParam — Link's actor is always valid.
-    p->zoraBoomerangActor = &p->actor;
 
     // Z: toggle the enemy lock (locks the nearest attention-enabled enemy, like Link's Z-target).
     if (CHECK_BTN_ALL(input->press.button, BTN_Z)) {
@@ -508,10 +550,9 @@ static void Beetle_StateFlying(Player* p, PlayState* play) {
     // locked it kamikaze-homes to hit it (then returns); otherwise it flies straight back to Link.
     if (CHECK_BTN_ALL(input->press.button, BTN_B)) {
         sBeetleAutonomous = 1;
-        Beetle_DestroySubCam(play);                        // camera back to Link
-        p->stateFlags1 &= ~PLAYER_STATE1_BOOMERANG_THROWN; // control back to Link
-        p->stateFlags2 &= ~PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET;
-        p->focusActor = NULL; // drop the lock reticle
+        Beetle_EndPiloting(p);
+        Beetle_DestroySubCam(play); // restore the camera that was active before launch
+        p->focusActor = NULL;       // drop the lock reticle
         if (sBeetleTarget != NULL) {
             sBeetleKamikaze = 1;
         }
@@ -589,6 +630,8 @@ static void Beetle_StateReturning(Player* p, PlayState* play) {
 }
 
 void Handle_Beetle(Player* p, PlayState* play) {
+    if (sBeetleOwner != play || sBeetlePlayer != p)
+        Beetle_ResetTransient(p, play);
     if (!sBeetleColInitialized)
         Beetle_InitCollider(play, p);
 
@@ -598,6 +641,14 @@ void Handle_Beetle(Player* p, PlayState* play) {
     if (!in.wasEquipped) {
         if (beetleActive)
             Beetle_Stop(p, play);
+        return;
+    }
+
+    if (beetleActive && (play->transitionTrigger != TRANS_TRIGGER_OFF || play->csCtx.state != CS_STATE_IDLE ||
+                         p->csAction != PLAYER_CSACTION_NONE ||
+                         (beetleState == BEETLE_STATE_FLYING && !sBeetleAutonomous &&
+                          (!Beetle_OwnsSubCam(play) || Play_GetActiveCamId(play) != beetleSubCamId)))) {
+        Beetle_Stop(p, play);
         return;
     }
 
@@ -681,6 +732,7 @@ s32 Player_UpperAction_Beetle(Player* this, PlayState* play) {
 }
 
 void Player_InitBeetleIA(PlayState* play, Player* this) {
+    Beetle_ResetTransient(this, play);
     Beetle_InitCollider(play, this);
     beetleActive = 0;
     beetleState = BEETLE_STATE_IDLE;
@@ -691,4 +743,34 @@ void Player_InitBeetleIA(PlayState* play, Player* this) {
     beetleTimer = 0;
     beetleSubCamId = SUBCAM_FREE;
     this->stateFlags1 |= PLAYER_STATE1_ITEM_IN_HAND;
+}
+
+// Called on native Player destruction and initialization, including heap-replacing
+// Combo resumes. Never dereference an owner or grabbed actor from an old heap.
+void Beetle_ResetTransient(Player* p, PlayState* play) {
+    if (sBeetleOwner == play) {
+        if (sBeetlePlayer == p) {
+            if (beetleFirstPerson) {
+                p->unk_AA5 = PLAYER_UNKAA5_0;
+                p->stateFlags1 &= ~PLAYER_STATE1_8;
+            }
+            Beetle_EndPiloting(p);
+        }
+        Beetle_DestroySubCam(play);
+        if (sBeetleColInitialized)
+            Collider_DestroyCylinder(play, &beetleCollider);
+    }
+    sBeetleOwner = play;
+    sBeetlePlayer = p;
+    sBeetleColInitialized = 0;
+    sBeetlePrevInvinc = 0;
+    sBeetleCamera = sBeetleReturnCamera = NULL;
+    sBeetleReturnCamId = CAM_ID_NONE;
+    beetleSubCamId = SUBCAM_FREE;
+    beetleActive = 0;
+    beetleState = BEETLE_STATE_IDLE;
+    beetleFirstPerson = 0;
+    beetleGrabbed = NULL;
+    sBeetleTarget = sBeetleCandidate = NULL;
+    sBeetleKamikaze = sBeetleAutonomous = 0;
 }

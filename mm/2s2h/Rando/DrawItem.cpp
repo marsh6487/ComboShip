@@ -57,6 +57,7 @@ extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe w
 // The shared ring renderer's debug OPEN_DISPS paths need the native graph
 // declarations above even when there is no Release/PCH to supply them.
 #include "../../../combo/ComboMmKeyRingDraw.h"
+#include "../../../combo/actors/ComboOwlEffects.h"
 #define COMBO_DOOR_KEY_HOST_MM
 #include "../../../combo/ComboDoorKeyGi.h"
 #undef COMBO_DOOR_KEY_HOST_MM
@@ -329,9 +330,16 @@ void DrawMilkRefill() {
 }
 
 void DrawOwlStatue() {
+    Matrix_Push();
     Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
     Matrix_Translate(0, -3000, 0, MTXMODE_APPLY);
     Gfx_DrawDListOpa(gPlayState, (Gfx*)gOwlStatueOpenedDL);
+    ComboOwl_DrawEffects(gPlayState, nullptr);
+    Matrix_Pop();
+    if (CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0)) {
+        const uint8_t color[4] = { 220, 225, 240, 255 };
+        NeiGi_DrawShimmerOverlay(gPlayState, color, nullptr);
+    }
 }
 
 Color_RGBA8 DefaultKeyColors[10] = {

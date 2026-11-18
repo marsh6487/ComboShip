@@ -6,6 +6,7 @@ PlayState* sNativeShopPlay = nullptr;
 s16 sBrowseCamera = CAM_ID_NONE, sBrowseParent = CAM_ID_NONE, sBrowseCameraUid = -1;
 Camera* sBrowseCameraPtr = nullptr;
 std::array<Vec3s, TREASURE_CHEST_SHOP_GAL_LIMB_MAX> sKeeperJoints{}, sKeeperMorphs{};
+BlackMarketKeeperInteraction::State sKeeperInteraction;
 struct CustomerAnchor {
     PlayState* play = nullptr;
     Player* player = nullptr;

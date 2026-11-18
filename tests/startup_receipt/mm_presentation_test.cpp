@@ -75,6 +75,7 @@ int main() {
         const int before=ack;GiveReceipt(actor,&play);assert(ack==before+1);
         assert(shown.find("Actual frozen tier")!=shown.npos&&shown.find(CW_STARTUP_SOURCE)!=shown.npos);
         assert(full?(boxes==1&&toasts==0):(boxes==0&&toasts==1));
+        if(!full) assert(shown==std::string("You received Actual frozen tier - ")+CW_STARTUP_SOURCE);
         assert(shown.find("Actual frozen tier")<shown.find(CW_STARTUP_SOURCE));
         DrawReceipt(actor,&play);
         if(owner==1)assert(drawnId==ids[category]);else assert(drawnName=="Concrete Progressive Tier");

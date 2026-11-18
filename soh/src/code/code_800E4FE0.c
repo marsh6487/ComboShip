@@ -736,8 +736,8 @@ void func_800E6300(SequenceChannel* channel, AudioCmd* cmd) {
             }
             return;
         case CHAN_UPD_PAN_UNSIGNED:
-            if (channel->newPan != cmd->asSbyte) {
-                channel->panChannelWeight = cmd->asSbyte;
+            if (channel->panChannelWeight != cmd->asUbyte) {
+                channel->panChannelWeight = cmd->asUbyte;
                 channel->changes.s.pan = 1;
             }
             return;

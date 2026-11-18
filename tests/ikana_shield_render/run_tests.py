@@ -59,8 +59,12 @@ def main():
                     native_flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                                      "-fno-omit-frame-pointer", "-fno-pie"]
                 objects = []
+                resource_dir = "soh/soh/resource/type/" if host == "oot" else "mm/2s2h/resource/type/"
                 sources = [engine + "/src/code/z_skelanime.c", engine + "/src/code/sys_matrix.c",
-                           "soh/soh/gu_pc.c" if host == "oot" else "mm/2s2h/gu_pc.c"]
+                           "soh/soh/gu_pc.c" if host == "oot" else "mm/2s2h/gu_pc.c",
+                           resource_dir + "Array.cpp", resource_dir + "Skeleton.cpp",
+                           "libultraship/src/fast/resource/type/DisplayList.cpp",
+                           "libultraship/src/ship/resource/Resource.cpp"]
                 if host == "oot":
                     sources += ["soh/src/code/z_skin_matrix.c"]
                 for source in sources:
@@ -73,13 +77,20 @@ def main():
                         source_path.write_text((ROOT / source).read_text() +
                             '\nvoid IkanaTest_SetMatrixStack(MtxF* stack) { sMatrixStack = sCurrentMatrix = stack; }\n')
                     source_flags = list(native_flags)
+                    if source.endswith("/Skeleton.cpp"):
+                        # Native Skeleton resources include ResourceManager's pinned
+                        # fixture headers; gate tests do not inherit the NEI CPATH.
+                        source_flags += ["-I" + path for path in os.environ.get(
+                            "COMBO_NEI_FIXTURE_CPATH", "").split(os.pathsep) if path]
                     if args.sanitize and source.endswith("gu_pc.c"):
                         # Both unchanged native guMtxF2L implementations rely on
                         # signed fixed-point shifts (e.g. 65536 << 16). Keep all
                         # other ASan/UBSan checks, excluding shift checks ONLY in
                         # that legacy conversion translation unit.
                         source_flags += ["-fno-sanitize=shift"]
-                    subprocess.run([os.environ.get("CC", "cc"), "-std=gnu2x", *source_flags,
+                    cpp = source_path.suffix == ".cpp"
+                    compiler = os.environ.get("CXX", "c++") if cpp else os.environ.get("CC", "cc")
+                    subprocess.run([compiler, "-std=c++20" if cpp else "-std=gnu2x", *source_flags,
                                     "-w", "-c", str(source_path), "-o", str(output)], check=True)
                     objects.append(str(output))
                 binary = build / (host + ("-combo" if combo else "-original"))

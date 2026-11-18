@@ -4,6 +4,7 @@
 #include "Rando/Bags.h"
 #include "Rando/InfiniteUpgrades.h"
 #include "Rando/ActorBehavior/Souls.h"
+#include "Rando/SoulShuffle.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
 #include "mods/combo_rpg.h"
@@ -240,6 +241,12 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
     if (randoCheckId != RC_UNKNOWN) {
         hasObtainedCheck = RANDO_SAVE_CHECKS[randoCheckId].obtained;
     }
+
+    // NPC, animal and miscellaneous souls have no vanilla get-item entry. Their
+    // permanent flags survive Song of Time, just like the older enemy souls.
+    // Do not offer the original soul again when its check respawns next cycle.
+    if (const auto* soul = SoulShuffle::Find(randoItemId))
+        return !hasObtainedCheck && !Flags_GetRandoInf(soul->flag);
 
     if (const auto* key = RustyDoorKeys::Find(randoItemId))
         return !hasObtainedCheck && !Flags_GetRandoInf(key->flag);

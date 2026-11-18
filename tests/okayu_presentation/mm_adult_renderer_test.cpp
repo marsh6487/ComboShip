@@ -40,8 +40,9 @@ struct RitoLimb { Vec3s position; u8 child, sibling; const char* display; };
 static constexpr const char* kRitoBase = "objects/forms/rito/object_link_boy/";
 static std::map<std::string,std::vector<std::string>> ritoCalls;
 static int failures = 0, cases = 0;
-static u8 sIsMod, sIsForm, sIsChildRig;
+static u8 sIsMod, sIsForm, sIsChildRig, sIsSeasonalRig;
 static std::string sRigBase;
+static std::string seasonalSkeleton;
 static FlexSkeletonHeader model;
 static FlexSkeletonHeader* sSkel = &model;
 static std::map<std::string,Gfx> meshes;
@@ -103,8 +104,16 @@ s32 BossRemains_IsGohtWorn() { return goht; }
 s32 CustomForms_ActiveForm() { return form; }
 const char* CustomForms_BasePath() { return form == CUSTOM_FORM_RITO ? kRitoBase : nullptr; }
 s32 AdultLink_IsActive() { return 1; }
+const char *PakLoader_GetSeasonalSkeletonPath() {
+  return seasonalSkeleton.empty() ? nullptr : seasonalSkeleton.c_str();
+}
 SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path,SkelAnime*) {
-    return form == CUSTOM_FORM_RITO && std::string(path) == std::string(kRitoBase) + "gLinkAdultSkel" ? &model.sh : nullptr;
+  if (!seasonalSkeleton.empty() && path == seasonalSkeleton)
+    return &model.sh;
+  return form == CUSTOM_FORM_RITO &&
+                 std::string(path) == std::string(kRitoBase) + "gLinkAdultSkel"
+             ? &model.sh
+             : nullptr;
 }
 void* MmAssets_LoadFromOotArchive(const char*,size_t*) { return nullptr; }
 void* OotAssets_LoadGfxDirect(const char*) { return &nativeFP; }
@@ -165,7 +174,11 @@ static void Reset() {
     player = {}; player.transformation = PLAYER_FORM_HUMAN; player.actor.scale.y = .01f;
     player.leftHandType = PLAYER_MODELTYPE_LH_OPEN; player.rightHandType = PLAYER_MODELTYPE_RH_OPEN;
     player.unk_AA5 = PLAYER_UNKAA5_3;
-    sIsMod = 1; sIsForm = sIsChildRig = 0; sRigBase.clear(); form = CUSTOM_FORM_NONE;
+    sIsMod = 1;
+    sIsForm = sIsChildRig = sIsSeasonalRig = 0;
+    sRigBase.clear();
+    seasonalSkeleton.clear();
+    form = CUSTOM_FORM_NONE;
     bodyMod = hideSword = four = odolwa = goht = mirror = vanilla = false;
     tier = masterTier = fairyTier = 0; selected.clear(); unavailable.clear();
     for(auto& name : sOotEyeName) name = "unused-eye";
@@ -256,6 +269,61 @@ static void Sword(int item,int action,int model,int kokiriTier=0,int trueMaster=
         CHECK(lastLeft[1].words.w1 == reinterpret_cast<uintptr_t>(sDL_LHClosed));
     } else CHECK(false);
 }
+static void ActualSeasonalSetup() {
+  Reset();
+  const std::string base = "objects/seasonal_outfits/public_set/adult/winter/";
+  seasonalSkeleton = "__OTR__" + base + "gLinkAdultSkel";
+  for (const char *symbol :
+       {"gLinkAdultLeftHandNearDL",
+        "gLinkAdultLeftHandClosedNearDL",
+        "gLinkAdultLeftHandHoldingMasterSwordNearDL",
+        "gLinkAdultLeftHandHoldingBgsNearDL",
+        "gLinkAdultRightHandNearDL",
+        "gLinkAdultRightHandClosedNearDL",
+        "gLinkAdultRightHandHoldingHylianShieldNearDL",
+        "gLinkAdultRightHandHoldingBowNearDL",
+        "gLinkAdultRightHandHoldingOotNearDL",
+        "gLinkAdultRightHandHoldingHookshotNearDL",
+        "gLinkAdultWaistNearDL",
+        "gLinkAdultSheathNearDL",
+        "gLinkAdultMasterSwordAndSheathNearDL",
+        "gLinkAdultHylianShieldAndSheathNearDL",
+        "gLinkAdultHylianShieldSwordAndSheathNearDL",
+        "gLinkAdultRightHandHoldingMirrorShieldNearDL",
+        "gLinkAdultMirrorShieldAndSheathNearDL",
+        "gLinkAdultMirrorShieldSwordAndSheathNearDL",
+        "gLinkAdultRightArmOutNearDL",
+        "gLinkAdultRightHandOutNearDL",
+        "gLinkAdultLeftArmOutNearDL",
+        "gLinkAdultRightHandHoldingBowFirstPersonDL",
+        "gLinkAdultRightHandHoldingHookshotFarDL",
+        "gLinkAdultRightHandHoldingSlingshotNearDL",
+        "gLinkAdultRightHandHoldingSlingshotFirstPersonDL"})
+    Mesh((base + symbol).c_str());
+  model.sh.limbCount = 21;
+  model.dListCount = 18;
+  sReady = sSetupFailedPermanently = 0;
+  sSkel = nullptr;
+  CHECK(AdultLink_Setup());
+  CHECK(sIsSeasonalRig && sIsForm && sIsMod && !sIsChildRig &&
+        sRigBase == base && sSkel == &model);
+  player.heldItemAction = PLAYER_IA_BOW;
+  player.heldItemId = ITEM_BOW;
+  player.rightHandType = PLAYER_MODELTYPE_RH_BOW;
+  player.stateFlags1 |= PLAYER_STATE1_100000;
+  Draw();
+  CHECK(lastRight ==
+        Mesh((base + "gLinkAdultRightHandHoldingBowFirstPersonDL").c_str()));
+  CHECK(lastLeftForearm ==
+        Mesh((base + "gLinkAdultRightArmOutNearDL").c_str()));
+  CHECK(!lastHead && !lastTorso);
+  // Existing custom forms win even while a seasonal family is selected.
+  form = CUSTOM_FORM_RITO;
+  sReady = sSetupFailedPermanently = sIsSeasonalRig = sIsForm = sIsMod = 0;
+  CHECK(AdultLink_Setup());
+  CHECK(!sIsSeasonalRig && sRigBase == kRitoBase);
+}
+
 int main() {
     Reset(); Draw(); CHECK(lastLeft == &original && lastRight == &original);
     Reset(); player.leftHandType = PLAYER_MODELTYPE_LH_CLOSED; player.rightHandType = PLAYER_MODELTYPE_RH_CLOSED;
@@ -356,5 +424,6 @@ int main() {
     ActualRitoSetup();
 #endif
     if(failures) { std::fprintf(stderr,"%d renderer regression failures (%d frames)\n",failures,cases); return 1; }
+    ActualSeasonalSetup();
     std::printf("PASS %d native-struct adult renderer frames\n",cases);
 }

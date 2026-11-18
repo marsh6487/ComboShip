@@ -489,6 +489,33 @@ void FinishArrival(PlayState* play) {
         MagicMirrorPlayer_Arrive(play, player);
 }
 u16 PressedButton(PlayState* play) {
+    if (!play)
+        return 0;
+    const auto* player = GET_PLAYER(play);
+    if (!player)
+        return 0;
+        // Native item dispatch gives the instrument these buttons, but the Mirror
+        // reads the raw pad before that dispatch. Do not interpret notes as travel
+        // requests (or emit a rejected-travel sound). The message interval covers
+        // demonstrations, lessons and recording before/after the playing flag.
+#ifdef COMBO_MAGIC_MIRROR_MM
+    const bool drawingOcarina =
+        (player->itemAction == PLAYER_IA_OCARINA || player->heldItemAction == PLAYER_IA_OCARINA) &&
+        (player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM);
+    // func_80847994 consumes state3_20 to force the native ocarina pull-out.
+    if (drawingOcarina || (player->stateFlags2 & PLAYER_STATE2_USING_OCARINA) ||
+        (player->stateFlags3 & PLAYER_STATE3_20))
+#else
+    const bool drawingOcarina =
+        ((player->itemAction >= PLAYER_IA_OCARINA_FAIRY && player->itemAction <= PLAYER_IA_OCARINA_OF_TIME) ||
+         (player->heldItemAction >= PLAYER_IA_OCARINA_FAIRY && player->heldItemAction <= PLAYER_IA_OCARINA_OF_TIME)) &&
+        (player->stateFlags1 & PLAYER_STATE1_START_CHANGING_HELD_ITEM);
+    if (drawingOcarina || (player->stateFlags2 & PLAYER_STATE2_OCARINA_PLAYING) ||
+        (player->stateFlags3 & PLAYER_STATE3_FORCE_PULL_OCARINA))
+#endif
+        return 0;
+    if (play->msgCtx.msgMode >= MSGMODE_OCARINA_STARTING && play->msgCtx.msgMode < MSGMODE_TEXT_AWAIT_NEXT)
+        return 0;
     static constexpr u16 buttons[] = { 0, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
     for (s32 index = 1; index < 8; ++index)
         if ((play->state.input[0].press.button & buttons[index]) && !MirrorHost::ButtonClaimed(buttons[index]) &&

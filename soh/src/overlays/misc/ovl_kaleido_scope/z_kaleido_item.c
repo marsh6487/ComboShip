@@ -2558,13 +2558,21 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
 
             // Calculate inventory slot with page offset using modular system
             int inventorySlot = ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]);
+            u16 inventoryItem = ExtInv_GetSlotItem(inventorySlot);
 
-            // A boundary move can leave the cursor in place after ownership or
-            // shared-cell contents changed. Resolve that cell again even when
-            // movement returned 2; the cached previous item is not ownership.
-            cursorItem = ExtInv_GetSlotItem(inventorySlot);
-            if (cursorItem == ITEM_NONE) {
-                cursorItem = PAUSE_ITEM_NONE;
+            // SoH preserves the previous item when vertical movement hits a
+            // boundary (result 2). Together with page-arrow reentry this is
+            // the native equip-swap window, independent of Timeless Equipment.
+            // Extended pages still resolve their own cells on every move;
+            // native trade normalization above runs before navigation.
+            // Empty destinations must clear any cached item, even in the swap window.
+            if (!CVarGetInteger(CVAR_ENHANCEMENT("RestoreEquipSwap"), 0) || ExtInv_GetCurrentPage() != 0 ||
+                moveCursorResult != 2 || inventoryItem == ITEM_NONE ||
+                (cursorItem <= 0xFF && TradeAdult_IsConsumedIndex(TradeAdult_IndexOfItem((u8)cursorItem)))) {
+                cursorItem = inventoryItem;
+                if (cursorItem == ITEM_NONE) {
+                    cursorItem = PAUSE_ITEM_NONE;
+                }
             }
 
             pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;

@@ -8,6 +8,10 @@
 
 #define ANIM_INTERP 1
 
+#define PLAYER_FLEX_SKIN_STORE(matrix) Matrix_ToMtx(matrix)
+#include "../../../combo/actors/PlayerFlexSkinDraw.inc"
+#undef PLAYER_FLEX_SKIN_STORE
+
 s32 PlayerAnimation_Loop(PlayState* play, SkelAnime* skelAnime);
 s32 PlayerAnimation_Once(PlayState* play, SkelAnime* skelAnime);
 s32 SkelAnime_LoopFull(SkelAnime* skelAnime);
@@ -164,9 +168,11 @@ void SkelAnime_DrawFlexLimbLod(PlayState* play, s32 limbIndex, void** skeleton, 
 
     if ((overrideLimbDraw == NULL) || !overrideLimbDraw(play, limbIndex, &newDList, &pos, &rot, actor)) {
         Matrix_TranslateRotateZYX(&pos, &rot);
+        newDList = PlayerFlexSkin_SelectLimb(sPlayerFlexSkinPlan, limbIndex, newDList, limbDList);
         if (newDList != NULL) {
             Matrix_ToMtx(*mtx);
             gSPMatrix(POLY_OPA_DISP++, *mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+            PlayerFlexSkin_RecordDraw(POLY_OPA_DISP, limbIndex, newDList, limbDList);
             gSPDisplayList(POLY_OPA_DISP++, newDList);
             (*mtx)++;
         } else if (limbDList != NULL) {
@@ -208,7 +214,13 @@ static void SkelAnime_DrawFlexLodImpl(PlayState* play, void** skeleton, Vec3s* j
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = GRAPH_ALLOC(play->state.gfxCtx, dListCount * sizeof(Mtx));
+    const void* playerSkin = bindXlu ? PlayerFlexSkin_GetPlan(skeleton, dListCount) : NULL;
+    const void* previousPlayerSkin = sPlayerFlexSkinPlan;
+    PlayerFlexSkinFrame skinFrame = { 0 };
+    PlayerFlexSkinFrame* previousSkinFrame = sPlayerFlexSkinFrame;
+    playerSkin = PlayerFlexSkin_CheckRoom(play, playerSkin, dListCount);
+    Mtx* mtx = GRAPH_ALLOC(play->state.gfxCtx, (dListCount + PlayerFlexSkin_MatrixCount(playerSkin)) * sizeof(Mtx));
+    Mtx* matrixBase = mtx;
 
     if (skeleton == NULL) {
         return;
@@ -216,6 +228,10 @@ static void SkelAnime_DrawFlexLodImpl(PlayState* play, void** skeleton, Vec3s* j
 
     OPEN_DISPS(play->state.gfxCtx);
 
+    sPlayerFlexSkinPlan = playerSkin;
+    sPlayerFlexSkinFrame = &skinFrame;
+    if (playerSkin != NULL)
+        PlayerFlexSkin_InitMatrices(matrixBase, dListCount);
     gSPSegment(POLY_OPA_DISP++, 0x0D, mtx);
     if (bindXlu) {
         // Deferred player equipment must use this skeleton's matrices, rather
@@ -235,10 +251,12 @@ static void SkelAnime_DrawFlexLodImpl(PlayState* play, void** skeleton, Vec3s* j
 
     if ((overrideLimbDraw == NULL) || !overrideLimbDraw(play, 1, &newDList, &pos, &rot, actor)) {
         Matrix_TranslateRotateZYX(&pos, &rot);
+        newDList = PlayerFlexSkin_SelectLimb(playerSkin, 1, newDList, limbDList);
         if (newDList != NULL) {
             Gfx* polyTemp = POLY_OPA_DISP;
 
             gSPMatrix(&polyTemp[0], Matrix_ToMtx(mtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+            PlayerFlexSkin_RecordDraw(&polyTemp[1], 1, newDList, limbDList);
             gSPDisplayList(&polyTemp[1], newDList);
             POLY_OPA_DISP = &polyTemp[2];
             mtx++;
@@ -258,6 +276,10 @@ static void SkelAnime_DrawFlexLodImpl(PlayState* play, void** skeleton, Vec3s* j
     }
 
     Matrix_Pop();
+
+    PlayerFlexSkin_ApplyMatrices(playerSkin, matrixBase, dListCount);
+    sPlayerFlexSkinPlan = previousPlayerSkin;
+    sPlayerFlexSkinFrame = previousSkinFrame;
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

@@ -55,3 +55,8 @@ if __name__=='__main__':
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_use_tests.py')],check=True)
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_ice_projectile_tests.py')],check=True)
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_action_tests.py')],check=True)
+
+    # Source regressions for MM manual aim/camera ownership and extended-item stow.
+    subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_switchhook_aim_tests.py'),'--sanitize'],check=True)
+    subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_beetle_camera/run_tests.py')],check=True)
+    subprocess.run([sys.executable,'-B',str(ROOT/'tests/nei_item_stow/run_slate_stow_tests.py')],check=True)

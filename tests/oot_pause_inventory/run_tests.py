@@ -45,21 +45,25 @@ int gComboVanillaMode = 0; // Keep the existing seeded page-toggle controls.
 #endif
 static NeiSaveData nei;
 static ExtendedInventoryState sExtInvState;
-static int customEnabled=1, masksEnabled=1, ngc, cycleActive;
+static int customEnabled=1, masksEnabled=1, ngc, cycleActive, equipSwap=1;
+static u8 slotAgeReqs[72];
 static int sGustOverlayActive, sArrowWheelOverlayActive, equipCalls;
 static u16 equippedItem, equippedSlot;
 NeiSaveData* Nei_Save(void) { return &nei; }
 uint16_t Nei_GetOwnedItem(uint8_t slot) { return slot>=24 && slot<72 ? nei.ownedItems[slot-24] : ITEM_NONE; }
 unsigned char Picto_IsOwned(void) { return 0; }
 unsigned char PowerKeg_IsOwned(void) { return 0; }
-uint8_t ExtInv_GetSlotAgeReq(uint8_t slot) { return AGE_REQ_NONE; }
+uint8_t ExtInv_GetSlotAgeReq(uint8_t slot) { return slotAgeReqs[slot]; }
 int32_t CVarGetInteger(const char* key, int32_t fallback) {
     if (!strcmp(key,"gMods.CustomItems.Enabled")) return customEnabled;
     if (!strcmp(key,"gMods.MmMasks.InventoryEnabled")) return masksEnabled;
     if (!strcmp(key,CVAR_ENHANCEMENT("NGCKaleidoSwitcher"))) return ngc;
+    if (!strcmp(key,CVAR_ENHANCEMENT("RestoreEquipSwap"))) return equipSwap;
     return fallback;
 }
 bool IsItemCycling(void) { return cycleActive; }
+s32 TradeAdult_IndexOfItem(u8 item) { return -1; }
+u8 TradeAdult_IsConsumedIndex(s32 index) { return 0; }
 void KaleidoScope_HandleItemCycles(PlayState* play) {}
 void HarpoonDrops_RequestDropFromPause(int tab, int slot) {}
 bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) { return result; }
@@ -80,8 +84,9 @@ static Vtx cursorVertices[20];
 static void reset(void) {
     memset(&play,0,sizeof(play)); memset(&gSaveContext,0,sizeof(gSaveContext));
     memset(&nei,0,sizeof(nei)); memset(gSaveContext.inventory.items,ITEM_NONE,24);
+    memset(slotAgeReqs,AGE_REQ_NONE,sizeof(slotAgeReqs));
     for (int i=0;i<48;i++) nei.ownedItems[i]=ITEM_NONE;
-    customEnabled=masksEnabled=1; ngc=cycleActive=0;
+    customEnabled=masksEnabled=equipSwap=1; ngc=cycleActive=0;
     sGustOverlayActive=sArrowWheelOverlayActive=equipCalls=0;
     play.pauseCtx.state=6; play.pauseCtx.pageIndex=PAUSE_ITEM;
     play.pauseCtx.cursorItem[PAUSE_ITEM]=PAUSE_ITEM_NONE;
@@ -94,6 +99,46 @@ static void tick(u16 pressed, s16 stickX) {
 }
 static void cooldown(void) { for (int i=0;i<15;i++) tick(0,0); }
 int main(int argc,char** argv) {
+    if (argc>1 && !strcmp(argv[1],"equip-swap")) {
+        // Reenter from the left page arrow while holding up at the top row.
+        // SoH keeps the cached adult item but checks the new child-usable slot.
+        // The hook stub returns the actual age result; no Timeless cheat runs.
+        for (int enabled=0;enabled<2;++enabled) for (int page=0;page<3;++page) {
+            reset();
+            equipSwap=enabled;
+            gSaveContext.linkAge=LINK_AGE_CHILD;
+            gSaveContext.inventory.items[SLOT_HOOKSHOT]=ITEM_HOOKSHOT;
+            gSaveContext.inventory.items[SLOT_STICK]=ITEM_STICK;
+            slotAgeReqs[SLOT_HOOKSHOT]=AGE_REQ_ADULT;
+            assert(!CHECK_AGE_REQ_SLOT(SLOT_HOOKSHOT));
+            for(int i=0;i<page;++i) { ExtInv_SwitchPage(); cooldown(); }
+            nei.ownedItems[0]=ITEM_ROD_FIRE;
+            nei.ownedItems[24]=ITEM_MM_MASK_DEKU;
+            play.pauseCtx.cursorSpecialPos=PAUSE_CURSOR_PAGE_LEFT;
+            play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_HOOKSHOT;
+            play.pauseCtx.cursorPoint[PAUSE_ITEM]=SLOT_HOOKSHOT;
+            play.pauseCtx.cursorSlot[PAUSE_ITEM]=SLOT_HOOKSHOT;
+            play.state.input[0].press.button=BTN_CLEFT;
+            play.pauseCtx.stickRelX=40;
+            play.pauseCtx.stickRelY=40;
+            Step(&play);
+            assert(equipCalls==1);
+            assert(equippedSlot==page*24);
+            assert(equippedItem==(page==0?(enabled?ITEM_HOOKSHOT:ITEM_STICK):page==1?ITEM_ROD_FIRE:ITEM_MM_MASK_DEKU));
+        }
+        // Selecting the adult-only slot normally still rejects child equip.
+        reset();gSaveContext.linkAge=LINK_AGE_CHILD;
+        slotAgeReqs[SLOT_HOOKSHOT]=AGE_REQ_ADULT;
+        gSaveContext.inventory.items[SLOT_HOOKSHOT]=ITEM_HOOKSHOT;
+        play.pauseCtx.cursorPoint[PAUSE_ITEM]=SLOT_HOOKSHOT;
+        play.pauseCtx.cursorSlot[PAUSE_ITEM]=SLOT_HOOKSHOT;
+        play.pauseCtx.cursorX[PAUSE_ITEM]=SLOT_HOOKSHOT%6;
+        play.pauseCtx.cursorY[PAUSE_ITEM]=SLOT_HOOKSHOT/6;
+        play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_HOOKSHOT;
+        tick(BTN_CLEFT,0);assert(equipCalls==0);
+        puts("PASS OoT: native equip swap with Timeless off, ordinary age checks and extended-page isolation");
+        return 0;
+    }
     for (int stored=0;stored<2;stored++) {
         reset(); customEnabled=masksEnabled=0;
         if (stored) nei.magicMirrorOwned=1;
@@ -204,7 +249,7 @@ def main():
         for combined in (False,True):
             binary=Path(td)/("combo" if combined else "solo")
             subprocess.run([os.environ.get("CC","cc"),*flags,*( ["-DCOMBO_BUILD"] if combined else []),*includes,str(source),"-o",str(binary)],check=True)
-            for mode in ("navigation","same-frame"):
+            for mode in ("navigation","same-frame","equip-swap"):
                 failed |= subprocess.run([str(binary),mode],env=env).returncode != 0
         return int(failed)
 

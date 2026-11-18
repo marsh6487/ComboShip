@@ -11,6 +11,7 @@
 #include "mods/items/logic/adult_link_render.h" // AdultLink_IsActive — MM's real age (see sGetActiveIndex)
 
 extern "C" Gfx* ResourceMgr_LoadGfxByName(const char* path);
+extern "C" u8 ResourceMgr_FileExists(const char* path);
 extern "C" int ResourceMgr_OTRSigCheck(char* imgData);
 extern "C" SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 
@@ -40,6 +41,9 @@ extern PlayState* gPlayState;
 #include <algorithm>
 #include <cstdint>
 #include <zlib.h>
+#include "../../../combo/PakNativeData.h"
+#include "../../../combo/actors/SeasonalOutfits.h"
+#include "mods/extended_inventory.h"
 
 // Upper bound for an estimated zobj decompression buffer. A player .zobj is a
 // few hundred KB at most; 64 MB is generously safe and stops a crafted DEFL
@@ -198,6 +202,10 @@ struct PakModel {
     void* childLimbTable[PAK_MAX_LIMBS];
     FlexSkeletonHeader childFlexHeader;
 
+    // Native vertices/matrices referenced by translated body and equipment DLs.
+    // The draw is deferred; these must outlive the temporary parsing context.
+    std::vector<std::shared_ptr<void>> nativeBufferOwners;
+
     // Translated native DLs (owned, must be freed)
     std::map<u32, Gfx*> adultTranslatedDLs;
     std::map<u32, Gfx*> childTranslatedDLs;
@@ -252,8 +260,18 @@ static std::string sForcedModelPath;
 static s32 sForcedEquipIndex = -1;
 static std::string sForcedEquipPath;
 
-// Helper: get active model index for current Link age
-// Forced model takes priority over user selection
+// Seasonal bodies are selected only from the exact private authored roots.
+static s32 sSeasonalModelIndex = -1;
+static SeasonalOutfits::DrawFrameGate sDrawFrameGate;
+static std::vector<std::string> sOutfitSets;
+static bool PakLoader_IsRemoteRenderActive(void);
+static void PakLoader_UpdateSeasonalSelection(void);
+static inline bool sBodySelectionEnabled(void) {
+    return CVarGetInteger("gMods.PakLoader.Enabled", 0) ||
+           (!PakLoader_IsRemoteRenderActive() && sSeasonalModelIndex >= 0);
+}
+
+// Forced/custom-form and remote model choices retain their established priority.
 static inline s32 sGetActiveIndex(void) {
     if (sForcedModelIndex >= 0 && sForcedModelIndex < (s32)sModels.size()) {
         return sForcedModelIndex;
@@ -261,7 +279,9 @@ static inline s32 sGetActiveIndex(void) {
     // NOT LINK_AGE_IN_YEARS: MM pins linkAge to adult forever (z64save.h:566), so that test picked
     // the adult slot every frame and no child pak could ever be selected. NEI's age is the Time
     // Gate's flag.
-    return AdultLink_IsActive() ? sSelectedAdultIndex : sSelectedChildIndex;
+    return SeasonalOutfits::Select(-1, sSeasonalModelIndex,
+                                   AdultLink_IsActive() ? sSelectedAdultIndex : sSelectedChildIndex,
+                                   PakLoader_IsRemoteRenderActive());
 }
 
 // ============================================================================
@@ -446,7 +466,7 @@ struct SwapContext {
     u8* data;
     u32 size;
     std::set<u32> swappedDLs; // DL offsets already processed
-    std::set<u32> swappedVtx; // Vtx buffer offsets already processed
+    std::shared_ptr<PakNativeData::Buffers> nativeBuffers = std::make_shared<PakNativeData::Buffers>();
     std::set<u32> swappedTex; // Texture offsets already processed
 
     // Current texture state (from SETTILE/SETTIMG)
@@ -456,34 +476,6 @@ struct SwapContext {
     u32 lastTexWidth;  // width from SETTILE
     u32 lastTexHeight; // height from SETTILESIZE
 };
-
-/**
- * Byte-swap a vertex buffer from BE to native LE.
- * Vtx layout (16 bytes): ob[3](s16) + flag(u16) + tc[2](s16) + cn[4](u8)
- */
-static void SwapVertexBuffer(SwapContext& ctx, u32 offset, u32 count) {
-    if (ctx.swappedVtx.count(offset))
-        return;
-    ctx.swappedVtx.insert(offset);
-
-    for (u32 i = 0; i < count; i++) {
-        u32 voff = offset + i * 16;
-        if (voff + 16 > ctx.size)
-            break;
-
-        u8* v = ctx.data + voff;
-        // ob[0..2]: 3 x s16 (bytes 0-5)
-        SWAP16_INPLACE(v + 0);
-        SWAP16_INPLACE(v + 2);
-        SWAP16_INPLACE(v + 4);
-        // flag: u16 (bytes 6-7)
-        SWAP16_INPLACE(v + 6);
-        // tc[0..1]: 2 x s16 (bytes 8-11)
-        SWAP16_INPLACE(v + 8);
-        SWAP16_INPLACE(v + 10);
-        // cn[0..3]: 4 x u8 (bytes 12-15) - no swap needed
-    }
-}
 
 /**
  * Byte-swap a texture buffer for RGBA16 format.
@@ -627,9 +619,14 @@ countDone:
         switch (opcode) {
             case F3DEX2_G_VTX: {
                 u32 numVtx = (w0 >> 12) & 0xFF;
-                if (seg == 0x06 && segOff < ctx.size) {
-                    SwapVertexBuffer(ctx, segOff, numVtx);
-                    nativeDL[i].words.w1 = (uintptr_t)(ctx.data + segOff);
+                if (seg == 0x06) {
+                    Vtx* vertices = ctx.nativeBuffers->Vertices(ctx.data, ctx.size, segOff, numVtx);
+                    if (vertices) {
+                        nativeDL[i].words.w1 = (uintptr_t)vertices;
+                    } else {
+                        nativeDL[i].words.w0 = 0;
+                        nativeDL[i].words.w1 = 0;
+                    }
                 } else if (seg != 0x00) {
                     nativeDL[i].words.w1 = (uintptr_t)(w1 | 1); // segmented, LSB=1
                 }
@@ -685,15 +682,14 @@ countDone:
                 break;
 
             case F3DEX2_G_MTX: {
-                if (seg == 0x06 && segOff < ctx.size) {
-                    // Byte-swap the 64-byte matrix data (16 x s32 BE → LE)
-                    if (!ctx.swappedVtx.count(segOff)) { // Reuse vtx tracking to prevent double-swap
-                        ctx.swappedVtx.insert(segOff);
-                        for (u32 mi = 0; mi < 16 && segOff + mi * 4 + 4 <= ctx.size; mi++) {
-                            SWAP32_INPLACE(ctx.data + segOff + mi * 4);
-                        }
+                if (seg == 0x06) {
+                    Mtx* matrix = ctx.nativeBuffers->Matrix(ctx.data, ctx.size, segOff);
+                    if (matrix) {
+                        nativeDL[i].words.w1 = (uintptr_t)matrix;
+                    } else {
+                        nativeDL[i].words.w0 = 0;
+                        nativeDL[i].words.w1 = 0;
                     }
-                    nativeDL[i].words.w1 = (uintptr_t)(ctx.data + segOff);
                 } else if (seg != 0x00 && w1 != 0xFFFFFFFF) {
                     nativeDL[i].words.w1 = (uintptr_t)(w1 | 1);
                 }
@@ -1494,6 +1490,7 @@ static void LoadEquipmentZobj(u8* zobjData, u32 zobjSize, PakModel& model) {
 
     parseAge("adult", model.adultEquipDLs, model.adultTranslatedDLs);
     parseAge("child", model.childEquipDLs, model.childTranslatedDLs);
+    model.nativeBufferOwners.push_back(ctx.nativeBuffers);
 
     // Generate combined DLs from individual pieces.
     // Z64O generates these at load time: DL_LFIST_SWORD1 = hilt + blade + lfist, etc.
@@ -1722,6 +1719,7 @@ static bool LoadRawZobjModel(PakModel& model) {
                               model.childTranslatedDLs, &swapCtx)) {
             model.childReady = 1;
             ZobjParseAliasTable(zobjData, zobjSize, model.childEquipDLs, model.childTranslatedDLs, swapCtx);
+            model.nativeBufferOwners.push_back(swapCtx.nativeBuffers);
             PAK_LOG("Raw zobj '%s' loaded as CHILD model", model.displayName);
             return true;
         }
@@ -1733,6 +1731,7 @@ static bool LoadRawZobjModel(PakModel& model) {
                               model.adultTranslatedDLs, &swapCtx)) {
             model.adultReady = 1;
             ZobjParseAliasTable(zobjData, zobjSize, model.adultEquipDLs, model.adultTranslatedDLs, swapCtx);
+            model.nativeBufferOwners.push_back(swapCtx.nativeBuffers);
             PAK_LOG("Raw zobj '%s' loaded as ADULT model", model.displayName);
             return true;
         }
@@ -1997,7 +1996,16 @@ static bool LoadO2rEquipment(PakModel& model) {
     if (!rm)
         return false;
     auto archiveManager = rm->GetArchiveManager();
-    if (archiveManager) {
+    const std::string filename = std::filesystem::path(path).filename().string();
+    const bool privateBodyFile = SeasonalOutfits::PrivateArchive(filename);
+    if (privateBodyFile && archiveManager) {
+        if (auto archives = archiveManager->GetArchives())
+            for (const auto& mounted : *archives)
+                if (mounted &&
+                    std::filesystem::path(mounted->GetPath()).filename() == std::filesystem::path(path).filename())
+                    model.o2rArchiveMounted = 1;
+    }
+    if (!privateBodyFile && archiveManager) {
         // RemoveArchive matches by exact stored path string. libultraship's
         // patches scanner can store either the absolute or the relative form
         // depending on platform, and a path like "./mods/foo.o2r" may differ
@@ -2140,13 +2148,23 @@ static bool LoadO2rEquipment(PakModel& model) {
             continue;
 
         bool isChild = O2rPathIsChild(fpath);
+        if (privateBodyFile) {
+            if (SeasonalOutfits::Season(model.o2rAdultSkelOtr, true) >= 0)
+                isChild = false;
+            else if (SeasonalOutfits::Season(model.o2rChildSkelOtr, false) >= 0)
+                isChild = true;
+        }
         auto& dest = isChild ? model.childEquipDLs : model.adultEquipDLs;
         dest[alias] = dl;
         model.o2rResourceHolders.push_back(std::move(res));
         loadedCount++;
     }
 
-    if (loadedCount == 0) {
+    const bool privateAdult =
+        privateBodyFile && hasAdultSkel && SeasonalOutfits::Season(model.o2rAdultSkelOtr, true) >= 0;
+    const bool privateChild =
+        privateBodyFile && hasChildSkel && SeasonalOutfits::Season(model.o2rChildSkelOtr, false) >= 0;
+    if (loadedCount == 0 && !privateAdult && !privateChild) {
         PAK_LOG("O2R '%s': no equipment-shaped DLs found — skipping (body-only "
                 ".o2r packs aren't supported)",
                 path.c_str());
@@ -2155,24 +2173,13 @@ static bool LoadO2rEquipment(PakModel& model) {
 
     model.o2rArchive = archive;
     model.source = PAK_SOURCE_O2R;
-    // .o2r is ALWAYS equipment-only — the body-skel swap path is unstable for
-    // community packs (they typically reference vertex resources via OTR paths
-    // that don't resolve through ArchiveManager LIFO, and the unguarded
-    // gfx_vtx_otr_filepath_handler_custom in libultraship's Fast3D interpreter
-    // crashes the first frame after the swap). Forcing equipment-only here
-    // keeps the .o2r out of the body-model dropdown entirely (ModelHasAdult /
-    // ModelHasChild gate on this flag), so the user can only use its
-    // equipment DLs via Equipment Pack / Slot Mix. That path is safe because
-    // the standalone Archive shared_ptr keeps the Gfx* command stream alive
-    // and any vertex references inside still resolve through the sticky
-    // global mount.
-    (void)hasAdultSkel;
-    (void)hasChildSkel;
-    model.isEquipmentOnly = 1;
-    model.hasAdult = !model.adultEquipDLs.empty();
-    model.hasChild = !model.childEquipDLs.empty();
-    model.adultReady = 0; // body swap intentionally disabled for .o2r
-    model.childReady = 0;
+    // Community fixed-alias O2Rs retain the equipment-only safety gate.
+    // Only our private, non-shadowing authored roots are eligible body models.
+    model.isEquipmentOnly = !(privateAdult || privateChild);
+    model.hasAdult = privateAdult || !model.adultEquipDLs.empty();
+    model.hasChild = privateChild || !model.childEquipDLs.empty();
+    model.adultReady = privateAdult;
+    model.childReady = privateChild;
     snprintf(model.displayName, sizeof(model.displayName), "%s", std::filesystem::path(path).stem().string().c_str());
     PAK_LOG("O2R '%s' loaded %d equipment DLs (adult=%d, child=%d, skel adult=%d child=%d)", model.displayName,
             loadedCount, (int)model.adultEquipDLs.size(), (int)model.childEquipDLs.size(), hasAdultSkel, hasChildSkel);
@@ -2443,6 +2450,7 @@ static bool LoadPakModel(PakModel& model) {
                 model.adultReady = 1;
                 ZobjParseAliasTable(model.adultZobj, model.adultZobjSize, model.adultEquipDLs, model.adultTranslatedDLs,
                                     adultSwapCtx);
+                model.nativeBufferOwners.push_back(adultSwapCtx.nativeBuffers);
                 PAK_LOG("Adult model ready!");
             } else {
                 PAK_LOG("Failed to build adult skeleton");
@@ -2461,6 +2469,7 @@ static bool LoadPakModel(PakModel& model) {
                 model.childReady = 1;
                 ZobjParseAliasTable(model.childZobj, model.childZobjSize, model.childEquipDLs, model.childTranslatedDLs,
                                     childSwapCtx);
+                model.nativeBufferOwners.push_back(childSwapCtx.nativeBuffers);
                 PAK_LOG("Child model ready!");
             } else {
                 PAK_LOG("Failed to build child skeleton");
@@ -2580,12 +2589,60 @@ static void LazyResolveO2rSkel(PakModel& model) {
     }
 }
 
+// Resolve before local draw/cache reconstruction. Private resource paths allow
+// sticky mounts to coexist through a complete spring -> winter -> spring cycle.
+static void PakLoader_UpdateSeasonalSelection(void) {
+    if (PakLoader_IsRemoteRenderActive())
+        return;
+    s32 next = -1;
+    if (gPlayState != nullptr && CVarGetInteger(SEASONAL_OUTFITS_CVAR, 0) && Seasons_SeasonCount() != 0) {
+        const bool adult = (AdultLink_IsActive() != 0);
+        const std::string wanted =
+            SeasonalOutfits::Skeleton(CVarGetString(SEASONAL_OUTFITS_SET_CVAR, "din"), adult, Seasons_GetSeason());
+        if (!wanted.empty()) {
+            for (size_t i = 0; i < sModels.size(); ++i) {
+                PakModel& model = sModels[i];
+                const char* path = adult ? model.o2rAdultSkelOtr : model.o2rChildSkelOtr;
+                if (model.source != PAK_SOURCE_O2R || model.isEquipmentOnly || std::strcmp(path, wanted.c_str()))
+                    continue;
+                if (!model.o2rArchiveMounted)
+                    MountO2rArchive(model);
+                LazyResolveO2rSkel(model);
+                FlexSkeletonHeader* skeleton = adult ? model.o2rAdultSkel : model.o2rChildSkel;
+                if (skeleton != nullptr && IsValidLinkSkel(&skeleton->sh) && skeleton->sh.limbCount == 21 &&
+                    skeleton->dListCount > 0 && skeleton->dListCount <= 21) {
+                    next = static_cast<s32>(i);
+                    break;
+                }
+            }
+        }
+    }
+    sSeasonalModelIndex = next; // Missing/Off leaves the ordinary player model selection intact.
+}
+
+extern "C" s32 PakLoader_GetOutfitSetCount(void) {
+    if (!sInitialized)
+        PakLoader_Init();
+    return static_cast<s32>(sOutfitSets.size());
+}
+
+extern "C" const char* PakLoader_GetOutfitSet(s32 index) {
+    return index >= 0 && index < static_cast<s32>(sOutfitSets.size()) ? sOutfitSets[index].c_str() : nullptr;
+}
+
+extern "C" const char* PakLoader_GetSeasonalSkeletonPath(void) {
+    if (sSeasonalModelIndex < 0 || sGetActiveIndex() != sSeasonalModelIndex || PakLoader_IsRemoteRenderActive())
+        return nullptr;
+    const PakModel& model = sModels[sSeasonalModelIndex];
+    return (AdultLink_IsActive() != 0) ? model.o2rAdultSkelOtr : model.o2rChildSkelOtr;
+}
+
 extern "C" void PakLoader_SwapSkeleton(Player* player) {
     if (sGetActiveIndex() < 0 || sGetActiveIndex() >= (s32)sModels.size())
         return;
 
     PakModel& model = sModels[sGetActiveIndex()];
-    u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+    u8 isAdult = AdultLink_IsActive() != 0;
 
     void** pakSkeleton = NULL;
     s32 pakDListCount = 0;
@@ -2621,6 +2678,20 @@ extern "C" void PakLoader_SwapSkeleton(Player* player) {
     // Swap in custom
     player->skelAnime.skeleton = pakSkeleton;
     player->skelAnime.dListCount = pakDListCount;
+}
+
+extern "C" const char* PakLoader_GetSkinSkeletonPath(void** skeleton) {
+    const s32 index = sGetActiveIndex();
+    if (!skeleton || index < 0 || index >= (s32)sModels.size())
+        return NULL;
+    const PakModel& model = sModels[index];
+    if (model.source != PAK_SOURCE_O2R)
+        return NULL;
+    if (model.o2rAdultSkel && model.o2rAdultSkel->sh.segment == skeleton)
+        return model.o2rAdultSkelOtr;
+    if (model.o2rChildSkel && model.o2rChildSkel->sh.segment == skeleton)
+        return model.o2rChildSkelOtr;
+    return NULL;
 }
 
 extern "C" void PakLoader_RestoreSkeleton(Player* player) {
@@ -2888,7 +2959,20 @@ static void CleanupRuntimeDLs(void) {
 // Frees GbiWrap per-frame DLs (double-buffered). Equipment cache DLs are NOT touched here;
 // they live until the next RebuildCachedEquipDLs call (when selection changes).
 // Also forces a cache rebuild if the previous frame's fist resolution was incomplete.
+static bool PakLoader_BeginDrawFrame(void) {
+    return gPlayState == nullptr || sDrawFrameGate.Enter(gPlayState, gPlayState->state.frames);
+}
+
 extern "C" void PakLoader_FrameBegin(void) {
+    if (!PakLoader_BeginDrawFrame()) {
+        // Selection can change in the menu, but a second draw must retain all
+        // temporary DLs already queued by the first draw of this frame.
+        PakLoader_UpdateSeasonalSelection();
+        return;
+    }
+    if (!sInitialized && gPlayState != nullptr && CVarGetInteger(SEASONAL_OUTFITS_CVAR, 0))
+        PakLoader_Init();
+    PakLoader_UpdateSeasonalSelection();
     CleanupRuntimeDLs();
     // Allow the equipment-DL pool rotation to happen on the next rebuild. Only
     // the FIRST rebuild within a frame rotates; later rebuilds (e.g. the one
@@ -2926,7 +3010,7 @@ extern "C" void PakLoader_FrameBegin(void) {
     // fresh ResourceMgr_LoadGfxByName result. If the ResourceMgr relocated the resource,
     // the pointer differs → invalidate cache so the next rebuild captures the fresh one.
     if (!sCachedVanillaPtrs.empty()) {
-        u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+        u8 isAdult = AdultLink_IsActive() != 0;
         struct VanillaAlias {
             u32 alias;
             const char* adultPath;
@@ -3132,14 +3216,14 @@ static void RebuildCachedEquipDLs(void) {
     }
     sCachedEquipDLs.clear();
 
-    u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+    u8 isAdult = AdultLink_IsActive() != 0;
 
     // Layer 1: body pak equipment.
     // Only included when the pak loader CVar is on (user selected a body model)
     // or when a body model is explicitly forced (Kafei Mask, Champion Tunic, etc.).
     // Excluded for equipment-only forced items (Four Sword) with CVar off.
     s32 bodyIdx = -1;
-    if (CVarGetInteger("gMods.PakLoader.Enabled", 0) || sForcedModelIndex >= 0) {
+    if (sBodySelectionEnabled() || sForcedModelIndex >= 0) {
         bodyIdx = sGetActiveIndex();
     }
     // Defensive insert — filter out entries whose Gfx* is actually an unresolved
@@ -3561,10 +3645,10 @@ static void RebuildCachedEquipDLs(void) {
 static std::map<u32, Gfx*>* sGetEquipDLs(void) {
     // Compute bodyIdx the same way RebuildCachedEquipDLs does, to avoid infinite rebuild loops.
     s32 bodyIdx = -1;
-    if (CVarGetInteger("gMods.PakLoader.Enabled", 0) || sForcedModelIndex >= 0) {
+    if (sBodySelectionEnabled() || sForcedModelIndex >= 0) {
         bodyIdx = sGetActiveIndex();
     }
-    u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+    u8 isAdult = AdultLink_IsActive() != 0;
     EnsureSlotMixLoaded();
     u64 mixHash = SlotMixHash();
 
@@ -3583,8 +3667,8 @@ extern "C" Gfx* PakLoader_GetEquipDL(Player* player, s32 limbIndex) {
     // only selection AND slot mixes work without "Enable Custom Player Model"
     // being on.
     EnsureSlotMixLoaded();
-    if (!CVarGetInteger("gMods.PakLoader.Enabled", 0) && sForcedModelIndex < 0 && sSelectedEquipIndex < 0 &&
-        sForcedEquipIndex < 0 && !AnySlotMixActive())
+    if (!sBodySelectionEnabled() && sForcedModelIndex < 0 && sSelectedEquipIndex < 0 && sForcedEquipIndex < 0 &&
+        !AnySlotMixActive())
         return NULL;
 
     std::map<u32, Gfx*>* eqPtr = sGetEquipDLs();
@@ -4074,6 +4158,29 @@ static Gfx* HarpoonSkinSync_GetDLOverride(const char* otrPath) {
     return NULL; // no remote-dummy DL override available in this build
 }
 
+// Native gameplay/first-person/pause callbacks still ask for canonical body
+// aliases. Resolve only aliases actually supplied beside the active private
+// skeleton; missing ones retain the established shared-equipment path.
+static Gfx* PakLoader_SeasonalDL(const char* otrPath) {
+    const char* skeleton = PakLoader_GetSeasonalSkeletonPath();
+    if (!skeleton || !otrPath)
+        return NULL;
+    const char* path = std::strncmp(otrPath, "__OTR__", 7) == 0 ? otrPath + 7 : otrPath;
+    if (std::strncmp(path, "alt/", 4) == 0)
+        path += 4;
+    if (std::strncmp(path, "objects/object_link_boy/", 24) && std::strncmp(path, "objects/object_link_child/", 26) &&
+        std::strncmp(path, "objects/object_custom_equip/", 28))
+        return NULL;
+    const char* symbol = std::strrchr(path, '/');
+    if (!symbol)
+        return NULL;
+    std::string selected(skeleton, std::strrchr(skeleton, '/') + 1);
+    selected += symbol + 1;
+    if (!ResourceMgr_FileExists(selected.c_str()))
+        return NULL;
+    return ResourceMgr_LoadGfxByName(selected.c_str());
+}
+
 extern "C" Gfx* PakLoader_GetDLOverride(const char* otrPath) {
     if (otrPath == nullptr)
         return NULL;
@@ -4087,11 +4194,14 @@ extern "C" Gfx* PakLoader_GetDLOverride(const char* otrPath) {
         return harpoonDl;
     }
 
+    if (Gfx* seasonal = PakLoader_SeasonalDL(otrPath))
+        return seasonal;
+
     // Check if any equipment source is active. Equipment-only selection is
     // valid without the body-model toggle, so a non-forced selected equipment
     // pak is enough on its own.
     EnsureSlotMixLoaded();
-    u8 hasPakEnabled = CVarGetInteger("gMods.PakLoader.Enabled", 0) != 0;
+    u8 hasPakEnabled = sBodySelectionEnabled();
     u8 hasForcedEquip = (sForcedEquipIndex >= 0 && sForcedEquipIndex < (s32)sModels.size());
     u8 hasSelectedEquip = (sSelectedEquipIndex >= 0 && sSelectedEquipIndex < (s32)sModels.size());
     u8 hasBodyEquip = (sGetActiveIndex() >= 0 && sGetActiveIndex() < (s32)sModels.size());
@@ -4219,13 +4329,33 @@ static const u32 sMouthTextureOffsets[] = { 0x4000, 0x4400, 0x4800, 0x4C00 };
 static void* PakLoader_GetFaceTexture(const u32* offsets, s32 index, s32 maxIndex, u32 texSize) {
     if (sGetActiveIndex() < 0 || sGetActiveIndex() >= (s32)sModels.size())
         return NULL;
-    if (!CVarGetInteger("gMods.PakLoader.Enabled", 0))
+    if (!sBodySelectionEnabled())
         return NULL;
     if (index < 0 || index > maxIndex)
         index = 0;
 
     PakModel& model = sModels[sGetActiveIndex()];
-    u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+    u8 isAdult = AdultLink_IsActive() != 0;
+    if (model.source == PAK_SOURCE_O2R && sGetActiveIndex() == sSeasonalModelIndex) {
+        static const char* const eyes[2][8] = {
+            { "gLinkChildEyesOpenTex", "gLinkChildEyesHalfTex", "gLinkChildEyesClosedfTex", "gLinkChildEyesRollLeftTex",
+              "gLinkChildEyesRollRightTex", "gLinkChildEyesShockTex", "gLinkChildEyesUnk1Tex",
+              "gLinkChildEyesUnk2Tex" },
+            { "gLinkAdultEyesOpenTex", "gLinkAdultEyesHalfTex", "gLinkAdultEyesClosedfTex", "gLinkAdultEyesRollLeftTex",
+              "gLinkAdultEyesRollRightTex", "gLinkAdultEyesShockTex", "gLinkAdultEyesUnk1Tex", "gLinkAdultEyesUnk2Tex" }
+        };
+        static const char* const mouths[2][4] = {
+            { "gLinkChildMouth1Tex", "gLinkChildMouth2Tex", "gLinkChildMouth3Tex", "gLinkChildMouth4Tex" },
+            { "gLinkAdultMouth1Tex", "gLinkAdultMouth2Tex", "gLinkAdultMouth3Tex", "gLinkAdultMouth4Tex" }
+        };
+        const char* skeleton = isAdult ? model.o2rAdultSkelOtr : model.o2rChildSkelOtr;
+        std::string path(skeleton, std::strrchr(skeleton, '/') + 1);
+        path += offsets == sEyeTextureOffsets ? eyes[isAdult][index] : mouths[isAdult][index];
+        if (!ResourceMgr_FileExists(path.c_str()))
+            return NULL;
+        static std::set<std::string> retainedFacePaths;
+        return const_cast<char*>(retainedFacePaths.insert(path).first->c_str());
+    }
     u8* zobjData = isAdult ? model.adultZobj : model.childZobj;
     u32 zobjSize = isAdult ? model.adultZobjSize : model.childZobjSize;
     u8 ready = isAdult ? model.adultReady : model.childReady;
@@ -4405,15 +4535,10 @@ extern "C" void PakLoader_Init(void) {
     std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods", appShortName);
     PAK_LOG("Mods path: %s", modsPath.c_str());
 
-    // .pak / .zobj are scanned RECURSIVELY under mods/ so users can organise
-    // skins into subfolders. .o2r files are intentionally NOT scanned:
-    // community .o2r packs embed OTR vertex paths that don't resolve through
-    // pak_loader's standalone Archive instance, and the unguarded
-    // gfx_vtx_otr_filepath_handler_custom in libultraship's Fast3D interpreter
-    // crashes the first frame the .o2r's DLs are drawn. libultraship's own
-    // ArchiveManager auto-mounts mods/*.o2r at startup as a global override
-    // (its native intended behaviour) — pak_loader stays out of that path.
+    // Community PAK/ZOBJ discovery is unchanged. Only *.private.o2r authored
+    // packs opt into the private seasonal body contract.
     std::vector<std::string> rawZobjFiles;
+    std::vector<std::string> privateBodyFiles;
 
     if (!modsPath.empty() && std::filesystem::exists(modsPath) && std::filesystem::is_directory(modsPath)) {
         std::error_code ec;
@@ -4439,6 +4564,10 @@ extern "C" void PakLoader_Init(void) {
             } else if (ext == ".zobj") {
                 rawZobjFiles.push_back(p);
                 PAK_LOG("Found raw zobj: %s", p.c_str());
+            } else if (ext == ".o2r") {
+                const std::string file = it->path().filename().string();
+                if (SeasonalOutfits::PrivateArchive(file))
+                    privateBodyFiles.push_back(p);
             }
         }
     }
@@ -4446,7 +4575,7 @@ extern "C" void PakLoader_Init(void) {
     PAK_LOG("Found %d .pak, %d .zobj files", (int)pakFiles.size(), (int)rawZobjFiles.size());
 
     // Reserve space so push_back doesn't reallocate and invalidate internal pointers
-    sModels.reserve(pakFiles.size() + rawZobjFiles.size());
+    sModels.reserve(pakFiles.size() + rawZobjFiles.size() + privateBodyFiles.size());
 
     // Load each .pak model
     for (auto& pakPath : pakFiles) {
@@ -4558,6 +4687,37 @@ extern "C" void PakLoader_Init(void) {
     // Populate the sync registry (harpoon/skins/) — forward declared at
     // global scope near the top of this file.
     PakLoader_InitSyncRegistry();
+
+    // Opt-in authored private bodies have no public model aliases. Shared
+    // equipment remains an ordinary globally loaded O2R dependency.
+    std::sort(privateBodyFiles.begin(), privateBodyFiles.end());
+    for (const std::string& path : privateBodyFiles) {
+        PakModel model = {};
+        model.pakPath = path;
+        if (LoadO2rEquipment(model) && !model.isEquipmentOnly) {
+            std::string set;
+            if (SeasonalOutfits::Season(model.o2rAdultSkelOtr, true, &set) >= 0 ||
+                SeasonalOutfits::Season(model.o2rChildSkelOtr, false, &set) >= 0)
+                sOutfitSets.push_back(set);
+            sModels.push_back(std::move(model));
+        }
+    }
+    std::sort(sOutfitSets.begin(), sOutfitSets.end());
+    sOutfitSets.erase(std::unique(sOutfitSets.begin(), sOutfitSets.end()), sOutfitSets.end());
+    // Appending private models must not renumber old PAK/ZOBJ/sync selections.
+    // A vector growth can move native model structs; rebind their self-pointers.
+    if (!privateBodyFiles.empty()) {
+        for (PakModel& model : sModels) {
+            if (model.source == PAK_SOURCE_O2R)
+                continue;
+            for (s32 i = 0; i < PAK_MAX_LIMBS; ++i) {
+                if (model.adultLimbTable[i])
+                    model.adultLimbTable[i] = &model.adultLimbs[i];
+                if (model.childLimbTable[i])
+                    model.childLimbTable[i] = &model.childLimbs[i];
+            }
+        }
+    }
 }
 
 // Auto-force model based on worn MM mask (called per-frame)
@@ -4572,7 +4732,7 @@ static void PakLoader_CheckMaskForce(void) {
 extern "C" u8 PakLoader_HasActiveBodyModel(void) {
     PakLoader_CheckMaskForce();
     const bool forced = sForcedModelIndex >= 0 && sForcedModelIndex < (s32)sModels.size();
-    if (!forced && !CVarGetInteger("gMods.PakLoader.Enabled", 0))
+    if (!forced && !sBodySelectionEnabled())
         return 0;
     const s32 bodyIdx = sGetActiveIndex();
     if (bodyIdx < 0 || bodyIdx >= (s32)sModels.size())
@@ -4614,7 +4774,7 @@ extern "C" u8 PakLoader_HasActiveModel(void) {
             return 1;
     }
 
-    if (!CVarGetInteger("gMods.PakLoader.Enabled", 0)) {
+    if (!sBodySelectionEnabled()) {
         return 0;
     }
 
@@ -4637,7 +4797,7 @@ extern "C" void PakLoader_DrawPlayer(PlayState* play, Player* player) {
 
     PakModel& model = sModels[sGetActiveIndex()];
 
-    u8 isAdult = (LINK_AGE_IN_YEARS == YEARS_ADULT);
+    u8 isAdult = AdultLink_IsActive() != 0;
     void** skeleton;
     s32 dListCount;
     u8* zobjData;
@@ -5352,6 +5512,9 @@ extern "C" void PakLoader_Shutdown(void) {
     sForcedEquipIndex = -1;
     sForcedEquipPath.clear();
     sInitialized = 0;
+    sSeasonalModelIndex = -1;
+    sOutfitSets.clear();
+    sDrawFrameGate = {};
     for (auto* p : sEquipCombinedDLs)
         free(p);
     sEquipCombinedDLs.clear();

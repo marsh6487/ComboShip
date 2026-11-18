@@ -143,8 +143,9 @@ void GiveReceipt(Actor* actor, PlayState* play) {
     if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE)
         CustomMessage::SetActiveCustomMessage(message.msg, message);
     else
+        // Keep attribution ASCII: the default ImGui font has no em-dash glyph.
         Notification::Emit({ .message = "You received",
-                             .suffix = std::string(sReceipt.value.displayName) + " — " + CW_STARTUP_SOURCE });
+                             .suffix = std::string(sReceipt.value.displayName) + " - " + CW_STARTUP_SOURCE });
     // These callbacks are presentation only: inventory, traps, story and sharing
     // already completed before the durable receipt became READY.
     sReceipt.presented = true;

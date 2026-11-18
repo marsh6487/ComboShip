@@ -1209,3 +1209,7 @@ void Menu::DrawContent(const std::set<std::string>& onlyPaths, const std::set<st
 }
 
 } // namespace Ship
+
+#define COMBO_MENU_POPOUT_OOT
+#include "../../../combo/gui/MenuControlPopout.inc"
+#undef COMBO_MENU_POPOUT_OOT

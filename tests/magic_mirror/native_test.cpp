@@ -1181,7 +1181,75 @@ void TestArrivalRetainsPreparedItemCamera() {
 #endif
 }
 
+void TestOcarinaOwnsMirrorShortcut() {
+  const u16 buttons[] = {BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP,
+                         BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT};
+  for (u16 button : buttons) {
+    for (int mode = MSGMODE_OCARINA_STARTING; mode < MSGMODE_TEXT_AWAIT_NEXT; ++mode) {
+      Reset();
+      play.msgCtx.msgMode = mode;
+      play.state.input[0].cur.button = play.state.input[0].press.button = button;
+      const Input nativeInput = play.state.input[0];
+      MirrorRuntime::Update();
+      assert(!errors && !prompts && !handoffs && !animationStarts);
+      assert(!MirrorRuntime::sPrompt && !MirrorRuntime::sCastPlay);
+      assert(std::memcmp(&nativeInput, &play.state.input[0], sizeof(Input)) == 0);
+    }
+    // Native pull-out/playing and forced-pull ownership may precede messages.
+    for (int phase = 0; phase < 3; ++phase) {
+      Reset();
+#ifdef MIRROR_OOT
+      if (phase == 0) player.stateFlags2 = PLAYER_STATE2_OCARINA_PLAYING;
+      else if (phase == 1) player.stateFlags3 = PLAYER_STATE3_FORCE_PULL_OCARINA;
+      else {
+        player.itemAction = PLAYER_IA_OCARINA_OF_TIME;
+        player.stateFlags1 = PLAYER_STATE1_START_CHANGING_HELD_ITEM;
+      }
+#else
+      if (phase == 0) player.stateFlags2 = PLAYER_STATE2_USING_OCARINA;
+      else if (phase == 1) player.stateFlags3 = PLAYER_STATE3_20;
+      else {
+        player.itemAction = PLAYER_IA_OCARINA;
+        player.stateFlags3 = PLAYER_STATE3_START_CHANGING_HELD_ITEM;
+      }
+#endif
+      play.state.input[0].cur.button = play.state.input[0].press.button = button;
+      const Input nativeInput = play.state.input[0];
+      MirrorRuntime::Update();
+      assert(!errors && !prompts && !handoffs && !animationStarts);
+      assert(std::memcmp(&nativeInput, &play.state.input[0], sizeof(Input)) == 0);
+      // Keeping the note held after stowing the instrument cannot queue travel.
+      player.stateFlags1 = player.stateFlags2 = player.stateFlags3 = 0;
+      player.itemAction = player.heldItemAction = PLAYER_IA_NONE;
+      play.state.input[0].press.button = 0;
+      MirrorRuntime::Update();
+      assert(!errors && !prompts && !animationStarts);
+      // A fresh edge retains normal casting and claims only its own button.
+      play.state.input[0].press.button = button;
+      MirrorRuntime::Update();
+      assert(!errors && prompts == 1 && animationStarts == 1);
+      assert(!(play.state.input[0].press.button & button));
+    }
+  }
+  Reset();
+  play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+  play.state.input[0].press.button = BTN_DUP;
+  MirrorRuntime::Update();
+  assert(errors == 1 && !prompts); // Ordinary rejected travel still reports failure.
+  Reset();
+  play.state.input[0].press.button = BTN_DUP;
+  MirrorRuntime::Update();
+  assert(MirrorRuntime::sPrompt && animationStarts == 1);
+  // The shortcut guard must not bypass cleanup of an already-active ritual.
+  player.actionFunc = NativeIdle;
+  play.msgCtx.msgMode = MSGMODE_OCARINA_PLAYING;
+  MirrorRuntime::Update();
+  assert(!MirrorRuntime::sPrompt && !MirrorRuntime::sCastPlay && !errors);
+  std::puts("PASS Mirror ignores native instrument input without consuming notes or queuing travel");
+}
+
 int main() {
+  TestOcarinaOwnsMirrorShortcut();
   TestArrivalRetainsPreparedItemCamera();
   TestShuffledStumpIndependentOfMirrorOwnership();
   TestCastStartsAndPersistsDuringPrompt();

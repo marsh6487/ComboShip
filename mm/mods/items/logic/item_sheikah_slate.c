@@ -127,6 +127,8 @@ static s16 sSlateHoldTimer = 0;
 static u8 sSlateDrawn = 0;      // the tablet is out, in Link's hand
 static s16 sSlateCastTimer = 0; // frames left of the cast pose
 static s8 sSlatePrevInvinc = 0;
+static u16 sSlateSuppressedButtons = 0;
+static u32 sSlateStowFrame = (u32)-1;
 static u8 sSlatePrevRightHand = 0; // hand type to put back when the tablet is stowed
 
 // How long the arm stays extended on a cast. The hookshot's own shot pose is short and snappy;
@@ -173,6 +175,36 @@ static void Slate_OnWheelConfirm(s32 index) {
     }
 }
 
+// Native A/Put Away must see the Slate even though it has no vanilla item
+// action. Cancel only its own UI/targeting; placed rune effects keep running.
+void Slate_PutAway(PlayState* play, Player* player) {
+    u8 ownsWheel = BoxMenu_IsOpen() && sBoxMOnConfirm == Slate_OnWheelConfirm;
+    if (!sSlateDrawn && !ownsWheel && !Cryonis_ModeActive() && sSensorPhase == SENSOR_PHASE_IDLE)
+        return;
+    sSlateSuppressedButtons |=
+        Slate_EquippedButtonMask() & (play->state.input[0].cur.button | play->state.input[0].press.button);
+    sSlateStowFrame = play->gameplayFrames;
+    sSlateHoldTimer = 0;
+    Slate_Stow(play, player);
+    sSlateCastTimer = 0;
+    if (ownsWheel)
+        BoxMenu_Close(play, 0);
+    Cryonis_ModeExit(0);
+    if (sSensorPhase != SENSOR_PHASE_IDLE) {
+        Message_CloseTextbox(play);
+        play->msgCtx.msgMode = MSGMODE_TEXT_DONE;
+        Sensor_Release(player);
+    }
+    Stasis_UpdateOffer(play, 0);
+}
+
+static u8 Slate_InputSuppressed(PlayState* play) {
+    if (sSlateStowFrame == play->gameplayFrames)
+        return 1;
+    sSlateSuppressedButtons &= play->state.input[0].cur.button;
+    return (sSlateSuppressedButtons & Slate_EquippedButtonMask()) != 0;
+}
+
 // Fills the row with ALL runes — locked ones included, drawn grayed and unselectable, so the wheel
 // doubles as a reminder of what is still missing (the wand wheel's medallion previews do the same).
 static s32 Slate_BuildWheel(BoxMenuEntry* out) {
@@ -205,6 +237,11 @@ void Slate_TickInput(PlayState* play, Player* player) {
     // goes stale on a scene change with no word to us. Both run before every early return below.
     RemoteBomb_Tick(play);
     Cryonis_Tick(play);
+
+    // Ext-item input bypasses ItemInput_Update's u8 item latch. Prevent the
+    // same press/held button from redrawing the tablet after native put-away.
+    if (Slate_InputSuppressed(play))
+        return;
 
     // ABOVE the blocking checks and the stow paths on purpose: with the aiming mode below them, the
     // A that commits a placement had already gone through the unequip, and the tablet was gone by

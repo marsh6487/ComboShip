@@ -97,6 +97,9 @@ static ColliderQuadInit sSwitchHookQuadInit = {
 // HELPER FUNCTIONS
 // ============================================================================
 
+void SwitchHook_CleanupManualAim(Player* player, PlayState* play);
+void SwitchHook_OnFired(Player* player);
+
 /**
  * Teleporting an actor by writing world.pos moves its model and bg checks but leaves its HITBOXES
  * behind: colliders store world-space geometry that only the owning actor refreshes inside its own

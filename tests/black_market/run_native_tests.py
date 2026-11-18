@@ -26,7 +26,8 @@ signatures = ["bool SoloExterior(", "bool Exterior(", "Vec3f Door(", "u16 Return
               "const Item* Offer(", "PurchaseResult Status(", "void RefreshOwnedStock(",
               "bool ReceiptContext(", "void AbortMarketReceipt(", "void GiveMarketReceipt(",
               "void ReleaseReceiptEvent(", "void MarketReceiptDestroyed(", "void CancelReceipt(",
-              "void OfferMarketReceipt(", "bool Purchase(", "void SceneInit(", "void MarketText(",
+              "void OfferMarketReceipt(", "bool Purchase(", "void SceneInit(",
+              "std::string NativeKeeperMessageSfx(", "void MarketText(",
               "void ComboBlackMarket_SaveState(", "void ComboBlackMarket_LoadState(",
               'extern "C" void ComboBlackMarket_ApplyResume(',
               'extern "C" void ComboBlackMarket_NormalizeEntry(', "void LoadSolo("]

@@ -5,6 +5,7 @@
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarketItems.h"
 #include "BlackMarketEntry.h"
+#include "BlackMarketKeeperInteraction.h"
 #include "rando/BlackMarket.h"
 #include "ComboCapeReceiptChoice.h"
 #include "overlays/actors/ovl_En_Ossan/z_en_ossan.h"

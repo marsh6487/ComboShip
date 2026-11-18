@@ -207,19 +207,20 @@ static void AcceptedIceAudio(void) {
 static Actor RequireHit(s16 actorId, DamageTable* table, ColliderElement* attack, u32 receiverFlags, int damage,
                         int effect) {
     Actor target = { 0 };
-    Collider receiver = { 0 };
-    ColliderElement element = { 0 };
+    ColliderCylinder receiver = { 0 };
     target.id = actorId;
     target.category = ACTORCAT_ENEMY;
     target.colChkInfo.damageTable = table;
-    receiver.actor = &target;
-    receiver.acFlags = AC_HIT;
-    element.acElemFlags = ACELEM_HIT;
-    element.acDmgInfo.dmgFlags = receiverFlags;
-    element.acHit = &player.meleeWeaponQuads[0].base;
-    element.acHitElem = attack;
-    REQUIRE(!CollisionCheck_NoSharedFlags(attack, &element));
-    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver, &element);
+    receiver.base.actor = &target;
+    receiver.base.shape = COLSHAPE_CYLINDER;
+    receiver.dim = (Cylinder16){ .radius = 20, .height = 60 };
+    receiver.base.acFlags = AC_HIT;
+    receiver.elem.acElemFlags = ACELEM_HIT;
+    receiver.elem.acDmgInfo.dmgFlags = receiverFlags;
+    receiver.elem.acHit = &player.meleeWeaponQuads[0].base;
+    receiver.elem.acHitElem = attack;
+    REQUIRE(!CollisionCheck_NoSharedFlags(attack, &receiver.elem));
+    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.elem);
     if (target.colChkInfo.damage != damage || target.colChkInfo.damageEffect != effect) {
         fprintf(stderr, "actor %d: damage/effect %d/%d, expected %d/%d\n", actorId, target.colChkInfo.damage,
                 target.colChkInfo.damageEffect, damage, effect);
@@ -534,8 +535,7 @@ static void NativeSoulAdmission(void) {
                         DinFireSword_Update(&play, &player);
                         DinFireSword_RefreshDamage(&play, &player);
                         Actor target = { 0 };
-                        Collider receiver = { 0 };
-                        ColliderElement element = { 0 };
+                        ColliderCylinder receiver = { 0 };
                         Vec3f contact = { 0 };
                         const s16 ids[] = { ACTOR_EN_SLIME, ACTOR_EN_DEKUBABA, ACTOR_EN_KUSA, ACTOR_OBJ_GRASS };
                         target.id = ids[kind];
@@ -543,20 +543,22 @@ static void NativeSoulAdmission(void) {
                         target.colChkInfo.damageTable = kind == 0   ? Test_ChuchuTable()
                                                         : kind == 1 ? Test_DekuBabaTable()
                                                                     : NULL;
-                        receiver.actor = &target;
-                        receiver.acFlags = AC_ON | AC_TYPE_PLAYER;
-                        element.acElemFlags = ACELEM_ON;
-                        element.acDmgInfo.dmgFlags = kind == 0   ? 0xF7CFFFFF
-                                                     : kind == 2 ? Test_KusaMask()
-                                                     : kind == 3 ? Test_GrassMask()
-                                                                 : DMG_DEFAULT;
+                        receiver.base.actor = &target;
+                        receiver.base.shape = COLSHAPE_CYLINDER;
+                        receiver.dim = (Cylinder16){ .radius = 20, .height = 60 };
+                        receiver.base.acFlags = AC_ON | AC_TYPE_PLAYER;
+                        receiver.elem.acElemFlags = ACELEM_ON;
+                        receiver.elem.acDmgInfo.dmgFlags = kind == 0   ? 0xF7CFFFFF
+                                                           : kind == 2 ? Test_KusaMask()
+                                                           : kind == 3 ? Test_GrassMask()
+                                                                       : DMG_DEFAULT;
                         ColliderQuad* attack = &player.meleeWeaponQuads[0];
-                        REQUIRE(!CollisionCheck_NoSharedFlags(&attack->elem, &element));
+                        REQUIRE(!CollisionCheck_NoSharedFlags(&attack->elem, &receiver.elem));
                         const int allowed = kind >= 2 || !enabled || owned;
-                        REQUIRE(CollisionCheck_SetATvsAC(&play, &attack->base, &attack->elem, &contact, &receiver,
-                                                         &element, &contact, &contact) == allowed);
-                        REQUIRE(!!(receiver.acFlags & AC_HIT) == allowed);
-                        CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver, &element);
+                        REQUIRE(CollisionCheck_SetATvsAC(&play, &attack->base, &attack->elem, &contact, &receiver.base,
+                                                         &receiver.elem, &contact, &contact) == allowed);
+                        REQUIRE(!!(receiver.base.acFlags & AC_HIT) == allowed);
+                        CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.elem);
                         REQUIRE(target.colChkInfo.damage == allowed);
                     }
                 }

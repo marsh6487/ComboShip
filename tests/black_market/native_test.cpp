@@ -5,6 +5,7 @@
 #include "2s2h/Enhancements/Gameplay/BlackMarketDoorNative.h"
 #include "entrances/BlackMarketEntrance.h"
 #include "BlackMarketExitDoor.h"
+#include "BlackMarketKeeperInteraction.h"
 #include "entrances/SoloForest.h"
 #include "rando/BlackMarket.h"
 #include "BlackMarketText.h"
@@ -516,9 +517,17 @@ int main(int argc, char** argv) {
     assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Leave") != std::string::npos);
     textId = kConfirmText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("\xC2I'll buy it\x11No thanks") != std::string::npos);
+    constexpr char greetingBody[] = "A\x1E\x12\x34\xBF";
+    char greeting[MESSAGE_HEADER_SIZE + sizeof(greetingBody) - 1] = { '\x1E', '\x01', '\x02' };
+    std::copy_n(greetingBody, sizeof(greetingBody) - 1, greeting + MESSAGE_HEADER_SIZE);
+    MessageTableEntry keeperMessages[] = { { 0x76D, 0, greeting, sizeof(greeting) }, { 0xFFFF, 0, nullptr, 0 } };
+    gSaveContext.save.playerForm = PLAYER_FORM_HUMAN;
+    play.msgCtx.messageTableNES = keeperMessages;
     textId = kWelcomeText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("Continue") != std::string::npos &&
            CustomMessage::last.msg.find("Talk") == std::string::npos);
+    assert(CustomMessage::last.msg.starts_with("\x1E\x12\x34"));
+    play.msgCtx.messageTableNES = nullptr;
     textId = kKeeperHelpChoiceText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("How does this shop work?") != std::string::npos &&
            CustomMessage::last.msg.find("Back") != std::string::npos);

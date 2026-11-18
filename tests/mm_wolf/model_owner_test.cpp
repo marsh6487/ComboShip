@@ -1,5 +1,6 @@
 #include "mods/pak_loader/pak_loader.h"
 #include "mods/items/logic/adult_link_render.h"
+#include "combo/actors/SeasonalOutfits.h"
 #include <cassert>
 #include <cstdio>
 #include <map>
@@ -17,6 +18,8 @@ struct PakModel;
 static std::vector<PakModel> sModels;
 static s32 sSelectedAdultIndex = -1, sSelectedChildIndex = -1, sSelectedEquipIndex = -1;
 static s32 sForcedModelIndex = -1, sForcedEquipIndex = -1;
+static s32 sSeasonalModelIndex = -1;
+static bool sRemoteRenderActive;
 static bool adult, enabled, slotMix;
 static std::map<u32, Gfx*> sCachedEquipDLs;
 extern "C" {
@@ -35,11 +38,13 @@ static void sGetEquipDLs(void) {}
 int main() {
     // MM's legacy linkAge value is adult even when NEI's Time Gate selects child.
     gSaveContext.save.linkAge = 0;
-    sModels.resize(3);
+    constexpr s32 seasonalIndex = 3;
+    sModels.resize(4);
     sModels[0].isEquipmentOnly = 1;
     sModels[0].adultReady = sModels[0].childReady = 1;
     sModels[1].childReady = 1;
     sModels[2].adultReady = 1;
+    sModels[seasonalIndex].adultReady = 1;
     sCachedEquipDLs[1] = reinterpret_cast<Gfx*>(uintptr_t(2));
     sSelectedEquipIndex = 0;
     if (!PakLoader_HasActiveModel() || PakLoader_HasActiveBodyModel()) {
@@ -72,5 +77,19 @@ int main() {
     sForcedModelIndex = -1;
     sSelectedAdultIndex = -1;
     assert(!PakLoader_HasActiveBodyModel());
-    std::puts("PASS production MM PAK ownership: equipment/slot mix, enabled/forced bodies and NEI ages");
+
+    sSelectedAdultIndex = 2;
+    sSeasonalModelIndex = seasonalIndex;
+    assert(sGetActiveIndex() == seasonalIndex && PakLoader_HasActiveModel() && PakLoader_HasActiveBodyModel());
+    sForcedModelIndex = 2;
+    assert(sGetActiveIndex() == 2 && PakLoader_HasActiveBodyModel());
+
+    // Remote drawing clears local choices and forces an installed remote skin.
+    sRemoteRenderActive = true;
+    sSelectedAdultIndex = -1;
+    sForcedModelIndex = -1;
+    assert(sGetActiveIndex() == -1 && !PakLoader_HasActiveModel() && !PakLoader_HasActiveBodyModel());
+    sForcedModelIndex = 2;
+    assert(sGetActiveIndex() == 2 && PakLoader_HasActiveModel() && PakLoader_HasActiveBodyModel());
+    std::puts("PASS production MM PAK ownership: equipment/slot mix, NEI ages, seasonal and forced/remote priority");
 }

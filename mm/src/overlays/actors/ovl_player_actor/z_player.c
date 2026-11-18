@@ -1286,6 +1286,7 @@ PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX] = {
     },
 };
 
+#include "../../../../../combo/actors/ZeldaRun.h"
 PlayerAnimationHeader* D_8085BE84[PLAYER_ANIMGROUP_MAX][PLAYER_ANIMTYPE_MAX] = {
     // PLAYER_ANIMGROUP_wait
     {
@@ -2946,7 +2947,7 @@ PlayerAnimationHeader* func_8082EEE0(Player* this) {
     if (this->unk_B64 != 0) {
         return D_8085BE84[PLAYER_ANIMGROUP_damage_run][this->modelAnimType];
     } else {
-        return D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType];
+        return ZeldaRun_Select(this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]);
     }
 }
 
@@ -9435,7 +9436,8 @@ void func_8083A794(Player* this, PlayState* play) {
         this->unk_B70 = 0;
         this->unk_B34 = 0.0f;
         this->unk_B38 = 0.0f;
-        Player_Anim_PlayLoopMorph(play, this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]);
+        Player_Anim_PlayLoopMorph(play, this,
+                                  ZeldaRun_Select(this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]));
     }
 
     Player_SetAction(play, this, Player_IsZTargeting(this) ? Player_Action_14 : Player_Action_13, 1);

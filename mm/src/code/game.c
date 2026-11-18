@@ -174,6 +174,7 @@ static void GameState_UpdateUiVisibility(GameState* gameState) {
     }
 
     UiVisibility_Toggle();
+    Audio_PlaySfx(UiVisibility_IsHidden() ? NA_SE_SY_CAMERA_ZOOM_UP : NA_SE_SY_CAMERA_ZOOM_DOWN);
 }
 
 void GameState_Update(GameState* gameState) {

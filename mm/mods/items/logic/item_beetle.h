@@ -91,6 +91,7 @@ void Beetle_UpdateWingAnimation(f32* scale, s8* direction);
 
 // State check
 u8 Beetle_IsFlying(void);
+void Beetle_ResetTransient(Player* player, PlayState* play);
 
 #ifdef __cplusplus
 }

@@ -50,6 +50,16 @@ static void BottleItems_SyncSlot(PlayState* play, u8 slot, u8 want) {
             }
         }
     }
+    // MM stores D-pad equipment separately. Leaving this row empty after a
+    // drink made a charged bottle look and behave like a single-use bottle.
+    for (s16 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; btn++) {
+        if (DPAD_SLOT_EQUIP(0, btn) == slot && DPAD_BUTTON_ITEM_EQUIP(0, btn) != want) {
+            DPAD_SET_CUR_FORM_BTN_ITEM(btn, want);
+            if (play != NULL) {
+                Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
+            }
+        }
+    }
 }
 
 // A VANILLA bottle item (empty bottle or any content, MM range 0x12 ITEM_BOTTLE .. 0x27

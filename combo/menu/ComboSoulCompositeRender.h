@@ -9,6 +9,10 @@ inline s32 CfaOverrideLimbDrawXlu(PlayState*, s32 limbIndex, Gfx** dl, Vec3f* po
         if (limbIndex >= c.limbFrom && limbIndex <= c.limbTo)
             gDPSetEnvColor((*gfx)++, c.env[0], c.env[1], c.env[2], c.env[3]);
     }
+    if (info->proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA) {
+        if (const char* path = ComboGoldSkulltula::LimbPath(limbIndex))
+            *dl = (Gfx*)path;
+    }
     const auto* rule = CfaFindLimbDL(limbIndex);
     if (rule) {
         pos->x += rule->posDx;
@@ -226,6 +230,10 @@ inline bool CfaPreflightComposite(const CwItemAnimDrawInfo* info, const std::sha
     for (int i = 0; i < info->limbDLCount; ++i)
         if (!exists(info->limbDLs[i].dlPath) || !exists(info->limbDLs[i].postDlPath))
             return false;
+    if (info->proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA)
+        for (const auto& limb : ComboGoldSkulltula::Limbs)
+            if (!exists(limb.path))
+                return false;
     return exists(info->postModelDlPath);
 }
 inline CfaTexAnimEntry* CfaGetTexAnim(const char* path, const char* game,
