@@ -1,5 +1,5 @@
 /* Native-header fixture. The runner inserts the real dispatch and cutscene
- * predicates below; only the shared UI latch and unused callbacks are doubles. */
+ * predicates below with controlled latch, audio and callback boundaries. */
 #include "global.h"
 #include "gui/UiVisibility.h"
 #include "libultraship/bridge/consolevariablebridge.h"
@@ -15,7 +15,8 @@ static PlayState play;
 static PlayState otherPlay;
 static Player player;
 static int enabled, hidden, debugEnabled, moonJump, conflictOverride;
-static unsigned toggles, checks;
+static unsigned toggles, cues, checks;
+static u16 lastCue;
 static const char* caseName;
 
 #define CHECK(expression)                                                                                      \
@@ -40,6 +41,28 @@ void UiVisibility_Toggle(void) {
         ++toggles;
     }
 }
+
+static void recordCue(u16 id) {
+    lastCue = id;
+    ++cues;
+}
+
+#ifdef UI_CONTROL_TEST_MM
+void Audio_PlaySfx(u16 id) {
+    recordCue(id);
+}
+#else
+Vec3f gSfxDefaultPos;
+f32 gSfxDefaultFreqAndVolScale = 1.0f;
+s8 gSfxDefaultReverb;
+
+void Audio_PlaySfxGeneral(u16 id, Vec3f* position, u8 token, f32* frequency, f32* volume, s8* reverb) {
+    CHECK(position == &gSfxDefaultPos && token == 4);
+    CHECK(frequency == &gSfxDefaultFreqAndVolScale && volume == frequency);
+    CHECK(reverb == &gSfxDefaultReverb);
+    recordCue(id);
+}
+#endif
 
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
     if (!strcmp(name, "gDeveloperTools.DebugEnabled")) {
@@ -109,7 +132,8 @@ static void reset(const char* name, int initialHidden) {
     enabled = 1;
     hidden = initialHidden;
     debugEnabled = moonJump = conflictOverride = 0;
-    toggles = 0;
+    toggles = cues = 0;
+    lastCue = 0;
     caseName = name;
 }
 
@@ -117,10 +141,15 @@ static void dispatch(GameState* state, int mayToggle) {
     Input before[ARRAY_COUNT(state->input)];
     int wasHidden = hidden;
     unsigned beforeToggles = toggles;
+    unsigned beforeCues = cues;
     memcpy(before, state->input, sizeof(before));
     GameState_UpdateUiVisibility(state);
     CHECK(toggles == beforeToggles + mayToggle);
     CHECK(hidden == (mayToggle ? !wasHidden : wasHidden));
+    CHECK(cues == beforeCues + mayToggle);
+    if (mayToggle) {
+        CHECK(lastCue == (wasHidden ? NA_SE_SY_CAMERA_ZOOM_DOWN : NA_SE_SY_CAMERA_ZOOM_UP));
+    }
     CHECK(memcmp(before, state->input, sizeof(before)) == 0);
     ++checks;
 }
@@ -420,7 +449,7 @@ int main(void) {
 #else
     const char* mode = "original";
 #endif
-    printf("PASS %s %s: %u native control dispatches; real cutscene predicates, both UI latch states, input preserved\n",
+    printf("PASS %s %s: %u native control dispatches, cutscene gates, both latch states, input and toggle cues\n",
            host, mode, checks);
     return 0;
 }
