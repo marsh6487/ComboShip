@@ -40,8 +40,24 @@ production+="\nvoid Picto_SetOnLensActive(unsigned char on) {sPictoOnLens=on?1:0
 setup=CHECKS[:CHECKS.index("int main(")]
 checks=r'''
 int main(void) {
- for(int page=0;page<3;page++) {
-  reset();sExtInvState.currentPage=page;
+ for(int enabled=0;enabled<2;enabled++) {
+  reset();equipSwap=enabled;
+  gSaveContext.inventory.items[SLOT_STICK]=ITEM_STICK;
+  play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_STICK;
+  play.pauseCtx.cursorPoint[PAUSE_ITEM]=SLOT_STICK;
+  play.pauseCtx.cursorX[PAUSE_ITEM]=SLOT_STICK%6;play.pauseCtx.cursorY[PAUSE_ITEM]=SLOT_STICK/6;
+  Step(&play);
+  assert(play.pauseCtx.cursorItem[PAUSE_ITEM]==ITEM_STICK && equipCalls==0);
+  // The selected native item disappears before the next frame's boundary input.
+  gSaveContext.inventory.items[SLOT_STICK]=ITEM_NONE;
+  play.pauseCtx.stickRelY=40;play.state.input[0].press.button=BTN_CLEFT;
+  Step(&play);
+  assert(equipCalls==0 && "removed native item was equipped from cached selection");
+  assert(play.pauseCtx.cursorItem[PAUSE_ITEM]==PAUSE_ITEM_NONE && "removed native item retained its title");
+ }
+ puts("PASS OoT selection: removed native item clears across frames with equip swap off/on");
+ for(int enabled=0;enabled<2;enabled++) for(int page=0;page<3;page++) {
+  reset();equipSwap=enabled;sExtInvState.currentPage=page;
   play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_WHIP;
   play.pauseCtx.cursorPoint[PAUSE_ITEM]=0;play.pauseCtx.cursorX[PAUSE_ITEM]=0;play.pauseCtx.cursorY[PAUSE_ITEM]=0;
   play.pauseCtx.stickRelY=40;play.state.input[0].press.button=BTN_CLEFT;
