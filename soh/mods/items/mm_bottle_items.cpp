@@ -19,6 +19,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ShipInit.hpp"
 #include "mods/items/custom_bottles.h"
+#include <iterator>
 
 extern "C" {
 #include "z64.h"
@@ -29,12 +30,14 @@ extern PlayState* gPlayState;
 void Interface_LoadItemIcon1(PlayState* play, u16 button);
 }
 
-// Sync a bottle slot to `want` and any C-button equipping it (reloading the C-button icon on change).
+// Sync by bottle-slot identity, including SoH's four extended D-pad buttons.
+// The native drink path empties the used button even when the counter hook
+// keeps the content, so every binding must be projected back from that slot.
 static void BottleItems_SyncSlot(PlayState* play, u8 slot, u8 want) {
     if (gSaveContext.inventory.items[slot] != want) {
         gSaveContext.inventory.items[slot] = want;
     }
-    for (s16 j = 1; j < 4; j++) { // C-left/down/right -> cButtonSlots[0..2]
+    for (s16 j = 1; j < std::size(gSaveContext.equips.buttonItems); j++) {
         if (gSaveContext.equips.cButtonSlots[j - 1] == slot && gSaveContext.equips.buttonItems[j] != want) {
             gSaveContext.equips.buttonItems[j] = want;
             if (play != NULL) {

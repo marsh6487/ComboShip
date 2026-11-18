@@ -15,7 +15,7 @@ s32 CustomItems_HasStowableHeldItem(Player* p) {
     return gCustomItemState.lanternEquipped || gCustomItemState.lanternSwinging || fireRodActive ||
            fireRodFirstPerson || iceRodActive || iceRodFirstPerson || lightRodActive || lightRodFirstPerson ||
            gCustomItemState.gustJarEquipped || gCustomItemState.mogmaMittsActive ||
-           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn();
+           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn() || Slate_IsDrawn();
 }
 
 void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
@@ -23,6 +23,7 @@ void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
         return;
     }
 
+    Slate_PutAway(play, p);
     Seasons_Stow(play, p);
     Lantern_PutAway(p, play);
     FireRod_PutAway(p, play);

@@ -216,7 +216,10 @@ void Rando::ActorBehavior::InitEnemyDropBehavior() {
 
     COND_VB_SHOULD(VB_DRAW_SLIME_RANDO_ITEM, shouldRegister, {
         if (!RANDO_SAVE_CHECKS[RC_ENEMY_DROP_CHUCHU].cycleObtained) {
-            RandoItemId randoItemId = Rando::ConvertItem(RANDO_SAVE_CHECKS[RC_ENEMY_DROP_CHUCHU].randoItemId);
+            // Match the actual drop/receipt conversion after a cycle reset: the
+            // permanent check flag must select its renewable replacement too.
+            RandoItemId randoItemId =
+                Rando::ConvertItem(RANDO_SAVE_CHECKS[RC_ENEMY_DROP_CHUCHU].randoItemId, RC_ENEMY_DROP_CHUCHU);
 
             EnSlime* slime = va_arg(args, EnSlime*);
             Matrix_RotateYS(slime->actor.shape.rot.y, MTXMODE_APPLY);

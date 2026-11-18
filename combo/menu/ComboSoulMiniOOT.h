@@ -7,6 +7,7 @@
 // 7/0/5 (astronomer/dog lady/banker). These are native OoT semantic identities.
 #include "ComboItemDrawABI.h"
 #include "ComboSoulModelSettings.h"
+#include "ComboGoldSkulltulaLimbs.h"
 #include <initializer_list>
 
 namespace ComboSoulMiniOOT {
@@ -191,6 +192,11 @@ inline constexpr Model Catalog[] = {
       "__OTR__objects/object_os_anime/gObjOsAnim_28DC", 16, 0, 0.007f, -20.0f }, // En_Hy
     { RG_SOUL_NPC_THIEVES, "__OTR__objects/object_ge1/gGerudoWhiteSkel",
       "__OTR__objects/object_ge1/gGerudoWhiteIdleAnim", 16, 0, 0.006f, -20.0f }, // En_Ge1
+    // Misc actors have their own native meshes; they are not boss-slot indices.
+    { RG_SOUL_MISC_GS, "__OTR__objects/object_st/object_st_Skel_005298",
+      "__OTR__objects/object_st/object_st_Anim_000304", 30, 1, 0.018f, 0.0f }, // En_Sw, gold variant
+    { RG_SOUL_MISC_BUSINESS_SCRUB, "__OTR__objects/object_shopnuts/gBusinessScrubSkel",
+      "__OTR__objects/object_shopnuts/gBusinessScrubLookAroundAnim", 18, 0, 0.014f, -15.0f }, // En_Shopnuts
 };
 inline const Model* Find(int32_t id) {
     for (const auto& model : Catalog)
@@ -201,8 +207,8 @@ inline const Model* Find(int32_t id) {
 inline bool UsesDetailed(int32_t id) {
     if (!Find(id))
         return false;
-    return id >= RG_SOUL_NPC_SARIA && id <= RG_SOUL_NPC_THIEVES ? !ComboSoulModels::SimplerNpc()
-                                                                : !ComboSoulModels::SimplerEnemy();
+    const bool npc = (id >= RG_SOUL_NPC_SARIA && id <= RG_SOUL_NPC_THIEVES) || id == RG_SOUL_MISC_BUSINESS_SCRUB;
+    return npc ? !ComboSoulModels::SimplerNpc() : !ComboSoulModels::SimplerEnemy();
 }
 inline CwAnimSegBind& Segment(CwItemAnimDrawInfo& out, int seg, const char* path = nullptr) {
     auto& bind = out.segs[out.segCount++];
@@ -292,6 +298,9 @@ inline int32_t Describe(int32_t id, CwItemAnimDrawInfo* result) {
     out.flameSeg.xStep2 = 1;
     out.flameSeg.yStep2 = -8;
     switch (id) {
+        case RG_SOUL_MISC_GS:
+            out.proceduralProfile = CW_ANIM_PROFILE_GOLD_SKULLTULA;
+            break;
         case RG_SOUL_ENEMY_STALFOS: {
             // TP's owning replacement also branches through the native OPA material slot.
             Segment(out, 12);

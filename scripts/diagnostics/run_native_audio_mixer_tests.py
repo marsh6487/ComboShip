@@ -40,6 +40,8 @@ static inline void op_free(OggOpusFile* f) { abort(); }
                        str(ROOT / "tests/audio_mixer/mix_test.c"), "-lm", "-o", str(binary)]
             if game == "mm":
                 command.insert(1, "-DTEST_MM_HILOGAIN")
+            else:
+                command.insert(1, "-DTEST_OOT_HILOGAIN")
             subprocess.run(command, check=True)
             failures += subprocess.run([str(binary)], timeout=30).returncode != 0
     raise SystemExit(bool(failures))

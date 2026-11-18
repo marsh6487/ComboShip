@@ -19,6 +19,8 @@ ui=(ROOT/'soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c').read_text()
 scope=(ROOT/'soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope_PAL.c').read_text()
 trade=(ROOT/'soh/mods/items/logic/trade_items.c').read_text()
 prefix=base['PREFIX'].replace('#define IS_RANDO 0','#define IS_RANDO 1')
+prefix=prefix.replace('s32 TradeAdult_IndexOfItem(u8 item) { return -1; }','')
+prefix=prefix.replace('u8 TradeAdult_IsConsumedIndex(s32 index) { return 0; }','')
 prefix=prefix.replace('void KaleidoScope_HandleItemCycles(PlayState* play) {}','void KaleidoScope_HandleItemCycles(PlayState* play);')
 prefix+='''
 void ItemGrantAudit_Begin(const char*,int,int,int) {}
@@ -59,6 +61,29 @@ int main(){
     assert(gSaveContext.inventory.items[SLOT_TRADE_CHILD]!=ITEM_LETTER_ZELDA);
     assert(gSaveContext.inventory.items[SLOT_TRADE_ADULT]==ITEM_COJIRO);
     assert(equipCalls==1 && equippedItem==ITEM_COJIRO && equippedSlot==SLOT_TRADE_ADULT);
+    // The restored native equip-swap window must not resurrect a consumed
+    // trade item cached while the cursor was on a page arrow.
+    reset();nei.tradeAdultRevision[22]=1;
+    gSaveContext.inventory.items[SLOT_STICK]=ITEM_STICK;
+    play.pauseCtx.cursorSpecialPos=PAUSE_CURSOR_PAGE_LEFT;
+    play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_LETTER_ZELDA;
+    play.state.input[0].press.button=BTN_CLEFT;
+    play.pauseCtx.stickRelX=40;play.pauseCtx.stickRelY=40;
+    Step(&play);
+    assert(equipCalls==1 && equippedItem==ITEM_STICK && equippedSlot==SLOT_STICK);
+    // Randomizer normalization also preserves an owned adult item in the
+    // legitimate native boundary swap, with the age-requirement hook active.
+    reset();gSaveContext.linkAge=LINK_AGE_CHILD;
+    slotAgeReqs[SLOT_HOOKSHOT]=AGE_REQ_ADULT;
+    gSaveContext.inventory.items[SLOT_STICK]=ITEM_STICK;
+    gSaveContext.inventory.items[SLOT_HOOKSHOT]=ITEM_HOOKSHOT;
+    assert(!CHECK_AGE_REQ_SLOT(SLOT_HOOKSHOT));
+    play.pauseCtx.cursorSpecialPos=PAUSE_CURSOR_PAGE_LEFT;
+    play.pauseCtx.cursorItem[PAUSE_ITEM]=ITEM_HOOKSHOT;
+    play.state.input[0].press.button=BTN_CLEFT;
+    play.pauseCtx.stickRelX=40;play.pauseCtx.stickRelY=40;
+    Step(&play);
+    assert(equipCalls==1 && equippedItem==ITEM_HOOKSHOT && equippedSlot==SLOT_STICK);
     // A completed native/editor write arrives after load; same-frame C press
     // must see the repaired corner instead of equipping a stale Letter there.
     for(int target=22;target<=23;++target) {

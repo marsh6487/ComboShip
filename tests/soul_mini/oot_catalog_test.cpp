@@ -35,7 +35,7 @@ static constexpr Identity Identities[] = {
 static void path(const char* p) { if(p) std::printf("\"%s\"",p); else std::printf("null"); }
 int main(int argc, char**) {
     using namespace ComboSoulMiniOOT;
-    assert(sizeof(Catalog)/sizeof(Catalog[0]) == 89);
+    assert(sizeof(Catalog)/sizeof(Catalog[0]) == 91);
     CwItemAnimDrawInfo info{};
     assert(!Describe(-1, &info)); assert(!Describe(RG_SOUL_NPC_SARIA, nullptr));
     std::set<int> unique;
@@ -44,11 +44,12 @@ int main(int argc, char**) {
     if(dump) std::puts("[");
     bool first=true;
     for(const auto& identity: Identities) {
-        if(std::strcmp(identity.category,"ENEMY") && std::strcmp(identity.category,"NPC")) {
+        const bool misc = identity.id == RG_SOUL_MISC_GS || identity.id == RG_SOUL_MISC_BUSINESS_SCRUB;
+        if(std::strcmp(identity.category,"ENEMY") && std::strcmp(identity.category,"NPC") && !misc) {
             assert(!Find(identity.id)); continue;
         }
         assert(unique.insert(identity.id).second);
-        const bool npc = !std::strcmp(identity.category,"NPC");
+        const bool npc = !std::strcmp(identity.category,"NPC") || identity.id == RG_SOUL_MISC_BUSINESS_SCRUB;
         npc ? ++npcs : ++enemies;
         enemySimple = npcSimple = 0;
         assert(Describe(identity.id,&info)); assert(info.stateDependent);
@@ -119,6 +120,13 @@ int main(int argc, char**) {
             std::printf("],\"transform\":{\"translate\":[%f,%f,%f],\"rotate\":[%d,%d,%d],\"scale\":[%f,%f,%f]}}",p.transform.translate[0],p.transform.translate[1],p.transform.translate[2],p.transform.rotate[0],p.transform.rotate[1],p.transform.rotate[2],p.transform.scale[0],p.transform.scale[1],p.transform.scale[2]);
         }
         std::printf("],\"flameDlPath\":");path(info.flameDlPath);
+        std::printf(",\"proceduralProfile\":%d,\"proceduralLimbDLs\":[",info.proceduralProfile);
+        if(info.proceduralProfile==CW_ANIM_PROFILE_GOLD_SKULLTULA){
+            bool firstLimb=true;
+            for(const auto& limb:ComboGoldSkulltula::Limbs){if(!firstLimb)std::printf(",");firstLimb=false;
+                std::printf("{\"limbIndex\":%d,\"dlPath\":",limb.index);path(limb.path);std::printf("}");}
+        }
+        std::printf("]");
         std::printf(",\"fallbackTokenPath\":");path(info.fallbackTokenPath);
         std::printf(",\"texAnimPath\":");path(info.texAnimPath);
         std::printf(",\"texAnimPath2\":");path(info.texAnimPath2);
@@ -127,11 +135,13 @@ int main(int argc, char**) {
         for(int i=0;i<info.segCount;i++)paths.push_back(info.segs[i].path);
         for(int i=0;i<info.limbDLCount;i++){paths.push_back(info.limbDLs[i].dlPath);paths.push_back(info.limbDLs[i].postDlPath);}
         for(int i=0;i<info.partCount;i++){paths.push_back(info.parts[i].dlPath);paths.push_back(info.parts[i].alternateDlPath);}
+        if(info.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA)
+            for(const auto& limb:ComboGoldSkulltula::Limbs) paths.push_back(limb.path);
         bool firstPath=true;
         for(auto p:paths)if(p){if(!firstPath)std::printf(",");firstPath=false;path(p);}
         std::printf("]}");
     }
-    assert(enemies==43 && npcs==46 && composites==7);
+    assert(enemies==44 && npcs==47 && composites==7);
     if(dump)std::puts("\n]");
-    else std::puts("PASS 89 live descriptors, unique coverage, all four preference combinations, bounded static/palette/material recipes");
+    else std::puts("PASS 91 live descriptors, unique coverage, all four preference combinations, bounded static/palette/material recipes");
 }

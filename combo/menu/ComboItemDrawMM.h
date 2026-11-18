@@ -299,6 +299,14 @@ static int32_t MM_FillOpsDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         case RI_OWL_STONE_TOWER:
         case RI_OWL_WOODFALL:
         case RI_OWL_ZORA_CAPE:
+            // The consumer brackets the OPS model before emitting this overlay
+            // in the original GI pose. Keep the opt-in live across cached draws.
+            out->stateDependent = 2;
+            out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+            out->itemShimmerColor[0] = 220;
+            out->itemShimmerColor[1] = 225;
+            out->itemShimmerColor[2] = 240;
+            out->itemShimmerColor[3] = 255;
             MM_Op(out, CW_OP_SETUP_OPA);
             MM_OpV(out, CW_OP_SCALE, 0.01f, 0.01f, 0.01f);
             MM_OpV(out, CW_OP_TRANSLATE, 0.0f, -3000.0f, 0.0f);
@@ -962,7 +970,7 @@ static int32_t MM_FillMinifrogAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
 
 static int32_t MM_FillAnimDrawInfo(RandoItemId id, CwItemAnimDrawInfo* out) {
     if (MM_FillBossSoulAnim(id, out) || MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) ||
-        MM_FillMinifrogAnim(id, out)) {
+        MM_FillMiscSoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
         return 1;
     }
     return 0;
@@ -1504,7 +1512,7 @@ extern "C" COMBO_EXPORT int32_t MM_GetSoulMiniAnimDrawInfoById(int32_t itemId, C
             return 0;
         *out = CwItemAnimDrawInfo{};
         const auto id = static_cast<RandoItemId>(itemId);
-        return MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out);
+        return MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) || MM_FillMiscSoulAnim(id, out);
     } catch (...) { return 0; }
 }
 

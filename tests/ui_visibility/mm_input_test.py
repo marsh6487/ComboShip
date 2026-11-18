@@ -33,7 +33,7 @@ static PlayState *gPlayState;
 static void Play_Main(GameState *state);
 static void playerUpdate(void) {}
 static int minimal, enabled, hidden = 1, blocked, inCutscene, hookAllows = 1;
-static int minimapDisabled, mapUpdates, sLastRoomNum, playerFloor, toggles, sounds, mainCalls, events;
+static int minimapDisabled, mapUpdates, sLastRoomNum, playerFloor, toggles, sounds, mainCalls, events, lastSound;
 static int R_PAUSE_BG_PRERENDER_STATE;
 static struct { void *mapDataScene, *minimapCurTex, *minimapPrevTex;
     int minimapCurX,minimapCurY,minimapPrevX,minimapPrevY,curRoom,prevRoom,swapAnimTimer; } sMapDisp;
@@ -88,7 +88,7 @@ static void UiVisibility_Toggle(void) { if (enabled) { hidden ^= 1; ++toggles; }
 static int Play_InCsMode(PlayState *play) { return inCutscene; }
 static int MapDisp_IsMinimapToggleBlocked(PlayState *play) { return blocked; }
 static int GameInteractor_Should(int id, int value) { assert(id==VB_MINIMAP_TOGGLE); return hookAllows; }
-static void Audio_PlaySfx(int id) { assert(id==10 || id==11); ++sounds; }
+static void Audio_PlaySfx(int id) { assert(id==10 || id==11); lastSound=id; ++sounds; }
 static void MapDisp_Update(PlayState *play) { ++mapUpdates; }
 static int Map_IsInDungeonScene(PlayState *play) { return 0; }
 static int Map_IsInBossScene(PlayState *play) { return 0; }
@@ -132,21 +132,21 @@ int main(void) {
     assert(minimapDisabled == 0 && sounds == 2);
     reset(&play); enabled = minimal = blocked = 1;
     GameState_Update(&play.state);
-    assert(toggles == 1 && !UiVisibility_IsHidden() && minimapDisabled == 0 && sounds == 0);
+    assert(toggles == 1 && !UiVisibility_IsHidden() && minimapDisabled == 0 && sounds == 1 && lastSound == 11);
     GameState_Update(&play.state);
-    assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0);
+    assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0 && sounds == 2 && lastSound == 10);
     // Inventory/dialogue/file-select L must preserve visibility and input.
     // Native minimap handling must not double-toggle.
     play.pauseCtx.state = 6; inCutscene = 1;
     GameState_Update(&play.state);
-    assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0);
+    assert(toggles == 2 && UiVisibility_IsHidden() && minimapDisabled == 0 && sounds == 2);
     assert(play.state.input[0].press.button == BTN_L);
     play.state.main = otherMain;
     GameState_Update(&play.state);
-    assert(toggles == 2 && UiVisibility_IsHidden());
+    assert(toggles == 2 && UiVisibility_IsHidden() && sounds == 2);
     play.state.input[0].press.button = 0;
     GameState_Update(&play.state);
-    assert(toggles == 2);
+    assert(toggles == 2 && sounds == 2);
     enabled = 0;
     assert(!UiVisibility_IsHidden());
     reset(&play); minimal = 1; inCutscene = 1;

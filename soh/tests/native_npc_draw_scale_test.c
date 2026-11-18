@@ -28,6 +28,19 @@ s32 NativeNpcPose_SkinMatrixCount(const void* plan) {
 void NativeNpcPose_BlendSkinMatrix(const void* plan, s32 index, const MtxF* native, MtxF* result) {
     assert(0);
 }
+/* This fixture exercises NPCs; optional player companions are absent. */
+const void* PlayerFlexSkin_GetPlan(void** skeleton, s32 count) {
+    return NULL;
+}
+s32 PlayerFlexSkin_MatrixCount(const void* plan) {
+    return 0;
+}
+void PlayerFlexSkin_BlendMatrix(const void* plan, s32 index, const MtxF* native, MtxF* result) {
+    assert(0);
+}
+Gfx* PlayerFlexSkin_SelectLimb(const void* plan, s32 index, Gfx* selected, Gfx* original) {
+    return selected;
+}
 void* Graph_Alloc(GraphicsContext* context, size_t size) {
     assert(size <= sizeof(storage));
     return storage;

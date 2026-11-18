@@ -1015,9 +1015,8 @@ static void SwitchHook_Retract(Player* p, PlayState* play) {
 //
 // The Switch Hook is a held item: the first equipped-button press draws it.
 // With it in hand:
-//   - C-Up toggles MANUAL AIM — the vanilla hookshot aim camera (func_80831010
-//     keeps unk_AA5 = 3 alive each frame, the IK-axe pattern; being set before
-//     Player_ActionHandler_0 runs also suppresses the vanilla C-Up peek).
+//   - C-Up toggles MANUAL AIM through the native hookshot upper-action entry.
+//     The native weapon-aim action owns camera retention and cancellation.
 //   - Pressing the equipped C/D button LAUNCHES it: where you AIM while in
 //     C-Up mode (no auto-target), or at the blue live selection otherwise
 //     (z_arms_hook.c reads SwitchHook_IsAimingManual()).
@@ -1025,43 +1024,63 @@ static void SwitchHook_Retract(Player* p, PlayState* play) {
 
 static u8 sShAimManual = 0;
 
-// True while the C-Up manual-aim camera is up (arms_hook skips selection/auto-aim;
-// z_player.c's func_80831010 gate falls through to the vanilla aim path).
+// True only while the native hookshot weapon-aim action owns manual aim.
 u8 SwitchHook_IsAimingManual(void) {
     return sShAimManual;
 }
 
-// Called by z_arms_hook.c the moment the hook launches — manual aim ends at the shot.
+// Also used on player teardown. Never clear another item's newly installed aim.
 void SwitchHook_OnFired(Player* p) {
     if (sShAimManual) {
         sShAimManual = 0;
-        p->unk_AA5 = PLAYER_UNKAA5_0;
+        if (p->heldItemId == ITEM_SWITCH_HOOK && p->heldItemAction == PLAYER_IA_HOOKSHOT &&
+            p->unk_AA5 == PLAYER_UNKAA5_3) {
+            p->unk_AA5 = PLAYER_UNKAA5_0;
+        }
+    }
+}
+
+void SwitchHook_CleanupManualAim(Player* p, PlayState* play) {
+    if (sShAimManual &&
+        (p->heldItemId != ITEM_SWITCH_HOOK || p->heldItemAction != PLAYER_IA_HOOKSHOT ||
+         p->unk_AA5 != PLAYER_UNKAA5_3 || ItemInput_IsBlocked(p, play) || p->csAction != PLAYER_CSACTION_NONE ||
+         play->csCtx.state != CS_STATE_IDLE || play->transitionTrigger == TRANS_TRIGGER_START ||
+         CHECK_BTN_ANY(play->state.input[0].press.button, BTN_A | BTN_B | BTN_R))) {
+        SwitchHook_OnFired(p);
     }
 }
 
 void Handle_SwitchHook(Player* p, PlayState* play) {
-    // Skijer's NEI switchhook rework: the firing/swap logic runs through the vanilla hookshot
-    // (ITEM_SWITCH_HOOK -> PLAYER_IA_HOOKSHOT in extended_player.c + arms_hook). This handler only
-    // owns the C-Up manual-aim toggle; the old custom first-person/projectile handler below is dead
-    // (it produced the boomerang pose and never aimed properly).
-    extern bool func_80831010(Player * this, PlayState * play);
+    // The projectile/swap runs through native hookshot upper actions and ArmsHook.
+    // C-Up must enter that same upper-action lifecycle, not just request its camera.
+    extern bool func_80831010(Player * player, PlayState * play);
+    extern s32 func_80831814(Player * player, PlayState * play, PlayerUnkAA5 aimType);
+    extern s32 func_80830E30(Player * player, PlayState * play);
 
-    if (p->heldItemId != ITEM_SWITCH_HOOK) {
-        if (sShAimManual) { // put away mid-aim: drop the aim camera cleanly
-            sShAimManual = 0;
-            p->unk_AA5 = PLAYER_UNKAA5_0;
-        }
+    SwitchHook_CleanupManualAim(p, play);
+    if (p->heldItemId != ITEM_SWITCH_HOOK || p->heldItemAction != PLAYER_IA_HOOKSHOT) {
         return;
     }
 
     if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_CUP)) {
-        sShAimManual ^= 1;
-        if (!sShAimManual) {
-            p->unk_AA5 = PLAYER_UNKAA5_0;
+        // Do not let native C-Up peek or another equipped tool reuse this toggle.
+        play->state.input[0].press.button &= ~BTN_CUP;
+        if (sShAimManual) {
+            SwitchHook_OnFired(p);
+        } else if (p->unk_AA5 == PLAYER_UNKAA5_0 && p->heldActor != NULL && !ItemInput_IsBlocked(p, play) &&
+                   p->csAction == PLAYER_CSACTION_NONE && play->csCtx.state == CS_STATE_IDLE &&
+                   play->transitionTrigger != TRANS_TRIGGER_START &&
+                   !CHECK_BTN_ANY(play->state.input[0].press.button, BTN_A | BTN_B | BTN_R) &&
+                   func_80831814(p, play, PLAYER_UNKAA5_3)) {
+            // Enable the manual branch before asking the native hookshot admission gate.
+            sShAimManual = 1;
+            if (func_80831010(p, play) || !func_80830E30(p, play)) {
+                SwitchHook_OnFired(p);
+            }
+            // func_80830E30 seeds unk_ACC and upper7. Upper7/8 retain aim and
+            // process the equipped-button shot. Native cancellation clears AA5;
+            // the next cleanup drops manual ownership instead of reopening it.
         }
-    }
-    if (sShAimManual) {
-        func_80831010(p, play); // hold the vanilla hookshot aim camera each frame
     }
     return;
 

@@ -109,6 +109,7 @@ extern SaveContext gSaveContext;
 #include "ComboSoulGiFlameOOT.h"
 
 #include "ComboMaskShimmer.h"
+#include "../../../../combo/actors/ComboOwlEffects.h"
 #include "ComboCollectibleShimmerHost.h"
 #include "ComboMorphaGi.h"
 #include "ComboItemEffectColors.h"
@@ -4193,12 +4194,13 @@ void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry) {
 // The 2Ship rando draws each owl-statue check with the opened owl-statue model
 // (object_sek "sek_open_model"), scaled 0.01 with a -3000 Y translate to bring
 // the tall statue down to get-item size (mm Rando/DrawItem.cpp DrawOwlStatue).
-// Single opaque DL, shared by all 10 owl statues.
+// Shared by all 10 owl statues; shimmer uses the caller's GI pose.
 // =============================================================================
 void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry) {
     if (!MmAssets_IsAvailable())
         return;
 
+    Matrix_Push();
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -4209,6 +4211,12 @@ void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry) {
     GSP_MM_DL(POLY_OPA_DISP++, gMmOwlStatueOpenedDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    ComboOwl_DrawEffects(play, "mm");
+    Matrix_Pop();
+    if (CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0)) {
+        const uint8_t color[4] = { 220, 225, 240, 255 };
+        NeiGi_DrawShimmerOverlay(play, color, "mm");
+    }
 }
 
 // Authored OoT Clock: available in each host's own archive, including effects-off.

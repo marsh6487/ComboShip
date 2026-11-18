@@ -1783,7 +1783,9 @@ static void DrawStartingItemsTab() {
         ImGui::TableNextColumn();
         CVarCheckbox("Consumables Full", Rando::StaticData::Options[RO_STARTING_CONSUMABLES].cvar,
                      CheckboxOptions({ {
-                         .tooltip = "Start with full Deku Sticks and Deku Nuts",
+                         .tooltip = "Start with full Deku Sticks and Deku Nuts.\n"
+                                    "In Combo, these amounts also enter the shared inventory in OoT.\n"
+                                    "Leave this off to collect your starting ammo through gameplay.",
                      } }));
 
         ImGui::TableNextColumn();

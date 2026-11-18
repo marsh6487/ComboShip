@@ -122,6 +122,8 @@ static s16 sSlateHoldTimer = 0;
 static u8 sSlateDrawn = 0;      // the tablet is out, in Link's hand
 static s16 sSlateCastTimer = 0; // frames left of the cast pose
 static s8 sSlatePrevInvinc = 0;
+static u16 sSlateSuppressedButtons = 0;
+static u32 sSlateStowFrame = (u32)-1;
 
 // How long the arm stays extended on a cast. The hookshot's own shot pose is short and snappy;
 // this only has to cover the moment the rune fires.
@@ -157,6 +159,36 @@ u16 Slate_EquippedButtonMask(void) {
 
 static void Slate_OnWheelConfirm(s32 index) {
     Slate_SetRune(Slate_RuneAt((u8)index));
+}
+
+// Native A/Put Away must see the Slate even though it has no vanilla item
+// action. Cancel only its own UI/targeting; placed rune effects keep running.
+void Slate_PutAway(PlayState* play, Player* player) {
+    u8 ownsWheel = BoxMenu_IsOpen() && sBoxMOnConfirm == Slate_OnWheelConfirm;
+    if (!sSlateDrawn && !ownsWheel && !Cryonis_ModeActive() && sSensorPhase == SENSOR_PHASE_IDLE)
+        return;
+    sSlateSuppressedButtons |=
+        Slate_EquippedButtonMask() & (play->state.input[0].cur.button | play->state.input[0].press.button);
+    sSlateStowFrame = play->gameplayFrames;
+    sSlateHoldTimer = 0;
+    Slate_Stow(play, player);
+    sSlateCastTimer = 0;
+    if (ownsWheel)
+        BoxMenu_Close(play, 0);
+    Cryonis_ModeExit(0);
+    if (sSensorPhase != SENSOR_PHASE_IDLE) {
+        Message_CloseTextbox(play);
+        play->msgCtx.msgMode = MSGMODE_TEXT_DONE;
+        Sensor_Release(player);
+    }
+    Stasis_UpdateOffer(play, 0);
+}
+
+static u8 Slate_InputSuppressed(PlayState* play) {
+    if (sSlateStowFrame == play->gameplayFrames)
+        return 1;
+    sSlateSuppressedButtons &= play->state.input[0].cur.button;
+    return (sSlateSuppressedButtons & Slate_EquippedButtonMask()) != 0;
 }
 
 // Owned runes only, in the order the kaleido wheel cycles them, so every entry is selectable.
@@ -203,6 +235,11 @@ void Slate_TickInput(PlayState* play, Player* player) {
     RemoteBomb_Tick(play);
     // Cryonis owns a real actor too — this is where it learns the scene took it away.
     Cryonis_Tick(play);
+
+    // Ext-item input bypasses ItemInput_Update's u8 item latch. Prevent the
+    // same press/held button from redrawing the tablet after native put-away.
+    if (Slate_InputSuppressed(play))
+        return;
 
     // Paint what a cast would grab, but only while the tablet is actually out on the Stasis rune —
     // otherwise every actor Link walks past would shimmer. Called every frame either way so the

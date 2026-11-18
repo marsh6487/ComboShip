@@ -84,7 +84,7 @@ const char* OwnerRejection(Player* player) {
         return "custom-form";
     if (Sm64Mario_IsActive() || CVarGetInteger("gSm64Mario", 0))
         return "mario-form";
-    if (PakLoader_HasActiveBodyModel())
+    if (PakLoader_HasActiveBodyModel() && PakLoader_GetSeasonalSkeletonPath() == nullptr)
         return "pak-body-model";
     if (O2rLoader_HasActiveModel())
         return "o2r-body-model";

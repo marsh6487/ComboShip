@@ -290,6 +290,9 @@ static void GameState_UpdateUiVisibility(GameState* gameState) {
         CVarGetInteger(CVAR_DEVELOPER_TOOLS("EnableMapToggle"), 0);
     if (allowToggle) {
         UiVisibility_Toggle();
+        Audio_PlaySfxGeneral(UiVisibility_IsHidden() ? NA_SE_SY_CAMERA_ZOOM_UP : NA_SE_SY_CAMERA_ZOOM_DOWN,
+                             &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultReverb);
     }
 }
 

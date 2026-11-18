@@ -6,6 +6,10 @@
 #endif
 #include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
+#include "../../../combo/gui/MenuControlPopout.h"
+#ifdef COMBO_BUILD
+bool Combo_OotIsForeground(void);
+#endif
 #include <soh/Enhancements/enhancementTypes.h>
 #include "soh/Enhancements/SwitchAge.h"
 #include "soh/Enhancements/AdultMasks.h"
@@ -447,6 +451,12 @@ void SohMenu::AddMenuEnhancements() {
                 .DisabledTooltip("This is not compatible with the Locked Overworld Doors Randomizer option."));
 
     AddWidget(path, "Pause Menu", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Restore Native Equip Swap", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("RestoreEquipSwap"))
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Restores the original OoT pause-menu page-arrow timing used for equip swapping.\n"
+            "Works without Timeless Equipment; ordinary slot age restrictions remain active.\n"
+            "Applies to the native item page; extended inventory pages keep their own item selection."));
     AddWidget(path, "Allow the Cursor to be on Any Slot", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_ENHANCEMENT("PauseAnyCursor"))
         .Options(
@@ -882,6 +892,20 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("EquipmentAlwaysVisible"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip("Makes all equipment visible, regardless of age."));
+    extern std::shared_ptr<SohMenu> mSohMenu;
+#ifdef COMBO_BUILD
+    auto spinForeground = &::Combo_OotIsForeground;
+#else
+    auto spinForeground = +[] { return true; };
+#endif
+    ComboMenuPopout::EnsureWindow(mSohMenu, "Spin Attack##OOT", "gOpenWindows.SpinAttack", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
+                                  ImVec2(440, 220), spinForeground);
+    AddWidget(path, "Popout Spin Attack", WIDGET_WINDOW_BUTTON)
+        .CVar("gOpenWindows.SpinAttack")
+        .WindowName("Spin Attack##OOT")
+        .HideInSearch(true)
+        .Options(WindowButtonOptions().EmbedWindow(false).Tooltip("Keep spin attack settings open while playing."));
     AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
         .CVar(CW_SPIN_STYLE_CVAR)
         .Options(ComboboxOptions()

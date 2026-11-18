@@ -4,7 +4,8 @@
 #include "tests/test_require.h"
 #include <string.h>
 static int armed, hidden = 1, debugEnabled, moonJump, conflictOverride, minimal;
-static unsigned toggles;
+static unsigned toggles, sounds;
+static u16 lastSound;
 static GameInfo gameInfo;
 GameInfo *gGameInfo = &gameInfo;
 PlayState *gPlayState;
@@ -32,6 +33,17 @@ int32_t CVarGetInteger(const char *name, int32_t fallback) {
 int Play_InCsMode(PlayState *play) {
   return play->csCtx.state != CS_STATE_IDLE;
 }
+Vec3f gSfxDefaultPos;
+f32 gSfxDefaultFreqAndVolScale;
+s8 gSfxDefaultReverb;
+void Audio_PlaySfxGeneral(u16 id, Vec3f *pos, u8 token, f32 *freq,
+                         f32 *volume, s8 *reverb) {
+  REQUIRE(pos == &gSfxDefaultPos && token == 4);
+  REQUIRE(freq == &gSfxDefaultFreqAndVolScale && volume == freq);
+  REQUIRE(reverb == &gSfxDefaultReverb);
+  lastSound = id;
+  ++sounds;
+}
 /* PRODUCTION_INPUT */
 /* PRODUCTION_FULL_UI */
 /* PRODUCTION_MAP_L */
@@ -56,20 +68,26 @@ int main(void) {
     unsigned before = toggles;
     GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before && R_MINIMAP_DISABLED == 1);
+    REQUIRE(sounds == toggles);
     armed = 1;
     hidden = 1;
     GameState_UpdateUiVisibility(&play.state);
     unsigned accepted = state == 0 ? 1 : 0;
     REQUIRE(toggles == before + accepted);
     REQUIRE(UiVisibility_IsHidden() == (state != 0));
+    REQUIRE(sounds == toggles);
+    if (accepted) REQUIRE(lastSound == NA_SE_SY_CAMERA_ZOOM_DOWN);
     REQUIRE(R_MINIMAP_DISABLED == 1);
     REQUIRE(play.state.input[0].press.button == BTN_L);
     GameState_UpdateUiVisibility(&play.state);
     REQUIRE(UiVisibility_IsHidden() && toggles == before + 2 * accepted);
+    REQUIRE(sounds == toggles);
+    if (accepted) REQUIRE(lastSound == NA_SE_SY_CAMERA_ZOOM_UP);
     play.state.input[0].press.button = 0;
     play.state.input[0].cur.button = BTN_L;
     GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before + 2 * accepted);
+    REQUIRE(sounds == toggles);
     play.state.input[0].press.button = BTN_L;
   }
   GameState fileSelect = {0};
@@ -77,6 +95,7 @@ int main(void) {
   unsigned before = toggles;
   GameState_UpdateUiVisibility(&fileSelect);
   REQUIRE(toggles == before);
+  REQUIRE(sounds == toggles);
   play.pauseCtx.state = 0;
   play.msgCtx.msgMode = MSGMODE_NONE;
   for (unsigned conflicts = 1; conflicts <= 3; ++conflicts) {
@@ -86,9 +105,11 @@ int main(void) {
     before = toggles;
     GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before);
+    REQUIRE(sounds == toggles);
     conflictOverride = 1;
     GameState_UpdateUiVisibility(&play.state);
     REQUIRE(toggles == before + 1);
+    REQUIRE(sounds == toggles);
   }
   debugEnabled = moonJump = conflictOverride = 0;
   play.csCtx.state = CS_STATE_IDLE;

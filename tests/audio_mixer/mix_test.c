@@ -150,7 +150,7 @@ static void checkReverb(void) {
   }
 }
 
-#ifdef TEST_MM_HILOGAIN
+#if defined(TEST_MM_HILOGAIN) || defined(TEST_OOT_HILOGAIN)
 /* Preserve every byte outside the command's rounded byte span, including the
  * adjacent synthesis workspace. Compare UQ4.4 gain using wide independent
  * arithmetic. */
@@ -163,7 +163,7 @@ static void checkHiLoGain(void) {
       for (size_t n = 0; n < sizeof(lengths) / sizeof(lengths[0]); ++n) {
         const size_t span =
             ((lengths[n] + 31) & ~31) / sizeof(int16_t);
-        const size_t offset = (0x3B0 - 0x330) / sizeof(int16_t);
+        const size_t offset = BUF_S16(0x500) - rspa.buf.as_s16;
         for (size_t i = 0; i < sizeof(original) / sizeof(original[0]); ++i)
           original[i] = nextSample();
         memcpy(expected, original, sizeof(expected));
@@ -174,14 +174,16 @@ static void checkHiLoGain(void) {
                                         : (int16_t)v;
         }
         memcpy(rspa.buf.as_s16, original, sizeof(original));
-        aHiLoGainImpl((uint8_t)gain, lengths[n], 0x3B0);
-        compare("MM HiLoGain span and adjacent workspace", rspa.buf.as_s16,
+        aHiLoGainImpl((uint8_t)gain, lengths[n], 0x500);
+        compare("HiLoGain span and adjacent workspace", rspa.buf.as_s16,
                 expected, sizeof(expected) / sizeof(expected[0]));
         ++cases;
       }
     }
   }
+#ifdef TEST_MM_HILOGAIN
   assert(hiLoGainModeReports == 1);
+#endif
 }
 #endif
 
@@ -205,7 +207,7 @@ int main(void) {
     }
   }
   checkReverb();
-#ifdef TEST_MM_HILOGAIN
+#if defined(TEST_MM_HILOGAIN) || defined(TEST_OOT_HILOGAIN)
   checkHiLoGain();
 #endif
   printf("%s native SSE2 mixer: %u cases, %u mismatched samples\n", GAME_NAME,

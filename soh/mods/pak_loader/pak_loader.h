@@ -44,6 +44,15 @@ u8 PakLoader_HasActiveModel(void);
  */
 void PakLoader_SwapSkeleton(Player* player);
 
+/* Actual selected o2r skeleton path for optional weighted player companions.
+ * Raw PAK/ZOBJ models return NULL and retain ordinary rigid Flex rendering. */
+const char* PakLoader_GetSkinSkeletonPath(void** skeleton);
+
+/* Active private seasonal root, or NULL for the normal/forced/remote body. */
+const char* PakLoader_GetSeasonalSkeletonPath(void);
+s32 PakLoader_GetOutfitSetCount(void);
+const char* PakLoader_GetOutfitSet(s32 index);
+
 /**
  * Restore original skeleton after vanilla draw completes.
  * Called AFTER vanilla Player_DrawGameplay finishes.

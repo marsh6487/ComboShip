@@ -15,6 +15,12 @@ static void dump(const char* name, const char* category, const CwItemAnimDrawInf
     for(int i=0;i<d.colorSegmentCount;++i){if(i)std::cout<<',';std::cout<<d.colorSegments[i].segment;}
     std::cout<<"],\"limbDLs\":[";
     for(int i=0;i<d.limbDLCount;++i){if(i)std::cout<<',';auto& l=d.limbDLs[i];std::cout<<"{\"limbIndex\":"<<l.limbIndex<<",\"hide\":"<<l.hide<<",\"postSelf\":"<<l.postSelf<<",\"dlPath\":";q(l.dlPath);std::cout<<",\"postDlPath\":";q(l.postDlPath);std::cout<<'}';}
+    std::cout<<"],\"proceduralProfile\":"<<d.proceduralProfile<<",\"proceduralLimbDLs\":[";
+    if(d.proceduralProfile==CW_ANIM_PROFILE_GOLD_SKULLTULA){
+        bool firstLimb=true;
+        for(const auto& limb:ComboGoldSkulltula::Limbs){if(!firstLimb)std::cout<<',';firstLimb=false;
+            std::cout<<"{\"limbIndex\":"<<limb.index<<",\"dlPath\":";q(limb.path);std::cout<<'}';}
+    }
     std::cout<<"],\"parts\":[";
     for(int i=0;i<d.partCount;++i){if(i)std::cout<<',';auto& p=d.parts[i];std::cout<<"{\"dlPath\":";q(p.dlPath);std::cout<<",\"alternateDlPath\":";q(p.alternateDlPath);std::cout<<",\"xlu\":"<<p.xlu<<",\"materialProfile\":"<<p.materialProfile<<",\"framePaths\":[";for(int f=0;f<p.frameCount;++f){if(f)std::cout<<',';q(p.framePaths[f]);}std::cout<<"]}";}
     std::cout<<"],\"flameDlPath\":";q(d.flameDlPath);std::cout<<",\"fallbackTokenPath\":";q(d.fallbackTokenPath);std::cout<<'}';
@@ -74,6 +80,33 @@ int main(int argc,char**) {
         assert(ComboDrawNativeMmSoul(e.id)==1 && rendered==oldRender+1);
         ComboSoulModels::npc=true;assert(ComboDrawNativeMmSoul(e.id)==0 && rendered==oldRender+1);
         ComboSoulModels::npc=false;
+    }
+    for (auto id : {RI_SOUL_MISC_GS, RI_SOUL_MISC_BUSINESS_SCRUB}) {
+        CwItemAnimDrawInfo misc{};
+        assert(MM_FillMiscSoulAnim(id, &misc));
+        assert(misc.opa && misc.stateDependent && misc.skelPath && misc.animPath && misc.fallbackTokenPath);
+        if (id == RI_SOUL_MISC_GS) {
+            assert(misc.limbCount == 30 && misc.nonFlexSkeleton);
+            assert(misc.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA);
+        } else {
+            assert(misc.limbCount == BUSINESS_SCRUB_LIMB_MAX && !misc.nonFlexSkeleton);
+            const uint64_t mask = (UINT64_C(1) << BUSINESS_SCRUB_LIMB_RIGHT_HAND_HAT) |
+                                  (UINT64_C(1) << BUSINESS_SCRUB_LIMB_RIGHT_HAND_BAG) |
+                                  (UINT64_C(1) << BUSINESS_SCRUB_LIMB_LEFT_HAND_BAG) |
+                                  (UINT64_C(1) << BUSINESS_SCRUB_LIMB_SCALP) |
+                                  (UINT64_C(1) << BUSINESS_SCRUB_LIMB_HAIR) |
+                                  (UINT64_C(1) << BUSINESS_SCRUB_LIMB_LEFT_ARM_BAG);
+            assert(misc.hiddenLimbMask == mask);
+            assert(misc.limbDLCount == 1 && misc.limbDLs[0].limbIndex == BUSINESS_SCRUB_LIMB_EYES);
+            assert(!strcmp(misc.animPath, "__OTR__objects/object_dnt/gBusinessScrubBobAnim"));
+        }
+        if(dumping){dump(id==RI_SOUL_MISC_GS?"GS":"BUSINESS_SCRUB","misc",misc,first);first=false;}
+        assert(ComboDrawNativeMmSoul(id));
+        ComboSoulModels::enemy = id == RI_SOUL_MISC_GS;
+        ComboSoulModels::npc = id == RI_SOUL_MISC_BUSINESS_SCRUB;
+        misc = {}; assert(!MM_FillMiscSoulAnim(id, &misc));
+        assert(!ComboDrawNativeMmSoul(id));
+        ComboSoulModels::enemy = ComboSoulModels::npc = false;
     }
     assert(pushes==pops);
     CwItemAnimDrawInfo d{};assert(!MM_FillNpcSoulAnim(RI_UNKNOWN,&d));assert(!MM_FillEnemySoulAnim(RI_UNKNOWN,&d));

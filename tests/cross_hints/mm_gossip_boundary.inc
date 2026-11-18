@@ -208,7 +208,7 @@ json Run(const json& hints) {
         {"%gA harmless joke%w.","%gA harmless joke%w."},
         {"can be found at Gerudo Fortress (OOT)","can be found at Gerudo Fortress (OOT)"},
         {"A relic can be found at  (OOT)","A relic can be found at  (OOT)"},
-        {"A relic can be found at Termina (MM)","A relic can be found at Termina (MM)"},
+        {"A relic can be found at Termina (MM)","%gA relic%w can be found at %yTermina (MM)%w"},
         {"A 50%x relic can be found at Coast (OOT)","%rA 50%x relic%w can be found at %yCoast (OOT)%w"}
     }) {
         Check(ComboHintPresentation::MmForeignGossip(raw)==expected,
@@ -216,6 +216,21 @@ json Run(const json& hints) {
         Check(ComboHintPresentation::MmForeignGossip(expected)==expected,
               "foreign placement presentation must be idempotent");
     }
+    for (const auto& [raw, expected] : std::vector<std::pair<std::string,std::string>> {
+        {"They say Stalfos Enemy Soul can be found at Kokiri Forest.", "They say %gStalfos Enemy Soul%w can be found at %yKokiri Forest.%w"},
+        {"They say that Saria NPC Soul is hidden in the Lost Woods.", "They say that %gSaria NPC Soul%w is hidden %yin the Lost Woods.%w"},
+        {"a disguised Relic can be found hoarded in a dark temple", "%ga disguised Relic%w can be found hoarded in %ya dark temple%w"},
+        {"%rAn authored soul clue%w is hidden %yat home%w.", "%rAn authored soul clue%w is hidden %yat home%w."},
+        {"They say #a hidden soul# can be found at a forest.", "They say #a hidden soul# can be found at a forest."},
+        {"They say \x05\x41" "a soul\x05\x40 can be found at Lost Woods.", "They say \x05\x41" "a soul\x05\x40 can be found at Lost Woods."},
+        {"A mysterious rumor.", "A mysterious rumor."}
+    }) {
+        Check(ComboHintPresentation::PlainPlacement(raw)==expected,"plain placement emphasis changed the shown clue");
+        Check(ComboHintPresentation::PlainPlacement(expected)==expected,"placement emphasis repeated color controls");
+    }
+    const std::string nativeEncodedPlacement = std::string("They say ") + std::string("\x05\x41",2) + "a soul can be found at Lost Woods (OOT)";
+    Check(ComboHintPresentation::MmForeignGossip(nativeEncodedPlacement) == nativeEncodedPlacement,
+          "foreign hint decoration must retain native encoded color commands");
     Reset(hints);
     auto loaded=ComboRando::LoadHintsMM(0);
     Check(loaded.gossipPool.size()==hints.at("mm").at("gossipPool").size(),"MM loader dropped cross pool entries");

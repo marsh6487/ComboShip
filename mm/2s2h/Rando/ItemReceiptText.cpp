@@ -6,6 +6,7 @@
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboBossSoulReceiptText.h"
+#include "ComboSoulReceiptText.h"
 #include "ComboBossSoulReceiptIcon.h"
 #include "ComboCapeReceiptChoice.h"
 #include "ComboVanillaItemReceiptText.h"
@@ -753,6 +754,15 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, con
 } // namespace
 
 static bool BossSoulItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (const auto* soul = itemName ? ComboSoulReceiptText::Find(itemName) : nullptr) {
+        using ComboSoulReceiptText::Language;
+        const auto language = gSaveContext.options.language == LANGUAGE_GER   ? Language::German
+                              : gSaveContext.options.language == LANGUAGE_FRE ? Language::French
+                                                                              : Language::English;
+        entry.receiptPresentation = {};
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(ComboSoulReceiptText::Body(*soul, language)));
+        return true;
+    }
     const auto* soul = itemName ? ComboBossSoulReceiptText::Find(itemName) : nullptr;
     if (!soul)
         return false;

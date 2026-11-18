@@ -9,6 +9,7 @@
 #include "Rando/InfiniteUpgrades.h"
 #include "Rando/Logic/SeedGeneration.h"
 extern "C" void Partners_Reset(void);
+extern "C" void Horse_ResetMountState(void);
 #include "../../combo/menu/ComboIkanaShieldResources.h"
 #include "../../combo/menu/ComboIkanaShieldResourceOwner.h"
 #include "../../combo/emotes/EmoteBridge.h"
@@ -4057,6 +4058,10 @@ extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
 // straight to Play in South Clock Town for the given slot. Counterpart to OOT's SOH_ResumeGame.
 extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_ResumeGame");
+    // MM's DLL remains resident during OoT play. Its old mount marker must not
+    // spawn Epona at an unrelated shuffled arrival (e.g. Pirates' Fortress).
+    // Leave ownership and the saved parked-horse position untouched.
+    Horse_ResetMountState();
     // Both games share one crash handler. MM_RunMain registered this only at first boot;
     // OoT has since replaced it, so reclaim ownership before any MM resume work.
     CrashHandlerRegisterCallback(CrashHandler_PrintExt);

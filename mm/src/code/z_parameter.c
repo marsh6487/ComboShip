@@ -5461,8 +5461,13 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
         return false;
     }
 
+    const bool infiniteMagic = CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic();
+    if (infiniteMagic) {
+        magicToConsume = 0;
+    }
+
     // Not enough magic available to consume
-    if (!RandoCapacity_InfiniteMagic() && (gSaveContext.save.saveInfo.playerData.magic - magicToConsume) < 0) {
+    if ((gSaveContext.save.saveInfo.playerData.magic - magicToConsume) < 0) {
         if (gSaveContext.magicCapacity != 0) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
         }
@@ -5477,9 +5482,6 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS)) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
-                }
-                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
-                    magicToConsume = 0;
                 }
                 gSaveContext.magicToConsume = magicToConsume;
                 gSaveContext.magicState = MAGIC_STATE_CONSUME_SETUP;
@@ -5497,9 +5499,6 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
                 }
-                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
-                    magicToConsume = 0;
-                }
                 gSaveContext.magicToConsume = magicToConsume;
                 gSaveContext.magicState = MAGIC_STATE_METER_FLASH_3;
                 return true;
@@ -5510,7 +5509,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
 
         case MAGIC_CONSUME_LENS:
             if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
-                if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
+                if (gSaveContext.save.saveInfo.playerData.magic != 0 || infiniteMagic) {
                     interfaceCtx->magicConsumptionTimer = 80;
                     gSaveContext.magicState = MAGIC_STATE_CONSUME_LENS;
                     return true;
@@ -5541,7 +5540,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
 
         case MAGIC_CONSUME_GORON_ZORA:
             // Goron spiked rolling or Zora electric barrier
-            if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
+            if (gSaveContext.save.saveInfo.playerData.magic != 0 || infiniteMagic) {
                 interfaceCtx->magicConsumptionTimer = 10;
                 gSaveContext.magicState = MAGIC_STATE_CONSUME_GORON_ZORA_SETUP;
                 return true;
@@ -5552,7 +5551,7 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
         case MAGIC_CONSUME_GIANTS_MASK:
             // Wearing Giant's Mask
             if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
-                if ((gSaveContext.save.saveInfo.playerData.magic != 0 || RandoCapacity_InfiniteMagic())) {
+                if (gSaveContext.save.saveInfo.playerData.magic != 0 || infiniteMagic) {
                     interfaceCtx->magicConsumptionTimer = R_MAGIC_CONSUME_TIMER_GIANTS_MASK;
                     gSaveContext.magicState = MAGIC_STATE_CONSUME_GIANTS_MASK;
                     return true;
@@ -5572,9 +5571,6 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
                 (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS)) {
                 if (gSaveContext.magicState == MAGIC_STATE_CONSUME_LENS) {
                     play->actorCtx.lensActive = false;
-                }
-                if ((CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) || RandoCapacity_InfiniteMagic())) {
-                    magicToConsume = 0;
                 }
                 gSaveContext.save.saveInfo.playerData.magic -= magicToConsume;
                 return true;
@@ -6450,12 +6446,32 @@ s16 sDpadItemAmmoY[] = {
     47 + 11, // EQUIP_SLOT_D_UP
 };
 
+static s16 Interface_BottomlessAmmo(s16 button, bool dpad) {
+    extern uint8_t Bottle_BottomlessOwned(void);
+    extern uint8_t Bottle_BottomlessCount(void);
+    if (!Bottle_BottomlessOwned()) {
+        return -1;
+    }
+    if (dpad) {
+        if (button >= EQUIP_SLOT_D_RIGHT && button <= EQUIP_SLOT_D_UP && DPAD_SLOT_EQUIP(0, button) == SLOT_BOTTLE_4) {
+            return Bottle_BottomlessCount();
+        }
+    } else if (button >= EQUIP_SLOT_C_LEFT && button <= EQUIP_SLOT_C_RIGHT &&
+               C_SLOT_EQUIP(0, button) == SLOT_BOTTLE_4) {
+        return Bottle_BottomlessCount();
+    }
+    return -1;
+}
+
 void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
+    extern uint8_t Bottle_BottomlessOwned(void);
+    extern uint8_t Bottle_BottomlessCount(void);
     // Skijer's NEI: OoT slingshot seed pouch (NeiSaveData-backed; 0xA3 is outside AMMO()/SLOT())
     extern uint8_t Nei_SlingshotSeeds(void);
     extern uint8_t Nei_SlingshotCapacity(void);
     u8 i;
     u16 ammo;
+    s16 bottomlessAmmo = Interface_BottomlessAmmo(button, true);
 
     if (!GameInteractor_Should(VB_DRAW_HUD_AMMO_COUNT, true, button, alpha, true)) {
         return;
@@ -6467,7 +6483,7 @@ void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
 
     if ((i == ITEM_DEKU_STICK) || (i == ITEM_DEKU_NUT) || (i == ITEM_BOMB) || (i == ITEM_BOW) ||
         ((i >= ITEM_BOW_FIRE) && (i <= ITEM_BOW_LIGHT)) || (i == ITEM_BOMBCHU) || (i == ITEM_POWDER_KEG) ||
-        (i == ITEM_MAGIC_BEANS) || (i == ITEM_PICTOGRAPH_BOX) || (i == ITEM_FAIRY_SLINGSHOT)) {
+        (i == ITEM_MAGIC_BEANS) || (i == ITEM_PICTOGRAPH_BOX) || (i == ITEM_FAIRY_SLINGSHOT) || bottomlessAmmo >= 0) {
 
         if ((i >= ITEM_BOW_FIRE) && (i <= ITEM_BOW_LIGHT)) {
             i = ITEM_BOW;
@@ -6476,7 +6492,9 @@ void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
         // (The elemental-bullet fold is gone — Skijer's NEI. The button holds a plain
         // ITEM_FAIRY_SLINGSHOT now, so it already matches the seed-pouch arm below.)
 
-        if (i == ITEM_FAIRY_SLINGSHOT) {
+        if (bottomlessAmmo >= 0) {
+            ammo = bottomlessAmmo;
+        } else if (i == ITEM_FAIRY_SLINGSHOT) {
             ammo = Nei_SlingshotSeeds();
         } else {
             ammo = AMMO(i);
@@ -6847,9 +6865,8 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
     {
         extern uint8_t Bottle_BottomlessOwned(void);
         extern uint8_t Bottle_BottomlessCount(void);
-        if ((button >= EQUIP_SLOT_C_LEFT) && (button <= EQUIP_SLOT_C_RIGHT) &&
-            (C_SLOT_EQUIP(0, button) == SLOT_BOTTLE_4) && Bottle_BottomlessOwned()) {
-            u8 bbAmmo = Bottle_BottomlessCount();
+        const s16 bbAmmo = Interface_BottomlessAmmo(button, false);
+        if (bbAmmo >= 0) {
 
             OPEN_DISPS(play->state.gfxCtx);
 

@@ -10,6 +10,8 @@
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
 #include "ComboBossSoulReceiptIcon.h"
+#include "ComboSoulReceiptText.h"
+#include "Rando/SoulShuffle.h"
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
 #include "vanilla/ComboVanillaMode.h"
@@ -993,6 +995,45 @@ int main(int argc, char** argv) {
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  size_t ordinarySouls = 0;
+  const auto ordinarySave = gSaveContext;
+  for (const auto& [id, item] : Rando::StaticData::Items) {
+    const auto* soul = item.name ? ComboSoulReceiptText::Find(item.name) : nullptr;
+    const bool nativeSoul = (id >= RI_SOUL_ENEMY_ALIEN && id <= RI_SOUL_ENEMY_WOLFOS) || Rando::SoulShuffle::Find(id);
+    assert(!nativeSoul || soul);
+    if (!soul) continue;
+    ++ordinarySouls;
+    for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      CustomMessage::Entry native, imported;
+      native.icon = imported.icon = 0xF5;
+      const int reads = donorReads;
+      assert(Rando::ApplyItemReceiptText(id, native));
+      assert(Rando::ApplyForeignItemReceiptText(item.name, imported));
+      assert(native.msg == imported.msg && donorReads == reads);
+      assert(!native.autoFormat && native.icon == 0xF5);
+      const auto flattened = FlattenReceiptLines(native.msg);
+      assert(flattened.find('%') == std::string::npos);
+      assert(flattened.size() > std::strlen(item.name) + 30 && flattened.size() < 1269);
+      if (language == LANGUAGE_ENG) {
+        const char color = soul->family == ComboSoulReceiptText::Family::Enemy ? 1
+                         : soul->family == ComboSoulReceiptText::Family::Npc ? 6
+                         : soul->family == ComboSoulReceiptText::Family::Animal ? 2 : 4;
+        assert(flattened.find(std::string(1, color) + item.name + std::string(1, '\0')) != std::string::npos);
+        const char* flavor = soul->family == ComboSoulReceiptText::Family::Enemy ? "spirit"
+                           : soul->family == ComboSoulReceiptText::Family::Npc ? "presence"
+                           : soul->family == ComboSoulReceiptText::Family::Animal ? "Life"
+                           : std::string_view(soul->name) == "Business Scrub Misc Soul" ? "merchants" : "spiders";
+        assert(flattened.find(flavor) != std::string::npos);
+      }
+    }
+  }
+  gSaveContext = ordinarySave;
+  assert(ordinarySouls == std::size(Rando::SoulShuffle::Catalog) + RI_SOUL_ENEMY_WOLFOS - RI_SOUL_ENEMY_ALIEN + 1);
+  assert(!ComboSoulReceiptText::Find("Soul of an invented monster"));
+  assert(!ComboSoulReceiptText::Find("Unrelated NPC Soul Costume"));
+  std::cout << "PASS ordinary soul native/foreign receipts: " << ordinarySouls
+            << " native catalog rows, colored names, concise descriptions and three locales\n";
   const struct {
     RandoItemId id;
     const char *name;

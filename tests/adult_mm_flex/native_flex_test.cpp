@@ -44,8 +44,15 @@ static Gfx* sFinalLeftHand;
 static Gfx* sFinalRightHand;
 static unsigned sMissingMeshLoads;
 
+// The adult matrix-layout fixture uses ordinary rigid model companions.
+extern "C" const void* PlayerFlexSkin_GetPlan(void**, s32) { return nullptr; }
+extern "C" s32 PlayerFlexSkin_MatrixCount(const void*) { return 0; }
+extern "C" void PlayerFlexSkin_BlendMatrix(const void*, s32, const MtxF*, MtxF*) { CHECK(false); }
+extern "C" Gfx* PlayerFlexSkin_SelectLimb(const void*, s32, Gfx* selected, Gfx*) { return selected; }
+
 static FlexSkeletonHeader* sSkel;
-static u8 sReady, sSetupFailedPermanently, sIsMod, sIsForm, sIsChildRig;
+static u8 sReady, sSetupFailedPermanently, sIsMod, sIsForm, sIsChildRig,
+    sIsSeasonalRig;
 static std::string sRigBase, sModEyePath[PLAYER_EYES_MAX], sModMouthPath[PLAYER_MOUTH_MAX];
 static void* sModEye[PLAYER_EYES_MAX];
 static void* sModMouth[PLAYER_MOUTH_MAX];
@@ -77,6 +84,7 @@ u8 gEquipShifts[] = { 0, 4, 8, 12 };
 extern MtxF* sMatrixStack;
 extern MtxF* sCurrentMatrix;
 s32 AdultLink_IsActive(void) { return 1; }
+const char *PakLoader_GetSeasonalSkeletonPath(void) { return nullptr; }
 bool ResourceMgr_IsAltAssetsEnabled(void) { return sAlt; }
 u8 ResourceMgr_FileExists(const char* path) {
     if (!sMod || std::strstr(path, "alt/") == nullptr) return 0;

@@ -29,6 +29,7 @@
 #include "ComboKeyReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboBossSoulReceiptText.h"
+#include "ComboSoulReceiptText.h"
 #include "ComboLanternReceiptIcon.h"
 #include "ComboVanillaItemReceiptText.h"
 #include "soh/ShipInit.hpp"
@@ -488,6 +489,22 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         return;
     }
     auto soulItem = Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid));
+    if (const auto* soul = ComboSoulReceiptText::Find(soulItem.GetName().GetEnglish())) {
+        using ComboSoulReceiptText::Language;
+        msg = CustomMessage(ComboSoulReceiptText::Body(*soul),
+                            ComboSoulReceiptText::Body(*soul, Language::German, soulItem.GetName().GetGerman()),
+                            ComboSoulReceiptText::Body(*soul, Language::French, soulItem.GetName().GetFrench()),
+                            TEXTBOX_TYPE_BLUE);
+        if (soulItem.HasCustomIcon()) {
+            msg.receiptPresentation.singleBox = 1;
+            std::snprintf(msg.receiptPresentation.iconPath, sizeof(msg.receiptPresentation.iconPath), "%s",
+                          soulItem.GetCustomIcon());
+            msg.receiptPresentation.iconWidth = msg.receiptPresentation.iconHeight = 32;
+            msg.AutoFormat(ITEM_CUSTOM);
+        } else
+            msg.AutoFormat();
+        return;
+    }
     if (const auto* soul = ComboBossSoulReceiptText::Find(soulItem.GetName().GetEnglish())) {
         using ComboBossSoulReceiptText::Language;
         msg = CustomMessage(ComboBossSoulReceiptText::Body(*soul),
@@ -706,6 +723,14 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                 // Use the name frozen by the model latch, never resolve a
                 // progressive against the now-changing MM save a second time.
                 std::string receiptName = resolved ? resolved : fi->itemName;
+                if (const auto* soul = ComboSoulReceiptText::Find(receiptName)) {
+                    using ComboSoulReceiptText::Language;
+                    msg = CustomMessage(ComboSoulReceiptText::Body(*soul),
+                                        ComboSoulReceiptText::Body(*soul, Language::German),
+                                        ComboSoulReceiptText::Body(*soul, Language::French), TEXTBOX_TYPE_BLUE);
+                    msg.AutoFormat();
+                    return;
+                }
                 if (const auto* soul = ComboBossSoulReceiptText::Find(receiptName)) {
                     using ComboBossSoulReceiptText::Language;
                     msg = CustomMessage(ComboBossSoulReceiptText::Body(*soul),

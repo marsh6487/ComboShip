@@ -235,8 +235,9 @@ void Visible() {
     if (sVisible)
         return;
     sVisible = true;
+    // Notifications use the default ImGui font, whose glyph range excludes an em dash.
     Notification::Emit(
-        { .message = "You received", .suffix = std::string(sReceipt.displayName) + " — " + CW_STARTUP_SOURCE });
+        { .message = "You received", .suffix = std::string(sReceipt.displayName) + " - " + CW_STARTUP_SOURCE });
     RetryAck();
 }
 void TextStarted(PlayState* play, const GetItemEntry* entry) {

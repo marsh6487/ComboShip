@@ -528,7 +528,7 @@ void Menu::MenuDrawItem(WidgetInfo& widget, uint32_t width, UIWidgets::Colors me
                 auto options = std::static_pointer_cast<UIWidgets::WindowButtonOptions>(widget.options);
                 options->color = menuThemeIndex;
                 UIWidgets::WindowButton(widget.name.c_str(), widget.cVar, window, *options);
-                if (!window->IsVisible()) {
+                if (options->embedWindow && !window->IsVisible()) {
                     window->DrawElement();
                 }
             } break;
@@ -1110,3 +1110,5 @@ void Menu::DrawContent(const std::set<std::string>& onlyPaths, const std::set<st
 }
 
 } // namespace Ship
+
+#include "../../../combo/gui/MenuControlPopout.inc"

@@ -25,7 +25,7 @@ struct SaveManager {static SaveManager* Instance;void ThreadPoolWait(){waitCalls
 static SaveManager manager;SaveManager* SaveManager::Instance=&manager;
 void Save_SaveFile(){assert(prepared);saveCalls++;if(failSave)throw std::runtime_error("save capture failed before enqueue");}
 struct GameInteractor{static bool IsSaveLoaded(){return loaded;}};
-namespace Notification {struct Options {std::string message,suffix;};void Emit(Options o){assert(o.message=="You received");assert(o.suffix.find("Concrete Bow")<o.suffix.find(CW_STARTUP_SOURCE));toasts++;}}
+namespace Notification {struct Options {std::string message,suffix;};void Emit(Options o){assert(o.message=="You received");assert(o.suffix == std::string("Concrete Bow - ") + CW_STARTUP_SOURCE);toasts++;}}
 namespace ComboRando {enum {GAME_MM=1};struct ForeignItem {int itemGame=1;std::string itemName="Progressive Bow",displayName="Bow (MM)",category="major";bool advancement=true,trap=false;};}
 static ComboRando::ForeignItem foreign;
 static bool foreignPresent=false;

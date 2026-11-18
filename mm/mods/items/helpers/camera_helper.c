@@ -267,7 +267,9 @@ void Projectile_UpdateRotationFromStick(s16* yaw, s16* pitch, PlayState* play, s
     f32 magnitude = sqrtf(SQ(rawX) + SQ(rawY));
 
     if (magnitude > 20.0f) {
-        // Steer 1:1 with MM's first-person AIM controls (Ship_HandleFirstPersonAiming, z_player.c):
+        // Flight yaw follows OoT's Beetle: right stick input decreases yaw.
+        // Preserve MM's own invert/mirrored-world modifiers for both axes.
+        // Steer with MM's first-person AIM options (Ship_HandleFirstPersonAiming, z_player.c):
         // stick X → yaw, stick Y → pitch, honoring the SAME invert CVars the aim camera uses
         // (GI_INVERT_FIRST_PERSON_AIM_X/Y). Default Y is negated so pushing UP flies UP; the consumer's
         // +pitch means DOWN (Beetle_Move: pos.y -= sin(pitch)), which lines up with aiming's default
@@ -278,7 +280,7 @@ void Projectile_UpdateRotationFromStick(s16* yaw, s16* pitch, PlayState* play, s
         f32 relX = rawX * GameInteractor_InvertControl(GI_INVERT_FIRST_PERSON_AIM_X);
         f32 relY = rawY * -GameInteractor_InvertControl(GI_INVERT_FIRST_PERSON_AIM_Y);
 
-        *yaw += (s16)((relX / 60.0f) * turnSpeed);
+        *yaw += (s16)((-relX / 60.0f) * turnSpeed);
         *pitch += (s16)((relY / 60.0f) * turnSpeed);
 
         if (*pitch > pitchMax)

@@ -30,6 +30,7 @@ class Menu : public GuiWindow {
     UIWidgets::Colors GetMenuThemeColor();
 
     void MenuDrawItem(WidgetInfo& widget, UIWidgets::Colors menuThemeIndex);
+    void DrawPopoutControls(const std::string& section, const std::string& sidebar, const std::set<std::string>& cvars);
     void DrawContent(const std::set<std::string>& onlyPaths, const std::set<std::string>& skipPaths);
     void AddMenuEntry(std::string entryName, const char* entryCvar);
     void AddSearchWidget(SearchWidget widget);

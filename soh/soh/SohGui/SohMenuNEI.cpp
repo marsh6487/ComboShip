@@ -1,8 +1,14 @@
+#include "../../../combo/actors/SeasonalOutfits.h"
+#include "../../../combo/actors/ZeldaRun.h"
 #include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/ComboGameMode.h"
 #include "../../../combo/rando/MagicMirrorSettings.h"
 #include "../../../combo/rando/RitoMaskSettings.h"
 #include "SohMenu.h"
+#include "../../../combo/gui/MenuControlPopout.h"
+#ifdef COMBO_BUILD
+bool Combo_OotIsForeground(void);
+#endif
 #include "../../../combo/NeiGracePolicy.h"
 #include "../../../combo/NeiSeasonsPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
@@ -955,6 +961,19 @@ void RegisterNEIMenu() {
     path.sidebarName = "Pak Loader";
     path.column = SECTION_COLUMN_1;
     mSohMenu->AddWidget(path, "Custom Models (.pak)", WIDGET_SEPARATOR_TEXT);
+#ifdef COMBO_BUILD
+    auto pakForeground = &::Combo_OotIsForeground;
+#else
+    auto pakForeground = +[] { return true; };
+#endif
+    ComboMenuPopout::EnsureWindow(mSohMenu, "PAK Loader", "gOpenWindows.PakLoader", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), {}, ImVec2(1080, 720), pakForeground);
+    mSohMenu->AddWidget(path, "Popout PAK Loader", WIDGET_WINDOW_BUTTON)
+        .CVar("gOpenWindows.PakLoader")
+        .WindowName("PAK Loader")
+        .HideInSearch(true)
+        .Options(WindowButtonOptions().EmbedWindow(false).Tooltip(
+            "Keep model, outfit and equipment settings open while playing."));
 
     // Build model combobox maps per age (triggers lazy init of PakLoader)
     {
@@ -1002,6 +1021,54 @@ void RegisterNEIMenu() {
             .Options(CheckboxOptions().Tooltip("Replaces Link's model with a custom model from a .pak file.\n"
                                                "Place ModLoader64 zzplayas .pak files in the mods/ folder.\n"
                                                "You can choose different models for Adult and Child Link."));
+
+        mSohMenu->AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
+            .CVar(ZELDA_RUN_CVAR)
+            .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+                "Use the latest POC7 Zelda-style empty-handed run. Requires the optional animation pack. "
+                "Independent of seasonal outfits; walking and weapon-running animations stay unchanged."));
+        mSohMenu->AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
+            .CVar(ZELDA_RUN_AGES_CVAR)
+            .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
+            .Options(ComboboxOptions()
+                         .DefaultIndex(ZELDA_RUN_BOTH)
+                         .ComboMap(
+                             { { ZELDA_RUN_CHILD, "Child" }, { ZELDA_RUN_ADULT, "Adult" }, { ZELDA_RUN_BOTH, "Both" } })
+                         .Tooltip("Choose which Link ages use the optional run. Transformation forms keep their own "
+                                  "animations."));
+        mSohMenu->AddWidget(path, "Seasonal Player Outfits", WIDGET_CVAR_CHECKBOX)
+            .CVar(SEASONAL_OUTFITS_CVAR)
+            .Options(
+                CheckboxOptions().DefaultValue(false).Tooltip("Automatically use outfits for the current season. Off "
+                                                              "or a missing outfit keeps your normal player model."));
+        mSohMenu->AddWidget(path, "Outfit Set", WIDGET_CVAR_COMBOBOX)
+            .CVar("gEnhancements.SeasonalOutfits.SetIndex")
+            .PreFunc([](WidgetInfo& info) {
+                auto options = std::static_pointer_cast<UIWidgets::ComboboxOptions>(info.options);
+                options->comboMap.clear();
+                options->comboMap[-1] = "Selected set not installed";
+                const char* selected = CVarGetString(SEASONAL_OUTFITS_SET_CVAR, "din");
+                int selectedIndex = -1;
+                const s32 count = PakLoader_GetOutfitSetCount();
+                for (s32 i = 0; i < count; ++i) {
+                    const char* set = PakLoader_GetOutfitSet(i);
+                    options->comboMap[i] = set;
+                    if (std::strcmp(selected, set) == 0)
+                        selectedIndex = i;
+                }
+                CVarSetInteger("gEnhancements.SeasonalOutfits.SetIndex", selectedIndex);
+                options->disabled = count == 0;
+                options->disabledTooltip = "Install an outfit set for this game, then restart.";
+            })
+            .Callback([](WidgetInfo& info) {
+                if (const char* set = PakLoader_GetOutfitSet(CVarGetInteger(info.cVar, -1)))
+                    CVarSetString(SEASONAL_OUTFITS_SET_CVAR, set);
+            })
+            .Options(ComboboxOptions()
+                         .DefaultIndex(-1)
+                         .ComboMap({ { -1, "Selected set not installed" } })
+                         .Tooltip("Choose an installed outfit set. Your normal model is used when the current age or "
+                                  "season has no outfit."));
 
         mSohMenu->AddWidget(path, "Adult Link Model", WIDGET_CVAR_COMBOBOX)
             .CVar("gMods.PakLoader.AdultModel")

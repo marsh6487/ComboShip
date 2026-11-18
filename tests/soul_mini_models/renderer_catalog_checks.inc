@@ -91,6 +91,8 @@ static void RegisterSoulCatalogResources(const CwItemAnimDrawInfo& info,
         owner->normal[path] = std::make_shared<SoulCatalogRawResource>();
         owner->replacement[path] = std::make_shared<SoulCatalogRawResource>();
     };
+    if (info.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA)
+        for (const auto& limb : ComboGoldSkulltula::Limbs) add(limb.path);
     for (int i = 0; i < info.segCount; ++i) add(info.segs[i].path);
     for (int i = 0; i < info.limbDLCount; ++i) {
         add(info.limbDLs[i].dlPath); add(info.limbDLs[i].postDlPath);
@@ -141,6 +143,7 @@ static void CheckSoulCatalogDraw(const CwItemAnimDrawInfo& info, const char* own
                 assert(false);
             }
             int body = 0;
+            int goldMeshes = 0;
             for (auto range : {std::pair{c.opa, c.op}, std::pair{c.xlu, c.xp}}) {
                 std::vector<std::string> scopes;
                 for (Gfx* cmd = range.first; cmd < range.second; ++cmd) {
@@ -158,6 +161,10 @@ static void CheckSoulCatalogDraw(const CwItemAnimDrawInfo& info, const char* own
                             const std::string expected = std::string("__OTR__@") + ownerName + ":";
                             assert(!std::strncmp(path, expected.c_str(), expected.size()));
                             assert(!scopes.empty() && scopes.back() == ownerName);
+                            if (info.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA) {
+                                for (const auto& limb : ComboGoldSkulltula::Limbs)
+                                    if (std::string(path) == expected + (limb.path + 7)) ++goldMeshes;
+                            }
                             ++body;
                         }
                     }
@@ -165,9 +172,24 @@ static void CheckSoulCatalogDraw(const CwItemAnimDrawInfo& info, const char* own
                 assert(scopes.empty());
             }
             assert(body > 0); // A flame-only success is a regression.
+            if (info.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA)
+                assert(goldMeshes == 10); // Every native limb receives its own gold mesh.
             assert(current.x == 19 && current.y == 23 && current.sx == 2 && matrices.empty());
             assert(Ship::Context::GetRawInstance()->rm == host);
             ++draws;
+        }
+    }
+    if (info.proceduralProfile == CW_ANIM_PROFILE_GOLD_SKULLTULA) {
+        owner->alt = false;
+        for (const auto& limb : ComboGoldSkulltula::Limbs) {
+            auto resource = owner->normal.at(limb.path);
+            owner->normal.erase(limb.path);
+            CfaClearCaches();
+            GraphicsContext c; PlayState p{{&c, 17}, 17, {}};
+            current = {}; current.x = 123;
+            assert(!ComboForeignAnim_Draw(&info, ownerName, &p));
+            assert(c.op == c.opa && c.xp == c.xlu && matrices.empty() && current.x == 123);
+            owner->normal[limb.path] = resource;
         }
     }
     CfaClearCaches();
@@ -194,7 +216,13 @@ static void RunSoulCatalogChecks() {
         CheckSoulCatalogDraw(info, "mm", SoulCatalogMm::NpcNames[i], draws);
         ++records;
     }
-    assert(records == 189 && draws == 2268);
+    for (auto id : {SoulCatalogMm::RI_SOUL_MISC_GS, SoulCatalogMm::RI_SOUL_MISC_BUSINESS_SCRUB}) {
+        CwItemAnimDrawInfo info{};
+        assert(SoulCatalogMm::MM_FillMiscSoulAnim(id, &info));
+        CheckSoulCatalogDraw(info, "mm", "misc", draws);
+        ++records;
+    }
+    assert(records == 193 && draws == 2316);
     std::cout << "Soul catalog: " << records << " production recipes, " << draws
               << " host draws, native/replacement/native assets, four frames, body + owner + state checks passed\n";
 }

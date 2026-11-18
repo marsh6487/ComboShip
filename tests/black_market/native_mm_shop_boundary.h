@@ -48,6 +48,7 @@ void EnGirlA_Update(Actor *, PlayState *);
 #endif
 #define Message_GetState FixtureMessageState
 #define Message_ShouldAdvance FixtureAdvance
+#define Message_ShouldAdvanceSilent FixtureAdvance
 #define Message_ContinueTextbox FixtureContinue
 #define Message_StartTextbox FixtureStart
 #define Message_CloseTextbox FixtureClose

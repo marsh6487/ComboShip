@@ -3357,7 +3357,12 @@ s32 Magic_RequestChange(PlayState* play, s16 amount, s16 type) {
         return false;
     }
 
-    if ((type != 5) && (gSaveContext.magic - amount) < 0) {
+    const bool infiniteMagic = Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MAGIC_METER);
+    if (infiniteMagic && type != MAGIC_ADD) {
+        amount = 0;
+    }
+
+    if ((type != MAGIC_ADD) && (gSaveContext.magic - amount) < 0) {
         if (gSaveContext.magicCapacity != 0) {
             Audio_PlaySfxGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                  &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
@@ -3397,7 +3402,7 @@ s32 Magic_RequestChange(PlayState* play, s16 amount, s16 type) {
             }
         case MAGIC_CONSUME_LENS:
             if (gSaveContext.magicState == MAGIC_STATE_IDLE) {
-                if (gSaveContext.magic != 0) {
+                if (gSaveContext.magic != 0 || infiniteMagic) {
                     play->interfaceCtx.unk_230 = 80;
                     gSaveContext.magicState = MAGIC_STATE_CONSUME_LENS;
                     return true;
@@ -5380,6 +5385,14 @@ static int16_t gItemAmmoX[] = { B_BUTTON_X + 2, C_LEFT_BUTTON_X + 1, C_DOWN_BUTT
 static int16_t gItemAmmoY[] = { B_BUTTON_Y + 18, C_LEFT_BUTTON_Y + 17, C_DOWN_BUTTON_Y + 17, C_RIGHT_BUTTON_Y + 17,
                                 DPAD_UP_Y + 11,  DPAD_DOWN_Y + 11,     DPAD_LEFT_Y + 11,     DPAD_RIGHT_Y + 11 };
 
+static s16 Interface_BottomlessAmmo(s16 button) {
+    if (button >= 1 && button < ARRAY_COUNT(gSaveContext.equips.buttonItems) &&
+        gSaveContext.equips.cButtonSlots[button - 1] == SLOT_BOTTLE_4 && Bottle_BottomlessOwned()) {
+        return Bottle_BottomlessCount();
+    }
+    return -1;
+}
+
 void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
     s16 i;
     s16 ammo;
@@ -5616,11 +5629,7 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
     // Bottomless Bottle counter (Skijer's NEI): a multi-use content on SLOT_BOTTLE_4 shows its use-
     // counter as "ammo" — this number is the ONLY thing that identifies a Bottomless Bottle. Always
     // shown while owned: 0 when empty, else the remaining uses.
-    s16 bottomlessAmmo = -1;
-    if ((button >= 1) && (button <= 3) && (gSaveContext.equips.cButtonSlots[button - 1] == SLOT_BOTTLE_4) &&
-        Bottle_BottomlessOwned()) {
-        bottomlessAmmo = Bottle_BottomlessCount();
-    }
+    s16 bottomlessAmmo = Interface_BottomlessAmmo(button);
 
     // Pictograph Box counter (Skijer's NEI): the Lens slot in pictobox mode shows 1 with a kept photo,
     // else 0. The Lens isn't a vanilla ammo item, so force the counter on for it.
@@ -5646,17 +5655,15 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
             i = ITEM_BOW;
         }
 
-        if (i == ITEM_SWITCH_HOOK) {
+        if (bottomlessAmmo >= 0) {
+            ammo = bottomlessAmmo;
+        } else if (i == ITEM_SWITCH_HOOK) {
             // Skijer's NEI: shots left in the 5-charge pool (0 through the 2-minute gray-out).
             // ITEM_SWITCH_HOOK (0xA5) is outside the vanilla AMMO()/SLOT() tables — never AMMO(i) it.
             extern u8 SwitchHook_GetCharges(void);
             ammo = SwitchHook_GetCharges();
         } else {
             ammo = AMMO(i);
-        }
-
-        if (bottomlessAmmo >= 0) {
-            ammo = bottomlessAmmo; // override with the Bottomless Bottle counter
         }
 
         // Power Keg counter (Skijer's NEI): the Bomb slot in keg mode carries its OWN ammo, so show the
