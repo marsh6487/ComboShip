@@ -42,6 +42,7 @@ prefix = '''
 #include "functions.h"
 #include "z64math.h"
 #endif
+#include "ComboGoldSkulltulaLimbs.h"
 #include "ComboItemDrawABI.h"
 extern const CwItemAnimDrawInfo* sCfaInfo;
 const CwAnimLimbDL* CfaFindLimbDL(s32);
