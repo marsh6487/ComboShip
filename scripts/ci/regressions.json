@@ -1,5 +1,12 @@
 [
   {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "Floating pickup counters: lifecycle, projection, inventory and optional native rupee HUD hiding",
+    "run": "python3 -B tests/pickup_counter/run_tests.py --sanitize\npython3 -B tests/pickup_counter/run_native_tests.py --sanitize\npython3 -B tests/pickup_counter/run_hud_tests.py"
+  },
+  {
     "suite": "equipment",
     "origin": "gate",
     "native_abi": "explicit",

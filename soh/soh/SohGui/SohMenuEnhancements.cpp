@@ -1009,6 +1009,29 @@ void SohMenu::AddMenuEnhancements() {
 
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "UI", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Pickup Counters", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("PickupCounter"))
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Show animated rupee and ammo counters beside Link after pickups. Includes current amount, actual "
+            "wallet or bag capacity, a small pickup gain, and a brief icon glint. Up to three item types stack, "
+            "then fade after 2.8 seconds. Respects True Hidden UI. Available in both games."));
+    static const std::map<int32_t, const char*> pickupRupeeHudOptions = { { 0, "Show HUD Rupee Counter" },
+                                                                          { 1, "Hide HUD Rupee Counter" } };
+    AddWidget(path, "HUD Rupee Counter", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_ENHANCEMENT("PickupCounterHideHudRupees"))
+        .RaceDisable(false)
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0); })
+        .Options(ComboboxOptions()
+                     .ComboMap(pickupRupeeHudOptions)
+                     .DefaultIndex(0)
+                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
+                              "Turning off Pickup Counters restores the regular HUD."));
+    AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar(CVAR_ENHANCEMENT("PickupCounterScale"))
+        .RaceDisable(false)
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0); })
+        .Options(FloatSliderOptions().Min(0.65f).Max(1.5f).DefaultValue(1.0f).Format("%.2fx"));
     AddWidget(path, "Minimal UI", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MinimalUI"))
         .Options(CheckboxOptions().Tooltip("Hides most of the UI when not needed.\n"

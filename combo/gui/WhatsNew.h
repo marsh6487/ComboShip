@@ -19,6 +19,12 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gEnhancements.PickupCounter", Kind::New,
+      "Animated rupee and ammo counters follow Link after pickups, with item icons, current/capacity, "
+      "a small pickup gain and icon glint. Available in both games; off by default." },
+    { "gEnhancements.PickupCounterScale", Kind::New, "Adjust the size of the floating pickup counters." },
+    { "gEnhancements.PickupCounterHideHudRupees", Kind::New,
+      "Optionally hide the regular rupee HUD while Pickup Counters is enabled; floating pickups stay visible." },
     { "gRandoSettings.ShuffleRitoMask", Kind::New,
       "Rito Mask: optional shared reward with authored get-item model and flight in both games. Choose it in the "
       "existing mask wheel in Combo or OoT; solo MM cycles its independently owned Rito and Bremen masks. Defaults "
