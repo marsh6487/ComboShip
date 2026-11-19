@@ -17,9 +17,12 @@ static void DrawTycoonRupeeIcon() {
     gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 220, 120, 255, interfaceCtx->magicAlpha,
                             COSMETIC_ID("HUD.RupeeIcon"));
     gDPSetEnvColor(OVERLAY_DISP++, 50, 0, 80, 255);
-    HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
-    OVERLAY_DISP =
-        Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16, 1 << 10, 1 << 10);
+    if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
+        CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+        HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
+        OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16,
+                                          1 << 10, 1 << 10);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -48,9 +51,12 @@ static void DrawTycoonRupeeCounter() {
         gDPPipeSync(OVERLAY_DISP++);
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, magicAlpha);
 
-        HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
-        OVERLAY_DISP = Gfx_DrawTexRectI8(OVERLAY_DISP, (TexturePtr)sCounterTextures[counterDigits[digitIndex]], 8, 16,
-                                         xPos + 1, 207, 8, 16, 1 << 10, 1 << 10);
+        if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
+            CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+            HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
+            OVERLAY_DISP = Gfx_DrawTexRectI8(OVERLAY_DISP, (TexturePtr)sCounterTextures[counterDigits[digitIndex]], 8,
+                                             16, xPos + 1, 207, 8, 16, 1 << 10, 1 << 10);
+        }
 
         gDPPipeSync(OVERLAY_DISP++);
 
@@ -62,29 +68,32 @@ static void DrawTycoonRupeeCounter() {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 100, 100, 100, interfaceCtx->magicAlpha);
         }
 
-        HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
-        if (HudEditor_ShouldOverrideDraw()) {
-            if (CVarGetInteger(hudEditorElements[hudEditorActiveElement].modeCvar, HUD_EDITOR_ELEMENT_MODE_VANILLA) ==
-                HUD_EDITOR_ELEMENT_MODE_HIDDEN) {
-                hudEditorActiveElement = HUD_EDITOR_ELEMENT_NONE;
+        if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
+            CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+            HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
+            if (HudEditor_ShouldOverrideDraw()) {
+                if (CVarGetInteger(hudEditorElements[hudEditorActiveElement].modeCvar,
+                                   HUD_EDITOR_ELEMENT_MODE_VANILLA) == HUD_EDITOR_ELEMENT_MODE_HIDDEN) {
+                    hudEditorActiveElement = HUD_EDITOR_ELEMENT_NONE;
+                } else {
+                    s16 rectLeft = xPos;
+                    s16 rectTop = 824 / 4;
+                    s16 rectWidth = 0x20 / 4;
+                    s16 rectHeight = (888 / 4) - rectTop;
+                    s16 dsdx = 512;
+                    s16 dtdy = 512;
+
+                    HudEditor_ModifyDrawValues(&rectLeft, &rectTop, &rectWidth, &rectHeight, &dsdx, &dtdy);
+
+                    hudEditorActiveElement = HUD_EDITOR_ELEMENT_NONE;
+
+                    gSPWideTextureRectangle(OVERLAY_DISP++, rectLeft << 2, rectTop << 2, (rectLeft + rectWidth) << 2,
+                                            (rectTop + rectHeight) << 2, G_TX_RENDERTILE, 0, 0, dsdx << 1, dtdy << 1);
+                }
             } else {
-                s16 rectLeft = xPos;
-                s16 rectTop = 824 / 4;
-                s16 rectWidth = 0x20 / 4;
-                s16 rectHeight = (888 / 4) - rectTop;
-                s16 dsdx = 512;
-                s16 dtdy = 512;
-
-                HudEditor_ModifyDrawValues(&rectLeft, &rectTop, &rectWidth, &rectHeight, &dsdx, &dtdy);
-
-                hudEditorActiveElement = HUD_EDITOR_ELEMENT_NONE;
-
-                gSPWideTextureRectangle(OVERLAY_DISP++, rectLeft << 2, rectTop << 2, (rectLeft + rectWidth) << 2,
-                                        (rectTop + rectHeight) << 2, G_TX_RENDERTILE, 0, 0, dsdx << 1, dtdy << 1);
+                gSPTextureRectangle(OVERLAY_DISP++, xPos * 4, 206 << 2, (xPos * 4) + 0x20, 222 << 2, G_TX_RENDERTILE, 0,
+                                    0, 1 << 10, 1 << 10);
             }
-        } else {
-            gSPTextureRectangle(OVERLAY_DISP++, xPos * 4, 206 << 2, (xPos * 4) + 0x20, 222 << 2, G_TX_RENDERTILE, 0, 0,
-                                1 << 10, 1 << 10);
         }
     }
 

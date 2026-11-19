@@ -1589,6 +1589,26 @@ void BenMenu::AddEnhancements() {
             "An optional HD pack adds smooth higher-resolution versions. "
             "Day announcements, boss names and custom cards keep their existing presentation. "
             "Changes apply to the next location card."));
+    AddWidget(path, "Pickup Counters", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.PickupCounter")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Show animated rupee and ammo counters beside Link after pickups. Includes current amount, actual "
+            "wallet or bag capacity, a small pickup gain, and a brief icon glint. Up to three item types stack, "
+            "then fade after 2.8 seconds. Respects True Hidden UI. Available in both games."));
+    static const std::unordered_map<int32_t, const char*> pickupRupeeHudOptions = { { 0, "Show HUD Rupee Counter" },
+                                                                                    { 1, "Hide HUD Rupee Counter" } };
+    AddWidget(path, "HUD Rupee Counter", WIDGET_CVAR_COMBOBOX)
+        .CVar("gEnhancements.PickupCounterHideHudRupees")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.PickupCounter", 0); })
+        .Options(ComboboxOptions()
+                     .ComboMap(&pickupRupeeHudOptions)
+                     .DefaultIndex(0)
+                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
+                              "Turning off Pickup Counters restores the regular HUD."));
+    AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gEnhancements.PickupCounterScale")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.PickupCounter", 0); })
+        .Options(FloatSliderOptions().Min(0.65f).Max(1.5f).DefaultValue(1.0f).Format("%.2fx"));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
 #ifdef COMBO_BUILD
     AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {

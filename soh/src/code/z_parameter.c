@@ -6125,8 +6125,11 @@ void Interface_Draw(PlayState* play) {
                     PosX_RC = PosX_RC_ori;
                 }
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, rColor.r, rColor.g, rColor.b, interfaceCtx->magicAlpha);
-                OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, PosX_RC, PosY_RC, 16, 16,
-                                              1 << 10, 1 << 10);
+                if (!CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0) ||
+                    CVarGetInteger(CVAR_ENHANCEMENT("PickupCounterHideHudRupees"), 0) != 1) {
+                    OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, PosX_RC, PosY_RC, 16, 16,
+                                                  1 << 10, 1 << 10);
+                }
             }
 
             if (GameInteractor_Should(VB_RENDER_KEY_COUNTER, true)) {
@@ -6261,9 +6264,13 @@ void Interface_Draw(PlayState* play) {
                 svar2 = rupeeDigitsFirst[CUR_UPG_VALUE(UPG_WALLET)];
                 svar5 = rupeeDigitsCount[CUR_UPG_VALUE(UPG_WALLET)];
 
-                for (svar1 = 0, svar3 = 16; svar1 < svar5; svar1++, svar2++, svar3 += 8) {
-                    OVERLAY_DISP = Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[svar2]]),
-                                                 8, 16, PosX_RC + svar3, PosY_RC, 8, 16, 1 << 10, 1 << 10);
+                if (!CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0) ||
+                    CVarGetInteger(CVAR_ENHANCEMENT("PickupCounterHideHudRupees"), 0) != 1) {
+                    for (svar1 = 0, svar3 = 16; svar1 < svar5; svar1++, svar2++, svar3 += 8) {
+                        OVERLAY_DISP =
+                            Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[svar2]]), 8, 16,
+                                          PosX_RC + svar3, PosY_RC, 8, 16, 1 << 10, 1 << 10);
+                    }
                 }
             }
         } else {
