@@ -2,6 +2,7 @@
 #include "Rando/KeyRings.h"
 #include "Rando/RustyDoorKeys.h"
 #include "Rando/Bags.h"
+#include "Rando/Wallets.h"
 #include "Rando/InfiniteUpgrades.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/SoulShuffle.h"
@@ -258,6 +259,8 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         return !hasObtainedCheck && !Flags_GetRandoInf(upgrade->flag);
     if (randoItemId == RI_WALLET_CHILD)
         return !hasObtainedCheck && !RandoCapacity_HasWallet();
+    if (randoItemId == RI_WALLET_ZFG)
+        return !hasObtainedCheck && !RandoCapacity_HasZfgWallet();
 
     if (randoItemId == RI_OOT_NEI_RITO_MASK)
         return !RitoMask_IsOwned();
@@ -314,16 +317,7 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
             }
             return Nei_GetOwnedItem(SLOT_ROCS) != ITEM_ROCS_CAPE;
         case RI_PROGRESSIVE_WALLET:
-            if (hasObtainedCheck) {
-                return false;
-            } else if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES) {
-                if (CUR_UPG_VALUE(UPG_WALLET) >= 3) {
-                    return false;
-                }
-            } else if (CUR_UPG_VALUE(UPG_WALLET) >= 2) {
-                return false;
-            }
-            return true;
+            return !hasObtainedCheck && Wallets::NextProgressiveItem() != RI_JUNK;
         case RI_WALLET_ADULT:
             if (CUR_UPG_VALUE(UPG_WALLET) >= 1) {
                 return false;
@@ -911,19 +905,7 @@ RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckI
                 assert(false);
                 return RI_JUNK;
             case RI_PROGRESSIVE_WALLET:
-                if (!RandoCapacity_HasWallet()) {
-                    return RI_WALLET_CHILD;
-                }
-                if (CUR_UPG_VALUE(UPG_WALLET) == 0) {
-                    return RI_WALLET_ADULT;
-                } else if (CUR_UPG_VALUE(UPG_WALLET) == 1) {
-                    return RI_WALLET_GIANT;
-                } else if (CUR_UPG_VALUE(UPG_WALLET) == 2) {
-                    return RI_WALLET_TYCOON;
-                }
-                // Shouldn't happen, just in case
-                assert(false);
-                return RI_JUNK;
+                return Wallets::NextProgressiveItem();
             case RI_PROGRESSIVE_SWORD:
                 if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) == EQUIP_VALUE_SWORD_NONE &&
                     (STOLEN_ITEM_1 < ITEM_SWORD_KOKIRI) && (STOLEN_ITEM_2 < ITEM_SWORD_KOKIRI)) {

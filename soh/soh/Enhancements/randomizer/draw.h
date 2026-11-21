@@ -156,6 +156,7 @@ void Randomizer_DrawMmSoul(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry);
 // MM owl-statue warp points (single-DL MM owl model from mm.o2r), shared by all 10 owls
 void Randomizer_DrawMmOwlStatue(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawWallet(PlayState* play, GetItemEntry* getItemEntry);
 // MM time items (6 clock halves): static Clock Town clock-tower face from mm.o2r object_obj_tokeidai,
 // day variants at face rotation 0xC000, night variants with sun/moon panel flipped 0x8000
 void Randomizer_DrawClock(PlayState* play, GetItemEntry* getItemEntry);

@@ -141,11 +141,13 @@ struct DrawUniforms {
     simd::float1 toonHighlightIntensity;
     simd::float1 toonShadowIntensity;
     simd::float1 toonDebug;
+    simd::float1 modelOpacity;
 };
 
 static_assert(offsetof(DrawUniforms, prim_depth) == 24, "Metal primitive-depth offset must match the shader");
 static_assert(offsetof(DrawUniforms, toonLightDir) == 28, "Metal toon offset must match packed_float3");
-static_assert(sizeof(DrawUniforms) == 84, "Metal DrawUniforms must match every shader variant");
+static_assert(offsetof(DrawUniforms, modelOpacity) == 84, "Metal model opacity must follow the original draw constants");
+static_assert(sizeof(DrawUniforms) == 88, "Metal DrawUniforms must match every shader variant");
 
 struct CoordUniforms {
     simd::uint2 coords[MAX_PIXEL_DEPTH_COORDS];

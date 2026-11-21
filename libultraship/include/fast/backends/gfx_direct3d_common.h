@@ -47,7 +47,8 @@ struct PerDrawCB {
 
 struct PerPrimDepthCB {
     float prim_depth;
-    float _pad[3]; // 16-byte CB alignment
+    float model_opacity;
+    float _pad[2]; // 16-byte CB alignment
 };
 
 struct Coord {

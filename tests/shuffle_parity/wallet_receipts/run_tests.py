@@ -58,7 +58,7 @@ static void ShareNativeMagicFloor(int){assert(false);}
 '''
 def native_c(game):
  inv=read(game+'/src/code/z_inventory.c');actor=read(game+'/src/code/z_actor.c')
- names=('gUpgradeMasks','gUpgradeNegMasks','gUpgradeShifts','gUpgradeCapacities','gItemSlots')
+ names=('gBitFlags','gUpgradeMasks','gUpgradeNegMasks','gUpgradeShifts','gUpgradeCapacities','gItemSlots')
  tables='\n'.join(re.search(r'^(?:u32|u16|u8) '+n+r'\[[^]]*\](?:\[4\])? = \{.*?\};',inv,re.M|re.S)[0] for n in names)
  fs=('Flags_GetRandomizerInf','Flags_SetRandomizerInf') if game=='soh' else ('Flags_GetRandoInf','Flags_SetRandoInf','Flags_ClearRandoInf')
  hooks='soh/Enhancements/game-interactor/GameInteractor_Hooks.h' if game=='soh' else '2s2h/GameInteractor/GameInteractor.h'
@@ -87,6 +87,7 @@ def oot(build):
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/logic.h"
+#include "soh/Enhancements/randomizer/WalletProgression.h"
 #include "soh/Enhancements/item-tables/ItemTableManager.h"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/FleetShipCombo/FleetComboItems.h"
@@ -96,6 +97,7 @@ def oot(build):
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "mods/nei_save.h"
 #include "combo/rando/RpgStats.h"
+#include "rando/SharedItems.h"
 extern "C" {#include "variables.h"
 SaveContext gSaveContext{};PlayState* gPlayState=nullptr;
 }
@@ -104,18 +106,23 @@ extern "C" NeiSaveData* Nei_Save(){return &nei;}
 extern "C" void GameInteractor_ExecuteOnFlagSet(int16_t,int16_t){}
 extern "C" void Flags_SetEventChkInf(s32){assert(false);}
 extern "C" s32 Inventory_HasEmptyBottle(){return 1;}
-extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey){return 0;}
+static bool zfgEnabled = false;
+static bool tycoonEnabled = false;
+extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey key){
+ return key == RSK_INCLUDE_ZFG_WALLET ? zfgEnabled : key == RSK_INCLUDE_TYCOON_WALLET && tycoonEnabled;
+}
+int gComboSuppressAnchorSend = 0;
 static bool SOH_ShareSoulReceipt(int){return false;}
 static bool FleetSync_IsApplyingFc(){return false;}
 namespace FleetRpg {ComboRpgState Read(){return {};}}
 struct SaveManager {static SaveManager* Instance;void SaveFile(int){++persisted;}};SaveManager mgr;SaveManager* SaveManager::Instance=&mgr;
 bool Combo_OotIsForeground(){return foreground;}
 Randomizer::Randomizer(){} Randomizer::~Randomizer(){}
-u8 Randomizer::GetRandoSettingValue(RandomizerSettingKey){return 0;}
+u8 Randomizer::GetRandoSettingValue(RandomizerSettingKey key){return Randomizer_GetSettingValue(key);}
 static Randomizer randomizer;
 struct OTRGlobals {static OTRGlobals* Instance;Randomizer* gRandomizer=&randomizer;};OTRGlobals globals;OTRGlobals* OTRGlobals::Instance=&globals;
 '''.replace('extern "C" {#include','extern "C" {\n#include')
- s+='ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGet randoGet){bool tycoonWallet=false;u8 infiniteUpgrades=0;'+re.search(r'u8 numWallets = [^;]+;',rnd)[0]+'switch(randoGet){'+cases(rnd,'        case RG_PROGRESSIVE_WALLET:','        case RG_PROGRESSIVE_SCALE:')+'default:assert(false);return CANT_OBTAIN_ALREADY_HAVE;}}\n'
+ s+='ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGet randoGet){bool tycoonWallet=tycoonEnabled;u8 infiniteUpgrades=0;switch(randoGet){'+cases(rnd,'        case RG_PROGRESSIVE_WALLET:','        case RG_PROGRESSIVE_SCALE:')+'default:assert(false);return CANT_OBTAIN_ALREADY_HAVE;}}\n'
  s+='Text::Text()=default;\n'+block(text,'Text::Text(std::string english_, std::string french_, std::string german_)')+'\n'
  s+='namespace Rando {\n'+block(item,'Item::Item()')+'\n'
  starts=[m.start() for m in re.finditer(r'Item::Item\(const RandomizerGet',item)]
@@ -123,22 +130,25 @@ struct OTRGlobals {static OTRGlobals* Instance;Randomizer* gRandomizer=&randomiz
  for fn in ('Logic::Logic()','void Logic::SetSaveContext(','uint32_t Logic::CurrentUpgrade(','bool Logic::CheckRandoInf('):s+=block(logic,fn)+'\n'
  s+='static std::shared_ptr<Logic> walletLogic=std::make_shared<Logic>();\nstd::array<Item,RG_MAX> StaticData::itemTable;\nstd::unordered_map<std::string,RandomizerGet> StaticData::itemNameToEnum;\nItem& StaticData::RetrieveItem(RandomizerGet id){return itemTable.at(id);}\nvoid StaticData::InitItemTable(){\n'
  rows=read('soh/soh/Enhancements/randomizer/item_list.cpp')
- for token in ('RG_PROGRESSIVE_WALLET','RG_ADULT_WALLET','RG_GIANT_WALLET','RG_TYCOON_WALLET','RG_CHILD_WALLET','RG_BLUE_RUPEE'):
+ for token in ('RG_PROGRESSIVE_WALLET','RG_ADULT_WALLET','RG_GIANT_WALLET','RG_TYCOON_WALLET','RG_CHILD_WALLET','RG_ZFG_WALLET','RG_BLUE_RUPEE'):
   line=re.search(r'^\s*itemTable\['+token+r'\].*$',rows,re.M);assert line,token;s+=line[0].split('.CustomIcon(')[0].rstrip(';')+';\n'
  s+='itemNameToEnum["Progressive Wallet"]=RG_PROGRESSIVE_WALLET; }\n'
  s+=block(item,'static bool ItemResolvesFromState(')+'\n'
  wallet=cases(item[item.index('std::shared_ptr<GetItemEntry> Item::GetGIEntry('):],'        case RG_PROGRESSIVE_WALLET:','        case RG_PROGRESSIVE_SCALE:')
  footer=item[item.index('    if (giEntry != nullptr && (actual == RG_NONE'):item.index('GetItemEntry Item::GetGIEntry_Copy()')]
- s+='std::shared_ptr<GetItemEntry> Item::GetGIEntry(RandomizerGet* actualOut) const {if(giEntry&&!ItemResolvesFromState(randomizerGet))return giEntry;auto logic=walletLogic;RandomizerGet actual=RG_NONE;bool tycoonWallet=false;u8 infiniteUpgrades=0;switch(randomizerGet){'+wallet+'default:assert(false);}\n'+footer+'\n'+block(item,'GetItemEntry Item::GetGIEntry_Copy()')+'\n}\n'
+ s+='std::shared_ptr<GetItemEntry> Item::GetGIEntry(RandomizerGet* actualOut) const {if(giEntry&&!ItemResolvesFromState(randomizerGet))return giEntry;auto logic=walletLogic;auto* randomizer=OTRGlobals::Instance->gRandomizer;RandomizerGet actual=RG_NONE;bool tycoonWallet=tycoonEnabled;u8 infiniteUpgrades=0;switch(randomizerGet){'+wallet+'default:assert(false);}\n'+footer+'\n'+block(item,'GetItemEntry Item::GetGIEntry_Copy()')+'\n}\n'
  s+='ItemTableManager::ItemTableManager(){} ItemTableManager::~ItemTableManager(){}\nItemTableManager itm;ItemTableManager* ItemTableManager::Instance=&itm;\nGetItemEntry ItemTableManager::RetrieveItemEntry(uint16_t table,uint16_t id){assert(table==MOD_NONE&&id==GI_RUPEE_BLUE);return Rando::StaticData::RetrieveItem(RG_BLUE_RUPEE).GetGIEntry_Copy();}\n'
  s+=glue('soh')+'\n'+transport('soh')+'\n'
  param=read('soh/src/code/z_parameter.c');a=param.index('    } else if (item == ITEM_WALLET_ADULT) {');b=param.index('    } else if (item == ITEM_STICK_UPGRADE_20)',a)
- s+='extern "C" u8 Return_Item(u8,ModIndex,ItemID){return ITEM_NONE;}\nextern "C" void Rupees_ChangeBy(s16){}\nextern "C" u8 Item_Give(PlayState*,u8 item){if(false){'+param[a:b]+'}else{assert(item==ITEM_RUPEE_BLUE);}return ITEM_NONE;}\nextern "C" u16 Randomizer_Item_Give(PlayState*,GetItemEntry){assert(false&&"finite OoT wallets must dispatch through native MOD_NONE");return 0;}\n'
+ s+='extern "C" u8 Return_Item(u8,ModIndex,ItemID){return ITEM_NONE;}\nextern "C" void Rupees_ChangeBy(s16){}\nextern "C" u8 Item_Give(PlayState*,u8 item){if(false){'+param[a:b]+'}else{assert(item==ITEM_RUPEE_BLUE);}return ITEM_NONE;}\nextern "C" u16 Randomizer_Item_Give(PlayState*,GetItemEntry gie){switch(gie.getItemId){'+block(rnd,'        case RG_ZFG_WALLET: {')+' default:assert(false);}return 0;}\n'
  s+=block(bridge,'void Combo_ApplyItemReceiveSideEffects(')+'\n'+block(bridge,'void Combo_FlushDormantAccumulators(')+'\n'+block(bridge,'void Combo_GrantResolvedOOT(')+'\n'+block(bridge,'static bool GrantOotItemByName(')+'\n'+block(bridge,'extern "C" COMBO_EXPORT void SOH_GrantCrossItem(')+'\n'+block(bridge,'extern "C" COMBO_EXPORT void SOH_GrantSharedItem(')+'\n'
+ for marker in ('extern "C" COMBO_EXPORT int SOH_GetSharedTier(','extern "C" COMBO_EXPORT void SOH_RaiseSharedTier('):
+  s+=block(bridge,marker)+' catch (...) { abort(); }\n'
  s+=r'''
-static void Reset(){gSaveContext={};nei={};persisted=forwards=0;sReceiveDepth=0;sPullPending=false;Rando::walletLogic->SetSaveContext(&gSaveContext);Flags_SetRandomizerInf(RAND_INF_HAS_WALLET);}
-static void Home(){const bool can=randomizer.GetItemObtainabilityFromRandomizerGet(RG_PROGRESSIVE_WALLET)==CAN_OBTAIN;auto gie=can?Rando::StaticData::RetrieveItem(RG_PROGRESSIVE_WALLET).GetGIEntry_Copy():itm.RetrieveItemEntry(MOD_NONE,GI_RUPEE_BLUE);assert(gie.modIndex==MOD_NONE);Item_Give(gPlayState,gie.itemId);}
-static json State(){return {{"level",CUR_UPG_VALUE(UPG_WALLET)},{"capacity",CUR_CAPACITY(UPG_WALLET)},{"childFlag",bool(Flags_GetRandomizerInf(RAND_INF_HAS_WALLET))},{"hasWallet",bool(Flags_GetRandomizerInf(RAND_INF_HAS_WALLET))},{"obtained",nei.comboObtainedFc[FCI_WALLET]},{"applied",nei.comboAppliedFc[FCI_WALLET]},{"forwards",forwards},{"persisted",persisted},{"receiveDepth",sReceiveDepth}};}
+static void Reset(){gSaveContext={};nei={};persisted=forwards=0;sReceiveDepth=0;sPullPending=false;zfgEnabled=tycoonEnabled=false;Rando::walletLogic->SetSaveContext(&gSaveContext);Flags_SetRandomizerInf(RAND_INF_HAS_WALLET);}
+static void EnableZfg(bool tycoon){zfgEnabled=true;tycoonEnabled=tycoon;}
+static void Home(){const bool can=randomizer.GetItemObtainabilityFromRandomizerGet(RG_PROGRESSIVE_WALLET)==CAN_OBTAIN;auto gie=can?Rando::StaticData::RetrieveItem(RG_PROGRESSIVE_WALLET).GetGIEntry_Copy():itm.RetrieveItemEntry(MOD_NONE,GI_RUPEE_BLUE);if(gie.modIndex==MOD_NONE)Item_Give(gPlayState,gie.itemId);else Randomizer_Item_Give(gPlayState,gie);}
+static json State(){return {{"tier",SOH_GetSharedTier(ComboRando::SF_WALLET)},{"level",CUR_UPG_VALUE(UPG_WALLET)},{"capacity",CUR_CAPACITY(UPG_WALLET)},{"childFlag",bool(Flags_GetRandomizerInf(RAND_INF_HAS_WALLET))},{"hasWallet",bool(Flags_GetRandomizerInf(RAND_INF_HAS_WALLET))},{"obtained",nei.comboObtainedFc[FCI_WALLET]},{"applied",nei.comboAppliedFc[FCI_WALLET]},{"forwards",forwards},{"persisted",persisted},{"receiveDepth",sReceiveDepth}};}
 '''
  sync=read('soh/soh/FleetShipCombo/FleetSync.cpp');a=sync.index('        auto upg = [&u]');b=sync.index('\n        Inventory_ChangeUpgrade(UPG_QUIVER',a)
  s+='void ApplyWalletSnapshot(const json& sh){const auto& u=sh["upgrades"];'+sync[a:b]+'}\n'
@@ -149,6 +159,7 @@ def mm(build):
  s=COMMON+r'''
 #include "Rando/Rando.h"
 #include "Rando/Wallets.h"
+#include "rando/SharedItems.h"
 #include "FleetShipCombo/FleetComboItems.h"
 #include "FleetShipCombo/FleetComboItemsGlue.h"
 #include "FleetShipCombo/FleetSharedItems.h"
@@ -165,17 +176,19 @@ void GameInteractor_ExecuteOnFlagSet(FlagType,uint32_t){}
 void GameInteractor_ExecuteOnFlagUnset(FlagType,uint32_t){}
 s32 Inventory_HasEmptyBottle(){return 1;}
 int ComboRpg_IsEnabled(int){return 0;}
+int ComboRpg_NativeMagicTier(int){abort();}
 }
 static NeiSaveData nei;
 extern "C" NeiSaveData* Nei_Save(){return &nei;}
 static bool MM_ShareSoulReceipt(int){return false;}
 void SaveManager_SaveCurrentForCombo(){++persisted;}
+bool Combo_MmIsForeground(){return foreground;}
 namespace Rando {bool gComboDormantGive=false;thread_local bool gItemGrantSimulation=false;}
 '''
  s+=glue('mm')+'\n'+transport('mm')+'\n'
  items=read('mm/2s2h/Rando/StaticData/Items.cpp');a=items.index('#define RI(');b=items.index('\n\n',a)
  s+='namespace Rando::StaticData {\n'+items[a:b]+'\nstd::map<RandoItemId,RandoStaticItem> Items={\n'
- for token in ('RI_PROGRESSIVE_WALLET','RI_WALLET_CHILD','RI_WALLET_ADULT','RI_WALLET_GIANT','RI_WALLET_TYCOON','RI_RUPEE_RED'):
+ for token in ('RI_PROGRESSIVE_WALLET','RI_WALLET_CHILD','RI_WALLET_ADULT','RI_WALLET_GIANT','RI_WALLET_TYCOON','RI_WALLET_ZFG','RI_RUPEE_RED'):
   s+=re.search(r'^\s*RI\('+token+r',.*$',items,re.M)[0]+'\n'
  s+='};\n#undef RI\n'+block(items,'static const std::unordered_map<RandoItemId, std::string>& ComboItemEmitNames()')+'\n'+block(items,'const std::string& GetItemDisplayName(')+'\n}\n'
  obtainable=cases(conv,'        case RI_PROGRESSIVE_WALLET:','        case RI_WALLET_ADULT:')
@@ -186,16 +199,19 @@ namespace Rando {bool gComboDormantGive=false;thread_local bool gItemGrantSimula
  depth=give[a:b]
  record=block(give,'    if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0) {');record=record[:record.index('        // "You found X"')]+'    }\n'
  walletcases=cases(give,'        case RI_WALLET_ADULT:','        case RI_GS_TOKEN_SWAMP:')
- s+='u32 gRandoPickupSerial=0;\nvoid GiveItem(RandoItemId randoItemId,RandoCheckId){'+depth+record+'switch(randoItemId){case RI_WALLET_CHILD:Wallets::Give(randoItemId);break;'+walletcases+'case RI_RUPEE_RED:case RI_JUNK:break;default:assert(false);}}\n}\n'
+ s+='u32 gRandoPickupSerial=0;\nvoid GiveItem(RandoItemId randoItemId,RandoCheckId){'+depth+record+'switch(randoItemId){case RI_WALLET_CHILD:case RI_WALLET_ZFG:Wallets::Give(randoItemId);break;'+walletcases+'case RI_RUPEE_RED:case RI_JUNK:break;default:assert(false);}}\n}\n'
  a=param.index('    } else if (item == ITEM_WALLET_ADULT)');b=param.index('    } else if',param.index('    } else if (item == ITEM_WALLET_GIANT)',a)+1)
  s+='extern "C" u8 Item_Give(PlayState*,u8 item){if(false){'+param[a:b]+'}else{assert(false);}return ITEM_NONE;}\n'
  for marker in ('static bool Combo_IsBottleRefill(','void Combo_MM_FlushAccumulators(','static void Combo_MM_GiveDormantResolvedInternal(','void Combo_MM_GiveDormantResolved(','static const std::unordered_map<std::string, RandoItemId>& Combo_MM_SpoilerNameToItemId('):
   s+=block(bridge,marker)+'\n'
  for marker in ('static bool GrantMmItemByName(','extern "C" COMBO_EXPORT void MM_GrantCrossItem(','extern "C" COMBO_EXPORT void MM_GrantSharedItem('):s+=block(bridge,marker)+'\n'
+ for marker in ('extern "C" COMBO_EXPORT int MM_GetSharedTier(','extern "C" COMBO_EXPORT void MM_RaiseSharedTier('):
+  s+=block(bridge,marker)+' catch (...) { abort(); }\n'
  s+=r'''
 static void Reset(){gSaveContext={};nei={};persisted=forwards=0;sReceiveDepth=0;sPullPending=false;gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;RANDO_SAVE_OPTIONS[RO_SHUFFLE_CHILD_WALLET]=1;}
+static void EnableZfg(bool tycoon){RANDO_SAVE_OPTIONS[RO_SHUFFLE_ZFG_WALLET]=1;RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET]=tycoon;}
 static void Home(){Rando::GiveItem(Rando::ConvertItem(RI_PROGRESSIVE_WALLET));}
-static json State(){return {{"level",CUR_UPG_VALUE(UPG_WALLET)},{"capacity",CUR_CAPACITY(UPG_WALLET)},{"childFlag",bool(Flags_GetRandoInf(RANDO_INF_WALLET_CHILD))},{"hasWallet",bool(RandoCapacity_HasWallet())},{"obtained",nei.comboObtainedFc[FCI_WALLET]},{"applied",nei.comboAppliedFc[FCI_WALLET]},{"forwards",forwards},{"persisted",persisted},{"receiveDepth",sReceiveDepth}};}
+static json State(){return {{"tier",MM_GetSharedTier(ComboRando::SF_WALLET)},{"level",CUR_UPG_VALUE(UPG_WALLET)},{"capacity",CUR_CAPACITY(UPG_WALLET)},{"childFlag",bool(Flags_GetRandoInf(RANDO_INF_WALLET_CHILD))},{"hasWallet",bool(RandoCapacity_HasWallet())},{"obtained",nei.comboObtainedFc[FCI_WALLET]},{"applied",nei.comboAppliedFc[FCI_WALLET]},{"forwards",forwards},{"persisted",persisted},{"receiveDepth",sReceiveDepth}};}
 '''
  sync=read('mm/2s2h/FleetShipCombo/FleetSync.cpp');a=sync.index('        auto upg = [&u]');b=sync.index('\n        // Wallet level 3',a)
  s+='void ApplyWalletSnapshot(const json& sh){const auto& u=sh["upgrades"];'+sync[a:b]+'}\n'
@@ -205,7 +221,7 @@ static json State(){return {{"level",CUR_UPG_VALUE(UPG_WALLET)},{"capacity",CUR_
 def protocol(game):
  prefix='SOH' if game=='soh' else 'MM'
  init='Rando::StaticData::InitItemTable();' if game=='soh' else ''
- return '\nint main(){'+init+r'''std::string line;while(std::getline(std::cin,line)){auto c=json::parse(line);auto op=c.at("op").get<std::string>();if(op=="reset")Reset();else if(op=="home"){foreground=true;Home();}else if(op=="cross"){foreground=false;'''+prefix+r'''_GrantCrossItem("Progressive Wallet");}else if(op=="shared"){foreground=false;'''+prefix+r'''_GrantSharedItem(c.at("name").get<std::string>().c_str());}else if(op=="sync")ApplyWalletSnapshot(c.at("state"));else if(op=="reload"){auto saved=gSaveContext;gSaveContext={};gSaveContext=saved;}else assert(op=="state");std::cout<<json({{"state",State()}}).dump()<<std::endl;}}
+ return '\nint main(){'+init+r'''std::string line;while(std::getline(std::cin,line)){auto c=json::parse(line);auto op=c.at("op").get<std::string>();if(op=="reset")Reset();else if(op=="zfg")EnableZfg(c.at("tycoon").get<bool>());else if(op=="raise"){foreground=false;'''+prefix+r'''_RaiseSharedTier(ComboRando::SF_WALLET,c.at("tier").get<int>());}else if(op=="home"){foreground=true;Home();}else if(op=="cross"){foreground=false;'''+prefix+r'''_GrantCrossItem("Progressive Wallet");}else if(op=="shared"){foreground=false;'''+prefix+r'''_GrantSharedItem(c.at("name").get<std::string>().c_str());}else if(op=="sync")ApplyWalletSnapshot(c.at("state"));else if(op=="reload"){auto saved=gSaveContext;gSaveContext={};gSaveContext=saved;}else assert(op=="state");std::cout<<json({{"state",State()}}).dump()<<std::endl;}}
 '''
 
 def exercise(build):
@@ -216,7 +232,7 @@ def exercise(build):
   proc=procs[game];proc.stdin.write(json.dumps(command)+'\n');proc.stdin.flush()
   while True:
    line=proc.stdout.readline()
-   assert line,game+' native component exited; see '+str(build/(game+'-stderr.log'))
+   assert line,game+' native component exited: '+(build/(game+'-stderr.log')).read_text()
    message=json.loads(line)
    if 'peer' in message:
     request('mm' if game=='soh' else 'soh',{'op':'shared','name':message['peer']},depth+1)
@@ -248,6 +264,25 @@ def exercise(build):
        assert state['level']==2 and state['capacity']==500 and state['hasWallet'],(order,routes,mask,exchange,final)
        assert state['obtained']==state['applied']==0,(game,'wallet tier double-recorded as progressive FC count',state)
       results.append({'order':order,'routes':routes,'syncMask':mask,'handoffOrder':exchange,'trace':trace,'final':final})
+  for source, target in (('soh','mm'), ('mm','soh')):
+   for tycoon in (False, True):
+    previous_tier = 3 if tycoon else 2
+    for game in procs:
+     request(game,{'op':'reset'})
+     request(game,{'op':'zfg','tycoon':tycoon})
+     request(game,{'op':'sync','state':{'upgrades':{'wallet':previous_tier}}})
+     state = request(game,{'op':'shared','name':'Progressive Wallet'})
+     assert state['tier']==previous_tier and state['capacity']<9999,(game,'relative relays must not award ZFG',state)
+    state = request(source,{'op':'cross'})
+    assert state['tier']==4 and state['level']==previous_tier and state['capacity']==9999,state
+    assert request(target,{'op':'state'})['tier']==previous_tier,'independent ownership must survive a foreign receipt'
+    peer = request(target,{'op':'raise','tier':state['tier']})
+    assert peer['tier']==4 and peer['level']==previous_tier and peer['capacity']==9999,peer
+    assert request(target,{'op':'raise','tier':4})==peer,'an already mirrored tier must not be granted twice'
+    for game in procs:
+     restored = request(game,{'op':'reload'})
+     assert restored['tier']==4 and restored['capacity']==9999 and restored['obtained']==restored['applied']==0,restored
+  print('PASS ZFG foreign and absolute shared grants in both directions, duplicate suppression, and save reload')
   output={'result':'PASS','fixtureSha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'nativeHostSaves':'real OoT/MM SaveContext and native item/flag/upgrade layouts','scenarioCount':len(results),'explicitChildFlagFinalVariants':sorted({r['final']['mm']['childFlag'] for r in results}),'scope':'actual source-component grant/dispatch/conversion/relay/wallet-snapshot paths; renderer, notification, transport scheduling and persistence I/O are controlled; not gameplay or graph substitution','scenarios':results}
   ((build.parent if ARGS.output else build)/'result.json').write_text(json.dumps(output,indent=2)+'\n')
   print('PASS actual native-wallet source components:',len(results),'receipt/order/physical-delivery/switch schedules; MM final native base/Adult/Giant capacity500; FC counters stable; save reloads')

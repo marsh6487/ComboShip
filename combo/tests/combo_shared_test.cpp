@@ -194,6 +194,39 @@ static CombinedFillResult fill(json o, json m, uint32_t mask, const std::string&
     return CrossWorldCombinedFill(o.dump(), m.dump(), 42, oot, mm, nullptr, forced, OotAccess::ALL_REACHABLE, {},
                                   GAME_OOT, pairs, mask);
 }
+
+static void zfgWalletPool() {
+    constexpr auto wallet = "Progressive Wallet";
+    constexpr auto shared = 1u << SF_WALLET;
+    for (bool tycoon : { false, true }) {
+        for (bool enabled : { false, true }) {
+            const int copies = 2 + tycoon + enabled;
+            json o = emptyDump(), m = emptyDump();
+            o["zfgWallet"] = enabled;
+            add(o, wallet, copies);
+            add(m, wallet, copies);
+            add(o, "Junk", 1, false);
+            add(m, "Junk", 1, false);
+            auto result = fill(o, m, shared, "");
+            check(result.success && countPlaced(result, GAME_OOT, wallet) == copies &&
+                      countPlaced(result, GAME_MM, wallet) == 0,
+                  "Shared Wallets retains one native chain including the optional ZFG upgrade");
+            result = fill(o, m, 0, "");
+            check(result.success && countPlaced(result, GAME_OOT, wallet) == copies &&
+                      countPlaced(result, GAME_MM, wallet) == copies,
+                  "independent wallet pools retain the optional copy in each game");
+        }
+    }
+    auto source = emptyDump();
+    source["zfgWallet"] = true;
+    const std::vector<std::string> pickups = { wallet, wallet, wallet, wallet };
+    std::vector<std::string> ootOwned, mmOwned;
+    SharedOwnedViews(BuildSharedItemGroups({}, shared, source.dump()), pickups, {}, ootOwned, mmOwned);
+    check(mmOwned.size() == 4, "enabled ZFG upgrade reaches the MM oracle view");
+    SharedOwnedViews(BuildSharedItemGroups({}, shared), pickups, {}, ootOwned, mmOwned);
+    check(mmOwned.size() == 3, "older wallet pools retain their former oracle cap");
+}
+
 static void fillAndCredit() {
     auto pairs = pairsJson({ { "Progressive Bow", "Progressive Bow" }, { "Progressive Bow", "Progressive Bow" } });
     json o = emptyDump(), m = emptyDump();
@@ -350,6 +383,7 @@ int main() {
     parsedNamesAndDisplay();
 #ifndef COMBO_SHARED_BASELINE
     fillAndCredit();
+    zfgWalletPool();
     confinedSharedSources();
     ganondorfHint();
 #endif

@@ -183,7 +183,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     }
     if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
                           raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI &&
-                          raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
+                          raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR && raw.drawKind != CW_DRAW_KIND_ZFG_WALLET)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -217,7 +217,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
 
     if (raw.drawKind == CW_DRAW_KIND_MM_KEY_RING && !CwValidMmKeyRingRecipe(&raw))
         return ComboForeignResolveOOT::Unknown;
-    if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
+    if ((raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR || raw.drawKind == CW_DRAW_KIND_ZFG_WALLET) &&
+        (raw.dlistCount != 0 || raw.opCount != 0))
         return ComboForeignResolveOOT::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
     int32_t n = raw.dlistCount < CW_DRAW_MAX_DLISTS ? raw.dlistCount : CW_DRAW_MAX_DLISTS;
@@ -1535,6 +1536,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             break;
         case CW_DRAW_KIND_DOUBLE_DEFENSE:
             MM_DrawForeignDoubleDefense(info);
+            break;
+        case CW_DRAW_KIND_ZFG_WALLET:
+            MM_DrawZfgWalletModel(gPlayState);
             break;
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             MM_DrawForeignNativeEquipment(info);

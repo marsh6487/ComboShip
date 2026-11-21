@@ -22,6 +22,10 @@
 
 namespace Rando {
 
+inline constexpr bool IsStartingRewardCheck(RandoCheckId check) {
+    return check == RC_STARTING_ITEM_DEKU_MASK || check == RC_STARTING_ITEM_SONG_OF_HEALING;
+}
+
 // Scoped native inventory probes must not emit real acquisition side effects.
 extern thread_local bool gItemGrantSimulation;
 

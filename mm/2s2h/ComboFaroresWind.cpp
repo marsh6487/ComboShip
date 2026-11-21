@@ -79,6 +79,12 @@ extern "C" void ComboFw_PublishPoint(void) {
     PublishNativePoint(true);
 }
 
+extern "C" int ComboFw_ReadSavedPointForDisplay(ComboFwPoint* point) {
+    if (!Combo_IsCombinedGame() || !sFwCallbacks.read || !point || gSaveContext.fileNum < 0 || gSaveContext.fileNum > 2)
+        return -1;
+    return sFwCallbacks.read(gSaveContext.fileNum, point);
+}
+
 static int ReadPoint(ComboFwPoint* p) {
     if (!sFwCallbacks.read)
         return -1;

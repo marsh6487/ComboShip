@@ -1,37 +1,63 @@
-/**
- * oot_spells_messages.cpp — C bridge for the OoT spell textboxes (Skijer's NEI).
- *
- * Farore's Wind menu: OoT opens message 0x3B ("You cast Farore's Wind!" — a THREE-choice box:
- * Return to the Warp Point / Dispel the Warp Point / Exit; verbatim from the OoT decomp
- * text/message_data.h:1797). MM's message table has no such text, so it's re-created through
- * 2ship's CustomMessage system with MM's native three-choice control code (0xC3). The C side
- * (item_oot_spells.c Player_Action_OotFwMenu) reads play->msgCtx.choiceIndex:
- * 0 = Return, 1 = Dispel, 2 = Exit (no effect).
- *
- * Compiled standalone via the mods/*.cpp CMake glob.
- */
-
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/ShipUtils.h"
+#include "global.h"
+#include "mods/nei_save.h"
+#include "gameplay/FaroresWindLocation.h"
+#include <utility>
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#include "entrances/BlackMarketEntrance.h"
+#endif
 
 extern "C" {
-#include "variables.h"
-
-void OotSpells_OpenFwTextbox(void) {
-    CustomMessage::Entry entry;
-
-    entry.textboxType = 0; // standard box
-    // OoT message 0x003B — VERBATIM from the OoT decomp (gc-eu-mq-dbg text/message_data.h:1797):
-    //   "You cast Farore's Wind!\n" THREE_CHOICE
-    //       COLOR(ADJUSTABLE) "Return to the Warp Point\n" "Dispel the Warp Point\n" "Exit" COLOR(DEFAULT)
-    // It IS a three-choice box. The handler Player_Action_8085063C reads choiceIndex 0 (return to the
-    // warp point) and 1 (dispel); choiceIndex 2 (Exit) falls through and just closes with no effect —
-    // Player_Action_OotFwMenu mirrors this exactly.
-    //
-    // Control codes as OCTAL escapes — a \x?? hex escape greedily eats following hex-digit letters
-    // (\x11Dispel -> \x11D = 0x11D), so octal (fixed 3 digits) is required:
-    //   \002 = 0x02, \021 = 0x11 (newline), \303 = 0xC3 (CTRL_THREE_CHOICE).
-    CustomMessage::StartTextbox(
-        "You cast Farore's Wind!\002\021\303Return to the Warp Point\021Dispel the Warp Point\021Exit", entry);
+extern s32 gSceneEntranceTableCount;
+extern SceneEntranceTableEntry sSceneEntranceTable[];
 }
 
-} // extern "C"
+namespace {
+const char* GetLocationName(int32_t entrance) {
+    if (entrance < 0 || entrance > UINT16_MAX)
+        return nullptr;
+    const int entranceScene = entrance >> 9;
+    const int spawn = (entrance >> 4) & 0x1F;
+    if (entranceScene >= gSceneEntranceTableCount)
+        return nullptr;
+    const auto& sceneTable = sSceneEntranceTable[entranceScene];
+    if (!sceneTable.table || spawn >= sceneTable.tableCount || !sceneTable.table[spawn])
+        return nullptr;
+
+    // Use the ordinary scene entry. Layer-specific arrays can be shorter than
+    // the four-bit cutscene selector and share the same destination name.
+    const int scene = ABS_ALT(sceneTable.table[spawn][0].sceneId);
+#ifdef COMBO_BUILD
+    if (scene == COMBO_BLACK_MARKET_SCENE)
+        return "Skiejer's Black Market";
+#endif
+    return Ship_GetSceneName(scene);
+}
+} // namespace
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT const char* MM_GetFwLocationName(int32_t entrance) {
+    return GetLocationName(entrance);
+}
+#endif
+
+extern "C" void OotSpells_OpenFwTextbox(void) {
+    const auto* fw = Nei_Save();
+    const std::string heading = FaroresWind::Heading(1, fw->fwSet ? fw->fwEntrance : -1,
+                                                     "Return point: ", GetLocationName, [](const std::string& text) {
+                                                         float width = 0.0f;
+                                                         for (unsigned char character : text)
+                                                             width += Ship_GetCharFontWidthNES(character);
+                                                         return width <= 300.0f;
+                                                     });
+
+    CustomMessage::Entry entry;
+    entry.autoFormat = false;
+    // MM's four-row textbox needs one heading and three choice rows. Encode
+    // the existing return/dispel/exit choices without wrapping those rows.
+    std::string body = heading.empty() ? "You cast Farore's Wind!" : heading;
+    body += "\002\021\303Return to the Warp Point\021Dispel the Warp Point\021Exit\277";
+    CustomMessage::StartTextbox(std::move(body), entry);
+}

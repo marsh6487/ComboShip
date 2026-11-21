@@ -10,6 +10,7 @@
 #include "global.h"
 #include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "audio/TwilightPrincessTargeting.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
@@ -5596,6 +5597,10 @@ void Player_UpdateZTargeting(Player* this, PlayState* play) {
                     if (!(this->stateFlags1 & (PLAYER_STATE1_PARALLEL | PLAYER_STATE1_LOCK_ON_FORCED_TO_RELEASE)) &&
                         (Player_Action_95 != this->actionFunc)) {
                         Player_SetParallel(this);
+                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL &&
+                            ResourceMgr_FileExists(TP_TARGET_CAMERA_CUE)) {
+                            Audio_PlaySfx(NA_SE_SY_LOCK_ON_HUMAN);
+                        }
                     }
                 }
             }

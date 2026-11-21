@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import struct
+import sys
 import tempfile
 import zipfile
 import zlib
@@ -143,9 +144,13 @@ def _write_merged(archive, temporary, additions):
             output.write(original.comment)
 
 
-def merge(archive, root, game):
+def merge(archive, root, game, extra_resources=None):
     archive, root = Path(archive), Path(root)
     additions = resources(root, game)
+    if extra_resources:
+        if additions.keys() & extra_resources.keys():
+            raise ValueError('Duplicate authored resource names')
+        additions.update(extra_resources)
     before_hash = hashlib.sha256(archive.read_bytes()).digest()
     with zipfile.ZipFile(archive) as source:
         entries = source.infolist()
@@ -187,5 +192,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', type=Path)
     parser.add_argument('--game', choices=('soh', '2ship'), required=True)
+    parser.add_argument('--with-zfg-wallet', action='store_true', help='Include the classic ZFG wallet materials')
     args = parser.parse_args()
-    print(f'Added {merge(args.archive, ROOT, args.game)} native partner resources to {args.archive}')
+    extra_resources = None
+    if args.with_zfg_wallet:
+        sys.path.insert(0, str(ROOT / 'tools/zfg_wallet'))
+        from texture_classic_wallet import resources as wallet_resources, verify as verify_wallet
+        extra_resources = wallet_resources()
+        verify_wallet(extra_resources)
+    print(f'Added {merge(args.archive, ROOT, args.game, extra_resources)} port resources to {args.archive}')

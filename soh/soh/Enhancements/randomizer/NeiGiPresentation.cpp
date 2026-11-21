@@ -3,6 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
+#include "WalletGi.h"
 #include "ComboIkanaShieldResources.h"
 #include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
@@ -1177,7 +1178,39 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
     return true;
 }
 
+extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* outXluStart, f32* outScale,
+                                         s32* outDrawKind, uint8_t* outColors);
+
+static bool NeiGi_DescribeWallet(const GetItemEntry* entry, CwItemDrawInfo* out) {
+    if (!entry || !out || entry->drawFunc != Randomizer_DrawWallet)
+        return false;
+    const int tier = OotWalletGi_Tier(entry);
+    if (tier < 0)
+        return false;
+
+    if (tier == CW_WALLET_ZFG) {
+        CwDescribeZfgWallet(out);
+    } else {
+        // Preserve the native purse display list order and all its materials.
+        if (entry->gid != GID_WALLET_ADULT && entry->gid != GID_WALLET_GIANT)
+            return false;
+        void* lists[CW_DRAW_MAX_DLISTS] = {};
+        const int32_t count = GetItem_GetDrawTableEntry(entry->gid, lists, CW_DRAW_MAX_DLISTS, &out->xluStartIndex,
+                                                        &out->scale, &out->drawKind, nullptr);
+        if (count <= 0)
+            return false;
+        out->dlistCount = count;
+        for (int32_t i = 0; i < count; ++i)
+            out->dlists[i] = static_cast<const char*>(lists[i]);
+    }
+    out->itemShimmer = OotWalletGi_Shimmer(tier, out->itemShimmerColor);
+    out->stateDependent = 2; // Re-evaluate the local Item Effects toggle for concrete receipts.
+    return true;
+}
+
 extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out) {
+    if (NeiGi_DescribeWallet(entry, out))
+        return 1;
     if (const int song = SongForEntry(entry); song >= 0) {
         if (!out)
             return 0;

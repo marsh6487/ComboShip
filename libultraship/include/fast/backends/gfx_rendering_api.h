@@ -136,6 +136,13 @@ class GfxRenderingAPI {
     virtual ImTextureID GetTextureById(int id) = 0;
     virtual void SetCurrentPrimDepth(float depth) = 0;
 
+    void SetCurrentModelOpacity(float opacity) {
+        if (mCurrentModelOpacity != opacity) {
+            mCurrentModelOpacity = opacity;
+            mModelOpacityDirty = true;
+        }
+    }
+
     // SOH [Enhancement] Toon lighting: the interpreter pushes the per-object dominant light here
     // before each batch; backends read the mToon* members in their per-draw uniform paths.
     virtual void SetToonLighting(const float dir[3], const float color[3], const float ambient[3]) {
@@ -188,5 +195,7 @@ class GfxRenderingAPI {
     bool mSrgbMode = false;
     float mCurrentPrimDepth = 0.0f;
     bool mPrimDepthDirty = true;
+    float mCurrentModelOpacity = 1.0f;
+    bool mModelOpacityDirty = false;
 };
 } // namespace Fast

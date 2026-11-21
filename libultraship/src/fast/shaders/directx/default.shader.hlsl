@@ -119,10 +119,15 @@ float4 tex2D3PointFilter(in Texture2D tex, in SamplerState tSampler, in float2 t
 }
 @end
 
-@if(o_prim_depth)
+@if(o_prim_depth || o_model_opacity)
 cbuffer PerPrimDepthCB : register(b2) {
     float prim_depth;
-    float3 _pad; // pad to 16-byte cbuffer alignment
+    @if(o_model_opacity)
+        float model_opacity;
+        float2 _pad;
+    @else
+        float3 _pad; // pad to 16-byte cbuffer alignment
+    @end
 }
 @end
 
@@ -381,16 +386,27 @@ PSOutput PSMain(PSInput input, float4 screenSpace : SV_Position) {
 
     PSOutput output;
     @if(o_alpha)
+        @if(o_model_opacity)
+            texel.a *= model_opacity;
+        @end
         @if(srgb_mode)
             output.color = fromLinear(texel);
         @else
             output.color = texel;
         @end
     @else
-        @if(srgb_mode)
-            output.color = fromLinear(float4(texel, 1.0));
+        @if(o_model_opacity)
+            @if(srgb_mode)
+                output.color = fromLinear(float4(texel, model_opacity));
+            @else
+                output.color = float4(texel, model_opacity);
+            @end
         @else
-            output.color = float4(texel, 1.0);
+            @if(srgb_mode)
+                output.color = fromLinear(float4(texel, 1.0));
+            @else
+                output.color = float4(texel, 1.0);
+            @end
         @end
     @end
     @if(o_prim_depth)

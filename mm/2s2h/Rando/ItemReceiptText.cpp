@@ -1162,6 +1162,10 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (id == RI_WALLET_ZFG) {
+        SetReceiptBody(entry, "You found %gZFG's Wallet%w!\nIt holds up to %y9,999 Rupees%w.");
+        return true;
+    }
     if (id == RI_OOT_NEI_RITO_MASK) {
         SetReceiptBody(entry, "You found the %gRito Mask%w!\nWear it to take to the skies.");
         return true;

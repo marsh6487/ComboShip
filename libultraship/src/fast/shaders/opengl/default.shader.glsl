@@ -107,6 +107,7 @@
         @end
     @end
 
+    @if(o_model_opacity) uniform float model_opacity;
     @if(o_fog) @{attr} vec4 vFog;
     @if(o_grayscale) @{attr} vec4 vGrayscaleColor;
     @if(o_toon) @{attr} vec3 vNormal;
@@ -316,9 +317,16 @@
             @if(o_invisible)
                 texel.a = 0.0;
             @end
+            @if(o_model_opacity)
+                texel.a *= model_opacity;
+            @end
             @{vOutColor} = texel;
         @else
-            @{vOutColor} = vec4(texel, 1.0);
+            @if(o_model_opacity)
+                @{vOutColor} = vec4(texel, model_opacity);
+            @else
+                @{vOutColor} = vec4(texel, 1.0);
+            @end
         @end
 
         @if(srgb_mode)

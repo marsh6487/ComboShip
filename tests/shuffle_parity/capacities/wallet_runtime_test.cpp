@@ -8,6 +8,7 @@ extern "C" {
 #include "functions.h"
 SaveContext gSaveContext{};
 PlayState* gPlayState;
+int NativeWalletFourDigits(void);
 }
 #include "wallet_flush.inc"
 namespace Rando::Logic { uint64_t gCurrentRegionTime; }
@@ -84,4 +85,34 @@ int main() {
     RANDO_SAVE_OPTIONS[RO_SHUFFLE_CHILD_WALLET] = 0;
     REQUIRE(CUR_CAPACITY(UPG_WALLET) == 99);
     std::puts("PASS native missing/child/adult wallet affordability, rupee grants and dormant save flush");
+
+    for (bool tycoon : {false, true}) {
+        gSaveContext = {};
+        gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_CHILD_WALLET] = 1;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_TYCOON_WALLET] = tycoon;
+        RANDO_SAVE_OPTIONS[RO_SHUFFLE_ZFG_WALLET] = 1;
+        auto& balance = gSaveContext.save.saveInfo.playerData.rupees;
+        auto& upgrades = gSaveContext.save.saveInfo.inventory.upgrades;
+        upgrades = 1u << gUpgradeShifts[UPG_BULLET_BAG];
+        REQUIRE(Rando::Wallets::Give(RI_WALLET_ZFG));
+        REQUIRE(RandoCapacity_HasZfgWallet());
+        REQUIRE(CUR_UPG_VALUE(UPG_BULLET_BAG) == 1);
+        REQUIRE(CUR_UPG_VALUE(UPG_WALLET) == (tycoon ? 3 : 2));
+        REQUIRE(CUR_CAPACITY(UPG_WALLET) == 9999);
+        REQUIRE(NativeWalletFourDigits());
+        Combo_MM_FlushAccumulators();
+        REQUIRE(balance == 9999);
+        Rupees_ChangeBy(-125);
+        Combo_MM_FlushAccumulators();
+        REQUIRE(balance == 9874);
+        REQUIRE(Rando::Wallets::Give(RI_WALLET_ZFG));
+        REQUIRE(gSaveContext.rupeeAccumulator == 0);
+        REQUIRE(Rando::Wallets::NextProgressiveItem() == RI_JUNK);
+        REQUIRE(Rando::Wallets::Remove(RI_WALLET_ZFG));
+        REQUIRE(!RandoCapacity_HasZfgWallet());
+        REQUIRE(balance == CUR_CAPACITY(UPG_WALLET));
+        REQUIRE(Rando::Wallets::NextProgressiveItem() == RI_WALLET_ZFG);
+    }
+    std::puts("PASS ZFG wallet direct grant, native-tier floor, four-digit HUD, spend, deduplication and removal");
 }

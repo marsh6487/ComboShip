@@ -637,7 +637,7 @@ struct ShaderProgram* GfxRenderingAPIDX11::CreateAndLoadNewShader(uint64_t shade
     D3D11_BLEND_DESC blend_desc;
     ZeroMemory(&blend_desc, sizeof(D3D11_BLEND_DESC));
 
-    if (cc_features.opt_alpha) {
+    if (cc_features.opt_alpha || cc_features.opt_model_opacity) {
         blend_desc.RenderTarget[0].BlendEnable = true;
         blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
         blend_desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
@@ -998,15 +998,17 @@ void GfxRenderingAPIDX11::DrawTrianglesInternal(float buf_vbo[], size_t buf_vbo_
         mContext->Unmap(mPerDrawCb.Get(), 0);
     }
 
-    // G_ZS_PRIM: upload prim_depth cbuffer when it changed
-    if (mPrimDepthDirty) {
+    // Upload the shared per-draw scalar constants when either changes.
+    if (mPrimDepthDirty || mModelOpacityDirty) {
         mPerPrimDepthCbData.prim_depth = mCurrentPrimDepth;
+        mPerPrimDepthCbData.model_opacity = mCurrentModelOpacity;
         D3D11_MAPPED_SUBRESOURCE ms;
         ZeroMemory(&ms, sizeof(D3D11_MAPPED_SUBRESOURCE));
         mContext->Map(mPerPrimDepthCb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
         memcpy(ms.pData, &mPerPrimDepthCbData, sizeof(PerPrimDepthCB));
         mContext->Unmap(mPerPrimDepthCb.Get(), 0);
         mPrimDepthDirty = false;
+        mModelOpacityDirty = false;
     }
 
     // SOH [Enhancement] Toon lighting: per-object dominant light + ramp shape into the dedicated toon
@@ -1682,6 +1684,7 @@ std::string gfx_direct3d_common_build_shader(size_t& numFloats, const CCFeatures
         { "o_grayscale", cc_features.opt_grayscale },
         { "o_prim_depth", cc_features.opt_prim_depth },
         { "o_toon", cc_features.opt_toon },
+        { "o_model_opacity", cc_features.opt_model_opacity },
         { "o_textures", M_ARRAY(cc_features.usedTextures, bool, 2) },
         { "o_masks", M_ARRAY(cc_features.used_masks, bool, 2) },
         { "o_blend", M_ARRAY(cc_features.used_blend, bool, 2) },

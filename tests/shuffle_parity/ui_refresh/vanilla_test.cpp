@@ -33,6 +33,7 @@ void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>&, std::vector<R
 static constexpr RandoOptionId newOptions[] = {
     RO_SHUFFLE_NPC_SOULS, RO_SHUFFLE_ANIMAL_SOULS, RO_SHUFFLE_MISC_SOULS,
     RO_SHUFFLE_DEKU_STICK_BAG, RO_SHUFFLE_DEKU_NUT_BAG, RO_SHUFFLE_CHILD_WALLET,
+    RO_SHUFFLE_ZFG_WALLET,
     RO_INFINITE_UPGRADES, RO_SHUFFLE_RUSTY_KEYS, RO_SHUFFLE_KEY_RINGS, RO_SHUFFLE_SONG_EVENTS,
     RO_SHUFFLE_ICICLE_DROPS, RO_SHUFFLE_ROCK_DROPS, RO_SHUFFLE_BOULDER_DROPS,
     RO_SHUFFLE_RED_BOULDER_DROPS, RO_SHUFFLE_SOIL_DROPS, RO_SHUFFLE_LOTTERY_NIGHTS,
@@ -68,8 +69,10 @@ int main() {
         REQUIRE(IncompatibleWithLogicSetting(option));
     }
     ClearIncompatibleSetting();
-    for(auto option:Rando::VanillaCompatibility::UnsupportedOptions)
-        REQUIRE(CVarGetInteger(Rando::StaticData::Options[option].cvar,0)==0);
+    for(auto option:Rando::VanillaCompatibility::UnsupportedOptions) {
+        const bool retainSharedPreference = option == RO_SHUFFLE_ZFG_WALLET && Combo_IsCombinedGame();
+        REQUIRE(CVarGetInteger(Rando::StaticData::Options[option].cvar,0)==retainSharedPreference);
+    }
     Configure(RO_LOGIC_GLITCHLESS,true);
     for(auto option:newOptions) REQUIRE(!IncompatibleWithLogicSetting(option));
     ClearIncompatibleSetting();

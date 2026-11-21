@@ -605,10 +605,15 @@ ItemTrackerNumbers GetItemCurrentAndMax(ItemTrackerItem item) {
             case ITEM_WALLET_GIANT:
                 result.currentCapacity =
                     IS_RANDO && !Flags_GetRandomizerInf(RAND_INF_HAS_WALLET) ? 0 : CUR_CAPACITY(UPG_WALLET);
-                result.maxCapacity =
-                    IS_RANDO && OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_INCLUDE_TYCOON_WALLET)
-                        ? 999
-                        : 500;
+                if (OotWallet_HasZfg() ||
+                    (IS_RANDO && OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_INCLUDE_ZFG_WALLET))) {
+                    result.maxCapacity = OOT_ZFG_WALLET_CAPACITY;
+                } else {
+                    result.maxCapacity =
+                        IS_RANDO && OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_INCLUDE_TYCOON_WALLET)
+                            ? 999
+                            : 500;
+                }
                 result.currentAmmo = gSaveContext.rupees;
                 break;
             case ITEM_BOMBCHU: {

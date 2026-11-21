@@ -97,8 +97,13 @@ int bombchu = -1, ammo = 0;
 #define INV_CONTENT(x) bombchu
 #define AMMO(x) ammo
 #define CUR_CAPACITY(x) 20
-struct GetItemEntry { RandomizerGet id; bool blueRupee = false; };
-constexpr int CAN_OBTAIN = 0, CANNOT_OBTAIN = 1, MOD_NONE = 0, GI_RUPEE_BLUE = 7;
+constexpr int CAN_OBTAIN = 0, CANNOT_OBTAIN = 1, MOD_NONE = 0, MOD_RANDOMIZER = 1, GI_RUPEE_BLUE = 7;
+struct GetItemEntry {
+    RandomizerGet id;
+    bool blueRupee = false;
+    int modIndex = blueRupee ? MOD_NONE : MOD_RANDOMIZER;
+    RandomizerGet getItemId = id;
+};
 struct RandomizerBoundary {
     int GetItemObtainabilityFromRandomizerGet(RandomizerGet) const {
         return obtainable ? CAN_OBTAIN : CANNOT_OBTAIN;

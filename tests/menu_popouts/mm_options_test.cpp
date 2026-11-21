@@ -1,4 +1,5 @@
 #include "2s2h/BenGui/MenuTypes.h"
+#include "combo/ComboGameMode.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -21,7 +22,7 @@ static void Check(bool condition, const char* message) {
 static WidgetInfo sWidget;
 static unsigned sRegistrations;
 static WidgetInfo& AddWidget(WidgetPath& path, const char* name, WidgetType type) {
-    Check(path.sectionName == "Enhancements", "registration keeps its menu section");
+    Check(path.sectionName == "Enhancements" || path.sectionName == "Rando", "registration keeps its menu section");
     Check(type == WIDGET_WINDOW_BUTTON, "registration creates a window button");
     sWidget = WidgetInfo{};
     sWidget.name = name;
@@ -34,6 +35,29 @@ static void RegisterPopout() {
     WidgetPath path{ "Enhancements", "Graphics", SECTION_COLUMN_1 };
     /* PRODUCTION_POPOUT_REGISTRATION */
 }
+
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+
+struct MenuRegistry {
+    WidgetInfo& AddWidget(WidgetPath& path, const char* name, WidgetType type) {
+        return ::AddWidget(path, name, type);
+    }
+};
+
+static void CheckEntrancePopout(int mode, const char* cvar) {
+    gComboGameMode = mode;
+    MenuRegistry registry;
+    auto* mBenMenu = &registry;
+    WidgetPath path{ "Rando", "Entrance Tracker", SECTION_COLUMN_1 };
+    /* PRODUCTION_ENTRANCE_POPOUT_REGISTRATION */
+    Check(sWidget.cVar && std::strcmp(sWidget.cVar, cvar) == 0, "entrance tracker uses the active mode's CVar");
+    Check(sWidget.windowName && std::strcmp(sWidget.windowName, "Entrance Tracker") == 0,
+          "entrance tracker button routes to the registered window");
+    auto options = std::static_pointer_cast<WindowButtonOptions>(sWidget.options);
+    Check(options && options->showButton && !options->embedWindow, "entrance tracker opens as a popout");
+}
+#endif
 
 int main() {
     // Menu export initializes MM while OoT may be active; construction must not
@@ -58,5 +82,14 @@ int main() {
         Check(!options->embedWindow, "the compact popout does not embed its window contents");
         Check(options->tooltip && options->tooltip[0] != '\0', "the button retains a tooltip");
     }
+#ifdef COMBO_BUILD
+    try {
+        CheckEntrancePopout(COMBO_GAME_BOTH, "gOpenWindows.EntranceTracker");
+        CheckEntrancePopout(COMBO_GAME_MM, "gWindows.EntranceTracker");
+    } catch (const std::bad_variant_access& error) {
+        std::fprintf(stderr, "FAIL MM entrance tracker popout: native registration threw %s\n", error.what());
+        return EXIT_FAILURE;
+    }
+#endif
     std::puts("PASS native MM popout registration, typed options and window routing without game/UI initialization");
 }

@@ -176,6 +176,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             InfiniteUpgrades::Give(randoItemId);
             break;
         case RI_WALLET_CHILD:
+        case RI_WALLET_ZFG:
             Wallets::Give(randoItemId);
             break;
         case RI_DEKU_STICK_BAG:

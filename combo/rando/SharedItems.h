@@ -35,6 +35,10 @@ enum SharedFamily {
 
 static_assert(SF_COUNT == 17, "Shared soul bits must not alias scalar tier families");
 
+// Wallet state 4 is exchanged by the shared-tier bridge only. The engine's
+// packed UPG_WALLET stays within 0..3 and ownership is saved separately.
+inline constexpr int kZfgWalletTier = 4;
+
 struct SharedFamilyDef {
     SharedFamily family;
     const char* key;     // spoiler/CLI key

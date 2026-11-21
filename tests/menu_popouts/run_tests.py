@@ -15,15 +15,14 @@ sys.path.insert(0, str(ROOT / "tests/nei_held"))
 from run_articulated_tests import flags as soh_flags
 
 
-def registration(source_path, cvar):
+def registration(source_path, route):
     source = (ROOT / source_path).read_text()
-    route = f'.CVar("{cvar}")'
     if source.count(route) != 1:
-        raise AssertionError(f"expected one native popout registration for {cvar}")
+        raise AssertionError(f"expected one native popout registration for {route}")
     anchor = source.index(route)
     builder = source.rfind("AddWidget(", 0, anchor)
     if builder < 0:
-        raise AssertionError(f"missing native popout builder for {cvar}")
+        raise AssertionError(f"missing native popout builder for {route}")
     start = source.rfind("\n", 0, builder) + 1
     end = source.index(";\n", anchor) + 1
     return source[start:end]
@@ -35,15 +34,17 @@ def main():
     args = parser.parse_args()
     mm_fixture = Path(__file__).with_name("mm_options_test.cpp").read_text()
     mm_fixture = mm_fixture.replace("/* PRODUCTION_POPOUT_REGISTRATION */", registration(
-        "mm/2s2h/BenGui/BenMenu.cpp", "gWindows.SpinAttackMM"))
+        "mm/2s2h/BenGui/BenMenu.cpp", '.CVar("gWindows.SpinAttackMM")'))
+    mm_fixture = mm_fixture.replace("/* PRODUCTION_ENTRANCE_POPOUT_REGISTRATION */", registration(
+        "mm/2s2h/Rando/Menu.cpp", '.WindowName("Entrance Tracker")'))
     # SaveEditor.h initializes readable labels through this native helper.
     mm_fixture = mm_fixture.replace("/* PRODUCTION_ENUM_LABEL_HELPER */", function(
         (ROOT / "mm/2s2h/ShipUtils.cpp").read_text(), "convertEnumToReadableName"))
     soh_fixture = Path(__file__).with_name("soh_options_test.cpp").read_text()
     soh_fixture = soh_fixture.replace("/* SOH_PAK_POPOUT_REGISTRATION */", registration(
-        "soh/soh/SohGui/SohMenuNEI.cpp", "gOpenWindows.PakLoader"))
+        "soh/soh/SohGui/SohMenuNEI.cpp", '.CVar("gOpenWindows.PakLoader")'))
     soh_fixture = soh_fixture.replace("/* SOH_SPIN_POPOUT_REGISTRATION */", registration(
-        "soh/soh/SohGui/SohMenuEnhancements.cpp", "gOpenWindows.SpinAttack"))
+        "soh/soh/SohGui/SohMenuEnhancements.cpp", '.CVar("gOpenWindows.SpinAttack")'))
     includes = [ROOT / path for path in (
         "mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets", "mm/mods",
         "libultraship/include", "combo", "combo/menu", "")]

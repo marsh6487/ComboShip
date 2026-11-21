@@ -21,6 +21,7 @@
 #include "soh/Enhancements/debugger/performanceTimer.h"
 #include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "soh/Enhancements/randomizer/SoulShuffle.h"
+#include "soh/Enhancements/randomizer/WalletProgression.h"
 #include "soh/Enhancements/randomizer/bean_patches.h"
 #include "soh/Enhancements/randomizer/dungeon.h"
 #include "soh/Enhancements/randomizer/entrance.h"
@@ -326,6 +327,45 @@ static void InventoryMatrix() {
   delete logic->mSaveContext;
   delete other->mSaveContext;
 }
+#ifdef OOT_ZFG_WALLET_FIXTURE
+static void WalletMatrix() {
+  auto logic = Fresh();
+  auto &ctx = *Rando::fixtureContext;
+  ctx.GetOption(RSK_INCLUDE_TYCOON_WALLET).Set(0);
+  ctx.GetOption(RSK_INCLUDE_ZFG_WALLET).Set(1);
+  ctx.GetOption(RSK_INFINITE_UPGRADES).Set(RO_INF_UPGRADES_PROGRESSIVE);
+  logic->SetRandoInf(RAND_INF_HAS_WALLET, true);
+  logic->SetUpgrade(UPG_BULLET_BAG, 2);
+
+  Effect(*logic, RG_PROGRESSIVE_WALLET);
+  Effect(*logic, RG_PROGRESSIVE_WALLET);
+  Check(logic->CurrentUpgrade(UPG_WALLET) == 2 && !logic->HasItem(RG_ZFG_WALLET),
+        "solver recognizes the pre-ZFG native Giant tier");
+  Effect(*logic, RG_PROGRESSIVE_WALLET);
+  Check(logic->HasItem(RG_ZFG_WALLET) && logic->CurrentUpgrade(UPG_WALLET) == 2,
+        "solver awards ZFG after Giant with Tycoon disabled");
+  Effect(*logic, RG_PROGRESSIVE_WALLET);
+  Effect(*logic, RG_PROGRESSIVE_WALLET);
+  Check(logic->CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY) &&
+            logic->CurrentUpgrade(UPG_BULLET_BAG) == 2,
+        "Infinite follows ZFG without touching the native bullet bag");
+
+  Effect(*logic, RG_PROGRESSIVE_WALLET, false);
+  Check(logic->CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY),
+        "removing a surplus copy leaves the wallet at its earned endpoint");
+  Effect(*logic, RG_PROGRESSIVE_WALLET, false);
+  Check(!logic->CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY) && logic->HasItem(RG_ZFG_WALLET),
+        "undoing Infinite leaves the finite bonus");
+  Effect(*logic, RG_PROGRESSIVE_WALLET, false);
+  Check(!logic->HasItem(RG_ZFG_WALLET) && logic->CurrentUpgrade(UPG_WALLET) == 2,
+        "undoing the finite bonus leaves the native Giant tier");
+  ctx.GetOption(RSK_INCLUDE_TYCOON_WALLET).Set(1);
+  Effect(*logic, RG_ZFG_WALLET);
+  Check(logic->CurrentUpgrade(UPG_WALLET) == 3 && logic->HasItem(RG_ZFG_WALLET),
+        "direct solver receipt establishes the configured Tycoon floor");
+  delete logic->mSaveContext;
+}
+#endif
 static void CombinedGuards();
 int main() {
   std::cout << std::unitbuf;
@@ -348,6 +388,9 @@ int main() {
   live.wandRodsOwned = 0xff;
   gSaveContext.inventory.questItems = 0x3f;
   InventoryMatrix();
+#ifdef OOT_ZFG_WALLET_FIXTURE
+  WalletMatrix();
+#endif
   CombinedGuards();
   std::cout << (failures ? "FAIL: " : "PASS: ")
             << "native solver inventory isolation (" << failures

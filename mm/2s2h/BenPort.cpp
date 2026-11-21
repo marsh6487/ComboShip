@@ -131,6 +131,7 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/Rando/CheckTracker/CheckTracker.h" // ComboShip: rebuild peek map on dormant load
 #include "2s2h/Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/SaveManager/SaveManager.h"
+#include "2s2h/Enhancements/Saving/SavingEnhancements.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/BenGui/Notification.h"
@@ -1833,12 +1834,15 @@ extern "C" void InitOTR(int argc, char* argv[]) {
             // Portal return always persists MM; a reset persists only when autosave is enabled. Never
             // persist outside gameplay: the title/attract path wipes save first (Sram_InitNewSave). An owl
             // save has already written itself through the flashrom seam.
-            if (!isOwlSaveQuit && (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) &&
-                gSaveContext.gameMode == GAMEMODE_NORMAL) {
-                if (isFwReturn)
-                    MM_CaptureFwDeparture();
-                Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
-                SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
+            if (!isOwlSaveQuit && gSaveContext.gameMode == GAMEMODE_NORMAL) {
+                if (isReset && CVarGetInteger("gEnhancements.Saving.RememberSaveLocation", 0)) {
+                    SavingEnhancements_AutosaveOnReset();
+                } else if (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) {
+                    if (isFwReturn)
+                        MM_CaptureFwDeparture();
+                    Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
+                    SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
+                }
             }
             if (gComboReturnCallback)
                 gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));
@@ -4546,6 +4550,7 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
             ComboRando::RitoMaskSettings::RestoreSnapshot(j);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
+        CVarSetInteger("gRandoSettings.IncludeZfgWallet", RO_GENERIC_OFF);
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
         CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL);
@@ -5699,7 +5704,7 @@ extern "C" COMBO_EXPORT int32_t MM_FinishStartupReceipt(CwStartupReceipt* receip
 
 // Save-direct grant by spoiler name. Bracketed as a receive so the give choke does not share it back
 // to OoT; the two exports below decide whether the item is then shared.
-static bool GrantMmItemByName(const char* itemName, RandoItemId* granted) {
+static bool GrantMmItemByName(const char* itemName, RandoItemId* granted, bool allowZfgWallet = true) {
     if (!itemName)
         return false;
     const auto& nameToId = Combo_MM_SpoilerNameToItemId();
@@ -5712,6 +5717,8 @@ static bool GrantMmItemByName(const char* itemName, RandoItemId* granted) {
     // ComboShip: convert like a native pickup does. MM's equipped shield value IS ownership, so an
     // already-owned item would otherwise downgrade it through vanilla Item_Give.
     RandoItemId rid = Rando::ConvertItem(placed);
+    if (rid == RI_WALLET_ZFG && !allowZfgWallet)
+        return false;
     if (rid != placed) {
         SPDLOG_INFO("[ComboShip] MM_GrantCrossItem: '{}' not obtainable (already have / no slot), converted {} -> {}",
                     itemName, (int)placed, (int)rid);
@@ -5776,7 +5783,8 @@ extern "C" COMBO_EXPORT void MM_GrantSharedItem(const char* itemName) {
         FleetShared_RequestPullFromPeer();
         return;
     }
-    GrantMmItemByName(itemName, nullptr);
+    // The Shared Wallets tier bridge mirrors concrete ZFG ownership.
+    GrantMmItemByName(itemName, nullptr, false);
 }
 
 extern "C" COMBO_EXPORT void MM_ApplySharedMagicFloor(int tier) {
@@ -5882,7 +5890,7 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
             return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
                                             gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired);
         case ComboRando::SF_WALLET:
-            return CUR_UPG_VALUE(UPG_WALLET);
+            return RandoCapacity_HasZfgWallet() ? ComboRando::kZfgWalletTier : CUR_UPG_VALUE(UPG_WALLET);
         case ComboRando::SF_HOOKSHOT:
             return INV_CONTENT(ITEM_HOOKSHOT) != ITEM_NONE ? 1 : 0;
         case ComboRando::SF_FIRE_ARROWS:
@@ -5926,7 +5934,8 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
     if (!IS_RANDO || family < 0 || family >= ComboRando::SF_COUNT)
         return;
     const auto& def = ComboRando::SharedFamilyByIndex(family);
-    tier = std::min(tier, def.mmTierCap);
+    const int tierCap = family == ComboRando::SF_WALLET ? ComboRando::kZfgWalletTier : def.mmTierCap;
+    tier = std::min(tier, tierCap);
     for (;;) {
         const int cur = MM_GetSharedTier(family);
         if (cur >= tier)
@@ -5955,7 +5964,7 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
                 base = RI_PROGRESSIVE_MAGIC;
                 break;
             case ComboRando::SF_WALLET:
-                base = RI_PROGRESSIVE_WALLET;
+                base = tier == ComboRando::kZfgWalletTier ? RI_WALLET_ZFG : RI_PROGRESSIVE_WALLET;
                 break;
             case ComboRando::SF_HOOKSHOT:
                 base = RI_HOOKSHOT;
@@ -5998,7 +6007,7 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
         }
         // Default check id (RC_UNKNOWN) is safe here: none of these families gate on hasObtainedCheck.
         RandoItemId rid = Rando::ConvertItem(base);
-        if (rid == RI_JUNK)
+        if (rid == RI_JUNK || (rid == RI_WALLET_ZFG && tier != ComboRando::kZfgWalletTier))
             return; // never substitutes junk — stop instead of granting the wrong thing
         {
             // A tier reconciliation must not echo a progressive NEI grant into the source game.

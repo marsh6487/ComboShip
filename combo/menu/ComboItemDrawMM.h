@@ -39,6 +39,7 @@
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Rando/DungeonItemVisuals.h"
 #include "2s2h/Rando/SpinAttackGi.h"
+#include "2s2h/Rando/WalletGi.h"
 #include "2s2h_assets.h"                                     // custom rando models (triforce, ocarina buttons, ...)
 #include "objects/gameplay_keep/gameplay_keep.h"             // stray-fairy skel/anim + soul flame DL
 #include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
@@ -1257,6 +1258,15 @@ static int32_t MM_FillCaneDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     return 1;
 }
 
+static bool MM_FillWalletShimmer(RandoItemId id, CwItemDrawInfo* out) {
+    if (!MM_WalletGi_ShimmerColor(id, out->itemShimmerColor))
+        return false;
+    out->itemShimmer =
+        CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) ? CW_ITEM_SHIMMER_TINTED : CW_ITEM_SHIMMER_NONE;
+    out->stateDependent = 2;
+    return true;
+}
+
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (id == RI_OOT_CLOCK)
         return NeiClockGi::Describe(out, NeiClockGi::OpaqueMM,
@@ -1297,6 +1307,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (it == Rando::StaticData::Items.end()) {
         return 0;
     }
+    if (id == RI_WALLET_ZFG) {
+        CwDescribeZfgWallet(out);
+        MM_FillWalletShimmer(id, out);
+        return 1;
+    }
     CwItemDrawInfo nei{};
     if (MM_FillElementalSpellDrawInfo(id, out))
         return 1;
@@ -1308,6 +1323,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     out->neiShimmer = nei.neiShimmer;
     out->itemShimmer = nei.itemShimmer;
+    const bool wallet = MM_FillWalletShimmer(id, out);
     if (nei.neiShimmer)
         out->stateDependent = 2;
     if (MM_FillCaneDrawInfo(id, out))
@@ -1423,9 +1439,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)it->second.drawId, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
-    if (nativeShimmer)
-        out->itemShimmer = nativeShimmer;
+    if (!wallet) {
+        const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
+        if (nativeShimmer)
+            out->itemShimmer = nativeShimmer;
+    }
     if (ComboCollectibleShimmer_ProfileForDrawId((s16)it->second.drawId) >= 0)
         out->stateDependent = 2; // Keep opt-in and owning-game color/rainbow live, including while disabled.
     if (it->second.drawId == GID_CHATEAU) {

@@ -34,17 +34,20 @@ static inline int RandoCapacity_HasBagForItem(int item) {
     return 1;
 }
 
-static inline int RandoCapacity_HasWallet(void) {
-    const RandoInf flag = RANDO_INF_WALLET_CHILD;
-    return gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
-           !gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] ||
-           CUR_UPG_VALUE(UPG_WALLET) > 0 ||
+static inline int RandoCapacity_HasFlag(RandoInf flag) {
+    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO &&
            (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
 }
 
-static inline int RandoCapacity_InfiniteFlag(RandoInf flag) {
-    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO &&
-           (gSaveContext.save.shipSaveInfo.rando.randoInf[flag / 16] & (1u << (flag % 16))) != 0;
+static inline int RandoCapacity_HasZfgWallet(void) {
+    return RandoCapacity_HasFlag(RANDO_INF_WALLET_ZFG);
+}
+
+static inline int RandoCapacity_HasWallet(void) {
+    return gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
+           !gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] ||
+           CUR_UPG_VALUE(UPG_WALLET) > 0 || RandoCapacity_HasFlag(RANDO_INF_WALLET_CHILD) ||
+           RandoCapacity_HasZfgWallet();
 }
 
 static inline int RandoCapacity_HasIndependentBombchuBag(void) {
@@ -87,17 +90,17 @@ static inline int RandoCapacity_InfiniteAmmo(int item) {
         default:
             return 0;
     }
-    return RandoCapacity_InfiniteFlag(flag) && RandoCapacity_HasBag(upgrade) && CUR_UPG_VALUE(upgrade) > 0 &&
+    return RandoCapacity_HasFlag(flag) && RandoCapacity_HasBag(upgrade) && CUR_UPG_VALUE(upgrade) > 0 &&
            INV_CONTENT(item) == item;
 }
 
 static inline int RandoCapacity_InfiniteMagic(void) {
-    return RandoCapacity_InfiniteFlag(RANDO_INF_INFINITE_MAGIC) &&
+    return RandoCapacity_HasFlag(RANDO_INF_INFINITE_MAGIC) &&
            gSaveContext.save.saveInfo.playerData.isMagicAcquired && gSaveContext.magicCapacity > 0;
 }
 
 static inline int RandoCapacity_InfiniteWallet(void) {
-    return RandoCapacity_InfiniteFlag(RANDO_INF_INFINITE_WALLET) && RandoCapacity_HasWallet();
+    return RandoCapacity_HasFlag(RANDO_INF_INFINITE_WALLET) && RandoCapacity_HasWallet();
 }
 
 static inline int RandoCapacity_CanSpendMagic(int amount) {
@@ -107,6 +110,8 @@ static inline int RandoCapacity_CanSpendMagic(int amount) {
 static inline int RandoCapacity_Current(int upgrade) {
     if (upgrade == UPG_WALLET && !RandoCapacity_HasWallet())
         return 0;
+    if (upgrade == UPG_WALLET && RandoCapacity_HasZfgWallet())
+        return 9999;
     if (upgrade == UPG_WALLET && RandoCapacity_InfiniteWallet()) {
         const int finite = gUpgradeCapacities[upgrade][CUR_UPG_VALUE(upgrade)];
         const int tycoon = gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET];

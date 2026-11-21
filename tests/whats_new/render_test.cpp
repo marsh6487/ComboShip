@@ -305,6 +305,10 @@ int main() {
   try {
     ProbeRequestedInventory();
     ProbeTabs();
+    const auto *rememberSave =
+        WhatsNew::Find("gEnhancements.Saving.RememberSaveLocation");
+    Check(rememberSave && rememberSave->kind == WhatsNew::Kind::New,
+          "2Ship Remember Save Location uses the gold accent");
     std::set<std::string> keys;
     for (const auto &entry : WhatsNew::kControls) {
       Check(keys.insert(entry.key).second && entry.note[0],

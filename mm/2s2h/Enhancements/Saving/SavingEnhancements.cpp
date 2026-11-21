@@ -13,7 +13,7 @@ extern "C" {
 #define CVAR_REMEMBER_SAVE_LOCATION_NAME "gEnhancements.Saving.RememberSaveLocation"
 #define CVAR_REMEMBER_SAVE_LOCATION CVarGetInteger(CVAR_REMEMBER_SAVE_LOCATION_NAME, 0)
 
-static int lastEntrance = -1;
+static int lastScene = -1;
 static int entranceToSave = -1;
 
 static HOOK_ID skipEntranceCutsceneHookId = 0;
@@ -227,7 +227,18 @@ static RegisterShipInitFunc registerSavingEnhancements(
                 gSaveContext.save.shipSaveInfo.fileCreatedAt = GetUnixTimestamp();
             }
             gSaveContext.shipSaveContext.lastTimeLog = GetUnixTimestamp();
-            lastEntrance = entranceToSave = gSaveContext.save.shipSaveInfo.pauseSaveEntrance;
+            lastScene = -1;
+            entranceToSave = gSaveContext.save.shipSaveInfo.pauseSaveEntrance;
+        });
+
+        COND_HOOK(OnSceneInit, true, [](s8 sceneId, s8) {
+            if (gSaveContext.gameMode != GAMEMODE_NORMAL)
+                return;
+            // Grotto exits use spawn 0 and reposition Link to the hole. Keep the grotto entrance
+            // until the next regular arrival so a reload can use the saved grotto respawn data.
+            if (lastScene != SCENE_KAKUSIANA || sceneId == SCENE_KAKUSIANA)
+                entranceToSave = gSaveContext.save.entrance;
+            lastScene = sceneId;
         });
 
         // Owl statue prompt
@@ -315,19 +326,6 @@ static RegisterShipInitFunc registerSavingEnhancements(
 
 static RegisterShipInitFunc registerRememberSaveLocation(
     []() {
-        COND_VB_SHOULD(VB_PLAY_TRANSITION_CS, CVAR_REMEMBER_SAVE_LOCATION, {
-            /*
-             * Update the entrance to save, unless we're leaving a grotto. Grottos exit to entrance 0 of the destination
-             * scene and adjust the position manually. In effect, there is no real entrance to target for loading
-             * purposes, so we just load into the last grotto instead under those circumstances.
-             */
-            if (lastEntrance != -1 && !(Entrance_GetSceneIdAbsolute(gSaveContext.save.entrance) != SCENE_KAKUSIANA &&
-                                        Entrance_GetSceneIdAbsolute(lastEntrance) == SCENE_KAKUSIANA)) {
-                entranceToSave = gSaveContext.save.entrance;
-            }
-            lastEntrance = gSaveContext.save.entrance;
-        });
-
         COND_HOOK(OnSaveLoad, CVAR_REMEMBER_SAVE_LOCATION, SkipEntranceCutsceneOnLoad);
         COND_HOOK(OnSaveLoad, CVAR_REMEMBER_SAVE_LOCATION, LoadRespawnData);
     },

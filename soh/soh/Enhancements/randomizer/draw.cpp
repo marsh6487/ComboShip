@@ -6,6 +6,7 @@
 #include "NeiGiRender.h"
 #include "../../../../combo/NeiClockGI.h"
 #include "NeiGiPresentation.h"
+#include "WalletGi.h"
 #include <ship/resource/Resource.h>
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
@@ -526,6 +527,25 @@ extern "C" void Randomizer_DrawRocsFeather(PlayState* play, GetItemEntry* getIte
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiRocsFeatherDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+#include "render/ZfgWalletClassicRuntime.h"
+#include "render/ZfgWalletDraw.h"
+
+static void OOT_DrawZfgWalletModel(PlayState* play) {
+    ComboZfgWallet::Draw(play, "oot");
+}
+
+void Randomizer_DrawWallet(PlayState* play, GetItemEntry* entry) {
+    const int tier = OotWalletGi_Tier(entry);
+    if (tier == CW_WALLET_ZFG) {
+        OOT_DrawZfgWalletModel(play);
+    } else {
+        GetItem_Draw(play, entry->gid);
+    }
+    uint8_t color[4];
+    if (OotWalletGi_Shimmer(tier, color))
+        NeiGi_DrawTintedShimmerOverlay(play, color, nullptr);
 }
 
 #ifdef COMBO_BUILD

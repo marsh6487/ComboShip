@@ -4,8 +4,8 @@ Run `python tests/mm_rando_queue_timing/run_tests.py --sanitize`. The runner
 builds both standalone and `COMBO_BUILD` variants. Use the repository native
 compiler adapters for the combined `GBI_FLOAT_MTX` / `GBI_S32_VTX` ABI.
 
-This is a characterization of existing production pacing. It makes no
-production edits and does not shorten the native item animation counter.
+The fixture verifies that the two starting checks arrive without interrupting
+movement and that regular checks keep their existing timing.
 
 ## What executes
 
@@ -19,18 +19,18 @@ The runner extracts unmodified production bodies for:
 
 The fixture uses real MM `PlayState`, `Player`, `EnItem00`, `RandoSaveCheck`,
 static check/item declarations and `GIEvent` variant types. It uses the actual
-`RC_STARTING_ITEM_DEKU_MASK` and `RC_STARTING_ITEM_SONG_OF_HEALING` check IDs,
-with controlled green-rupee awards. The awarded items in cor's seed remain
-unknown; this is not a replay of that saved state.
+`RC_STARTING_ITEM_DEKU_MASK` and `RC_STARTING_ITEM_SONG_OF_HEALING` check IDs
+with controlled major, junk and foreign awards. The two South Clock Town
+chests exercise normal timing with controlled green-rupee awards.
 
 External boundaries are actor allocation, pose-parent acceptance, engine audio,
 graphics, collision/collider services, item naming/conversion, UI messages,
 notifications and the final inventory `Rando::GiveItem` operation. The final
 inventory operation records callbacks; actual obtained/eligible check-state
 changes and exactly-once callback flags run in the production queue callback.
-The fixture therefore proves grant callback timing and check consumption, not
-every inventory mutation or a real save write. Combo foreign/trap delivery
-services are compiled but unused; their fixture stubs abort on unexpected use.
+The fixture measures grant callbacks and check consumption. A Combo stub
+records the foreign startup handoff, where the cross-game save and notification
+normally occur. Trap effects and persistence are outside the fixture.
 
 Native parent acceptance is supplied explicitly after seven offer updates.
 The native `Actor_OfferGetItem`/player animation action itself is not simulated.
@@ -67,7 +67,7 @@ Junk Items Only (one), Everything But Major (two), and Always (three).
 `Items.cpp::ShouldShowGetItemCutscene` keeps major cutscenes below three, keeps
 health/lesser/stray-fairy/token/small-key cutscenes below two, and keeps junk
 cutscenes only below one. Foreign checks use the separate existing Combo
-importance selector; this harness exercises local checks.
+importance selector. The two starting checks always use overhead delivery.
 
 `ProcessEvents` also selects overhead delivery for its listed player motion/
 action flags or held explosives. When the event requested a cutscene but falls
@@ -75,10 +75,7 @@ back to overhead, the existing callback applies a thirty-count freeze. Neither
 the setting nor overhead fallback bypasses queue-level active messages, native
 blocking cutscenes, transitions or an existing current event.
 
-These results reproduce deliberate pacing and serialization, not an unintended
-cold-load defect. The supplied runtime log has no first-eligible, first-safe,
-parent-accepted, first-visible milestones. Actual Clock Tower first-load timing
-and whether resources introduce wall-clock stalls remain runtime-unverified.
+The full game's cold-load and rendering time remain runtime-unverified.
 
 ## Authentic randomizer start-state extension
 
@@ -108,5 +105,10 @@ full movement/camera controller `Player_Action_35` or claim that cor's actual
 scene entry selects mode D. Source trace shows that controller increments the
 negative counter toward zero before `Player_StopCutscene`; modes E/F use their
 own counters. Actual scene/respawn parameters are required to identify cor's
-selected mode and measured wait. This startup controller wait precedes the
-independent post-parent twenty-counter grant/visibility hold.
+selected mode and measured wait.
+
+At the first safe opportunity each starting check spawns overhead and grants
+on its first item update. The next check can spawn while the first receipt is
+still visible. The fixture verifies two notifications, one grant per check,
+and no get-item offer, textbox, freeze or movement-speed change, even with
+the item-cutscene setting at Never and the native pre-dawn border active.

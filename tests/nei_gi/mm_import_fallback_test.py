@@ -80,7 +80,7 @@ native+=block_from(presentation,presentation.index('const Binding kBindings[] = 
 native+=functions(presentation)['MM_DescribeNeiGi']+'\n'
 owner_functions=functions(source)
 for name in ('MM_Op','MM_OpV','MM_IsProgressiveItem','MM_FillElementalSpellDrawInfo',
-             'MM_FillImportedSwordFallback','MM_FillItemDrawInfo'):
+             'MM_FillImportedSwordFallback','MM_FillWalletShimmer','MM_FillItemDrawInfo'):
     native+=owner_functions[name]+'\n'
 native+=r'''
 void ExpectRito(const CwItemDrawInfo& out) {

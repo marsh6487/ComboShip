@@ -84,7 +84,12 @@
 
 #define CUR_UPG_VALUE(upg) ((s32)(gSaveContext.inventory.upgrades & gUpgradeMasks[upg]) >> gUpgradeShifts[upg])
 #define CAPACITY(upg, value) gUpgradeCapacities[upg][value]
-#define CUR_CAPACITY(upg) CAPACITY(upg, CUR_UPG_VALUE(upg))
+// The 9,999-rupee wallet lives outside the two-bit native upgrade field.
+#define OOT_ZFG_WALLET_CAPACITY 9999
+#define OotWallet_HasZfg() \
+    ((gSaveContext.ship.randomizerInf[RAND_INF_HAS_ZFG_WALLET >> 4] & (1u << (RAND_INF_HAS_ZFG_WALLET & 0xF))) != 0)
+#define CUR_CAPACITY(upg) \
+    (((upg) == UPG_WALLET && OotWallet_HasZfg()) ? OOT_ZFG_WALLET_CAPACITY : CAPACITY(upg, CUR_UPG_VALUE(upg)))
 
 #define CHECK_QUEST_ITEM(item) (gBitFlags[item] & gSaveContext.inventory.questItems)
 #define CHECK_DUNGEON_ITEM(item, dungeonIndex) (gSaveContext.inventory.dungeonItems[dungeonIndex] & gBitFlags[item])

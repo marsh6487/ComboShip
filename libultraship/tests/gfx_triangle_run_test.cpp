@@ -33,6 +33,20 @@ class RecordingBackend : public BackendDefaults {
     size_t lastIndexedStride = 0;
     bool supportsIndexed = true;
     bool recording = true;
+#ifdef GFX_HAS_MODEL_OPACITY
+    struct OpacityDraw {
+        float opacity;
+        bool shaderOpacity;
+        bool shaderAlpha;
+        unsigned depthFlags;
+        bool blend;
+    };
+    std::vector<OpacityDraw> opacityDraws;
+    ShaderProgram* active = nullptr;
+    unsigned depthFlags = 0;
+    bool blend = false;
+    bool recordOpacity = false;
+#endif
     GfxClipParameters GetClipParameters() override { return clip; }
     ShaderProgram* LookupShader(uint64_t a, uint64_t b) override {
         auto i = programs.find({a, b});
@@ -45,7 +59,12 @@ class RecordingBackend : public BackendDefaults {
         LoadShader(&p);
         return &p;
     }
-    void LoadShader(ShaderProgram* p) override { event(1, p->id0); event(2, p->id1); }
+    void LoadShader(ShaderProgram* p) override {
+        event(1, p->id0); event(2, p->id1);
+#ifdef GFX_HAS_MODEL_OPACITY
+        active = p;
+#endif
+    }
     void UnloadShader(ShaderProgram*) override { event(3, 0); }
     void ShaderGetInfo(ShaderProgram* p, uint8_t* count, bool textures[2]) override {
         ++queries;
@@ -56,15 +75,31 @@ class RecordingBackend : public BackendDefaults {
     void SetSamplerParameters(int s, bool linear, uint32_t cms, uint32_t cmt) override {
         event(4, s | (linear << 8) | (cms << 16) | (cmt << 24));
     }
-    void SetDepthTestAndMask(bool a, bool b) override { event(5, a | (b << 1)); }
+    void SetDepthTestAndMask(bool a, bool b) override {
+        event(5, a | (b << 1));
+#ifdef GFX_HAS_MODEL_OPACITY
+        depthFlags = a | (b << 1);
+#endif
+    }
     void SetZmodeDecal(bool a) override { event(6, a); }
     void SetViewport(int x, int y, int w, int h) override { event(7, x); event(7, y); event(7, w); event(7, h); }
     void SetScissor(int x, int y, int w, int h) override { event(8, x); event(8, y); event(8, w); event(8, h); }
-    void SetUseAlpha(bool a) override { event(9, a); }
+    void SetUseAlpha(bool a) override {
+        event(9, a);
+#ifdef GFX_HAS_MODEL_OPACITY
+        blend = a;
+#endif
+    }
     void SetCurrentPrimDepth(float z) override { uint32_t bits; memcpy(&bits, &z, 4); event(10, bits); }
     void DrawTriangles(float* data, size_t length, size_t count) override {
         triangles += count;
         event(11, count); event(12, length);
+#ifdef GFX_HAS_MODEL_OPACITY
+        if (recordOpacity) {
+            opacityDraws.push_back(
+                { mCurrentModelOpacity, active->features.opt_model_opacity, active->features.opt_alpha, depthFlags, blend });
+        }
+#endif
         if (recording) {
             size_t at = output.size();
             output.resize(at + length);
@@ -1010,6 +1045,91 @@ static void forestTintTraceTest() {
                  "Alt and bounded output\n";
 }
 
+#ifdef GFX_HAS_MODEL_OPACITY
+static void modelOpacityTest() {
+    // Modes used by the native GI and Kin's cutout core, translucent shell,
+    // and textured shine decal. Keep source alpha math in all four variants.
+    constexpr uint32_t modes[] = {
+        Z_CMP | Z_UPD,
+        G_RM_PASS | G_RM_AA_ZB_OPA_SURF2,
+        G_RM_PASS | G_RM_AA_ZB_TEX_EDGE2,
+        G_RM_PASS | G_RM_AA_ZB_XLU_SURF2,
+        G_RM_FOG_SHADE_A | G_RM_AA_ZB_XLU_DECAL2,
+    };
+    for (const bool indexed : { false, true }) {
+        for (const auto mode : modes) {
+            Fixture f;
+            f.backend.recordOpacity = true;
+            f.gfx.SetIndexedTrianglesEnabled(indexed);
+            f.gfx.mRdp->other_mode_l = mode;
+            f.gfx.mRdp->other_mode_h = G_CYC_2CYCLE;
+            const auto drawTwice = [&] {
+                f.gfx.GfxSpTri1(0, 1, 2, false);
+                f.gfx.GfxSpTri1(2, 1, 3, false);
+            };
+            const auto push = [&](uint8_t opacity) {
+                F3DGfx cmd{};
+                cmd.words.w1 = opacity;
+                F3DGfx* cursor = &cmd;
+                gfx_model_opacity_push_handler_custom(&f.gfx, &cursor);
+            };
+            const auto pop = [&] {
+                gfx_model_opacity_pop_handler_custom(&f.gfx, nullptr);
+            };
+
+            beginRun(f.gfx, true);
+            drawTwice();
+            const bool indexedBaseline = f.gfx.mBufUsesIndices;
+            push(128);
+            drawTwice();
+            push(64);
+            drawTwice();
+            pop();
+            drawTwice();
+            pop();
+            drawTwice();
+            f.gfx.Flush();
+
+            const auto& draws = f.backend.opacityDraws;
+            require(draws.size() == 5 && f.backend.triangles == 10, "opacity scopes must preserve each triangle run");
+            constexpr float half = 128 / 255.0f;
+            require(draws[0].opacity == 1 && draws[1].opacity == half && draws[2].opacity == half * (64 / 255.0f) &&
+                        draws[3].opacity == half && draws[4].opacity == 1,
+                    "nested opacity must compose and restore at the batch boundary");
+            for (size_t i = 0; i < draws.size(); ++i) {
+                const bool scoped = i > 0 && i < 4;
+                require(draws[i].shaderAlpha == draws[0].shaderAlpha && draws[i].shaderOpacity == scoped,
+                        "scoped opacity must preserve the original combiner alpha option");
+                require(draws[i].blend == (scoped || draws[0].blend),
+                        "active opacity must blend even when the original material is opaque");
+                require(draws[i].depthFlags == (scoped ? draws[0].depthFlags & 1 : draws[0].depthFlags),
+                        "opacity must preserve depth test and suppress depth writes only during fade");
+            }
+            const auto& output = f.backend.output;
+            const auto stride = output.size() / draws.size();
+            for (size_t i = 1; i < draws.size(); ++i) {
+                require(std::equal(output.begin(), output.begin() + stride, output.begin() + i * stride),
+                        "opacity must leave the model's original packed vertex inputs byte-identical");
+            }
+            require(f.backend.indexedDraws == (indexedBaseline ? draws.size() : 0),
+                    "opacity must preserve the original indexed submission eligibility");
+
+            push(32);
+            f.gfx.mShaderStack.push(3);
+            drawTwice();
+            f.gfx.Flush();
+            require(!draws.back().shaderOpacity && draws.back().depthFlags == draws[0].depthFlags,
+                    "custom shaders must keep their original contracts inside opacity scopes");
+            f.gfx.SpReset();
+            require(f.gfx.CurrentModelOpacity() == 1, "frame reset must discard a leaked opacity scope");
+            pop();
+            require(f.gfx.CurrentModelOpacity() == 1, "unpaired opacity pop must be harmless");
+        }
+    }
+    std::cout << "PASS nested model opacity, Kin material blend/depth, unchanged layout, custom shader and indexed runs\n";
+}
+#endif
+
 int main(int argc, char** argv) {
     bool reference = false, bench = false, indexBench = false;
     for (int i = 1; i < argc; ++i) {
@@ -1022,6 +1142,9 @@ int main(int argc, char** argv) {
     if (!reference) indexedSubmissionTest();
 #ifdef GFX_HAS_INDEXED_TRIANGLES
     if (!reference) { indexedBoundariesTest(); indexedEquivalenceTest(); indexedSpecialCasesTest(); }
+#endif
+#ifdef GFX_HAS_MODEL_OPACITY
+    if (!reference) modelOpacityTest();
 #endif
     if (!reference) {
         grayscaleBrightnessTest();

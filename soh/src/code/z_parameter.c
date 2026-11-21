@@ -52,6 +52,8 @@ u8 MasterCycle_IsRiding(void);
 #define PLAYER_ON_REAL_HORSE(player) (((player)->stateFlags1 & PLAYER_STATE1_ON_HORSE) && !MasterCycle_IsRiding())
 #include "soh/Enhancements/speedrun/Speedrun.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "../../../combo/hud/PickupCounterWallet.h"
+#include "../../../combo/hud/RupeeCounterDigits.h"
 extern MessageTableEntry* sNesMessageEntryTablePtr;
 extern MessageTableEntry* sGerMessageEntryTablePtr;
 extern MessageTableEntry* sFraMessageEntryTablePtr;
@@ -5943,8 +5945,6 @@ void Interface_Draw(PlayState* play) {
     static s16 D_80125B1C[][3] = {
         { 0, 150, 0 }, { 100, 255, 0 }, { 255, 255, 255 }, { 0, 0, 0 }, { 255, 255, 255 },
     };
-    static s16 rupeeDigitsFirst[] = { 1, 0, 0, 0 };
-    static s16 rupeeDigitsCount[] = { 2, 3, 3, 3 };
 
     // courtesy of https://github.com/TestRunnerSRL/OoT-Randomizer/blob/Dev/ASM/c/hud_colors.c
     static Color_RGB8 rupeeWalletColors[4] = {
@@ -6125,8 +6125,7 @@ void Interface_Draw(PlayState* play) {
                     PosX_RC = PosX_RC_ori;
                 }
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, rColor.r, rColor.g, rColor.b, interfaceCtx->magicAlpha);
-                if (!CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0) ||
-                    CVarGetInteger(CVAR_ENHANCEMENT("PickupCounterHideHudRupees"), 0) != 1) {
+                if (PickupCounter_ShouldDrawWallet(play)) {
                     OVERLAY_DISP = Gfx_TextureIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, PosX_RC, PosY_RC, 16, 16,
                                                   1 << 10, 1 << 10);
                 }
@@ -6244,32 +6243,14 @@ void Interface_Draw(PlayState* play) {
                 gDPSetCombineLERP(OVERLAY_DISP++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE,
                                   TEXEL0, 0, PRIMITIVE, 0);
 
-                interfaceCtx->counterDigits[0] = interfaceCtx->counterDigits[1] = 0;
-                interfaceCtx->counterDigits[2] = gSaveContext.rupees;
+                s16 rupeeDigits[RUPEE_COUNTER_MAX_DIGITS];
+                u8 minimumDigits = CUR_CAPACITY(UPG_WALLET) >= 1000 ? 4 : CUR_UPG_VALUE(UPG_WALLET) == 0 ? 2 : 3;
+                s16 digitCount = RupeeCounter_BuildDigits(gSaveContext.rupees, minimumDigits, rupeeDigits);
 
-                if ((interfaceCtx->counterDigits[2] > 9999) || (interfaceCtx->counterDigits[2] < 0)) {
-                    interfaceCtx->counterDigits[2] &= 0xDDD;
-                }
-
-                while (interfaceCtx->counterDigits[2] >= 100) {
-                    interfaceCtx->counterDigits[0]++;
-                    interfaceCtx->counterDigits[2] -= 100;
-                }
-
-                while (interfaceCtx->counterDigits[2] >= 10) {
-                    interfaceCtx->counterDigits[1]++;
-                    interfaceCtx->counterDigits[2] -= 10;
-                }
-
-                svar2 = rupeeDigitsFirst[CUR_UPG_VALUE(UPG_WALLET)];
-                svar5 = rupeeDigitsCount[CUR_UPG_VALUE(UPG_WALLET)];
-
-                if (!CVarGetInteger(CVAR_ENHANCEMENT("PickupCounter"), 0) ||
-                    CVarGetInteger(CVAR_ENHANCEMENT("PickupCounterHideHudRupees"), 0) != 1) {
-                    for (svar1 = 0, svar3 = 16; svar1 < svar5; svar1++, svar2++, svar3 += 8) {
-                        OVERLAY_DISP =
-                            Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[interfaceCtx->counterDigits[svar2]]), 8, 16,
-                                          PosX_RC + svar3, PosY_RC, 8, 16, 1 << 10, 1 << 10);
+                if (PickupCounter_ShouldDrawWallet(play)) {
+                    for (s16 digit = 0, x = 16; digit < digitCount; digit++, x += 8) {
+                        OVERLAY_DISP = Gfx_TextureI8(OVERLAY_DISP, ((u8*)digitTextures[rupeeDigits[digit]]), 8, 16,
+                                                     PosX_RC + x, PosY_RC, 8, 16, 1 << 10, 1 << 10);
                     }
                 }
             }

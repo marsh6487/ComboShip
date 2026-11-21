@@ -2,6 +2,9 @@
 #include "2s2h/BenGui/HudEditor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Rando/RupeeCounterDigits.h"
+#define PICKUP_COUNTER_WALLET_MM
+#include "../../../../combo/hud/PickupCounterWallet.h"
+#undef PICKUP_COUNTER_WALLET_MM
 
 extern "C" {
 #include "interface/parameter_static/parameter_static.h"
@@ -17,8 +20,7 @@ static void DrawTycoonRupeeIcon() {
     gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 220, 120, 255, interfaceCtx->magicAlpha,
                             COSMETIC_ID("HUD.RupeeIcon"));
     gDPSetEnvColor(OVERLAY_DISP++, 50, 0, 80, 255);
-    if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-        CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+    if (PickupCounter_ShouldDrawWallet(play)) {
         HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
         OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16,
                                           1 << 10, 1 << 10);
@@ -51,8 +53,7 @@ static void DrawTycoonRupeeCounter() {
         gDPPipeSync(OVERLAY_DISP++);
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, magicAlpha);
 
-        if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-            CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+        if (PickupCounter_ShouldDrawWallet(play)) {
             HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
             OVERLAY_DISP = Gfx_DrawTexRectI8(OVERLAY_DISP, (TexturePtr)sCounterTextures[counterDigits[digitIndex]], 8,
                                              16, xPos + 1, 207, 8, 16, 1 << 10, 1 << 10);
@@ -68,8 +69,7 @@ static void DrawTycoonRupeeCounter() {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 100, 100, 100, interfaceCtx->magicAlpha);
         }
 
-        if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-            CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+        if (PickupCounter_ShouldDrawWallet(play)) {
             HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
             if (HudEditor_ShouldOverrideDraw()) {
                 if (CVarGetInteger(hudEditorElements[hudEditorActiveElement].modeCvar,

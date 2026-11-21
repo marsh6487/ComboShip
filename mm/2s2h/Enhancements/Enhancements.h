@@ -37,6 +37,8 @@ enum AmmoBuybackOptions {
     AMMO_BUYBACK_HALF_PRICE,
 };
 
+#define GIBDO_TRADE_SEQUENCE_CVAR "gEnhancements.DifficultyOptions.GibdoTradeSequence"
+
 enum GibdoTradeSequenceOptions {
     GIBDO_TRADE_SEQUENCE_VANILLA,
     GIBDO_TRADE_SEQUENCE_MM3D,

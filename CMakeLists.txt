@@ -464,7 +464,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom/shaders/
     # ComboShip: Torch's packer replaced ZAPD here (mm still packs with ZAPD). Manual, not ALL.
     COMMAND $<TARGET_FILE:soh-o2r-packer> ${CMAKE_CURRENT_SOURCE_DIR}/soh/assets/custom ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r ${CMAKE_PROJECT_VERSION}
-    COMMAND ${Python3_EXECUTABLE} -B "${COMBO_PARTNER_RESOURCE_MERGER}" --game soh ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r
+    COMMAND ${Python3_EXECUTABLE} -B "${COMBO_PARTNER_RESOURCE_MERGER}" --game soh ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r --with-zfg-wallet
     COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/scripts/packaging/normalize_candidate_o2r.py ${CMAKE_CURRENT_SOURCE_DIR}/soh/soh.o2r
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR=${CMAKE_SOURCE_DIR}/x64/$<CONFIG> -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLYSOHOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/CMake/copy-existing-otrs.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/soh
@@ -478,7 +478,7 @@ add_custom_target(
     # Overlay defaults so MM's separate Prism shaders (for example flatavg) survive.
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/fast/shaders/ ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom/shaders/
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/OTRExporter/extract_assets.py -z "$<TARGET_FILE:ZAPD>" --norom --custom-otr-file 2ship.o2r "--custom-assets-path" ${CMAKE_CURRENT_SOURCE_DIR}/mm/assets/custom --port-ver "${CMAKE_PROJECT_VERSION}"
-    COMMAND ${Python3_EXECUTABLE} -B "${COMBO_PARTNER_RESOURCE_MERGER}" --game 2ship ${CMAKE_CURRENT_SOURCE_DIR}/mm/2ship.o2r
+    COMMAND ${Python3_EXECUTABLE} -B "${COMBO_PARTNER_RESOURCE_MERGER}" --game 2ship ${CMAKE_CURRENT_SOURCE_DIR}/mm/2ship.o2r --with-zfg-wallet
     COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/scripts/packaging/normalize_candidate_o2r.py ${CMAKE_CURRENT_SOURCE_DIR}/mm/2ship.o2r
     COMMAND ${CMAKE_COMMAND} -DSYSTEM_NAME=${CMAKE_SYSTEM_NAME} -DTARGET_DIR="$<TARGET_FILE_DIR:ZAPD>" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_BINARY_DIR} -DONLY2SHIPOTR=On -P ${CMAKE_CURRENT_SOURCE_DIR}/CMake/copy-existing-otrs.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mm

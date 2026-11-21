@@ -5,6 +5,7 @@
 #include "combo/menu/ComboCollectibleShimmer.h"
 #include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
+#include "mm/2s2h/Rando/WalletGi.h"
 #include "mm/2s2h/Rando/SoulShuffle.h"
 #include "mm/include/z64item.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"

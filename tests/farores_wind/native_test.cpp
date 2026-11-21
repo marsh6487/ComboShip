@@ -94,7 +94,10 @@ static int request(int game, int slot) {
     return available;
 }
 
+// NATIVE_FW_LOCATION_TEST
+
 int main() {
+    TestLocationMessage();
 #ifdef TEST_MM
     EntranceTableEntry entry{};
     EntranceTableEntry* spawns[32]{};

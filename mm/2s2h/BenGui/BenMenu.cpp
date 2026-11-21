@@ -1510,7 +1510,9 @@ void BenMenu::AddEnhancements() {
             "in South Clock Town, unless Remember Save Location is enabled."));
     AddWidget(path, "Remember Save Location", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Saving.RememberSaveLocation")
-        .Options(CheckboxOptions().Tooltip("When loading a save, places Link at the last entrance he went through."));
+        .Options(CheckboxOptions().Tooltip(
+            "Resume at the entrance saved by Pause Menu Save or Autosave. With Autosave enabled, resetting from "
+            "gameplay also saves your current entrance. Song of Time starts the next cycle in Clock Town."));
     AddWidget(path, "Autosave", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Saving.Autosave")
         .Options(CheckboxOptions().Tooltip(
@@ -1604,12 +1606,16 @@ void BenMenu::AddEnhancements() {
         .Options(ComboboxOptions()
                      .ComboMap(&pickupRupeeHudOptions)
                      .DefaultIndex(0)
-                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
-                              "Turning off Pickup Counters restores the regular HUD."));
+                     .Tooltip("Hide the regular HUD rupee icon and digits outside shops. "
+                              "Your balance still appears while shopping."));
     AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gEnhancements.PickupCounterScale")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.PickupCounter", 0); })
         .Options(FloatSliderOptions().Min(0.65f).Max(1.5f).DefaultValue(1.0f).Format("%.2fx"));
+    AddWidget(path, "Gibdo Request Icons", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Graphics.GibdoRequestIcons")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Show the requested item and quantity above nearby Gibdos in Beneath the Well before talking to them."));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
 #ifdef COMBO_BUILD
     AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
@@ -1742,18 +1748,14 @@ void BenMenu::AddEnhancements() {
             "overcast sky faces; takes effect after changing scenes. MM moon is unchanged."));
     AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
         .CVar(ZELDA_RUN_CVAR)
-        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Use the latest POC7 Zelda-style empty-handed run. Requires the optional animation pack. "
-            "Independent of seasonal outfits; walking and weapon-running animations stay unchanged."));
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip("Use the built-in Zelda-style empty-handed run."));
     AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
         .CVar(ZELDA_RUN_AGES_CVAR)
         .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
-        .Options(
-            ComboboxOptions()
-                .DefaultIndex(ZELDA_RUN_BOTH)
-                .ComboMap(&zeldaRunAgeOptions)
-                .Tooltip(
-                    "Choose which Link ages use the optional run. Transformation forms keep their own animations."));
+        .Options(ComboboxOptions()
+                     .DefaultIndex(ZELDA_RUN_BOTH)
+                     .ComboMap(&zeldaRunAgeOptions)
+                     .Tooltip("Choose which Link ages use Zelda Run. Transformation forms keep their own animations."));
     AddWidget(path, "Seasonal Player Outfits", WIDGET_CVAR_CHECKBOX)
         .CVar(SEASONAL_OUTFITS_CVAR)
         .Options(CheckboxOptions().DefaultValue(false).Tooltip("Automatically use outfits for the current season. Off "
@@ -2081,7 +2083,8 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "Skip Item Get Cutscene", WIDGET_CVAR_COMBOBOX)
         .CVar("gEnhancements.Cutscenes.SkipGetItemCutscenes")
         .Options(ComboboxOptions()
-                     .Tooltip("Note: This only works in Randomizer currently.")
+                     .Tooltip("Choose which randomizer pickups skip their get-item cutscenes. "
+                              "The two starting checks always appear overhead and let you keep moving.")
                      .ComboVec(&skipGetItemCutscenesOptions));
 
     // Dialogue Enhancements
@@ -2538,7 +2541,7 @@ void BenMenu::AddEnhancements() {
                 .DefaultIndex(DekuGuardSearchBallsOptions::DEKU_GUARD_SEARCH_BALLS_NIGHT_ONLY)
                 .ComboVec(&dekuGuardSearchBallsOptions));
     AddWidget(path, "Gibdo Trade Sequence Options", WIDGET_CVAR_COMBOBOX)
-        .CVar("gEnhancements.DifficultyOptions.GibdoTradeSequence")
+        .CVar(GIBDO_TRADE_SEQUENCE_CVAR)
         .Options(
             ComboboxOptions()
                 .Tooltip("Changes the way the Gibdo Trade Sequence works:\n"
@@ -3389,6 +3392,11 @@ void BenMenu::AddNEI() {
     // ===================== Tab: Custom Items =====================
     WidgetPath itemsPath = { "Skijer's NEI", "Custom Items", SECTION_COLUMN_1 };
     AddWidget(itemsPath, "Custom Items", WIDGET_SEPARATOR_TEXT);
+    AddWidget(itemsPath, "NEI item shimmer", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.SkijerNEI.ItemEffects")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Adds glints to supported NEI pickups, shop displays and shuffled world items. "
+            "Each progressive wallet tier uses its own tint."));
     AddWidget(itemsPath, "Custom Items Page", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.CustomItems.Enabled")
         .Options(CheckboxOptions()

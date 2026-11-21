@@ -46,6 +46,8 @@ void ComboFw_SyncPoint(void);
 void ComboFw_PublishPoint(void);
 void ComboFw_ClearPoint(void);
 void ComboFw_ClearLocalPoint(void);
+// Same status as the shared reader. This lookup never imports a legacy point.
+int ComboFw_ReadSavedPointForDisplay(ComboFwPoint* point);
 // 0 = same game (continue native return), 1 = queued game handoff, -1 = unavailable/invalid.
 int ComboFw_RequestReturn(void);
 int ComboFw_ApplyArrival(void);
@@ -64,6 +66,10 @@ static inline void ComboFw_PublishPoint(void) {
 static inline void ComboFw_ClearPoint(void) {
 }
 static inline void ComboFw_ClearLocalPoint(void) {
+}
+static inline int ComboFw_ReadSavedPointForDisplay(ComboFwPoint* point) {
+    (void)point;
+    return -1;
 }
 static inline int ComboFw_RequestReturn(void) {
     return 0;

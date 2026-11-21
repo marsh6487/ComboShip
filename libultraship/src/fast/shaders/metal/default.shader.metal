@@ -20,6 +20,9 @@ struct DrawUniforms {
     float toonHighlightIntensity;
     float toonShadowIntensity;
     float toonDebug;
+    @if(o_model_opacity)
+    float modelOpacity;
+    @end
 };
 
 struct FragOut {
@@ -330,9 +333,16 @@ fragment FragOut fragmentShader(
         @if(o_invisible)
             texel.w = 0.0;
         @end
+        @if(o_model_opacity)
+            texel.w *= drawUniforms.modelOpacity;
+        @end
         out.color = texel;
     @else
-        out.color = float4(texel, 1.0);
+        @if(o_model_opacity)
+            out.color = float4(texel, drawUniforms.modelOpacity);
+        @else
+            out.color = float4(texel, 1.0);
+        @end
     @end
     @if(o_prim_depth)
         out.depth = drawUniforms.prim_depth;

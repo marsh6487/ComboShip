@@ -1,3 +1,4 @@
+#include "../../../combo/actors/ZeldaRun.h"
 #include "../../../combo/gameplay/SwordElementOverride.h"
 #include "../../../combo/render/SpinAttackStyle.h"
 #ifdef COMBO_BUILD
@@ -998,6 +999,18 @@ void SohMenu::AddMenuEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Hides stowed swords, shields, and the scabbard, even while a weapon is drawn.\n"
             "Equipment held in the hands stays visible. Also applies to the pause-menu preview."));
+    AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
+        .CVar(ZELDA_RUN_CVAR)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip("Use the built-in Zelda-style empty-handed run."));
+    AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
+        .CVar(ZELDA_RUN_AGES_CVAR)
+        .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
+        .Options(
+            ComboboxOptions()
+                .DefaultIndex(ZELDA_RUN_BOTH)
+                .ComboMap({ { ZELDA_RUN_CHILD, "Child" }, { ZELDA_RUN_ADULT, "Adult" }, { ZELDA_RUN_BOTH, "Both" } })
+                .Tooltip("Choose which Link ages use Zelda Run. Transformation forms keep their own "
+                         "animations."));
     AddWidget(path, "Scale Adult Equipment as Child", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("ScaleAdultEquipmentAsChild"))
         .RaceDisable(false)
@@ -1039,8 +1052,8 @@ void SohMenu::AddMenuEnhancements() {
         .Options(ComboboxOptions()
                      .ComboMap(pickupRupeeHudOptions)
                      .DefaultIndex(0)
-                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
-                              "Turning off Pickup Counters restores the regular HUD."));
+                     .Tooltip("Hide the regular HUD rupee icon and digits outside shops. "
+                              "Your balance still appears while shopping."));
     AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar(CVAR_ENHANCEMENT("PickupCounterScale"))
         .RaceDisable(false)

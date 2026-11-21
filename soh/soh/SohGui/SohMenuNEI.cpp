@@ -1,5 +1,4 @@
 #include "../../../combo/actors/SeasonalOutfits.h"
-#include "../../../combo/actors/ZeldaRun.h"
 #include "../../../combo/NeiWolfAssetResource.h"
 #include "../../../combo/ComboGameMode.h"
 #include "../../../combo/rando/MagicMirrorSettings.h"
@@ -1022,20 +1021,6 @@ void RegisterNEIMenu() {
                                                "Place ModLoader64 zzplayas .pak files in the mods/ folder.\n"
                                                "You can choose different models for Adult and Child Link."));
 
-        mSohMenu->AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
-            .CVar(ZELDA_RUN_CVAR)
-            .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-                "Use the latest POC7 Zelda-style empty-handed run. Requires the optional animation pack. "
-                "Independent of seasonal outfits; walking and weapon-running animations stay unchanged."));
-        mSohMenu->AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
-            .CVar(ZELDA_RUN_AGES_CVAR)
-            .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
-            .Options(ComboboxOptions()
-                         .DefaultIndex(ZELDA_RUN_BOTH)
-                         .ComboMap(
-                             { { ZELDA_RUN_CHILD, "Child" }, { ZELDA_RUN_ADULT, "Adult" }, { ZELDA_RUN_BOTH, "Both" } })
-                         .Tooltip("Choose which Link ages use the optional run. Transformation forms keep their own "
-                                  "animations."));
         mSohMenu->AddWidget(path, "Seasonal Player Outfits", WIDGET_CVAR_CHECKBOX)
             .CVar(SEASONAL_OUTFITS_CVAR)
             .Options(

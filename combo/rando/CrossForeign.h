@@ -539,7 +539,9 @@ inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwShar
         const auto& def = SharedFamilyByIndex(i);
         if (!(mask & (1u << i)) || !def.mmHasItem)
             continue;
-        connect(def.ootName, def.mmName, false, static_cast<size_t>(def.mmTierCap));
+        const int tierCap =
+            i == SF_WALLET && nativeDumps[GAME_OOT].value("zfgWallet", false) ? kZfgWalletTier : def.mmTierCap;
+        connect(def.ootName, def.mmName, false, static_cast<size_t>(tierCap));
         // Prefer the native OOT representation for an enabled family when deduplicating aliases.
         for (auto& group : groups) {
             auto n = std::find_if(group.names.begin(), group.names.end(),

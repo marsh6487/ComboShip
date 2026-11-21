@@ -40,6 +40,9 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/gfxbridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#define PICKUP_COUNTER_WALLET_MM
+#include "../../../combo/hud/PickupCounterWallet.h"
+#undef PICKUP_COUNTER_WALLET_MM
 
 // mods/actors/master_cycle.c — the Master Cycle rides on Epona's actor, so every "is he on a horse"
 // test in the HUD answers yes for it too. None of what those tests do is right for a bike: they
@@ -9690,8 +9693,7 @@ void Interface_Draw(PlayState* play) {
             gDPSetEnvColor(OVERLAY_DISP++, sRupeeCounterIconEnvColors[CUR_UPG_VALUE(UPG_WALLET)].r,
                            sRupeeCounterIconEnvColors[CUR_UPG_VALUE(UPG_WALLET)].g,
                            sRupeeCounterIconEnvColors[CUR_UPG_VALUE(4)].b, 255);
-            if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+            if (PickupCounter_ShouldDrawWallet(play)) {
                 HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                 OVERLAY_DISP =
                     Gfx_DrawTexRectIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16, 1 << 10, 1 << 10);
@@ -9949,8 +9951,7 @@ void Interface_Draw(PlayState* play) {
                 gDPPipeSync(OVERLAY_DISP++);
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, magicAlpha);
 
-                if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                    CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+                if (PickupCounter_ShouldDrawWallet(play)) {
                     HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                     OVERLAY_DISP = Gfx_DrawTexRectI8(OVERLAY_DISP, sCounterTextures[counterDigits[sp2CC]], 8, 16,
                                                      sp2CA + 1, 207, 8, 16, 1 << 10, 1 << 10);
@@ -9967,8 +9968,7 @@ void Interface_Draw(PlayState* play) {
                 }
 
                 // Keep native colors and digit preparation active when only the HUD counter is hidden.
-                if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                    CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+                if (PickupCounter_ShouldDrawWallet(play)) {
                     // #region 2S2H [Cosmetic] Hud Editor
                     HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                     if (HudEditor_ShouldOverrideDraw()) {

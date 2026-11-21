@@ -60,7 +60,7 @@ run("launcher save persistence and both recall handoffs", container)
 for game in ("soh", "mm"):
     flags = ["-DCOMBO_BUILD", "-DF3DEX_GBI_2", "-DCONTROLLERBUTTONS_T=uint32_t", "-DLOG_LEVEL_GAME_PRINTS=0"]
     flags += ["-I" + str(ROOT / path) for path in (game, game + "/include", game + "/include/PR", game + "/src",
-                                                game + "/assets", game + "/mods", "libultraship/include")]
+                                                game + "/assets", game + "/mods", "libultraship/include", "combo/menu")]
     if game == "mm":
         flags += ["-DTEST_MM", "-DMM_BUILD_DLL", "-I" + str(ROOT / "mm/2s2h")]
     else:
@@ -69,6 +69,24 @@ for game in ("soh", "mm"):
     if game == "mm":
         capture = re.sub(r"\bthis\b", "play", capture)
     source = (ROOT / "tests/farores_wind/native_test.cpp").read_text().replace("// NATIVE_FLAG_CAPTURE", capture)
+    if game == "mm":
+        message_path = "mm/mods/items/logic/oot_spells_messages.cpp"
+        native_path = "mm/src/code/z_message_nes.c"
+        widths = "sNESFontWidths"
+        message_name = "OotSpells_OpenFwTextbox"
+    else:
+        message_path = "soh/soh/Enhancements/Gameplay/FaroresWindLocation.cpp"
+        native_path = "soh/src/code/z_message_PAL.c"
+        widths = "sFontWidths"
+        message_name = "ShowDestination"
+    native = (ROOT / native_path).read_text()
+    font_widths = re.search(r"f32 " + widths + r"\[\d+\] = \{.*?^\};", native, re.M | re.S).group()
+    location_test = font_widths + "\n" + (ROOT / "tests/farores_wind/location_test.inc").read_text()
+    location_test = location_test.replace("// NATIVE_FW_LOCATION_MESSAGE", "\n".join(
+        body(message_path, name) for name in ("GetLocationName", message_name)))
+    source = source.replace("// NATIVE_FW_LOCATION_TEST", location_test)
+    if sys.platform.startswith("linux"):
+        flags += ["-rdynamic"]
     if game == "soh":
         scene=(ROOT/'soh/soh/unbound/SceneDB.cpp').read_text()
         scene_flags='\n'.join(block_from(scene,scene.index(signature)) for signature in (

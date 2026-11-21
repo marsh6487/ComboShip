@@ -265,7 +265,7 @@ struct ShaderProgram* GfxRenderingAPIMetal::CreateAndLoadNewShader(uint64_t shad
     // SOH [Enhancement] World light casting: declare the Stencil8 format on every pipeline (parallels the
     // unconditional depth format above), so pipelines stay consistent with the stencil-bearing render pass.
     pipeline_descriptor->setStencilAttachmentPixelFormat(MTL::PixelFormatStencil8);
-    if (cc_features.opt_alpha) {
+    if (cc_features.opt_alpha || cc_features.opt_model_opacity) {
         pipeline_descriptor->colorAttachments()->object(0)->setBlendingEnabled(true);
         pipeline_descriptor->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setDestinationRGBBlendFactor(
@@ -637,11 +637,13 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
         mDrawUniforms.toonDebug = mToonDebug;
     }
 
-    if (textures_changed || mPrimDepthDirty || mShaderProgram->opt_toon ||
+    if (textures_changed || mPrimDepthDirty || mModelOpacityDirty || mShaderProgram->opt_toon ||
         current_framebuffer.mLastShaderProgram == nullptr) {
         mDrawUniforms.prim_depth = mCurrentPrimDepth;
+        mDrawUniforms.modelOpacity = mCurrentModelOpacity;
         current_framebuffer.mCommandEncoder->setFragmentBytes(&mDrawUniforms, sizeof(DrawUniforms), 1);
         mPrimDepthDirty = false;
+        mModelOpacityDirty = false;
     }
 
     if (current_framebuffer.mLastShaderProgram != mShaderProgram) {
