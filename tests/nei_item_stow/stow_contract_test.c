@@ -17,6 +17,7 @@ SaveContext gSaveContext;
 CustomItemState gCustomItemState;
 static Player player;
 static PlayState play;
+PlayState *gPlayState = &play;
 static Input *sControlInput;
 static s32 sUpperBodyIsBusy;
 static ItemEquipState sMittsEquipState;
@@ -80,6 +81,7 @@ void Player_UseItem(PlayState *s, Player *p, s32 item);
 static void Reset(void) {
   memset(&player, 0, sizeof(player));
   memset(&play, 0, sizeof(play));
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
   memset(&gCustomItemState, 0, sizeof(gCustomItemState));
   memset(&gSaveContext, 0, sizeof(gSaveContext));
   memset(&sEquipCache, 0, sizeof(sEquipCache));

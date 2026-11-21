@@ -20,6 +20,7 @@ s8 gSfxDefaultReverb;
 
 static Player player;
 static PlayState play;
+PlayState *gPlayState = &play;
 static Vec3s joints[PLAYER_LIMB_MAX];
 static u16 sounds[64];
 static size_t soundCount;
@@ -35,6 +36,7 @@ static EffectBlure trail;
 static void ResetFixture(int slot) {
   memset(&player, 0, sizeof(player));
   memset(&play, 0, sizeof(play));
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
   memset(&gSaveContext, 0, sizeof(gSaveContext));
   memset(&gCustomItemState, 0, sizeof(gCustomItemState));
   memset(&sEquipCache, 0, sizeof(sEquipCache));
