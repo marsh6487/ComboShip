@@ -39,7 +39,7 @@
 #include "../../../../../combo/menu/ComboItemIconOwnership.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
-#include "mods/extended_equipment.h"        // ExtEquip_* (Skijer's NEI)
+#include "mods/extended_equipment.h" // ExtEquip_* (Skijer's NEI)
 #include "expansions/ssbb/ssbb_spawn.h"
 #include "mods/broken_items/broken_items.h" // BrokenItems_* form selector (Skijer's NEI)
 #include "mods/nei_save.h"

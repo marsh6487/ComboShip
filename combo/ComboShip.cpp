@@ -4179,10 +4179,11 @@ int main(int argc, char** argv) {
     for (int game = 0; game < 2; ++game) {
         const auto module = game == 0 ? sohModule : mmModule;
         const std::string prefix = game == 0 ? "SOH_" : "MM_";
-        g_DrainBossWarpReward[game] = (const char* (*)(int, bool (*)(int, const char*)))
-            GetSym(module, (prefix + "DrainBossWarpReward").c_str());
+        g_DrainBossWarpReward[game] =
+            (const char* (*)(int, bool (*)(int, const char*)))GetSym(module, (prefix + "DrainBossWarpReward").c_str());
         g_BossWarpRewardReady[game] = (int (*)(int))GetSym(module, (prefix + "BossWarpRewardReady").c_str());
-        g_GrantBossWarpReward[game] = (bool (*)(int, const char*))GetSym(module, (prefix + "GrantBossWarpReward").c_str());
+        g_GrantBossWarpReward[game] =
+            (bool (*)(int, const char*))GetSym(module, (prefix + "GrantBossWarpReward").c_str());
         g_ShowBossWarpReward[game] = (void (*)(const char*))GetSym(module, (prefix + "ShowBossWarpReward").c_str());
         g_CaptureBossWarpRewardSave[game] =
             (void (*)(int))GetSym(module, (prefix + "CaptureBossWarpRewardSave").c_str());

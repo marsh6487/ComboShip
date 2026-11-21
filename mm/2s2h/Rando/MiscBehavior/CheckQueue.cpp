@@ -153,13 +153,14 @@ extern "C" void Rando_CancelMagicMirrorStump(void) {
 #ifdef COMBO_BUILD
 void Combo_MM_FlushAccumulators(void);
 
-extern "C" COMBO_EXPORT const char* MM_DrainBossWarpReward(
-    int slot, bool (*grantPeer)(int, const char*)) {
+extern "C" COMBO_EXPORT const char* MM_DrainBossWarpReward(int slot, bool (*grantPeer)(int, const char*)) {
     if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
         return nullptr;
 
     constexpr RandoCheckId bosses[] = {
-        RC_WOODFALL_TEMPLE_BOSS_WARP, RC_SNOWHEAD_TEMPLE_BOSS_WARP, RC_GREAT_BAY_TEMPLE_BOSS_WARP,
+        RC_WOODFALL_TEMPLE_BOSS_WARP,
+        RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+        RC_GREAT_BAY_TEMPLE_BOSS_WARP,
         RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP,
     };
     for (const auto rc : bosses) {
@@ -450,8 +451,9 @@ void Rando::MiscBehavior::CheckQueue() {
 #endif
 #ifdef COMBO_BUILD
                         if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP ||
-                            (Combo_IsCombinedGame() && Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM))
-                                                          .randoCheckType == RCTYPE_REMAINS))
+                            (Combo_IsCombinedGame() &&
+                             Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM))
+                                     .randoCheckType == RCTYPE_REMAINS))
                             SaveManager_SaveCurrentForCombo();
 #endif
                         CUSTOM_ITEM_PARAM = randoItemId;

@@ -188,7 +188,7 @@ RegisterShipInitFunc init([] {
 
 #ifdef COMBO_BUILD
 extern "C" COMBO_EXPORT int32_t MM_ReadSoulTrackerSave(int32_t slot, ComboRando::SoulTracker::VisitRow visit,
-                                                      void* context) {
+                                                       void* context) {
     if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO)
         return 0;
 

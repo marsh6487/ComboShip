@@ -714,8 +714,7 @@ void OOT_DeliverForeign(RandomizerCheck rc) {
 // A blue-warp check remains owned by the arena that opened it. Once a handoff parks
 // that arena, the foreground can complete the saved native queue entry without a PlayState.
 void Combo_GrantResolvedOOT(const GetItemEntry& entry);
-extern "C" COMBO_EXPORT const char* SOH_DrainBossWarpReward(
-    int slot, bool (*grantPeer)(int, const char*)) {
+extern "C" COMBO_EXPORT const char* SOH_DrainBossWarpReward(int slot, bool (*grantPeer)(int, const char*)) {
     if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
         return nullptr;
 
@@ -758,9 +757,9 @@ extern "C" COMBO_EXPORT const char* SOH_DrainBossWarpReward(
         } else {
             const Ship::ResourceManagerScope scope(Ship::CrossRMRegistry::Get("oot"));
             const auto entry = ctx->GetFinalGIEntry(rc, true, GI_NONE, false);
-            const auto received = entry.modIndex == MOD_RANDOMIZER ? static_cast<RandomizerGet>(entry.getItemId)
+            const auto received = entry.modIndex == MOD_RANDOMIZER   ? static_cast<RandomizerGet>(entry.getItemId)
                                   : entry.getItemId == GI_RUPEE_BLUE ? RG_BLUE_RUPEE
-                                                                    : placed;
+                                                                     : placed;
             result = Rando::StaticData::RetrieveItem(received).GetName().GetEnglish();
             Combo_GrantResolvedOOT(entry);
         }
@@ -786,11 +785,10 @@ extern "C" COMBO_EXPORT const char* SOH_DrainBossWarpReward(
 }
 
 extern "C" COMBO_EXPORT int SOH_BossWarpRewardReady(int slot) {
-    return Combo_IsCombinedGame() && IS_RANDO && gSaveContext.fileNum == slot &&
-           GameInteractor::IsPlayerInControl() && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
-           gPlayState->transitionMode == TRANS_MODE_OFF &&
-           !(GET_PLAYER(gPlayState)->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_GETTING_ITEM |
-                                                  PLAYER_STATE1_IN_ITEM_CS));
+    return Combo_IsCombinedGame() && IS_RANDO && gSaveContext.fileNum == slot && GameInteractor::IsPlayerInControl() &&
+           gPlayState->transitionTrigger == TRANS_TRIGGER_OFF && gPlayState->transitionMode == TRANS_MODE_OFF &&
+           !(GET_PLAYER(gPlayState)->stateFlags1 &
+             (PLAYER_STATE1_DEAD | PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS));
 }
 
 extern "C" COMBO_EXPORT void SOH_ShowBossWarpReward(const char* itemName) {

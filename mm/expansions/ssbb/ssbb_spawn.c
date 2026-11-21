@@ -86,7 +86,10 @@ static s32 PikachuForm_DrawMesh(PlayState* play, Vec3f* pos, s16 yaw) {
     // The SSBB mesh is in Brawl's coordinate space with its Z axis vertical.
     Vec3s rot = { 0x4000, yaw, 0 };
     static Gfx* eyeMaterials[] = {
-        pikachu_ssbb_mat_eyes_00, pikachu_ssbb_mat_eyes_01, pikachu_ssbb_mat_eyes_02, pikachu_ssbb_mat_eyes_03,
+        pikachu_ssbb_mat_eyes_00,
+        pikachu_ssbb_mat_eyes_01,
+        pikachu_ssbb_mat_eyes_02,
+        pikachu_ssbb_mat_eyes_03,
     };
     s32 blink = play->gameplayFrames % 50;
     s32 eyes = blink < 41 ? 0 : 1 + (blink - 41) / 3;

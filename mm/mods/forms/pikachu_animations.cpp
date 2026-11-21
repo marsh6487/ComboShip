@@ -26,8 +26,7 @@ std::array<AnimationClip, 6> sClips{ {
     { PIKA_ANIM_SWIMF },
 } };
 
-template <typename T, std::size_t Size>
-T ReadField(const std::array<char, Size>& bytes, std::size_t offset) {
+template <typename T, std::size_t Size> T ReadField(const std::array<char, Size>& bytes, std::size_t offset) {
     T field;
     std::memcpy(&field, bytes.data() + offset, sizeof(T));
     return field;
@@ -66,8 +65,8 @@ void LoadClips() {
         const f32 rate = ReadField<f32>(entry, 8);
         const std::streamoff offset = framesOffset + ReadField<u32>(entry, 12);
         const std::streamoff span = (std::streamoff)frames * bones * sizeof(SSBBBoneFrame);
-        if (frames == 0 || (bones != 47 && bones != 48) || !(rate > 0.0f && rate <= 120.0f) ||
-            offset > size || span > size - offset) {
+        if (frames == 0 || (bones != 47 && bones != 48) || !(rate > 0.0f && rate <= 120.0f) || offset > size ||
+            span > size - offset) {
             continue;
         }
 

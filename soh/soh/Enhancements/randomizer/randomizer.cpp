@@ -288,7 +288,8 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "mouvements cachés." },
 
     { RG_ROCS_CAPE, static_cast<int32_t>(ITEM_ROCS_CAPE),
-      "You got %rRoc's Cape%w!&Jump from the ground or water.&Press the item button again&in midair to %gdouble jump%w.",
+      "You got %rRoc's Cape%w!&Jump from the ground or water.&Press the item button again&in midair to %gdouble "
+      "jump%w.",
       "Du hast %rRocs Umhang%w erhalten!&Springe vom Boden oder Wasser.&Drücke die Item-Taste in der Luft&"
       "erneut für einen %gDoppelsprung%w.",
       "Vous obtenez la %rCape de Roc%w!&Sautez du sol ou de l'eau.&Appuyez de nouveau en l'air&"

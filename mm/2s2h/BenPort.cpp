@@ -5763,8 +5763,7 @@ extern "C" COMBO_EXPORT int MM_BossWarpRewardReady(int slot) {
         gSaveContext.cutsceneTrigger || gPlayState->gameOverCtx.state != GAMEOVER_INACTIVE)
         return false;
     Player* player = GET_PLAYER(gPlayState);
-    return player && !Player_InBlockingCsMode(gPlayState, player) &&
-           !(player->stateFlags1 & PLAYER_STATE1_DEAD) &&
+    return player && !Player_InBlockingCsMode(gPlayState, player) && !(player->stateFlags1 & PLAYER_STATE1_DEAD) &&
            std::holds_alternative<GIEventNone>(GameInteractor::Instance->currentEvent);
 }
 

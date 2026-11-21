@@ -51,8 +51,8 @@ int main(void) {
                 for (int v = 0; v < 4; ++v) {
                     REQUIRE(current->p[v].x == accepted->p[v].x && current->p[v].y == accepted->p[v].y &&
                             current->p[v].z == accepted->p[v].z);
-                    REQUIRE(current->alpha[v] == (current->spark == 3 ? (3 * accepted->alpha[v] + 2) / 5
-                                                                      : accepted->alpha[v]));
+                    REQUIRE(current->alpha[v] ==
+                            (current->spark == 3 ? (3 * accepted->alpha[v] + 2) / 5 : accepted->alpha[v]));
                 }
             }
         }
@@ -103,6 +103,7 @@ int main(void) {
     puts("PASS native linger lifetime: 138 fire updates; six usable seconds after recovery before 12-update burnout");
     puts("PASS continuous motion: accepted angular and unwrapped UV steps through every hold update; no loop reset or "
          "slowdown");
-    puts("PASS native material polish: lower warm glow, amber ribbon highlights, and preserved geometry and fade timing");
+    puts("PASS native material polish: lower warm glow, amber ribbon highlights, and preserved geometry and fade "
+         "timing");
     return 0;
 }

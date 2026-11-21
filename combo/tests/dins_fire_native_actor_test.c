@@ -281,8 +281,8 @@ s32 WaterBox_GetSurface1_2(PlayState* state, CollisionContext* context, f32 x, f
 void AudioSfx_PlaySfx(u16 sfx, Vec3f* pos, u8 token, f32* freq, f32* volume, s8* reverb) {
     torchIgnitions += sfx == NA_SE_EV_FLAME_IGNITION;
 }
-s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderElement* atElem, Vec3f* atPos,
-                             Collider* ac, ColliderElement* acElem, Vec3f* acPos, Vec3f* hitPos) {
+s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderElement* atElem, Vec3f* atPos, Collider* ac,
+                             ColliderElement* acElem, Vec3f* acPos, Vec3f* hitPos) {
     ac->acFlags |= AC_HIT;
     ac->ac = at->actor;
     acElem->acHitElem = atElem;
@@ -298,8 +298,8 @@ s32 WaterBox_GetSurfaceImpl(PlayState* state, CollisionContext* context, f32 x, 
 void Audio_PlaySfxGeneral(u16 sfx, Vec3f* pos, u8 token, f32* freq, f32* volume, s8* reverb) {
     torchIgnitions += sfx == NA_SE_EV_FLAME_IGNITION;
 }
-s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderInfo* atInfo, Vec3f* atPos,
-                             Collider* ac, ColliderInfo* acInfo, Vec3f* acPos, Vec3f* hitPos) {
+s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderInfo* atInfo, Vec3f* atPos, Collider* ac,
+                             ColliderInfo* acInfo, Vec3f* acPos, Vec3f* hitPos) {
     ac->acFlags |= AC_HIT;
     ac->ac = at->actor;
     acInfo->acHitInfo = atInfo;
@@ -549,8 +549,7 @@ static void stockRangeTorchPuzzle(void) {
     enum { torchFlag = 15, groupSize = 4 };
     ObjSyokudai torches[groupSize + 2] = { 0 };
     const Vec3f offsets[] = {
-        { 100, 0, 0 }, { 240, 0, 0 }, { -300, -140, 0 }, { 0, 0, 340 },
-        { 0, 0, -360 }, { 0, 200, 0 },
+        { 100, 0, 0 }, { 240, 0, 0 }, { -300, -140, 0 }, { 0, 0, 340 }, { 0, 0, -360 }, { 0, 200, 0 },
     };
     reset(1);
     torchSwitch = -1;
@@ -562,10 +561,9 @@ static void stockRangeTorchPuzzle(void) {
     for (int i = 0; i < ARRAY_COUNT(torches); ++i) {
         ObjSyokudai* torch = &torches[i];
         torch->actor.id = ACTOR_OBJ_SYOKUDAI;
-        torch->actor.params = i < groupSize ? (0x1000 | (groupSize << TORCH_GROUP_SHIFT) | torchFlag)
-                                            : (0x2000 | (torchFlag + 1));
-        torch->actor.world.pos =
-            (Vec3f){ origin.x + offsets[i].x, origin.y + offsets[i].y, origin.z + offsets[i].z };
+        torch->actor.params =
+            i < groupSize ? (0x1000 | (groupSize << TORCH_GROUP_SHIFT) | torchFlag) : (0x2000 | (torchFlag + 1));
+        torch->actor.world.pos = (Vec3f){ origin.x + offsets[i].x, origin.y + offsets[i].y, origin.z + offsets[i].z };
 #ifdef TEST_HOST_MM
         torch->actor.csId = 1;
 #endif
