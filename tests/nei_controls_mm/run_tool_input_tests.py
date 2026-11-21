@@ -12,6 +12,8 @@ EXTRA=r'''
 '''
 CHECKS=r'''
 int main(int argc,char**argv){
+ static PlayState play{};
+ gPlayState=&play;
  const u16 masks[]={BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
  const u16 items[]={EXT_ITEM_SHEIKAH_SLATE,EXT_ITEM_PHANTOM_HOURGLASS,EXT_ITEM_ROD_OF_SEASONS};
  u16(*readers[])()={Slate_EquippedButtonMask,Hourglass_EquippedButtonMask,Seasons_EquippedButtonMask};
@@ -20,6 +22,12 @@ int main(int argc,char**argv){
   Reset();pacci=riding=false;
   if(b<3)ExtButton_SetItem(0,b+1,items[t]);else ExtButton_SetDpadItem(0,b-3,items[t]);
   assert(readers[t]()==masks[b]&&"full-ID tool reads directly assigned C and Dpad bindings");
+  play.msgCtx.msgMode=MSGMODE_OCARINA_PLAYING;
+  play.state.input[0].press.button=play.state.input[0].cur.button=masks[b];
+  assert(readers[t]()==(b<3?masks[b]:0));
+  assert(play.state.input[0].press.button==masks[b]&&play.state.input[0].cur.button==masks[b]);
+  play.msgCtx.msgMode=MSGMODE_NONE;
+  assert(readers[t]()==masks[b]);
   cryonis=true;assert(readers[t]()==((b==5||b==6)?0:masks[b])&&"Cryonis claims only D up/down, preserving C and D left/right");cryonis=false;
   if(b>=3){
    dpadEnabled=0;assert(readers[t]()==0);dpadEnabled=1;
@@ -27,7 +35,7 @@ int main(int argc,char**argv){
    gSaveContext.shipSaveContext.dpad.status[b-3]=BTN_DISABLED;assert(readers[t]()==0);
   }
  }
- printf("PASS MM full-ID tool %d: all C/D directions, Dpad-off/status/Ultrahand guards\n",t);
+ printf("PASS MM full-ID tool %d: all C/D directions, ocarina and other D-pad ownership guards\n",t);
 }
 '''
 def main():

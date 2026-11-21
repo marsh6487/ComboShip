@@ -238,7 +238,7 @@ def main():
             if name == 'oot-sand':
                 sys.path.insert(0, str(ROOT / 'tests/nei_held'))
                 from run_articulated_tests import flags as oot_flags
-                compiler_flags = oot_flags()[1:]
+                compiler_flags = oot_flags()[1:] + ['-I' + str(ROOT / 'combo')]
             if args.sanitize:
                 compiler_flags += ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
                 # Native C passes D-pad values beyond EquipSlot's named members. That is valid in

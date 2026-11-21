@@ -3,6 +3,7 @@
  */
 
 #include "equip_helper.h"
+#include "combo/gameplay/OcarinaItemInput.h"
 #include <string.h>
 #include "../custom_items.h"
 #include "../../extended_equipment.h" // MAGIC_REQ — Magic Cape halves all magic costs
@@ -98,8 +99,8 @@ u8 MasterCycle_IsRiding(void);
 u8 Cryonis_ModeActive(void);
 
 u8 ItemInput_ButtonIsClaimed(u16 button) {
-    return ((button & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)) &&
-            (Pacci_UltrahandModeActive() || MasterCycle_IsRiding())) ||
+    return ((button & OCARINA_ITEM_DPAD) &&
+            (OcarinaItemInput_Active(gPlayState) || Pacci_UltrahandModeActive() || MasterCycle_IsRiding())) ||
            ((button & (BTN_DUP | BTN_DDOWN)) && Cryonis_ModeActive());
 }
 
@@ -156,7 +157,7 @@ u8 ItemInput_CheckDamage(Player* player, s8* prevInvincibility) {
 u8 ItemInput_CheckOtherButtons(u16 equippedButton, Input* input) {
     static const u16 sActionButtons = BTN_A | BTN_B | BTN_R | BTN_START | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP |
                                       BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
-    return (input->press.button & (sActionButtons & ~equippedButton)) != 0;
+    return (OcarinaItemInput_FilterDpad(gPlayState, input->press.button) & (sActionButtons & ~equippedButton)) != 0;
 }
 
 u8 ItemInput_IsBlockedEx(Player* player, PlayState* play, u8 skipOptionalBlockers) {

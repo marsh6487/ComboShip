@@ -17,6 +17,7 @@
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/extended_equipment.h"
 #include "mods/items/helpers/equip_helper.h"
+#include "gameplay/OcarinaItemInput.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorItem.h"
 #endif

@@ -19,6 +19,7 @@ static int calls[64];
 CHECKS=r'''
 int main(int argc,char**argv){
  static PlayState play;Player player{};
+ gPlayState=&play;
  Reset();play={};play.gameplayFrames=1;gSaveContext.save.playerForm=PLAYER_FORM_HUMAN;
  if(!strcmp(argv[1],"cache")){
   BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_LEFT)=ITEM_ROCS_FEATHER_SKIJER;
@@ -62,6 +63,15 @@ int main(int argc,char**argv){
    assert(statusInput.equippedButton==dMasks[d]&&!statusInput.isPressed);
    play.state.input[0].press.button=play.state.input[0].cur.button=dMasks[d];
    ItemInput_Update(&statusInput,item,&player,&play);assert(statusInput.isPressed);
+   play.msgCtx.msgMode=MSGMODE_OCARINA_PLAYING;
+   const auto notes=play.state.input[0];
+   ItemInput_Update(&statusInput,item,&player,&play);
+   assert(!statusInput.wasEquipped&&!statusInput.isPressed&&!statusInput.isHeld&&!statusInput.isReleased);
+   assert(!memcmp(&notes,&play.state.input[0],sizeof(Input)));
+   gSaveContext.buttonStatus[c]=BTN_ENABLED;
+   ItemInput_Update(&statusInput,item,&player,&play);
+   assert(statusInput.equippedButton==cMasks[c-1]&&!statusInput.isPressed&&!statusInput.otherButtonPressed);
+   play.msgCtx.msgMode=MSGMODE_NONE;
    gSaveContext.buttonStatus[c]=BTN_ENABLED;gSaveContext.shipSaveContext.dpad.status[d]=BTN_DISABLED;
    ItemInput_Update(&statusInput,item,&player,&play);
    assert(statusInput.equippedButton==cMasks[c-1]&&!statusInput.isPressed);

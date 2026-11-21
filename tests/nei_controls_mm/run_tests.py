@@ -22,6 +22,7 @@ PREFIX = r'''
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "mods/extended_equipment.h"
 #include "mods/extended_inventory.h"
+#include "gameplay/OcarinaItemInput.h"
 #include "ComboGameMode.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 #include <cassert>
@@ -29,6 +30,7 @@ PREFIX = r'''
 #include <cstdio>
 #include <initializer_list>
 SaveContext gSaveContext{};
+PlayState* gPlayState = nullptr;
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 u8 gItemSlots[77]{};
 static NeiSaveData nei{};

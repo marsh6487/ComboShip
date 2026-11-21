@@ -26,6 +26,7 @@ prefix=prefix.replace('void CustomItems_PutAwayHeldItems(Player* p,PlayState* pl
 prefix=prefix.replace('void Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;p->heldItemAction=p->itemAction=action;p->modelGroup=p->nextModelGroup;}','void Player_InitItemAction(PlayState*,Player*,PlayerItemAction);\nvoid Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;Player_InitItemAction(play,p,action);}')
 prefix=prefix.replace('void Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;}','s32 Player_UpperAction_ChangeHeldItem(Player*,PlayState*);\nvoid Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;p->upperActionFunc=Player_UpperAction_ChangeHeldItem;}')
 prefix+=r'''
+#include "gameplay/OcarinaItemInput.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 PlayState* gPlayState;
 int rodEquips,rodStows,menus,menuOpen,sceneNumber;

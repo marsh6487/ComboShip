@@ -495,6 +495,11 @@ int main(int argc, char** argv) {
     frame(BTN_DUP);
     assert(!WolfLinkForm_IsReady());
     integerCvars["gEnhancements.Dpad.DpadEquips"] = 1;
+    play.msgCtx.msgMode = MSGMODE_OCARINA_PLAYING;
+    frame(BTN_DUP, BTN_DUP);
+    assert(!WolfLinkForm_IsReady() && (play.state.input[0].press.button & BTN_DUP) &&
+           (play.state.input[0].cur.button & BTN_DUP));
+    play.msgCtx.msgMode = MSGMODE_NONE;
     hookSuppressedButtons = BTN_DUP;
     frame(BTN_DUP);
     assert(!WolfLinkForm_IsReady());

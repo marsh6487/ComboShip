@@ -20,6 +20,10 @@ def source(path):
 def body(path,name): return functions(source(path))[name]
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name: return
+ if any('OcarinaItemInput_' in part or 'OCARINA_ITEM_DPAD' in part for part in parts):
+  prefix = '#include "gameplay/OcarinaItemInput.h"\n' + prefix
+  if not re.search(r'\bPlayState\s*\*\s*gPlayState\b', prefix):
+   prefix += '\nPlayState* gPlayState = nullptr;\n'
  with tempfile.TemporaryDirectory(prefix='mm-nei-use-') as td:
   path=Path(td)/(name+'.cpp');path.write_text('#include "mods/items/custom_items.h"\n#include "mods/items/helpers/equip_helper.h"\n#include "mods/extended_player.h"\n#include <cassert>\n#include <iostream>\n'+prefix+'\n'+ '\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/name

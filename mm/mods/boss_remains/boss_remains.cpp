@@ -41,6 +41,7 @@ extern "C" {
 #include "z64.h"
 #include "functions.h"
 #include "macros.h"
+#include "combo/gameplay/OcarinaItemInput.h"
 #include "variables.h"
 extern SaveContext gSaveContext;
 // Not in functions.h (z_kaleido_collect.c forward-declares them locally too): the C-button /
@@ -1384,7 +1385,7 @@ extern "C" void BossRemains_TickInput(PlayState* play, Player* player) {
         BossRemains_TickOdolwa(play, player);
     }
 
-    u16 press = play->state.input[0].press.button;
+    u16 press = OcarinaItemInput_FilterDpad(play, play->state.input[0].press.button);
     if (press == 0) {
         return;
     }

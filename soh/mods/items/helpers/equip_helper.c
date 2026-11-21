@@ -3,6 +3,7 @@
  */
 
 #include "equip_helper.h"
+#include "combo/gameplay/OcarinaItemInput.h"
 #include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
 #include <string.h>
 #include "../custom_items.h"
@@ -12,6 +13,8 @@
 #include "libultraship/bridge.h"
 #include "transformation_masks/transformation_masks.h"
 #include "extended_inventory.h" // Sw97_* — Bomb Arrows rides the bow's element flag (Skijer's NEI)
+
+extern PlayState* gPlayState;
 
 typedef struct {
     u32 frameCount;
@@ -49,7 +52,7 @@ static void EquipCache_Update(PlayState* play) {
         u8 itemId = gSaveContext.equips.buttonItems[slot];
         sEquipCache.cachedItems[slot] = itemId;
         const u8 status = slot < 4 ? slot : slot + 1;
-        if (gSaveContext.buttonStatus[status] == BTN_DISABLED || ItemInput_ButtonIsClaimed(sButtonMasks[slot])) {
+        if (gSaveContext.buttonStatus[status] == BTN_DISABLED) {
             continue;
         }
         if (itemId != ITEM_NONE && itemId < 256) {
@@ -69,7 +72,9 @@ static void EquipCache_Update(PlayState* play) {
 
 u16 ItemInput_GetEquippedButton(u8 itemId, PlayState* play) {
     EquipCache_Update(play);
-    return sEquipCache.cachedButtons[itemId];
+    u16 buttons = sEquipCache.cachedButtons[itemId];
+    // Ownership can change after this frame's cache is populated. Keep usable C duplicates.
+    return ItemInput_ButtonIsClaimed(buttons) ? buttons & ~OCARINA_ITEM_DPAD : buttons;
 }
 
 void ItemInput_SuppressUntilRelease(u8 itemId, PlayState* play) {
@@ -85,36 +90,18 @@ u8 Pacci_UltrahandModeActive(void);
 u8 MasterCycle_IsRiding(void);
 u8 Cryonis_ModeActive(void);
 
-// Is this button spoken for THIS FRAME by something that has taken the pad over?
-//
-// There are four separate places in this fork that decide whether a button press means "use what
-// is equipped here", and they do not share a path: Player_GetItemOnButton for engine items,
-// ItemInput_Update for custom ones, transformation_masks.c for masks worn while transformed, and
-// the in-water Zora clause in custom_items_common.c. The first three all scan the raw pad against
-// buttonItems themselves, which is exactly why a guard placed in any ONE of them keeps not being
-// enough - Roc's Cape leaked through the second, and the Kafei mask through the third.
-//
-// So the ANSWER lives here once and the four sites ask the question. Adding a fifth claimant means
-// editing this function and nothing else.
+// Native items, NEI items and transformation shortcuts share D-pad ownership.
 u8 ItemInput_ButtonIsClaimed(u16 button) {
-    if (!(button & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT))) {
-        return 0; // only the D-pad is ever claimed; B and the C buttons are never taken this way
+    if (!(button & OCARINA_ITEM_DPAD)) {
+        return 0;
     }
-    return (Pacci_UltrahandModeActive() || MasterCycle_IsRiding() || Cryonis_ModeActive()) ? 1 : 0;
+    return OcarinaItemInput_Active(gPlayState) || Pacci_UltrahandModeActive() || MasterCycle_IsRiding() ||
+           Cryonis_ModeActive();
 }
 
 void ItemInput_Update(ItemInputState* out, u8 itemId, Player* player, PlayState* play) {
     out->equippedButton = ItemInput_GetEquippedButton(itemId, play);
     out->wasEquipped = (out->equippedButton != 0);
-
-    // Custom items never go through Player_GetItemOnButton - they find themselves in buttonItems
-    // and read the raw pad here - so the guard placed in that engine function did nothing for them.
-    // Roc's Cape on a D-pad slot kept firing right through Ultrahand mode because of exactly this
-    // second path. An item sitting on the D-pad is simply not usable while the mode owns it.
-    if (out->wasEquipped && ItemInput_ButtonIsClaimed(out->equippedButton)) {
-        out->isPressed = out->isHeld = out->isReleased = out->otherButtonPressed = out->damageTaken = 0;
-        return;
-    }
 
     if (!out->wasEquipped) {
         out->isPressed = out->isHeld = out->isReleased = out->otherButtonPressed = out->damageTaken = 0;
@@ -146,7 +133,7 @@ u8 ItemInput_CheckDamage(Player* player, s8* prevInvincibility) {
 u8 ItemInput_CheckOtherButtons(u16 equippedButton, Input* input) {
     static const u16 sActionButtons = BTN_A | BTN_B | BTN_R | BTN_START | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP |
                                       BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
-    return (input->press.button & (sActionButtons & ~equippedButton)) != 0;
+    return (OcarinaItemInput_FilterDpad(gPlayState, input->press.button) & (sActionButtons & ~equippedButton)) != 0;
 }
 
 u8 ItemInput_IsBlockedEx(Player* player, PlayState* play, u8 skipOptionalBlockers) {

@@ -1,5 +1,6 @@
 #include "expansions/ssbb/ssbb_spawn.h"
 #include "mods/forms/wolf_link_host.h"
+#include "combo/gameplay/OcarinaItemInput.h"
 #include "mods/nei_oot_compat.h"
 #include "mods/forms/custom_forms.h"
 #include "mods/ext_buttons/ext_buttons.h"
@@ -241,7 +242,8 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     sHost.effective = Input{};
     sHost.filter = 0;
     sHost.toggle = 0;
-    sHost.crystalPress = sHost.raw.press.button & ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
+    const u16 itemPress = OcarinaItemInput_FilterDpad(play, sHost.raw.press.button);
+    sHost.crystalPress = itemPress & ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
     sHost.attemptLogged = false;
 
     if (const char* selection = SelectionRejection(play, player)) {
@@ -252,7 +254,7 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
         return;
     }
 
-    if (sHost.raw.press.button & ItemButtons(0, true)) {
+    if (itemPress & ItemButtons(0, true)) {
         if (sHost.crystalPress)
             LogAttempt("form-item-input", player);
         if (WolfLinkForm_IsSelected() || WolfLinkForm_IsReady())
@@ -270,7 +272,7 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
         return;
     }
     if (Active(player) || CanActivate(play, player)) {
-        sHost.toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
+        sHost.toggle = OcarinaItemInput_FilterDpad(play, ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false));
         sHost.filter = sHost.toggle;
     } else if (sHost.crystalPress) {
         LogAttempt(ActivationRejection(play, player), player);
@@ -284,6 +286,7 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
         }
     }
     // Raw listeners (equipment/tools/Slate/Hourglass) run before native local-pad filtering.
+    sHost.filter = OcarinaItemInput_FilterDpad(play, sHost.filter);
     Filter(&play->state.input[0], sHost.filter);
 }
 
