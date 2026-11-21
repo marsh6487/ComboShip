@@ -19,9 +19,9 @@ import subprocess
 import sys
 
 TREES = {"soh": "soh/assets/custom", "mm": "mm/assets/custom"}
-# soh/assets/custom/shaders/ is untracked, wiped + re-copied from here on every GenerateSohOtr;
-# overlay this source so shader drift against mm's tracked snapshot is gated too.
-SOH_SHADER_SRC = "libultraship/src/fast/shaders"
+# Both archive targets copy these templates before packing. SoH replaces its
+# shader directory, while 2Ship keeps its additional shaders such as flatavg.
+SHARED_SHADER_SRC = "libultraship/src/fast/shaders"
 BASELINE = "asset-collisions.json"
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -56,10 +56,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        soh = tracked_blobs(TREES["soh"])
-        for p, oid in tracked_blobs(SOH_SHADER_SRC).items():
-            soh["shaders/" + p] = oid
+        shaders = {"shaders/" + p: oid for p, oid in tracked_blobs(SHARED_SHADER_SRC).items()}
+        soh = {p: oid for p, oid in tracked_blobs(TREES["soh"]).items() if not p.startswith("shaders/")}
+        soh.update(shaders)
         mm = tracked_blobs(TREES["mm"])
+        mm.update(shaders)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         if os.environ.get("GITHUB_ACTIONS"):
             error(f"git enumeration failed in CI: {e}")

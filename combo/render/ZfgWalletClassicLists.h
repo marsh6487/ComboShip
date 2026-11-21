@@ -17,7 +17,8 @@ struct ClassicLists {
 // The two textured stock sections are leaf lists. Redirect their texture images
 // and adjust the inner gem's scale. A replacement with a different material
 // layout continues to draw its original lists.
-inline std::vector<Gfx> ClassicTextureList(std::span<const Gfx> source, const char* texture, bool gemCoordinates = false) {
+inline std::vector<Gfx> ClassicTextureList(std::span<const Gfx> source, const char* texture,
+                                           bool gemCoordinates = false) {
     if (source.empty() || source.size() > 64)
         return {};
     std::vector<Gfx> result;
