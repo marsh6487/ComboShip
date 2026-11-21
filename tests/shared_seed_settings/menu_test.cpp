@@ -9,11 +9,13 @@
 #include <vector>
 #include <imgui.h>
 #include "gui/ComboMenuModel.h"
+#include "gui/ComboSoulTracker.h"
 
 static std::string currentId;
 static std::vector<std::string> navigation;
 static std::vector<int> rendered;
 static const ComboRando::GameMenu* renderedOwner;
+static int soulsPanelsDrawn;
 namespace ImGui {
 ImVec2 GetContentRegionAvail() { return {1000, 700}; }
 ImGuiStyle& GetStyle() { static ImGuiStyle style; return style; }
@@ -41,6 +43,7 @@ void ImDrawList::AddRectFilled(const ImVec2&, const ImVec2&, ImU32, float, ImDra
 namespace ComboEmotes { void DrawSettings() {} }
 namespace ComboSync { void DrawSyncSharedPanel() {} }
 namespace ComboRando {
+void SoulTracker::DrawSettings() { ++soulsPanelsDrawn; }
 ComboMenuModel& ComboMenuModel::Get() { static ComboMenuModel model; return model; }
 void ComboMenuModel::EnsureLoaded() {}
 bool ComboMenu_StyledSidebarEntry(const char*, bool, float) { navigation.push_back(currentId); return false; }
@@ -77,6 +80,7 @@ static bool Has(const char* key) {
 }
 static void Draw(ComboRando::ComboMenu& menu, const char* active) {
     navigation.clear(); rendered.clear(); renderedOwner = nullptr;
+    soulsPanelsDrawn = 0;
     menu.mHubActive = active;
     menu.DrawSharedPanel();
 }
@@ -121,6 +125,10 @@ int main() {
     Draw(menu, "Shared Seed Settings/Map & Compass Information");
     Check(!Has("Shared Seed Settings/Map & Compass Information") && rendered == std::vector<int>({301}),
           "unavailable donor falls back to available navigation safely");
+    menu.mScope = "settings";
+    Draw(menu, "Settings/Souls Tracker");
+    Check(Has("Settings/Souls Tracker") && soulsPanelsDrawn == 1 && rendered.empty(),
+          "shared settings dispatch the Souls Tracker to its own panel even when OoT is unavailable");
     if (!failures) std::cout << "PASS shared seed menu: native ownership, unique controls and unavailable-host recovery\n";
     return failures != 0;
 }

@@ -118,6 +118,7 @@ static bool mq;
 bool ResourceMgr_IsGameMasterQuest() { return mq; }
 static auto host = std::make_shared<Ship::ResourceManager>();
 static std::shared_ptr<Ship::ResourceManager> ActiveResMgr() { return host; }
+#include "tests/fixtures/no_pause_page_texture.h"
 '''
     production = '\n'.join((scope,
         function(resource, 'std::shared_ptr<Ship::IResource> ResourceMgr_GetResourceByNameHandlingMQ('),

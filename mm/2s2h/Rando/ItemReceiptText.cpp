@@ -1,4 +1,3 @@
-#include "Rando/EntranceTracker.h"
 #include "ItemReceiptText.h"
 #include "../../../combo/ComboGameMode.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
@@ -28,6 +27,7 @@
 #include "ComboResolve.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
+#include "Rando/EntranceTrackerNames.h"
 #include "Rando/SoloEntrances.h"
 #include "rando/SoloEntranceMmOverworld.h"
 #include <unordered_map>

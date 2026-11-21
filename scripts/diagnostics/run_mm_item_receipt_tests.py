@@ -95,12 +95,22 @@ std::string ShownForeignName(const ForeignItem&,const char* p) {return std::stri
 }
 ComboRando::ForeignItem foreign;
 void MMAnchor_BroadcastCrossItem(int,const char*,const char*) {}
-void SaveManager_SaveCurrentForCombo() {}
+int saves=0;
+bool savedCheckObtained=false;
+void SaveManager_SaveCurrentForCombo() {
+ ++saves;
+ savedCheckObtained=checks.at(param).obtained;
+}
 namespace Rando {
 void AppendReceiptSource(CustomMessage::Entry&,const std::string&);
 namespace StaticData {
 struct Item {RandoItemType randoItemType=RITYPE_MAJOR; int itemId=0;};
 std::map<RandoItemId,Item> Items;
+struct StaticCheck { RandoCheckType randoCheckType; };
+const std::map<RandoCheckId,StaticCheck> Checks = {
+ {RC_UNKNOWN, {RCTYPE_UNKNOWN}},
+ {RC_WOODFALL_TEMPLE_BOSS_WARP, {RCTYPE_REMAINS}},
+};
 std::string GetItemName(RandoItemId id,bool=true,RandoCheckId=RC_UNKNOWN) {return id==RI_OOT_EXT_MAGIC_CAPE ? "the Magic Cape" : "the Deku Leaf";}
 uint8_t GetIconForZMessage(RandoItemId) {return 0xF5;}
 bool ShouldShowGetItemCutscene(RandoItemId) {return showCutscene;}
@@ -157,7 +167,7 @@ int main(int argc,char** argv) {
  assert(CustomMessage::shown.msg.find("glide")==std::string::npos && "trap revealed its disguise description");
  assert(delivered==1);
  // Visibility is a required player choice even when all pickup animations are skipped.
- showCutscene=false;flags=0;checks[param]={RI_OOT_EXT_MAGIC_CAPE};
+ showCutscene=false;flags=0;param=RC_UNKNOWN;checks[param]={RI_OOT_EXT_MAGIC_CAPE};
  const int shownBefore=CustomMessage::shownCount;
  Apply(&actor,&play);
  assert(CustomMessage::shownCount==shownBefore+1 && CustomMessage::shown.capeVisibilityChoice);
@@ -180,7 +190,22 @@ int main(int argc,char** argv) {
  assert(CustomMessage::shown.capeVisibilityChoice && CustomMessage::shown.autoFormat);
  assert(CustomMessage::shown.msg.find('\x1C')==std::string::npos && "foreign fallback fades before the choice");
  std::ofstream(argv[2],std::ios::binary)<<CustomMessage::shown.msg;
- std::cout<<"queued native/foreign receipts, icons, bank attribution, grants and traps passed\n";
+ // An invalidated remains callback cannot grant, and a real award saves after collecting the check.
+ const int grantsBeforeBoss=granted;
+ const int savesBeforeBoss=saves;
+ param=RC_WOODFALL_TEMPLE_BOSS_WARP; flags=1;
+ auto& bossCheck=checks[param];
+ bossCheck={RI_REMAINS_ODOLWA}; bossCheck.eligible=false;
+ queued=true; queuedCheck=RC_WOODFALL_TEMPLE_BOSS_WARP;
+ Apply(&actor,&play);
+ assert(granted==grantsBeforeBoss && saves==savesBeforeBoss && !bossCheck.obtained);
+ assert(!queued && queuedCheck==RC_UNKNOWN);
+ bossCheck.eligible=true;
+ queued=true; queuedCheck=RC_WOODFALL_TEMPLE_BOSS_WARP;
+ Apply(&actor,&play);
+ assert(granted==grantsBeforeBoss+1 && saves==savesBeforeBoss+1 && savedCheckObtained);
+ assert(bossCheck.obtained && !bossCheck.eligible && !queued);
+ std::cout<<"queued native/foreign receipts, icons, bank attribution, grants, traps and remains persistence passed\n";
 }
 '''
 with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:

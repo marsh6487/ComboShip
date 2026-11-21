@@ -3,6 +3,7 @@
 #include "rando/CrossDungeonCoordinator.h"
 #include <mutex>
 #include <atomic>
+#include <cassert>
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
@@ -89,6 +90,12 @@ namespace ComboAnchor {
 static std::atomic<bool> sResyncPending{ false };
 static std::atomic<int> sActiveGame{ 0 };
 } // namespace ComboAnchor
+static int bossRewardDrains = 0;
+// The boss reward transaction itself is exercised by boss_launcher_behavior_test.py.
+static void Combo_DrainBossWarpReward(int slot, int foreground) {
+    assert(slot == g_comboCompletionSlot && foreground == ComboAnchor::sActiveGame.load());
+    ++bossRewardDrains;
+}
 static void (*SOH_Anchor_RequestResync)() = nullptr;
 static void (*MM_Anchor_RequestResync)() = nullptr;
 static int pumpFamily = ComboRando::SF_GORON_MASK;
@@ -121,9 +128,10 @@ int main() {
     g_MmSaveInMemorySlot = 0;
     Combo_SharedReconcileNow();
     Combo_SharedTick();
-    check(raises == 0, "stale dormant slot must never receive an item");
+    check(raises == 0 && bossRewardDrains == 0, "stale dormant slot must never receive an item or boss reward");
     g_MmSaveInMemorySlot = 1;
     Combo_SharedTick();
+    check(bossRewardDrains == 1, "matching dormant slot allows the boss reward queue to drain");
     check(raises == 1 && tiers[1][ComboRando::SF_BOW] == 1, "matching dormant slot receives exactly one missing tier");
     Combo_SharedReconcileNow();
     check(raises == 1, "repeated reconciliation cannot add a progressive tier");

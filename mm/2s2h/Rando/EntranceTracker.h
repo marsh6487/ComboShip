@@ -1,16 +1,10 @@
 #pragma once
 
 #ifdef COMBO_BUILD
-#include <string>
+#include "Rando/EntranceTrackerNames.h"
 #include <ship/window/gui/GuiWindow.h>
 
-namespace ComboRando::CrossDungeon {
-struct Dungeon;
-} // namespace ComboRando::CrossDungeon
-
 namespace Rando::EntranceTracker {
-std::string PortalSourceName(const ComboRando::CrossDungeon::Dungeon& portal);
-
 class Window final : public Ship::GuiWindow {
   public:
     using GuiWindow::GuiWindow;

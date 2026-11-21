@@ -113,6 +113,7 @@ std::map<int, Item> Items;
 
 namespace Ship {
 struct Resource {std::string name;};
+using IResource = Resource;
 class ResourceManager {
   public:
     std::shared_ptr<Resource> LoadResourceProcess(const char* raw){
@@ -129,6 +130,7 @@ struct CrossRMRegistry {
 namespace Fast {using Texture=Ship::Resource;}
 std::shared_ptr<Ship::ResourceManager> active;
 std::shared_ptr<Ship::ResourceManager> ActiveResMgr(){return active;}
+#include "tests/fixtures/no_pause_page_texture.h"
 /* TEXTURE_RESOLVER */
 bool nativeIconPresent=true, donorQueried=false;
 u8 ResourceMgr_FileExists(const char*){return nativeIconPresent;}
