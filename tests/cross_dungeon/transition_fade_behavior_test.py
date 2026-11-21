@@ -447,6 +447,7 @@ static int32_t Materialize(int32_t index) { return index; }
 static void ObserveScene(int) {}
 '''.replace('GAME', '0' if is_oot else '1')
     if not is_oot:
+        body += 'static void DiscoverEntrance(int32_t) {}\n'
         body += function(runtime, 'static int32_t RecoverBoss(') + '\n'
     body += function(runtime, 'static bool PrepareSwitch()') + '\n}\n'
     for marker in [prefix + '_CrossDungeonTransitionPending(', prefix + '_CompleteCrossDungeonTransition(',

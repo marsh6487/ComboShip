@@ -39,6 +39,7 @@ set(COMBOUI_SOURCES
     gui/ComboAnchorRoomWindow.cpp
     gui/ComboNotesWindow.cpp
     gui/ComboHintTracker.cpp
+    gui/ComboSoulTracker.cpp
     gui/ComboTimersWindow.cpp
     gui/ComboEmoteSettings.cpp
     gui/ComboCosmeticsSync.cpp
@@ -161,6 +162,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_SOURCE_DIR}/x64/Debug"
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/x64/Release"
     )
+
+    # Each game loads its own copy of libsm64, whose globals belong to that
+    # game's simulation even while both modules are resident in ComboShip.
+    set(COMBO_SM64_DLL "${CMAKE_SOURCE_DIR}/mm/2s2h/expansions/sm64/sm64.dll")
+    add_custom_command(TARGET ComboShip POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:ComboShip>/nei/soh" "$<TARGET_FILE_DIR:ComboShip>/nei/2ship"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${COMBO_SM64_DLL}" "$<TARGET_FILE_DIR:ComboShip>/nei/soh/sm64.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${COMBO_SM64_DLL}" "$<TARGET_FILE_DIR:ComboShip>/nei/2ship/sm64.dll"
+        VERBATIM)
+    install(FILES "${COMBO_SM64_DLL}" DESTINATION nei/soh COMPONENT combo)
+    install(FILES "${COMBO_SM64_DLL}" DESTINATION nei/2ship COMPONENT combo)
 
     # Release: no console window (kept in Debug for logs). Same /SUBSYSTEM:WINDOWS soh uses; soh relies
     # on SDL2main for WinMain, but ComboShip has its own main() (see above), so /ENTRY:mainCRTStartup

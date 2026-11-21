@@ -309,6 +309,15 @@ int main() {
   assert(!SSBBSkin_GetBoneWorldPos(&pika, 47, &position));
   assert(!SSBBSkin_GetBoneWorldPos(&pika, 48, &position));
 #endif
+#ifdef MM_PIKACHU_BIND_POSE_OPTION
+  auto* pikachuMesh = pika.def->skinMesh;
+  pika.ssbbAnim = nullptr;
+  assert(!SSBBSkin_Draw(&pika, &play, &position, &rotation));
+  pikachuMesh->drawBindPose = true;
+  assert(SSBBSkin_Draw(&pika, &play, &position, &rotation));
+  close(pikachuMesh->vtxBuf[pikachuMesh->bufIndex ^ 1][0].n.ob[0], static_cast<s16>(pikachuMesh->vertices[0].posX));
+  assert(!SSBBSkin_GetBoneWorldPos(&pika, 0, &position));
+#endif
   SSBBSkin_Destroy(pika.def->skinMesh);
   std::puts("PASS production MM skin: Pikachu defaults, Wolf root/TRS "
             "interpolation, scale and owner-scoped bone queries");

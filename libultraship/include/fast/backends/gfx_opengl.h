@@ -104,7 +104,7 @@ class GfxRenderingAPIOGL final : public GfxRenderingAPI {
     void StartDrawToFramebuffer(int fbId, float noiseScale) override;
     void CopyFramebuffer(int fbDstId, int fbSrcId, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0,
                          int dstX1, int dstY1) override;
-    void ClearFramebuffer(bool color, bool depth) override;
+    void ClearFramebuffer(bool color, bool depth, float clearAlpha = 1.0f) override;
     void ClearDepthRegion(int x, int y, int w, int h) override;
     void ReadFramebufferToCPU(int fbId, uint32_t width, uint32_t height, uint16_t* rgba16Buf) override;
     void ResolveMSAAColorBuffer(int fbIdTarger, int fbIdSrc) override;

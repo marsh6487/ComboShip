@@ -42,6 +42,7 @@
 #include "ship/utils/Utils.h"
 #include "ship/Context.h"
 #include "ship/config/ConsoleVariable.h"
+#include "libultraship/bridge/resourcebridge.h"
 
 #include "libultraship/libultra/os.h"
 
@@ -4331,6 +4332,18 @@ void Interpreter::GfxDpFillRectangle(int32_t ulx, int32_t uly, int32_t lrx, int3
     }
     uint32_t mode = (mRdp->other_mode_h & (3U << G_MDSFT_CYCLETYPE));
 
+    // A full transparent-black fill of a separate render target (such as the
+    // equipment preview) must write alpha zero. The opaque fill shader emits
+    // alpha one, so clear the target directly and keep the current depth.
+    if (mode == G_CYC_FILL && mFbActive && mActiveFrameBuffer != mFrameBuffers.end() && mRdp->fill_color.r == 0 &&
+        mRdp->fill_color.g == 0 && mRdp->fill_color.b == 0 && mRdp->fill_color.a == 0 && ulx == 0 && uly == 0 &&
+        lrx == (static_cast<int32_t>(mActiveFrameBuffer->second.orig_width) - 1) * 4 &&
+        lry == (static_cast<int32_t>(mActiveFrameBuffer->second.orig_height) - 1) * 4) {
+        Flush();
+        mRapi->ClearFramebuffer(true, false, 0.0f);
+        return;
+    }
+
     // Expand fullscreen fill rects to cover widescreen viewports.
     // Without this, screen clears and fades only cover the native 4:3 area.
     if (ulx == 0 && uly == 0) {
@@ -5446,6 +5459,10 @@ static bool IsValidResolvedAddress(uintptr_t addr) {
 // Resolve the same owner marker as the DL handler, scoped to this lookup so later host icons
 // keep using their own RM. A missing/invalid owner must never borrow a same-named host texture.
 static std::shared_ptr<Fast::Texture> ComboLoadTextureResource(const char* fileName) {
+    constexpr std::string_view pausePageRoute = "__OTR__@pause-page:";
+    if (std::string_view(fileName).starts_with(pausePageRoute)) {
+        return std::dynamic_pointer_cast<Fast::Texture>(ResourceLoadPausePageTile(fileName));
+    }
     auto rm = ActiveResMgr();
     static constexpr char kOtrPrefix[] = "__OTR__";
     if (strncmp(fileName, kOtrPrefix, sizeof(kOtrPrefix) - 1) == 0 && fileName[sizeof(kOtrPrefix) - 1] == '@') {

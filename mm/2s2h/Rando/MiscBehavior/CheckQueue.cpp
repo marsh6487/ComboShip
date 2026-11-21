@@ -11,6 +11,10 @@
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
+#include "2s2h/BenPort.h"
+#include "ComboExport.h"
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include "rando/CrossForeign.h"           // ComboShip: cross-world foreign-item marker map
 #include "2s2h/SaveManager/SaveManager.h" // ComboShip: persist delivered cross items into the MM save
 // ComboShip: Anchor shared-progression co-op — broadcast a locally-obtained check to teammates.
@@ -147,6 +151,77 @@ extern "C" void Rando_CancelMagicMirrorStump(void) {
 }
 #endif
 
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT const char* MM_DrainBossWarpReward(int slot, bool (*grantPeer)(int, const char*)) {
+    if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
+        return nullptr;
+
+    constexpr RandoCheckId bosses[] = {
+        RC_WOODFALL_TEMPLE_BOSS_WARP,
+        RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+        RC_GREAT_BAY_TEMPLE_BOSS_WARP,
+        RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP,
+    };
+    for (const auto rc : bosses) {
+        auto& check = RANDO_SAVE_CHECKS[rc];
+        if (!check.eligible || check.cycleObtained || check.randoItemId == RI_NONE)
+            continue;
+        if (!grantPeer)
+            return "";
+
+        static std::string result;
+        const auto placed = check.randoItemId;
+        const bool acquired = check.obtained;
+        if (placed == RI_COMBO_FOREIGN) {
+            const auto* foreign = Rando::MiscBehavior::MM_LookupForeign(rc);
+            if (!foreign)
+                continue;
+            if (foreign->trap) {
+                gSaveContext.save.shipSaveInfo.rando.pendingTrapCount++;
+                result = "Trap";
+            } else {
+                if (!acquired) {
+                    Rando::LatchComboForeign(rc);
+                    result = ComboRando::ShownForeignName(*foreign, Rando::ComboForeignLatchedName(rc));
+                    if (!grantPeer(foreign->itemGame, foreign->itemName.c_str()))
+                        continue;
+                }
+            }
+            if (!acquired)
+                MMAnchor_BroadcastCrossItem(foreign->itemGame, foreign->itemName.c_str(),
+                                            Rando::StaticData::GetCheckDisplayName(rc).c_str());
+        } else {
+            const Ship::ResourceManagerScope scope(Ship::CrossRMRegistry::Get("mm"));
+            auto item = Rando::ConvertItem(placed, rc);
+            if (item == RI_JUNK)
+                item = Rando::CurrentJunkItem(rc);
+            if (!Rando::StaticData::Items.contains(item))
+                continue;
+            result = Rando::StaticData::GetItemName(item, false, rc);
+            struct DormantScope {
+                bool previous = Rando::gComboDormantGive;
+                DormantScope() {
+                    Rando::gComboDormantGive = true;
+                }
+                ~DormantScope() {
+                    Rando::gComboDormantGive = previous;
+                }
+            } dormant;
+            Rando::GiveItem(item, rc);
+            Combo_MM_FlushAccumulators();
+        }
+        check.obtained = true;
+        check.cycleObtained = true;
+        check.eligible = false;
+        Rando::MiscBehavior::BroadcastCheckObtainedIfFirst(rc, placed, acquired);
+        SaveManager_SaveCurrentForCombo();
+        // Native MM repeats a cycle check without paying its cross-world reward a second time.
+        return placed == RI_COMBO_FOREIGN && acquired ? "" : result.c_str();
+    }
+    return nullptr;
+}
+#endif
+
 // This function handles queuing up item gives that the player has been marked as eligible for. If you are looking for
 // the behavior of the actual giving itself, the heavy lifting is done by the GameInteractor queue. This function is
 // currently called every frame, and loops through the entire list of checks, this works for now but as the check list
@@ -165,6 +240,11 @@ void Rando::MiscBehavior::CheckQueue() {
         auto randoSaveCheck = RANDO_SAVE_CHECKS[randoCheckId];
 
         if (randoSaveCheck.eligible) {
+#ifdef COMBO_BUILD
+            if (Combo_IsCombinedGame() && randoStaticCheck.randoCheckType == RCTYPE_REMAINS &&
+                gPlayState->sceneId == randoStaticCheck.sceneId)
+                continue;
+#endif
             queued = true;
             queuedCheck = randoCheckId;
 
@@ -181,6 +261,16 @@ void Rando::MiscBehavior::CheckQueue() {
                 .giveItem =
                     [](Actor* actor, PlayState* play) {
                         auto& randoSaveCheck = RANDO_SAVE_CHECKS[CUSTOM_ITEM_PARAM];
+#ifdef COMBO_BUILD
+                        if (Combo_IsCombinedGame() &&
+                            Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM)).randoCheckType ==
+                                RCTYPE_REMAINS &&
+                            !randoSaveCheck.eligible) {
+                            queued = false;
+                            queuedCheck = RC_UNKNOWN;
+                            return;
+                        }
+#endif
 #ifdef COMBO_BUILD
                         if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
                             !MagicMirror_CommitStumpRewardToken()) {
@@ -359,7 +449,10 @@ void Rando::MiscBehavior::CheckQueue() {
                                                                            randoSaveCheck.randoItemId, wasObtained);
 #endif
 #ifdef COMBO_BUILD
-                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP ||
+                            (Combo_IsCombinedGame() &&
+                             Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM))
+                                     .randoCheckType == RCTYPE_REMAINS))
                             SaveManager_SaveCurrentForCombo();
 #endif
                         CUSTOM_ITEM_PARAM = randoItemId;

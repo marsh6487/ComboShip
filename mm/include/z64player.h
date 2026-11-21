@@ -1477,6 +1477,7 @@ bool Player_CheckHostileLockOn(Player* player);
 bool Player_FriendlyLockOnOrParallel(Player* player);
 bool func_80123448(struct PlayState* play);
 bool Player_IsGoronOrDeku(Player* player);
+bool Player_IsDekuFlowerFlying(const Player* player);
 bool func_801234D4(struct PlayState* play);
 bool func_80123590(struct PlayState* play, Actor* actor);
 // #region 2S2H [Dpad]

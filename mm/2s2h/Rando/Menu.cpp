@@ -1620,8 +1620,8 @@ static void DrawItemPoolTab() {
                 "Include Pikachu Pokeball", Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar,
                 CheckboxOptions({ { .tooltip = "Adds the Pikachu Pokeball to the pool. Finding it unlocks PIKACHU\n"
                                                "MODE on the equipment page's Crossover Items sub-page.\n"
-                                               "2Ship has no Pikachu transformation yet — the form selects but Link\n"
-                                               "does not change.\n\nNot considered by logic." } }))) {
+                                               "In 2Ship, Pikachu replaces human Link's model and keeps MM controls."
+                                               "\n\nNot considered by logic." } }))) {
             NeiRando_EnableCrossover();
         }
     }
@@ -2427,6 +2427,15 @@ void Rando::RegisterMenu() {
         win->Update();
         win->DrawElement();
     });
+#endif
+
+#ifdef COMBO_BUILD
+    mBenMenu->AddSidebarEntry("Rando", "Entrance Tracker", 1);
+    path.sidebarName = "Entrance Tracker";
+    mBenMenu->AddWidget(path, "Toggle Entrance Tracker", WIDGET_WINDOW_BUTTON)
+        .CVar(Combo_IsCombinedGame() ? "gOpenWindows.EntranceTracker" : "gWindows.EntranceTracker")
+        .WindowName("Entrance Tracker")
+        .Options(UIWidgets::WindowButtonOptions().EmbedWindow(false));
 #endif
 
     mBenMenu->AddSidebarEntry("Rando", "Check Tracker", 1);

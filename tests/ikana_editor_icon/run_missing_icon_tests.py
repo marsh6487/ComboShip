@@ -53,6 +53,7 @@ def fixture(read):
 #include "combo/menu/ComboItemIconOwnership.h"
 #include "fast/resource/type/Texture.h"
 #include "ship/resource/CrossRMRegistry.h"
+#include "tests/fixtures/no_pause_page_texture.h"
 using u8 = uint8_t;
 #ifdef COMBO_BUILD
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }

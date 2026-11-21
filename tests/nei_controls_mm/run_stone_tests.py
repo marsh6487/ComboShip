@@ -12,10 +12,18 @@ static int sOotQuestCursorPoint=0x12,sPendingWarpStone=-1;
 static s16 sHoldFrames[SPIRITUAL_STONE_COUNT];
 static int summoned=-1,prompted=-1;
 static bool OotQuest_Has(s16){return hasStone;}
-void SpiritualStone_TogglePassive(s32){}
 void Interface_Dpad_LoadItemIcon(PlayState* play,u8 btn){Interface_Dpad_LoadItemIconImpl(play,btn);}
 static bool StonesEnabled(){return true;}
 static auto& State(){return gSaveContext.save.shipSaveInfo.spiritualStones;}
+static bool localQuestTex, localAltQuestTex, altQuestEnabled, donorQuestTex;
+static const char questIcon[] = "__OTR__textures/icon_item_24_static/gQuestIconKokiriEmeraldTex";
+static const char donorIcon[] = "__OTR__@oot:textures/icon_item_24_static/gQuestIconKokiriEmeraldTex";
+u8 ResourceMgr_FileExists(const char* path) { assert(path == questIcon); return localQuestTex; }
+u8 ResourceMgr_FileAltExists(const char* path) { assert(path == questIcon); return localAltQuestTex; }
+bool ResourceMgr_IsAltAssetsEnabled() { return altQuestEnabled; }
+int NeiResource_Available(const char* path) { assert(path == questIcon); return donorQuestTex; }
+const char* NeiResource_Route(const char* path) { assert(path == questIcon); return donorIcon; }
+
 
 
 u8 Message_GetState(MessageContext*){return 0;}
@@ -31,6 +39,32 @@ int main(int argc,char**argv){
  const u16 masks[]={BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
  const u16 items[]={EXT_ITEM_SPIRITUAL_STONE_KOKIRI,EXT_ITEM_SPIRITUAL_STONE_GORON,EXT_ITEM_SPIRITUAL_STONE_ZORA};
  static PlayState play;Player player{};
+ if (!strcmp(argv[1], "assign")) {
+  assert(OotQuest_Tex(nullptr) == nullptr);
+  assert(OotQuest_Tex(questIcon) == nullptr);
+  donorQuestTex = true;
+  assert(OotQuest_Tex(questIcon) == donorIcon);
+  localAltQuestTex = true;
+  assert(OotQuest_Tex(questIcon) == donorIcon);
+  altQuestEnabled = true;
+  assert(OotQuest_Tex(questIcon) == questIcon);
+  localQuestTex = true;
+  altQuestEnabled = false;
+  assert(OotQuest_Tex(questIcon) == questIcon);
+
+  Reset();
+  play.state.input[0].press.button = BTN_A;
+  sOotQuestCursorPoint = 0x12;
+  assert(!State().passive[SPIRITUAL_STONE_KOKIRI]);
+  StoneSelect(&play, &play.state.input[0]);
+  assert(State().passive[SPIRITUAL_STONE_KOKIRI]);
+  hasStone = false;
+  StoneSelect(&play, &play.state.input[0]);
+  assert(State().passive[SPIRITUAL_STONE_KOKIRI]);
+  hasStone = true;
+  StoneSelect(&play, &play.state.input[0]);
+  assert(!State().passive[SPIRITUAL_STONE_KOKIRI]);
+ }
  for(int stone=0;stone<3;++stone)for(int b=0;b<7;++b){
   Reset();play={};pacci=riding=false;hasStone=true;memset(sHoldFrames,0,sizeof(sHoldFrames));
   sPendingWarpStone=summoned=prompted=-1;sOotQuestCursorPoint=0x12+stone;
@@ -74,6 +108,7 @@ def main():
  buttons=read('mm/mods/ext_buttons/ext_buttons.cpp');collect=read('mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_collect.c');stone=read('mm/mods/spiritual_stones/spiritual_stones.cpp')
  first=collect.index('    if (point >= 0x12 && point <= 0x14 && OotQuest_Has(point))');last=collect.index('    // Stone of Agony',first)
  code=PREFIX+claim_definition(read)+EXTRA+'\n'+buttons[buttons.index('u16 ExtButton_GetItem'):buttons.rindex('} // extern')]
+ code+='\n'+function(collect,'OotQuest_Tex')+'\n'+function(stone,'SpiritualStone_TogglePassive')
  code+='\nvoid StoneSelect(PlayState* play,Input* input){s16 point=sOotQuestCursorPoint;\n'+collect[first:last]+'}\n'
  code+='\n'+function(stone,'StoneItemId')+'\n'+function(stone,'SpiritualStone_TickHold')+CHECKS
  with tempfile.TemporaryDirectory(prefix='nei-controls-mm-stones-') as td:

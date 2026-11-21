@@ -11,6 +11,7 @@
 #include "ComboAnchorRoomWindow.h" // combo-native floating Anchor room window
 #include "ComboNotesWindow.h"      // combo-owned cross-game Personal Notes window
 #include "ComboHintTracker.h"      // combo-owned unified Hint Tracker (#164)
+#include "ComboSoulTracker.h"
 #include "ComboEmoteSettings.h"
 #include "ComboTimersWindow.h" // combo-owned overlay timers (#173)
 #include "ComboSettingsSync.h" // combo-owned cross-game settings sync
@@ -461,6 +462,7 @@ struct HubEntry {
         COMBO_TRACKER,
         COMBO_CHECK_TRACKER,
         COMBO_HINT_TRACKER,
+        COMBO_SOUL_TRACKER,
         COMBO_TIMERS,
         COMBO_EMOTES,
         COMBO_SYNC,
@@ -1358,6 +1360,11 @@ void ComboMenu::DrawSharedPanel() {
         hnt.group = "Settings";
         hnt.kind = HubEntry::COMBO_HINT_TRACKER;
         e.push_back(std::move(hnt));
+        HubEntry souls;
+        souls.label = "Souls Tracker";
+        souls.group = "Settings";
+        souls.kind = HubEntry::COMBO_SOUL_TRACKER;
+        e.push_back(std::move(souls));
         // Combo-owned overlay timers (#173): one play-time overlay spanning both games.
         HubEntry tmr;
         tmr.label = "Timers";
@@ -1527,6 +1534,8 @@ void ComboMenu::DrawSharedPanel() {
         DrawCheckTrackerSharedPanel();
     } else if (active->kind == HubEntry::COMBO_HINT_TRACKER) {
         DrawHintTrackerSharedPanel();
+    } else if (active->kind == HubEntry::COMBO_SOUL_TRACKER) {
+        SoulTracker::DrawSettings();
     } else if (active->kind == HubEntry::COMBO_TIMERS) {
         DrawTimersSharedPanel();
     } else if (active->kind == HubEntry::COMBO_EMOTES) {
@@ -2075,6 +2084,7 @@ extern "C" COMBO_EXPORT void ComboUI_Register(void) {
     // hidden, so force it shut here — a config that persisted gOpenWindows.HintTracker=1 would
     // otherwise keep showing a window with no settings and no combo hint content.
     ComboRando::RegisterHintTrackerWindow();
+    ComboRando::SoulTracker::RegisterWindow();
     for (const auto& [cvar, name] : { std::pair{ "gOpenWindows.HintTracker", "Hint Tracker" },
                                       std::pair{ "gOpenWindows.HintTrackerSettings", "Hint Tracker Settings" } }) {
         CVarSetInteger(cvar, 0);

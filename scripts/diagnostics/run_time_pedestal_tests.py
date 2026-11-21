@@ -88,8 +88,9 @@ def main():
         if arrival_state:
             actor_body += arrival_state[0] + "\n"
         actor_body += "\n".join(source.values())
-        (build / "actor.c").write_text('#include "time_pedestal_fixture.h"\n' +
-            re.search(r"#define TIME_PEDESTAL_SKIP_FADE_FRAMES \d+", actor_source)[0] + "\n" + actor_body)
+        actor_constants = re.findall(r"^#define TIME_PEDESTAL_\w+_FRAMES \d+", actor_source, re.M)
+        (build / "actor.c").write_text('#include "time_pedestal_fixture.h"\n' + "\n".join(actor_constants) +
+                                       "\n" + actor_body)
         collision_source = (ROOT / "soh/src/code/z_collision_check.c").read_text()
         collision = functions(collision_source)
         collision_names = ["Collider_InitBase", "Collider_DestroyBase", "Collider_SetBase",

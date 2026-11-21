@@ -1137,6 +1137,7 @@ void Rando::StaticData::InitItemTable() {
         }
     };
     itemTable[RG_PROGRESSIVE_ROCS].SetCustomDrawFunc(Randomizer_DrawRocsFeatherSkijer); // rg=NEI_NO_RG in registry (2 RGs -> 1 item)
+    itemTable[RG_PROGRESSIVE_ROCS].CustomIcon("__OTR__textures/icon_item_custom/gItemIconRocsFeatherTex");
     setNeiDraw(RG_WHIP);
     setNeiDraw(RG_SPINNER);
     setNeiDraw(RG_BOMB_ARROWS);

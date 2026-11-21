@@ -722,6 +722,8 @@ void CustomItems_Update(Player* p, PlayState* play) {
         for (s32 mi = 0; mi < 7; mi++) {
             if (mi >= 3 && !CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0))
                 break;
+            if (ItemInput_ButtonIsClaimed(sMaskBtns[mi]))
+                continue;
             if (CHECK_BTN_ALL(ctrl->press.button, sMaskBtns[mi])) {
                 // sMaskBtns is sButtonMasks minus B, so logical slot = mi + 1 (C: 1-3, D-pad: 4-7).
                 u8 maskItem = ItemEquip_GetItemOnSlot((u8)(mi + 1));

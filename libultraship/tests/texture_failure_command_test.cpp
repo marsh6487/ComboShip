@@ -1,7 +1,9 @@
 // Production SETTIMG handlers; archive lookup and graphics-state sink are doubles.
 #include "fast/lus_gbi.h"
 #include "fast/resource/type/Texture.h"
+#include "libultraship/bridge/resourcebridge.h"
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
 #include <iostream>
@@ -26,6 +28,10 @@ template <typename... Args> static void Capture(const char* format, const Args&.
     errors.push_back({ format, { Field(args)... } });
 }
 #define SPDLOG_ERROR(...) Capture(__VA_ARGS__)
+
+std::shared_ptr<Ship::IResource> ResourceLoadPausePageTile(const char*) {
+    std::abort(); // The named and hashed fixtures must use the archive double.
+}
 
 namespace Ship {
 class ArchiveManager {

@@ -49,12 +49,33 @@ void Randomizer_DrawCaneSomariaUpgrade() {} void Randomizer_DrawCanePacciUpgrade
 void Randomizer_DrawCanePacciUltrahand() {} void Custom() {}
 struct GetItemEntry {int tableId,drawItemId,gid,itemId;void (*drawFunc)();};
 RandomizerGet concrete=RG_NONE;
+/* ROC_SLOT */
+uint16_t rocSlot=ITEM_NONE;
+uint16_t ExtInv_GetSlotItem(int slot) { assert(slot==SLOT_ROCS); return rocSlot; }
+RandomizerGet ResolveNativeRoc(RandomizerGet id) {
+ RandomizerGet actual = RG_NONE;
+ switch (id) {
+ /* ROC_RESOLUTION */
+ default:
+  break;
+ }
+ return actual;
+}
 namespace Rando::StaticData {
 std::unordered_map<std::string,RandomizerGet> itemNameToEnum;
 struct Name {std::string english="concrete award";};
 struct Item {RandomizerGet rg;std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet* actual) {
- *actual=concrete;return std::make_shared<GetItemEntry>(GetItemEntry{TABLE_RANDOMIZER,rg,rg==RG_MAGIC_STAT_UPGRADE?GID_MAGIC_LARGE:0,0,(rg==RG_MAGIC_STAT_UPGRADE || concrete==RG_KOKIRI_SWORD || concrete==RG_BIGGORON_SWORD)?nullptr:Custom});
- } const Name& GetName() {static Name name;return name;}};
+ *actual=concrete==RG_NONE ? ResolveNativeRoc(rg) : concrete;
+ if (*actual==RG_BLUE_RUPEE)
+  return std::make_shared<GetItemEntry>(GetItemEntry{TABLE_VANILLA,GI_RUPEE_BLUE,GID_RUPEE_BLUE,ITEM_RUPEE_BLUE,nullptr});
+ return std::make_shared<GetItemEntry>(GetItemEntry{TABLE_RANDOMIZER,rg,rg==RG_MAGIC_STAT_UPGRADE?GID_MAGIC_LARGE:0,0,(rg==RG_MAGIC_STAT_UPGRADE || concrete==RG_KOKIRI_SWORD || concrete==RG_BIGGORON_SWORD)?nullptr:Custom});
+ } const Name& GetName() {
+    static const Name fallback, feather{"Progressive Roc"}, cape{"Roc's Cape"}, rupee{"Blue Rupee"};
+    if(rg==RG_PROGRESSIVE_ROCS)return feather;
+    if(rg==RG_ROCS_CAPE)return cape;
+    if(rg==RG_BLUE_RUPEE)return rupee;
+    return fallback;
+ }};
 Item RetrieveItem(RandomizerGet rg) {return {rg};}
 }
 bool authoredAvailable = false;
@@ -70,8 +91,12 @@ int ResourceMgr_IsModAssetForGame(const char*,const char*);
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*);
 int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*,const char*,float*,float*);
 bool DrawOwnerActive();
-int GetItem_GetDrawTableEntry(int,void** dls,int,int*,float*,int*,uint8_t*) {
+int GetItem_GetDrawTableEntry(int gid,void** dls,int,int*,float*,int*,uint8_t*) {
  assert(DrawOwnerActive());
+ if (gid==GID_RUPEE_BLUE) {
+  dls[0]=(void*)"__OTR__blue_rupee";
+  return 1;
+ }
  if(concrete!=RG_MAGIC_STAT_UPGRADE && concrete!=RG_KOKIRI_SWORD && concrete!=RG_BIGGORON_SWORD)return 0;
  dls[0]=(void*)"__OTR__native_sword_row";return 1;
 }
@@ -259,6 +284,26 @@ int main() {
  resources.clear();
  OTRGlobals globals{&globals,&globals};OTRGlobals::Instance=&globals;
  /* NAME_MAP_INIT */
+ struct RocAward {
+     uint16_t owned;
+     const char* name;
+     const char* model;
+ };
+ const RocAward rocAwards[] = {
+     { ITEM_NONE, "Progressive Roc", "__OTR__@oot:objects/object_nei_rocs_feather/rocs_feather_dl" },
+     { ITEM_ROCS_FEATHER_SKIJER, "Roc's Cape", "__OTR__@oot:objects/object_nei_rocs_cape/rocs_cape_mesh_dl" },
+     { ITEM_ROCS_CAPE, "Blue Rupee", "__OTR__@oot:blue_rupee" },
+ };
+ selected=RG_PROGRESSIVE_ROCS;
+ for(const auto& award : rocAwards) {
+  rocSlot=award.owned;
+  resources.insert(std::string("__OTR__")+(award.model+12));
+  ComboForeignDrawInfoOOT info{};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(info.stateDependent && info.resolvedName==award.name && !strcmp(info.dls[0],award.model));
+ }
+ rocSlot=ITEM_NONE;
+ resources.clear();
  CwItemDrawInfo dependency{};
  for(auto sword:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,
                  RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}) {

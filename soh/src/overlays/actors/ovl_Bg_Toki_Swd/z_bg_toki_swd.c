@@ -83,14 +83,15 @@ static struct {
     PlayState* fillPlay;
     Player* player;
     Vec3f startPos, returnPos;
-    Vec3f cameraAt, cameraEye;
+    Vec3f cameraAt, cameraEye, cameraEndEye;
     s16 startYaw, returnYaw, scene, entrance;
     s16 subCamId, subCamUid;
     u16 fileNum;
     s8 room, age;
-    u8 pending, cameraAttempted, skipFadeFrame, fadeOutFrame, fillAlpha;
+    u8 pending, cameraAttempted, cameraFrame, skipFadeFrame, fadeOutFrame, fillAlpha;
 } sTimePedestalArrival;
 
+#define TIME_PEDESTAL_CAMERA_PULLBACK_FRAMES 32
 #define TIME_PEDESTAL_SKIP_FADE_FRAMES 8
 
 static void BgTokiSwd_SetSkipFill(PlayState* play, u8 alpha) {
@@ -310,6 +311,7 @@ s32 BgTokiSwd_BeginTimePedestalArrival(PlayState* play, Player* player) {
     sTimePedestalArrival.player = NULL;
     sTimePedestalArrival.subCamId = SUBCAM_NONE;
     sTimePedestalArrival.cameraAttempted = false;
+    sTimePedestalArrival.cameraFrame = 0;
     sTimePedestalArrival.skipFadeFrame = 0;
     sTimePedestalArrival.fadeOutFrame = 0;
     if (!sTimePedestalArrival.pending) {
@@ -338,7 +340,31 @@ s32 BgTokiSwd_IsTimePedestalArrival(PlayState* play, Player* player) {
 
 void BgTokiSwd_UpdateTimePedestalArrivalCamera(PlayState* play, Player* player) {
     if (!BgTokiSwd_IsTimePedestalArrival(play, player) || !play->state.running ||
-        play->transitionTrigger == TRANS_TRIGGER_START || sTimePedestalArrival.cameraAttempted) {
+        play->transitionTrigger == TRANS_TRIGGER_START) {
+        return;
+    }
+    if (sTimePedestalArrival.cameraAttempted) {
+        s16 subCamId = sTimePedestalArrival.subCamId;
+        if (subCamId == SUBCAM_NONE || Play_GetActiveCamId(play) != subCamId ||
+            Play_CameraGetUID(play, subCamId) != sTimePedestalArrival.subCamUid ||
+            play->transitionTrigger != TRANS_TRIGGER_OFF || sTimePedestalArrival.skipFadeFrame != 0 ||
+            sTimePedestalArrival.cameraFrame >= TIME_PEDESTAL_CAMERA_PULLBACK_FRAMES) {
+            return;
+        }
+
+        // Hold the close shot through the white reveal. Ease back as the
+        // arrival action plays, keeping its aim in the stump clearing.
+        f32 progress = ++sTimePedestalArrival.cameraFrame / (f32)TIME_PEDESTAL_CAMERA_PULLBACK_FRAMES;
+        progress = progress * progress * (3.0f - 2.0f * progress);
+        Vec3f eye = {
+            sTimePedestalArrival.cameraEye.x +
+                (sTimePedestalArrival.cameraEndEye.x - sTimePedestalArrival.cameraEye.x) * progress,
+            sTimePedestalArrival.cameraEye.y +
+                (sTimePedestalArrival.cameraEndEye.y - sTimePedestalArrival.cameraEye.y) * progress,
+            sTimePedestalArrival.cameraEye.z +
+                (sTimePedestalArrival.cameraEndEye.z - sTimePedestalArrival.cameraEye.z) * progress,
+        };
+        Play_CameraSetAtEye(play, subCamId, &sTimePedestalArrival.cameraAt, &eye);
         return;
     }
     // Player_Init runs before Play_Init initializes the main camera. Acquire
@@ -523,14 +549,17 @@ void BgTokiSwd_FinishTimePedestal(BgTokiSwd* this, PlayState* play) {
     TimePedestalCutscene_TransformPoint(&sTimePedestalArrival.startPos, &this->actor.world.pos,
                                         this->actor.shape.rot.y);
     sTimePedestalArrival.startYaw = this->actor.shape.rot.y + 0x8000;
-    // Frame the far side of the stump toward Sheik and Saria in room 10.
-    // These points use the same pedestal-relative coordinates as the native
-    // cutscene, so moving the authored sword moves both ages' shots together.
-    sTimePedestalArrival.cameraAt = (Vec3f){ -59.0f, play->linkAgeOnLoad == LINK_AGE_CHILD ? 103.0f : 118.0f, 56.0f };
-    sTimePedestalArrival.cameraEye = (Vec3f){ -80.0f, play->linkAgeOnLoad == LINK_AGE_CHILD ? 132.0f : 150.0f, 165.0f };
+    // Use the Temple reference's low, front-three-quarter arrival framing.
+    // The character faces negative Z in this coordinate space. Rebase both
+    // shots along with the player when the stump has a different yaw or height.
+    sTimePedestalArrival.cameraAt = (Vec3f){ -1.0f, play->linkAgeOnLoad == LINK_AGE_CHILD ? 96.0f : 106.0f, 18.0f };
+    sTimePedestalArrival.cameraEye = (Vec3f){ -42.0f, 82.0f, -107.0f };
+    sTimePedestalArrival.cameraEndEye = (Vec3f){ -49.0f, 90.0f, -129.0f };
     TimePedestalCutscene_TransformPoint(&sTimePedestalArrival.cameraAt, &this->actor.world.pos,
                                         this->actor.shape.rot.y);
     TimePedestalCutscene_TransformPoint(&sTimePedestalArrival.cameraEye, &this->actor.world.pos,
+                                        this->actor.shape.rot.y);
+    TimePedestalCutscene_TransformPoint(&sTimePedestalArrival.cameraEndEye, &this->actor.world.pos,
                                         this->actor.shape.rot.y);
     sTimePedestalArrival.returnPos = this->returnPos;
     sTimePedestalArrival.returnYaw = this->returnYaw;

@@ -11,7 +11,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKENDS = ROOT / 'libultraship/src/fast/backends'
-API = (ROOT / 'libultraship/include/fast/backends/gfx_rendering_api.h').read_text()
+BACKEND_HEADERS = ROOT / 'libultraship/include/fast/backends'
+API = (BACKEND_HEADERS / 'gfx_rendering_api.h').read_text()
 
 
 def function(source, signature):
@@ -26,6 +27,11 @@ def function(source, signature):
             depth -= 1
         end += 1
     return source[start:end]
+
+
+def clear_declaration(header_name):
+    source = (BACKEND_HEADERS / header_name).read_text()
+    return re.search(r'void ClearFramebuffer\([^;]+?\)', source)[0] + ';'
 
 
 def run(name, source):
@@ -146,6 +152,7 @@ struct GLState {
  bool stencil=false, depth=false, scissor=false; unsigned mask=0, clearMask=0;
  int func=GL_ALWAYS, reference=0, frontFail=GL_KEEP, backFail=GL_KEEP, frontPass=GL_KEEP, backPass=GL_KEEP;
  int clearValue=99, depthFunc=0, transitions=0; bool depthMask=false;
+ float clearAlpha=-1.0f;
 } gl;
 void glEnable(int cap) { if(cap==GL_STENCIL_TEST) {gl.stencil=true; ++gl.transitions;}
  if(cap==GL_DEPTH_TEST) {gl.depth=true;} if(cap==GL_SCISSOR_TEST) {gl.scissor=true;} }
@@ -157,7 +164,10 @@ void glStencilOp(int,int f,int p) {gl.frontFail=gl.backFail=f;gl.frontPass=gl.ba
 void glStencilOpSeparate(int face,int,int f,int p) {
  if(face==GL_FRONT) {gl.frontFail=f;gl.frontPass=p;} else {gl.backFail=f;gl.backPass=p;} }
 void glPolygonOffset(float,float) {} void glBufferData(int,size_t,float*,int) {} void glDrawArrays(int,int,size_t) {}
-void glClearStencil(int i) {gl.clearValue=i;} void glClearColor(float,float,float,float) {}
+void glClearStencil(int i) {gl.clearValue=i;}
+void glClearColor(float red,float green,float blue,float alpha) {
+ assert(red==0.0f && green==0.0f && blue==0.0f); gl.clearAlpha=alpha;
+}
 bool glIsEnabled(int) {return gl.scissor;} void glGetIntegerv(int,int* out) {std::fill(out,out+4,0);}
 void glClear(unsigned mask) {gl.clearMask=mask;} void glScissor(int,int,int,int) {}
 struct GfxRenderingAPIOGL {
@@ -169,7 +179,8 @@ struct GfxRenderingAPIOGL {
  void DrawTriangles(float*,size_t,size_t); void StartFrame();
  void DrawTrianglesInternal(float*,size_t,size_t,const uint16_t*);
  void SubmitIndexedTriangles(const uint16_t*,size_t) {assert(false && "legacy stencil fixture uses direct draws");}
- void ClearFramebuffer(bool,bool); void ClearDepthRegion(int,int,int,int);
+ ''' + clear_declaration('gfx_opengl.h') + r'''
+ void ClearDepthRegion(int,int,int,int);
 };
 ''' + gl_methods + r'''
 int main() {
@@ -192,7 +203,9 @@ int main() {
  g.mCurrentZmodeDecal=1; draw(); assert(gl.depthFunc==GL_LEQUAL);
  g.ClearFramebuffer(false,true); assert(gl.clearMask==(GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT));
  assert(gl.clearValue==0 && gl.mask==255 && !gl.depthMask);
- g.ClearFramebuffer(true,false); assert(gl.clearMask==GL_COLOR_BUFFER_BIT);
+ g.ClearFramebuffer(true,false); assert(gl.clearMask==GL_COLOR_BUFFER_BIT && gl.clearAlpha==1.0f);
+ g.ClearFramebuffer(true,false,0.0f); assert(gl.clearMask==GL_COLOR_BUFFER_BIT && gl.clearAlpha==0.0f);
+ assert(!gl.depthMask && gl.scissor);
  g.ClearDepthRegion(1,2,3,4); assert(gl.clearMask==(GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT));
  // OoT ends in a non-neutral mode; an MM frame with no new commands still returns to Off.
  g.StartFrame(); draw(); assert(g.mStencilMode==0 && !gl.stencil);
@@ -339,8 +352,18 @@ namespace fmt {template<class... A> std::string format(const char*,A...) {return
 namespace NS {constexpr int UTF8StringEncoding=0; struct String {static void* string(const char*,int) {return nullptr;}};}
 namespace MTL {
 enum LoadAction {LoadActionDontCare,LoadActionLoad,LoadActionClear}; constexpr int DepthClipModeClamp=1;
-struct RenderPassColorAttachmentDescriptor {LoadAction load=LoadActionLoad;
- LoadAction loadAction() {return load;} void setLoadAction(LoadAction x) {load=x;}};
+struct ClearColor {
+ double red, green, blue, alpha;
+ bool operator==(const ClearColor&) const = default;
+};
+struct RenderPassColorAttachmentDescriptor {
+ LoadAction load = LoadActionLoad;
+ ClearColor value{.125, .25, .5, .75};
+ LoadAction loadAction() { return load; }
+ void setLoadAction(LoadAction action) { load = action; }
+ ClearColor clearColor() { return value; }
+ void setClearColor(ClearColor color) { value = color; }
+};
 using RenderPassDepthAttachmentDescriptor=RenderPassColorAttachmentDescriptor;
 struct StencilAttachment : RenderPassColorAttachmentDescriptor {unsigned clear=77;void setClearStencil(unsigned x) {clear=x;}};
 struct Colors {RenderPassColorAttachmentDescriptor color;auto* object(int) {return &color;}};
@@ -350,9 +373,22 @@ struct Pass {Colors colors;RenderPassDepthAttachmentDescriptor depth;StencilAtta
 struct Viewport {};struct ScissorRect {};
 struct Encoder {int ends=0;void endEncoding() {++ends;} void setLabel(void*) {} void setDepthClipMode(int) {}
  void setViewport(const Viewport&) {} void setScissorRect(const ScissorRect&) {}};
-struct CommandBuffer {Encoder encoder;int begins=0; LoadAction color,depth,stencil;unsigned clear;
- Encoder* renderCommandEncoder(Pass* p) {++begins;color=p->colors.color.load;depth=p->depth.load;
- stencil=p->stencil.load;clear=p->stencil.clear;return &encoder;}};
+struct CommandBuffer {
+ Encoder encoder;
+ int begins = 0;
+ LoadAction color, depth, stencil;
+ unsigned clear;
+ ClearColor colorValue;
+ Encoder* renderCommandEncoder(Pass* pass) {
+  ++begins;
+  color = pass->colors.color.load;
+  depth = pass->depth.load;
+  stencil = pass->stencil.load;
+  clear = pass->stencil.clear;
+  colorValue = pass->colors.color.clearColor();
+  return &encoder;
+ }
+};
 }
 constexpr int SHADER_MAX_TEXTURES=6;
 struct GfxRenderingAPIMetal {
@@ -364,19 +400,29 @@ struct GfxRenderingAPIMetal {
  void* mLastBoundTextures[6]{};void* mLastBoundSamplers[6]{};
  int mLastDepthTest=1,mLastDepthMask=1,mLastZmodeDecal=1,mLastStencilMode=4;
  } mFramebuffers[1];size_t mCurrentFramebuffer=0;
- void ClearFramebuffer(bool,bool);
+ ''' + clear_declaration('gfx_metal.h') + r'''
 };
 '''+metal_clear+r'''
 int main() {
  GfxRenderingAPIMetal g;auto& fb=g.mFramebuffers[0];
+ const auto original = fb.pass.colors.color.clearColor();
+ const auto checkColorClear = [&](double alpha) {
+  assert((fb.buffer.colorValue == MTL::ClearColor{0.0, 0.0, 0.0, alpha}));
+  assert(fb.buffer.color == MTL::LoadActionClear && fb.buffer.depth == MTL::LoadActionLoad);
+  assert(fb.buffer.stencil == MTL::LoadActionLoad); // Color clears preserve a pending volume mask.
+  assert(fb.pass.colors.color.clearColor() == original);
+  assert(fb.pass.colors.color.load == MTL::LoadActionLoad && fb.pass.stencil.load == MTL::LoadActionLoad);
+  assert(fb.mLastStencilMode == -1 && !fb.mHasBoundVertexShader && !fb.mHasBoundFragShader);
+  assert(fb.mLastShaderProgram == nullptr);
+ };
  g.ClearFramebuffer(false,false);assert(fb.buffer.begins==0);
  g.ClearFramebuffer(true,false);
- assert(fb.buffer.color==MTL::LoadActionClear&&fb.buffer.depth==MTL::LoadActionLoad);
- assert(fb.buffer.stencil==MTL::LoadActionLoad); // color clear preserves a pending volume mask
- assert(fb.pass.colors.color.load==MTL::LoadActionLoad&&fb.pass.stencil.load==MTL::LoadActionLoad);
- assert(fb.mLastStencilMode==-1&&!fb.mHasBoundVertexShader&&!fb.mHasBoundFragShader&&fb.mLastShaderProgram==nullptr);
+ checkColorClear(1.0);
+ g.ClearFramebuffer(true,false,0.0f);
+ checkColorClear(0.0);
  g.ClearFramebuffer(false,true);
  assert(fb.buffer.color==MTL::LoadActionLoad&&fb.buffer.depth==MTL::LoadActionClear);
+ assert(fb.buffer.colorValue==original);
  assert(fb.buffer.stencil==MTL::LoadActionClear&&fb.buffer.clear==0);
  assert(fb.pass.depth.load==MTL::LoadActionLoad&&fb.pass.stencil.load==MTL::LoadActionLoad);
  fb.mHasDepthBuffer=false;g.ClearFramebuffer(false,true);

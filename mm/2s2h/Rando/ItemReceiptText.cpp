@@ -27,6 +27,7 @@
 #include "ComboResolve.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
+#include "Rando/EntranceTrackerNames.h"
 #include "Rando/SoloEntrances.h"
 #include "rando/SoloEntranceMmOverworld.h"
 #include <unordered_map>
@@ -752,6 +753,12 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, con
     return false;
 }
 } // namespace
+
+#ifdef COMBO_BUILD
+std::string Rando::EntranceTracker::PortalSourceName(const ComboRando::CrossDungeon::Dungeon& portal) {
+    return InformationEntranceSource(portal);
+}
+#endif
 
 static bool BossSoulItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (const auto* soul = itemName ? ComboSoulReceiptText::Find(itemName) : nullptr) {

@@ -1392,6 +1392,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_OOT_NEI_ROCS_FEATHER:
         case RI_OOT_PROGRESSIVE_ROC:
             return "__OTR__textures/icon_item_custom/gItemIconRocsFeatherTex";
+        case RI_OOT_NEI_ROCS_CAPE:
+            return "__OTR__textures/icon_item_custom/gItemIconRocsCapeTex";
         case RI_OOT_PROGRESSIVE_STICK_CAPACITY: // MM's own stick/nut icons; no upgrade art exists
             return (const char*)gItemIcons[ITEM_DEKU_STICK];
         case RI_OOT_PROGRESSIVE_NUT_CAPACITY:

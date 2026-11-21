@@ -166,6 +166,7 @@ std::shared_ptr<std::vector<std::shared_ptr<Archive>>> ArchiveManager::GetArchiv
 }
 
 void ArchiveManager::ResetVirtualFileSystem() {
+    ++mMountRevision;
     // Store the original list of archives because we will clear it and re-add them.
     // The re-add will trigger the file virtual file system to get populated.
     auto archives = mArchives;
@@ -305,6 +306,7 @@ std::shared_ptr<Archive> ArchiveManager::AddArchive(std::shared_ptr<Archive> arc
     SPDLOG_INFO("Adding Archive {} to Archive Manager", archive->GetPath());
 
     mArchives.push_back(archive);
+    ++mMountRevision;
     // Index in mArchives is the load-order priority (last added = highest, wins conflicts).
     archive->SetPriority(static_cast<int32_t>(mArchives.size() - 1));
     if (archive->HasGameVersion()) {

@@ -1,3 +1,4 @@
+#include "combo/rando/BossWarpRewardSave.h"
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaRewards.h"
 #include "combo/rando/StartupCheckReceiptState.h"
@@ -17,6 +18,7 @@ static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
 static std::map<int, uint32_t> g_startupAckRetries;
 static uint32_t g_startupGeneration = 0;
@@ -254,5 +256,18 @@ int main(int argc, char** argv) {
     Combo_CompleteStartupReceipt(2, true);
     assert(grants == beforeSentinel + 1 && peerGrants == grants);
     assert(Host(CW_STARTUP_PEEK, 0, 2, &found) == 1 && found.drawItemId == -1);
+    // A boss reward's native counterpart can publish before the originating
+    // check does. The production writer must stage it without changing disk.
+    const auto beforePair = ReadDisk(2);
+    auto& bossReward = g_bossWarpRewardWrites.try_emplace(2, 0).first->second;
+    bossReward.required |= 1u << 1;
+    Combo_WriteGameSave(1, 2, R"({"bossReward":true})");
+    assert(bossReward.native[1]["bossReward"] == true && bossReward.NeedsSnapshot(0));
+    assert(ReadDisk(2) == beforePair);
+    Combo_WriteGameSave(0, 2, R"({"bossCheck":true})");
+    assert(bossReward.native[0]["bossCheck"] == true && !bossReward.NeedsSnapshot(1));
+    assert(ReadDisk(2) == beforePair);
+    assert(Host(CW_STARTUP_BEGIN_FILE, 0, 2) == 1);
+    assert(!g_bossWarpRewardWrites.contains(2)); // Fresh slot cannot inherit an old staged award.
     std::cout << "PASS production host: paired MM commit, write/snapshot failure retries, no duplicate award, reload/copy, generation isolation and one-time receipt\n";
 }

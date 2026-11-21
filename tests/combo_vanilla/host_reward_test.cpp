@@ -1,3 +1,4 @@
+#include "combo/rando/BossWarpRewardSave.h"
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaRewards.h"
 #include "combo/rando/StartupCheckReceiptState.h"
@@ -17,6 +18,7 @@ static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
 static std::map<int, uint32_t> g_startupAckRetries;
 static std::vector<int> g_evictedSlots;

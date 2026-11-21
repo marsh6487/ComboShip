@@ -20,6 +20,7 @@
 #include "interface/icon_item_vtx_static/icon_item_vtx_static.h"
 #include "BenPort.h"
 #include <libultraship/bridge/gfxdebuggerbridge.h>
+#include <libultraship/bridge/resourcebridge.h>
 #include "archives/item_name_static/item_name_static.h"
 #include "archives/map_name_static/map_name_static.h"
 
@@ -88,14 +89,12 @@ static TexturePtr sNeiEquipmentPageBgTextures[] = {
     "__OTR__textures/icon_item_static/gPauseEquipment24Tex",
 };
 
-// Picks the OoT equipment background when the companion archive provides it (cached probe).
 static TexturePtr* KaleidoNei_GetMaskPageBgTextures(void) {
-    extern u8 ResourceMgr_FileExists(const char* resName);
-    static s8 sHasOotBg = -1;
-    if (sHasOotBg == -1) {
-        sHasOotBg = ResourceMgr_FileExists("__OTR__textures/icon_item_static/gPauseEquipment00Tex") ? 1 : 0;
+    TexturePtr* tiles = ResourceGetPausePageTiles(sNeiEquipmentPageBgTextures, "oot");
+    if (tiles == NULL) {
+        tiles = ResourceGetPausePageTiles(sMaskPageBgTextures, NULL);
     }
-    return sHasOotBg ? sNeiEquipmentPageBgTextures : sMaskPageBgTextures;
+    return tiles != NULL ? tiles : sMaskPageBgTextures;
 }
 
 TexturePtr sItemPageBgTextures[] = {
@@ -185,18 +184,15 @@ static TexturePtr sNeiOotQuestPageBgTextures[] = {
     "__OTR__textures/icon_item_static/gPauseQuestStatus24Tex",
 };
 
-// Picks the OoT quest-page parchment when the OoT quest page is toggled on (L) and the companion
-// provides it (cached probe); otherwise MM's own quest background. Skijer's NEI.
 static TexturePtr* KaleidoNei_GetQuestPageBgTextures(void) {
-    extern u8 ResourceMgr_FileExists(const char* resName);
-    static s8 sHasOotQuestBg = -1;
-    if (sHasOotQuestBg == -1) {
-        sHasOotQuestBg = ResourceMgr_FileExists("__OTR__textures/icon_item_static/gPauseQuestStatus01Tex") ? 1 : 0;
+    if (CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0)) {
+        TexturePtr* tiles = ResourceGetPausePageTiles(sNeiOotQuestPageBgTextures, "oot");
+        if (tiles != NULL) {
+            return tiles;
+        }
     }
-    if (sHasOotQuestBg && CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0)) {
-        return sNeiOotQuestPageBgTextures;
-    }
-    return sQuestPageBgTextures;
+    TexturePtr* tiles = ResourceGetPausePageTiles(sQuestPageBgTextures, NULL);
+    return tiles != NULL ? tiles : sQuestPageBgTextures;
 }
 
 s16 gVtxPageMapWorldQuadsWidth[VTX_PAGE_MAP_WORLD_QUADS] = {
@@ -750,8 +746,8 @@ Gfx* KaleidoScope_DrawPageSections(Gfx* gfx, Vtx* vertices, TexturePtr* textures
     // Draw first 8/15 background textures
     while (j < 32) {
         gDPPipeSync(gfx++);
-        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
         gSP1Quadrangle(gfx++, j, j + 2, j + 3, j + 1, 0);
 
         j += 4;
@@ -764,8 +760,8 @@ Gfx* KaleidoScope_DrawPageSections(Gfx* gfx, Vtx* vertices, TexturePtr* textures
     // Draw last 7/15 background textures
     while (j < 28) {
         gDPPipeSync(gfx++);
-        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
         gSP1Quadrangle(gfx++, j, j + 2, j + 3, j + 1, 0);
 
         j += 4;
@@ -2294,13 +2290,13 @@ s16 sQuestVtxRectLeft[] = {
     -65,  // QUEST_SONG_BOSSA_NOVA
     -41,  // QUEST_SONG_ELEGY
     -19,  // QUEST_SONG_OATH
-    -18,  // QUEST_SONG_SARIA
+    -1,   // QUEST_SONG_SARIA
     -109, // QUEST_SONG_TIME
     -87,  // QUEST_SONG_HEALING
     -65,  // QUEST_SONG_EPONA
     -41,  // QUEST_SONG_SOARING
     -19,  // QUEST_SONG_STORMS
-    -18,  // QUEST_SONG_SUN
+    -1,   // QUEST_SONG_SUN
     -103, // QUEST_BOMBERS_NOTEBOOK
     7,    // QUEST_QUIVER
     82,   // QUEST_BOMB_BAG

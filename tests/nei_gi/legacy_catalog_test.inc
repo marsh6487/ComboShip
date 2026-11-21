@@ -16,6 +16,7 @@
         { RG_GUST_JAR, "__OTR__objects/object_nei_gust_jar/jar_model_dl", 5.0f },
         { RG_TIME_GATE, "__OTR__objects/object_nei_time_gate/g_timegate_dl", 0.5f },
         { RG_MINISH_CAP, "__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl", 0.5f },
+        { RG_PROGRESSIVE_ROCS, "__OTR__objects/object_nei_rocs_feather/rocs_feather_dl", 0.5f },
         { RG_ROCS_CAPE, "__OTR__objects/object_nei_rocs_cape/rocs_cape_mesh_dl", 0.6f },
         { RG_FIRE_ROD, "__OTR__objects/object_nei_fire_rod/Cylinder_001_opaque_dl", 0.2f },
         { RG_ICE_ROD, "__OTR__objects/object_nei_ice_rod/ice_rod_opaque_dl", 0.2f },

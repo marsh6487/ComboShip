@@ -1,12 +1,13 @@
 #pragma once
 
 #include "../SoulShuffle.h"
+#include "../../../../combo/rando/SoulTrackerData.h"
 #include <cstddef>
 #include <vector>
 
 namespace Rando::SoulTracker {
 
-enum class Family { Boss, Enemy, Npc, Animal, Misc };
+using ComboRando::SoulTracker::Family;
 
 struct Entry {
     RandoItemId item;

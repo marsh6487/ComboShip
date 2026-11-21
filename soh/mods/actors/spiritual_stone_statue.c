@@ -148,7 +148,7 @@ static void Statue_Update(Actor* thisx, PlayState* play) {
 #define JEWEL_HOVER_Y_BASE 35.0f   // height above the statue's anchor
 #define JEWEL_HOVER_AMPLITUDE 2.0f // how much it bobs up/down
 #define JEWEL_HOVER_PERIOD_F 80.0f // ~80 frames for a full bob
-#define JEWEL_SPIN_DEG_PER_F 5.0f  // ~72 frames for a full spin
+#define JEWEL_SPIN_STEP 0x038E     // about 5 degrees per frame
 #define JEWEL_SCALE 0.12f          // markedly larger than the statue so it reads
 
 static void Statue_Draw(Actor* thisx, PlayState* play) {
@@ -178,8 +178,7 @@ static void Statue_Draw(Actor* thisx, PlayState* play) {
         const StoneJewel* j = &sStoneJewels[stone];
         f32 t = (f32)play->gameplayFrames;
         f32 bob = sinf(t * (2.0f * M_PI / JEWEL_HOVER_PERIOD_F)) * JEWEL_HOVER_AMPLITUDE;
-        // BINANG units = 0x10000 / 360. Per-frame degree increment → BINANG.
-        s16 spin = (s16)(t * (JEWEL_SPIN_DEG_PER_F * (0x10000 / 360.0f)));
+        s16 spin = (s16)(u16)(play->gameplayFrames * JEWEL_SPIN_STEP);
 
         OPEN_DISPS(play->state.gfxCtx);
 
@@ -200,9 +199,10 @@ static void Statue_Draw(Actor* thisx, PlayState* play) {
                    (uintptr_t)Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, 255, 64, 64, 1, 0, 255, 16, 16, 0, 0, 0, 0));
         gSPSegment(POLY_OPA_DISP++, 8, (uintptr_t)Gfx_TexScrollEx(play->state.gfxCtx, 0, 0, 16, 16, 0, 0));
 
-        Matrix_Translate(thisx->world.pos.x, thisx->world.pos.y + JEWEL_HOVER_Y_BASE + bob, thisx->world.pos.z,
-                         MTXMODE_NEW);
-        Matrix_RotateY(BINANG_TO_RAD((f32)spin), MTXMODE_APPLY);
+        // Match the Temple of Time's jewel actor transform for these display lists.
+        Vec3s jewelRotation = { 0x4000, spin, 0 };
+        Matrix_SetTranslateRotateYXZ(thisx->world.pos.x, thisx->world.pos.y + JEWEL_HOVER_Y_BASE + bob,
+                                     thisx->world.pos.z, &jewelRotation);
         Matrix_Scale(JEWEL_SCALE, JEWEL_SCALE, JEWEL_SCALE, MTXMODE_APPLY);
 
         // Gem (XLU): cast const char[] → Gfx* for the C++ translation unit.

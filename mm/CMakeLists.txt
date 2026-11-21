@@ -590,8 +590,7 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     )
 endif()
 
-# Mario Mode's sm64.dll is not copied by the build: it is installed next to the ROM, in nei/2ship,
-# by the installer (see sm64_mario.c — the library is opened by name at run time, never linked).
+# ComboShip deploys libsm64 under nei/2ship. The user supplies the SM64 ROM.
 
 # Harpoon multiplayer data: copy the harpoon/ folder (gamemodes/*/gamemode.yaml
 # + skins/) next to the executable so the client can scan installed gamemodes

@@ -31,6 +31,19 @@ void* Combo_ResolveSym(const char* game,const char* symbol){assert(!strcmp(game,
 const char* NeiResource_Route(const char* p){assert(!strcmp(p,"__OTR__legacy_model"));return "__OTR__@oot:legacy_model";}
 '''+functions(source)['MM_FillImportedSwordFallback']+'\nint main(){\n'
 for id,name in rows:
+    if id == 'RI_OOT_NEI_ROCS_FEATHER':
+        code += r'''
+        {
+            CwItemDrawInfo out{};
+            out.resolvedName = "award";
+            const auto previous = described;
+            assert(MM_FillImportedSwordFallback(RI_OOT_NEI_ROCS_FEATHER, &out) == 1);
+            assert(out.drawKind == CW_DRAW_KIND_CUSTOM_GI && out.scale == .5f);
+            assert(out.resolvedName == std::string("award") && described == previous);
+            assert(!strcmp(out.dlists[0], "__OTR__@oot:objects/object_nei_rocs_feather/rocs_feather_dl"));
+        }
+'''
+        continue
     expected='Poké Ball' if id=='RI_OOT_NEI_POKE_BALL' else name
     code+=f'Rando::StaticData::Items[{id}]={{"{name}"}};{{CwItemDrawInfo out{{}};out.resolvedName="award";assert(MM_FillImportedSwordFallback({id},&out)==1&&"imported custom item lost its native fallback");assert(described=="{expected}"&&out.resolvedName==std::string("award")&&!strcmp(out.dlists[0],"__OTR__@oot:legacy_model"));}}\n'
 code+='CwItemDrawInfo out{};assert(!MM_FillImportedSwordFallback(RI_COMBO_FOREIGN,&out));std::cout<<"PASS imported custom catalog fallback and canonical owner boundary; foreign sentinel never recurses\\n";}\n'

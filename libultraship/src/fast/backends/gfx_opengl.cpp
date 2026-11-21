@@ -822,7 +822,7 @@ void GfxRenderingAPIOGL::Init() {
     glEnable(GL_DEPTH_CLAMP);
 #endif
     glDepthFunc(GL_LEQUAL);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     mFrameBuffers.resize(1); // for the default screen buffer
 
@@ -950,7 +950,7 @@ void GfxRenderingAPIOGL::StartDrawToFramebuffer(int fb_id, float noise_scale) {
     mCurrentFrameBuffer = fb_id;
 }
 
-void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth) {
+void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth, float clearAlpha) {
     if (mLastScissorEnabled != 0) {
         mLastScissorEnabled = 0;
         glDisable(GL_SCISSOR_TEST);
@@ -961,7 +961,7 @@ void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth) {
     // glStencilMask must allow the write for glClear to touch the stencil plane.
     glStencilMask(0xFF);
     glClearStencil(0);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, clearAlpha);
     glClear((color ? GL_COLOR_BUFFER_BIT : 0) | (depth ? (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT) : 0));
     glDepthMask(mCurrentDepthMask ? GL_TRUE : GL_FALSE);
     if (mLastScissorEnabled != 1) {

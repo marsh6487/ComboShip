@@ -271,8 +271,9 @@ struct ShaderProgram* GfxRenderingAPIMetal::CreateAndLoadNewShader(uint64_t shad
         pipeline_descriptor->colorAttachments()->object(0)->setDestinationRGBBlendFactor(
             MTL::BlendFactorOneMinusSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setRgbBlendOperation(MTL::BlendOperationAdd);
-        pipeline_descriptor->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorZero);
-        pipeline_descriptor->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+        pipeline_descriptor->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+        pipeline_descriptor->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(
+            MTL::BlendFactorOneMinusSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setAlphaBlendOperation(MTL::BlendOperationAdd);
         pipeline_descriptor->colorAttachments()->object(0)->setWriteMask(MTL::ColorWriteMaskAll);
     } else {
@@ -1113,7 +1114,7 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale) 
     memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
 }
 
-void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
+void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth, float clearAlpha) {
     if (!color && !depth) {
         return;
     }
@@ -1127,7 +1128,9 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
     MTL::RenderPassColorAttachmentDescriptor* srcColorAttachment =
         framebuffer.mRenderPassDescriptor->colorAttachments()->object(0);
     MTL::LoadAction origLoadAction = srcColorAttachment->loadAction();
+    const auto origClearColor = srcColorAttachment->clearColor();
     if (color) {
+        srcColorAttachment->setClearColor({ 0.0, 0.0, 0.0, clearAlpha });
         srcColorAttachment->setLoadAction(MTL::LoadActionClear);
     }
 
@@ -1156,6 +1159,7 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
 
     // Now that the command encoder is started, we set the original load actions back for the next frame's use
     srcColorAttachment->setLoadAction(origLoadAction);
+    srcColorAttachment->setClearColor(origClearColor);
     stencilAttachment->setLoadAction(origStencilLoadAction);
     if (depth && framebuffer.mHasDepthBuffer) {
         srcDepthAttachment->setLoadAction(origDepthLoadAction);

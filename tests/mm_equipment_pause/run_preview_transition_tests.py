@@ -173,6 +173,8 @@ struct Vtx { struct { s16 ob[3]; u16 flag; s16 tc[2]; u8 cn[4]; } v; };
 #define G_ZS_PRIM 0
 #define G_RM_CLD_SURF 0
 #define G_RM_CLD_SURF2 0
+#define G_RM_XLU_SURF 1
+#define G_RM_XLU_SURF2 2
 #define G_CULL_BOTH 0
 #define G_FOG 0
 #define G_LIGHTING 0
@@ -207,12 +209,12 @@ void Matrix_Scale(float x,float y,float z,int) { Matrix b=Identity();b[0][0]=x;b
 void Matrix_RotateXFApply(float angle) { Matrix b=Identity();b[1][1]=b[2][2]=std::cos(angle);b[1][2]=-std::sin(angle);b[2][1]=std::sin(angle);Apply(b); }
 #define MATRIX_FINALIZE_AND_LOAD(gfx,ctx) ((void)(gfx),loadedMatrix=currentMatrix)
 
-struct Composite { bool quad=false,opa=false;int fb=-1,alpha=0,width=0,height=0;Vtx vertices[4]={};double x0=0,y0=0,x1=0,y1=0; };
+struct Composite { bool quad=false,opa=false;int fb=-1,alpha=0,width=0,height=0,renderMode=0;Vtx vertices[4]={};double x0=0,y0=0,x1=0,y1=0; };
 // GPU_PRODUCTION_BOUNDARY
 static Composite composite;
 static Vtx* sampledVertices=nullptr;
 static u8 previewAlpha;
-static int tileWidth,tileHeight,previewFb,changedMatrix,changedScissor;
+static int tileWidth,tileHeight,previewFb,previewRenderMode,changedMatrix,changedScissor;
 static PlayState* drawingPlay;
 static Vtx previewStorage[4];
 static bool IsOpa(Gfx* gfx) { return gfx>=opaCommands&&gfx<opaCommands+4096; }
@@ -227,7 +229,7 @@ static std::array<double,2> Project(const Vtx& v) {
     return {160+focal*right/depth,120-focal*world[1]/depth};
 }
 static void RecordPreviewQuad(Gfx* gfx,int a,int b,int c,int d) {
-    composite.quad=true;composite.opa=IsOpa(gfx);composite.fb=previewFb;composite.alpha=previewAlpha;composite.width=tileWidth;composite.height=tileHeight;
+    composite.quad=true;composite.opa=IsOpa(gfx);composite.fb=previewFb;composite.alpha=previewAlpha;composite.width=tileWidth;composite.height=tileHeight;composite.renderMode=previewRenderMode;
     for(int i=0;i<4;i++)composite.vertices[i]=sampledVertices[i];
     auto top=Project(composite.vertices[a]);auto bottom=Project(composite.vertices[c]);
     composite.x0=top[0];composite.y0=top[1];composite.x1=bottom[0];composite.y1=bottom[1];
@@ -252,6 +254,7 @@ static void RecordPreviewRectangle(Gfx* gfx,int x0,int y0,int,int,int x1,int y1,
 #define gSPMatrix(gfx,...) ((void)(gfx),++changedMatrix)
 #define gDPSetScissor(...) (++changedScissor)
 #define gDPSetOtherMode(...) ((void)0)
+#define gDPSetRenderMode(gfx,mode1,mode2) ((void)(gfx),previewRenderMode=(mode1)|(mode2))
 #define gSPClearGeometryMode(...) ((void)0)
 #define gSPSetGeometryMode(...) ((void)0)
 #define gDPSetCombineLERP(...) ((void)0)
@@ -289,7 +292,7 @@ static void RecordPreviewRectangle(Gfx* gfx,int x0,int y0,int,int,int x1,int y1,
     code += "\nswitch(pauseCtx->pageIndex) {" + active + "}\n}\n"
     code += r'''
 static void DrawPreview(PlayState* play) {
-    drawingPlay=play;composite={};changedMatrix=changedScissor=0;POLY_OPA_DISP=opaCommands;OVERLAY_DISP=overlayCommands;
+    drawingPlay=play;composite={};previewRenderMode=changedMatrix=changedScissor=0;POLY_OPA_DISP=opaCommands;OVERLAY_DISP=overlayCommands;
     gridBegin=play->pauseCtx.maskVtx;DrawPreviewPage(play);
 }
 static void CheckComposite(PlayState* play,const char* label) {
@@ -303,6 +306,7 @@ static void CheckComposite(PlayState* play,const char* label) {
               composite.vertices[3].v.tc[0]==192*32&&composite.vertices[3].v.tc[1]==336*32,
               "preview UVs cover the complete framebuffer without mirrored layout");
         check(composite.alpha==play->pauseCtx.alpha,"preview follows pause alpha");
+        check(composite.renderMode==(G_RM_XLU_SURF|G_RM_XLU_SURF2),"preview composites only nontransparent pixels");
         check(composite.vertices[0].v.ob[2]==0&&composite.vertices[3].v.ob[2]==0,"preview lies on equipment page");
     }
 }

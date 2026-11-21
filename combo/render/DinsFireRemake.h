@@ -541,5 +541,17 @@ static inline void CwDinsFireRemake_BuildNativeFire(CwDinsMesh* mesh, int frame,
                                                     uint32_t primary, uint32_t secondary) {
     CwDinsFireRemake_BuildFireRecipe(mesh, frame, CW_DINS_NATIVE_FADE_START_FRAME, CW_DINS_NATIVE_FADE_TICKS, right, up,
                                      primary, secondary);
+
+    // Keep the authored texture and coverage. Reduce the layered warm glow and
+    // tint the full-color ribbon highlights toward amber for clearer flame detail.
+    for (size_t i = 0; i < mesh->count; ++i) {
+        CwDinsQuad* q = &mesh->quads[i];
+        if (q->spark == 3) {
+            for (int v = 0; v < 4; ++v)
+                q->alpha[v] = (uint8_t)((q->alpha[v] * 3 + 2) / 5);
+        } else if (q->spark == 2 && !q->palette) {
+            q->primary = 0xFFE6CC;
+        }
+    }
 }
 #endif

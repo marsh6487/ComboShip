@@ -130,8 +130,10 @@ static bool TransformMasks_IsTransformed() { return transformed; }
 static int MmForm_GetCurrentForm() { return gFormState.currentForm; }
 static bool MasterCycle_IsRiding() { return riding; }
 static bool MmMaskWear_BlocksSword() { return blocksSword; }
-static bool Pacci_UltrahandModeActive() { return false; }
-static bool Cryonis_ModeActive() { return false; }
+static const u16 sButtonMasks[] = { BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
+static u8 ItemInput_ButtonIsClaimed(u16 button) {
+    return riding && (button & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT));
+}
 static s32 CVarGetInteger(const char*, s32 defaultValue) { return defaultValue; }
 static bool ExtEquip_IsButtonItem(int) { return false; }
 static int ExtButton_GetItem(int) { return 0; }

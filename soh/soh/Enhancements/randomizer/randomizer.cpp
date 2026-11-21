@@ -288,9 +288,12 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "mouvements cachés." },
 
     { RG_ROCS_CAPE, static_cast<int32_t>(ITEM_ROCS_CAPE),
-      "Your feather grew into the&%rRoc's Cape%w!&Jump, then hold the button to&%rglide%w gently to the ground.",
-      "Deine Feder wurde zum&%rRocs Umhang%w!&Springe und halte die Taste&um sanft zu %rgleiten%w.",
-      "Votre plume devient la&%rCape de Roc%w!&Sautez puis maintenez pour&%rplaner%w doucement." },
+      "You got %rRoc's Cape%w!&Jump from the ground or water.&Press the item button again&in midair to %gdouble "
+      "jump%w.",
+      "Du hast %rRocs Umhang%w erhalten!&Springe vom Boden oder Wasser.&Drücke die Item-Taste in der Luft&"
+      "erneut für einen %gDoppelsprung%w.",
+      "Vous obtenez la %rCape de Roc%w!&Sautez du sol ou de l'eau.&Appuyez de nouveau en l'air&"
+      "pour faire un %gdouble saut%w." },
 
     // Dual Cane per-skill textboxes (order: Statue keeps RG_CANE_OF_SOMARIA's own message).
     { RG_CANE_PACCI_FLIP, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),

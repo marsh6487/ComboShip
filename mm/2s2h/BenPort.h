@@ -240,6 +240,7 @@ uint64_t GetUnixTimestamp();
 COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind));
 // Ctrl+R reset while MM is foreground: bounce back to OOT (saves if autosave on) + go dormant.
 COMBO_EXPORT void MM_RequestComboReturn(void);
+void Combo_MM_FlushAccumulators(void);
 void MM_ApplyComboPortalArrival(void);
 void MM_ApplyComboPortalAfterIntroSkip(void);
 COMBO_EXPORT void MM_PrepareForTransition(void);

@@ -2,6 +2,7 @@
 // only doubles, with logger output captured for the missing-texture contract.
 #include "fast/lus_gbi.h"
 #include "fast/resource/type/Texture.h"
+#include "../fixtures/no_pause_page_texture.h"
 #include <cassert>
 #include <cstring>
 #include <dlfcn.h>

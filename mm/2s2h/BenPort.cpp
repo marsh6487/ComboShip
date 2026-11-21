@@ -16,6 +16,7 @@ extern "C" void Horse_ResetMountState(void);
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../combo/gameplay/CrossoverAssetPath.h"
 #include "BenPort.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -593,6 +594,14 @@ extern "C" const char* Nei_AssetDir(void) {
 #else
     return "nei";
 #endif
+}
+
+extern "C" const char* Nei_FindCrossoverAsset(const char* name) {
+    static thread_local std::string path;
+    path = Crossover::FindAsset(name, Nei_AssetDir(), true, [](const std::string& relativePath) {
+        return Ship::Context::LocateFileAcrossAppDirs(relativePath, appShortName);
+    });
+    return path.empty() ? nullptr : path.c_str();
 }
 
 static bool RemoveArchiveAcrossAppDirs(const std::string& fileName) {
@@ -1828,7 +1837,6 @@ extern "C" void InitOTR(int argc, char* argv[]) {
                 gSaveContext.gameMode == GAMEMODE_NORMAL) {
                 if (isFwReturn)
                     MM_CaptureFwDeparture();
-                void Combo_MM_FlushAccumulators(void);
                 Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
                 SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
             }
@@ -5728,6 +5736,38 @@ extern "C" COMBO_EXPORT void MM_GrantCrossItem(const char* itemName) {
     if (GrantMmItemByName(itemName, &granted)) {
         FleetShared_OnNativeObtained((int)granted);
     }
+}
+
+extern "C" COMBO_EXPORT bool MM_GrantBossWarpReward(int slot, const char* itemName) {
+    if (gSaveContext.fileNum != slot || !IS_RANDO)
+        return false;
+    RandoItemId granted = RI_NONE;
+    if (!GrantMmItemByName(itemName, &granted))
+        return false;
+    FleetShared_OnNativeObtained(static_cast<int>(granted));
+    return true;
+}
+
+extern "C" COMBO_EXPORT void MM_CaptureBossWarpRewardSave(int slot) {
+    if (gSaveContext.fileNum == slot && IS_RANDO)
+        SaveManager_SaveCurrentForCombo();
+}
+
+extern "C" COMBO_EXPORT int MM_BossWarpRewardReady(int slot) {
+    if (!Combo_IsCombinedGame() || !IS_RANDO || gSaveContext.fileNum != slot ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || !gPlayState || gGameState != &gPlayState->state ||
+        !gGameState->running || gPlayState->transitionTrigger != TRANS_TRIGGER_OFF ||
+        gPlayState->transitionMode != TRANS_MODE_OFF || gPlayState->pauseCtx.state != 0 ||
+        gPlayState->msgCtx.msgMode != MSGMODE_NONE || gPlayState->csCtx.state != CS_STATE_IDLE ||
+        gSaveContext.cutsceneTrigger || gPlayState->gameOverCtx.state != GAMEOVER_INACTIVE)
+        return false;
+    Player* player = GET_PLAYER(gPlayState);
+    return player && !Player_InBlockingCsMode(gPlayState, player) && !(player->stateFlags1 & PLAYER_STATE1_DEAD) &&
+           std::holds_alternative<GIEventNone>(GameInteractor::Instance->currentEvent);
+}
+
+extern "C" COMBO_EXPORT void MM_ShowBossWarpReward(const char* itemName) {
+    Notification::Emit({ .message = "Dungeon reward", .suffix = itemName });
 }
 
 // The peer's half of a shared item (OoT obtained it): grant only, never share back.

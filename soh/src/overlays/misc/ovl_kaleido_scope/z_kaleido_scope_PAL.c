@@ -266,21 +266,23 @@ static void* sNeiMmQuestPageBgTexs[] = {
     "__OTR__icon_item_static_yar/gPauseQuestStatus24Tex",
 };
 
-// Picks MM's quest-page background when the MM quest page is flipped on (L) and mm.o2r provides it
-// (cached probe); otherwise OoT's own parchment for the current language. Skijer's NEI.
-static void* KaleidoNei_GetQuestStatusTexs(void) {
-    static s8 sHasMmQuestBg = -1;
+// Pick the title and body from one complete atlas, including for the flipped page.
+static void** KaleidoNei_GetQuestStatusTexs(void) {
+    if (CVarGetInteger(CVAR_ENHANCEMENT("SkijerNEI.MmQuestPage"), 0)) {
+        void** tiles = ResourceGetPausePageTiles(sNeiMmQuestPageBgTexs, "mm");
+        if (tiles != NULL) {
+            return tiles;
+        }
+    }
+    void** nativeTiles = sQuestStatusTexs[gSaveContext.language];
+    void** tiles = ResourceGetPausePageTiles(nativeTiles, NULL);
+    return tiles != NULL ? tiles : nativeTiles;
+}
 
-    if (sHasMmQuestBg == -1) {
-        // NOTE: ResourceMgr_FileExists checks the boot-time ExtensionCache, which does NOT contain
-        // the later-mounted mm.o2r entries — probe by actually resolving the texture instead.
-        sHasMmQuestBg =
-            (ResourceMgr_LoadTexOrDListByName("icon_item_static_yar/gPauseQuestStatus01Tex") != NULL) ? 1 : 0;
-    }
-    if (sHasMmQuestBg && CVarGetInteger(CVAR_ENHANCEMENT("SkijerNEI.MmQuestPage"), 0)) {
-        return sNeiMmQuestPageBgTexs;
-    }
-    return sQuestStatusTexs[gSaveContext.language];
+static void** KaleidoNei_GetEquipmentTexs(void) {
+    void** nativeTiles = sEquipmentTexs[gSaveContext.language];
+    void** tiles = ResourceGetPausePageTiles(nativeTiles, NULL);
+    return tiles != NULL ? tiles : nativeTiles;
 }
 
 static void* sSaveTexs[] = {
@@ -1092,8 +1094,8 @@ Gfx* KaleidoScope_DrawPageSections(Gfx* gfx, Vtx* vertices, void** textures) {
     j = 0;
     while (j < 32) {
         gDPPipeSync(gfx++);
-        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
         gSP1Quadrangle(gfx++, j, j + 2, j + 3, j + 1, 0);
 
         j += 4;
@@ -1105,8 +1107,8 @@ Gfx* KaleidoScope_DrawPageSections(Gfx* gfx, Vtx* vertices, void** textures) {
     j = 0;
     while (j < 28) {
         gDPPipeSync(gfx++);
-        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        gDPLoadTextureBlock(gfx++, textures[i], G_IM_FMT_IA, G_IM_SIZ_8b, 80, 32, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
         gSP1Quadrangle(gfx++, j, j + 2, j + 3, j + 1, 0);
 
         j += 4;
@@ -1344,8 +1346,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
-            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->equipPageVtx,
-                                                          sEquipmentTexs[gSaveContext.language]);
+            POLY_OPA_DISP =
+                KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->equipPageVtx, KaleidoNei_GetEquipmentTexs());
 
             KaleidoScope_DrawEquipment(play);
         }
@@ -1479,8 +1481,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
                 gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
-                POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->equipPageVtx,
-                                                              sEquipmentTexs[gSaveContext.language]);
+                POLY_OPA_DISP =
+                    KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->equipPageVtx, KaleidoNei_GetEquipmentTexs());
 
                 KaleidoScope_DrawEquipment(play);
 

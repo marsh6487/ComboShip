@@ -24,6 +24,7 @@ def main():
     common = r'''
 #include "mods/items/custom_items.h"
 #include "mods/items/helpers/equip_helper.h"
+#include "gameplay/OcarinaItemInput.h"
 #include "mods/items/logic/item_rod_common.h"
 #include "mods/extended_player.h"
 #include "functions.h"
@@ -32,6 +33,7 @@ def main():
 #include <stdio.h>
 #include <string.h>
 CustomItemState gCustomItemState;
+PlayState* gPlayState = nullptr;
 static u16 sStowedItemButtons[256];
 static u16 equippedButton;
 static int consumes, releasedMwa, releases, sparks;

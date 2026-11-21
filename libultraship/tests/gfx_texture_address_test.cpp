@@ -2,6 +2,7 @@
 // Moving validation after signature probing must crash the segment8/9 cases.
 #include "fast/lus_gbi.h"
 #include "fast/resource/type/Texture.h"
+#include "libultraship/bridge/resourcebridge.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -16,6 +17,14 @@ template <typename... Args> static void IgnoreDiagnostic(const Args&...) {}
 // External linkage lets dladdr recognize these low mapped addresses in non-PIE tests.
 alignas(8) unsigned char gTestRawTexture[128] = { 0x12, 0x34, 0x56, 0x78 };
 alignas(8) char gTestTexturePath[] = "__OTR__textures/test/scene_texture";
+alignas(8) char gTestPauseTilePath[] = "__OTR__@pause-page:test";
+
+static std::shared_ptr<Fast::Texture> sPauseTile;
+
+std::shared_ptr<Ship::IResource> ResourceLoadPausePageTile(const char* route) {
+    assert(std::strcmp(route, gTestPauseTilePath) == 0);
+    return sPauseTile;
+}
 
 namespace Ship {
 class ResourceManager {
@@ -126,11 +135,18 @@ static void ValidTextures() {
     assert(sInterpreter->lastMetadata.width == 8 && sInterpreter->lastMetadata.height == 4);
     assert(sInterpreter->lastMetadata.h_byte_scale == 4 && sInterpreter->lastMetadata.v_pixel_scale == 2);
 
+    sPauseTile = texture;
+    const int loads = sManager->loads;
+    Submit(reinterpret_cast<uintptr_t>(gTestPauseTilePath));
+    assert(sInterpreter->lastPath == gTestPauseTilePath);
+    assert(sInterpreter->lastMetadata.resource == sPauseTile);
+    assert(sManager->loads == loads);
+
     sInterpreter->mSegmentPointers[9] = reinterpret_cast<uintptr_t>(gTestTexturePath);
     Submit(0x09000001); // Bound segment may point at an OTR path, not just raw pixels.
     assert(sInterpreter->lastPixels == texture->ImageData);
     sInterpreter->mSegmentPointers[9] = 0;
-    puts("PASS raw/module textures, bound segment offsets, OTR resources and HD metadata");
+    puts("PASS raw/module textures, bound segment offsets, OTR resources, pause tiles and HD metadata");
 }
 } // namespace Fast
 

@@ -85,7 +85,7 @@ static int flags = 1, param = RC_UNKNOWN, param2 = 0;
 int gMMComboGoalRequired = 0;
 int (*gMMComboOtherTriforceCount)() = nullptr;
 void MMAnchor_BroadcastCrossItem(int, const char*, const char*) {}
-void SaveManager_SaveCurrentForCombo() {}
+void SaveManager_SaveCurrentForCombo() { assert(false && "the NPC key check must not use remains persistence"); }
 namespace Rando {
 RandoItemId ConvertItem(RandoItemId id, RandoCheckId) { return id; }
 RandoItemId CurrentJunkItem(RandoCheckId) { return RI_RUPEE_GREEN; }

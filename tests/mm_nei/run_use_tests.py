@@ -20,6 +20,10 @@ def source(path):
 def body(path,name): return functions(source(path))[name]
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name: return
+ if any('OcarinaItemInput_' in part or 'OCARINA_ITEM_DPAD' in part for part in parts):
+  prefix = '#include "gameplay/OcarinaItemInput.h"\n' + prefix
+  if not re.search(r'\bPlayState\s*\*\s*gPlayState\b', prefix):
+   prefix += '\nPlayState* gPlayState = nullptr;\n'
  with tempfile.TemporaryDirectory(prefix='mm-nei-use-') as td:
   path=Path(td)/(name+'.cpp');path.write_text('#include "mods/items/custom_items.h"\n#include "mods/items/helpers/equip_helper.h"\n#include "mods/extended_player.h"\n#include <cassert>\n#include <iostream>\n'+prefix+'\n'+ '\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/name
@@ -616,6 +620,7 @@ gust_prefix=gust_prefix.replace('ItemId Player_GetItemOnButton(PlayState* play,P
 gust_prefix=gust_prefix.replace('ItemId Player_Dpad_GetItemOnButton(PlayState* play,Player* p,DpadEquipSlot slot){',
     'ItemId Player_Dpad_GetItemOnButton(PlayState* play,Player* p,DpadEquipSlot slot){++buttonQueries;')
 gust_prefix+='\n#include "mods/items/logic/item_gustjar.h"\n#include "mods/transformation_masks/transformation_masks.h"\n#include "mods/transformation_masks/assets/mm_asset_loader.h"\nstatic u8 sGustTornadoOn;\n'
+gust_prefix+='\n#include "gameplay/OcarinaItemInput.h"\nPlayState* gPlayState;\n'
 def service_stub(path,name):
  signature=body(path,name).split('{',1)[0]
  return signature+'{'+('' if re.search(r'\bvoid\s+'+name+r'\(',signature) else 'return 0;')+'}\n'
@@ -675,6 +680,7 @@ original_prefix,original_parts=caller_prefix,caller_parts
 caller_prefix,caller_parts=gust_prefix,gust_parts
 run_caller('extended_equipment_held_tool',r'''
  Player p;PlayState play;
+ gPlayState=&play;
  for(int dpad=0;dpad<2;dpad++)for(u8 item=ITEM_EXT_SWORD_1;item<=ITEM_EXT_BOOTS_3;item++){
   ResetCaller(&p,&play,ITEM_GUST_JAR,dpad?BTN_DDOWN:BTN_CLEFT);
   p.heldItemAction=p.itemAction=PLAYER_IA_GUST_JAR;p.modelGroup=PLAYER_MODELGROUP_DEFAULT;

@@ -83,11 +83,22 @@ int main() {
     saved["randoSaveOptions"][RO_SHUFFLE_DUNGEON_ENTRANCES] = 1;
     const auto entrances = SavedDungeonMap();
     saved["soloEntrances"] = entrances;
+#ifdef COMBO_BUILD
+    const auto discoveries = json({ ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(GROTTOS, 19) });
+    saved["discoveredEntrances"] = discoveries;
+    saved["discoveredEntrances"].push_back(ENTRANCE(GROTTOS, 19));
+    saved["discoveredEntrances"].push_back(-1);
+    saved["discoveredEntrances"].push_back(0x10000);
+    saved["discoveredEntrances"].push_back("invalid");
+#endif
     auto selected = std::make_unique<RandoSaveInfo>();
     saved.get_to(*selected);
     json roundtrip = *selected;
     REQUIRE(roundtrip.contains("soloEntrances"));
     REQUIRE(roundtrip.at("soloEntrances") == entrances);
+#ifdef COMBO_BUILD
+    REQUIRE(roundtrip.at("discoveredEntrances") == discoveries);
+#endif
 
     // File select parses other files into temporary structures. Such a preview
     // must not change the selected save's replayable map or recovery metadata.
@@ -104,8 +115,14 @@ int main() {
     // local mapping and checkpoint rather than retaining the preceding file.
     auto legacy = saved;
     legacy.erase("soloEntrances");
+#ifdef COMBO_BUILD
+    legacy.erase("discoveredEntrances");
+#endif
     legacy["randoSaveOptions"][RO_SHUFFLE_DUNGEON_ENTRANCES] = 0;
     legacy.get_to(*selected);
+#ifdef COMBO_BUILD
+    REQUIRE(Rando::EntranceTracker::Discovered(*selected).empty());
+#endif
     const auto cleared = json(*selected).at("soloEntrances");
     REQUIRE(cleared.is_null() || (cleared.contains("enabled") && !cleared.at("enabled").get<bool>()));
 

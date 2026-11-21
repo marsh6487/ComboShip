@@ -25,6 +25,9 @@ def run(name,prefix,parts,checks):
    if not re.search(r'\b'+mode+r'\([^;]*\)\s*\{',prefix):
     prefix += '\nu8 '+mode+'(){return 0;}\n'
   parts.insert(0,body('mm/mods/items/helpers/equip_helper.c','ItemInput_ButtonIsClaimed'))
+  prefix = '#include "gameplay/OcarinaItemInput.h"\n' + prefix
+  if not re.search(r'\bPlayState\s*\*\s*gPlayState\b', prefix):
+   prefix += '\nPlayState* gPlayState = nullptr;\n'
   parts[:0]=[body('mm/mods/extended_equipment.c',n) for n in ('ExtEquip_IsButtonItem','ExtEquip_GetLegacyButtonItem')]
  if any('MMSeasonParticles_' in part for part in parts):
   # Extracted native snow/leaf bodies now share the real editor particle policy.

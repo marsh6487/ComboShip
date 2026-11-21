@@ -11,6 +11,7 @@
 #include "2s2h/Enhancements/ModMenu/ModMenu.h"
 #include "CosmeticEditor.h"
 #include "Notification.h"
+#include "2s2h/Rando/EntranceTracker.h"
 #include "2s2h/Rando/CheckTracker/CheckTracker.h"
 
 #ifdef __APPLE__
@@ -224,6 +225,14 @@ void SetupGuiElements() {
                                                                  "Notifications Window" COMBO_MM_TRACKER_SUFFIX);
     gui->AddGuiWindow(mNotificationWindow);
     mNotificationWindow->Show();
+
+#ifdef COMBO_BUILD
+    // In Combo mode the existing OoT window hosts the active game's tracker.
+    if (!Combo_IsCombinedGame()) {
+        gui->AddGuiWindow(std::make_shared<Rando::EntranceTracker::Window>("gWindows.EntranceTracker",
+                                                                           "Entrance Tracker", ImVec2(600, 375)));
+    }
+#endif
 
     mRandoCheckTrackerWindow = std::make_shared<Rando::CheckTracker::CheckTrackerWindow>(
         "gWindows.CheckTracker", "Check Tracker" COMBO_MM_TRACKER_SUFFIX, ImVec2(375, 460));

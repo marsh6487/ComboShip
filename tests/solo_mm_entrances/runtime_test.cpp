@@ -163,7 +163,23 @@ static void ObserveArrival(int scene, int32_t entrance) {
 
 static void TestNativeRestore() {
     LoadNativeDungeonFile();
-    const int32_t arrived = Transition(ENTRANCE(WOODFALL_TEMPLE, 0));
+    auto& rando = gSaveContext.save.shipSaveInfo.rando;
+    constexpr int32_t source = ENTRANCE(WOODFALL_TEMPLE, 0);
+    constexpr int32_t destination = ENTRANCE(SNOWHEAD_TEMPLE, 0);
+    uint64_t trackerRevision;
+    const auto& displayed = Rando::EntranceTracker::GetRuntime(trackerRevision);
+    REQUIRE(displayed.Enabled());
+    REQUIRE((displayed.Lookup(ComboRando::CrossDungeon::Phase::AfterNative, source)->to ==
+             ComboRando::CrossDungeon::Endpoint{ 1, destination }));
+    REQUIRE(Rando::EntranceTracker::Discovered(rando).empty());
+    gSaveContext.respawnFlag = -1;
+    REQUIRE(Transition(source) == source);
+    REQUIRE(Rando::EntranceTracker::Discovered(rando).empty());
+    gSaveContext.respawnFlag = 0;
+    const int32_t arrived = Transition(source);
+    const auto discovered = Rando::EntranceTracker::Discovered(rando);
+    REQUIRE(arrived == destination);
+    REQUIRE(discovered.size() == 1 && discovered.front() == source);
     ObserveArrival(SCENE_HAKUGIN, arrived);
     REQUIRE(gSaveContext.save.shipSaveInfo.rando.soloEntrances.checkpoint == ENTRANCE(SNOWHEAD_TEMPLE, 0));
     REQUIRE(Combo_MM_SaveCrossDungeonCheckpoint() == ENTRANCE(SNOWHEAD_TEMPLE, 0));
