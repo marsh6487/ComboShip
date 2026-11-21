@@ -129,7 +129,12 @@ static std::string Loaded() {
     return std::string(reinterpret_cast<const char*>(play.msgCtx.font.msgBuf.schar), play.msgCtx.msgLength);
 }
 
-static void Reset(RandoItemId id, int element, bool enabled, bool owned, bool overhead) {
+static RandoCheckId Reset(RandoItemId id, int element, bool enabled, bool owned, bool overhead) {
+    constexpr RandoCheckId arrowChecks[] = { RC_UNKNOWN, RC_SNOWHEAD_TEMPLE_FIRE_ARROW_CHEST,
+                                             RC_GREAT_BAY_TEMPLE_ICE_ARROW_CHEST,
+                                             RC_STONE_TOWER_TEMPLE_LIGHT_ARROW_CHEST };
+    const RandoCheckId checkId = arrowChecks[element];
+    assert(Rando::StaticData::Checks.at(checkId).randoItemId == id);
     std::memset(&gSaveContext, 0, sizeof(gSaveContext));
     std::memset(&play, 0, sizeof(play));
     std::memset(options, 0, sizeof(options));
@@ -138,7 +143,7 @@ static void Reset(RandoItemId id, int element, bool enabled, bool owned, bool ov
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
     options[element] = enabled;
     flags = overhead ? 0 : CustomItem::GIVE_ITEM_CUTSCENE;
-    param = RC_UNKNOWN;
+    param = checkId;
     param2 = 0;
     grants = opens = notices = 0;
     denyGrant = false;
@@ -154,6 +159,7 @@ static void Reset(RandoItemId id, int element, bool enabled, bool owned, bool ov
     activeCustomMessage = {};
     play.msgCtx.msgLength = 4;
     std::memcpy(play.msgCtx.font.msgBuf.schar, "old\277", 4);
+    return checkId;
 }
 
 int main() {
@@ -165,11 +171,11 @@ int main() {
                     for (bool authored : { false, true })
                         for (bool denied : { false, true }) {
                             customReceipt = authored;
-                            Reset(ids[element], element, enabled, owned, overhead);
+                            const auto check = Reset(ids[element], element, enabled, owned, overhead);
                             denyGrant = denied;
                             Rando::MiscBehavior::Receive(nullptr, &play);
                             assert(grants == 1 && notices == 0);
-                            assert(RANDO_SAVE_CHECKS[RC_UNKNOWN].obtained && !RANDO_SAVE_CHECKS[RC_UNKNOWN].eligible);
+                            assert(RANDO_SAVE_CHECKS[check].obtained && !RANDO_SAVE_CHECKS[check].eligible);
                             assert(activeCustomMessage.swordElementTutorial == (!owned ? element : 0));
                             if (!overhead) CustomMessage::LoadCustomMessageIntoFont(activeCustomMessage);
                             assert(opens == (overhead ? 1 : 0));

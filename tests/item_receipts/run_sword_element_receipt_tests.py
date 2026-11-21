@@ -99,6 +99,13 @@ with tempfile.TemporaryDirectory(prefix="sword-element-receipt-") as directory:
     for id in ("RI_UNKNOWN", "RI_ARROW_FIRE", "RI_ARROW_ICE", "RI_ARROW_LIGHT"):
         catalog += re.search(r"^\s*RI\(" + id + r",[^\n]*", catalog_source, re.M)[0] + "\n"
     catalog += "}; }\n#undef RI\n"
+    checks_source = (ROOT / "mm/2s2h/Rando/StaticData/Checks.cpp").read_text()
+    catalog += checks_source[checks_source.index("#define RC("):checks_source.index("// clang-format off")]
+    catalog += "namespace Rando::StaticData { std::map<RandoCheckId, RandoStaticCheck> Checks = {\n"
+    for check in ("RC_SNOWHEAD_TEMPLE_FIRE_ARROW_CHEST", "RC_GREAT_BAY_TEMPLE_ICE_ARROW_CHEST",
+                  "RC_STONE_TOWER_TEMPLE_LIGHT_ARROW_CHEST"):
+        catalog += re.search(r"^\s*RC\(" + check + r",[^\n]*", checks_source, re.M)[0] + "\n"
+    catalog += "}; }\n#undef RC\n"
     font_source = (ROOT / "mm/src/code/z_message_nes.c").read_text()
     font = re.search(r"f32 sNESFontWidths\[160\] = (\{.*?\n\});", font_source, re.S)[1]
     catalog += 'extern "C" { float sNESFontWidths[160] = ' + font + "; }\n"
