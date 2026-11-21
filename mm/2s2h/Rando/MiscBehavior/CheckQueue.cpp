@@ -11,6 +11,7 @@
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
+#include "2s2h/BenPort.h"
 #include "ComboExport.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -151,8 +152,6 @@ extern "C" void Rando_CancelMagicMirrorStump(void) {
 #endif
 
 #ifdef COMBO_BUILD
-void Combo_MM_FlushAccumulators(void);
-
 extern "C" COMBO_EXPORT const char* MM_DrainBossWarpReward(int slot, bool (*grantPeer)(int, const char*)) {
     if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
         return nullptr;

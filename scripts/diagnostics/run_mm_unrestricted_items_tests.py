@@ -26,6 +26,7 @@ def main():
               source[source.index("#define RESTRICTIONS_TABLE_END"):
                      source.index("s16 sPictoState")],
               function(source, "Interface_SetSceneRestrictions"),
+              function(source, "Interface_UpdateDekuFlightBButton"),
               function(source, "Interface_UpdateButtonsPart2")]
     flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
              "-DNON_EQUIVALENT", "-DNON_MATCHING", "-Wno-int-conversion", "-Wno-incompatible-pointer-types",

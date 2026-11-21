@@ -3,7 +3,7 @@
  */
 
 #include "equip_helper.h"
-#include "combo/gameplay/OcarinaItemInput.h"
+#include "../../../../combo/gameplay/OcarinaItemInput.h"
 #include <string.h>
 #include "../custom_items.h"
 #include "../../extended_equipment.h" // MAGIC_REQ — Magic Cape halves all magic costs

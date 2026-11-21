@@ -17,7 +17,7 @@
 #include "../custom_items.h"
 #include "../helpers/camera_helper.h"
 #include "../helpers/equip_helper.h"
-#include "combo/gameplay/OcarinaItemInput.h"
+#include "../../../../combo/gameplay/OcarinaItemInput.h"
 #include "../helpers/fx_helper.h"
 #include "../objects/object_tornado.h" // shared wind cone + spiral ribbons
 #include "mods/nei_save.h"             // ootQuestItems — MM's stand-in for OoT's medallion quest bits

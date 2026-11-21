@@ -143,6 +143,7 @@ extern "C" void Beetle_ResetTransient(Player* player,PlayState* play){
 void HGrace_ResetTransient(){} // Fairy reset behavior is exercised by tests/mm_grace.
 void WolfLinkHost_Destroy(PlayState*,Player*){}
 void WolfLinkHost_RestorePlayerInput(Player*,Input*){}
+extern "C" void PikachuForm_Destroy(void){}
 void Effect_Destroy(PlayState*,s32){}
 void LightContext_RemoveLight(PlayState*,LightContext*,LightNode*){}
 s32 Collider_DestroyCylinder(PlayState*,ColliderCylinder*){return 1;}

@@ -3,7 +3,7 @@
  */
 
 #include "equip_helper.h"
-#include "combo/gameplay/OcarinaItemInput.h"
+#include "../../../../combo/gameplay/OcarinaItemInput.h"
 #include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
 #include <string.h>
 #include "../custom_items.h"

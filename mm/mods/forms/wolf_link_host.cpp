@@ -1,6 +1,6 @@
 #include "expansions/ssbb/ssbb_spawn.h"
 #include "mods/forms/wolf_link_host.h"
-#include "combo/gameplay/OcarinaItemInput.h"
+#include "../../../combo/gameplay/OcarinaItemInput.h"
 #include "mods/nei_oot_compat.h"
 #include "mods/forms/custom_forms.h"
 #include "mods/ext_buttons/ext_buttons.h"

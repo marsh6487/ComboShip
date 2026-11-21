@@ -41,7 +41,7 @@ extern "C" {
 #include "z64.h"
 #include "functions.h"
 #include "macros.h"
-#include "combo/gameplay/OcarinaItemInput.h"
+#include "../../../combo/gameplay/OcarinaItemInput.h"
 #include "variables.h"
 extern SaveContext gSaveContext;
 // Not in functions.h (z_kaleido_collect.c forward-declares them locally too): the C-button /

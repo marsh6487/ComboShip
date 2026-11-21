@@ -1837,7 +1837,6 @@ extern "C" void InitOTR(int argc, char* argv[]) {
                 gSaveContext.gameMode == GAMEMODE_NORMAL) {
                 if (isFwReturn)
                     MM_CaptureFwDeparture();
-                void Combo_MM_FlushAccumulators(void);
                 Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
                 SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
             }
