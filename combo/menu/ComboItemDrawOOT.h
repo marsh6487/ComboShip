@@ -636,6 +636,8 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             return CwCustomGi(out, "__OTR__objects/object_nei_time_gate/g_timegate_dl", 0.5f);
         case RG_MINISH_CAP:
             return CwCustomGi(out, "__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl", 0.5f);
+        case RG_PROGRESSIVE_ROCS:
+            return CwCustomGi(out, "__OTR__objects/object_nei_rocs_feather/rocs_feather_dl", 0.5f);
         case RG_ROCS_CAPE:
             return CwCustomGi(out, "__OTR__objects/object_nei_rocs_cape/rocs_cape_mesh_dl", 0.6f);
         case RG_FIRE_ROD:

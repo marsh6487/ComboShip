@@ -2257,7 +2257,7 @@ void RandomizeColor(CosmeticOption& cosmeticOption, bool manual) {
     ApplySideEffects(cosmeticOption);
 }
 
-void DrawCosmeticRow(CosmeticOption& cosmeticOption) {
+void DrawCosmeticRow(CosmeticOption& cosmeticOption, bool compact) {
     {
         WhatsNew::Scope releaseHighlight(cosmeticOption.valuesCvar, cosmeticOption.label.c_str(),
                                          CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
@@ -2271,8 +2271,10 @@ void DrawCosmeticRow(CosmeticOption& cosmeticOption) {
             Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
         }
     }
-    // the longest option name
-    ImGui::SameLine((ImGui::CalcTextSize("Message Light Blue (None No Shadow)").x * 1.0f) + 60.0f);
+    if (!compact) {
+        // Align the buttons after the longest option name in the full editor.
+        ImGui::SameLine(ImGui::CalcTextSize("Message Light Blue (None No Shadow)").x + 60.0f);
+    }
     if (UIWidgets::Button(
             ("Random##" + cosmeticOption.label).c_str(),
             UIWidgets::ButtonOptions().Size(ImVec2(80, 31)).Padding(ImVec2(2.0f, 0.0f)).Color(THEME_COLOR))) {

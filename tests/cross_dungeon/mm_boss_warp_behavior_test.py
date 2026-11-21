@@ -98,7 +98,7 @@ static void Item_Give(PlayState*,int) {} enum { ITEM_SONG_OATH, MTXMODE_APPLY, R
 static void Matrix_Scale(float,float,float,int) {}
 namespace Rando { static void DrawItem(int) {} }
 using namespace ComboRando::CrossDungeon;
-namespace ComboCrossMmRuntime { static RuntimeState state(1); static std::optional<RuntimeState::Transition> pending;
+namespace ComboCrossMmRuntime { static void DiscoverEntrance(int32_t) {} static RuntimeState state(1); static std::optional<RuntimeState::Transition> pending;
     static bool departureFadeComplete=false;
     static std::optional<Endpoint> pendingBossRecovery; static bool bossDeathRecoveryRequested=false;
     static CheckpointState checkpoint; static int32_t localDungeonArrival=-1; }

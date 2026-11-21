@@ -1,6 +1,7 @@
 #include "vanilla/ComboVanillaSave.h"
 #include "vanilla/ComboVanillaFile.h"
 #include "vanilla/ComboVanillaRewards.h"
+#include "rando/BossWarpRewardSave.h"
 #include "rando/StartupCheckReceiptState.h"
 // ComboShip - Unified Launcher for OOT (soh.dll) + MM (2ship.dll)
 //
@@ -471,6 +472,9 @@ static bool Combo_BindCrossDungeonRuntime(const nlohmann::json& seed) {
 // See docs/deviations/boot-shutdown.md.
 static std::mutex g_containerMutex;
 static std::map<int, nlohmann::json> g_containerCache;
+// One game-thread boss receipt may save both native halves. Stage native writers
+// until the slot can persist the obtained check and its item in one rename.
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
@@ -598,6 +602,7 @@ static void EraseComboContainer(int slot) {
     {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         g_containerCache.erase(slot);
+        g_bossWarpRewardWrites.erase(slot);
         g_vanillaReceipts.erase(slot);
         g_startupCompletions.erase(slot);
         g_startupAckRetries.erase(slot);
@@ -627,6 +632,7 @@ static void Combo_CopyContainer(int from, int to) {
         // A receipt's native grant has not reached disk until its atomic
         // commit. Copy only that durable state, including recoverable pending.
         g_vanillaReceipts.erase(to);
+        g_bossWarpRewardWrites.erase(to);
         g_startupCompletions.erase(to);
         g_startupAckRetries.erase(to);
         copy["slot"] = to;
@@ -711,8 +717,14 @@ static void Combo_WriteGameSave(int game, int fileNum, const char* json) {
         } catch (...) {}
         return; // The MM award, its OoT shared effect and READY receipt are one write.
     }
-    auto& c = LoadOrCreateContainer(fileNum);
     const char* key = (game == ComboRando::GAME_OOT) ? "oot" : "mm";
+    if (auto receipt = g_bossWarpRewardWrites.find(fileNum); receipt != g_bossWarpRewardWrites.end()) {
+        try {
+            receipt->second.native[game] = nlohmann::json::parse(json);
+        } catch (...) {}
+        return;
+    }
+    auto& c = LoadOrCreateContainer(fileNum);
     try {
         c[key] = nlohmann::json::parse(json);
     } catch (...) { return; }
@@ -900,6 +912,7 @@ static int32_t Combo_StartupReceipt(int32_t action, int32_t game, int32_t slot, 
                 ++g_startupGeneration;
             if (!ComboStartupReceipt::BeginFile(document, g_startupGeneration))
                 return -1;
+            g_bossWarpRewardWrites.erase(slot);
             g_startupCompletions.erase(slot);
             g_startupAckRetries.erase(slot);
             if (receipt)
@@ -1311,6 +1324,12 @@ static FnSetSharedChangedCb SOH_SetSharedChangedCb = nullptr;
 static FnSetSharedChangedCb MM_SetSharedChangedCb = nullptr;
 static FnSetSharedTickCb SOH_SetSharedTickCb = nullptr;
 static FnSetSharedTickCb MM_SetSharedTickCb = nullptr;
+static const char* (*g_DrainBossWarpReward[2])(int, bool (*)(int, const char*)) = {};
+static int (*g_BossWarpRewardReady[2])(int) = {};
+static bool (*g_GrantBossWarpReward[2])(int, const char*) = {};
+static void (*g_ShowBossWarpReward[2])(const char*) = {};
+static void (*g_CaptureBossWarpRewardSave[2])(int) = {};
+static void (*g_WaitBossWarpRewardSaves)() = nullptr;
 // Shared-items mask of the LOADED slot (seed-bound, like g_goalHunt/g_startingGameMM). Absent key = 0.
 static uint32_t g_sharedMask = 0;
 static bool g_sharedReconcilePending = false;
@@ -2082,11 +2101,109 @@ static void Combo_SharedReconcileNow() try {
     std::cerr << "[ComboShip] Combo_SharedReconcileNow threw: " << e.what() << std::endl;
 } catch (...) { std::cerr << "[ComboShip] Combo_SharedReconcileNow threw a non-std exception" << std::endl; }
 
+static bool Combo_GrantBossWarpReward(int game, const char* name) {
+    if ((game != 0 && game != 1) || !g_GrantBossWarpReward[game] ||
+        !g_GrantBossWarpReward[game](g_comboCompletionSlot, name))
+        return false;
+    std::lock_guard<std::mutex> lock(g_containerMutex);
+    g_bossWarpRewardWrites.at(g_comboCompletionSlot).required |= 1u << game;
+    return true;
+}
+
+static void Combo_CommitBossWarpReward(int slot, int foreground) {
+    std::array<bool, 2> missing{};
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        const auto receipt = g_bossWarpRewardWrites.find(slot);
+        if (receipt == g_bossWarpRewardWrites.end() || !receipt->second.complete)
+            return;
+        for (int game = 0; game < 2; ++game)
+            missing[game] = receipt->second.NeedsSnapshot(game);
+    }
+    for (int game = 0; game < 2; ++game) {
+        if (missing[game] && g_CaptureBossWarpRewardSave[game])
+            g_CaptureBossWarpRewardSave[game](slot);
+    }
+    if (missing[0] || missing[1])
+        g_WaitBossWarpRewardSaves();
+
+    std::string displayName;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        const auto receipt = g_bossWarpRewardWrites.find(slot);
+        if (receipt == g_bossWarpRewardWrites.end() || receipt->second.NeedsSnapshot(0) ||
+            receipt->second.NeedsSnapshot(1))
+            return; // Retry save capture only; applying the reward twice would mint an item.
+
+        auto& document = LoadOrCreateContainer(slot);
+        const auto& native = receipt->second.native;
+        if (native[0].is_object())
+            document["oot"] = native[0];
+        if (native[1].is_object())
+            document["mm"] = native[1];
+        displayName = std::move(receipt->second.displayName);
+        g_bossWarpRewardWrites.erase(receipt);
+        // The merged cache remains authoritative if the disk is temporarily
+        // unavailable. A later flush retries both halves together.
+        FlushContainer(slot);
+    }
+    Combo_OnSharedChanged(foreground, slot);
+    if (!displayName.empty() && g_ShowBossWarpReward[foreground])
+        g_ShowBossWarpReward[foreground](displayName.c_str());
+}
+
+static void Combo_DrainBossWarpReward(int slot, int foreground) {
+    const int dormant = 1 - foreground;
+    const auto drain = g_DrainBossWarpReward[dormant];
+    if (!drain || !g_BossWarpRewardReady[foreground] || !g_WaitBossWarpRewardSaves ||
+        !g_BossWarpRewardReady[foreground](slot))
+        return;
+
+    bool hasStagedReward;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        hasStagedReward = g_bossWarpRewardWrites.contains(slot);
+    }
+    if (hasStagedReward) {
+        Combo_CommitBossWarpReward(slot, foreground);
+        return; // Includes an interrupted handoff: keep partial writes off disk.
+    }
+    if (!drain(slot, nullptr))
+        return;
+
+    // OoT's single writer may still have a snapshot captured before the
+    // transition. Drain it before staging either post-award native save.
+    g_WaitBossWarpRewardSaves();
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        if (g_startupCompletions.contains(slot))
+            return;
+        g_bossWarpRewardWrites.try_emplace(slot, dormant);
+    }
+    const char* displayed = drain(slot, Combo_GrantBossWarpReward);
+    g_WaitBossWarpRewardSaves();
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        auto receipt = g_bossWarpRewardWrites.find(slot);
+        if (!displayed) {
+            // A rejected native lookup or grant has no effects to persist.
+            if (receipt->second.required == (1u << dormant) && !receipt->second.native[0].is_object() &&
+                !receipt->second.native[1].is_object())
+                g_bossWarpRewardWrites.erase(receipt);
+            return;
+        }
+        receipt->second.displayName = displayed;
+        receipt->second.complete = true;
+    }
+    Combo_CommitBossWarpReward(slot, foreground);
+}
+
 // Per-frame drain seam (SOH_/MM_SetSharedTickCb). Gated on both saves resident.
 static void Combo_SharedTick() try {
-    if (!g_sharedReconcilePending || g_sharedMask == 0)
-        return;
     if (g_comboCompletionSlot < 0 || g_MmSaveInMemorySlot != g_comboCompletionSlot)
+        return;
+    Combo_DrainBossWarpReward(g_comboCompletionSlot, ComboAnchor::sActiveGame.load());
+    if (!g_sharedReconcilePending || g_sharedMask == 0)
         return;
     g_sharedReconcilePending = false; // clear BEFORE raising — a raise re-fires the poke and re-arms it
     Combo_SharedReconcileNow();
@@ -3487,8 +3604,10 @@ static int Combo_VanillaCreation(int slot, int phase) try {
             return 0;
         std::lock_guard<std::mutex> lock(g_containerMutex);
         const bool began = g_vanillaCreations[slot].Begin(slot, LoadOrCreateContainer(slot));
-        if (began)
+        if (began) {
+            g_bossWarpRewardWrites.erase(slot);
             g_startupCompletions.erase(slot);
+        }
         return began ? 1 : 0;
     }
     if (phase == 2) {
@@ -4057,6 +4176,18 @@ int main(int argc, char** argv) {
     MM_SetSharedChangedCb = (FnSetSharedChangedCb)GetSym(mmModule, "MM_SetSharedChangedCb");
     SOH_SetSharedTickCb = (FnSetSharedTickCb)GetSym(sohModule, "SOH_SetSharedTickCb");
     MM_SetSharedTickCb = (FnSetSharedTickCb)GetSym(mmModule, "MM_SetSharedTickCb");
+    for (int game = 0; game < 2; ++game) {
+        const auto module = game == 0 ? sohModule : mmModule;
+        const std::string prefix = game == 0 ? "SOH_" : "MM_";
+        g_DrainBossWarpReward[game] = (const char* (*)(int, bool (*)(int, const char*)))
+            GetSym(module, (prefix + "DrainBossWarpReward").c_str());
+        g_BossWarpRewardReady[game] = (int (*)(int))GetSym(module, (prefix + "BossWarpRewardReady").c_str());
+        g_GrantBossWarpReward[game] = (bool (*)(int, const char*))GetSym(module, (prefix + "GrantBossWarpReward").c_str());
+        g_ShowBossWarpReward[game] = (void (*)(const char*))GetSym(module, (prefix + "ShowBossWarpReward").c_str());
+        g_CaptureBossWarpRewardSave[game] =
+            (void (*)(int))GetSym(module, (prefix + "CaptureBossWarpRewardSave").c_str());
+    }
+    g_WaitBossWarpRewardSaves = (void (*)())GetSym(sohModule, "SOH_WaitBossWarpRewardSaves");
 
     // Oracle exports
     Combo_SOH_Rando_Reset = (FnOracleVoid)GetSym(sohModule, "Combo_SOH_Rando_Reset");

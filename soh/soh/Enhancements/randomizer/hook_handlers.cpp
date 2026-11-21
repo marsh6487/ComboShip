@@ -8,6 +8,8 @@
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "rando/CrossDungeonPendingChecks.h"
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled(void);
 extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative);
 #endif
@@ -353,8 +355,42 @@ nlohmann::json Combo_SOH_SavePendingChecks() {
 void Combo_SOH_LoadPendingChecks(const nlohmann::json& payload) {
     sCrossDungeonPendingChecks.Load(payload);
 }
+
+static void QueueUnclaimedBossWarpRewards(const std::vector<RandomizerCheck>& restored) {
+    if (!IS_RANDO || !Combo_IsCombinedGame())
+        return;
+
+    const auto ctx = Rando::Context::GetInstance();
+    for (const auto rc : Rando::StaticData::dungeonRewardLocations) {
+        const auto collection = Rando::StaticData::GetLocation(rc)->GetCollectionCheck();
+        const bool usedWarp = collection.type == SPOILER_CHK_EVENT_CHK_INF
+                                  ? Flags_GetEventChkInf(collection.flag) != 0
+                                  : collection.type == SPOILER_CHK_RANDOMIZER_INF &&
+                                        Flags_GetRandomizerInf(static_cast<RandomizerInf>(collection.flag));
+        if (!usedWarp || std::find(restored.begin(), restored.end(), rc) != restored.end())
+            continue;
+
+        auto* loc = ctx->GetItemLocation(rc);
+        const auto reward = loc->GetPlacedRandomizerGet();
+        if (reward == RG_NONE)
+            continue;
+
+        if (loc->HasObtained()) {
+            // Older builds could mark a used warp saved before handing over its reward.
+            // Only reopen it when a permanent stone or medallion is still provably missing.
+            if (Rando::StaticData::RetrieveItem(reward).GetItemType() != ITEMTYPE_DUNGEONREWARD ||
+                OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(reward) != CAN_OBTAIN)
+                continue;
+            loc->SetCheckStatus(RCSHOW_SCUMMED);
+        }
+
+        randomizerQueuedChecks.push(rc);
+    }
+}
+
 void Combo_SOH_RestorePendingChecks() {
     // Native OnLoadGame has recreated the seed Context and cleared both native queue stages.
+    std::vector<RandomizerCheck> restored;
     for (const auto& name : sCrossDungeonPendingChecks.RestoreOnce()) {
         RandomizerCheck found = RC_UNKNOWN_CHECK;
         for (int i = 1; i < RC_MAX; ++i) {
@@ -369,7 +405,9 @@ void Combo_SOH_RestorePendingChecks() {
             continue;
         }
         randomizerQueuedChecks.push(found);
+        restored.push_back(found);
     }
+    QueueUnclaimedBossWarpRewards(restored);
 }
 #endif
 
@@ -673,6 +711,92 @@ void OOT_DeliverForeign(RandomizerCheck rc) {
     }
 }
 
+// A blue-warp check remains owned by the arena that opened it. Once a handoff parks
+// that arena, the foreground can complete the saved native queue entry without a PlayState.
+void Combo_GrantResolvedOOT(const GetItemEntry& entry);
+extern "C" COMBO_EXPORT const char* SOH_DrainBossWarpReward(
+    int slot, bool (*grantPeer)(int, const char*)) {
+    if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
+        return nullptr;
+
+    if (randomizerQueuedChecks.empty() && randomizerQueuedCheck == RC_UNKNOWN_CHECK)
+        return nullptr;
+    const auto ctx = Rando::Context::GetInstance();
+    const auto& bosses = Rando::StaticData::dungeonRewardLocations;
+    auto pending = randomizerQueuedChecks;
+    if (randomizerQueuedCheck != RC_UNKNOWN_CHECK)
+        pending.push(randomizerQueuedCheck);
+
+    while (!pending.empty()) {
+        const auto rc = pending.front();
+        pending.pop();
+        if (std::find(bosses.begin(), bosses.end(), rc) == bosses.end())
+            continue;
+        auto* loc = ctx->GetItemLocation(rc);
+        const auto placed = loc->GetPlacedRandomizerGet();
+        if (loc->HasObtained() || placed == RG_NONE)
+            continue;
+        if (!grantPeer)
+            return ""; // Read-only probe before the launcher stages either save.
+
+        static std::string result;
+        const auto& checkName = Rando::StaticData::GetLocation(rc)->GetName();
+        if (placed == RG_COMBO_FOREIGN) {
+            const auto* foreign = OOT_LookupForeignByCheck(rc);
+            if (!foreign)
+                continue;
+            if (foreign->trap) {
+                gSaveContext.ship.pendingIceTrapCount++;
+                result = "Ice Trap";
+            } else {
+                Randomizer_LatchComboForeign(rc);
+                result = ComboRando::ShownForeignName(*foreign, Randomizer_ComboForeignLatchedName(rc));
+                if (!grantPeer(foreign->itemGame, foreign->itemName.c_str()))
+                    continue;
+            }
+            Anchor_BroadcastCrossItem(foreign->itemGame, foreign->itemName.c_str(), checkName.c_str());
+        } else {
+            const Ship::ResourceManagerScope scope(Ship::CrossRMRegistry::Get("oot"));
+            const auto entry = ctx->GetFinalGIEntry(rc, true, GI_NONE, false);
+            const auto received = entry.modIndex == MOD_RANDOMIZER ? static_cast<RandomizerGet>(entry.getItemId)
+                                  : entry.getItemId == GI_RUPEE_BLUE ? RG_BLUE_RUPEE
+                                                                    : placed;
+            result = Rando::StaticData::RetrieveItem(received).GetName().GetEnglish();
+            Combo_GrantResolvedOOT(entry);
+        }
+        loc->SetCheckStatus(RCSHOW_COLLECTED);
+        sCrossDungeonPendingChecks.Acknowledge(checkName);
+        std::queue<RandomizerCheck> retained;
+        while (!randomizerQueuedChecks.empty()) {
+            if (randomizerQueuedChecks.front() != rc)
+                retained.push(randomizerQueuedChecks.front());
+            randomizerQueuedChecks.pop();
+        }
+        randomizerQueuedChecks = std::move(retained);
+        if (randomizerQueuedCheck == rc) {
+            randomizerQueuedCheck = RC_UNKNOWN_CHECK;
+            randomizerQueuedItemEntry = GET_ITEM_NONE;
+        }
+        CheckTracker::SpoilAreaFromCheck(rc);
+        CheckTracker::RecalculateAllAreaTotals();
+        SaveManager::Instance->SaveFile(slot);
+        return result.c_str();
+    }
+    return nullptr;
+}
+
+extern "C" COMBO_EXPORT int SOH_BossWarpRewardReady(int slot) {
+    return Combo_IsCombinedGame() && IS_RANDO && gSaveContext.fileNum == slot &&
+           GameInteractor::IsPlayerInControl() && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
+           gPlayState->transitionMode == TRANS_MODE_OFF &&
+           !(GET_PLAYER(gPlayState)->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_GETTING_ITEM |
+                                                  PLAYER_STATE1_IN_ITEM_CS));
+}
+
+extern "C" COMBO_EXPORT void SOH_ShowBossWarpReward(const char* itemName) {
+    Notification::Emit({ .message = "Dungeon reward", .suffix = itemName });
+}
+
 // ComboShip (#164): combo Hint Tracker reveal reporter, defined in OTRGlobals.cpp (it owns the
 // RandomizerHint -> combo hint-key map).
 void OOT_ComboHintRevealed(RandomizerHint hintKey);
@@ -710,6 +834,12 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
     }
 
     RandomizerCheck rc = randomizerQueuedChecks.front();
+#ifdef COMBO_BUILD
+    const auto* location = Rando::StaticData::GetLocation(rc);
+    if (Combo_IsCombinedGame() && location->GetRCType() == RCTYPE_DUNGEON_REWARD &&
+        location->GetActorID() == ACTOR_DOOR_WARP1 && gPlayState->sceneNum == location->GetScene())
+        return;
+#endif
     auto loc = Rando::Context::GetInstance()->GetItemLocation(rc);
     RandomizerGet vanillaRandomizerGet = Rando::StaticData::GetLocation(rc)->GetVanillaItem();
     GetItemID vanillaItem = (GetItemID)Rando::StaticData::RetrieveItem(vanillaRandomizerGet).GetItemID();
@@ -884,7 +1014,14 @@ void RandomizerOnItemReceiveHandler(GetItemEntry receivedItemEntry) {
         CheckTracker::SpoilAreaFromCheck(randomizerQueuedCheck);
         CheckTracker::RecalculateAllAreaTotals();
         CheckTracker::RecalculateAvailableChecks();
-        SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_TRACKER_DATA, true);
+#ifdef COMBO_BUILD
+        const auto* location = Rando::StaticData::GetLocation(randomizerQueuedCheck);
+        if (Combo_IsCombinedGame() && location->GetRCType() == RCTYPE_DUNGEON_REWARD &&
+            location->GetActorID() == ACTOR_DOOR_WARP1)
+            SaveManager::Instance->SaveFile(gSaveContext.fileNum);
+        else
+#endif
+            SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_TRACKER_DATA, true);
         randomizerQueuedCheck = RC_UNKNOWN_CHECK;
         randomizerQueuedItemEntry = GET_ITEM_NONE;
     }

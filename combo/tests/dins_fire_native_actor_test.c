@@ -1,11 +1,13 @@
 /* Real actor functions with engine boundaries supplied by a deterministic scene. */
 #include "global.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
+#include "overlays/actors/ovl_Obj_Syokudai/z_obj_syokudai.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifdef TEST_HOST_MM
+#include "2s2h/GameInteractor/GameInteractor.h"
 #define CW_DINS_HOST_MM
 #define NATIVE_INIT MagicFireDins_Init
 #define NATIVE_DESTROY MagicFireDins_Destroy
@@ -19,6 +21,11 @@
 #define ARROW_LIT_PARAM ARROW_TYPE_NORMAL_LIT
 #define ARROW_DAMAGE(arrow) ((arrow).collider.elem.atDmgInfo.dmgFlags)
 #define FIRE_DAMAGE(fire) ((fire).collider.elem.atDmgInfo.damage)
+#define TORCH_FLAME(torch) ((torch).flameCollider)
+#define TORCH_TIMER(torch) ((torch).snuffTimer)
+#define TORCH_INIT sFlameColliderInit
+#define TORCH_COUNT sNumLitTorchesInGroup
+#define TORCH_GROUP_SHIFT 7
 #define func_800876C8 Magic_Reset
 #define func_8002F7DC Player_PlaySfx
 #else
@@ -34,6 +41,12 @@
 #define ARROW_LIT_PARAM ARROW_NORMAL_LIT
 #define ARROW_DAMAGE(arrow) ((arrow).collider.info.toucher.dmgFlags)
 #define FIRE_DAMAGE(fire) ((fire).collider.info.toucher.damage)
+#define TORCH_FLAME(torch) ((torch).colliderFlame)
+#define TORCH_TIMER(torch) ((torch).litTimer)
+#define TORCH_INIT sCylInitFlame
+#define TORCH_COUNT sLitTorchCount
+#define TORCH_GROUP_SHIFT 6
+#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #endif
 #include "combo/render/DinsFireNative.h"
 #include "combo/render/DinsFireRemake.h"
@@ -50,6 +63,7 @@ static PlayState play;
 static Player player;
 static EnArrow arrow;
 static int attacks, kills, resets, lightAdds, lightRemoves, ignitionSounds, fireSounds, colliderDestroys;
+static Collider* lastAttack;
 static int failLight;
 static int customColors;
 static u32 customPrimary, customSecondary;
@@ -107,6 +121,20 @@ s32 Collider_InitCylinder(PlayState* state, ColliderCylinder* collider) {
 s32 Collider_SetCylinder(PlayState* state, ColliderCylinder* collider, Actor* actor, ColliderCylinderInit* init) {
     collider->base.actor = actor;
     collider->base.atFlags = init->base.atFlags;
+    collider->base.acFlags = init->base.acFlags;
+    collider->dim = init->dim;
+#ifdef TEST_HOST_MM
+    collider->elem.atElemFlags = init->elem.atElemFlags;
+    collider->elem.acElemFlags = init->elem.acElemFlags;
+    collider->elem.atDmgInfo.dmgFlags = init->elem.atDmgInfo.dmgFlags;
+    collider->elem.atDmgInfo.damage = init->elem.atDmgInfo.damage;
+    collider->elem.acDmgInfo.dmgFlags = init->elem.acDmgInfo.dmgFlags;
+#else
+    collider->info.toucherFlags = init->info.toucherFlags;
+    collider->info.bumperFlags = init->info.bumperFlags;
+    collider->info.toucher = init->info.toucher;
+    collider->info.bumper.dmgFlags = init->info.bumper.dmgFlags;
+#endif
     return 1;
 }
 s32 Collider_DestroyCylinder(PlayState* state, ColliderCylinder* collider) {
@@ -120,6 +148,7 @@ void Collider_UpdateCylinder(Actor* actor, ColliderCylinder* collider) {
 }
 s32 CollisionCheck_SetAT(PlayState* state, CollisionCheckContext* context, Collider* collider) {
     ++attacks;
+    lastAttack = collider;
     return 0;
 }
 void Magic_Reset(PlayState* state) {
@@ -188,8 +217,99 @@ f32 Math_SmoothStepToF(f32* value, f32 target, f32 scale, f32 step, f32 minStep)
     return diff;
 }
 
+/* Engine boundaries for the real torch update and collision narrow phase. */
+static int torchSwitch;
+static int torchIgnitions;
+f32 gSfxDefaultFreqAndVolScale = 1.0f;
+s8 gSfxDefaultReverb;
+s32 Flags_GetSwitch(PlayState* state, s32 flag) {
+    return torchSwitch == flag;
+}
+void Flags_SetSwitch(PlayState* state, s32 flag) {
+    torchSwitch = flag;
+}
+void Flags_UnsetSwitch(PlayState* state, s32 flag) {
+    torchSwitch = -1;
+}
+s32 CollisionCheck_SetAC(PlayState* state, CollisionCheckContext* context, Collider* collider) {
+    collider->acFlags &= ~AC_HIT;
+    return 1;
+}
+s32 CollisionCheck_SetOC(PlayState* state, CollisionCheckContext* context, Collider* collider) {
+    return 1;
+}
+void Math_Vec3f_Diff(Vec3f* a, Vec3f* b, Vec3f* dest) {
+    *dest = (Vec3f){ a->x - b->x, a->y - b->y, a->z - b->z };
+}
+void Lights_PointSetColorAndRadius(LightInfo* info, u8 r, u8 g, u8 b, s16 radius) {
+}
+f32 Rand_ZeroOne(void) {
+    return .5f;
+}
+void Actor_PlaySfx_Flagged(Actor* actor, u16 sfx) {
+}
+u8 Lantern_GetTorchTint(Actor* actor, u8* prim, u8* env) {
+    return 0;
+}
+bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) {
+    return result;
+}
+#ifdef TEST_HOST_MM
+static s16 torchCutscene;
+void Math_Vec3s_ToVec3f(Vec3f* dest, Vec3s* src) {
+    *dest = (Vec3f){ src->x, src->y, src->z };
+}
+s16 CutsceneManager_GetCurrentCsId(void) {
+    return torchCutscene;
+}
+s16 CutsceneManager_IsNext(s16 csId) {
+    return 1;
+}
+s16 CutsceneManager_StartWithPlayerCs(s16 csId, Actor* actor) {
+    return torchCutscene = csId;
+}
+void CutsceneManager_Queue(s16 csId) {
+}
+s32 func_800F22C4(s16 csId, Actor* actor) {
+    return 1;
+}
+void Audio_PlaySfx_AtPos(Vec3f* pos, u16 sfx) {
+}
+s32 WaterBox_GetSurface1_2(PlayState* state, CollisionContext* context, f32 x, f32 z, f32* y, WaterBox** box) {
+    return 0;
+}
+void AudioSfx_PlaySfx(u16 sfx, Vec3f* pos, u8 token, f32* freq, f32* volume, s8* reverb) {
+    torchIgnitions += sfx == NA_SE_EV_FLAME_IGNITION;
+}
+s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderElement* atElem, Vec3f* atPos,
+                             Collider* ac, ColliderElement* acElem, Vec3f* acPos, Vec3f* hitPos) {
+    ac->acFlags |= AC_HIT;
+    ac->ac = at->actor;
+    acElem->acHitElem = atElem;
+    return 1;
+}
+#else
+s32 OnePointCutscene_Attention(PlayState* state, Actor* actor) {
+    return 1;
+}
+s32 WaterBox_GetSurfaceImpl(PlayState* state, CollisionContext* context, f32 x, f32 z, f32* y, WaterBox** box) {
+    return 0;
+}
+void Audio_PlaySfxGeneral(u16 sfx, Vec3f* pos, u8 token, f32* freq, f32* volume, s8* reverb) {
+    torchIgnitions += sfx == NA_SE_EV_FLAME_IGNITION;
+}
+s32 CollisionCheck_SetATvsAC(PlayState* state, Collider* at, ColliderInfo* atInfo, Vec3f* atPos,
+                             Collider* ac, ColliderInfo* acInfo, Vec3f* acPos, Vec3f* hitPos) {
+    ac->acFlags |= AC_HIT;
+    ac->ac = at->actor;
+    acInfo->acHitInfo = atInfo;
+    return 1;
+}
+#endif
+
 #include "dins_native_actor_scheduler.inc"
 #include "dins_native_actor_production.inc"
+#include "dins_native_torch_production.inc"
 static MagicFire fire;
 
 static void reset(int native) {
@@ -198,6 +318,7 @@ static void reset(int native) {
     memset(&arrow, 0, sizeof(arrow));
     memset(&fire, 0, sizeof(fire));
     memset(&light, 0, sizeof(light));
+    lastAttack = NULL;
     attacks = kills = resets = lightAdds = lightRemoves = ignitionSounds = fireSounds = colliderDestroys = failLight =
         0;
     audioAttaches = audioContacts = audioReleases = audioUpdates = audioStops = 0;
@@ -338,7 +459,7 @@ static void usableLinger(void) {
     };
     reset(1);
     release();
-    int damageSample = 0, fullRadius = 0;
+    int damageSample = 0;
     for (int frame = 0; frame < 138; ++frame) {
         if (frame > 0)
             step();
@@ -348,11 +469,9 @@ static void usableLinger(void) {
             REQUIRE(FIRE_DAMAGE(fire) == originalDamage[damageSample].damage);
             ++damageSample;
         }
-        if (frame == 8)
-            fullRadius = fire.collider.dim.radius;
         if (frame >= 8 && frame < 126) {
             REQUIRE(fire.action == 2 && fire.actionTimer == 126 - frame);
-            REQUIRE(fire.alphaMultiplier == 1.0f && fire.collider.dim.radius == fullRadius);
+            REQUIRE(fire.alphaMultiplier == 1.0f);
             REQUIRE(light.info->params.point.radius == 175 && light.info->params.point.color[0] > 0);
             REQUIRE(lightAdds == 1 && lightRemoves == 0 && resets == 0);
         }
@@ -390,6 +509,96 @@ static void usableLinger(void) {
     step();
     REQUIRE(kills == 1 && attacks == 138 && player.STICK_TIMER == 0);
     REQUIRE(arrow.actor.params == ARROW_NORMAL_PARAM && ignitionSounds == 1);
+}
+static void stockAttackBounds(void) {
+    Cylinder16 stock[CW_DINS_NATIVE_FIRE_TICKS];
+    int stockFrames = 0;
+    reset(0);
+    for (int i = 0; i < 21; ++i)
+        step();
+    while (fire.actor.update != NULL) {
+        step();
+        if (fire.actor.update != NULL)
+            stock[stockFrames++] = fire.collider.dim;
+    }
+    REQUIRE(stockFrames == 70 && stock[stockFrames - 1].radius >= 325);
+    NATIVE_DESTROY(&fire.actor, &play);
+
+    reset(1);
+    release();
+    for (int frame = 0; frame < CW_DINS_NATIVE_FIRE_TICKS; ++frame) {
+        if (frame > 0)
+            step();
+        Cylinder16* bounds = &fire.collider.dim;
+        if (frame < stockFrames) {
+            REQUIRE(bounds->radius >= stock[frame].radius);
+            REQUIRE(bounds->yShift == stock[frame].yShift);
+            REQUIRE(bounds->yShift + bounds->height + .0001f >= stock[frame].yShift + stock[frame].height);
+            if (frame == stockFrames - 1)
+                REQUIRE(bounds->radius == stock[frame].radius);
+        } else {
+            float localRadius = CwDins_NativeRadius(frame / (float)CW_DINS_NATIVE_RATE);
+            REQUIRE(bounds->radius == (s16)localRadius && bounds->yShift == 0);
+        }
+    }
+    step();
+    NATIVE_DESTROY(&fire.actor, &play);
+}
+
+static void stockRangeTorchPuzzle(void) {
+    enum { torchFlag = 15, groupSize = 4 };
+    ObjSyokudai torches[groupSize + 2] = { 0 };
+    const Vec3f offsets[] = {
+        { 100, 0, 0 }, { 240, 0, 0 }, { -300, -140, 0 }, { 0, 0, 340 },
+        { 0, 0, -360 }, { 0, 200, 0 },
+    };
+    reset(1);
+    torchSwitch = -1;
+    torchIgnitions = TORCH_COUNT = 0;
+#ifdef TEST_HOST_MM
+    torchCutscene = CS_ID_NONE;
+#endif
+    const Vec3f origin = player.actor.world.pos;
+    for (int i = 0; i < ARRAY_COUNT(torches); ++i) {
+        ObjSyokudai* torch = &torches[i];
+        torch->actor.id = ACTOR_OBJ_SYOKUDAI;
+        torch->actor.params = i < groupSize ? (0x1000 | (groupSize << TORCH_GROUP_SHIFT) | torchFlag)
+                                            : (0x2000 | (torchFlag + 1));
+        torch->actor.world.pos =
+            (Vec3f){ origin.x + offsets[i].x, origin.y + offsets[i].y, origin.z + offsets[i].z };
+#ifdef TEST_HOST_MM
+        torch->actor.csId = 1;
+#endif
+        Collider_SetCylinder(&play, &TORCH_FLAME(*torch), &torch->actor, &TORCH_INIT);
+    }
+    step();
+    REQUIRE(attacks == 0 && torchSwitch == -1);
+    release();
+    for (int frame = 0; frame < CW_DINS_NATIVE_FIRE_TICKS; ++frame) {
+        if (frame > 0)
+            step();
+        REQUIRE(lastAttack == &fire.collider.base && lastAttack->atFlags == (AT_ON | AT_TYPE_PLAYER));
+        for (int i = 0; i < ARRAY_COUNT(torches); ++i) {
+            ObjSyokudai* torch = &torches[i];
+            ObjSyokudai_Update(&torch->actor, &play);
+            Collider* flame = &TORCH_FLAME(*torch).base;
+            REQUIRE(flame->acFlags == (AC_ON | AC_TYPE_PLAYER));
+            CollisionCheck_AC_CylVsCyl(&play, &play.colChkCtx, lastAttack, flame);
+        }
+        if (frame == 56)
+            REQUIRE(torchSwitch == -1 && torchIgnitions == 1);
+        /* Only the sweep should reach the final torch. Allow one native
+         * update to read the AC hit and an additional MM cutscene update. */
+        if (frame == 71)
+            REQUIRE(torchSwitch == torchFlag && torchIgnitions == groupSize);
+    }
+    for (int i = 0; i < groupSize; ++i)
+        REQUIRE(TORCH_TIMER(torches[i]) != 0);
+    for (int i = groupSize; i < ARRAY_COUNT(torches); ++i)
+        REQUIRE(TORCH_TIMER(torches[i]) == 0);
+    REQUIRE(torchIgnitions == groupSize);
+    step();
+    NATIVE_DESTROY(&fire.actor, &play);
 }
 static void cancellationsAndFallback(void) {
     reset(1);
@@ -542,9 +751,12 @@ int main(void) {
     nativeScheduling();
     lightFollowsNativeCosmetics();
     usableLinger();
+    stockAttackBounds();
+    stockRangeTorchPuzzle();
     audioOwnershipAndLegacy();
     puts("PASS native Din actor: release, 138-update anchored fire, six usable seconds, original damage falloff, late "
          "stick/arrow ignition, magic/light cleanup, cancellation and legacy guards");
+    puts("PASS native Din torch puzzle: stock attack reach and native grouped switch activation");
     puts("PASS native Din audio routing: authored contact/release, anchored age publication, generation-qualified "
          "kill/direct destroy, unchanged stock release and stick ignition");
     return 0;

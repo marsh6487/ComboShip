@@ -510,8 +510,7 @@ if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     # matter which subdirectory defines the target.
     install(FILES "$<TARGET_FILE:libultraship>" DESTINATION . COMPONENT combo)
     install(FILES "$<TARGET_FILE:comboui>"      DESTINATION . COMPONENT combo)
-    # (soh.o2r is installed by soh/CMakeLists.txt; 2ship.o2r by mm/CMakeLists.txt. Mario Mode's
-    # sm64.dll is deliberately absent: the installer puts it in nei/, next to the ROM.)
+    # The games install their own port archives. combo/CMakeLists.txt installs libsm64.
 
     # Extractor assets. These MUST match the flat layout the runtime POST_BUILD produces
     # (combo/CMakeLists.txt): soh's Torch ymls and mm's ZAPD extractor dir merged into assets/, mm's

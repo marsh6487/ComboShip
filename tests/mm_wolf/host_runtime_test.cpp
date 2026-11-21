@@ -12,7 +12,7 @@ static GameInteractor fixtureInteractor;
 GameInteractor* GameInteractor::Instance = &fixtureInteractor;
 
 static s32 otherForm = CUSTOM_FORM_NONE;
-static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, pakBodyModel, o2rModel;
+static u8 pendant, beetle, kite, trident, mario, pikachu, customItemBlock, pakModel, pakBodyModel, o2rModel;
 static unsigned nativeActions, nativeDamageTicks, iceBursts, thawCompletions;
 static bool nativeAnimationDone;
 static u16 hookSuppressedButtons;
@@ -94,6 +94,12 @@ u8 Trident_OwnsPlayerAction(void) {
 }
 u8 Sm64Mario_IsActive(void) {
     return mario;
+}
+s32 PikachuForm_IsSelected(void) {
+    return pikachu;
+}
+extern "C" s32 PikachuForm_Draw(PlayState*, Player*) {
+    return 0;
 }
 s32 CustomItems_BlocksMovement(Player*) {
     return customItemBlock;
@@ -514,7 +520,7 @@ int main(int argc, char** argv) {
     assert(!WolfLinkForm_IsReady());
     pendant = 0;
     // Active tool/other-form arbitration must never silently steal their input/action.
-    for (u8* blocker : { &beetle, &kite, &trident, &mario, &customItemBlock, &pakBodyModel, &o2rModel }) {
+    for (u8* blocker : { &beetle, &kite, &trident, &mario, &pikachu, &customItemBlock, &pakBodyModel, &o2rModel }) {
         *blocker = 1;
         frame(BTN_CLEFT);
         assert(!WolfLinkForm_IsReady());

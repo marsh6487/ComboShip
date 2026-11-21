@@ -43,74 +43,42 @@ static s16 sEquipTimer = 0;
 
 extern int gPauseLinkFrameBuffer;
 
-void KaleidoScope_DrawEquipmentImage(PlayState* play, void* source, u32 width, u32 height) {
+static void KaleidoScope_DrawEquipmentImage(PlayState* play) {
+    static u64 sFramebufferTextureDimensions[2] = { 0, 0 };
     PauseContext* pauseCtx = &play->pauseCtx;
-    u8* curTexture;
-    s32 vtxIndex;
-    s32 textureCount;
-    s32 textureHeight;
-    s32 remainingSize;
-    s32 textureSize;
-    s32 pad;
-    s32 i;
+    const s16 width = PAUSE_EQUIP_PLAYER_WIDTH;
+    const s16 height = PAUSE_EQUIP_PLAYER_HEIGHT;
+    if (gPauseLinkFrameBuffer == -1) {
+        return;
+    }
+
+    // The framebuffer is already a complete image on the host GPU. Keep the quad
+    // and its UVs full-height instead of reusing the original 32-pixel TMEM strip.
+    Vtx* vertices = Graph_Alloc(play->state.gfxCtx, 4 * sizeof(Vtx));
+    for (s32 i = 0; i < 4; ++i) {
+        vertices[i] = pauseCtx->equipVtx[80 + i];
+        vertices[i].v.ob[1] = pauseCtx->equipVtx[80].v.ob[1] - ((i & 2) ? height : 0);
+        vertices[i].v.tc[0] = (i & 1) ? width << 5 : 0;
+        vertices[i].v.tc[1] = (i & 2) ? height << 5 : 0;
+    }
 
     OPEN_DISPS(play->state.gfxCtx);
 
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetRenderMode(POLY_OPA_DISP++, G_RM_XLU_SURF, G_RM_XLU_SURF2);
     gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_POINT);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
-
-    curTexture = source;
-    remainingSize = width * height * 2;
-    textureHeight = 4096 / (width * 2);
-    textureSize = width * textureHeight * 2;
-    textureCount = remainingSize / textureSize;
-    if ((remainingSize % textureSize) != 0) {
-        textureCount += 1;
-    }
-
-    vtxIndex = 80;
-
-    gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, textureHeight, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+    gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, height, 0, G_TX_NOMIRROR | G_TX_CLAMP,
                      G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-
-    remainingSize -= textureSize;
-
-    textureCount = 1;
-
-    // VERTEX Y EXTEND
-    pauseCtx->equipVtx[vtxIndex + 2].v.ob[1] -= 80;
-    pauseCtx->equipVtx[vtxIndex + 3].v.ob[1] -= 80;
-
-    for (i = 0; i < textureCount; i++) {
-        gSPVertex(POLY_OPA_DISP++, &pauseCtx->equipVtx[vtxIndex], 4, 0);
-
-        gDPSetTextureImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, curTexture);
-
-        gDPLoadSync(POLY_OPA_DISP++);
-        gDPLoadTile(POLY_OPA_DISP++, G_TX_LOADTILE, 0, 0, (width - 1) << 2, (textureHeight - 1) << 2);
-
-        gDPSetTextureImageFB(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, gPauseLinkFrameBuffer);
-        gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
-
-        curTexture += textureSize;
-
-        if ((remainingSize - textureSize) < 0) {
-            if (remainingSize > 0) {
-                textureHeight = remainingSize / (s32)(width * 2);
-                remainingSize -= textureSize;
-
-                gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, textureHeight, 0,
-                                 G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK,
-                                 G_TX_NOLOD, G_TX_NOLOD);
-            }
-        } else {
-            remainingSize -= textureSize;
-        }
-
-        vtxIndex += 4;
-    }
+    // Seed the interpreter's loaded size before selecting the framebuffer texture.
+    // The aligned placeholder is never uploaded.
+    gDPSetTextureImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, sFramebufferTextureDimensions);
+    gDPLoadSync(POLY_OPA_DISP++);
+    gDPLoadTile(POLY_OPA_DISP++, G_TX_LOADTILE, 0, 0, (width - 1) << 2, (height - 1) << 2);
+    gSPVertex(POLY_OPA_DISP++, vertices, 4, 0);
+    gDPSetTextureImageFB(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, gPauseLinkFrameBuffer);
+    gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -507,8 +475,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
         gSPSegment(POLY_OPA_DISP++, 0x0A, pauseCtx->nameSegment);
         gSPSegment(POLY_OPA_DISP++, 0x0B, play->interfaceCtx.mapSegment);
         Gfx_SetupDL_42Opa(play->state.gfxCtx);
-        KaleidoScope_DrawEquipmentImage(play, pauseCtx->playerSegment, PAUSE_EQUIP_PLAYER_WIDTH,
-                                        PAUSE_EQUIP_PLAYER_HEIGHT);
+        KaleidoScope_DrawEquipmentImage(play);
 
         CLOSE_DISPS(play->state.gfxCtx);
         gExtEquipSuppressIconOverride = 0;
@@ -1196,7 +1163,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
     // gSPSegment(POLY_OPA_DISP++, 0x0C, pauseCtx->iconItemAltSegment);
 
     Gfx_SetupDL_42Opa(play->state.gfxCtx);
-    KaleidoScope_DrawEquipmentImage(play, pauseCtx->playerSegment, PAUSE_EQUIP_PLAYER_WIDTH, PAUSE_EQUIP_PLAYER_HEIGHT);
+    KaleidoScope_DrawEquipmentImage(play);
 
     if (pauseCtx->pageIndex == PAUSE_EQUIP && sSwordElementMenu.phase) {
         SwordElementKaleido_Draw(play, &sSwordElementMenu, ExtInv_GetItemIcon(sSwordElementMenu.item));

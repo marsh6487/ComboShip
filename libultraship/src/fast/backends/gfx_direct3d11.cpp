@@ -642,9 +642,8 @@ struct ShaderProgram* GfxRenderingAPIDX11::CreateAndLoadNewShader(uint64_t shade
         blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
         blend_desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
         blend_desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-        blend_desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
-        blend_desc.RenderTarget[0].DestBlendAlpha =
-            D3D11_BLEND_ONE; // We initially clear alpha to 1.0f and want to keep it at 1.0f
+        blend_desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+        blend_desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
         blend_desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
         blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     } else {
@@ -1208,10 +1207,10 @@ void GfxRenderingAPIDX11::StartDrawToFramebuffer(int fb_id, float noise_scale) {
     mContext->Unmap(mPerFrameCb.Get(), 0);
 }
 
-void GfxRenderingAPIDX11::ClearFramebuffer(bool color, bool depth) {
+void GfxRenderingAPIDX11::ClearFramebuffer(bool color, bool depth, float clearAlpha) {
     FramebufferDX11& fb = mFrameBuffers[mCurrentFramebuffer];
     if (color) {
-        const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        const float clearColor[] = { 0.0f, 0.0f, 0.0f, clearAlpha };
         mContext->ClearRenderTargetView(fb.render_target_view.Get(), clearColor);
     }
     if (depth && fb.has_depth_buffer) {

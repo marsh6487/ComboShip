@@ -15,6 +15,7 @@ extern "C" void Partners_Reset(void);
 #include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../combo/gameplay/CrossoverAssetPath.h"
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
 #include "CrashHandlerExt.h"
@@ -584,6 +585,14 @@ extern "C" const char* Nei_AssetDir(void) {
 #else
     return "nei";
 #endif
+}
+
+extern "C" const char* Nei_FindCrossoverAsset(const char* name) {
+    static thread_local std::string path;
+    path = Crossover::FindAsset(name, Nei_AssetDir(), false, [](const std::string& relativePath) {
+        return Ship::Context::LocateFileAcrossAppDirs(relativePath, appShortName);
+    });
+    return path.empty() ? nullptr : path.c_str();
 }
 
 void CheckAndCreateModFolder() {
@@ -4317,13 +4326,13 @@ static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
         rg = it->second;
     }
     // Convert unobtainable items to a blue rupee while preserving shared-item receive suppression.
-    GetItemEntry gie = OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(rg) != CAN_OBTAIN
-                           ? ItemTableManager::Instance->RetrieveItemEntry(MOD_NONE, GI_RUPEE_BLUE)
-                           : Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
+    const bool obtainable = OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(rg) == CAN_OBTAIN;
+    GetItemEntry gie = obtainable ? Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy()
+                                  : ItemTableManager::Instance->RetrieveItemEntry(MOD_NONE, GI_RUPEE_BLUE);
     FleetSharedReceiveGuard receiveGuard;
     Combo_GrantResolvedOOT(gie);
     if (granted)
-        *granted = rg;
+        *granted = !obtainable && rg == RG_PROGRESSIVE_ROCS ? RG_BLUE_RUPEE : rg;
     SPDLOG_INFO("[ComboShip] cross grant: granted '{}' into OOT save", itemName);
     return true;
 }
@@ -4335,6 +4344,25 @@ extern "C" COMBO_EXPORT void SOH_GrantCrossItem(const char* itemName) {
     if (GrantOotItemByName(itemName, &granted)) {
         FleetShared_OnNativeObtained((int)granted);
     }
+}
+
+extern "C" COMBO_EXPORT bool SOH_GrantBossWarpReward(int slot, const char* itemName) {
+    if (gSaveContext.fileNum != slot || !IS_RANDO)
+        return false;
+    RandomizerGet granted = RG_NONE;
+    if (!GrantOotItemByName(itemName, &granted))
+        return false;
+    FleetShared_OnNativeObtained(static_cast<int>(granted));
+    return true;
+}
+
+extern "C" COMBO_EXPORT void SOH_CaptureBossWarpRewardSave(int slot) {
+    if (gSaveContext.fileNum == slot && IS_RANDO)
+        SaveManager::Instance->SaveFile(slot);
+}
+
+extern "C" COMBO_EXPORT void SOH_WaitBossWarpRewardSaves() {
+    SaveManager::Instance->ThreadPoolWait();
 }
 
 // The peer's half of a shared item (MM obtained it): grant only, never share back.

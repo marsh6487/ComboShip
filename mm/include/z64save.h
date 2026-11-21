@@ -419,6 +419,8 @@ typedef struct RandoSaveInfo {
     RandoSoloEntranceSave soloEntrances;
 #ifdef COMBO_BUILD
     u8 pendingTrapCount; // ComboShip: cross-world traps granted while MM was dormant; drained on activation
+    u16 discoveredEntrances[2 * 256 + 8]; // Both directions of the maximum Solo MM layout, plus boss escape aliases.
+    u16 discoveredEntranceCount;
 #endif
 } RandoSaveInfo;
 

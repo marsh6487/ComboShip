@@ -369,9 +369,9 @@ s32 SSBBSkin_DrawWithReserve(SSBBCharacterInstance* inst, PlayState* play, Vec3f
         return 0;
 
     skin = inst->def->skinMesh;
-    if (!skin->vtxBuf[0] || !skin->vtxBuf[1])
+    if (!skin->vtxBuf[0] || !skin->vtxBuf[1] || !skin->boneCount || skin->boneCount > SSBB_MAX_SKIN_BONES)
         return 0;
-    if (!inst->ssbbAnim)
+    if (!inst->ssbbAnim && !skin->drawBindPose)
         return 0;
 
     // Outer Open/CloseDisps plus the nested SetupDL25_Opa markers consume
@@ -385,9 +385,9 @@ s32 SSBBSkin_DrawWithReserve(SSBBCharacterInstance* inst, PlayState* play, Vec3f
         !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->overlay, 2 * sizeof(Gfx) + (reserve ? reserve->overlayBytes : 0)))
         return 0;
 
-    if (!SSBBSkin_ComputePose(inst))
+    if (inst->ssbbAnim && !SSBBSkin_ComputePose(inst))
         return 0;
-    if (CVarGetInteger("gExpansions.SSBB.SkinDebug", 0) == 1) {
+    if (!inst->ssbbAnim || CVarGetInteger("gExpansions.SSBB.SkinDebug", 0) == 1) {
         MtxF identity;
         s32 i;
         sPoseOwner = NULL; // Bind-pose debug drawing has no sampled animation pose.

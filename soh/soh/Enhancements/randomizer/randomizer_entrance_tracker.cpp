@@ -8,6 +8,10 @@
 #include <array>
 #include <cctype>
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
+#include "ComboResolve.h"
+#include "ComboGameMode.h"
+bool Combo_OotIsForeground(void);
 extern "C" uint64_t Combo_SOH_TrackerSeedRevision(void);
 extern "C" int Combo_SOH_GetTrackerDestination(int32_t, int32_t, int*, int32_t*, const char**, int*, int32_t*, int*);
 extern "C" int32_t Combo_SOH_TrackerSource(size_t);
@@ -20,6 +24,7 @@ extern "C" int32_t Combo_SOH_TrackerSource(size_t);
 extern "C" {
 #include <z64.h>
 #include "macros.h"
+#include "variables.h"
 extern PlayState* gPlayState;
 
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
@@ -29,6 +34,9 @@ extern PlayState* gPlayState;
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "entrance.h"
 #include "soh/SohGui/UIWidgets.hpp"
+#ifdef COMBO_BUILD
+#include "ComboMenuSharedContext.h"
+#endif
 
 using namespace UIWidgets;
 
@@ -495,6 +503,15 @@ const EntranceData* GetEntranceData(s16 index) {
     return nullptr;
 }
 
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT const char* SOH_GetEntranceTrackerDestinationLabel(int32_t entrance) {
+    if (entrance < 0 || entrance > INT16_MAX)
+        return nullptr;
+    const auto* data = GetEntranceData(static_cast<s16>(entrance));
+    return data ? data->destination.c_str() : nullptr;
+}
+#endif
+
 // Every destination consumer uses this projection; source/discovery identity stays native.
 static uint64_t trackerSeedRevision = 0;
 static std::map<std::pair<int32_t, int32_t>, EntranceData> trackerDestinations;
@@ -543,6 +560,15 @@ static const EntranceData* GetDestinationData(const EntranceOverride& entrance) 
             }
         }
         data.destination = (ingress ? "" : "Outside ") + std::string(game == 1 ? "MM " : "OoT ") + name;
+#ifdef COMBO_BUILD
+        if (game == 1) {
+            using GetLabel = const char* (*)(int32_t);
+            static const auto getLabel =
+                reinterpret_cast<GetLabel>(Combo_ResolveSym("2ship", "MM_GetEntranceTrackerDestinationLabel"));
+            if (const char* label = getLabel ? getLabel(index) : nullptr)
+                data.destination = std::string("MM ") + label;
+        }
+#endif
         data.metaTag = id;
         if (index != reverse)
             data.source = data.destination;
@@ -973,21 +999,34 @@ void EntranceTrackerWindow::Draw() {
     if (!IsVisible()) {
         return;
     }
+#ifdef COMBO_BUILD
+    ComboMenuContext::UseSharedImGuiContext();
+#endif
     DrawElement();
     // Sync up the IsVisible flag if it was changed by ImGui
     SyncVisibilityConsoleVariable();
 }
 
+static void DrawOotRoutes(bool available);
+
 void EntranceTrackerWindow::DrawElement() {
+    bool mmForeground = false;
 #ifdef COMBO_BUILD
-    if (trackerSeedRevision != Combo_SOH_TrackerSeedRevision())
-        InitEntranceTrackingData();
+    mmForeground = Combo_IsCombinedGame() && !Combo_OotIsForeground();
 #endif
     Color_Background = CVarGetColor(CVAR_TRACKER_ENTRANCE("BgColor.Value"), Color_Bg_Default);
     if (CVarGetInteger(CVAR_TRACKER_ENTRANCE("WindowType"), TRACKER_WINDOW_WINDOW) == TRACKER_WINDOW_FLOATING) {
-        if (CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowOnlyPaused"), 0) &&
-            (gPlayState == nullptr || gPlayState->pauseCtx.state == 0)) {
-            return;
+        if (CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowOnlyPaused"), 0)) {
+            bool paused = !mmForeground && gPlayState && gPlayState->pauseCtx.state != 0;
+#ifdef COMBO_BUILD
+            if (mmForeground) {
+                static const auto isPaused =
+                    reinterpret_cast<int (*)(void)>(Combo_ResolveSym("2ship", "MM_IsPausedForCombo"));
+                paused = isPaused && isPaused();
+            }
+#endif
+            if (!paused)
+                return;
         }
 
         if (CVarGetInteger(CVAR_TRACKER_ENTRANCE("DisplayType"), TRACKER_DISPLAY_ALWAYS) ==
@@ -1018,221 +1057,259 @@ void EntranceTrackerWindow::DrawElement() {
             "Entrance Tracker", &mIsVisible, Color_Background,
             static_cast<TrackerWindowType>(CVarGetInteger(CVAR_TRACKER_ENTRANCE("WindowType"), TRACKER_WINDOW_WINDOW)),
             CVarGetInteger(CVAR_TRACKER_ENTRANCE("Draggable"), 1), ImGuiWindowFlags_NoScrollbar)) {
-        if (!GameInteractor::IsSaveLoaded()) {
-            ImGui::Text("Waiting for file load..."); // TODO Language
-            Trackers::EndFloatWindows();
-            return;
-        }
-
-        static ImGuiTextFilter locationSearch;
-
-        uint8_t nextTreeState = 0;
-        if (Button("Collapse All", ButtonOptions({ { .tooltip = "Collapse all entrance groups" } })
-                                       .Color(THEME_COLOR)
-                                       .Size(Sizes::Inline))) {
-            nextTreeState = 1;
-        }
-        ImGui::SameLine();
-        if (Button("Expand All", ButtonOptions({ { .tooltip = "Expand all entrance groups" } })
-                                     .Color(THEME_COLOR)
-                                     .Size(Sizes::Inline))) {
-            nextTreeState = 2;
-        }
-        ImGui::SameLine();
-        if (Button("Clear",
-                   ButtonOptions({ { .tooltip = "Clear the search field" } }).Color(THEME_COLOR).Size(Sizes::Inline))) {
-            locationSearch.Clear();
-        }
-
-        PushStyleCombobox(THEME_COLOR);
-        if (locationSearch.Draw()) {
-            nextTreeState = 2;
-        }
-        PopStyleCombobox();
-
-        uint8_t destToggle = CVarGetInteger(CVAR_TRACKER_ENTRANCE("SortBy"), 0);
-        uint8_t groupToggle = CVarGetInteger(CVAR_TRACKER_ENTRANCE("GroupBy"), 0);
-
-        // Combine destToggle and groupToggle to get a range of 0-3
-        uint8_t groupType = destToggle + (groupToggle * 2);
-        size_t groupCount = groupToggle ? (size_t)ENTRANCE_TYPE_COUNT : (size_t)SPOILER_ENTRANCE_GROUP_COUNT;
-        auto groupNames = groupToggle ? groupTypeNames : spoilerEntranceGroupNames;
-
-        EntranceOverride* entranceList;
-
-        switch (groupType) {
-            case ENTRANCE_SOURCE_AREA:
-                entranceList = srcListSortedByArea;
-                break;
-            case ENTRANCE_DESTINATION_AREA:
-                entranceList = destListSortedByArea;
-                break;
-            case ENTRANCE_SOURCE_TYPE:
-                entranceList = srcListSortedByType;
-                break;
-            case ENTRANCE_DESTINATION_TYPE:
-                entranceList = destListSortedByType;
-                break;
-            default:
-                assert(false);
-                return;
-        }
-
-        // Begin tracker list
-        ImGui::BeginChild("ChildEntranceTrackerLocations", ImVec2(0, -8));
-        bool showTo = CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowTo"), 0);
-        bool showFrom = CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowFrom"), 0);
-        bool collapseUndiscovered = CVarGetInteger(CVAR_TRACKER_ENTRANCE("CollapseUndiscovered"), 0);
-        bool highlightPrevious = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HighlightPrevious"), 0);
-        bool highlightAvailable = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HighlightAvailable"), 0);
-        bool hideReverse = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HideReverseEntrances"), 1);
-        bool autoScrollArea = CVarGetInteger(CVAR_TRACKER_ENTRANCE("AutoScroll"), 0);
-        for (size_t i = 0; i < groupCount; i++) {
-            std::string groupName = groupNames[i];
-
-            uint16_t entranceCount = gEntranceTrackingData.GroupEntranceCounts[groupType][i];
-            uint16_t startIndex = gEntranceTrackingData.GroupOffsets[groupType][i];
-
-            bool doAreaScroll = false;
-            int undiscovered = 0;
-            std::vector<EntranceOverride> displayEntrances = {};
-
-            // Loop over entrances first for filtering
-            for (size_t entranceIdx = 0; entranceIdx < entranceCount; entranceIdx++) {
-                size_t trueIdx = entranceIdx + startIndex;
-
-                EntranceOverride entrance = entranceList[trueIdx];
-
-                const EntranceData* original = GetSourceData(entrance.index);
-                const EntranceData* override = GetDestinationData(entrance);
-
-                // If entrance is a dungeon, grotto, or interior entrance, the transition into that area has oneExit
-                // set, which means we can filter the return transitions as redundant if entrances are not decoupled, as
-                // this is redundant information. Also checks a setting, enabled by default, for hiding them. If all of
-                // these conditions are met, we skip adding this entrance to any lists. However, if entrances are
-                // decoupled, then all transitions need to be displayed, so we proceed with the filtering
-                if ((original->type == ENTRANCE_TYPE_DUNGEON || original->type == ENTRANCE_TYPE_GROTTO ||
-                     original->type == ENTRANCE_TYPE_INTERIOR) &&
-                    (original->oneExit != 1 && OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(
-                                                   RSK_DECOUPLED_ENTRANCES) == RO_GENERIC_OFF) &&
-                    hideReverse == 1) {
-                    continue;
+#ifdef COMBO_BUILD
+        if (Combo_IsCombinedGame()) {
+            const int slot = gSaveContext.fileNum;
+            const bool ootAvailable = mmForeground ? slot >= 0 && slot <= 2 && gSaveContext.gameMode == GAMEMODE_NORMAL
+                                                   : GameInteractor::IsSaveLoaded();
+            static bool wasMmForeground = false;
+            const bool switchedToMm = mmForeground && !wasMmForeground;
+            const bool switchedToOot = !mmForeground && wasMmForeground;
+            wasMmForeground = mmForeground;
+            const auto mmSelected = switchedToMm ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            const auto ootSelected = switchedToOot ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabBar("Entrance Tracker Games")) {
+                if (ImGui::BeginTabItem("Ocarina of Time", nullptr, ootSelected)) {
+                    DrawOotRoutes(ootAvailable);
+                    ImGui::EndTabItem();
                 }
-
-                // Only show blue warps if bluewarp shuffle is on
-                if ((original->metaTag.ends_with("bw") || override->metaTag.ends_with("bw")) &&
-                    OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_DECOUPLED_ENTRANCES) ==
-                        RO_GENERIC_OFF) {
-                    continue;
+                if (ImGui::BeginTabItem("Majora's Mask", nullptr, mmSelected)) {
+                    static const auto drawMm =
+                        reinterpret_cast<void (*)(int, int)>(Combo_ResolveSym("2ship", "MM_DrawEntranceTracker"));
+                    if (drawMm)
+                        drawMm(mmForeground || ootAvailable ? slot : -1, mmForeground);
+                    else
+                        ImGui::TextUnformatted("MM entrance tracker is unavailable.");
+                    ImGui::EndTabItem();
                 }
-
-                bool isDiscovered = IsEntranceDiscovered(entrance.index);
-
-                bool showOverride = (!destToggle ? showTo : showFrom) || isDiscovered;
-                bool showOriginal = (!destToggle ? showFrom : showTo) || isDiscovered;
-
-                const char* origSrcAreaName = spoilerEntranceGroupNames[original->srcGroup].c_str();
-                const char* origTypeName = groupTypeNames[original->type].c_str();
-                const char* rplcSrcAreaName = spoilerEntranceGroupNames[override->dstGroup].c_str();
-                const char* rplcTypeName = groupTypeNames[override->type].c_str();
-
-                const char* origSrcName = showOriginal ? original->source.c_str() : "";
-                const char* rplcDstName = showOverride ? override->destination.c_str() : "";
-
-                // Filter for entrances by group name, type, source/destination names, and meta tags
-                if ((!locationSearch.IsActive() && (showOriginal || showOverride || !collapseUndiscovered)) ||
-                    ((showOriginal &&
-                      (locationSearch.PassFilter(origSrcName) || locationSearch.PassFilter(origSrcAreaName) ||
-                       locationSearch.PassFilter(origTypeName) ||
-                       locationSearch.PassFilter(original->metaTag.c_str()))) ||
-                     (showOverride &&
-                      (locationSearch.PassFilter(rplcDstName) || locationSearch.PassFilter(rplcSrcAreaName) ||
-                       locationSearch.PassFilter(rplcTypeName) ||
-                       locationSearch.PassFilter(override->metaTag.c_str()))))) {
-
-                    // Detect if a scroll should happen and remember the scene for that scroll
-                    if (!doAreaScroll &&
-                        (lastSceneOrEntranceDetected != LinkIsInArea(original) && LinkIsInArea(original) != -1)) {
-                        lastSceneOrEntranceDetected = LinkIsInArea(original);
-                        doAreaScroll = true;
-                    }
-
-                    displayEntrances.push_back(entrance);
-                } else if (!isDiscovered) {
-                    undiscovered++;
-                }
+                ImGui::EndTabBar();
             }
-
-            // Then display the entrances in groups
-            if (displayEntrances.size() != 0 || (!locationSearch.IsActive() && undiscovered > 0)) {
-                // Handle opening/closing trees based on auto scroll or collapse/expand buttons
-                if (nextTreeState == 1) {
-                    ImGui::SetNextItemOpen(false, ImGuiCond_None);
-                } else {
-                    ImGui::SetNextItemOpen(true, nextTreeState == 0 && !doAreaScroll ? ImGuiCond_Once : ImGuiCond_None);
-                }
-
-                if (ImGui::TreeNode(groupName.c_str())) {
-                    for (auto entrance : displayEntrances) {
-                        const EntranceData* original = GetSourceData(entrance.index);
-                        const EntranceData* override = GetDestinationData(entrance);
-
-                        bool isDiscovered = IsEntranceDiscovered(entrance.index);
-
-                        bool showOverride = (!destToggle ? showTo : showFrom) || isDiscovered;
-                        bool showOriginal = (!destToggle ? showFrom : showTo) || isDiscovered;
-
-                        const char* unknown = "???";
-
-                        const char* origSrcName = showOriginal ? original->source.c_str() : unknown;
-                        const char* rplcDstName = showOverride ? override->destination.c_str() : unknown;
-
-                        uint32_t color = isDiscovered ? IM_COL32_WHITE : COLOR_GRAY;
-
-                        // Handle highlighting and auto scroll
-                        if ((original->index == lastEntranceIndex ||
-                             (override->reverseIndex == lastEntranceIndex &&
-                              OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_DECOUPLED_ENTRANCES) ==
-                                  RO_GENERIC_OFF)) &&
-                            highlightPrevious) {
-                            color = COLOR_ORANGE;
-                        } else if (LinkIsInArea(original) != -1) {
-                            if (highlightAvailable) {
-                                color = COLOR_GREEN;
-                            }
-
-                            if (doAreaScroll) {
-                                doAreaScroll = false;
-                                if (autoScrollArea) {
-                                    ImGui::SetScrollHereY(0.0f);
-                                }
-                            }
-                        }
-
-                        ImGui::PushStyleColor(ImGuiCol_Text, color);
-
-                        // Use a non-breaking space to keep the arrow from wrapping to a newline by itself
-                        ImGui::TextWrapped("%s\u00A0-> %s", origSrcName, rplcDstName);
-
-                        ImGui::PopStyleColor();
-                    }
-
-                    // Write collapsed undiscovered info
-                    if (!locationSearch.IsActive() && undiscovered > 0) {
-                        Spacer(0);
-                        ImGui::PushStyleColor(ImGuiCol_Text, COLOR_GRAY);
-                        ImGui::TextWrapped("%d Undiscovered", undiscovered);
-                        ImGui::PopStyleColor();
-                    }
-
-                    Spacer(0);
-                    ImGui::TreePop();
-                }
-            }
+        } else
+#endif
+        {
+            DrawOotRoutes(GameInteractor::IsSaveLoaded());
         }
-        ImGui::EndChild();
     }
     Trackers::EndFloatWindows();
+}
+
+static void DrawOotRoutes(bool available) {
+    if (!available) {
+        ImGui::TextUnformatted("Waiting for file load...");
+        return;
+    }
+#ifdef COMBO_BUILD
+    if (trackerSeedRevision != Combo_SOH_TrackerSeedRevision())
+        InitEntranceTrackingData();
+#endif
+    if (!gEntranceTrackingData.EntranceCount) {
+        ImGui::TextUnformatted("This file has no shuffled OoT entrances.");
+        return;
+    }
+
+    static ImGuiTextFilter locationSearch;
+
+    uint8_t nextTreeState = 0;
+    if (Button(
+            "Collapse All",
+            ButtonOptions({ { .tooltip = "Collapse all entrance groups" } }).Color(THEME_COLOR).Size(Sizes::Inline))) {
+        nextTreeState = 1;
+    }
+    ImGui::SameLine();
+    if (Button("Expand All",
+               ButtonOptions({ { .tooltip = "Expand all entrance groups" } }).Color(THEME_COLOR).Size(Sizes::Inline))) {
+        nextTreeState = 2;
+    }
+    ImGui::SameLine();
+    if (Button("Clear",
+               ButtonOptions({ { .tooltip = "Clear the search field" } }).Color(THEME_COLOR).Size(Sizes::Inline))) {
+        locationSearch.Clear();
+    }
+
+    PushStyleCombobox(THEME_COLOR);
+    if (locationSearch.Draw()) {
+        nextTreeState = 2;
+    }
+    PopStyleCombobox();
+
+    bool destToggle = CVarGetInteger(CVAR_TRACKER_ENTRANCE("SortBy"), 0) != 0;
+    bool groupToggle = CVarGetInteger(CVAR_TRACKER_ENTRANCE("GroupBy"), 0) != 0;
+
+    // Combine destToggle and groupToggle to get a range of 0-3
+    uint8_t groupType = destToggle + (groupToggle * 2);
+    size_t groupCount = groupToggle ? (size_t)ENTRANCE_TYPE_COUNT : (size_t)SPOILER_ENTRANCE_GROUP_COUNT;
+    auto groupNames = groupToggle ? groupTypeNames : spoilerEntranceGroupNames;
+
+    EntranceOverride* entranceList;
+
+    switch (groupType) {
+        case ENTRANCE_SOURCE_AREA:
+            entranceList = srcListSortedByArea;
+            break;
+        case ENTRANCE_DESTINATION_AREA:
+            entranceList = destListSortedByArea;
+            break;
+        case ENTRANCE_SOURCE_TYPE:
+            entranceList = srcListSortedByType;
+            break;
+        case ENTRANCE_DESTINATION_TYPE:
+            entranceList = destListSortedByType;
+            break;
+        default:
+            assert(false);
+            return;
+    }
+
+    // Begin tracker list
+    ImGui::BeginChild("ChildEntranceTrackerLocations", ImVec2(0, -8));
+    bool showTo = CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowTo"), 0);
+    bool showFrom = CVarGetInteger(CVAR_TRACKER_ENTRANCE("ShowFrom"), 0);
+    bool collapseUndiscovered = CVarGetInteger(CVAR_TRACKER_ENTRANCE("CollapseUndiscovered"), 0);
+    bool highlightPrevious = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HighlightPrevious"), 0);
+    bool highlightAvailable = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HighlightAvailable"), 0);
+    bool hideReverse = CVarGetInteger(CVAR_TRACKER_ENTRANCE("HideReverseEntrances"), 1);
+    bool autoScrollArea = CVarGetInteger(CVAR_TRACKER_ENTRANCE("AutoScroll"), 0);
+    for (size_t i = 0; i < groupCount; i++) {
+        std::string groupName = groupNames[i];
+
+        uint16_t entranceCount = gEntranceTrackingData.GroupEntranceCounts[groupType][i];
+        uint16_t startIndex = gEntranceTrackingData.GroupOffsets[groupType][i];
+
+        bool doAreaScroll = false;
+        int undiscovered = 0;
+        std::vector<EntranceOverride> displayEntrances = {};
+
+        // Loop over entrances first for filtering
+        for (size_t entranceIdx = 0; entranceIdx < entranceCount; entranceIdx++) {
+            size_t trueIdx = entranceIdx + startIndex;
+
+            EntranceOverride entrance = entranceList[trueIdx];
+
+            const EntranceData* original = GetSourceData(entrance.index);
+            const EntranceData* override = GetDestinationData(entrance);
+
+            // If entrance is a dungeon, grotto, or interior entrance, the transition into that area has oneExit
+            // set, which means we can filter the return transitions as redundant if entrances are not decoupled, as
+            // this is redundant information. Also checks a setting, enabled by default, for hiding them. If all of
+            // these conditions are met, we skip adding this entrance to any lists. However, if entrances are
+            // decoupled, then all transitions need to be displayed, so we proceed with the filtering
+            if ((original->type == ENTRANCE_TYPE_DUNGEON || original->type == ENTRANCE_TYPE_GROTTO ||
+                 original->type == ENTRANCE_TYPE_INTERIOR) &&
+                (original->oneExit != 1 &&
+                 OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_DECOUPLED_ENTRANCES) == RO_GENERIC_OFF) &&
+                hideReverse == 1) {
+                continue;
+            }
+
+            // Only show blue warps if bluewarp shuffle is on
+            if ((original->metaTag.ends_with("bw") || override->metaTag.ends_with("bw")) &&
+                OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_DECOUPLED_ENTRANCES) == RO_GENERIC_OFF) {
+                continue;
+            }
+
+            bool isDiscovered = IsEntranceDiscovered(entrance.index);
+
+            bool showOverride = (!destToggle ? showTo : showFrom) || isDiscovered;
+            bool showOriginal = (!destToggle ? showFrom : showTo) || isDiscovered;
+
+            const char* origSrcAreaName = spoilerEntranceGroupNames[original->srcGroup].c_str();
+            const char* origTypeName = groupTypeNames[original->type].c_str();
+            const char* rplcSrcAreaName = spoilerEntranceGroupNames[override->dstGroup].c_str();
+            const char* rplcTypeName = groupTypeNames[override->type].c_str();
+
+            const char* origSrcName = showOriginal ? original->source.c_str() : "";
+            const char* rplcDstName = showOverride ? override->destination.c_str() : "";
+
+            // Filter for entrances by group name, type, source/destination names, and meta tags
+            if ((!locationSearch.IsActive() && (showOriginal || showOverride || !collapseUndiscovered)) ||
+                ((showOriginal &&
+                  (locationSearch.PassFilter(origSrcName) || locationSearch.PassFilter(origSrcAreaName) ||
+                   locationSearch.PassFilter(origTypeName) || locationSearch.PassFilter(original->metaTag.c_str()))) ||
+                 (showOverride &&
+                  (locationSearch.PassFilter(rplcDstName) || locationSearch.PassFilter(rplcSrcAreaName) ||
+                   locationSearch.PassFilter(rplcTypeName) || locationSearch.PassFilter(override->metaTag.c_str()))))) {
+
+                // Detect if a scroll should happen and remember the scene for that scroll
+                if (!doAreaScroll &&
+                    (lastSceneOrEntranceDetected != LinkIsInArea(original) && LinkIsInArea(original) != -1)) {
+                    lastSceneOrEntranceDetected = LinkIsInArea(original);
+                    doAreaScroll = true;
+                }
+
+                displayEntrances.push_back(entrance);
+            } else if (!isDiscovered) {
+                undiscovered++;
+            }
+        }
+
+        // Then display the entrances in groups
+        if (displayEntrances.size() != 0 || (!locationSearch.IsActive() && undiscovered > 0)) {
+            // Handle opening/closing trees based on auto scroll or collapse/expand buttons
+            if (nextTreeState == 1) {
+                ImGui::SetNextItemOpen(false, ImGuiCond_None);
+            } else {
+                ImGui::SetNextItemOpen(true, nextTreeState == 0 && !doAreaScroll ? ImGuiCond_Once : ImGuiCond_None);
+            }
+
+            if (ImGui::TreeNode(groupName.c_str())) {
+                for (auto entrance : displayEntrances) {
+                    const EntranceData* original = GetSourceData(entrance.index);
+                    const EntranceData* override = GetDestinationData(entrance);
+
+                    bool isDiscovered = IsEntranceDiscovered(entrance.index);
+
+                    bool showOverride = (!destToggle ? showTo : showFrom) || isDiscovered;
+                    bool showOriginal = (!destToggle ? showFrom : showTo) || isDiscovered;
+
+                    const char* unknown = "???";
+
+                    const char* origSrcName = showOriginal ? original->source.c_str() : unknown;
+                    const char* rplcDstName = showOverride ? override->destination.c_str() : unknown;
+
+                    uint32_t color = isDiscovered ? IM_COL32_WHITE : COLOR_GRAY;
+
+                    // Handle highlighting and auto scroll
+                    if ((original->index == lastEntranceIndex ||
+                         (override->reverseIndex == lastEntranceIndex &&
+                          OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_DECOUPLED_ENTRANCES) ==
+                              RO_GENERIC_OFF)) &&
+                        highlightPrevious) {
+                        color = COLOR_ORANGE;
+                    } else if (LinkIsInArea(original) != -1) {
+                        if (highlightAvailable) {
+                            color = COLOR_GREEN;
+                        }
+
+                        if (doAreaScroll) {
+                            doAreaScroll = false;
+                            if (autoScrollArea) {
+                                ImGui::SetScrollHereY(0.0f);
+                            }
+                        }
+                    }
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, color);
+
+                    // Use a non-breaking space to keep the arrow from wrapping to a newline by itself
+                    ImGui::TextWrapped("%s\u00A0-> %s", origSrcName, rplcDstName);
+
+                    ImGui::PopStyleColor();
+                }
+
+                // Write collapsed undiscovered info
+                if (!locationSearch.IsActive() && undiscovered > 0) {
+                    Spacer(0);
+                    ImGui::PushStyleColor(ImGuiCol_Text, COLOR_GRAY);
+                    ImGui::TextWrapped("%d Undiscovered", undiscovered);
+                    ImGui::PopStyleColor();
+                }
+
+                Spacer(0);
+                ImGui::TreePop();
+            }
+        }
+    }
+    ImGui::EndChild();
 }
 
 void EntranceTrackerWindow::InitElement() {

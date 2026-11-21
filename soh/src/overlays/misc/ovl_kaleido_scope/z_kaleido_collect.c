@@ -1063,13 +1063,13 @@ static u8 MmPage_SongOwned(s16 songIdx) {
     return CHECK_QUEST_ITEM(def->questItem) ? 1 : 0;
 }
 
-// ---- MM's EXACT quest-page layout, ported verbatim from MM z_kaleido_scope_NES.c ----
+// MM's quest-page layout, shared with MM z_kaleido_scope_NES.c.
 // 23 content quads in MM QUEST_* point order (0-3 remains diamond, 4 shield, 5 sword, 6-11 lower
 // song row, 12-17 upper song row, 18 notebook, 19 quiver, 20 bomb bag, 21 skull token (unused),
 // 22 heart piece) + 8 played-note staff quads (23-30).
 static const s16 sMmQuestQuadX[31] = {
-    45,  78,  10,   45, 80, 11,   -109, -87, -65, -41, -19, -18, -109, -87, -65, -41,
-    -19, -18, -103, 7,  82, -110, -54,  -98, -86, -74, -62, -50, -38,  -26, -14,
+    45,  78, 10,   45, 80, 11,   -109, -87, -65, -41, -19, -1,  -109, -87, -65, -41,
+    -19, -1, -103, 7,  82, -110, -54,  -98, -86, -74, -62, -50, -38,  -26, -14,
 };
 static const s16 sMmQuestQuadY[31] = {
     62, 42, 42, 20,  -9,  -9, -20, -20, -20, -20, -20, -20, 2,   2,   2,   2,
@@ -1084,7 +1084,7 @@ static const s16 sMmQuestQuadH[31] = {
     24, 24, 32, 32, 32, 24, 48, 16, 16, 16, 16, 16, 16, 16, 16,
 };
 
-// MM's cursor link table (MM z_kaleido_collect.c sCursorPointLinks), verbatim: {up, down, left,
+// MM's cursor link table (MM z_kaleido_collect.c sCursorPointLinks): {up, down, left,
 // right} per point; -1 = stay, -2 = page-switch left, -3 = page-switch right.
 static const s16 sMmQuestCursorLinks[23][4] = {
     { -1, 3, 2, 1 },    // 0  Odolwa (remains diamond top)
@@ -1092,21 +1092,21 @@ static const s16 sMmQuestCursorLinks[23][4] = {
     { 0, 5, 22, 3 },    // 2  Gyorg (left)
     { 0, 4, 2, 1 },     // 3  Twinmold (bottom)
     { 1, 20, 5, -3 },   // 4  Shield
-    { 2, 19, 16, 4 },   // 5  Sword
+    { 2, 19, 17, 4 },   // 5  Sword
     { 12, -1, -2, 7 },  // 6  Sonata (lower row)
     { 13, -1, 6, 8 },   // 7  Goron Lullaby
     { 14, -1, 7, 9 },   // 8  New Wave Bossa Nova
     { 15, -1, 8, 10 },  // 9  Elegy
-    { 16, -1, 9, 19 },  // 10 Oath
-    { 17, -1, 10, 5 },  // 11 Saria
+    { 16, -1, 9, 11 },  // 10 Oath
+    { 17, -1, 10, 19 }, // 11 Saria
     { 18, 6, -2, 13 },  // 12 Command Melody (Time row, upper)
     { 18, 7, 12, 14 },  // 13 Healing
     { 22, 8, 13, 15 },  // 14 Fugue of Home (Epona row)
     { 22, 9, 14, 16 },  // 15 Soaring
-    { 22, 10, 15, 5 },  // 16 Ballad of Hero (Storms row)
+    { 22, 10, 15, 17 }, // 16 Ballad of Hero (Storms row)
     { 22, 11, 16, 5 },  // 17 Sun
     { -1, 12, -2, 22 }, // 18 Bombers' Notebook
-    { 5, -1, 10, 20 },  // 19 Quiver
+    { 5, -1, 11, 20 },  // 19 Quiver
     { 4, -1, 19, -3 },  // 20 Bomb Bag
     { 19, 12, -2, 22 }, // 21 Skull Token (unused quad)
     { -1, 16, 18, 2 },  // 22 Heart Piece

@@ -9,6 +9,7 @@
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
 #include "BenMenu.h"
+#include "CosmeticEditor.h"
 #include "../../../combo/gui/MenuControlPopout.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/ComboGameMode.h"
@@ -1391,8 +1392,8 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Replaces Link with Mario from Super Mario 64, driven by libsm64. Mario keeps SM64 "
             "physics and animations.\n\n"
-            "Requires sm64.dll next to 2ship.exe (shipped automatically) and a valid SM64 US "
-            "Z64 ROM (sm64.z64) placed next to 2ship.exe or pointed to via the gSm64RomPath CVar.\n\n"
+            "Requires a US Super Mario 64 ROM in big-endian format (sm64.z64). "
+            "Place it in nei/ or set gSm64RomPath to its location.\n\n"
             "C-Left = Cappy, C-Right = Roll; these override equipped MM items in those slots.\n"
             "C-Down keeps its equipped item. D-pad controls Wing, Metal, Vanish, and Fire caps."));
     AddWidget(path, "Mario Mask C-Down Toggle", WIDGET_CVAR_CHECKBOX)
@@ -1641,21 +1642,12 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
-    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
-                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
-                                  ImVec2(420, 220),
-#ifdef COMBO_BUILD
-                                  Combo_MmIsForeground
-#else
-                                  []() { return true; }
-#endif
-    );
     AddWidget(path, "Popout Spin Attack", WIDGET_WINDOW_BUTTON)
         .CVar("gWindows.SpinAttackMM")
         .WindowName("Spin Attack##MM")
         .HideInSearch(true)
         .Options(std::make_shared<WindowButtonOptions>(WindowButtonOptions().EmbedWindow(false).Tooltip(
-            "Keep the spin style and elemental effect controls open while playing.")));
+            "Keep spin attack settings and colors open while playing.")));
     AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
         .CVar(CW_SPIN_STYLE_CVAR)
         .Options(ComboboxOptions()
@@ -1669,6 +1661,32 @@ void BenMenu::AddEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
+    std::set<std::string> spinControls{ CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR };
+    static const char* const spinCosmetics[] = { "Effects.SpinSlashCharge", "Effects.SpinSlashBurst",
+                                                "Effects.GreatSpinCharge", "Effects.GreatSpinBurst" };
+    for (const char* id : spinCosmetics) {
+        auto& option = cosmeticOptions.at(id);
+        spinControls.insert(option.valuesCvar);
+        AddWidget(path, option.label, WIDGET_CUSTOM)
+            .CVar(option.valuesCvar)
+            .CustomFunction([](WidgetInfo& widget) {
+                for (const char* id : spinCosmetics) {
+                    auto& option = cosmeticOptions.at(id);
+                    if (widget.cVar == option.valuesCvar) {
+                        CosmeticEditorDrawRow(option, true);
+                        return;
+                    }
+                }
+            });
+    }
+    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), std::move(spinControls), ImVec2(420, 410),
+#ifdef COMBO_BUILD
+                                  Combo_MmIsForeground
+#else
+                                  []() { return true; }
+#endif
+    );
     AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.ItemGetLightShaft")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
@@ -3647,7 +3665,8 @@ void BenMenu::AddNEI() {
             "Form selector (Link / Mario / Pikachu) on the equipment page's transform sub-page (L cycles).\n"
             "Mario needs the Mario Mask and Pikachu needs the Pokeball; both are randomizer items\n"
             "(see 'Include Mario Mask' / 'Include Pikachu Pokeball' in the rando item pool).\n"
-            "Pikachu has no transformation in 2Ship yet — the form selects but Link does not change."));
+            "Pikachu replaces human Link's model and keeps MM controls. Install pikachu_anims.bin "
+            "in nei/ for movement animations."));
 
     // Quick transform. The pad button is read straight from SDL (CrossoverHotkey_Tick in
     // BenPort.cpp) because Back/Select has no N64 button to map it onto.

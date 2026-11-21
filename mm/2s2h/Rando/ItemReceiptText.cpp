@@ -1,3 +1,4 @@
+#include "Rando/EntranceTracker.h"
 #include "ItemReceiptText.h"
 #include "../../../combo/ComboGameMode.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
@@ -752,6 +753,12 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, con
     return false;
 }
 } // namespace
+
+#ifdef COMBO_BUILD
+std::string Rando::EntranceTracker::PortalSourceName(const ComboRando::CrossDungeon::Dungeon& portal) {
+    return InformationEntranceSource(portal);
+}
+#endif
 
 static bool BossSoulItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (const auto* soul = itemName ? ComboSoulReceiptText::Find(itemName) : nullptr) {

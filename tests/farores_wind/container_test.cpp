@@ -1,3 +1,4 @@
+#include "rando/BossWarpRewardSave.h"
 #include "gameplay/ComboFaroresWindJson.h"
 #include "vanilla/ComboVanillaFile.h"
 #include "vanilla/ComboVanillaSave.h"
@@ -19,6 +20,7 @@ static std::map<int, nlohmann::json> g_containerCache;
 // Existing Farore controls run with no in-flight native creation or reward.
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
 static std::map<int, uint32_t> g_startupAckRetries;
 static std::vector<int> g_evictedSlots;

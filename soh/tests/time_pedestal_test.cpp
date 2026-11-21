@@ -1370,6 +1370,7 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     failSubCamera = cameraCase == ArrivalCameraCase::NoSlot;
     if (cameraCase == ArrivalCameraCase::OtherCamera)
         arrival.activeCamera = 2;
+    arrival.transitionTrigger = TRANS_TRIGGER_END;
     Player_Action_8084E9AC(&arrival.player, &arrival);
     REQUIRE(arrival.player.actionFunc == Player_Action_8084E9AC && !animationComplete);
     if (failSubCamera || cameraCase == ArrivalCameraCase::OtherCamera) {
@@ -1394,12 +1395,27 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     // Both points must live near this transformed pedestal, not Temple of Time's origin.
     REQUIRE(fabsf(exitCamera.at.x + 736) < 250 && fabsf(exitCamera.at.z + 2395) < 250);
     REQUIRE(fabsf(exitCamera.eye.x + 736) < 250 && fabsf(exitCamera.eye.z + 2395) < 250);
-    REQUIRE(exitCamera.eye.x > -736 && exitCamera.eye.z > -2395); // Sheik and Saria's side of the stump.
+    REQUIRE(exitCamera.eye.x < arrival.player.actor.world.pos.x); // In front of the incoming player.
+    REQUIRE(exitCamera.eye.y > arrival.player.actor.world.pos.y);
+    REQUIRE(exitCamera.eye.y < arrival.player.actor.world.pos.y + 20.0f); // Low Temple framing.
     arrival.player.actor.world.pos.x += 12.0f;
     arrival.state.input[0] = {};
     Player_Action_8084E9AC(&arrival.player, &arrival);
     REQUIRE(arrival.player.actionFunc == Player_Action_8084E9AC);
+    // Hold the close shot while the native white fade is still revealing it.
     REQUIRE(cameraCreates == 1 && memcmp(&arrival.subCamera, &exitCamera, sizeof(Camera)) == 0);
+    arrival.transitionTrigger = TRANS_TRIGGER_OFF;
+    f32 lastEyeX = exitCamera.eye.x;
+    for (int frame = 0; frame < 36; ++frame) {
+        BgTokiSwd_UpdateTimePedestalArrivalCamera(&arrival, &arrival.player);
+        REQUIRE(arrival.subCamera.eye.x <= lastEyeX);
+        lastEyeX = arrival.subCamera.eye.x;
+    }
+    REQUIRE(fabsf(lastEyeX - (exitCamera.eye.x - 22.0f)) < 0.01f);
+    REQUIRE(fabsf(arrival.subCamera.eye.y - (exitCamera.eye.y + 8.0f)) < 0.01f);
+    REQUIRE(memcmp(&arrival.subCamera.at, &exitCamera.at, sizeof(Vec3f)) == 0);
+    REQUIRE(cameraCreates == 1);
+    const Vec3f pulledBackEye = arrival.subCamera.eye;
     if (cameraCase == ArrivalCameraCase::ReusedSlot || cameraCase == ArrivalCameraCase::SceneTeardown ||
         cameraCase == ArrivalCameraCase::SkipTeardown) {
         if (cameraCase == ArrivalCameraCase::SkipTeardown) {
@@ -1449,7 +1465,7 @@ static void CheckArrival(bool sourceAdult, bool rando, bool skipMain, bool skipE
     REQUIRE(arrival.activeCamera == CAM_ID_MAIN && !arrival.subCameraAllocated);
     REQUIRE(cameraCopies == 1 && cameraClears == 1 && letterboxSize == 0);
     REQUIRE(memcmp(&arrival.camera.at, &exitCamera.at, sizeof(Vec3f)) == 0);
-    REQUIRE(memcmp(&arrival.camera.eye, &exitCamera.eye, sizeof(Vec3f)) == 0);
+    REQUIRE(memcmp(&arrival.camera.eye, &pulledBackEye, sizeof(Vec3f)) == 0);
     REQUIRE(arrival.csCtx.state == CS_STATE_IDLE);
     REQUIRE(memcmp(&arrival.player.actor.world.pos, &returnPos, sizeof(returnPos)) == 0);
     // Position restoration keeps the actor on the known safe floor point, but

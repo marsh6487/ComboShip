@@ -69,6 +69,24 @@ def main():
                 pieces += ['#include "combo/render/DinsFireNativeActor.h"']
             pieces += [function(source, name) for name in names]
             (build / "dins_native_actor_production.inc").write_text("\n".join(pieces))
+            torch = (ROOT / host / "src/overlays/actors/ovl_Obj_Syokudai/z_obj_syokudai.c").read_text()
+            collision = (ROOT / host / "src/code/z_collision_check.c").read_text()
+            math = (ROOT / host / "src/code/sys_math3d.c").read_text()
+            if host == "mm":
+                skip = ("CollisionCheck_IsElementNotAC", "CollisionCheck_IsElementNotAT")
+                overlap = "Math3D_CylVsCylOverlapCenterDist"
+            else:
+                skip = ("CollisionCheck_SkipBump", "CollisionCheck_SkipTouch")
+                overlap = "Math3D_CylOutsideCylDist"
+            (build / "dins_native_torch_production.inc").write_text("\n".join([
+                re.search(r"static ColliderCylinderInit (?:sCylInitFlame|sFlameColliderInit) = \{.*?^\};",
+                          torch, re.S | re.M)[0],
+                re.search(r"static s32 (?:sLitTorchCount|sNumLitTorchesInGroup);", torch)[0],
+                function(math, overlap),
+                *(function(collision, name) for name in (*skip, "CollisionCheck_NoSharedFlags",
+                                                         "CollisionCheck_AC_CylVsCyl")),
+                function(torch, "ObjSyokudai_Update"),
+            ]))
             executable = build / host
             compiled = subprocess.run([*shlex.split(os.environ.get("CC", "cc")), *flags,
                                        "combo/tests/dins_fire_native_actor_test.c", "-Wl,--gc-sections", "-lm",

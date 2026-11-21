@@ -996,6 +996,7 @@ static bool MM_IsProgressiveItem(RandoItemId id) {
         case RI_OOT_PROGRESSIVE_HAMMER:
         case RI_OOT_PROGRESSIVE_MASTER_SWORD:
         case RI_OOT_PROGRESSIVE_BGS:
+        case RI_OOT_PROGRESSIVE_ROC:
         case RI_PROGRESSIVE_BOW:
         case RI_PROGRESSIVE_BOMB_BAG:
         case RI_PROGRESSIVE_WALLET:
@@ -1054,6 +1055,14 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
         case RI_OOT_NEI_MARIO_MASK:
             name = "Mario Mask";
             break;
+        case RI_OOT_NEI_ROCS_FEATHER:
+            // The OoT name "Roc's Feather" is reserved for its other feather.
+            out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+            out->dlistCount = 1;
+            out->xluStartIndex = -1;
+            out->scale = 0.5f;
+            out->dlists[0] = "__OTR__@oot:objects/object_nei_rocs_feather/rocs_feather_dl";
+            return 1;
         case RI_OOT_IRON_KNUCKLE_AXE:
         case RI_OOT_EXT_CANE_OF_BYRNA:
         case RI_OOT_EXT_CHAMPIONS_TUNIC:
@@ -1101,7 +1110,6 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
         case RI_OOT_NEI_TIME_GATE:
         case RI_OOT_NEI_WHIP:
         case RI_OOT_NEI_ZONAI_PERMAFROST:
-        case RI_OOT_NEI_ROCS_FEATHER:
         case RI_OOT_NEI_ROCS_CAPE: {
             const auto item = Rando::StaticData::Items.find(id);
             if (item == Rando::StaticData::Items.end())
@@ -1262,6 +1270,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     // still reaches MM_FillSongDrawInfo.
     if (MM_IsProgressiveItem(id)) {
         RandoItemId resolved = Rando::ConvertItem(id);
+        // A maxed Roc chain takes the fixed Red Rupee from MM_GrantCrossItem.
+        if (id == RI_OOT_PROGRESSIVE_ROC && resolved == RI_JUNK)
+            resolved = RI_RUPEE_RED;
         if (resolved != RI_UNKNOWN && resolved != id) {
             id = resolved;
             progressiveConverted = true;

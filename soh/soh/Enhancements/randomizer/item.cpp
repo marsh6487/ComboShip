@@ -345,10 +345,12 @@ std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursio
                     actual = RG_PROGRESSIVE_ROCS;
                     break;
                 case ITEM_ROCS_FEATHER_SKIJER:
-                case ITEM_ROCS_CAPE:
                     actual = RG_ROCS_CAPE;
                     break;
+                case ITEM_ROCS_CAPE:
                 default:
+                    // Match the duplicate reward used by the native check and cross-game grant.
+                    actual = RG_BLUE_RUPEE;
                     break;
             }
             break;

@@ -40,6 +40,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "mods/extended_equipment.h"        // ExtEquip_* (Skijer's NEI)
+#include "expansions/ssbb/ssbb_spawn.h"
 #include "mods/broken_items/broken_items.h" // BrokenItems_* form selector (Skijer's NEI)
 #include "mods/nei_save.h"
 #include "expansions/sm64/sm64_mario.h"
@@ -1207,9 +1208,11 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
 
     // Match Player_DrawGameplay's call: real face index + the gameplay post-limb-draw (held item
     // / shield / sheath). postLimbDraw NULL previously skipped setup some forms expect.
-    Player_DrawImpl(play, (void**)player->skelAnime.skeleton, player->skelAnime.jointTable,
-                    player->skelAnime.dListCount, 0, player->transformation, 0, player->actor.shape.face,
-                    Player_OverrideLimbDrawGameplayDefault, Player_PostLimbDrawGameplay, &player->actor);
+    if (!PikachuForm_DrawPause(play)) {
+        Player_DrawImpl(play, (void**)player->skelAnime.skeleton, player->skelAnime.jointTable,
+                        player->skelAnime.dListCount, 0, player->transformation, 0, player->actor.shape.face,
+                        Player_OverrideLimbDrawGameplayDefault, Player_PostLimbDrawGameplay, &player->actor);
+    }
 
     Matrix_Pop();
 
@@ -1257,6 +1260,7 @@ static void KaleidoEquip_DrawDollImage(PlayState* play) {
 
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetRenderMode(POLY_OPA_DISP++, G_RM_XLU_SURF, G_RM_XLU_SURF2);
     gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_POINT);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
     gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, 0,

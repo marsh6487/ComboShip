@@ -19,4 +19,11 @@ void Combo_MM_SoloEntranceRestoreWarpCheckpoint(int32_t index);
 int32_t Combo_MM_SoloEntranceSavedCheckpoint(void);
 #ifdef __cplusplus
 }
+
+namespace ComboRando::CrossDungeon {
+class RuntimeState;
+}
+namespace Rando::EntranceTracker {
+const ComboRando::CrossDungeon::RuntimeState& GetRuntime(uint64_t& revision);
+}
 #endif

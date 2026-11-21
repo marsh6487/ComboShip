@@ -44,6 +44,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               '#include "mods/nei_save.h"\n'
                               'u8 RocBoots_OnWater(void);\n'
                               '#include "mods/forms/wolf_link_host.h"\n'
+                              '#include "expansions/ssbb/ssbb_spawn.h"\n'
                               '#include "mods/items/custom_items.h"\n'
                               '#include "mods/extended_equipment.h"\n'
                               'extern Gfx gEffIceFragment3DL[];\n'

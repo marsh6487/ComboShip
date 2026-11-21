@@ -42,8 +42,14 @@ template <class T> std::shared_ptr<T> ResourceLoad(uint64_t crc) {
     return std::static_pointer_cast<T>(ResourceLoad(crc));
 }
 
+// Internally bound atlas tile used by Fast3D's named texture load.
+std::shared_ptr<Ship::IResource> ResourceLoadPausePageTile(const char* route);
+
 extern "C" {
 #endif
+
+// All 15 tiles in the first complete archive layer, or NULL if none is mounted.
+API_EXPORT void** ResourceGetPausePageTiles(void* const* tiles, const char* game);
 
 /** @brief Returns the 64-bit CRC that corresponds to the given resource path. */
 API_EXPORT uint64_t ResourceGetCrcByName(const char* name);

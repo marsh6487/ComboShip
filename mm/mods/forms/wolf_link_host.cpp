@@ -1,3 +1,4 @@
+#include "expansions/ssbb/ssbb_spawn.h"
 #include "mods/forms/wolf_link_host.h"
 #include "mods/nei_oot_compat.h"
 #include "mods/forms/custom_forms.h"
@@ -80,7 +81,7 @@ u16 ItemButtons(u16 item, bool forms) {
 }
 
 const char* OwnerRejection(Player* player) {
-    if (CustomForms_ActiveForm() != CUSTOM_FORM_NONE)
+    if (CustomForms_ActiveForm() != CUSTOM_FORM_NONE || PikachuForm_IsSelected())
         return "custom-form";
     if (Sm64Mario_IsActive() || CVarGetInteger("gSm64Mario", 0))
         return "mario-form";

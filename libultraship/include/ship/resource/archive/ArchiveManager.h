@@ -158,6 +158,10 @@ class ArchiveManager {
      */
     int32_t GetFilePriority(const std::string& filePath);
 
+    uint64_t GetMountRevision() const {
+        return mMountRevision;
+    }
+
     /**
      * @brief Lists virtual paths of all files matching the given search mask across all archives.
      * @param searchMask Glob pattern (empty = list everything).
@@ -236,6 +240,7 @@ class ArchiveManager {
 
   private:
     std::vector<std::shared_ptr<Archive>> mArchives;
+    uint64_t mMountRevision = 0;
     std::vector<uint32_t> mGameVersions;
     std::unordered_set<uint32_t> mValidGameVersions;
     std::unordered_map<uint64_t, std::string> mHashes;

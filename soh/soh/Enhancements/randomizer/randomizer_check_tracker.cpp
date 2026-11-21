@@ -785,6 +785,10 @@ void CheckTrackerHintRevealed(RandomizerHint hintKey) {
 // ComboShip: true when the loaded save's own flags prove this check was obtained. Conservative —
 // unmapped collection-check types return false so a genuine save-scum is never falsely promoted.
 static bool ComboCheckFlagObtained(const Rando::Location& loc) {
+    // A boss warp opens the reward check before the give queue can deliver it.
+    if (loc.GetRCType() == RCTYPE_DUNGEON_REWARD && loc.GetActorID() == ACTOR_DOOR_WARP1)
+        return false;
+
     Rando::SpoilerCollectionCheck scc = loc.GetCollectionCheck();
     switch (scc.type) {
         case SPOILER_CHK_CHEST:

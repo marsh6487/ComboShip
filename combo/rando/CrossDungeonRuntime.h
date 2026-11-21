@@ -65,6 +65,7 @@ class RuntimeState {
         Endpoint to;
         Endpoint checkpoint; // Safe native source endpoint persisted before another host runs.
         std::optional<Endpoint> arrivalCheckpoint = std::nullopt;
+        int32_t source = -1;
     };
     struct BossRecovery {
         Endpoint arena;  // Physical identity retained independently of source recovery.
@@ -135,6 +136,12 @@ class RuntimeState {
     bool Enabled() const {
         return !routes.empty();
     }
+    const std::vector<Route>& Routes() const {
+        return routes;
+    }
+    const std::vector<Dungeon>& Catalogue() const {
+        return dungeons;
+    }
     std::optional<Transition> Lookup(Phase phase, int32_t index) const {
         for (const auto& r : routes) {
             if (r.phase != phase || r.from != Endpoint{ game, index })
@@ -144,14 +151,14 @@ class RuntimeState {
                     if (d.pool == Pool::Boss && d.entrance.game == game &&
                         ((d.hasReverse && d.exit == r.from) ||
                          std::find(d.escapeExits.begin(), d.escapeExits.end(), r.from) != d.escapeExits.end()))
-                        return Transition{ r.to, d.entrance, r.arrivalCheckpoint };
+                        return Transition{ r.to, d.entrance, r.arrivalCheckpoint, index };
             for (const auto& d : dungeons) {
                 if (phase == Phase::AfterNative && d.entrance == r.from)
-                    return Transition{ r.to, d.returnTo, r.arrivalCheckpoint };
+                    return Transition{ r.to, d.returnTo, r.arrivalCheckpoint, index };
                 if (phase == Phase::BeforeNative && d.entrance.game == game &&
                     (d.exit == r.from ||
                      std::find(d.escapeExits.begin(), d.escapeExits.end(), r.from) != d.escapeExits.end()))
-                    return Transition{ r.to, d.entrance, r.arrivalCheckpoint };
+                    return Transition{ r.to, d.entrance, r.arrivalCheckpoint, index };
             }
             throw std::logic_error("cross-dungeon route lacks its source checkpoint");
         }
