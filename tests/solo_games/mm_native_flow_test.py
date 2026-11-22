@@ -199,12 +199,13 @@ namespace Ship {struct Console{};}
 #define SET_NEXT_GAMESTATE(s,init,size) ((s)->next=1)
 #define ERROR_MESSAGE(...) ((void)0)
 int returns=0;void MM_RequestComboReturn(){++returns;}
-'''+block(reset_source,'static bool ResetHandler(')+r'''
+int autosaves=0;void SavingEnhancements_AutosaveOnReset(){assert(state.running);++autosaves;}
+'''+block(reset_source,'extern "C" void FleetCombo_DoLocalReset(')+'\n'+block(reset_source,'static bool ResetHandler(')+r'''
 int main() {
     assert(!ResetHandler(nullptr,{},nullptr));
-    assert(!state.running && state.next==1 && returns==0);
+    assert(!state.running && state.next==1 && returns==0 && autosaves==1);
     state={};gComboGameMode=COMBO_GAME_BOTH;assert(!ResetHandler(nullptr,{},nullptr));
-    assert(state.running && returns==1);
+    assert(state.running && state.next==0 && returns==1 && autosaves==1);
     std::cout<<"MM native reset boundary passed\n";
 }
 '''
