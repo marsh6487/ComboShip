@@ -89,7 +89,22 @@ def block(source, start):
 def fixture():
     pause = (FOLDER / "z_kaleido_equipment.c").read_text()
     scope = (FOLDER / "z_kaleido_scope_NES.c").read_text()
-    code = ownership.fixture().split("int main() {")[0]
+    code = ownership.selectors.defines(scope, "CVAR_OOT_QUEST_PAGE")
+    code += ownership.fixture().split("int main() {")[0]
+    code = code.replace("void CVarSetInteger(const char*, int value) { enabled = value; }", r'''
+static int ootQuestPage;
+void CVarSetInteger(const char* name, int value) {
+    if (std::strcmp(name, CVAR_OOT_QUEST_PAGE) == 0)
+        ootQuestPage = value;
+    else
+        enabled = value;
+}
+''')
+    code = code.replace("s32 CVarGetInteger(const char*,s32 fallback){return fallback;}", r'''
+s32 CVarGetInteger(const char* name, s32 fallback) {
+    return std::strcmp(name, CVAR_OOT_QUEST_PAGE) == 0 ? ootQuestPage : fallback;
+}
+''')
     code = code.replace("#include <cstdio>", "#include <cstdio>\n#include <cmath>\n#include <array>\n#include <vector>")
     code = code.replace("struct Gfx {};\nstruct Vtx {};", r'''
 using f32 = float;
@@ -282,7 +297,19 @@ static void RecordPreviewRectangle(Gfx* gfx,int x0,int y0,int,int,int x1,int y1,
     code += ownership.selectors.defines(scope, "SWITCH_PAGE_")
     for name in ("sPageSwitchEyeDx", "sPageSwitchEyeDz", "sPageSwitchNextPageIndex"):
         code += re.search(r"(?:f32|u16) " + name + r"\[\] = \{.*?\};", scope, re.S).group(0) + "\n"
-    for name in ("KaleidoScope_SwitchPage", "KaleidoScope_HandlePageToggles", "KaleidoScope_UpdateSwitchPage"):
+    code += r'''
+using TexturePtr = const void*;
+static bool ootQuestAtlasAvailable;
+static TexturePtr* ResourceGetPausePageTiles(TexturePtr const* tiles, const char* game) {
+    static TexturePtr loadedTiles[15];
+    check(tiles && std::strcmp(game, "oot") == 0, "quest atlas lookup uses the OoT owner");
+    return ootQuestAtlasAvailable ? loadedTiles : nullptr;
+}
+'''
+    code += re.search(r"static TexturePtr sNeiOotQuestPageBgTextures\[\] = \{.*?\};", scope, re.S).group(0) + "\n"
+    code += block(scope, scope.index("static TexturePtr* KaleidoNei_GetOotQuestPageBgTextures(")) + "\n"
+    for name in ("KaleidoScope_UsesOotQuestPage",
+                 "KaleidoScope_SwitchPage", "KaleidoScope_HandlePageToggles", "KaleidoScope_UpdateSwitchPage"):
         code += ownership.production_function(scope, name) + "\n"
     draw = ownership.production_function(scope, "KaleidoScope_DrawPages")
     inactive = block(draw, draw.index("if ((pauseCtx->pageIndex != PAUSE_MASK) && (pauseCtx->pageIndex != PAUSE_MAP))"))
@@ -312,6 +339,17 @@ static void CheckComposite(PlayState* play,const char* label) {
 }
 int main() {
     PlayState play;play.pauseCtx.eye={64,0,0};save.capeOwned=1;
+    play.pauseCtx.pageIndex = PAUSE_QUEST;
+    play.state.input.press.button = BTN_L;
+    KaleidoScope_HandlePageToggles(&play, &play.state.input);
+    check(!ootQuestPage && !KaleidoScope_UsesOotQuestPage(), "L retains MM quest when the OoT atlas is unavailable");
+    ootQuestAtlasAvailable = true;
+    KaleidoScope_HandlePageToggles(&play, &play.state.input);
+    check(ootQuestPage && KaleidoScope_UsesOotQuestPage(), "L opens the available OoT quest page");
+    KaleidoScope_HandlePageToggles(&play, &play.state.input);
+    check(!ootQuestPage && !KaleidoScope_UsesOotQuestPage(), "L returns to the MM quest page");
+    play.pauseCtx.pageIndex = PAUSE_MASK;
+    play.state.input.press.button = 0;
     CheckComposite(&play,"settled equipment preview uses page-owned quad");
     check(std::fabs(composite.x0-86)<1&&std::fabs(composite.y0-68)<1&&std::fabs(composite.x1-150)<1&&std::fabs(composite.y1-180)<1,
           "settled placement preserves the former 64x112 screen rectangle");
