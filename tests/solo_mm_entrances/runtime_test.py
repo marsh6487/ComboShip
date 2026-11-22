@@ -44,6 +44,9 @@ with tempfile.TemporaryDirectory(prefix="solo-mm-runtime-") as directory:
                     native += prefix + ".oneWayEntrances.insert(" + entrance + ");\n"
     native += "}\n"
     (temporary / "native_regions.inc").write_text(native)
+    tracker = (ROOT / "mm/2s2h/Rando/EntranceTracker.cpp").read_text()
+    rows = tracker[tracker.index("namespace Rando::EntranceTracker {"):tracker.index("void DrawRoutes(")]
+    (temporary / "native_tracker_rows.inc").write_text(rows + "}\n}\n")
     bridge = (ROOT / "mm/2s2h/GameInteractor/GameInteractor.cpp").read_text()
     lifecycle = "\n".join(block(bridge, "void " + name + "(") for name in (
         "GameInteractor_ExecuteOnSaveLoad", "GameInteractor_ExecuteOnSceneInit",
