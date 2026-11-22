@@ -219,6 +219,10 @@ struct Entry {
 std::string shown;
 void SetActiveCustomMessage(std::string msg, Entry) { shown = msg; }
 void StartTextbox(std::string msg, Entry) { shown = msg; }
+std::string RemoveColorCodes(const std::string &) {
+  assert(false && "scale fixture entered a starting-reward trap");
+  return {};
+}
 } // namespace CustomMessage
 std::string frozen;
 namespace Rando {
@@ -257,6 +261,9 @@ void CollectForeign(int check) {
   using Rando::MiscBehavior::BankRewardSourceSuffix;
   CUSTOM_ITEM_PARAM = check;
   auto &randoSaveCheck = RANDO_SAVE_CHECKS[check];
+  // Both checks are ordinary chests. The full receipt fixture tests the
+  // production predicate and the separate starting-reward path.
+  const bool startingReward = false;
   /* FOREIGN_QUEUE */
 }
 void ReloadWithoutManualSave() {

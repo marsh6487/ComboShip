@@ -1,10 +1,11 @@
 """Execute OoT's real authored NEI recipe exporter with Rito's production catalog row."""
 from pathlib import Path
-import re,os,subprocess,tempfile
+import re,os,subprocess,sys,tempfile
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
+from run_time_pedestal_tests import functions
 s=(ROOT/'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text()
-start=s.index('static bool NeiGi_FillCrossGameInfo(');end=s.index('\nextern "C" int32_t NeiGi_DescribeEntry(',start)
-function=s[start:end]
+function=functions(s)['NeiGi_FillCrossGameInfo']
 row=re.search(r'\{ Randomizer_DrawRitoMask,[^\n]+',s)[0]
 fixture=r'''
 #include "ComboItemDrawABI.h"

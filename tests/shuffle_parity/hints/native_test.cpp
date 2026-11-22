@@ -1,6 +1,7 @@
 #include "Rando/Logic/Logic.h"
 #include "Rando/MagicHints.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
+#include "Rando/Wallets.h"
 #include "mods/combo_rpg.h"
 #include "mods/extended_inventory.h"
 #include "mods/nei_save.h"

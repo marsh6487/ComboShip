@@ -1,4 +1,4 @@
-"""Preserve R22 IDs and the cumulative Solo MM then Rito append-only identities."""
+"""Preserve R22 IDs and the cumulative append-only Solo MM, Rito and ZFG wallet identities."""
 from pathlib import Path
 import json, re
 ROOT = Path(__file__).resolve().parents[2]
@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # This immutable prefix fixture records its exact source blob provenance.
 BASELINE = json.loads((Path(__file__).with_name('baseline_ids_r22.json')).read_text())
 assert BASELINE['baseline_commit'] == '191794e8c7534c30a55ee4ab4554e49356c6ca75'
-# The cumulative candidate keeps Solo MM's existing donor ordinals, then Rito.
+# The cumulative candidate keeps Solo MM's existing donor ordinals, then Rito and ZFG's Wallet.
 # These literals are a save/seed compatibility contract, not the current source's order.
 MM_OPTION_APPEND_IDS = [
  (100, 'RO_SHUFFLE_DUNGEON_ENTRANCES'),
@@ -26,23 +26,23 @@ MM_OPTION_APPEND_IDS = [
  (114, 'RO_MIX_GROTTO_ENTRANCES'),
  (115, 'RO_MIX_OVERWORLD_ENTRANCES'),
  (116, 'RO_SHUFFLE_RITO_MASK'),
+ (117, 'RO_SHUFFLE_ZFG_WALLET'),
 ]
 def read(p): return (ROOT/p).read_text()
-for p, token, end in [
- ('soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h','RG_RITO_MASK','RG_MAX'),
- ('soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h','RSK_SHUFFLE_RITO_MASK','RSK_MAX'),
- ('mm/2s2h/Rando/Types.h','RI_OOT_NEI_RITO_MASK','RI_MAX'),
- ('mm/2s2h/Rando/Types.h','RO_SHUFFLE_RITO_MASK','RO_MAX')]:
+for p, appended, end in [
+ ('soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h',
+  ['RG_RITO_MASK', 'RG_ZFG_WALLET'], 'RG_MAX'),
+ ('soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h',
+  ['RSK_SHUFFLE_RITO_MASK', 'RSK_INCLUDE_ZFG_WALLET'], 'RSK_MAX'),
+ ('mm/2s2h/Rando/Types.h', ['RI_OOT_NEI_RITO_MASK', 'RI_WALLET_ZFG'], 'RI_MAX'),
+ ('mm/2s2h/Rando/Types.h', [name for _, name in MM_OPTION_APPEND_IDS], 'RO_MAX')]:
  current=read(p)
- assert token in current, f'missing appended {token}'
  prefix=end.split('_')[0]
  regex = r'RANDO_ENUM_ITEM\(('+prefix+r'_[A-Z0-9_]+)' if p.endswith('Get.h') or p.endswith('Key.h') else r'^\s*('+prefix+r'_[A-Z0-9_]+)\s*(?:,|=)'
  ids=lambda s:[x for x in re.findall(regex,s[:s.rfind("RANDO_ENUM_ITEM("+end+")") if "RANDO_ENUM_ITEM" in regex else s.index("    "+end+",")],re.M) if x!=end]
  current_ids, previous_ids = ids(current), BASELINE['identity_prefixes'][prefix]['names']
- appended = [token]
- if token == 'RO_SHUFFLE_RITO_MASK':
+ if end == 'RO_MAX':
   assert len(previous_ids) == 100, 'unexpected R22 MM option boundary'
-  appended = [name for _, name in MM_OPTION_APPEND_IDS]
   # Every entry in this enum is implicit. Reject an explicit override rather
   # than treating its source position as its serialized numeric identity.
   option_body = current[:current.index('    RO_MAX,')].rsplit('typedef enum {', 1)[1]
