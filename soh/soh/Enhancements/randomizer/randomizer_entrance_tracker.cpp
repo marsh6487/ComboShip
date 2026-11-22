@@ -11,6 +11,8 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboGameMode.h"
+#include "rando/CrossDungeonTracker.h"
+#include "rando/CrossForeign.h"
 bool Combo_OotIsForeground(void);
 extern "C" uint64_t Combo_SOH_TrackerSeedRevision(void);
 extern "C" int Combo_SOH_GetTrackerDestination(int32_t, int32_t, int*, int32_t*, const char**, int*, int32_t*, int*);
@@ -1009,6 +1011,35 @@ void EntranceTrackerWindow::Draw() {
 
 static void DrawOotRoutes(bool available);
 
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT void SOH_ReadMmEntranceTrackerArrivals(int32_t slot, int32_t reveal,
+                                                               ComboRando::CrossDungeon::VisitMmTrackerArrival visit,
+                                                               void* context) {
+    if (!Combo_IsCombinedGame() || slot < 0 || slot > 2 || gSaveContext.fileNum != slot ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || !IS_RANDO)
+        return;
+    if (trackerSeedRevision != Combo_SOH_TrackerSeedRevision())
+        InitEntranceTrackingData();
+
+    const bool canReveal = reveal && !CVarGetInteger(CVAR_SETTING("DisableChanges"), 0);
+    for (int i = 0; i < gEntranceTrackingData.EntranceCount; ++i) {
+        const auto& row = srcListSortedByType[i];
+        if (!canReveal && !IsEntranceDiscovered(row.index))
+            continue;
+        int game, pool, ingress;
+        int32_t index, reverse;
+        const char* id;
+        if (!Combo_SOH_GetTrackerDestination(row.index, row.override, &game, &index, &id, &pool, &reverse, &ingress) ||
+            game != ComboRando::GAME_MM || !ingress)
+            continue;
+        if (const auto* source = GetEntranceData(row.index)) {
+            const auto name = source->destination + " (" + spoilerEntranceGroupNames[source->srcGroup] + ")";
+            visit(context, name.c_str(), index);
+        }
+    }
+}
+#endif
+
 void EntranceTrackerWindow::DrawElement() {
     bool mmForeground = false;
 #ifdef COMBO_BUILD
@@ -1062,6 +1093,11 @@ void EntranceTrackerWindow::DrawElement() {
             const int slot = gSaveContext.fileNum;
             const bool ootAvailable = mmForeground ? slot >= 0 && slot <= 2 && gSaveContext.gameMode == GAMEMODE_NORMAL
                                                    : GameInteractor::IsSaveLoaded();
+            if (ootAvailable && IS_RANDO) {
+                const auto& icons = Rando::Context::GetInstance()->hashIconIndexes;
+                const auto spoiler = ComboRando::ComboSpoilerPath(icons).filename().string();
+                ImGui::TextDisabled("Active spoiler  %s", spoiler.c_str());
+            }
             static bool wasMmForeground = false;
             const bool switchedToMm = mmForeground && !wasMmForeground;
             const bool switchedToOot = !mmForeground && wasMmForeground;

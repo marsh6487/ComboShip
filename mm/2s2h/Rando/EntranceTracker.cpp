@@ -7,6 +7,7 @@
 #include "Rando/Logic/Logic.h"
 #include "Rando/Rando.h"
 #include "combo/ComboExport.h"
+#include "combo/ComboGameMode.h"
 #include "combo/ComboResolve.h"
 #include "combo/rando/CrossDungeonTracker.h"
 #include "combo/rando/SoloEntranceMmRuntime.h"
@@ -44,6 +45,10 @@ std::string ArrivalName(Endpoint endpoint, const std::vector<Dungeon>& catalogue
         return fmt::format("OoT entrance {:#06x}", endpoint.index);
     }
     if (const auto* portal = FindTrackerPortal(catalogue, endpoint)) {
+        if (endpoint == portal->entrance) {
+            if (const auto* doorway = NamedDoorway(portal->id))
+                return doorway->arrival;
+        }
         if (portal->pool == Pool::Grotto || IsInteriorPool(portal->pool)) {
             const std::string name = PortalSourceName(*portal);
             if (!name.empty())
@@ -65,8 +70,6 @@ std::vector<Row> BuildRows(const RuntimeState& runtime, bool showExits) {
     // the same way as MM's transition dispatcher, which tries BeforeNative first.
     std::map<int32_t, const Route*> routes;
     for (const auto& route : runtime.Routes()) {
-        if (!showExits && route.phase == Phase::BeforeNative)
-            continue;
         if (route.from.game == 1 && (route.phase == Phase::BeforeNative || !routes.contains(route.from.index)))
             routes[route.from.index] = &route;
     }
@@ -76,6 +79,8 @@ std::vector<Row> BuildRows(const RuntimeState& runtime, bool showExits) {
     for (const auto& [index, route] : routes) {
         const Dungeon* portal = nullptr;
         const bool exit = route->phase == Phase::BeforeNative;
+        if (exit && !showExits)
+            continue;
         if (!exit) {
             portal = runtime.FindEntrance(index);
         } else {
@@ -100,7 +105,8 @@ std::vector<Row> BuildRows(const RuntimeState& runtime, bool showExits) {
                 continue;
             }
         }
-        std::string source = PortalSourceName(*portal);
+        const auto* doorway = NamedDoorway(portal->id);
+        std::string source = doorway && !exit ? doorway->source : PortalSourceName(*portal);
         if (source.empty())
             source = ArrivalName(portal->entrance, catalogue);
         if (exit)
@@ -112,6 +118,36 @@ std::vector<Row> BuildRows(const RuntimeState& runtime, bool showExits) {
                std::tie(b.pool, b.exit, b.source, b.indices.front());
     });
     return result;
+}
+
+bool DrawIncomingFromOot(int slot, bool reveal, const ImGuiTextFilter& search, const std::vector<Dungeon>& catalogue) {
+    static const auto read =
+        reinterpret_cast<ReadMmTrackerArrivals>(Combo_ResolveSym("soh", "SOH_ReadMmEntranceTrackerArrivals"));
+    if (!read || !Combo_IsCombinedGame())
+        return false;
+
+    struct Incoming {
+        const ImGuiTextFilter& search;
+        const std::vector<Dungeon>& catalogue;
+        std::vector<std::pair<std::string, std::string>> matches;
+    } incoming{ search, catalogue, {} };
+    const auto append = [](void* context, const char* source, int32_t index) {
+        auto& data = *static_cast<Incoming*>(context);
+        auto destination = ArrivalName({ 1, index }, data.catalogue);
+        if (data.search.PassFilter(source) || data.search.PassFilter(destination.c_str()))
+            data.matches.emplace_back(source, std::move(destination));
+    };
+    read(slot, reveal, append, &incoming);
+    if (incoming.matches.empty())
+        return false;
+    if (search.IsActive())
+        ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+    if (ImGui::TreeNode("Entrances from OoT")) {
+        for (const auto& [source, destination] : incoming.matches)
+            ImGui::TextWrapped("%s -> %s", source.c_str(), destination.c_str());
+        ImGui::TreePop();
+    }
+    return true;
 }
 
 void DrawRoutes(int expectedSlot, bool foreground) {
@@ -135,11 +171,6 @@ void DrawRoutes(int expectedSlot, bool foreground) {
         rows = BuildRows(runtime, HasDecoupledExits());
         previousRevision = revision;
     }
-    if (rows.empty()) {
-        ImGui::TextUnformatted("This file has no shuffled MM entrances.");
-        return;
-    }
-
     constexpr char revealCvar[] = "gRando.EntranceTracker.RevealDestinations";
     const bool allowReveal = !CVarGetInteger("gSettings.DisableChanges", 0);
     bool reveal = allowReveal && CVarGetInteger(revealCvar, 0);
@@ -155,7 +186,7 @@ void DrawRoutes(int expectedSlot, bool foreground) {
     const auto discovered = Discovered(gSaveContext.save.shipSaveInfo.rando);
     ImGui::BeginChild("MM Entrance Tracker Routes");
     auto group = rows.begin();
-    bool hasMatches = false;
+    bool hasMatches = DrawIncomingFromOot(expectedSlot, reveal, search, runtime.Catalogue());
     while (group != rows.end()) {
         const auto pool = group->pool;
         const auto end = std::find_if(group, rows.end(), [pool](const Row& row) { return row.pool != pool; });
