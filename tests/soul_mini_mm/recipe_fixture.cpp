@@ -81,9 +81,34 @@ int main(int argc,char**) {
         ComboSoulModels::npc=true;assert(ComboDrawNativeMmSoul(e.id)==0 && rendered==oldRender+1);
         ComboSoulModels::npc=false;
     }
+    const Expected animals[] = {
+        { RI_SOUL_ANIMAL_CUCCO, "CUCCO", gNiwSkel, gNiwIdleAnim, NIW_LIMB_MAX },
+        { RI_SOUL_ANIMAL_COW, "COW", gCowSkel, gCowChewAnim, COW_LIMB_MAX },
+        { RI_SOUL_ANIMAL_DOG, "DOG", gDogSkel, gDogWalkAnim, DOG_LIMB_MAX },
+        { RI_SOUL_ANIMAL_BUTTERFLY, "BUTTERFLY", gameplay_field_keep_Skel_002FA0,
+          gameplay_field_keep_Anim_001D20, BUTTERFLY_LIMB_MAX },
+    };
+    for (const auto& animal : animals) {
+        CwItemAnimDrawInfo model{};
+        ComboSoulModels::enemy = ComboSoulModels::npc = true;
+        assert(MM_FillAnimalAndMiscSoulAnim(animal.id, &model));
+        assert(!std::strcmp(model.skelPath, animal.skel) && !std::strcmp(model.animPath, animal.anim));
+        assert(model.limbCount == animal.limbs && model.opa && model.fallbackTokenPath && model.flameDlPath);
+        assert(model.nonFlexSkeleton == (animal.id == RI_SOUL_ANIMAL_BUTTERFLY));
+        if (animal.id == RI_SOUL_ANIMAL_COW)
+            assert(model.hiddenLimb == COW_LIMB_NOSE_RING);
+        if (animal.id == RI_SOUL_ANIMAL_DOG)
+            assert(model.hasModelEnvColor && model.modelEnvColor[0] == 255 && model.modelEnvColor[2] == 200);
+        assert(ComboDrawNativeMmSoul(animal.id));
+        if (dumping) {
+            dump(animal.name, "animal", model, first);
+            first = false;
+        }
+    }
+    ComboSoulModels::enemy = ComboSoulModels::npc = false;
     for (auto id : {RI_SOUL_MISC_GS, RI_SOUL_MISC_BUSINESS_SCRUB}) {
         CwItemAnimDrawInfo misc{};
-        assert(MM_FillMiscSoulAnim(id, &misc));
+        assert(MM_FillAnimalAndMiscSoulAnim(id, &misc));
         assert(misc.opa && misc.stateDependent && misc.skelPath && misc.animPath && misc.fallbackTokenPath);
         if (id == RI_SOUL_MISC_GS) {
             assert(misc.limbCount == 30 && misc.nonFlexSkeleton);
@@ -102,13 +127,12 @@ int main(int argc,char**) {
         }
         if(dumping){dump(id==RI_SOUL_MISC_GS?"GS":"BUSINESS_SCRUB","misc",misc,first);first=false;}
         assert(ComboDrawNativeMmSoul(id));
-        ComboSoulModels::enemy = id == RI_SOUL_MISC_GS;
-        ComboSoulModels::npc = id == RI_SOUL_MISC_BUSINESS_SCRUB;
-        misc = {}; assert(!MM_FillMiscSoulAnim(id, &misc));
-        assert(!ComboDrawNativeMmSoul(id));
+        ComboSoulModels::enemy = ComboSoulModels::npc = true;
+        misc = {}; assert(MM_FillAnimalAndMiscSoulAnim(id, &misc));
+        assert(ComboDrawNativeMmSoul(id));
         ComboSoulModels::enemy = ComboSoulModels::npc = false;
     }
     assert(pushes==pops);
     CwItemAnimDrawInfo d{};assert(!MM_FillNpcSoulAnim(RI_UNKNOWN,&d));assert(!MM_FillEnemySoulAnim(RI_UNKNOWN,&d));
-    if(dumping)std::cout<<"\n]\n";else std::cout<<"PASS: production MM 53 NPC + 47 enemy recipes; independent same-frame category toggles; special geometry/material contracts; actual native ID dispatch/fallback/boss preservation\n";
+    if(dumping)std::cout<<"\n]\n";else std::cout<<"PASS: production MM 53 NPC, 47 enemy, 4 animal and 2 miscellaneous recipes; independent same-frame category toggles; special geometry/material contracts; actual native ID dispatch/fallback/boss preservation\n";
 }

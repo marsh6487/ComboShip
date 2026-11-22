@@ -494,36 +494,75 @@ static int32_t MM_FillSpecialEnemySoulAnim(RandoItemId id, CwItemAnimDrawInfo* o
     return 1;
 }
 
-// Misc souls use the actual native actor rigs. Keep merchant/collectible
-// ownership separate from enemy and NPC enum ranges.
-static int32_t MM_FillMiscSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
-    if (id != RI_SOUL_MISC_GS && id != RI_SOUL_MISC_BUSINESS_SCRUB)
-        return 0;
-    if (id == RI_SOUL_MISC_GS ? ComboSoulModels::SimplerEnemy() : ComboSoulModels::SimplerNpc())
-        return 0;
-    out->opa = 1;
-    out->hiddenLimb = -1;
-    out->scale = id == RI_SOUL_MISC_GS ? 0.018f : 0.012f;
-    out->translatePre[1] = id == RI_SOUL_MISC_GS ? 0.f : -24.f;
-    if (id == RI_SOUL_MISC_GS) {
-        out->skelPath = "__OTR__objects/object_st/object_st_Skel_005298";
-        out->animPath = "__OTR__objects/object_st/object_st_Anim_000304";
-        out->limbCount = 30;
-        out->nonFlexSkeleton = 1;
-        out->proceduralProfile = CW_ANIM_PROFILE_GOLD_SKULLTULA;
-    } else {
-        out->skelPath = "__OTR__objects/object_dnt/gBusinessScrubSkel";
-        out->animPath = "__OTR__objects/object_dnt/gBusinessScrubBobAnim";
-        out->limbCount = 28;
-        // EnAkindonuts bob state (ANIM_16): hide carried props and scalp/hair;
-        // retain the worn hat, with the ordinary eye mesh.
-        out->hiddenLimbMask = (UINT64_C(1) << 15) | (UINT64_C(1) << 16) | (UINT64_C(1) << 21) | (UINT64_C(1) << 23) |
-                              (UINT64_C(1) << 24) | (UINT64_C(1) << 27);
-        MM_MiniSwapLimb(out, 26, "__OTR__objects/object_dnt/gBusinessScrubEyesDL");
+// These identities use their native rigs independently of the enemy and NPC preferences.
+static int32_t MM_FillAnimalAndMiscSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
+    int32_t hiddenLimb = -1;
+    uint8_t env[4] = { 0, 0, 0, 255 };
+    switch (id) {
+        case RI_SOUL_ANIMAL_CUCCO: // En_Niw
+            out->skelPath = gNiwSkel;
+            out->animPath = gNiwIdleAnim;
+            out->limbCount = NIW_LIMB_MAX;
+            out->scale = 0.016f;
+            out->translatePre[1] = -12.f;
+            break;
+        case RI_SOUL_ANIMAL_COW: // En_Cow
+            out->skelPath = gCowSkel;
+            out->animPath = gCowChewAnim;
+            out->limbCount = COW_LIMB_MAX;
+            out->scale = 0.006f;
+            out->translatePre[1] = -20.f;
+            hiddenLimb = COW_LIMB_NOSE_RING;
+            break;
+        case RI_SOUL_ANIMAL_DOG: // En_Racedog
+            out->skelPath = gDogSkel;
+            out->animPath = gDogWalkAnim;
+            out->limbCount = DOG_LIMB_MAX;
+            out->scale = 0.018f;
+            out->translatePre[1] = -12.f;
+            env[0] = env[1] = 255;
+            env[2] = 200;
+            env[3] = 0;
+            break;
+        case RI_SOUL_ANIMAL_BUTTERFLY: // En_Butte
+            out->skelPath = gameplay_field_keep_Skel_002FA0;
+            out->animPath = gameplay_field_keep_Anim_001D20;
+            out->limbCount = BUTTERFLY_LIMB_MAX;
+            out->nonFlexSkeleton = 1;
+            out->scale = 0.035f;
+            break;
+        case RI_SOUL_MISC_GS:
+            out->skelPath = "__OTR__objects/object_st/object_st_Skel_005298";
+            out->animPath = "__OTR__objects/object_st/object_st_Anim_000304";
+            out->limbCount = 30;
+            out->nonFlexSkeleton = 1;
+            out->proceduralProfile = CW_ANIM_PROFILE_GOLD_SKULLTULA;
+            out->scale = 0.018f;
+            break;
+        case RI_SOUL_MISC_BUSINESS_SCRUB:
+            out->skelPath = gBusinessScrubSkel;
+            out->animPath = gBusinessScrubBobAnim;
+            out->limbCount = BUSINESS_SCRUB_LIMB_MAX;
+            out->scale = 0.012f;
+            out->translatePre[1] = -24.f;
+            // EnAkindonuts bob state (ANIM_16): hide carried props and scalp/hair;
+            // retain the worn hat, with the ordinary eye mesh.
+            out->hiddenLimbMask =
+                (UINT64_C(1) << BUSINESS_SCRUB_LIMB_RIGHT_HAND_HAT) |
+                (UINT64_C(1) << BUSINESS_SCRUB_LIMB_RIGHT_HAND_BAG) |
+                (UINT64_C(1) << BUSINESS_SCRUB_LIMB_LEFT_HAND_BAG) | (UINT64_C(1) << BUSINESS_SCRUB_LIMB_SCALP) |
+                (UINT64_C(1) << BUSINESS_SCRUB_LIMB_HAIR) | (UINT64_C(1) << BUSINESS_SCRUB_LIMB_LEFT_ARM_BAG);
+            MM_MiniSwapLimb(out, BUSINESS_SCRUB_LIMB_EYES, gBusinessScrubEyesDL);
+            break;
+        default:
+            return 0;
     }
-    MM_AnimEnv(out, 0, 0, 0, 255);
+    out->opa = 1;
+    out->hiddenLimb = hiddenLimb;
+    MM_AnimEnv(out, env[0], env[1], env[2], env[3]);
     MM_MiniFallback(out);
     const uint8_t grey[3] = { 155, 155, 155 };
-    MM_AnimSoulFlame(out, grey, .15f / out->scale, .15f / out->scale, .15f / out->scale);
+    const float flameSize = .15f / out->scale;
+    MM_AnimSoulFlame(out, grey, flameSize, flameSize, flameSize);
     return 1;
 }

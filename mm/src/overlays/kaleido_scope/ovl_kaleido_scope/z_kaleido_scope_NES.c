@@ -184,12 +184,20 @@ static TexturePtr sNeiOotQuestPageBgTextures[] = {
     "__OTR__textures/icon_item_static/gPauseQuestStatus24Tex",
 };
 
+#define CVAR_OOT_QUEST_PAGE "gEnhancements.Kaleido.OotQuestPage"
+
+static TexturePtr* KaleidoNei_GetOotQuestPageBgTextures(void) {
+    return CVarGetInteger(CVAR_OOT_QUEST_PAGE, 0) ? ResourceGetPausePageTiles(sNeiOotQuestPageBgTextures, "oot") : NULL;
+}
+
+bool KaleidoScope_UsesOotQuestPage(void) {
+    return KaleidoNei_GetOotQuestPageBgTextures() != NULL;
+}
+
 static TexturePtr* KaleidoNei_GetQuestPageBgTextures(void) {
-    if (CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0)) {
-        TexturePtr* tiles = ResourceGetPausePageTiles(sNeiOotQuestPageBgTextures, "oot");
-        if (tiles != NULL) {
-            return tiles;
-        }
+    TexturePtr* ootTiles = KaleidoNei_GetOotQuestPageBgTextures();
+    if (ootTiles != NULL) {
+        return ootTiles;
     }
     TexturePtr* tiles = ResourceGetPausePageTiles(sQuestPageBgTextures, NULL);
     return tiles != NULL ? tiles : sQuestPageBgTextures;
@@ -658,8 +666,11 @@ void KaleidoScope_HandlePageToggles(PlayState* play, Input* input) {
     // like the item-page ExtInv_SwitchPage flip) and before the page-scroll handling below.
     if ((pauseCtx->pageIndex == PAUSE_QUEST) && (pauseCtx->debugEditor == DEBUG_EDITOR_NONE) &&
         !pauseCtx->itemDescriptionOn && CHECK_BTN_ALL(input->press.button, BTN_L)) {
-        CVarSetInteger("gEnhancements.Kaleido.OotQuestPage", !CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0));
-        Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
+        bool showingOotPage = KaleidoScope_UsesOotQuestPage();
+        if (showingOotPage || ResourceGetPausePageTiles(sNeiOotQuestPageBgTextures, "oot") != NULL) {
+            CVarSetInteger(CVAR_OOT_QUEST_PAGE, !showingOotPage);
+            Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
+        }
         return;
     }
 
@@ -679,8 +690,7 @@ void KaleidoScope_HandlePageToggles(PlayState* play, Input* input) {
     // could never reach PAUSE_CURSOR_PAGE_LEFT/RIGHT, so the page was a one-way trip unless the
     // player knew about R/Z. The table is 1:1 with soh again and OotQuest_HandleCursor parks the
     // cursor on those positions properly, so the normal scroll has to work here too.
-    u8 sOotQuestInteract = (pauseCtx->pageIndex == PAUSE_QUEST) &&
-                           CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0) &&
+    u8 sOotQuestInteract = (pauseCtx->pageIndex == PAUSE_QUEST) && KaleidoScope_UsesOotQuestPage() &&
                            CVarGetInteger("gEnhancements.SkijerNEI.QuestPageInteract", 1);
 
     if ((CHECK_BTN_ALL(input->cur.button, BTN_DRIGHT) && !sOotQuestInteract) ||
@@ -1102,7 +1112,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
         }
     }
 
-    if (CVarGetInteger("gEnhancements.Saving.PauseSave", 0) || CVarGetInteger("gEnhancements.Kaleido.GameOver", 0)) {
+    if (CVarGetInteger("gEnhancements.Saving.PauseSave", 0) || IS_PAUSE_STATE_GAMEOVER(pauseCtx)) {
         Gfx_SetupDL42_Opa(gfxCtx);
         if ((pauseCtx->state == PAUSE_STATE_SAVEPROMPT) || IS_PAUSE_STATE_GAMEOVER(pauseCtx)) {
             KaleidoScope_UpdatePrompt(play);
@@ -1149,7 +1159,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->promptPageVtx, sSaveTexs);
             }
 
-            gSPVertex(POLY_OPA_DISP++, &pauseCtx->promptPageVtx[60], 32, 0);
+            gSPVertex(POLY_OPA_DISP++, &pauseCtx->promptPageVtx[PAGE_BG_QUADS * 4], VTX_PAGE_SAVE_QUADS * 4, 0);
 
             if (((pauseCtx->state == PAUSE_STATE_SAVEPROMPT) &&
                  ((pauseCtx->savePromptState <= PAUSE_SAVEPROMPT_STATE_4) ||
@@ -3224,7 +3234,7 @@ void KaleidoScope_DrawCursor(PlayState* play) {
     // KaleidoScope_DrawOotQuestStatus, in the page's view/projection (same as the icons) so it stays
     // aligned. MM's cursor is drawn in a different flat view (SetView 0,0,64 above), so it must not
     // also draw here.
-    if ((pauseCtx->pageIndex == PAUSE_QUEST) && CVarGetInteger("gEnhancements.Kaleido.OotQuestPage", 0) &&
+    if ((pauseCtx->pageIndex == PAUSE_QUEST) && KaleidoScope_UsesOotQuestPage() &&
         CVarGetInteger("gEnhancements.SkijerNEI.QuestPageInteract", 1)) {
         return;
     }
@@ -3333,7 +3343,9 @@ void KaleidoScope_Draw(PlayState* play) {
     s32 pad;
     PauseContext* pauseCtx = &play->pauseCtx;
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
-    MmUiDrawState uiDraw = MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden());
+    // Keep the Continue choice visible when the gameplay HUD is hidden.
+    MmUiDrawState uiDraw =
+        MmUiDraw_Begin(play->state.gfxCtx, UiVisibility_IsHidden() && !IS_PAUSE_STATE_GAMEOVER(pauseCtx));
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -4174,13 +4186,13 @@ void KaleidoScope_Update(PlayState* play) {
                         gSaveContext.save.saveInfo.playerData.magic = 0;
                     } else { // PAUSE_PROMPT_NO
 #ifdef COMBO_BUILD
-                        // ComboShip: same as the owl-save quit — MM's title path wipes the save. Vanilla
-                        // discards unsaved progress here too, so the semantics match.
-                        Combo_RequestOwlSaveQuit();
-#else
+                        if (Combo_IsCombinedGame()) {
+                            Combo_RequestOwlSaveQuit();
+                            break;
+                        }
+#endif
                         STOP_GAMESTATE(&play->state);
                         SET_NEXT_GAMESTATE(&play->state, TitleSetup_Init, sizeof(TitleSetupState));
-#endif
                     }
                 }
             }

@@ -216,13 +216,15 @@ static void RunSoulCatalogChecks() {
         CheckSoulCatalogDraw(info, "mm", SoulCatalogMm::NpcNames[i], draws);
         ++records;
     }
-    for (auto id : {SoulCatalogMm::RI_SOUL_MISC_GS, SoulCatalogMm::RI_SOUL_MISC_BUSINESS_SCRUB}) {
+    for (auto id : { SoulCatalogMm::RI_SOUL_ANIMAL_CUCCO, SoulCatalogMm::RI_SOUL_ANIMAL_COW,
+                     SoulCatalogMm::RI_SOUL_ANIMAL_DOG, SoulCatalogMm::RI_SOUL_ANIMAL_BUTTERFLY,
+                     SoulCatalogMm::RI_SOUL_MISC_GS, SoulCatalogMm::RI_SOUL_MISC_BUSINESS_SCRUB }) {
         CwItemAnimDrawInfo info{};
-        assert(SoulCatalogMm::MM_FillMiscSoulAnim(id, &info));
-        CheckSoulCatalogDraw(info, "mm", "misc", draws);
+        assert(SoulCatalogMm::MM_FillAnimalAndMiscSoulAnim(id, &info));
+        CheckSoulCatalogDraw(info, "mm", std::to_string(id).c_str(), draws);
         ++records;
     }
-    assert(records == 193 && draws == 2316);
+    assert(records == 201 && draws == 2412);
     std::cout << "Soul catalog: " << records << " production recipes, " << draws
               << " host draws, native/replacement/native assets, four frames, body + owner + state checks passed\n";
 }

@@ -20,10 +20,12 @@ def write_catalog_fixture(build):
     enemies = list(dict.fromkeys(re.findall(r'\bRI_SOUL_ENEMY_\w+\b', types)))
     catalog = (ROOT / 'combo/rando/SoulShuffleCatalog.inc').read_text()
     npcs = ['RI_SOUL_NPC_' + name for name in re.findall(r'SOUL\(MM, NPC, (\w+),', catalog)]
+    animals = ['RI_SOUL_ANIMAL_' + key for key in re.findall(r'SOUL\(MM, ANIMAL, (\w+),', catalog)]
+    misc = ['RI_SOUL_MISC_' + key for key in re.findall(r'SOUL\(MM, MISC, (\w+),', catalog)]
     assert len(enemies) == 47 and len(npcs) == 53
     result = ['#include "' + str(ROOT / 'combo/menu/ComboSoulMiniOOT.h') + '"',
               'namespace SoulCatalogMm {',
-              'enum RandoItemId {' + ','.join(enemies + npcs + ['RI_SOUL_MISC_GS', 'RI_SOUL_MISC_BUSINESS_SCRUB']) + ', RI_UNKNOWN};']
+              'enum RandoItemId {' + ','.join(enemies + npcs + animals + misc) + ', RI_UNKNOWN};']
     includes = re.findall(r'#include "((?:assets/)?objects/[^\"]+)"', mm)
     for inc in dict.fromkeys(includes + ['objects/object_bigslime/object_bigslime.h']):
         asset = ROOT / 'mm' / inc if inc.startswith('assets/') else ROOT / 'mm/assets' / inc

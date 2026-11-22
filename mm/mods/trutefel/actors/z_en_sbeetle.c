@@ -7,10 +7,6 @@
  *
  * ---- 2ship/MM port notes (this file is unity-#included into trutefel_enemies.cpp) ----------------
  *  - Compiled as C++ inside an extern "C" block: `this` -> `self`, explicit casts everywhere.
- *  - The OoT original set naviEnemyId + ACTOR_FLAG_18 for a custom Navi textbox (message 0x065D,
- *    sbeetle_message_data.h). MM's Tatl hints go through actor.hintId / TATL_HINT_ID_* and a
- *    custom entry would need extra message plumbing, so the hint is STUBBED OUT here (enemy is
- *    fully functional without it).
  *  - OoT->MM API mapping: Actor_MoveXZGravity->Actor_MoveWithGravity,
  *    Animation_ChangeByInfo->Actor_ChangeAnimationByInfo, Actor_SetDropFlag loses its 3rd arg,
  *    Audio_StopSfxById->AudioSfx_StopById, EffectSsEnIce_SpawnFlyingVec3f->local ice-chunk helper
@@ -274,8 +270,6 @@ void EnSbeetle_Init(Actor* thisx, PlayState* play) {
 
     ActorShape_Init(&self->actor.shape, 0.0f, ActorShadow_DrawCircle, 10.0f);
     Actor_SetScale(&self->actor, 0.1f);
-    // OoT: this->actor.naviEnemyId = NAVI_ENEMY_SCISSORS_BEETLE (custom message 0x065D) — stubbed,
-    // MM Tatl hints would need a custom TATL_HINT_ID + message table entry.
     thisx->gravity = -1.0f;
     self->nextIdleTimer = 0;
     self->attackTimer = 0;

@@ -1,4 +1,5 @@
 #include "z_en_m_thunder.h"
+#include "mods/boss_remains/boss_remains.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/extended_equipment.h"
@@ -87,9 +88,29 @@ void EnMThunder_SetupAction(EnMThunder* this, EnMThunderActionFunc actionFunc) {
     this->actionFunc = actionFunc;
 }
 
+static int EnMThunder_CanStyleSpin(PlayState* play, Player* player) {
+    if (SwordElement_IsRegularSword(play, player)) {
+        return true;
+    }
+    if (player == NULL || player->actor.scale.y <= 0.0f || player->csAction != 0 ||
+        (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_WATER)) ||
+        (player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW) || play->transitionTrigger != TRANS_TRIGGER_OFF) {
+        return false;
+    }
+
+    // The Deity sword and extended swords use the same spin actor as Link's
+    // swords. Their native hits retain the weapon's damage flags.
+    if (Player_IsFDHoldingSword(player)) {
+        return true;
+    }
+    return !TransformMasks_IsTransformedAny() && !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn() &&
+           ExtEquip_IsEnabled() && player->heldItemId >= ITEM_EXT_SWORD_1 && player->heldItemId <= ITEM_EXT_SWORD_3 &&
+           (player->heldItemAction == PLAYER_IA_SWORD_MASTER || player->heldItemAction == PLAYER_IA_SWORD_KOKIRI);
+}
+
 static void EnMThunder_InitStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
-    int eligible = SwordElement_IsRegularSword(play, player) && gSaveContext.isMagicAcquired &&
+    int eligible = EnMThunder_CanStyleSpin(play, player) && gSaveContext.isMagicAcquired &&
                    !(this->actor.params & EN_M_THUNDER_SWORD_BEAM_FLAG) && !GerudoMhr_UsesConeBurst(player) &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     CwSpinAttack_Init(&this->spinStyle, CVarGetInteger(CW_SPIN_STYLE_CVAR, 0),
@@ -101,7 +122,7 @@ static void EnMThunder_InitStyle(EnMThunder* this, PlayState* play) {
 static void EnMThunder_PreviewStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
-                   this->spinStyle.scene == play->sceneNum && SwordElement_IsRegularSword(play, player) &&
+                   this->spinStyle.scene == play->sceneNum && EnMThunder_CanStyleSpin(play, player) &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     CwSpinAttack_Preview(&this->spinStyle, SwordElement_Active(play, player), eligible,
                          play->pauseCtx.state != 0 || play->pauseCtx.debugState != 0);
@@ -110,7 +131,7 @@ static void EnMThunder_PreviewStyle(EnMThunder* this, PlayState* play) {
 static void EnMThunder_ReleaseStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
-                   this->spinStyle.scene == play->sceneNum && SwordElement_IsRegularSword(play, player) &&
+                   this->spinStyle.scene == play->sceneNum && EnMThunder_CanStyleSpin(play, player) &&
                    !this->isGerudoCone && !GerudoMhr_UsesConeBurst(player) &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     this->collider.info.toucher.dmgFlags =

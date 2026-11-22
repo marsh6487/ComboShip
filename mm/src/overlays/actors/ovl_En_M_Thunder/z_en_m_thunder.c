@@ -11,7 +11,9 @@
 
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "mods/boss_remains/boss_remains.h"
 #include "mods/extended_equipment.h"
+#include "mods/forms/custom_forms.h"
 #include "sword_element.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #define CW_SPIN_HOST_MM
@@ -104,9 +106,30 @@ void EnMThunder_UnkType_Setup(EnMThunder* this, PlayState* play) {
     this->actor.child = NULL;
 }
 
+static int EnMThunder_CanStyleSpin(PlayState* play, Player* player) {
+    if (SwordElement_IsRegularSword(play, player)) {
+        return true;
+    }
+    if (player == NULL || player->actor.scale.y <= 0.0f || player->csAction != 0 ||
+        (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_8000000)) ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000) || play->transitionTrigger != TRANS_TRIGGER_OFF) {
+        return false;
+    }
+
+    // Extended swords and the Deity sword can use the selected appearance.
+    // SwordElement_Active still gates elemental visuals and damage separately.
+    if (player->transformation == PLAYER_FORM_FIERCE_DEITY) {
+        return player->heldItemId == ITEM_SWORD_DEITY && player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED;
+    }
+    return player->transformation == PLAYER_FORM_HUMAN && CustomForms_ActiveForm() == CUSTOM_FORM_NONE &&
+           !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn() && ExtEquip_IsEnabled() &&
+           player->heldItemId >= ITEM_EXT_SWORD_1 && player->heldItemId <= ITEM_EXT_SWORD_3 &&
+           player->heldItemAction == PLAYER_IA_SWORD_KOKIRI;
+}
+
 static void EnMThunder_InitStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
-    int eligible = SwordElement_IsRegularSword(play, player) && gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
+    int eligible = EnMThunder_CanStyleSpin(play, player) && gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
                    ENMTHUNDER_GET_TYPE(&this->actor) < ENMTHUNDER_TYPE_MAX &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     CwSpinAttack_Init(&this->spinStyle, CVarGetInteger(CW_SPIN_STYLE_CVAR, 0),
@@ -118,7 +141,7 @@ static void EnMThunder_InitStyle(EnMThunder* this, PlayState* play) {
 static void EnMThunder_PreviewStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
-                   this->spinStyle.scene == play->sceneId && SwordElement_IsRegularSword(play, player) &&
+                   this->spinStyle.scene == play->sceneId && EnMThunder_CanStyleSpin(play, player) &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     CwSpinAttack_Preview(&this->spinStyle, SwordElement_Active(play, player), eligible,
                          play->pauseCtx.state != 0 || play->pauseCtx.debugEditor != 0);
@@ -127,7 +150,7 @@ static void EnMThunder_PreviewStyle(EnMThunder* this, PlayState* play) {
 static void EnMThunder_ReleaseStyle(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
-                   this->spinStyle.scene == play->sceneId && SwordElement_IsRegularSword(play, player) &&
+                   this->spinStyle.scene == play->sceneId && EnMThunder_CanStyleSpin(play, player) &&
                    this->subtype <= ENMTHUNDER_SUBTYPE_SPIN_REGULAR &&
                    (this->actor.parent == NULL || this->actor.parent == &player->actor);
     this->collider.elem.atDmgInfo.dmgFlags =

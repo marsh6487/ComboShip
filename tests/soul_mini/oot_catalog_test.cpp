@@ -35,22 +35,26 @@ static constexpr Identity Identities[] = {
 static void path(const char* p) { if(p) std::printf("\"%s\"",p); else std::printf("null"); }
 int main(int argc, char**) {
     using namespace ComboSoulMiniOOT;
-    assert(sizeof(Catalog)/sizeof(Catalog[0]) == 91);
+    assert(sizeof(Catalog)/sizeof(Catalog[0]) == 95);
     CwItemAnimDrawInfo info{};
     assert(!Describe(-1, &info)); assert(!Describe(RG_SOUL_NPC_SARIA, nullptr));
     std::set<int> unique;
-    unsigned enemies=0,npcs=0,composites=0;
+    unsigned enemies=0,npcs=0,animals=0,misc=0,composites=0;
     const bool dump = argc > 1;
     if(dump) std::puts("[");
     bool first=true;
     for(const auto& identity: Identities) {
-        const bool misc = identity.id == RG_SOUL_MISC_GS || identity.id == RG_SOUL_MISC_BUSINESS_SCRUB;
-        if(std::strcmp(identity.category,"ENEMY") && std::strcmp(identity.category,"NPC") && !misc) {
-            assert(!Find(identity.id)); continue;
-        }
         assert(unique.insert(identity.id).second);
-        const bool npc = !std::strcmp(identity.category,"NPC") || identity.id == RG_SOUL_MISC_BUSINESS_SCRUB;
-        npc ? ++npcs : ++enemies;
+        const bool npc = !std::strcmp(identity.category, "NPC");
+        const bool enemy = !std::strcmp(identity.category, "ENEMY");
+        if (npc)
+            ++npcs;
+        else if (enemy)
+            ++enemies;
+        else if (!std::strcmp(identity.category, "ANIMAL"))
+            ++animals;
+        else
+            ++misc;
         enemySimple = npcSimple = 0;
         assert(Describe(identity.id,&info)); assert(info.stateDependent);
         assert(info.scale > 0 && info.scale <= 1.0f);
@@ -63,9 +67,9 @@ int main(int argc, char**) {
         assert(info.fallbackTokenPath && info.flameDlPath && info.flameHasSeg);
         assert(info.skelPath || ++composites);
         enemySimple = 1;
-        assert(!!Describe(identity.id,&info) == npc);
+        assert(!!Describe(identity.id,&info) == !enemy);
         npcSimple = 1;
-        assert(!Describe(identity.id,&info));
+        assert(!!Describe(identity.id,&info) == (!enemy && !npc));
         enemySimple = 0;
         assert(!!Describe(identity.id,&info) == !npc);
         npcSimple = 0;
@@ -141,7 +145,7 @@ int main(int argc, char**) {
         for(auto p:paths)if(p){if(!firstPath)std::printf(",");firstPath=false;path(p);}
         std::printf("]}");
     }
-    assert(enemies==44 && npcs==47 && composites==7);
+    assert(enemies == 43 && npcs == 46 && animals == 4 && misc == 2 && composites == 7);
     if(dump)std::puts("\n]");
-    else std::puts("PASS 91 live descriptors, unique coverage, all four preference combinations, bounded static/palette/material recipes");
+    else std::puts("PASS 95 live descriptors, unique coverage, all four preference combinations, bounded static/palette/material recipes");
 }

@@ -4,6 +4,7 @@
 #include "macros.h"
 #include "din_fire_sword.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/transformation_masks/wolf_link_form.h"
 #include "mods/nei_save.h"
 #include "../../combo/vanilla/ComboVanillaMode.h"
 #include "mods/sound_translator/mm_audio_sfx.h"
@@ -151,6 +152,13 @@ static void FormJingle_Update() {
 }
 static int CVarGetInteger(const char*, int fallback) {
     return fallback;
+}
+// These cases exercise Goron audio with Crossover Pikachu mode disabled.
+extern "C" u8 WolfLinkForm_IsSelected() {
+    return 0;
+}
+extern "C" void WolfLinkForm_Select(u8) {
+    assert(false && "Goron audio cases must not enter Crossover Pikachu mode");
 }
 static u8 MmForm_IsEnabled() {
     return 1;

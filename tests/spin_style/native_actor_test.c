@@ -2,6 +2,8 @@
 // dispatch below are production code compiled against the actual native ABI.
 #include "din_fire_sword.h"
 #include "global.h"
+#include "mods/boss_remains/boss_remains.h"
+#include "mods/extended_equipment.h"
 #include "mods/nei_save.h"
 #include "overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.h"
 #include "spin_attack_style.h"
@@ -24,10 +26,11 @@ static PlayState play;
 static Player player;
 static NeiSaveData nei;
 static int style = 6, effects = 1, element, denied, killed, consumes, resets,
-           transformed, cone;
+           transformed, cone, fierceDeity, extendedEquipment;
 static LightNode node;
 
 #ifdef HOST_MM
+#include "mods/forms/custom_forms.h"
 #include "overlays/actors/ovl_Eff_Dust/z_eff_dust.h"
 #define INFO(c) (&(c)->elem)
 #define FLAGS(c) ((c)->elem.atDmgInfo.dmgFlags)
@@ -77,6 +80,7 @@ void AudioSfx_PlaySfx(u16 a, Vec3f *b, u8 c, f32 *d, f32 *e, s8 *f) {}
 void Audio_PlaySfx_SwordCharge(Vec3f *a, u8 b) {}
 bool Play_InCsMode(PlayState *p) { return false; }
 #else
+#include "mods/transformation_masks/transformation_masks.h"
 #define INFO(c) (&(c)->info)
 #define FLAGS(c) ((c)->info.toucher.dmgFlags)
 #define CHARGE EnMThunder_ChargingSpinAttack
@@ -89,7 +93,10 @@ bool Play_InCsMode(PlayState *p) { return false; }
 #define FIRE DMG_ARROW_FIRE
 #define ICE DMG_ARROW_ICE
 #define LIGHT DMG_ARROW_LIGHT
-u8 TransformMasks_IsTransformedAny(void) { return transformed; }
+u8 TransformMasks_IsTransformedAny(void) { return transformed || fierceDeity; }
+s32 Player_IsFDHoldingSword(Player* p) {
+  return fierceDeity && p->heldItemAction == PLAYER_IA_SWORD_KOKIRI;
+}
 u8 GerudoMhr_UsesConeBurst(Player *p) { return cone; }
 void EnMThunder_SpinAttacking(EnMThunder *s, PlayState *p) {
   (void)s;
@@ -129,6 +136,7 @@ NeiSaveData *Nei_Save(void) { return &nei; }
 u8 WeaponUpgrade_KokiriLevel(void) { return 0; }
 u8 WeaponUpgrade_HasTrueMaster(void) { return 0; }
 u8 WeaponUpgrade_HasGreatFairy(void) { return 0; }
+u8 ExtEquip_IsEnabled(void) { return extendedEquipment; }
 u8 ExtEquip_ShouldHideSwordDL(void) { return 0; }
 u8 FourSword_IsEquipped(void) { return 0; }
 s32 BossRemains_IsOdolwaWorn(void) { return 0; }
@@ -226,6 +234,7 @@ static void setup(EnMThunder *s) {
   effects = 1;
   element = 0;
   denied = killed = consumes = resets = transformed = cone = 0;
+  fierceDeity = extendedEquipment = 0;
 }
 
 int main(void) {
@@ -288,6 +297,86 @@ int main(void) {
     CHECK(s.spinStyle.released && s.spinStyle.element == 0 && consumes == 1);
     CHECK(EnMThunder_VisualStyle(&s, &play).style == variant);
   }
+
+  // Quick spins and both charge tiers retain native hit flags even when an
+  // element override is enabled for regular swords.
+  for (int weapon = 0; weapon < 4; ++weapon) {
+    for (int attack = 0; attack < 3; ++attack) {
+      const int quick = attack == 0;
+      const int great = attack == 2;
+      setup(&s);
+      element = 1;
+      style = CW_SPIN_STYLE_ARCANE;
+      if (weapon < 3) {
+        extendedEquipment = 1;
+        player.heldItemId = ITEM_EXT_SWORD_1 + weapon;
+#ifndef HOST_MM
+        if (weapon == 0) {
+          player.heldItemAction = PLAYER_IA_SWORD_MASTER;
+          s.actor.params = 0x102;
+        }
+#endif
+      } else {
+        fierceDeity = 1;
+#ifdef HOST_MM
+        player.transformation = PLAYER_FORM_FIERCE_DEITY;
+        player.heldItemId = ITEM_SWORD_DEITY;
+        player.heldItemAction = PLAYER_IA_SWORD_TWO_HANDED;
+        player.meleeWeaponAnimation = PLAYER_MWA_SPIN_ATTACK_2H;
+        s.actor.params = 0x103;
+#else
+        s.actor.params = 0x103;
+#endif
+      }
+      if (quick) {
+        s.actor.params &= 0xFF;
+        player.stateFlags2 = SPIN_FLAG;
+      }
+      EnMThunder_Init(&s.actor, &play);
+      if (!quick) {
+        CHARGE_AMOUNT = great ? 1.0f : .5f;
+        CHARGE(&s, &play);
+        CwSpinVisualSelection preview = EnMThunder_VisualStyle(&s, &play);
+        CHECK(preview.style == CW_SPIN_STYLE_ARCANE && !preview.accentElement);
+        style = CW_SPIN_STYLE_DARK_ENERGY;
+        player.stateFlags2 |= SPIN_FLAG;
+        CHARGE(&s, &play);
+      }
+      CwSpinVisualSelection visual = EnMThunder_VisualStyle(&s, &play);
+      CHECK(s.spinStyle.released && visual.style == CW_SPIN_STYLE_ARCANE &&
+            !visual.accentElement && !visual.nativeMaterialElement);
+      CHECK(FLAGS(&s.collider) == s.spinStyle.originalFlags &&
+            !(FLAGS(&s.collider) & (FIRE | ICE | LIGHT)));
+#ifdef HOST_MM
+      CHECK(s.subtype == (great ? 0 : 1) && s.timer == 8);
+      CHECK(s.scaleTarget == (weapon == 3 ? (great ? 6 : 4) : (great ? 3 : 2)));
+      CHECK(s.collider.elem.atDmgInfo.damage == (weapon == 3 ? 4 : 1));
+#else
+      CHECK(s.attackStrength == (great ? 0 : 1) && s.followPlayerTimer == 8);
+      CHECK(s.targetScale == (weapon == 0 ? (great ? 4 : 2) : (great ? 8 : 4)));
+#endif
+    }
+  }
+
+  setup(&s);
+  player.heldItemId = ITEM_EXT_SWORD_3;
+  EnMThunder_Init(&s.actor, &play);
+  CHECK(EnMThunder_VisualStyle(&s, &play).style == CW_SPIN_STYLE_NATIVE);
+  setup(&s);
+  extendedEquipment = 1;
+  player.heldItemId = ITEM_EXT_SWORD_3;
+  player.heldItemAction = PLAYER_IA_NONE;
+  EnMThunder_Init(&s.actor, &play);
+  CHECK(EnMThunder_VisualStyle(&s, &play).style == CW_SPIN_STYLE_NATIVE);
+  setup(&s);
+  fierceDeity = 1;
+  player.heldItemId = ITEM_NONE;
+  player.heldItemAction = PLAYER_IA_NONE;
+#ifdef HOST_MM
+  player.transformation = PLAYER_FORM_FIERCE_DEITY;
+#endif
+  EnMThunder_Init(&s.actor, &play);
+  CHECK(EnMThunder_VisualStyle(&s, &play).style == CW_SPIN_STYLE_NATIVE);
 #ifdef HOST_MM
   for (int upgrade = 0; upgrade <= 1; ++upgrade) {
     setup(&s);
@@ -301,6 +390,10 @@ int main(void) {
           FLAGS(&s.collider) == (s.spinStyle.originalFlags | FIRE));
   }
   setup(&s);
+  player.transformation = PLAYER_FORM_FIERCE_DEITY;
+  player.heldItemId = ITEM_SWORD_DEITY;
+  player.heldItemAction = PLAYER_IA_SWORD_TWO_HANDED;
+  s.actor.params = 0x103;
   element = 1;
   player.stateFlags2 = SPIN_FLAG;
   player.meleeWeaponAnimation = 0;
@@ -310,6 +403,7 @@ int main(void) {
   CHECK(EnMThunder_VisualStyle(&s, &play).style == CW_SPIN_STYLE_NATIVE);
 #else
   setup(&s);
+  fierceDeity = 1;
   element = 1;
   s.actor.params |= EN_M_THUNDER_SWORD_BEAM_FLAG;
   EnMThunder_Init(&s.actor, &play);

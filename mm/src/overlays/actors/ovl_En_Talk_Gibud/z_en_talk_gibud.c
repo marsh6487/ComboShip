@@ -791,6 +791,8 @@ void EnTalkGibud_SetupPassiveIdle(EnTalkGibud* this) {
  * Gibdo will not attempt to attack the player and can be spoken to.
  */
 void EnTalkGibud_PassiveIdle(EnTalkGibud* this, PlayState* play) {
+    const f32 tradeRange = 150.0f;
+
     if (Actor_TalkOfferAccepted(&this->actor, &play->state)) {
         this->isTalking = true;
         if (GameInteractor_Should(VB_GIBDO_TRADE_SEQUENCE_DO_TRADE, true, this, true)) {
@@ -799,9 +801,9 @@ void EnTalkGibud_PassiveIdle(EnTalkGibud* this, PlayState* play) {
         }
         Actor_PlaySfx(&this->actor, NA_SE_EN_REDEAD_AIM);
         EnTalkGibud_SetupTalk(this);
-    } else if ((this->actor.xzDistToPlayer < 100.0f) && !(this->collider.base.acFlags & AC_HIT)) {
+    } else if ((this->actor.xzDistToPlayer < tradeRange) && !(this->collider.base.acFlags & AC_HIT)) {
         Actor_TrackPlayer(play, &this->actor, &this->headRot, &this->torsoRot, this->actor.focus.pos);
-        Actor_OfferTalk(&this->actor, play, 100.0f);
+        Actor_OfferTalkExchange(&this->actor, play, tradeRange, 100.0f, PLAYER_IA_NONE);
     } else {
         Math_SmoothStepToS(&this->headRot.y, 0, 1, 0x64, 0);
         Math_SmoothStepToS(&this->torsoRot.y, 0, 1, 0x64, 0);

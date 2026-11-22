@@ -3,6 +3,9 @@
 
 #include "ultra64.h"
 
+#define GAME_OVER_SCREEN_CVAR "gEnhancements.Kaleido.GameOver"
+#define GAME_OVER_SCREEN_DEFAULT 1
+
 struct PlayState;
 
 

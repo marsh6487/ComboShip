@@ -1023,20 +1023,31 @@ void Interpreter::ImportTextureIA8(int tile, bool importReplacement) {
         fullImageLineSizeBytes = width;
     }
 
-    // Legacy HD song-note archives have no scale fields. Decode the whole image
-    // here while the display list continues to address its logical 16x24 tile.
-    if (!importReplacement && width == 16 && height == 24 && metadata->resource &&
-        metadata->type == TextureType::GrayscaleAlpha8bpp) {
+    // Legacy HD quest icons have no scale fields. Keep the display list's logical
+    // tile and decode the full image when the archive supplies a packed IA8 replacement.
+    if (!importReplacement && metadata->resource && metadata->type == TextureType::GrayscaleAlpha8bpp) {
         const auto init = metadata->resource->GetInitData();
-        if (init && init->ResourceVersion == 0 &&
-            GetBaseTexturePath(init->Path) == "textures/icon_item_static/gSongNoteTex") {
-            const uint32_t maxSize = std::min(8192, mRapi->GetMaxTextureSize());
+        if (init && init->ResourceVersion == 0) {
+            const auto path = GetBaseTexturePath(init->Path);
+            const bool songNote = width == 16 && height == 24 && path == "textures/icon_item_static/gSongNoteTex";
+            constexpr std::string_view heartPieces[] = {
+                "icon_item_static_yar/gItemIconHeartPiece1Tex", "textures/icon_item_static/gHeartPieceIcon1Tex",
+                "icon_item_static_yar/gItemIconHeartPiece2Tex", "textures/icon_item_static/gHeartPieceIcon2Tex",
+                "icon_item_static_yar/gItemIconHeartPiece3Tex", "textures/icon_item_static/gHeartPieceIcon3Tex",
+            };
+            const bool heartPiece =
+                width == 48 && height == 48 &&
+                std::find(std::begin(heartPieces), std::end(heartPieces), path) != std::end(heartPieces);
             const uint32_t imageWidth = metadata->width;
             const uint32_t imageHeight = metadata->height;
-            if (imageWidth >= width && imageHeight >= height && imageWidth <= maxSize && imageHeight <= maxSize &&
-                imageWidth * imageHeight == metadata->resource->GetPointerSize()) {
-                width = fullImageLineSizeBytes = imageWidth;
-                height = imageHeight;
+            if ((songNote || heartPiece) && imageWidth >= width && imageHeight >= height &&
+                (imageWidth > width || imageHeight > height)) {
+                const uint32_t maxSize = std::min(8192, mRapi->GetMaxTextureSize());
+                if (imageWidth <= maxSize && imageHeight <= maxSize &&
+                    imageWidth * imageHeight == metadata->resource->GetPointerSize()) {
+                    width = fullImageLineSizeBytes = imageWidth;
+                    height = imageHeight;
+                }
             }
         }
     }

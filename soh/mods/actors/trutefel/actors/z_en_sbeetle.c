@@ -9,18 +9,11 @@
  * - Unity-#included into trutefel_enemies.cpp inside extern "C" (C++ TU): `this` -> `self`,
  *   file-scope statics prefixed sSbeetle*.
  * - Actor_PlaySfx -> Audio_PlayActorSound2 | actor.speed -> actor.speedXZ
- * - NAVI_ENEMY_SCISSORS_BEETLE has no SoH enum entry: naviEnemyId 0x5D -> Navi C-up text
- *   0x065D (z_player.c: textId = naviEnemyId + 0x600). The message itself is a CustomMessage
- *   registered on the OnOpenText hook for 0x065D (trutefel_actor_reg.cpp) — English only,
- *   the reference's german/french placeholders were dropped.
  * - ACTOR_FLAG_18 (navi/C-up dialogue) -> ACTOR_FLAG_TALK_WITH_C_UP (same bit 1<<18), set
  *   with the rest of the flags at registration.
  */
 
 #include "z_en_sbeetle.h"
-
-// Navi C-up dialogue: textId = 0x600 + naviEnemyId -> 0x065D (see trutefel_actor_reg.cpp)
-#define NAVI_ENEMY_SCISSORS_BEETLE 0x5D
 
 #ifndef UPDBGCHECKINFO_FLAG_0
 #define UPDBGCHECKINFO_FLAG_0 (1 << 0)
@@ -263,7 +256,6 @@ void EnSbeetle_Init(Actor* thisx, PlayState* play) {
 
     ActorShape_Init(&self->actor.shape, 0.0f, ActorShadow_DrawCircle, 10.0f);
     Actor_SetScale(&self->actor, 0.1f);
-    self->actor.naviEnemyId = NAVI_ENEMY_SCISSORS_BEETLE;
     thisx->gravity = -1.0f;
     self->nextIdleTimer = 0;
     self->attackTimer = 0;

@@ -1,6 +1,7 @@
 // The real adapter runs against archive and resource boundaries. An active OoT
 // manager deliberately contains different data from MM to catch ownership leaks.
 #include "test_require.h"
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include <algorithm>
 #include <cctype>
@@ -104,6 +105,10 @@ int main() {
     settings["gEnhancements.MidnaCompanion"] = 1;
     REQUIRE(!MMMidnaAudioResources::Enabled()); // OoT opt-in does not enable MM
     settings["gEnhancements.MidnaCompanionMM"] = 1;
+    REQUIRE(MMMidnaAudioResources::Enabled());
+    settings[MM_NAVI_COMPANION_CVAR] = 1;
+    REQUIRE(!MMMidnaAudioResources::Enabled());
+    settings[MM_NAVI_COMPANION_CVAR] = 0;
     REQUIRE(MMMidnaAudioResources::Enabled());
     settings["gEnhancements.MidnaCompanion"] = 0;
     REQUIRE(MMMidnaAudioResources::Enabled());

@@ -318,6 +318,7 @@ void KaleidoScope_DrawWorldMap(PlayState* play);
 void KaleidoScope_UpdateWorldMapCursor(PlayState* play);
 
 // Collect
+bool KaleidoScope_UsesOotQuestPage(void);
 void KaleidoScope_DrawQuestStatus(PlayState* play);
 void KaleidoScope_UpdateQuestCursor(PlayState* play);
 void KaleidoScope_DrawOotQuestName(PlayState* play); // Skijer's NEI: OoT quest-page name box (flat view)

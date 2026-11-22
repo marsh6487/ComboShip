@@ -1,4 +1,5 @@
 #include "MidnaAudioResources.h"
+#include "CompanionStyle.h"
 
 #include <algorithm>
 #include <cctype>
@@ -10,6 +11,14 @@
 #ifdef COMBO_BUILD
 #include <ship/resource/CrossRMRegistry.h>
 #endif
+
+extern "C" bool MMCompanion_UseNavi(void) {
+    return CVarGetInteger(MM_NAVI_COMPANION_CVAR, 0) != 0;
+}
+
+extern "C" bool MMCompanion_UseMidna(void) {
+    return !MMCompanion_UseNavi() && CVarGetInteger(MM_MIDNA_COMPANION_CVAR, 0) != 0;
+}
 
 namespace {
 std::shared_ptr<Ship::ResourceManager> OwnManager() {
@@ -76,7 +85,7 @@ void WriteAssignment(const char* event, const std::string& path) {
 }
 
 bool Enabled() {
-    return CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) != 0;
+    return MMCompanion_UseMidna();
 }
 
 bool HasModel() {

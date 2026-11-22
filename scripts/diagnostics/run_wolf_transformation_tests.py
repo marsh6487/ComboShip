@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the production OoT transition bodies with Wolf's separate animator.
+"""Exercise the production OoT transition bodies with separate SSBB animators.
 
 The Wolf asset loader/audio/camera/equipment are service boundaries. The real
 LinkAnimation_Update dispatch and complete transition bodies are compiled here.
@@ -53,20 +53,22 @@ struct FormState {
     SkelAnime formSkelAnime;
 } gFormState;
 constexpr uint32_t PLAYER_STATE1_INPUT_DISABLED = 1, PLAYER_STATE1_IN_CUTSCENE = 2,
-                   PLAYER_STATE1_IN_WATER = 4, PLAYER_STATE3_PAUSE_ACTION_FUNC = 1;
+                   PLAYER_STATE1_IN_WATER = 4, PLAYER_STATE1_DEAD = 8, PLAYER_STATE3_PAUSE_ACTION_FUNC = 1;
 constexpr int MM_NA_SE_PL_PUT_OUT_ITEM = 1, MM_NA_SE_IT_SET_TRANSFORM_MASK = 2,
               MM_NA_SE_PL_FREEZE_S = 3, MM_NA_SE_IT_TRANSFORM_MASK_BROKEN = 4,
               MM_NA_SE_PL_TRANSFORM_VOICE = 5, MM_NA_SE_EV_LIGHTNING_HARD = 6,
               MM_NA_SE_PL_FACE_CHANGE = 7, MM_ANIM_CL_SETMASK = 1;
 constexpr float ZORA_SWIM_THRESHOLD = 20;
 static u8 sNativeMaskInstantFallback = 0, sForceInstantTransform = 0, sCutsceneMaskAnim = 0;
-static bool selected = true, instant = false, loadOk = true;
+static bool selected = true, instant = false, loadOk = true, pikachuMode = false;
 static int loads = 0, soundsIn = 0, soundsOut = 0, formTicks = 0, restricted = 0, restored = 0;
 #define MMFORM_LOG(...) ((void)0)
 #define GET_ACTIVE_CAM(play) (0)
 #define MMFORM_IS_ZORA_SWIM() (gFormState.currentForm == MM_PLAYER_FORM_ZORA)
-int CVarGetInteger(const char*, int) { return instant; }
+int CVarGetInteger(const char* name, int) { return std::strcmp(name, "gPikachuMode") == 0 ? pikachuMode : instant; }
+u8 MmForm_IsEnabled() { return true; }
 u8 WolfLinkForm_IsSelected() { return selected; }
+void WolfLinkForm_Select(u8 wolf) { selected = wolf; }
 void WolfLinkForm_PlayTransformSfx(u8 in) { in ? ++soundsIn : ++soundsOut; }
 int Camera_GetCamDirYaw(int) { return 0; }
 bool MmSfx_IsAvailable() { return true; }
@@ -95,6 +97,7 @@ u8 MmForm_UpdateNativeMaskCutscene(Player*, PlayState*, int) { return 0; }
 /* NATIVE_FORM_CHECK */
 /* ANIMATION_DISPATCH */
 /* CONTROLLERS */
+/* PIKACHU_MODE */
 static int Run(Player& player, PlayState& play, bool entering) {
     for (int tick = 1; tick <= 100; ++tick) {
         if (entering) MmForm_UpdateTransforming(&player, &play);
@@ -157,6 +160,36 @@ int main(int argc, char** argv) {
         gFormState.targetForm = MM_PLAYER_FORM_PIKACHU;
         for (int i = 0; i < 5; ++i) MmForm_UpdateTransforming(&player, &play);
         assert(gFormState.state == MMFORM_STATE_TRANSFORMING && loads == 0 && soundsIn == 0);
+    } else if (!std::strcmp(test, "pikachu-mode-exit")) {
+        selected = false;
+        pikachuMode = true;
+        UpdatePikachuMode(&player);
+        assert(Run(player, play, true) == 5);
+        assert(gFormState.state == MMFORM_STATE_ACTIVE && formTicks == 0);
+
+        pikachuMode = false;
+        UpdatePikachuMode(&player);
+        assert(gFormState.state == MMFORM_STATE_DETRANSFORMING);
+        assert(Run(player, play, false) == 5);
+        assert(gFormState.state == MMFORM_STATE_INACTIVE && gFormState.currentForm == MM_PLAYER_FORM_HUMAN);
+        assert(formTicks == 0 && restored == 1 && !sForceInstantTransform);
+        assert(!(player.stateFlags1 & PLAYER_STATE1_INPUT_DISABLED));
+    } else if (!std::strcmp(test, "pikachu-after-wolf")) {
+        assert(selected); // The inactive form slot retains the previous Wolf renderer selection.
+        pikachuMode = true;
+        UpdatePikachuMode(&player);
+        assert(!selected && gFormState.state == MMFORM_STATE_TRANSFORMING);
+        assert(Run(player, play, true) == 5);
+        assert(gFormState.state == MMFORM_STATE_ACTIVE && soundsIn == 0);
+    } else if (!std::strcmp(test, "pikachu-around-active-wolf")) {
+        assert(selected);
+        gFormState.state = MMFORM_STATE_ACTIVE;
+        gFormState.currentForm = MM_PLAYER_FORM_PIKACHU;
+        pikachuMode = true;
+        UpdatePikachuMode(&player);
+        pikachuMode = false;
+        UpdatePikachuMode(&player);
+        assert(selected && gFormState.state == MMFORM_STATE_ACTIVE);
     } else return 2;
     std::printf("PASS %s\n", test);
 }
@@ -183,6 +216,10 @@ def main():
     source = source.replace("/* ANIMATION_DISPATCH */", dispatch)
     source = source.replace("/* CONTROLLERS */", "\n".join(function(form, name) for name in
                             ("MmForm_UpdateTransforming", "MmForm_UpdateDetransforming")))
+    mode_start = form.index("    // === Pikachu Mode (Crossover Items selector) ===")
+    mode_end = form.index("    // Update blink", mode_start)
+    source = source.replace("/* PIKACHU_MODE */", function(form, "MmForm_IsPikachuActive") +
+                            "\nvoid UpdatePikachuMode(Player* player) {\n" + form[mode_start:mode_end] + "}\n")
     with tempfile.TemporaryDirectory(prefix="wolf-transformation-") as folder:
         path = Path(folder)
         (path / "sequence.cpp").write_text(source)
@@ -190,7 +227,9 @@ def main():
                         "-Werror", "-fsanitize=undefined", "-fno-sanitize-recover=all",
                         str(path / "sequence.cpp"), "-o", str(path / "sequence")], check=True)
         failed = []
-        for case in args.case or ("entry", "exit", "exit-after-reload", "buttons", "repeat", "load-failure", "rito", "pokeball-owner"):
+        for case in args.case or ("entry", "exit", "exit-after-reload", "buttons", "repeat", "load-failure", "rito",
+                                  "pokeball-owner", "pikachu-mode-exit", "pikachu-after-wolf",
+                                  "pikachu-around-active-wolf"):
             result = subprocess.run([str(path / "sequence"), case], capture_output=True, text=True)
             print(result.stdout, end="")
             if result.returncode:

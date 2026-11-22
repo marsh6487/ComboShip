@@ -1,6 +1,7 @@
 #include <string.h>
 #include "tests/test_require.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h"
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -12,6 +13,7 @@ static int nativeCalls, customCalls, clipPresent, disableCalls;
 static u16 nativeId;
 static MMMidnaAudioEvent customEvent;
 static int idleUpdates, idleEligible, playerCutscene, enabled = 1, resets, lightRemovals;
+static int naviEnabled;
 
 void MMMidnaAudio_UpdateIdle(bool eligible) {
     ++idleUpdates;
@@ -25,12 +27,12 @@ u8 Message_GetState(MessageContext* ctx) {
 }
 
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
-    return enabled;
+    return strcmp(name, MM_NAVI_COMPANION_CVAR) == 0 ? naviEnabled : enabled;
 }
 bool MMMidnaAudio_TryPlay(MMMidnaAudioEvent event) {
     ++customCalls;
     customEvent = event;
-    return enabled && clipPresent;
+    return enabled && !naviEnabled && clipPresent;
 }
 void Audio_PlaySfx(u16 id) {
     ++nativeCalls;
@@ -204,6 +206,7 @@ int main(void) {
     const u8 categories[] = { ACTORCAT_NPC, ACTORCAT_ENEMY, ACTORCAT_PROP };
     const MMMidnaAudioEvent eventsTarget[] = { MM_MIDNA_AUDIO_TARGET_NPC, MM_MIDNA_AUDIO_TARGET_ENEMY,
                                                MM_MIDNA_AUDIO_TARGET_OTHER };
+    const u16 naviTarget[] = { NA_SE_VO_NAVY_HELLO, NA_SE_VO_NAVY_ENEMY, NA_SE_VO_NAVY_HEAR };
     for (int i = 0; i < 3; ++i) {
         target.category = categories[i];
         memset(&fairy, 0, sizeof(fairy));
@@ -214,6 +217,13 @@ int main(void) {
         REQUIRE(customCalls == 1 && customEvent == eventsTarget[i] && nativeCalls == 0);
         func_8088EFA4(&fairy, &play);
         REQUIRE(customCalls == 1); // held lock-on never retriggers
+        naviEnabled = 1;
+        fairy.fairyFlags = 0;
+        nativeCalls = customCalls = 0;
+        func_8088EFA4(&fairy, &play);
+        func_8088EFA4(&fairy, &play);
+        REQUIRE(customCalls == 0 && nativeCalls == 1 && nativeId == naviTarget[i]);
+        naviEnabled = 0;
     }
     enabled = 0;
     fairy.fairyFlags = 0;
@@ -221,6 +231,14 @@ int main(void) {
     func_8088EFA4(&fairy, &play);
     REQUIRE(nativeCalls == 1 && nativeId == NA_SE_NONE);
     enabled = 1;
+    naviEnabled = 1;
+    nativeCalls = customCalls = 0;
+    EnElf_PlayTatlSound(&fairy, MM_MIDNA_AUDIO_APPEAR, NA_SE_EV_BELL_DASH_NORMAL);
+    REQUIRE(customCalls == 0 && nativeCalls == 1 && nativeId == NA_SE_EV_WHITE_FAIRY_DASH);
+    nativeCalls = customCalls = 0;
+    Interface_SetTatlCall(&play, TATL_STATE_2B);
+    REQUIRE(nativeCalls == 1 && nativeId == NA_SE_VO_NAVY_CALL);
+    naviEnabled = 0;
     player.focusActor = NULL;
     /* HUD polling with a non-companion pointer cannot trigger private audio. */
     companion.actor.params = FAIRY_TYPE_3;

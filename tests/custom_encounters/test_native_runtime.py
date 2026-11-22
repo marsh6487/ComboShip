@@ -49,6 +49,16 @@ Actor*Actor_Spawn(decltype(state.actorCtx)*ctx,PlayState*,int id,float x,float y
 void Actor_Kill(Actor*a){a->update=nullptr;++killed;}
 #include "combo/encounters/NativeCustomEnemies.inc.h"
 int main(){
+ const char* names[] = {"Miniblin", "Molmauk", "Scissors Beetle", "Lynel"};
+ uint8_t seenHints[256]{};
+ for (int kind = 1; kind <= 4; ++kind) {
+     const auto* hint = FindEnemyHint(CustomEnemies_Id(kind));
+     assert(hint && std::strcmp(hint->name, names[kind - 1]) == 0 && *hint->advice);
+     const uint8_t hintId = NEI_MM ? hint->mmId : hint->ootId;
+     assert(hintId != 0xFF && !seenHints[hintId]++);
+ }
+ assert(FindEnemyHint(ACTOR_EN_TITE) == nullptr && FindEnemyHint(-1) == nullptr);
+ assert(FindEnemyHint(ACTOR_EN_SBEETLE)->ootId == 0x5D);
  testPlayer.actor.world.pos=testPlayer.actor.home.pos={-1000,0,-1000};
  cv["gEnhancements.CustomEnemies.Molmauk"]=0;cv["gEnhancements.CustomEnemies.Beetle"]=0;cv["gEnhancements.CustomEnemies.Lynel"]=0;
  CustomEnemies_RecordEntry(&state,ACTOR_EN_TITE,0,0,0,-1);

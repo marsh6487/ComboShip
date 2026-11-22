@@ -22,7 +22,10 @@ def run(*args):
 def main():
     source = ACTOR.read_text()
     lights = (ROOT / 'mm/src/code/z_lights.c').read_text()
-    draw = ''.join(function(lights, name) for name in ('Lights_PointSetInfo', 'Lights_PointNoGlowSetInfo',
+    resources = (ROOT / 'mm/2s2h/Enhancements/Companion/MidnaAudioResources.cpp').read_text()
+    settings = ''.join(function(resources, name) for name in ('MMCompanion_UseNavi', 'MMCompanion_UseMidna'))
+    draw = settings.replace('extern "C" ', '')
+    draw += ''.join(function(lights, name) for name in ('Lights_PointSetInfo', 'Lights_PointNoGlowSetInfo',
                      'Lights_PointGlowSetInfo', 'Lights_PointSetColorAndRadius'))
     draw += function(source, 'EnElf_BlackMarketQuiet')
     for name in ('EnElf_UpdateMidnaBlink', 'func_8088E60C', 'EnElf_Update', 'EnElf_DrawMidnaShimmer',
@@ -37,7 +40,8 @@ def main():
         cfile.write_text(fixture.replace('/* PRODUCTION_MIDNA_DRAW */', draw))
         run(os.environ.get('CC', 'cc'), *flags, str(cfile), '-lm', '-o', str(folder / 'draw'))
         run(str(folder / 'draw'))
-        routing = function(HUD.read_text(), 'Interface_SetTatlCall')
+        routing = settings.replace('extern "C" ', '')
+        routing += function(HUD.read_text(), 'Interface_SetTatlCall')
         routing += ''.join(function(source, name) for name in ('EnElf_UpdateMidnaIdleAudio',
                            'EnElf_PlayTatlSound', 'EnElf_Destroy', 'func_8088EF18', 'func_8088EFA4'))
         cfile = folder / 'routing.c'
@@ -54,8 +58,8 @@ def main():
             print(result.stderr)
             result.check_returncode()
         print(result.stdout.strip())
-        resources = (ROOT / 'mm/2s2h/Enhancements/Companion/MidnaAudioResources.cpp').read_text()
-        adapter = ''.join(function(resources, name) for name in ('OwnManager', 'MMMidnaResources_Exists',
+        adapter = settings
+        adapter += ''.join(function(resources, name) for name in ('OwnManager', 'MMMidnaResources_Exists',
                                                                 'MMMidnaResources_Load'))
         adapter += 'namespace MMMidnaAudioResources {\n'
         adapter += ''.join(function(resources, name) for name in ('ListClips', 'ReadAssignment', 'WriteAssignment',
