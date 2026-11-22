@@ -47,7 +47,7 @@ inline ImTextureID GetTexture(Fast::Fast3dGui& gui, Fast::Interpreter& interpret
         texture->Data = stbi_load_from_memory(png.data(), static_cast<int>(png.size()), &texture->Metadata.Width,
                                               &texture->Metadata.Height, nullptr, STBI_rgb_alpha);
         if (!texture->Data || texture->Metadata.Width != kAtlasWidth || texture->Metadata.Height != kAtlasHeight)
-            return nullptr;
+            return {};
         texture->DataSize = kAtlasWidth * kAtlasHeight * 4;
         gui.LoadTextureFromResource(name, texture);
         // LoadTextureFromResource leaves the atlas selected. Linear sampling

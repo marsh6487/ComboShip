@@ -96,7 +96,7 @@ class SongEventMarkerWindow final : public Ship::GuiWindow {
         const bool showName = Songs::ShowSongEventName();
         // ImGui advances on rendered frames, independent from 20 Hz game updates.
         const double time = ImGui::GetTime();
-        ImTextureID atlas = nullptr;
+        ImTextureID atlas{};
         auto* draw = ImGui::GetForegroundDrawList(viewport.imguiViewport);
         draw->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.x + clip.width, clip.y + clip.height), true);
         for (int category : SongMarkerHost::kActorCategories) {

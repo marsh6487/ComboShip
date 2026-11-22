@@ -105,6 +105,23 @@ int main() {
  accepted=false; finished=true; gal.actionFunc(&gal,&play); check(true,true,false,false);
  finished=false; textState=TEXT_STATE_CLOSING; gal.actionFunc(&gal,&play); check(false,false,false,false);
  finished=true; textState=0; gal.actionFunc(&gal,&play); check(false,true,false,false);
+ // Sleep uses a distinct wake clip, then resumes the native talk loop.
+ State sleeping{.clip = Clip::Sleep, .sleepClips = true};
+ std::vector<Change> blends;
+ auto blend = [&](Clip clip, float frames) { blends.push_back({clip, frames}); };
+ sleeping.Update(true,false,false,false,blend);
+ sleeping.Update(true,false,true,false,blend);
+ assert(blends.size() == 1);
+ sleeping.Update(true,true,false,false,blend);
+ sleeping.Update(false,false,false,false,blend);
+ sleeping.Update(false,true,false,false,blend);
+ assert(blends.size() == 4);
+ assert(blends.front().clip == Clip::Wake && blends.front().morph < 0.f);
+ assert(blends[1].clip == Clip::Talk && blends[1].morph < 0.f);
+ assert(blends[2].clip == Clip::Raise && blends.back().clip == Clip::Sleep);
+ sleeping.Update(true,false,false,false,blend);
+ sleeping.Update(false,true,false,false,blend);
+ assert(blends.back().clip == Clip::Sleep);
  // Cues are copied as controls, not guessed SFX IDs or false argument matches.
  assert(FirstMessageSfx(std::string("\x17Hi\x1E\x68\x58\xBF",8))==std::string("\x1E\x68\x58",3));
  assert(FirstMessageSfx(std::string("\x1B\x1E\x42Text\xBF",8)).empty());

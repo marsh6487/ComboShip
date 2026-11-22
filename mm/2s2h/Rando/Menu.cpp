@@ -1213,7 +1213,7 @@ static void DrawItemPoolTab() {
                      "Adds the Tycoon's Wallet (5,000 rupees) to the item pool\n"
                      "as a third progressive wallet upgrade.",
                      1);
-    ItemPoolCheckbox("ZFG's Wallet", RO_SHUFFLE_ZFG_WALLET,
+    ItemPoolCheckbox("Include ZFG Wallet", RO_SHUFFLE_ZFG_WALLET,
                      "Adds one Progressive Wallet that raises capacity to 9,999 rupees after your other finite "
                      "wallet upgrades.",
                      1);

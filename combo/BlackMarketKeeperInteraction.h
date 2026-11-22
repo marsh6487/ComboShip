@@ -6,31 +6,38 @@
 
 // Presentation only. EnOssan still owns input, messages, cameras and receipts.
 namespace BlackMarketKeeperInteraction {
-enum class Clip { Idle, EnterTalk, Talk, Raise, Ask };
+enum class Clip { Idle, Sleep, Wake, EnterTalk, Talk, Raise, Ask };
 struct State {
     Clip clip = Clip::Idle;
     bool talking = false;
+    bool sleepClips = false;
 
     template <typename Change> void Update(bool active, bool finished, bool nextPage, bool refusal, Change change) {
         auto set = [&](Clip next, float morph) {
             clip = next;
             change(next, morph);
         };
+        const Clip rest = sleepClips ? Clip::Sleep : Clip::Idle;
         // These are EnTakaraya_Wait/Talk/SetupWait's native transitions. The
         // swaying talk loop never reports completion; once-only clips do.
         if (finished) {
-            if (clip == Clip::EnterTalk)
+            if (clip == Clip::Wake)
+                set(active ? Clip::Talk : rest, -6.f);
+            else if (clip == Clip::EnterTalk)
                 set(talking ? Clip::Talk : Clip::Raise, talking ? 0.f : 5.f);
             else if (clip == Clip::Raise)
-                set(talking ? Clip::Ask : Clip::Idle, talking ? 0.f : -4.f);
+                set(talking ? Clip::Ask : rest, talking ? 0.f : -4.f);
             else if (clip == Clip::Ask)
-                set(Clip::Idle, talking ? 0.f : -4.f);
+                set(talking ? Clip::Idle : rest, talking ? 0.f : -4.f);
         }
-        if (active && !talking)
-            set(Clip::EnterTalk, -4.f);
-        else if (!active && talking && clip == Clip::Talk)
+        if (active && !talking && clip != Clip::Wake) {
+            const bool waking = clip == Clip::Sleep;
+            set(waking ? Clip::Wake : Clip::EnterTalk, waking ? -10.f : -4.f);
+        } else if (!active && talking && clip == Clip::Talk)
             set(Clip::Raise, 5.f);
-        if (active && nextPage)
+        else if (!active && talking && clip == Clip::Idle && sleepClips)
+            set(rest, -6.f);
+        if (active && nextPage && clip != Clip::Wake)
             set(Clip::Raise, 5.f);
         if (refusal && clip == Clip::Idle)
             set(Clip::Ask, 5.f);

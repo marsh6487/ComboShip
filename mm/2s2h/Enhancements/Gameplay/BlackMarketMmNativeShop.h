@@ -345,6 +345,22 @@ void InitNativeStock(Actor* actor, PlayState* play) {
     NativeStockRefresh(play, item);
 }
 void NativeKeeperBlink(EnOssan* shop) {
+    using BlackMarketKeeperInteraction::Clip;
+    if (sKeeperInteraction.clip == Clip::Wake) {
+        // Closed to open, followed by two quick blinks during the wake clip.
+        constexpr u8 eyes[] = { 2, 1, 0, 0, 0, 1, 2, 3, 0, 1, 2, 3, 0 };
+        const auto frame = static_cast<size_t>(shop->skelAnime.curFrame);
+        shop->eyeTexIndex = eyes[std::min(frame, std::size(eyes) - 1)];
+        shop->blinkTimer = 90;
+        return;
+    }
+    const auto& message = sNativeShopPlay->msgCtx;
+    const bool hasTextbox = message.msgMode != MSGMODE_NONE && message.talkActor == &shop->actor;
+    if (!hasTextbox && shop->actionFunc == EnOssan_Idle && sKeeperInteraction.clip == Clip::Sleep) {
+        shop->eyeTexIndex = 2;
+        shop->blinkTimer = 2;
+        return;
+    }
     if (shop->blinkTimer > 0)
         --shop->blinkTimer;
     if (!shop->blinkTimer) {
