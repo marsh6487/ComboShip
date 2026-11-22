@@ -2,3 +2,4 @@
 #include "SeedContext.h"
 #include "logic.h"
 #include "combo/rando/SongEvents.h"
+#include "combo/rando/SongEventsBridge.h"

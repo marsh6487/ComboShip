@@ -20,6 +20,19 @@ with tempfile.TemporaryDirectory(prefix='song-event-native-') as td:
     fixture+='void RecognizeNativeSong(PlayState* play,int song){auto* msgCtx=&play->msgCtx;OcarinaStaff staff{};staff.state=song;msgCtx->ocarinaStaff=&staff;msgCtx->lastPlayedSong=song;'+reserve+'msgCtx->ocarinaStaff=nullptr;}\n'
     fixture+='void CloseNativeSong(PlayState* play){auto* msgCtx=&play->msgCtx;'+capture+'}\n'
     (Path(td)/'mm_message_reservation.inc').write_text(fixture)
+    composer=(ROOT/'mm/src/overlays/actors/ovl_En_Po_Composer/z_en_po_composer.c').read_text()
+    flags_src=(ROOT/'mm/src/code/z_actor.c').read_text()
+    flags_bodies=[]
+    for name in ('Flags_SetWeekEventReg', 'Flags_ClearWeekEventReg'):
+        start=flags_src.index('void '+name+'(s32 flag) {');end=flags_src.index('\n}',start)+2
+        flags_bodies.append(flags_src[start:end])
+    composer_bodies=['extern "C" {\n'+'\n'.join(flags_bodies)+'\n}']
+    for declaration in ('EnPoComposer_SetupStartCutscene(EnPoComposer* this)',
+                        'EnPoComposer_PlayCurse(EnPoComposer* this, PlayState* play)',
+                        'EnPoComposer_SharpCutsceneDone(EnPoComposer* this)'):
+        start=composer.index('void '+declaration+' {');end=composer.index('\n}',start)+2
+        composer_bodies.append(re.sub(r'\bthis\b','self',composer[start:end]))
+    (Path(td)/'mm_sharp_completion.inc').write_text('\n'.join(composer_bodies))
     pools=(ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
     a=pools.index('void GeneratePools(');a=pools.index('{',a)+1
     b=pools.index('    const bool hasOotGameplay',a)

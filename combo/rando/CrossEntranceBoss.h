@@ -24,6 +24,7 @@ extern "C" {
 #endif
 int Combo_SOH_CrossBossEnabled(void);
 int Combo_MM_CrossBossEnabled(void);
+int Combo_MM_IsShuffledBossEntrance(int32_t entrance);
 int Combo_MM_CrossBossLogicEnabled(void);
 void Combo_MM_RequestCrossBossDeathRecovery(void);
 int Combo_SOH_CrossBossLogicalClear(int id, int nativeValue);
@@ -39,6 +40,7 @@ int32_t Combo_SOH_CrossDungeonDeathCheckpoint(void);
 #define Combo_MM_CrossBossLogicalClear(id, nativeValue) (nativeValue)
 #define Combo_SOH_CrossBossEnabled() 0
 #define Combo_MM_CrossBossEnabled() 0
+#define Combo_MM_IsShuffledBossEntrance(entrance) 0
 #define Combo_MM_CrossBossLogicEnabled() 0
 #define Combo_MM_RequestCrossBossDeathRecovery() ((void)0)
 #define Combo_SOH_CrossBossWarp(scene) 0

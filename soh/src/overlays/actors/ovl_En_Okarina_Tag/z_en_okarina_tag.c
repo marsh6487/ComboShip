@@ -6,6 +6,7 @@
  */
 
 #include "z_en_okarina_tag.h"
+#include "overlays/actors/ovl_Bg_Mizu_Water/z_bg_mizu_water.h"
 #include "scenes/misc/hakaana_ouke/hakaana_ouke_scene.h"
 #include "scenes/overworld/spot02/spot02_scene.h"
 #include "vt.h"
@@ -41,6 +42,48 @@ extern CutsceneData D_80ABF9D0[];
 extern CutsceneData D_80ABFB40[];
 
 void EnOkarinaTag_Destroy(Actor* thisx, PlayState* play) {
+}
+
+static s32 EnOkarinaTag_IsShuffledWaterLevelCrest(const EnOkarinaTag* tag, PlayState* play) {
+    return play->sceneNum == SCENE_WATER_TEMPLE && tag->type == 7 &&
+           tag->ocarinaSong == OCARINA_ACTION_CHECK_LULLABY - OCARINA_ACTION_CHECK_SARIA &&
+           tag->switchFlag >= WATER_TEMPLE_WATER_F1_FLAG && tag->switchFlag <= WATER_TEMPLE_WATER_F3_FLAG &&
+           SongEvents_OotAssignedSong(play->sceneNum, tag->actor.room, play->curSpawn, OCARINA_ACTION_CHECK_LULLABY) >=
+               0;
+}
+
+int EnOkarinaTag_GetPendingSongAction(EnOkarinaTag* tag, PlayState* play) {
+    if (!tag->actor.update) {
+        return -1;
+    }
+
+    const s32 switchSet = (tag->switchFlag >= 0) && Flags_GetSwitch(play, tag->switchFlag);
+    // The vanilla-layout Well hook can allow refilling, but the drain marker is complete while lowered.
+    if ((play->sceneNum == SCENE_BOTTOM_OF_THE_WELL && switchSet) ||
+        (GameInteractor_Should(VB_OKARINA_TAG_COMPLETED, switchSet, tag) &&
+         !EnOkarinaTag_IsShuffledWaterLevelCrest(tag, play))) {
+        return -1;
+    }
+
+    if (tag->actionFunc == func_80ABEF2C && (tag->ocarinaSong != 6 || gSaveContext.scarecrowSpawnSongSet)) {
+        return (tag->ocarinaSong == 6 ? 0xA : tag->ocarinaSong) + OCARINA_ACTION_CHECK_SARIA;
+    }
+    if (tag->actionFunc != func_80ABF28C) {
+        return -1;
+    }
+
+    switch (tag->type) {
+        case 1:
+            return OCARINA_ACTION_CHECK_LULLABY;
+        case 2:
+            return Flags_GetEventChkInf(EVENTCHKINF_DRAINED_WELL_IN_KAKARIKO) ? -1 : OCARINA_ACTION_CHECK_STORMS;
+        case 4:
+            return Flags_GetEventChkInf(EVENTCHKINF_OPENED_THE_DOOR_OF_TIME) ? -1 : OCARINA_ACTION_CHECK_TIME;
+        case 6:
+            return Flags_GetEventChkInf(EVENTCHKINF_DESTROYED_ROYAL_FAMILY_TOMB) ? -1 : OCARINA_ACTION_CHECK_LULLABY;
+        default:
+            return -1;
+    }
 }
 
 void EnOkarinaTag_Init(Actor* thisx, PlayState* play) {
@@ -79,8 +122,10 @@ void EnOkarinaTag_Init(Actor* thisx, PlayState* play) {
     osSyncPrintf(VT_FGCOL(GREEN) "☆☆☆☆☆ 当り？\t\t ☆☆☆☆☆ %d\n" VT_RST, this->unk_158);
     osSyncPrintf("\n\n");
 
+    // Keep the shuffled repeatable water-level marker available on room re-entry, even for the active level.
     if (GameInteractor_Should(VB_OKARINA_TAG_COMPLETED,
-                              (this->switchFlag >= 0) && (Flags_GetSwitch(play, this->switchFlag)), this)) {
+                              (this->switchFlag >= 0) && (Flags_GetSwitch(play, this->switchFlag)), this) &&
+        !EnOkarinaTag_IsShuffledWaterLevelCrest(this, play)) {
         Actor_Kill(&this->actor);
     } else {
         switch (this->type) {

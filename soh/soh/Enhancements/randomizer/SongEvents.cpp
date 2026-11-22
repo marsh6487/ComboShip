@@ -1,5 +1,4 @@
 #include "SongEvents.h"
-#include "combo/rando/SongEventsBridge.h"
 #include "soh/ResourceManagerHelpers.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
@@ -80,29 +79,31 @@ static int EventForScene(int scene, int room, int spawn) {
 }
 static int sArmedOotAction = -1;
 static int sArmedOotScene = -1;
-extern "C" int SongEvents_OotAction(int scene, int room, int spawn, int vanillaAction) {
-    sArmedOotAction = -1;
-    sArmedOotScene = -1;
-    if (!IS_RANDO || !RAND_GET_OPTION(RSK_SHUFFLE_SONG_EVENTS).Get())
-        return vanillaAction;
-    int event = EventForScene(scene, room, spawn);
-    if (event < 0)
-        return vanillaAction;
+static int EventActionForSong(unsigned song) {
     static const int actions[] = {
         OCARINA_ACTION_CHECK_LULLABY, OCARINA_ACTION_CHECK_EPONA,    OCARINA_ACTION_CHECK_SARIA,
         OCARINA_ACTION_CHECK_STORMS,  OCARINA_ACTION_CHECK_SUNS,     OCARINA_ACTION_CHECK_TIME,
         OCARINA_ACTION_CHECK_MINUET,  OCARINA_ACTION_CHECK_BOLERO,   OCARINA_ACTION_CHECK_SERENADE,
         OCARINA_ACTION_CHECK_REQUIEM, OCARINA_ACTION_CHECK_NOCTURNE, OCARINA_ACTION_CHECK_PRELUDE,
     };
+    return song < std::size(actions) ? actions[song] : -1;
+}
+int SongEvents_OotAssignedSong(int scene, int room, int spawn, int vanillaAction) {
+    if (!IS_RANDO || !RAND_GET_OPTION(RSK_SHUFFLE_SONG_EVENTS).Get() || vanillaAction < 0)
+        return -1;
+    const int event = EventForScene(scene, room, spawn);
     // Different ocarina actors/songs in the same scene remain native.
-    if (vanillaAction != actions[Defaults(Game::Oot)[event]])
+    if (event < 0 || vanillaAction != EventActionForSong(OotDefaults[event]))
+        return -1;
+    const auto song = Rando::Context::GetInstance()->songEvents[event];
+    return Playable(Game::Oot, song) ? song : -1;
+}
+extern "C" int SongEvents_OotAction(int scene, int room, int spawn, int vanillaAction) {
+    sArmedOotAction = EventActionForSong(SongEvents_OotAssignedSong(scene, room, spawn, vanillaAction));
+    sArmedOotScene = sArmedOotAction < 0 ? -1 : scene;
+    if (sArmedOotAction < 0)
         return vanillaAction;
-    auto song = Rando::Context::GetInstance()->songEvents[event];
-    if (song >= 12)
-        return vanillaAction;
-    sArmedOotAction = actions[song];
-    sArmedOotScene = scene;
-    return actions[song];
+    return sArmedOotAction;
 }
 extern "C" int SongEvents_OotIsEventAction(int action) {
     return IS_RANDO && RAND_GET_OPTION(RSK_SHUFFLE_SONG_EVENTS).Get() && gPlayState &&

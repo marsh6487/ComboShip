@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, name):
-    match = re.search(r'^(?:static )?(?:extern "C" )?(?:void\*|void|bool|uint8_t|int32_t|std::shared_ptr<Fast::Texture>)\s+' + re.escape(name) +
+    return_type = r"void\*|void|bool|uint8_t|uint32_t|int32_t|std::string_view|std::shared_ptr<Fast::Texture>"
+    match = re.search(r'^(?:static )?(?:extern "C" )?(?:' + return_type + r")\s+" + re.escape(name) +
                       r"\([^;{}]*\)\s*\{", source, re.M)
     if not match:
         raise RuntimeError(f"Missing production function: {name}")
@@ -45,7 +46,8 @@ def main():
         (build / "texture_address_production.inc").write_text("\n".join(
             function(interpreter, name) for name in [
                 "Interpreter::SegAddr", "IsValidResolvedAddress", "gfx_check_image_signature", "ComboLoadTextureResource",
-                "ReportTextureLoadFailure", "gfx_set_timg_handler_rdp",
+                "ReportTextureLoadFailure", "gfx_set_timg_handler_rdp", "Interpreter::GetBaseTexturePath",
+                "GetEffectiveLineSize", "Interpreter::ImportTextureIA8",
             ]))
         # Resource destruction's trace logger is outside the texture address contract.
         (build / "spdlog").mkdir()

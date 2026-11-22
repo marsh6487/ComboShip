@@ -902,7 +902,7 @@ void Settings::CreateOptions() {
         }
     });
     OPT_BOOL(RSK_INCLUDE_TYCOON_WALLET, CVAR_RANDOMIZER_SETTING("IncludeTycoonWallet"));
-    OPT_BOOL(RSK_INCLUDE_ZFG_WALLET, "ZFG's Wallet", CVAR_RANDOMIZER_SETTING("IncludeZfgWallet"),
+    OPT_BOOL(RSK_INCLUDE_ZFG_WALLET, "Include ZFG Wallet", CVAR_RANDOMIZER_SETTING("IncludeZfgWallet"),
              "Add one Progressive Wallet that raises capacity to 9,999 rupees after the other finite wallets.");
     OPT_BOOL(RSK_SHUFFLE_OCARINA, CVAR_RANDOMIZER_SETTING("ShuffleOcarinas"));
     OPT_CALLBACK(RSK_SHUFFLE_OCARINA, {

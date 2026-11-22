@@ -191,6 +191,16 @@ extern "C" int Combo_MM_CrossBossEnabled(void) {
     return Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum >= 0 &&
            gSaveContext.fileNum <= 2 && ComboCrossMmRuntime::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
+extern "C" int Combo_MM_IsShuffledBossEntrance(int32_t entrance) {
+    using namespace ComboCrossMmRuntime;
+    if (!Combo_MM_CrossBossEnabled())
+        return 0;
+    const auto* source = state.FindEntrance(entrance);
+    if (!source || source->pool != Pool::Boss)
+        return 0;
+    const auto route = state.Lookup(Phase::AfterNative, entrance);
+    return route && route->to != Endpoint{ 1, entrance };
+}
 extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) {
     if (gComboGameMode == COMBO_GAME_MM) {
         Combo_MM_SoloEntranceRestoreCheckpoint(index);

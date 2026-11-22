@@ -796,10 +796,11 @@ void func_808BA10C(DoorWarp1* this, PlayState* play) {
             }
         }
     } else if (DOORWARP1_GET_FF00_1(&this->dyna.actor) != 0xFF) {
-        if (DOORWARP1_GET_FF(&this->dyna.actor) == ENDOORWARP1_FF_6) {
-            gSaveContext.respawnFlag = -2;
-        }
         play->nextEntrance = play->setupExitList[DOORWARP1_GET_FF00_3(&this->dyna.actor)];
+        if (DOORWARP1_GET_FF(&this->dyna.actor) == ENDOORWARP1_FF_6) {
+            // A shuffled arena needs normal entrance routing and its own spawn state.
+            gSaveContext.respawnFlag = Combo_MM_IsShuffledBossEntrance(play->nextEntrance) ? 0 : -2;
+        }
         Scene_SetExitFade(play);
         play->transitionTrigger = TRANS_TRIGGER_START;
     } else {

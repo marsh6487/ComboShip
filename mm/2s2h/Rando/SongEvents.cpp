@@ -106,94 +106,122 @@ extern "C" int SongEvents_MmSong(int event, int vanillaSong) {
 }
 // Use the actual accepting callbacks, not just actor IDs. A healed/completed
 // actor can remain loaded; its former assignment must never steal normal travel.
-static int AcceptingEvent(Actor* actor, Player* player, PlayState* play) {
+static int AcceptingEvent(Actor* actor, Player* player, PlayState* play, bool requireRange) {
     const float x = player->actor.world.pos.x, z = player->actor.world.pos.z;
     const float height = std::fabs(actor->playerHeightRel);
     switch (actor->id) {
         case ACTOR_DM_CHAR01:
             return play->sceneId == SCENE_21MITURINMAE &&
                            reinterpret_cast<DmChar01*>(actor)->actionFunc == func_80AA8698 &&
-                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_20_01) && x > -40.f && x < 40.f && z > 1000.f && z < 1078.f
+                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_20_01) &&
+                           (!requireRange || (x > -40.f && x < 40.f && z > 1000.f && z < 1078.f))
                        ? 0
                        : -1;
         case ACTOR_EN_DAI:
             return play->sceneId == SCENE_12HAKUGINMAE &&
                            reinterpret_cast<EnDai*>(actor)->actionFunc == func_80B3EEDC &&
-                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_30_01) && actor->xzDistToPlayer < 2500.f
+                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_30_01) && (!requireRange || actor->xzDistToPlayer < 2500.f)
                        ? 1
                        : -1;
         case ACTOR_DM_CHAR08:
             return play->sceneId == SCENE_31MISAKI &&
                            reinterpret_cast<DmChar08*>(actor)->actionFunc == DmChar08_WaitForSong &&
-                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_53_20) && x > -5780.f && x < -5385.f && z > 1120.f &&
-                           z < 2100.f
+                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_53_20) &&
+                           (!requireRange || (x > -5780.f && x < -5385.f && z > 1120.f && z < 2100.f))
                        ? 2
                        : -1;
         case ACTOR_EN_GB2:
             return play->sceneId == SCENE_TOUGITES && reinterpret_cast<EnGb2*>(actor)->actionFunc == func_80B0FEBC &&
-                           actor->xzDistToPlayer < 300.f
+                           (!requireRange || actor->xzDistToPlayer < 300.f)
                        ? 3
                        : -1;
         case ACTOR_EN_GG: {
             auto* ghost = reinterpret_cast<EnGg*>(actor);
             return play->sceneId == SCENE_GORON_HAKA && ghost->actionFunc == func_80B35450 &&
                            CHECK_WEEKEVENTREG(WEEKEVENTREG_91_10) && play->csCtx.state == CS_STATE_IDLE &&
-                           !ghost->unk_307 && actor->xzDistToPlayer < 200.f
+                           !ghost->unk_307 && (!requireRange || actor->xzDistToPlayer < 200.f)
                        ? 4
                        : -1;
         }
         case ACTOR_EN_HG: {
             auto* father = reinterpret_cast<EnHg*>(actor);
-            return play->sceneId == SCENE_MUSICHOUSE && actor->colChkInfo.health == 1 && height < 80.f &&
+            return play->sceneId == SCENE_MUSICHOUSE && actor->colChkInfo.health == 1 &&
                            father->actionFunc != EnHg_PlayCutscene && father->actionFunc != EnHg_HandleCutscene &&
-                           actor->xzDistToPlayer < 300.f
+                           (!requireRange || (height < 80.f && actor->xzDistToPlayer < 300.f))
                        ? 5
                        : -1;
         }
         case ACTOR_EN_YB:
             return play->sceneId == SCENE_00KEIKOKU && reinterpret_cast<EnYb*>(actor)->actionFunc == EnYb_Idle &&
-                           actor->xzDistToPlayer < 180.f && height < 50.f
+                           (!requireRange || (actor->xzDistToPlayer < 180.f && height < 50.f))
                        ? 6
                        : -1;
         case ACTOR_EN_ZOG: {
             auto callback = reinterpret_cast<EnZog*>(actor)->actionFunc;
             return play->sceneId == SCENE_30GYOSON && (callback == func_80B9451C || callback == func_80B948A8) &&
-                           actor->xzDistToPlayer < 120.f
+                           (!requireRange || actor->xzDistToPlayer < 120.f)
                        ? 7
                        : -1;
         }
         case ACTOR_EN_BSB:
             return play->sceneId == SCENE_BOTI && reinterpret_cast<EnBsb*>(actor)->actionFunc == func_80C0BFE8 &&
-                           actor->xzDistToPlayer <= 300.f &&
-                           std::abs(int(int16_t(actor->yawTowardsPlayer - actor->shape.rot.y))) < 0x4300
+                           (!requireRange ||
+                            (actor->xzDistToPlayer <= 300.f &&
+                             std::abs(int(int16_t(actor->yawTowardsPlayer - actor->shape.rot.y))) < 0x4300))
                        ? 8
                        : -1;
         case ACTOR_EN_HIDDEN_NUTS:
             return play->sceneId == SCENE_KINSTA1 &&
                            reinterpret_cast<EnHiddenNuts*>(actor)->actionFunc == func_80BDB2B8 &&
-                           actor->xzDistToPlayer <= 120.f
+                           (!requireRange || actor->xzDistToPlayer <= 120.f)
                        ? 9
                        : -1;
         case ACTOR_EN_GK:
             return play->sceneId == SCENE_16GORON_HOUSE &&
-                           reinterpret_cast<EnGk*>(actor)->actionFunc == func_80B5202C && actor->xzDistToPlayer < 100.f
+                           reinterpret_cast<EnGk*>(actor)->actionFunc == func_80B5202C &&
+                           (!requireRange || actor->xzDistToPlayer < 100.f)
                        ? 10
                        : -1;
         case ACTOR_EN_PO_COMPOSER:
             return play->sceneId == SCENE_IKANA && !(actor->params & 0x8000) &&
                            reinterpret_cast<EnPoComposer*>(actor)->actionFunc == EnPoComposer_PlayCurse &&
-                           actor->xzDistToPlayer < 300.f
+                           !CHECK_WEEKEVENTREG(WEEKEVENTREG_14_04) && (!requireRange || actor->xzDistToPlayer < 300.f)
                        ? 11
                        : -1;
         case ACTOR_EN_TIME_TAG:
             return play->sceneId == SCENE_OKUJOU && ((actor->params & 0xe000) >> 13) == 2 &&
                            reinterpret_cast<EnTimeTag*>(actor)->actionFunc == EnTimeTag_RooftopOath_Wait &&
-                           height < 80.f && actor->xzDistToPlayer < 300.f
+                           (!requireRange || (height < 80.f && actor->xzDistToPlayer < 300.f))
                        ? 12
                        : -1;
         default:
             return -1;
     }
+}
+int Rando::SongEvents::MarkerSong(Actor* actor, Player* player, PlayState* play, Vec3f& position) {
+    if (!IS_RANDO || !RANDO_SAVE_OPTIONS[RO_SHUFFLE_SONG_EVENTS] || !actor->update)
+        return -1;
+    const int event = AcceptingEvent(actor, player, play, false);
+    if (event < 0)
+        return -1;
+    const unsigned mode = RANDO_SAVE_OPTIONS[RO_ACCESS_DUNGEONS];
+    if (event <= SE::MM_TEMPLE_GREATBAY && (mode == RO_ACCESS_DUNGEONS_FORM_ONLY || mode == RO_ACCESS_DUNGEONS_OPEN))
+        return -1;
+    const auto song = gSaveContext.save.shipSaveInfo.rando.songEvents[event];
+    if (!SE::Playable(SE::Game::Mm, song))
+        return -1;
+
+    position = actor->world.pos;
+    if (actor->isDrawn && actor->focus.pos.y > position.y && actor->focus.pos.y < position.y + 120.f)
+        position.y = actor->focus.pos.y + 18.f;
+    else
+        position.y += 42.f;
+    if (event == SE::MM_TEMPLE_WOODFALL) {
+        // The invisible listener is not the platform where Link plays.
+        position.x = 0.f;
+        position.z = 1039.f;
+    }
+    return song;
 }
 extern "C" int SongEvents_MmInterceptSong(int song) {
     if (!IS_RANDO || !RANDO_SAVE_OPTIONS[RO_SHUFFLE_SONG_EVENTS] || !gPlayState)
@@ -203,7 +231,7 @@ extern "C" int SongEvents_MmInterceptSong(int song) {
         return false;
     for (int category = 0; category < ACTORCAT_MAX; ++category) {
         for (Actor* actor = gPlayState->actorCtx.actorLists[category].first; actor; actor = actor->next) {
-            int event = AcceptingEvent(actor, player, gPlayState);
+            int event = AcceptingEvent(actor, player, gPlayState, true);
             if (event < 0)
                 continue;
             if (event < 3) {
@@ -211,9 +239,8 @@ extern "C" int SongEvents_MmInterceptSong(int song) {
                 bool correctForm = player->transformation == (event == 0   ? PLAYER_FORM_DEKU
                                                               : event == 1 ? PLAYER_FORM_GORON
                                                                            : PLAYER_FORM_ZORA);
-                if (mode == RO_ACCESS_DUNGEONS_OPEN ||
-                    ((mode == RO_ACCESS_DUNGEONS_FORM_AND_SONG || mode == RO_ACCESS_DUNGEONS_FORM_ONLY) &&
-                     !correctForm))
+                if (mode == RO_ACCESS_DUNGEONS_OPEN || mode == RO_ACCESS_DUNGEONS_FORM_ONLY ||
+                    (mode == RO_ACCESS_DUNGEONS_FORM_AND_SONG && !correctForm))
                     continue;
             }
             if (event >= 4 && event <= 7 && player->transformation != PLAYER_FORM_HUMAN)

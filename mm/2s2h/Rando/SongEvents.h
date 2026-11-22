@@ -8,4 +8,5 @@ void RestoreForOracle(RandoSaveInfo& info);
 void RememberSavedMapping(const RandoSaveInfo& info);
 void Import(RandoSaveInfo& info, const nlohmann::json& spoiler);
 bool CanPlay(unsigned event);
+int MarkerSong(Actor* actor, Player* player, PlayState* play, Vec3f& position);
 } // namespace Rando::SongEvents

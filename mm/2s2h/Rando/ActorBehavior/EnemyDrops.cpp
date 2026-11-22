@@ -1,4 +1,5 @@
 #include "ActorBehavior.h"
+#include "Rando/EnemyDropProgress.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/CustomItem/CustomItem.h"
 
@@ -87,6 +88,12 @@ std::unordered_map<int16_t, std::tuple<RandoCheckId, ActorType, EnemyDropType>> 
 // clang-format on
 
 void SpawnDropItem(Vec3f position, RandoCheckId randoCheckId) {
+    auto& rando = gSaveContext.save.shipSaveInfo.rando;
+    const auto& check = rando.randoSaveChecks[randoCheckId];
+    if (check.shuffled && !check.skipped) {
+        rando.firstSlainEnemies |= Rando::EnemyDropProgress::DefeatedBit(randoCheckId);
+    }
+
     CustomItem::Spawn(
         position.x, position.y, position.z, 0,
         CustomItem::KILL_ON_TOUCH | CustomItem::TOSS_ON_SPAWN | CustomItem::ABLE_TO_ZORA_RANG, randoCheckId,

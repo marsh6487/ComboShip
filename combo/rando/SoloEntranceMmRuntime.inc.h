@@ -8,12 +8,14 @@
 namespace ComboSoloMmRuntime {
 using namespace ComboRando::CrossDungeon;
 static RuntimeState state(1);
+static bool decoupledExits = false;
 static CheckpointState checkpoint;
 static int32_t localArrival = -1;
 static bool bossDeathRecoveryRequested = false;
 
 static void ClearRuntime() {
     state.Install(nullptr);
+    decoupledExits = false;
     ++ComboCrossMmRuntime::trackerRevision;
     checkpoint.Arrive(-1, false);
     localArrival = -1;
@@ -68,8 +70,10 @@ extern "C" COMBO_EXPORT int MM_SetSoloEntranceRuntimeSeed(const char* raw) try {
     const auto seed = Rando::SoloEntrances::Seed(*candidate);
     const auto routes = Rando::SoloEntrances::BuildRoutes(*candidate);
     const auto catalogue = Rando::SoloEntrances::CatalogueForSave(*candidate);
+    const bool decoupled = !seed.is_null() && seed.at("policy").at("decoupled").get<bool>();
     using namespace ComboSoloMmRuntime;
     state.InstallValidated(seed, routes, catalogue);
+    decoupledExits = decoupled;
     ++ComboCrossMmRuntime::trackerRevision;
     checkpoint.Arrive(-1, false);
     localArrival = -1;
@@ -260,4 +264,8 @@ extern "C" int Combo_MM_SoloEntranceTransition(int32_t* index) {
 const ComboRando::CrossDungeon::RuntimeState& Rando::EntranceTracker::GetRuntime(uint64_t& revision) {
     revision = ComboCrossMmRuntime::trackerRevision;
     return Combo_IsCombinedGame() ? ComboCrossMmRuntime::state : ComboSoloMmRuntime::state;
+}
+
+bool Rando::EntranceTracker::HasDecoupledExits() {
+    return gComboGameMode == COMBO_GAME_MM && ComboSoloMmRuntime::decoupledExits;
 }

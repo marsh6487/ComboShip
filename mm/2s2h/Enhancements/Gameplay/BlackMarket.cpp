@@ -90,6 +90,8 @@ void Player_StartTalking(PlayState* play, Actor* actor);
 #include "BlackMarketCounterBarrier.h"
 #include "BlackMarketInteriorEffects.h"
 #include "BlackMarketKeeperAssets.h"
+#include "BlackMarketKeeperSleep.h"
+#include "MmPlacedSariaResources.h"
 
 void CustomItem00_Destroy(Actor* actor, PlayState* play);
 
@@ -653,6 +655,46 @@ bool CustomKeeperAvailable() {
     });
 }
 
+BlackMarketKeeperSleep::Clip sKeeperSleepAnimation, sKeeperWakeAnimation;
+
+bool LoadKeeperSleepAnimations() {
+    Ship::OwnRMScope scope("mm");
+    const auto load = [](const char* path, unsigned limbs) -> std::shared_ptr<SOH::Animation> {
+        auto clip = std::dynamic_pointer_cast<SOH::Animation>(ResourceLoad(path));
+        if (!clip || clip->type != SOH::AnimationType::Normal)
+            return {};
+        const auto frames = clip->animationData.animationHeader.common.frameCount;
+        if (frames <= 0 || !MmPlacedSaria::ValidateAnimation(clip, limbs, frames))
+            return {};
+        return clip;
+    };
+    const auto sleep = load("objects/object_bg/object_bg_Anim_009F20", 10); // OoT nodding off
+    const auto wake = load("objects/object_bg/object_bg_Anim_000A00", 10);  // OoT wake-up
+    const auto stance = load(BlackMarketKeeperAssets::kNativeAnimation, TREASURE_CHEST_SHOP_GAL_LIMB_MAX - 1);
+    if (!sleep || !wake || !stance)
+        return false;
+    const auto header = [](const std::shared_ptr<SOH::Animation>& clip) -> const AnimationHeader& {
+        return *reinterpret_cast<const AnimationHeader*>(&clip->animationData.animationHeader);
+    };
+    return sKeeperSleepAnimation.Build(header(sleep), header(stance)) &&
+           sKeeperWakeAnimation.Build(header(wake), header(stance));
+}
+
+AnimationHeader* KeeperAnimation(BlackMarketKeeperInteraction::Clip clip) {
+    using BlackMarketKeeperInteraction::Clip;
+    if (clip == Clip::Sleep)
+        return &sKeeperSleepAnimation.animation;
+    if (clip == Clip::Wake)
+        return &sKeeperWakeAnimation.animation;
+    const char* path = clip == Clip::EnterTalk ? object_bg_Anim_00A280
+                       : clip == Clip::Talk    ? object_bg_Anim_001384
+                       : clip == Clip::Raise   ? object_bg_Anim_00AD98
+                       : clip == Clip::Ask     ? object_bg_Anim_000968
+                       : sCustomKeeper         ? BlackMarketKeeper::kAnimation
+                                               : BlackMarketKeeperAssets::kNativeAnimation;
+    return reinterpret_cast<AnimationHeader*>(const_cast<char*>(path));
+}
+
 void KeeperUpdate(Actor* actor, PlayState* play) {
     MMFrameTiming::NamedScope timing("update", "black_market.keeper_update");
     RefreshOwnedStock();
@@ -684,14 +726,8 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
         sKeeperInteraction.Update(NativeShopDialog(shop), animationFinished, nextPage, refused,
                                   [&](BlackMarketKeeperInteraction::Clip clip, float morph) {
                                       using BlackMarketKeeperInteraction::Clip;
-                                      auto* animation = reinterpret_cast<AnimationHeader*>(const_cast<char*>(
-                                          clip == Clip::EnterTalk ? object_bg_Anim_00A280
-                                          : clip == Clip::Talk    ? object_bg_Anim_001384
-                                          : clip == Clip::Raise   ? object_bg_Anim_00AD98
-                                          : clip == Clip::Ask     ? object_bg_Anim_000968
-                                          : sCustomKeeper         ? BlackMarketKeeper::kAnimation
-                                                                  : BlackMarketKeeperAssets::kNativeAnimation));
-                                      if (clip == Clip::Idle || clip == Clip::Talk)
+                                      auto* animation = KeeperAnimation(clip);
+                                      if (clip == Clip::Idle || clip == Clip::Sleep || clip == Clip::Talk)
                                           Animation_MorphToLoop(&shop->skelAnime, animation, morph);
                                       else
                                           Animation_MorphToPlayOnce(&shop->skelAnime, animation, morph);
@@ -736,21 +772,22 @@ void InitKeeper(Actor* actor) {
     }
     auto* gal = reinterpret_cast<EnOssan*>(actor);
     sCustomKeeper = CustomKeeperAvailable();
-    sKeeperInteraction = {};
+    using BlackMarketKeeperInteraction::Clip;
+    const bool sleepClips = LoadKeeperSleepAnimations();
+    sKeeperInteraction = { .clip = sleepClips ? Clip::Sleep : Clip::Idle, .sleepClips = sleepClips };
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
-    SkelAnime_InitFlex(
-        gPlayState, &gal->skelAnime,
-        (FlexSkeletonHeader*)(sCustomKeeper ? kKeeper : BlackMarketKeeperAssets::kNativeSkeleton),
-        (AnimationHeader*)(sCustomKeeper ? BlackMarketKeeper::kAnimation : BlackMarketKeeperAssets::kNativeAnimation),
-        sKeeperJoints.data(), sKeeperMorphs.data(), TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
+    SkelAnime_InitFlex(gPlayState, &gal->skelAnime,
+                       (FlexSkeletonHeader*)(sCustomKeeper ? kKeeper : BlackMarketKeeperAssets::kNativeSkeleton),
+                       KeeperAnimation(sKeeperInteraction.clip), sKeeperJoints.data(), sKeeperMorphs.data(),
+                       TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
     actor->update = KeeperUpdate;
     actor->draw = KeeperDraw;
     // Native collider was never initialized; the private destructor owns only
     // this controller reference, not the ordinary shop or minigame state.
     actor->flags |= ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED;
     actor->shape.yOffset = 0;
-    gal->eyeTexIndex = 0;
+    gal->eyeTexIndex = sKeeperInteraction.sleepClips ? 2 : 0;
     gal->blinkTimer = 90;
     gal->blinkFunc = NativeKeeperBlink;
     sTalking = false;

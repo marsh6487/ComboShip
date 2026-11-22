@@ -1,12 +1,14 @@
 #include "Rando/Logic/Logic.h"
 #include "ComboGameMode.h"
 #include "entrances/SoloForest.h"
+#include "combo/rando/CrossDungeonTracker.h"
 #include "combo/rando/CrossEntranceMmCatalogue.h"
 #include "combo/rando/SoloEntranceMmOverworld.h"
 #include "tests/test_require.h"
 #include <cstdio>
 #include <memory>
 #include <numeric>
+#include <spdlog/fmt/fmt.h>
 
 #define COMBO_EXPORT
 #define SPDLOG_ERROR(...) ((void)0)
@@ -53,6 +55,22 @@ static void handleGiantsCheck(SceneId scene) { ++giantsBookkeepingCalls; lastGia
 #include "combo/rando/SoloEntranceMmRuntime.inc.h"
 #endif
 #include "native_regions.inc"
+#include "Rando/EntranceTrackerNames.h"
+std::string Rando::EntranceTracker::PortalSourceName(const ComboRando::CrossDungeon::Dungeon& portal) {
+    if (portal.id == "mm:interior:bomb_shop:0")
+        return "Bomb Shop";
+    if (portal.id == "mm:interior:trading_post:0")
+        return "Trading Post";
+    if (portal.id == "mm:interior:zora_hall_rooms:5")
+        return "Zora Hall Shop";
+    if (portal.id == "mm:boss:10")
+        return "Great Bay Temple's boss door";
+    return portal.id;
+}
+extern "C" const char* Ship_GetSceneName(s16 scene) {
+    return scene == SCENE_ICHIBA ? "West Clock Town" : "Unknown";
+}
+#include "native_tracker_rows.inc"
 #include "native_save_load.inc"
 #include "native_hooks.inc"
 #include "mm/2s2h/ComboFaroresWind.cpp"
@@ -147,6 +165,52 @@ static void SwapEntrances(const std::vector<ComboRando::CrossDungeon::Dungeon>& 
     std::swap(saved.permutation[Slot(catalogue, a)], saved.permutation[Slot(catalogue, b)]);
     for (size_t i = 0; i < saved.count; ++i)
         saved.reversePermutation[saved.permutation[i]] = i;
+}
+
+static void TestEntranceTrackerRows() {
+    using namespace ComboRando::CrossDungeon;
+    using namespace Rando::EntranceTracker;
+    constexpr int32_t bombShop = ENTRANCE(BOMB_SHOP, 0);
+    constexpr int32_t zoraShop = ENTRANCE(ZORA_HALL_ROOMS, 5);
+    constexpr int32_t tradingPost = ENTRANCE(TRADING_POST, 0);
+    constexpr int32_t tradingPostReturn = ENTRANCE(WEST_CLOCK_TOWN, 5);
+    static_assert(tradingPostReturn == 0xd450);
+
+    uint64_t revision;
+    for (bool decoupled : { false, true }) {
+        const auto catalogue = ConfigureNativeMap(4 | 16, decoupled); // Bosses and shops.
+        SwapEntrances(catalogue, bombShop, zoraShop);
+        SwapEntrances(catalogue, zoraShop, tradingPost);
+        GameInteractor_ExecuteOnSaveLoad(0);
+        const auto& runtime = GetRuntime(revision);
+        REQUIRE(HasDecoupledExits() == decoupled);
+        REQUIRE(runtime.Lookup(Phase::BeforeNative, ENTRANCE(WEST_CLOCK_TOWN, 6))->to.index == tradingPostReturn);
+        const auto rows = BuildRows(runtime, HasDecoupledExits());
+        const auto bomb = std::find_if(rows.begin(), rows.end(), [](const auto& row) { return row.source == "Bomb Shop"; });
+        REQUIRE(bomb != rows.end() && bomb->destination == "Zora Hall Shop");
+        const auto firstShopExit = std::find_if(rows.begin(), rows.end(), [](const auto& row) {
+            return row.pool == Pool::Shop && row.exit;
+        });
+        if (!decoupled) {
+            REQUIRE(rows.size() == catalogue.size());
+            REQUIRE(std::none_of(rows.begin(), rows.end(), [](const auto& row) { return row.exit; }));
+            continue;
+        }
+        REQUIRE(firstShopExit != rows.end());
+        REQUIRE(std::all_of(firstShopExit, rows.end(), [](const auto& row) { return row.pool == Pool::Shop && row.exit; }));
+        REQUIRE(firstShopExit->source == "Bomb Shop (exit)" && firstShopExit->destination == "Outside Trading Post");
+        const auto greatBayWarp = std::find_if(rows.begin(), rows.end(), [](const auto& row) {
+            return row.source == "Great Bay Temple's boss door (blue warp)";
+        });
+        REQUIRE(greatBayWarp != rows.end() && greatBayWarp->indices.size() == 2);
+        for (const uint16_t arrival : { ENTRANCE(ZORA_CAPE, 8), ENTRANCE(ZORA_CAPE, 9) })
+            REQUIRE(greatBayWarp->IsDiscovered(std::span(&arrival, 1)));
+    }
+    gComboGameMode = COMBO_GAME_BOTH;
+    REQUIRE(!HasDecoupledExits());
+    gComboGameMode = COMBO_GAME_MM;
+    LoadNativeDungeonFile();
+    REQUIRE(!HasDecoupledExits());
 }
 
 static int32_t Transition(int32_t source) {
@@ -596,6 +660,7 @@ int main() {
     REQUIRE(entrance == ENTRANCE(SOUTH_CLOCK_TOWN, 9));
 
     TestNativeRestore();
+    TestEntranceTrackerRows();
     TestGrottoRestore();
     TestBossIngressRecovery();
     TestMixedDecoupledBossRecovery();

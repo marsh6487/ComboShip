@@ -20,4 +20,6 @@ typedef struct EnOkarinaTag {
     /* 0x015C */ f32 interactRange;
 } EnOkarinaTag; // size = 0x0160
 
+int EnOkarinaTag_GetPendingSongAction(EnOkarinaTag* tag, PlayState* play);
+
 #endif

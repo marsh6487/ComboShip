@@ -173,8 +173,8 @@ def build_source():
     constants = "\n".join(re.findall(r"(?:alignas\(2\) )?constexpr (?:u16|char) k(?:BrowseText|KeeperMenuText|Keeper|Card)[^;]+;", source))
     constants += "\n" + array(source, "constexpr Vec3f kShelves[")
     production = '#include "mm/2s2h/Enhancements/Gameplay/BlackMarketMmNativeShop.h"\n'
-    for signature in ("void KeeperUpdate(", "s32 KeeperLimb(", "void KeeperDraw(", "void InitKeeper(",
-                      "void NativeKeeperDestroyed(", "void InitNativeKeeper(",
+    for signature in ("AnimationHeader* KeeperAnimation(", "void KeeperUpdate(", "s32 KeeperLimb(",
+                      "void KeeperDraw(", "void InitKeeper(", "void NativeKeeperDestroyed(", "void InitNativeKeeper(",
                       'extern "C" const ComboBlackMarketShopAdapter* ComboBlackMarketShop_GetAdapter('):
         production += function(source, signature) + "\n"
     item = (ROOT / "mm/src/overlays/actors/ovl_En_GirlA/z_en_girla.c").read_text()

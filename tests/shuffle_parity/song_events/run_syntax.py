@@ -18,10 +18,10 @@ for host in ('mm','soh'):
     for p in (host+'/include',host+'/include/PR',host+('/2s2h' if host=='mm' else '/soh'),host,host+'/src',host+'/assets','libultraship/include','combo','combo/menu'):
         flags+=['-isystem',str(ROOT/p)]
     if host=='mm':
-        paths=['mm/2s2h/Rando/'+p for p in ('SongEvents.cpp','Menu.cpp','DrawItem.cpp','Logic/GeneratePools.cpp','Spoiler/Apply.cpp','Spoiler/Generate.cpp','ActorBehavior/EnDai.cpp','ActorBehavior/DmChar01.cpp','ActorBehavior/DmChar08.cpp','Logic/Regions/North.cpp','Logic/Regions/East.cpp','Logic/Regions/West.cpp','Logic/Regions/TerminaField.cpp','Logic/Regions/SpiderHouses.cpp')]
+        paths=['mm/2s2h/Rando/'+p for p in ('SongEvents.cpp','SongEventMarkers.cpp','Menu.cpp','DrawItem.cpp','Logic/GeneratePools.cpp','Spoiler/Apply.cpp','Spoiler/Generate.cpp','ActorBehavior/EnDai.cpp','ActorBehavior/DmChar01.cpp','ActorBehavior/DmChar08.cpp','Logic/Regions/North.cpp','Logic/Regions/East.cpp','Logic/Regions/West.cpp','Logic/Regions/TerminaField.cpp','Logic/Regions/SpiderHouses.cpp')]
         paths+=['mm/src/code/z_message.c']
     else:
-        paths=['soh/soh/Enhancements/randomizer/'+p for p in ('SongEvents.cpp','SeedContext.cpp','logic.cpp','location_access.cpp','settings.cpp','item_list.cpp','draw.cpp','randomizer.cpp','Plandomizer.cpp','3drando/item_pool.cpp','3drando/spoiler_log.cpp')]
+        paths=['soh/soh/Enhancements/randomizer/'+p for p in ('SongEvents.cpp','SongEventMarkers.cpp','SeedContext.cpp','logic.cpp','location_access.cpp','settings.cpp','item_list.cpp','draw.cpp','randomizer.cpp','Plandomizer.cpp','3drando/item_pool.cpp','3drando/spoiler_log.cpp')]
         paths+=['soh/src/code/z_parameter.c','soh/src/code/z_kankyo.c','soh/src/code/z_play.c','soh/src/code/z_message_PAL.c','soh/soh/SaveManager.cpp']
     paths += [str(p.relative_to(ROOT)) for p in (ROOT/host/'src/overlays/actors').glob('*/z_*.c') if 'SongEvents' in p.read_text()]
     if os.environ.get('SONG_PATH_FILTER'):paths=[p for p in paths if re.search(os.environ['SONG_PATH_FILTER'],p)]

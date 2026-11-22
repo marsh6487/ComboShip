@@ -34,7 +34,10 @@ void NotePickup(PC::Kind kind) {
 
 class PickupCounterWindow final : public Ship::GuiWindow {
   public:
-    using GuiWindow::GuiWindow;
+    explicit PickupCounterWindow(void (*drawSceneIcons)())
+        : GuiWindow(PickupCounterHost::kWindowCvar, true, PickupCounterHost::kWindowName),
+          drawSceneIcons(drawSceneIcons) {
+    }
     void InitElement() override {
     }
     void UpdateElement() override {
@@ -54,6 +57,10 @@ class PickupCounterWindow final : public Ship::GuiWindow {
     void DrawElement() override {
     }
     void Draw() override {
+        // World icons have their own settings and render below the pickup rows.
+        if (drawSceneIcons) {
+            drawSceneIcons();
+        }
         if (!PickupSessionValid() || sPickupCounters.Empty() || UiVisibility_IsHidden() || !gPlayState ||
             gPlayState->pauseCtx.state != 0 || gPlayState->csCtx.state != CS_STATE_IDLE ||
             Player_InCsMode(gPlayState) || ImGui::GetCurrentContext() == nullptr) {
@@ -129,11 +136,12 @@ class PickupCounterWindow final : public Ship::GuiWindow {
     }
 
   private:
+    void (*drawSceneIcons)();
     PC::Point position;
     bool positioned = false;
 };
 
-void EnsurePickupCounterWindow() {
+void EnsurePickupCounterWindow(void (*drawSceneIcons)() = nullptr) {
     if (sPickupRegistered) {
         return;
     }
@@ -143,9 +151,7 @@ void EnsurePickupCounterWindow() {
     if (!gui) {
         return;
     }
-    auto hud =
-        std::make_shared<PickupCounterWindow>(PickupCounterHost::kWindowCvar, true, PickupCounterHost::kWindowName);
-    gui->AddGuiWindow(hud);
+    gui->AddGuiWindow(std::make_shared<PickupCounterWindow>(drawSceneIcons));
     sPickupRegistered = true;
 }
 } // namespace

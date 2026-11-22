@@ -44,6 +44,13 @@ with tempfile.TemporaryDirectory(prefix="solo-mm-runtime-") as directory:
                     native += prefix + ".oneWayEntrances.insert(" + entrance + ");\n"
     native += "}\n"
     (temporary / "native_regions.inc").write_text(native)
+    tracker = (ROOT / "mm/2s2h/Rando/EntranceTracker.cpp").read_text()
+    # Compile the tracker data used by the fixture without its ImGui draw helpers.
+    rows = "namespace Rando::EntranceTracker {\nnamespace {\nusing namespace ComboRando::CrossDungeon;\n"
+    rows += block(tracker, "struct Row {") + ";\n"
+    rows += block(tracker, "std::string ArrivalName(") + "\n"
+    rows += block(tracker, "std::vector<Row> BuildRows(") + "\n"
+    (temporary / "native_tracker_rows.inc").write_text(rows + "}\n}\n")
     bridge = (ROOT / "mm/2s2h/GameInteractor/GameInteractor.cpp").read_text()
     lifecycle = "\n".join(block(bridge, "void " + name + "(") for name in (
         "GameInteractor_ExecuteOnSaveLoad", "GameInteractor_ExecuteOnSceneInit",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise native soul obtainability, slime preview and tracker catalog.
+"""Exercise native soul obtainability, slime preview and tracker progress.
 
 Only unrelated conversion families, actor graphics and save I/O are replaced.
 The changed production bodies, real item/flag/option IDs and tracker model are
@@ -37,17 +37,73 @@ conversion = source("mm/2s2h/Rando/ConvertItem.cpp")
 prefix = body(conversion, "bool Rando::IsItemObtainable(").split("    if (const auto* key", 1)[0] + "    return true;\n}\n"
 enemy = source("mm/2s2h/Rando/ActorBehavior/EnemyDrops.cpp")
 slime = body(enemy, "COND_VB_SHOULD(VB_DRAW_SLIME_RANDO_ITEM").split("{", 1)[1].rsplit("}", 1)[0]
+drop = (ROOT / "mm/2s2h/Rando/ActorBehavior/EnemyDrops.cpp").read_text()
+record = body(drop, "void SpawnDropItem(").split("    CustomItem::Spawn(", 1)[0] + "    (void)position;\n}\n"
+tracker = (ROOT / "mm/2s2h/Rando/CheckTracker/SoulTracker.cpp").read_text()
+first_slain = body(tracker, "bool FirstSlainEnabled()") + "\n" + body(tracker, "int32_t ReadMmFirstSlain(")
 
 test = r'''
 #include "mm/2s2h/Rando/CheckTracker/SoulTrackerModel.h"
+#include "mm/2s2h/Rando/EnemyDropProgress.h"
+#include <array>
 #include <cassert>
 #include <cstdarg>
 #include <set>
 #include <cstdio>
+#include <string>
+#include <string_view>
 using namespace Rando;
-struct Check { bool obtained = false; bool cycleObtained = false; RandoItemId randoItemId = RI_UNKNOWN; };
-Check checks[RC_MAX]{};
+using namespace ComboRando::SoulTracker;
+struct Check {
+    bool obtained = false, cycleObtained = false, eligible = false, shuffled = false, skipped = false;
+    RandoItemId randoItemId = RI_UNKNOWN;
+};
+struct RandoSave { Check randoSaveChecks[RC_MAX]; int randoSaveOptions[RO_MAX]; uint64_t firstSlainEnemies; };
+struct { int fileNum = 0; struct { struct { RandoSave rando; } shipSaveInfo; } save; } gSaveContext{};
+auto& rando = gSaveContext.save.shipSaveInfo.rando;
+auto& checks = rando.randoSaveChecks;
+bool isRando = true;
+#define IS_RANDO isRando
 #define RANDO_SAVE_CHECKS checks
+#define RANDO_SAVE_OPTIONS rando.randoSaveOptions
+namespace Rando::StaticData {
+std::array<std::string, RC_MAX> CheckNames;
+}
+struct Vec3f {};
+__RECORD__
+__FIRST_SLAIN__
+
+static void CheckFirstSlainProgress() {
+    const auto capture = [](void* context, const char* name, FirstSlainStatus status) {
+        assert(std::string_view(name) == "Chuchu");
+        static_cast<std::vector<FirstSlainStatus>*>(context)->push_back(status);
+    };
+    std::vector<FirstSlainStatus> states;
+    assert(!ReadMmFirstSlain(0, capture, &states) && states.empty());
+    rando.randoSaveOptions[RO_SHUFFLE_ENEMY_DROPS] = 1;
+    auto& chu = checks[RC_ENEMY_DROP_CHUCHU];
+    chu = {};
+    chu.shuffled = true;
+    Rando::StaticData::CheckNames[RC_ENEMY_DROP_CHUCHU] = "Enemy Drop Chuchu";
+    checks[RC_ENEMY_DROP_WOLFOS].skipped = checks[RC_ENEMY_DROP_WOLFOS].shuffled = true;
+    SpawnDropItem({}, RC_ENEMY_DROP_WOLFOS);
+    SpawnDropItem({}, RC_ENEMY_DROP_BIO_DEKU_BABA); // Unshuffled.
+    assert(rando.firstSlainEnemies == 0);
+    assert(!ReadMmFirstSlain(1, capture, &states));
+    assert(ReadMmFirstSlain(0, capture, &states));
+    SpawnDropItem({}, RC_ENEMY_DROP_CHUCHU);
+    assert(rando.firstSlainEnemies == EnemyDropProgress::DefeatedBit(RC_ENEMY_DROP_CHUCHU));
+    assert(!chu.eligible && !chu.obtained && !chu.cycleObtained);
+    assert(ReadMmFirstSlain(0, capture, &states));
+    chu.obtained = true;
+    chu.cycleObtained = false;
+    assert(ReadMmFirstSlain(0, capture, &states));
+    assert((states == std::vector{ FirstSlainStatus::Unrecorded, FirstSlainStatus::Defeated,
+                                   FirstSlainStatus::Collected }));
+    isRando = false;
+    assert(!ReadMmFirstSlain(0, capture, &states) && states.size() == 3);
+}
+
 unsigned short flags[(RANDO_INF_MAX + 15) / 16]{};
 bool Flags_GetRandoInf(RandoInf flag) { return (flags[flag/16] >> (flag%16)) & 1; }
 void Own(RandoInf flag, bool own) {
@@ -142,9 +198,11 @@ int main() {
     assert(npc.size() == 53);
     assert(SoulTracker::Rows(SoulTracker::Family::Enemy, [](RandoOptionId) { return false; }).empty());
     assert(SoulTracker::PageCount(0) == 1 && SoulTracker::PageCount(12) == 1 && SoulTracker::PageCount(13) == 2);
-    puts("PASS native soul obtainability, cycle-reset slime preview, and all 111 tracker ownership identities");
+    CheckFirstSlainProgress();
+    puts("PASS native soul ownership, cycle-reset preview, and first-slay status before and after pickup");
 }
-'''.replace("__CONVERSION__", prefix).replace("__SLIME__", slime)
+'''.replace("__CONVERSION__", prefix).replace("__SLIME__", slime).replace("__RECORD__", record).replace(
+    "__FIRST_SLAIN__", first_slain)
 
 with tempfile.TemporaryDirectory(prefix="mm-soul-preview-") as folder:
     folder = Path(folder)

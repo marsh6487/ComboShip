@@ -1,4 +1,5 @@
 #include "../../../combo/ComboGameMode.h"
+#include "../../../combo/rando/SongEventDisplay.h"
 #include <unordered_set>
 
 #include <ship/Context.h>
@@ -6,6 +7,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "SohMenu.h"
 #include "soh/Enhancements/enhancementTypes.h"
+#include "soh/Enhancements/randomizer/SoulTracker.h"
 #include "soh/Enhancements/randomizer/randomizer_check_objects.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/settings.h"
@@ -820,6 +822,21 @@ void SohMenu::AddMenuRandomizer() {
     randoSettings->GetOptionGroup(RSG_MENU_SIDEBAR_LOGIC_ACCESS).AddWidgets(path);
     randoSettings->GetOptionGroup(RSG_MENU_SIDEBAR_DUNGEONS).AddWidgets(path);
     randoSettings->GetOptionGroup(RSG_MENU_SIDEBAR_SHUFFLES).AddWidgets(path);
+    {
+        namespace SongEvents = ComboRando::SongEvents;
+        WidgetPath songEventPath = { "Randomizer", "Shuffles", SECTION_COLUMN_1 };
+        AddWidgetAfter(songEventPath, CVAR_RANDOMIZER_SETTING("ShuffleSongEvents"), SongEvents::kGlyphDisplayLabel,
+                       WIDGET_CVAR_COMBOBOX)
+            .CVar(SongEvents::kGlyphDisplayCvar)
+            .RaceDisable(false)
+            .Options(ComboboxOptions()
+                         .ComboMap({
+                             { static_cast<int32_t>(SongEvents::GlyphDisplay::GlyphAndSongName),
+                               SongEvents::kGlyphAndSongNameLabel },
+                             { static_cast<int32_t>(SongEvents::GlyphDisplay::GlyphOnly), SongEvents::kGlyphOnlyLabel },
+                         })
+                         .Tooltip(SongEvents::kGlyphDisplayTooltip));
+    }
     randoSettings->GetOptionGroup(RSG_MENU_SIDEBAR_HINTS_TRAPS).AddWidgets(path);
     path.sidebarName = "Starting Items";
     AddSidebarEntry("Randomizer", path.sidebarName, 1);
@@ -885,6 +902,17 @@ void SohMenu::AddMenuRandomizer() {
             });
     }
 #endif
+
+    if (!Combo_IsCombinedGame()) {
+        path.sidebarName = "Souls Tracker";
+        AddSidebarEntry("Randomizer", path.sidebarName, 1);
+        AddWidget(path, "Toggle Souls Tracker", WIDGET_WINDOW_BUTTON)
+            .CVar(CVAR_WINDOW("SoulTracker"))
+            .RaceDisable(false)
+            .WindowName(Rando::SoulTracker::WindowName)
+            .Options(
+                WindowButtonOptions().Tooltip("View collected and missing souls in this OoT seed.").EmbedWindow(false));
+    }
 
     // Entrance Tracker
     path.sidebarName = "Entrance Tracker";

@@ -1046,7 +1046,8 @@ void ResetAllLocations() {
 bool HasTimePassAccess(uint8_t age) {
     for (const RandomizerRegion regionKey : GetAllRegions()) {
         auto region = RegionTable(regionKey);
-        if (region->TimePass() &&
+        // The entrance map is validated before items such as the Clock are granted.
+        if (region->timePass &&
             ((age == RO_AGE_CHILD && region->Child()) || (age == RO_AGE_ADULT && region->Adult()))) {
             return true;
         }

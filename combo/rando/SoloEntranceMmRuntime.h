@@ -25,5 +25,6 @@ class RuntimeState;
 }
 namespace Rando::EntranceTracker {
 const ComboRando::CrossDungeon::RuntimeState& GetRuntime(uint64_t& revision);
-}
+bool HasDecoupledExits();
+} // namespace Rando::EntranceTracker
 #endif

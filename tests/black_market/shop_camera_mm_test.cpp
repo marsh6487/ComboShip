@@ -10,6 +10,7 @@
 #include "combo/BlackMarketReceipt.h"
 #include "combo/rando/BlackMarket.h"
 #include "objects/object_bg/object_bg.h"
+#include "mm/2s2h/Enhancements/Gameplay/BlackMarketKeeperSleep.h"
 #include "mm/2s2h/Enhancements/Debug/FrameTiming.h"
 #include <sanitizer/asan_interface.h>
 
@@ -40,6 +41,11 @@ bool Safe(PlayState *) { return safe; }
 bool CustomKeeperAvailable() {
   return true;
 } // Resource selection has its own keeper fixture.
+// Supply decoded animation storage at the resource boundary. The production
+// selector and interaction state still run against the native shop actions.
+static bool keeperSleepClipsAvailable;
+static BlackMarketKeeperSleep::Clip sKeeperSleepAnimation, sKeeperWakeAnimation;
+bool LoadKeeperSleepAnimations() { return keeperSleepClipsAvailable; }
 const Item *Offer(int index) {
   return index >= 0 && index < 8 ? &Catalog()[index] : nullptr;
 }
@@ -1763,7 +1769,14 @@ static void CheckQueuedPoolExhaustion() {
             "Start without consuming reserved snapshot slot");
 }
 static void CheckKeeperDialogue() {
-  Reset(); Talk(); ReachSlot(-1);
+  using BlackMarketKeeperInteraction::Clip;
+  keeperSleepClipsAvailable = true;
+  Reset();
+  assert(sKeeperInteraction.clip == Clip::Sleep && shop.eyeTexIndex == 2);
+  Talk();
+  assert(sKeeperInteraction.clip == Clip::Wake &&
+         shop.skelAnime.animation == &sKeeperWakeAnimation.animation);
+  ReachSlot(-1);
   assert(play.msgCtx.currentTextId == kKeeperMenuText);
   const auto camera = sBrowseCameraPtr;
   const auto cs = CutsceneManager_GetCurrentCsId();
@@ -1809,6 +1822,7 @@ static void CheckKeeperDialogue() {
       if (interruption == 2) assert(play.msgCtx.currentTextId == 0x1234 && messageState != TEXT_STATE_CLOSING);
     }
   }
+  keeperSleepClipsAvailable = false;
   std::puts("MM optional native keeper intro/help/back/B retains camera; zero purchases/receipts");
 }
 static void CheckPlayerDrawBoundary() {

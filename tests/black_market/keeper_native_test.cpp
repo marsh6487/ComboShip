@@ -38,6 +38,21 @@ static std::array<Vec3s, TREASURE_CHEST_SHOP_GAL_LIMB_MAX> sKeeperJoints, sKeepe
 static PlayState* sNativeShopPlay;
 static EnOssan* expectedShop;
 static s16 sBrowseCamera = CAM_ID_NONE;
+static BlackMarketKeeperInteraction::State sKeeperInteraction;
+static bool sleepAvailable = true;
+static AnimationHeader sleepAnimation;
+bool LoadKeeperSleepAnimations() { return sleepAvailable; }
+AnimationHeader* KeeperAnimation(BlackMarketKeeperInteraction::Clip clip) {
+  if (clip == BlackMarketKeeperInteraction::Clip::Sleep) return &sleepAnimation;
+  return reinterpret_cast<AnimationHeader*>(
+      const_cast<char*>(sCustomKeeper ? BlackMarketKeeper::kAnimation : BlackMarketKeeperAssets::kNativeAnimation));
+}
+void EnOssan_Idle(EnOssan*, PlayState*) {}
+namespace MMFrameTiming {
+struct NamedScope {
+  NamedScope(const char*, const char*) {}
+};
+}
 bool NativeShopOwnCamera(PlayState*) { return false; }
 extern "C" s16 Play_GetActiveCamId(PlayState*) { return CAM_ID_MAIN; }
 // Native cursor commands execute in native_mm_shop_actor_test.cpp. This fixture
@@ -122,8 +137,13 @@ void RecordInit(PlayState *, SkelAnime *skel, FlexSkeletonHeader *skeleton,
             reinterpret_cast<const char *>(skeleton),
             "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel") ==
         0);
-    assert(std::strcmp(reinterpret_cast<const char *>(animation),
-                       BlackMarketKeeper::kAnimation) == 0);
+#ifndef OOT_KEEPER_TEST
+    if (sleepAvailable)
+      assert(animation == &sleepAnimation);
+    else
+#endif
+      assert(std::strcmp(reinterpret_cast<const char *>(animation),
+                         BlackMarketKeeper::kAnimation) == 0);
   } else {
 #ifdef OOT_KEEPER_TEST
     assert(animation == &nativeAnimation &&
@@ -150,8 +170,11 @@ void RecordInit(PlayState *, SkelAnime *skel, FlexSkeletonHeader *skeleton,
                        "__OTR__objects/object_bg/gTreasureChestShopGalSkel") ==
                0 &&
            "native-only market must not load a missing custom keeper");
-    assert(std::strcmp(reinterpret_cast<const char *>(animation),
-                       "__OTR__objects/object_bg/object_bg_Anim_009890") == 0);
+    if (sleepAvailable)
+      assert(animation == &sleepAnimation);
+    else
+      assert(std::strcmp(reinterpret_cast<const char *>(animation),
+                         "__OTR__objects/object_bg/object_bg_Anim_009890") == 0);
 #endif
   }
   ++initializations;
@@ -259,8 +282,9 @@ void Scenario(bool custom, bool partial, bool useAlt = false) {
 #ifdef OOT_KEEPER_TEST
   assert(sKeeper.timer == 90 && sKeeper.eye == 0);
 #else
-  assert(gal.blinkTimer == 90 && gal.eyeTexIndex == 0 && !sTalking);
+  assert(gal.blinkTimer == 90 && gal.eyeTexIndex == (sleepAvailable ? 2 : 0) && !sTalking);
   assert(gal.blinkFunc == NativeKeeperBlink);
+  assert(sKeeperInteraction.sleepClips == sleepAvailable);
   for (const auto& joint : gal.jointTable) assert(joint.x == 501 && joint.z == 503);
   for (const auto& morph : gal.morphTable) assert(morph.x == 701 && morph.z == 703);
   assert(sKeeperJoints.back().x == 33 && sKeeperMorphs.back().x == 63);
@@ -308,6 +332,24 @@ void Scenario(bool custom, bool partial, bool useAlt = false) {
   else
     assert(nativeBindings == 4);
 #else
+  using BlackMarketKeeperInteraction::Clip;
+  if (sleepAvailable) {
+    gal.actionFunc = EnOssan_Idle;
+    for (int frame = 0; frame < 90; ++frame) NativeKeeperBlink(&gal);
+    assert(gal.eyeTexIndex == 2 && gal.blinkTimer == 2);
+    gal.actionFunc = nullptr; // Dialogue now owns the keeper.
+    sKeeperInteraction.clip = Clip::Wake;
+    for (const auto [frame, eye] : {std::pair{0, 2}, {1, 1}, {2, 0}, {6, 2}, {8, 0}, {10, 2}, {12, 0}}) {
+      gal.skelAnime.curFrame = frame;
+      NativeKeeperBlink(&gal);
+      assert(gal.eyeTexIndex == eye);
+    }
+    gal.actionFunc = EnOssan_Idle;
+    sKeeperInteraction.clip = Clip::Raise;
+    NativeKeeperBlink(&gal);
+    assert(gal.eyeTexIndex == 0); // The return gesture is still playing.
+  }
+  gal.actionFunc = nullptr;
   gal.eyeTexIndex = 0; gal.blinkTimer = 90;
   for (int frame = 0; frame < 89; ++frame) NativeKeeperBlink(&gal);
   assert(gal.eyeTexIndex == 0 && gal.blinkTimer == 1);
@@ -324,6 +366,11 @@ int main() {
   Scenario(true, false, true);
   Scenario(false, false);
   Scenario(false, true);
+#ifndef OOT_KEEPER_TEST
+  sleepAvailable = false;
+  Scenario(true, false);
+  Scenario(false, false);
+#endif
 #ifdef OOT_KEEPER_TEST
   const int cachedLoads = nativeLoads, cachedGraphs = graphLoads;
   const auto *cachedTable = sNativeKeeper.skeleton.sh.segment;

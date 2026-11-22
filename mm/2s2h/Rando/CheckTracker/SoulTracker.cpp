@@ -1,8 +1,12 @@
 #include "SoulTrackerModel.h"
 #include <nlohmann/json.hpp>
+#include "Rando/EnemyDropProgress.h"
 #include "Rando/Rando.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#include "combo/ComboGameMode.h"
+#include "combo/gui/SoulTrackerView.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
 #include <ship/window/Window.h>
 #include <ship/window/gui/Gui.h>
@@ -11,6 +15,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -26,13 +31,42 @@ extern "C" {
 
 namespace {
 using namespace Rando::SoulTracker;
+using namespace ComboRando::SoulTracker;
 
 bool sOpen = false;
-Family sFamily = Family::Npc;
+std::size_t sSection = static_cast<std::size_t>(Family::Npc);
 std::size_t sPage = 0;
-constexpr const char* FamilyNames[] = { "Bosses", "Enemies", "NPCs / shopkeepers", "Animals", "Miscellaneous" };
+constexpr const char* Sections[] = {
+    "Bosses", "Enemies", "NPCs / shopkeepers", "Animals", "Miscellaneous", FirstSlainHeading,
+};
+constexpr std::size_t FirstSlainSection = std::size(Sections) - 1;
+
+bool FirstSlainEnabled() {
+    return RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_DROPS] != 0;
+}
+
+int32_t ReadMmFirstSlain(int32_t slot, VisitFirstSlain visit, void* context) {
+    if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO || !FirstSlainEnabled())
+        return 0;
+
+    constexpr std::string_view prefix = "Enemy Drop ";
+    const auto& rando = gSaveContext.save.shipSaveInfo.rando;
+    for (int id = RC_ENEMY_DROP_ALIEN; id <= RC_ENEMY_DROP_WOLFOS; ++id) {
+        const auto& check = rando.randoSaveChecks[id];
+        if (!check.shuffled || check.skipped)
+            continue;
+        const auto& name = Rando::StaticData::CheckNames[id];
+        const bool defeated =
+            rando.firstSlainEnemies & Rando::EnemyDropProgress::DefeatedBit(static_cast<RandoCheckId>(id));
+        visit(context, name.c_str() + (name.starts_with(prefix) ? prefix.size() : 0),
+              FirstSlainProgress(defeated || check.eligible, check.obtained));
+    }
+    return 1;
+}
 
 bool IsMapReady() {
+    if (!Combo_IsCombinedGame() && !CVarGetInteger(SoloPauseMapCvar, 1))
+        return false;
 #ifdef COMBO_BUILD
     if (!Combo_MmIsForeground())
         return false;
@@ -46,10 +80,6 @@ bool IsMapReady() {
            pause.debugEditor == DEBUG_EDITOR_NONE && !pause.itemDescriptionOn;
 }
 
-auto CurrentRows() {
-    return Rows(sFamily, [](RandoOptionId option) { return RANDO_SAVE_OPTIONS[option] != 0; });
-}
-
 bool HaveSoulOptions() {
     bool enabled = false;
     ForEach([&](const Entry& entry) { enabled = enabled || RANDO_SAVE_OPTIONS[entry.option] != 0; });
@@ -58,6 +88,30 @@ bool HaveSoulOptions() {
 
 const char* SoulName(const Entry& entry) {
     return entry.name ? entry.name : Rando::StaticData::Items.at(entry.item).name;
+}
+
+struct PauseRow {
+    const char* name;
+    const char* label;
+    bool recorded;
+};
+
+std::vector<PauseRow> CurrentRows() {
+    std::vector<PauseRow> rows;
+    if (sSection == FirstSlainSection) {
+        const auto append = [](void* context, const char* name, FirstSlainStatus status) {
+            static_cast<std::vector<PauseRow>*>(context)->push_back(
+                { name, FirstSlainLabels[static_cast<std::size_t>(status)], status != FirstSlainStatus::Unrecorded });
+        };
+        ReadMmFirstSlain(gSaveContext.fileNum, append, &rows);
+    } else {
+        for (const auto& entry : Rows(static_cast<Family>(sSection),
+                                      [](RandoOptionId option) { return RANDO_SAVE_OPTIONS[option] != 0; })) {
+            const bool owned = Flags_GetRandoInf(entry.flag) != 0;
+            rows.push_back({ SoulName(entry), owned ? "Owned" : "Missing", owned });
+        }
+    }
+    return rows;
 }
 
 void Consume(Input& input, u16 buttons) {
@@ -69,10 +123,18 @@ void Consume(Input& input, u16 buttons) {
 // This hook runs before native Kaleido and the debug-editor L shortcut. No
 // in-game map/cursor/Soaring action receives the overlay's navigation buttons.
 void HandleInput() {
-    if (!IsMapReady() || !HaveSoulOptions()) {
+    if (!IsMapReady()) {
         sOpen = false;
         return;
     }
+    const bool souls = HaveSoulOptions();
+    const bool firstSlain = FirstSlainEnabled();
+    if (!souls && !firstSlain) {
+        sOpen = false;
+        return;
+    }
+    const std::size_t sections = std::size(Sections) - !firstSlain;
+    sSection = souls ? std::min(sSection, sections - 1) : FirstSlainSection;
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
     if (!gui || gui->GetMenuOrMenubarVisible()) {
         sOpen = false;
@@ -92,11 +154,11 @@ void HandleInput() {
         Consume(input, BTN_B | BTN_START);
         return;
     }
-    if (CHECK_BTN_ALL(input.press.button, BTN_DLEFT)) {
-        sFamily = static_cast<Family>((static_cast<int>(sFamily) + 4) % 5);
+    if (souls && CHECK_BTN_ALL(input.press.button, BTN_DLEFT)) {
+        sSection = (sSection + sections - 1) % sections;
         sPage = 0;
-    } else if (CHECK_BTN_ALL(input.press.button, BTN_DRIGHT)) {
-        sFamily = static_cast<Family>((static_cast<int>(sFamily) + 1) % 5);
+    } else if (souls && CHECK_BTN_ALL(input.press.button, BTN_DRIGHT)) {
+        sSection = (sSection + 1) % sections;
         sPage = 0;
     }
     const auto pages = PageCount(CurrentRows().size());
@@ -123,7 +185,7 @@ class SoulsWindow final : public Ship::GuiWindow {
 #ifdef COMBO_BUILD
         ComboMenuContext::UseSharedImGuiContext();
 #endif
-        if (!IsMapReady() || !HaveSoulOptions() || !ImGui::GetCurrentContext())
+        if (!IsMapReady() || (!HaveSoulOptions() && !FirstSlainEnabled()) || !ImGui::GetCurrentContext())
             return;
         auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
         if (!gui || gui->GetMenuOrMenubarVisible())
@@ -141,7 +203,7 @@ class SoulsWindow final : public Ship::GuiWindow {
                           value.c_str());
         };
         if (!sOpen) {
-            text(0, 385, IM_COL32(255, 255, 220, 255), "L: Collected souls");
+            text(0, 385, IM_COL32(255, 255, 220, 255), "L: Souls Tracker");
             return;
         }
         draw->AddRectFilled(ImVec2(origin.x - 12 * scale, origin.y - 12 * scale),
@@ -149,22 +211,24 @@ class SoulsWindow final : public Ship::GuiWindow {
                             8.0f * scale);
         auto rows = CurrentRows();
         sPage = std::min(sPage, PageCount(rows.size()) - 1);
-        const auto owned =
-            std::count_if(rows.begin(), rows.end(), [](const Entry& e) { return Flags_GetRandoInf(e.flag) != 0; });
-        text(0, 0, IM_COL32(225, 235, 255, 255), "Collected souls - MM");
+        const bool firstSlain = sSection == FirstSlainSection;
+        const auto recorded = std::count_if(rows.begin(), rows.end(), [](const PauseRow& row) { return row.recorded; });
+        text(0, 0, IM_COL32(225, 235, 255, 255), "Souls Tracker - MM");
         text(0, 28, IM_COL32(240, 215, 155, 255),
-             std::string(FamilyNames[static_cast<int>(sFamily)]) + "  " + std::to_string(owned) + "/" +
-                 std::to_string(rows.size()));
+             std::string(Sections[sSection]) + "  " + std::to_string(recorded) + "/" + std::to_string(rows.size()));
         if (rows.empty())
-            text(0, 65, IM_COL32(190, 195, 205, 255), "This soul family is not shuffled in this save.");
+            text(0, 65, IM_COL32(190, 195, 205, 255),
+                 firstSlain ? "No first-slay checks in this seed." : "This soul family is not shuffled in this save.");
+        const ImU32 accent = firstSlain ? FirstSlainAccent : IM_COL32(140, 235, 165, 255);
         for (std::size_t row = 0; row < RowsPerPage && sPage * RowsPerPage + row < rows.size(); ++row) {
             const auto& entry = rows[sPage * RowsPerPage + row];
-            const bool collected = Flags_GetRandoInf(entry.flag) != 0;
-            text(0, 62 + row * 23, collected ? IM_COL32(140, 235, 165, 255) : IM_COL32(185, 190, 200, 255),
-                 std::string(collected ? "[Owned]  " : "[Missing]  ") + SoulName(entry));
+            text(0, 62 + row * 23, entry.recorded ? accent : IM_COL32(185, 190, 200, 255),
+                 std::string("[") + entry.label + "]  " + entry.name);
         }
         text(0, 348, IM_COL32(210, 220, 235, 255),
              "Page " + std::to_string(sPage + 1) + "/" + std::to_string(PageCount(rows.size())));
+        if (firstSlain)
+            text(130, 348, FirstSlainAccent, FirstSlainLegend);
         text(0, 373, IM_COL32(210, 220, 235, 255), "D-pad Left/Right: family   Up/Down: page   L/B: back");
     }
 };
@@ -198,5 +262,9 @@ extern "C" COMBO_EXPORT int32_t MM_ReadSoulTrackerSave(int32_t slot, ComboRando:
             visit(context, entry.family, SoulName(entry), owned);
     });
     return 1;
+}
+
+extern "C" COMBO_EXPORT int32_t MM_ReadFirstSlainSave(int32_t slot, VisitFirstSlain visit, void* context) {
+    return ReadMmFirstSlain(slot, visit, context);
 }
 #endif

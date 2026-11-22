@@ -1,10 +1,7 @@
 #include "2s2h/Enhancements/Enhancements.h"
-#include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/ShipInit.hpp"
 #include "gui/UiVisibility.h"
 #include "hud/PickupCounterDraw.h"
 #include "hud/WorldHudViewport.h"
-#include <ship/window/gui/GuiWindow.h>
 
 extern "C" {
 #include "functions.h"
@@ -18,10 +15,8 @@ bool Combo_MmIsForeground(void);
 
 namespace {
 constexpr char kEnabled[] = "gEnhancements.Graphics.GibdoRequestIcons";
-constexpr char kWindowName[] = "MM Gibdo Request Icons";
 constexpr float kFullOpacityDistance = 150.0f;
 constexpr float kMaxDistance = 240.0f;
-bool sWindowRegistered = false;
 
 bool CanDrawRequests(const PlayState* play) {
 #ifdef COMBO_BUILD
@@ -62,75 +57,48 @@ void DrawRequest(const WorldHud::Viewport& viewport, ImDrawList* draw, const EnT
     }
 }
 
-class GibdoRequestWindow final : public Ship::GuiWindow {
-  public:
-    using GuiWindow::GuiWindow;
-
-    void InitElement() override {
-    }
-    void UpdateElement() override {
-    }
-    void DrawElement() override {
-    }
-
-    void Draw() override {
-        PlayState* play = gPlayState;
-        const int tradeMode = CVarGetInteger(GIBDO_TRADE_SEQUENCE_CVAR, GIBDO_TRADE_SEQUENCE_VANILLA);
-        if (tradeMode == GIBDO_TRADE_SEQUENCE_NO_TRADE || !CanDrawRequests(play))
-            return;
-        Player* player = GET_PLAYER(play);
-        WorldHud::Viewport viewport;
-        if (!player || (player->stateFlags1 & PLAYER_STATE1_DEAD) || Player_InCsMode(play) ||
-            !WorldHud::GetViewport(viewport) || viewport.clip.width < 1 || viewport.clip.height < 1)
-            return;
-
-        const float scale = viewport.image.height / 720.0f;
-        const bool mirrored = CVarGetInteger("gModes.MirroredWorld.State", 0) != 0;
-        const auto& clip = viewport.clip;
-        auto* draw = ImGui::GetForegroundDrawList(viewport.imguiViewport);
-        draw->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.x + clip.width, clip.y + clip.height), true);
-        for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ENEMY].first; actor; actor = actor->next) {
-            const float distanceSq = actor->xyzDistToPlayerSq;
-            if (!actor->isDrawn || actor->room != play->roomCtx.curRoom.num ||
-                distanceSq >= kMaxDistance * kMaxDistance)
-                continue;
-            const auto* request = EnTalkGibud_GetPendingRequest(actor, play);
-            if (!request)
-                continue;
-
-            Vec3f head = actor->focus.pos;
-            head.y += 22.0f;
-            PickupCounter::Point anchor;
-            if (!viewport.Project(play->viewProjectionMtxF, head, mirrored, anchor))
-                continue;
-
-            Vec3f hit;
-            Vec3f eye = play->view.eye;
-            CollisionPoly* poly = nullptr;
-            s32 bgId;
-            if (BgCheck_CameraLineTest2(&play->colCtx, &eye, &head, &hit, &poly, true, true, true, false, &bgId))
-                continue;
-
-            const float distance = std::sqrt(distanceSq);
-            const float alpha = std::min(1.0f, (kMaxDistance - distance) / (kMaxDistance - kFullOpacityDistance));
-            DrawRequest(viewport, draw, *request, anchor, tradeMode, scale, alpha);
-        }
-        draw->PopClipRect();
-    }
-};
-
-void EnsureGibdoRequestWindow() {
-    if (sWindowRegistered || !CanDrawRequests(gPlayState))
-        return;
-    auto* context = Ship::Context::GetRawInstance();
-    auto window = context ? context->GetWindow() : nullptr;
-    auto gui = window ? window->GetGui() : nullptr;
-    if (gui) {
-        gui->AddGuiWindow(std::make_shared<GibdoRequestWindow>("gGibdoRequestWindow", true, kWindowName));
-        sWindowRegistered = true;
-    }
-}
-
-static RegisterShipInitFunc
-    gibdoRequestHudInit([]() { COND_HOOK(OnInterfaceDrawStart, true, EnsureGibdoRequestWindow); }, {});
 } // namespace
+
+void DrawGibdoRequests() {
+    PlayState* play = gPlayState;
+    const int tradeMode = CVarGetInteger(GIBDO_TRADE_SEQUENCE_CVAR, GIBDO_TRADE_SEQUENCE_VANILLA);
+    if (tradeMode == GIBDO_TRADE_SEQUENCE_NO_TRADE || !CanDrawRequests(play))
+        return;
+    Player* player = GET_PLAYER(play);
+    WorldHud::Viewport viewport;
+    if (!player || (player->stateFlags1 & PLAYER_STATE1_DEAD) || Player_InCsMode(play) ||
+        !WorldHud::GetViewport(viewport) || viewport.clip.width < 1 || viewport.clip.height < 1)
+        return;
+
+    const float scale = viewport.image.height / 720.0f;
+    const bool mirrored = CVarGetInteger("gModes.MirroredWorld.State", 0) != 0;
+    const auto& clip = viewport.clip;
+    auto* draw = ImGui::GetForegroundDrawList(viewport.imguiViewport);
+    draw->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.x + clip.width, clip.y + clip.height), true);
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ENEMY].first; actor; actor = actor->next) {
+        const float distanceSq = actor->xyzDistToPlayerSq;
+        if (!actor->isDrawn || actor->room != play->roomCtx.curRoom.num || distanceSq >= kMaxDistance * kMaxDistance)
+            continue;
+        const auto* request = EnTalkGibud_GetPendingRequest(actor, play);
+        if (!request)
+            continue;
+
+        Vec3f head = actor->focus.pos;
+        head.y += 22.0f;
+        PickupCounter::Point anchor;
+        if (!viewport.Project(play->viewProjectionMtxF, head, mirrored, anchor))
+            continue;
+
+        Vec3f hit;
+        Vec3f eye = play->view.eye;
+        CollisionPoly* poly = nullptr;
+        s32 bgId;
+        if (BgCheck_CameraLineTest2(&play->colCtx, &eye, &head, &hit, &poly, true, true, true, false, &bgId))
+            continue;
+
+        const float distance = std::sqrt(distanceSq);
+        const float alpha = std::min(1.0f, (kMaxDistance - distance) / (kMaxDistance - kFullOpacityDistance));
+        DrawRequest(viewport, draw, *request, anchor, tradeMode, scale, alpha);
+    }
+    draw->PopClipRect();
+}

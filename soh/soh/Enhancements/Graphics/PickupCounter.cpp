@@ -123,7 +123,7 @@ int IconItem(Kind kind) {
 
 namespace {
 void RegisterPickupCounter() {
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>(EnsurePickupCounterWindow);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>([] { EnsurePickupCounterWindow(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemReceive>(
         [](GetItemEntry entry) { NotePickup(PickupCounterHost::ReceiptKind(entry.itemId)); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](int16_t) { ResetPickupCounters(); });

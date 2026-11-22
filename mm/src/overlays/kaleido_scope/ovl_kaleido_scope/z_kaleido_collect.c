@@ -80,6 +80,12 @@ static const char* sOotStoneIconPaths[3] = {
 static const char* sOotAgonyIconPath = "__OTR__textures/icon_item_24_static/gQuestIconStoneOfAgonyTex";
 static const char* sOotGerudoIconPath = "__OTR__textures/icon_item_24_static/gQuestIconGerudosCardTex";
 static const char* sOotSkulltulaIconPath = "__OTR__textures/icon_item_24_static/gQuestIconGoldSkulltulaTex";
+static const char* sOotSongNotePath = "__OTR__textures/icon_item_static/gSongNoteTex";
+static const char* sOotHeartPiecePaths[] = {
+    "__OTR__textures/icon_item_static/gHeartPieceIcon1Tex",
+    "__OTR__textures/icon_item_static/gHeartPieceIcon2Tex",
+    "__OTR__textures/icon_item_static/gHeartPieceIcon3Tex",
+};
 
 // OoT quest cursor points: 0-5 medallions, 6-0x11 songs, 0x12-0x14 stones, 0x15 agony, 0x16 gerudo,
 // 0x17 skulltula, 0x18 heart-piece pie. Points map 1:1 onto the quad indices of the layout tables.
@@ -520,13 +526,16 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
         }
     }
 
-    // Songs (6..17) — the note texture, one per learned song, tinted with its OoT color.
+    // The OoT note silhouette fits the recesses on this page.
+    const char* songNote = OotQuest_Tex(sOotSongNotePath);
+    if (songNote == NULL) {
+        songNote = gItemIconSongNoteTex;
+    }
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
     gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
-    gDPLoadTextureBlock(POLY_OPA_DISP++, gItemIconSongNoteTex, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 24, 0,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
-                        G_TX_NOLOD);
+    gDPLoadTextureBlock(POLY_OPA_DISP++, songNote, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 24, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
     for (i = 0; i < 12; i++) {
         if (OotQuest_Has(OOT_QUEST_SONG_MINUET + i)) {
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, sOotSongR[i], sOotSongG[i], sOotSongB[i], pauseCtx->alpha);
@@ -612,22 +621,22 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
         }
     }
 
-    // --- Heart-piece count (quad 24, 48x48 IA8 pie) ---
-    // Skijer 2026-07-29 FIX: this quad was in the layout table but never drawn, so flipping to the
-    // OoT layout lost the piece-of-heart indicator that MM's own page shows. The count is the SAME
-    // save field in both layouts (questItems bits 28+), and MM's yar icon set has the pie textures,
-    // so this is MM's native draw (Gfx_DrawTexQuadIA8, icons 0x7A..) on the OoT quad.
+    // The count is local to this save. Use the artwork that fits the OoT heart recess.
     {
         u32 hpCount = GET_SAVE_INVENTORY_QUEST_ITEMS >> QUEST_HEART_PIECE_COUNT;
 
-        if (hpCount != 0) {
+        if (hpCount > 0 && hpCount <= ARRAY_COUNT(sOotHeartPiecePaths)) {
+            const char* heart = OotQuest_Tex(sOotHeartPiecePaths[hpCount - 1]);
+            if (heart == NULL) {
+                heart = gItemIcons[ITEM_HEART_PIECE_2 + hpCount - 1];
+            }
             gDPPipeSync(POLY_OPA_DISP++);
             gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
                               PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 70, 50, pauseCtx->alpha);
             gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
             gSPVertex(POLY_OPA_DISP++, &vtx[24 * 4], 4, 0);
-            POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, gItemIcons[0x7A + hpCount], 48, 48, 0);
+            POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, heart, 48, 48, 0);
         }
     }
 

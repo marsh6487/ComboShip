@@ -422,6 +422,7 @@ typedef struct RandoSaveInfo {
     u16 discoveredEntrances[2 * 256 + 8]; // Both directions of the maximum Solo MM layout, plus boss escape aliases.
     u16 discoveredEntranceCount;
 #endif
+    uint64_t firstSlainEnemies; // Enemy drop defeats recorded before the reward is picked up.
 } RandoSaveInfo;
 
 #include "mods/nei_save.h" // Skijer's NEI — embedded per-save custom state (NeiSaveData)

@@ -1,9 +1,11 @@
 #include "Rando/SongEvents.h"
+#include "Rando/EnemyDropProgress.h"
 #include "Rando/SoloEntrances.h"
 #include "Rando/VanillaCompatibility.h"
 #include "Rando/SongEventsNativeActors.h"
 #include "combo/rando/SongEventsBridge.h"
 #include "tests/test_require.h"
+#include "sequence.h"
 #include <cstring>
 #include <array>
 extern "C" {
@@ -31,10 +33,18 @@ CALLBACK(func_80B948A8,EnZog)
 CALLBACK(func_80C0BFE8,EnBsb)
 CALLBACK(func_80BDB2B8,EnHiddenNuts)
 CALLBACK(func_80B5202C,EnGk)
-CALLBACK(EnPoComposer_PlayCurse,EnPoComposer)
+CALLBACK(EnPoComposer_StartCutscene,EnPoComposer)
 CALLBACK(EnTimeTag_RooftopOath_Wait,EnTimeTag)
 #undef CALLBACK
+void Actor_Kill(Actor* actor) { actor->update = nullptr; }
+void Audio_PlaySfx(u16) {}
+void Audio_PlaySequenceAtPos(u8, Vec3f*, u16, f32) {}
+void func_800B8D10(PlayState*, Actor*, f32, s16, f32, s32, u32) {}
 }
+static s32 sPlayerIsPlayingOcarina;
+#define GameInteractor_ExecuteOnFlagSet(...) ((void)0)
+#define GameInteractor_ExecuteOnFlagUnset(...) ((void)0)
+#include "mm_sharp_completion.inc"
 #include "mm_save_json.inc"
 #include "mm_message_reservation.inc"
 #include "keeta_native_rules.inc"
@@ -258,7 +268,16 @@ int main() {
     auto map=ComboRando::SongEvents::Generate(ComboRando::SongEvents::Game::Mm,88,true);
     nlohmann::json spoiler={{"songEvents",map}};SongEvents::Import(info,spoiler);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));
+    const auto defeats = Rando::EnemyDropProgress::DefeatedBit(RC_ENEMY_DROP_ALIEN) |
+                         Rando::EnemyDropProgress::DefeatedBit(RC_ENEMY_DROP_WOLFOS);
+    info.firstSlainEnemies = defeats;
     nlohmann::json savedJson=info;memset(info.songEvents,0,sizeof(info.songEvents));savedJson.get_to(info);
+    REQUIRE(nlohmann::json::parse(savedJson.dump()).get<RandoSaveInfo>().firstSlainEnemies == defeats);
+    auto legacy = savedJson;
+    legacy.erase("firstSlainEnemies");
+    auto reused = info;
+    legacy.get_to(reused);
+    REQUIRE(reused.firstSlainEnemies == 0);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));
     memset(info.songEvents,0,sizeof(info.songEvents));SongEvents::RestoreForOracle(info);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));
@@ -277,9 +296,26 @@ int main() {
     setActor(&temple.dyna.actor,SCENE_21MITURINMAE);
     player.actor.world.pos.x=0;player.actor.world.pos.z=1040;player.transformation=PLAYER_FORM_DEKU;
     info.songEvents[0]=5;info.randoSaveOptions[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_FORM_AND_SONG;
+    Vec3f marker{};
+    auto markerSong=[&] { return SongEvents::MarkerSong(&temple.dyna.actor, &player, &play, marker); };
+    REQUIRE(markerSong() == -1); // Killed or uninitialized actor.
+    temple.dyna.actor.update = +[](Actor*, PlayState*) {};
+    REQUIRE(markerSong() == 5 && marker.x == 0.f && marker.z == 1039.f);
+    player.actor.world.pos.z = 975.f;
+    REQUIRE(markerSong() == 5 && !SongEvents_MmInterceptSong(OCARINA_SONG_TIME)); // Show on approach.
+    player.actor.world.pos.z = 1040.f;
+    info.randoSaveOptions[RO_ACCESS_DUNGEONS] = RO_ACCESS_DUNGEONS_FORM_ONLY;
+    REQUIRE(markerSong() == -1 && !SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    info.randoSaveOptions[RO_ACCESS_DUNGEONS] = RO_ACCESS_DUNGEONS_OPEN;
+    REQUIRE(markerSong() == -1);
+    info.randoSaveOptions[RO_ACCESS_DUNGEONS] = RO_ACCESS_DUNGEONS_FORM_AND_SONG;
+    info.randoSaveOptions[RO_SHUFFLE_SONG_EVENTS] = 0;
+    REQUIRE(markerSong() == -1);
+    info.randoSaveOptions[RO_SHUFFLE_SONG_EVENTS] = 1;
     REQUIRE(SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
     RecognizeNativeSong(&play,OCARINA_SONG_TIME);
     temple.actionFunc=nullptr; // Native event switches to a cutscene after recognizing the assignment.
+    REQUIRE(markerSong() == -1);
     CloseNativeSong(&play);
     REQUIRE(play.msgCtx.ocarinaMode==OCARINA_MODE_EVENT && play.msgCtx.ocarinaAction==OCARINA_ACTION_CHECK_NOTIME_DONE && sLastPlayedSong==0xff);
     REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
@@ -290,7 +326,10 @@ int main() {
     sLastPlayedSong=0xff;sSongEventReservedSong=-1;play.msgCtx.ocarinaMode=OCARINA_MODE_NONE;
     CloseNativeSong(&play);REQUIRE(play.msgCtx.ocarinaMode==OCARINA_MODE_NONE); // Closing unrelated dialogue cannot replay stale notes.
 
-    WEEKEVENTREG(WEEKEVENTREG_20_01 >> 8) |= WEEKEVENTREG_20_01 & 0xff;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));WEEKEVENTREG(WEEKEVENTREG_20_01 >> 8) &= ~(WEEKEVENTREG_20_01 & 0xff);
+    SET_WEEKEVENTREG(WEEKEVENTREG_20_01);
+    REQUIRE(markerSong() == -1 && !SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    CLEAR_WEEKEVENTREG(WEEKEVENTREG_20_01);
+    REQUIRE(markerSong() == 5); // Reopening next cycle is a fresh event.
     temple.dyna.actor.playerHeightRel=100;REQUIRE(SongEvents_MmInterceptSong(OCARINA_SONG_TIME)); // Native dyna origin height does not gate the pedestal.temple.dyna.actor.playerHeightRel=0;
     player.transformation=PLAYER_FORM_HUMAN;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
     info.randoSaveOptions[RO_ACCESS_DUNGEONS]=RO_ACCESS_DUNGEONS_SONG_ONLY;REQUIRE(SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
@@ -306,9 +345,26 @@ int main() {
     father.actor.colChkInfo.health=0;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));father.actor.colChkInfo.health=1;
     father.actionFunc=EnHg_HandleCutscene;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
     static EnPoComposer composer{};composer.actor.id=ACTOR_EN_PO_COMPOSER;composer.actionFunc=EnPoComposer_PlayCurse;info.songEvents[11]=5;
+    composer.actor.update = +[](Actor*, PlayState*) {};
     setActor(&composer.actor,SCENE_IKANA);REQUIRE(SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    auto sharpMarker = [&] { return SongEvents::MarkerSong(&composer.actor, &player, &play, marker); };
+    REQUIRE(sharpMarker() == 5);
     composer.actor.params=0x8000;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));composer.actor.params=0;
-    composer.actionFunc=nullptr;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    play.msgCtx.ocarinaMode = OCARINA_MODE_EVENT;
+    play.msgCtx.lastPlayedSong = OCARINA_SONG_STORMS;
+    composer.actionFunc(&composer, &play);
+    REQUIRE(composer.actionFunc == EnPoComposer_PlayCurse && sharpMarker() == 5);
+    play.msgCtx.lastPlayedSong = OCARINA_SONG_TIME;
+    composer.actionFunc(&composer, &play);
+    REQUIRE(composer.actionFunc == EnPoComposer_StartCutscene && composer.sharpCsNum == SHARP_CS_SONG_STORMS);
+    REQUIRE(sharpMarker() == -1 && !SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    EnPoComposer_SharpCutsceneDone(&composer);
+    REQUIRE(CHECK_WEEKEVENTREG(WEEKEVENTREG_14_04) && sharpMarker() == -1);
+    composer.actor.update = +[](Actor*, PlayState*) {};
+    composer.actionFunc = EnPoComposer_PlayCurse;
+    REQUIRE(sharpMarker() == -1 && !SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
+    CLEAR_WEEKEVENTREG(WEEKEVENTREG_14_04);
+    REQUIRE(sharpMarker() == 5);
     static EnTimeTag tag{};tag.actor.id=ACTOR_EN_TIME_TAG;tag.actor.params=0x4000;tag.actionFunc=EnTimeTag_RooftopOath_Wait;info.songEvents[12]=5;
     setActor(&tag.actor,SCENE_OKUJOU);REQUIRE(SongEvents_MmInterceptSong(OCARINA_SONG_TIME));
     tag.actor.xzDistToPlayer=301;REQUIRE(!SongEvents_MmInterceptSong(OCARINA_SONG_TIME));tag.actor.xzDistToPlayer=0;
