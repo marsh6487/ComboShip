@@ -1023,6 +1023,24 @@ void Interpreter::ImportTextureIA8(int tile, bool importReplacement) {
         fullImageLineSizeBytes = width;
     }
 
+    // Legacy HD song-note archives have no scale fields. Decode the whole image
+    // here while the display list continues to address its logical 16x24 tile.
+    if (!importReplacement && width == 16 && height == 24 && metadata->resource &&
+        metadata->type == TextureType::GrayscaleAlpha8bpp) {
+        const auto init = metadata->resource->GetInitData();
+        if (init && init->ResourceVersion == 0 &&
+            GetBaseTexturePath(init->Path) == "textures/icon_item_static/gSongNoteTex") {
+            const uint32_t maxSize = std::min(8192, mRapi->GetMaxTextureSize());
+            const uint32_t imageWidth = metadata->width;
+            const uint32_t imageHeight = metadata->height;
+            if (imageWidth >= width && imageHeight >= height && imageWidth <= maxSize && imageHeight <= maxSize &&
+                imageWidth * imageHeight == metadata->resource->GetPointerSize()) {
+                width = fullImageLineSizeBytes = imageWidth;
+                height = imageHeight;
+            }
+        }
+    }
+
     uint32_t i = 0;
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {

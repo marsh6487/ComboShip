@@ -3,10 +3,12 @@
 #include "fast/lus_gbi.h"
 #include "fast/resource/type/Texture.h"
 #include "libultraship/bridge/resourcebridge.h"
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <dlfcn.h>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -68,6 +70,36 @@ class Interpreter {
     void* lastPixels = nullptr;
     uint32_t lastFlags = 0;
     RawTexMetadata lastMetadata{};
+
+    struct LoadedTexture {
+        RawTexMetadata raw_tex_metadata{};
+        const uint8_t* addr{};
+        uint32_t size_bytes{}, line_size_bytes{}, full_image_line_size_bytes{};
+    };
+    struct {
+        LoadedTexture loaded_texture[1];
+        struct {
+            uint32_t tmem_index = 0, line_size_bytes = 16;
+        } texture_tile[1];
+    } rdp;
+    decltype(rdp)* mRdp = &rdp;
+    struct {
+        int GetMaxTextureSize() { return 256; }
+    } api;
+    decltype(api)* mRapi = &api;
+    std::vector<uint8_t> texels = std::vector<uint8_t>(256 * 256 * 4);
+    uint8_t* mTexUploadBuffer = texels.data();
+    struct MaskedTexture {
+        const uint8_t* replacementData;
+    };
+    std::map<std::string_view, MaskedTexture> mMaskedTextures;
+    uint32_t uploadedWidth{}, uploadedHeight{};
+    void UploadTextureMeasured(const uint8_t*, uint32_t width, uint32_t height) {
+        uploadedWidth = width;
+        uploadedHeight = height;
+    }
+    std::string_view GetBaseTexturePath(std::string_view path);
+    void ImportTextureIA8(int tile, bool importReplacement);
 };
 
 static auto sInterpreter = std::make_shared<Interpreter>();
@@ -78,6 +110,7 @@ static std::shared_ptr<Ship::ResourceManager> ActiveResMgr() {
 }
 
 #define C0(pos, width) ((cmd->words.w0 >> (pos)) & ((1U << width) - 1))
+#define SCALE_4_8(value) ((value) * 0x11)
 #include "texture_address_production.inc"
 
 static void Submit(uintptr_t address) {
@@ -148,6 +181,36 @@ static void ValidTextures() {
     sInterpreter->mSegmentPointers[9] = 0;
     puts("PASS raw/module textures, bound segment offsets, OTR resources, pause tiles and HD metadata");
 }
+
+static void LegacySongNote() {
+    Interpreter gfx;
+    const auto init = std::make_shared<Ship::ResourceInitData>();
+    auto texture = std::make_shared<Texture>(init);
+    texture->ImageDataSize = 192 * 192;
+    texture->ImageData = new uint8_t[texture->ImageDataSize]{};
+    // The legacy pack starts with two transparent rows. Put an opaque pixel
+    // in the image below the logical 384-byte block.
+    constexpr size_t pixel = 4 * 192 + 16;
+    texture->ImageData[pixel] = 0x7F;
+    auto& loaded = gfx.rdp.loaded_texture[0];
+    loaded.addr = texture->ImageData;
+    loaded.size_bytes = loaded.line_size_bytes = loaded.full_image_line_size_bytes = 16 * 24;
+    loaded.raw_tex_metadata = { 192, 192, 1, 1, texture, TextureType::GrayscaleAlpha8bpp };
+    for (const char* path : { "textures/icon_item_static/gSongNoteTex", "alt/textures/icon_item_static/gSongNoteTex" }) {
+        init->Path = path;
+        gfx.ImportTextureIA8(0, false);
+        assert(gfx.uploadedWidth == 192 && gfx.uploadedHeight == 192);
+        assert(gfx.texels[4 * pixel] == 0x77 && gfx.texels[4 * pixel + 3] == 0xFF);
+    }
+    texture->ImageDataSize--;
+    gfx.ImportTextureIA8(0, false);
+    assert(gfx.uploadedWidth == 16 && gfx.uploadedHeight == 24);
+    texture->ImageDataSize++;
+    init->Path = "textures/test/unrelated";
+    gfx.ImportTextureIA8(0, false);
+    assert(gfx.uploadedWidth == 16 && gfx.uploadedHeight == 24);
+    puts("PASS legacy quest note uploads its full IA8 image without changing unrelated tiles");
+}
 } // namespace Fast
 
 int main(int argc, char** argv) {
@@ -169,5 +232,6 @@ int main(int argc, char** argv) {
     }
     if (test == "all" || test == "valid") {
         Fast::ValidTextures();
+        Fast::LegacySongNote();
     }
 }
