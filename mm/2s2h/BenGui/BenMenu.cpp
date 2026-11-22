@@ -1667,30 +1667,19 @@ void BenMenu::AddEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
-    std::set<std::string> spinControls{ CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR };
-    static const char* const spinCosmetics[] = { "Effects.SpinSlashCharge", "Effects.SpinSlashBurst",
-                                                 "Effects.GreatSpinCharge", "Effects.GreatSpinBurst" };
-    for (const char* id : spinCosmetics) {
-        auto& option = cosmeticOptions.at(id);
-        spinControls.insert(option.valuesCvar);
-        AddWidget(path, option.label, WIDGET_CUSTOM).CVar(option.valuesCvar).CustomFunction([](WidgetInfo& widget) {
-            for (const char* id : spinCosmetics) {
-                auto& option = cosmeticOptions.at(id);
-                if (widget.cVar == option.valuesCvar) {
-                    CosmeticEditorDrawRow(option, true);
-                    return;
-                }
-            }
-        });
-    }
-    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
-                                  path.sidebarName.c_str(), std::move(spinControls), ImVec2(420, 410),
 #ifdef COMBO_BUILD
-                                  Combo_MmIsForeground
+    auto spinForeground = &Combo_MmIsForeground;
 #else
-                                  []() { return true; }
+    auto spinForeground = +[] { return true; };
 #endif
-    );
+    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
+                                  ImVec2(420, 410), spinForeground, [] {
+                                      for (const char* id : { "Effects.SpinSlashCharge", "Effects.SpinSlashBurst",
+                                                              "Effects.GreatSpinCharge", "Effects.GreatSpinBurst" }) {
+                                          CosmeticEditorDrawRow(cosmeticOptions.at(id), true);
+                                      }
+                                  });
     AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.ItemGetLightShaft")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(

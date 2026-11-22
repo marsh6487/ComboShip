@@ -918,22 +918,16 @@ void SohMenu::AddMenuEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
-    std::set<std::string> spinControls{ CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR };
-    for (const char* id : { "SpinAttack.Level1Primary", "SpinAttack.Level1Secondary", "SpinAttack.Level2Primary",
-                            "SpinAttack.Level2Secondary" }) {
-        auto& option = cosmeticOptions.at(id);
-        spinControls.insert(option.valuesCvar);
-        AddWidget(path, "Spin Attack " + option.label, WIDGET_CUSTOM)
-            .CVar(option.valuesCvar)
-            .RaceDisable(false)
-            .CustomFunction([&option](WidgetInfo&) {
-                if (!option.advancedOption || CVarGetInteger(CVAR_COSMETIC("AdvancedMode"), 0)) {
+    ComboMenuPopout::EnsureWindow(
+        mSohMenu, "Spin Attack##OOT", "gOpenWindows.SpinAttack", path.sectionName.c_str(), path.sidebarName.c_str(),
+        { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR }, ImVec2(440, 410), spinForeground, [] {
+            for (const char* id : { "SpinAttack.Level1Primary", "SpinAttack.Level1Secondary",
+                                    "SpinAttack.Level2Primary", "SpinAttack.Level2Secondary" }) {
+                auto& option = cosmeticOptions.at(id);
+                if (!option.advancedOption || CVarGetInteger(CVAR_COSMETIC("AdvancedMode"), 0))
                     DrawCosmeticRow(option, true);
-                }
-            });
-    }
-    ComboMenuPopout::EnsureWindow(mSohMenu, "Spin Attack##OOT", "gOpenWindows.SpinAttack", path.sectionName.c_str(),
-                                  path.sidebarName.c_str(), std::move(spinControls), ImVec2(440, 410), spinForeground);
+            }
+        });
     AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.ItemGetLightShaft")
         .RaceDisable(false)
