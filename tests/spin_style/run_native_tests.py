@@ -38,7 +38,7 @@ def declaration(source, name):
 
 def main():
     oot = ["-std=gnu2x", "-O1", "-g", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0",
-           "-Werror=implicit-function-declaration"]
+           "-Werror=implicit-function-declaration", "-Wno-incompatible-pointer-types", "-Wno-int-conversion"]
     oot += ["-I" + str(ROOT / p) for p in ("soh/include", "soh/src", "soh/assets", "soh", "soh/soh",
                                          "libultraship/include", "libultraship/src", "combo")]
     for path in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
@@ -60,7 +60,8 @@ def main():
             else:
                 constants += ["#define ENMTHUNDER_TYPE_MAX 4", re.search(r'typedef enum \{.*?\} EnMThunderSubType;', source, re.S).group(0),
                               declaration(source, "sDamages"), declaration(source, "sChargingSfxIds")]
-            names = ["EnMThunder_InitStyle", "EnMThunder_PreviewStyle", "EnMThunder_ReleaseStyle", "EnMThunder_VisualStyle"]
+            names = ["EnMThunder_CanStyleSpin", "EnMThunder_InitStyle", "EnMThunder_PreviewStyle",
+                     "EnMThunder_ReleaseStyle", "EnMThunder_VisualStyle"]
             if host == "soh": names += ["EnMThunder_SetupAction"]
             names += ["EnMThunder_Init", "EnMThunder_ChargingSpinAttack" if host == "soh" else "EnMThunder_Charge",
                       "EnMThunder_Destroy"]

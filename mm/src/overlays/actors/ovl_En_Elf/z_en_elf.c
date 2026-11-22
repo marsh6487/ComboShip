@@ -9,6 +9,7 @@
 #include "BlackMarketFairy.h"
 #include "entrances/BlackMarketEntrance.h"
 #endif
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -353,9 +354,8 @@ static void EnElf_UpdateMidnaBlink(EnElf* this, PlayState* play) {
 
     /* Only visible companion time advances the blink clock. Native draw gates
      * still decide whether the model is drawn, including Giant's Mask/cues. */
-    if (this->actor.params == FAIRY_TYPE_0 && CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) &&
-        this->unk_244 != 6 && !(this->fairyFlags & 8) && this->actor.scale.x >= 0.004f && this->innerColor.a > 0.0f &&
-        player->currentMask != PLAYER_MASK_GIANT &&
+    if (this->actor.params == FAIRY_TYPE_0 && MMCompanion_UseMidna() && this->unk_244 != 6 && !(this->fairyFlags & 8) &&
+        this->actor.scale.x >= 0.004f && this->innerColor.a > 0.0f && player->currentMask != PLAYER_MASK_GIANT &&
         (!(player->stateFlags1 & PLAYER_STATE1_100000) || kREG(90) < this->actor.projectedPos.z) &&
         (!Cutscene_IsCueInChannel(play, CS_CMD_ACTOR_CUE_201) ||
          play->csCtx.actorCues[Cutscene_GetCueChannel(play, CS_CMD_ACTOR_CUE_201)]->id != 6)) {
@@ -364,9 +364,21 @@ static void EnElf_UpdateMidnaBlink(EnElf* this, PlayState* play) {
 }
 
 static void EnElf_PlayTatlSound(EnElf* this, MMMidnaAudioEvent event, u16 nativeSfx) {
-    if (this->actor.params != FAIRY_TYPE_0 || !MMMidnaAudio_TryPlay(event)) {
-        Actor_PlaySfx(&this->actor, nativeSfx);
+    static const u16 naviSfx[] = {
+        [MM_MIDNA_AUDIO_DASH] = NA_SE_EV_WHITE_FAIRY_DASH,   [MM_MIDNA_AUDIO_APPEAR] = NA_SE_EV_WHITE_FAIRY_DASH,
+        [MM_MIDNA_AUDIO_VANISH] = NA_SE_EV_NAVY_VANISH,      [MM_MIDNA_AUDIO_TARGET_NPC] = NA_SE_VO_NAVY_HELLO,
+        [MM_MIDNA_AUDIO_TARGET_ENEMY] = NA_SE_VO_NAVY_ENEMY, [MM_MIDNA_AUDIO_TARGET_OTHER] = NA_SE_VO_NAVY_HEAR,
+    };
+    if (this->actor.params == FAIRY_TYPE_0) {
+        if (MMCompanion_UseNavi()) {
+            if ((unsigned)event < ARRAY_COUNT(naviSfx)) {
+                nativeSfx = naviSfx[event];
+            }
+        } else if (MMMidnaAudio_TryPlay(event)) {
+            return;
+        }
     }
+    Actor_PlaySfx(&this->actor, nativeSfx);
 }
 
 void EnElf_Init(Actor* thisx, PlayState* play2) {
@@ -938,7 +950,7 @@ void func_8088E60C(EnElf* this, PlayState* play) {
     Lights_PointGlowSetInfo(&this->lightInfoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
                             this->actor.world.pos.z, 255, 255, 255, glowLightRadius);
     /* Preserve local illumination; a usable companion mesh replaces the halo. */
-    if (this->actor.params == FAIRY_TYPE_0 && CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) &&
+    if (this->actor.params == FAIRY_TYPE_0 && MMCompanion_UseMidna() &&
         MMMidnaResources_Load("objects/midna_navi/poc1/MidnaFloatDL") != NULL) {
         this->lightInfoGlow.type = LIGHT_POINT_NOGLOW;
     }
@@ -1160,7 +1172,7 @@ void func_8088EFA4(EnElf* this, PlayState* play) {
             (Math_Vec3f_DistXYZ(&this->actor.world.pos, &play->actorCtx.attention.tatlHoverPos) < 50.0f)) {
             this->unk_268 = 1;
         }
-    } else if (this->unk_238 != 0.0f) {
+    } else {
         if (Math_StepToF(&this->unk_238, 0.0f, 0.25f)) {
             this->innerColor = play->actorCtx.attention.tatlInnerColor;
             this->outerColor = play->actorCtx.attention.tatlOuterColor;
@@ -1178,14 +1190,11 @@ void func_8088EFA4(EnElf* this, PlayState* play) {
             this->fairyFlags ^= 1;
         }
     } else if ((tatlHoverActor != NULL) && (player->focusActor != NULL)) {
-        u8 temp = this->unk_269;
-        u16 targetSfxId = (this->unk_269 == 0) ? NA_SE_NONE : NA_SE_NONE;
-
-        if (!temp) {
+        if (this->unk_269 == 0) {
             MMMidnaAudioEvent event = tatlHoverActor->category == ACTORCAT_NPC     ? MM_MIDNA_AUDIO_TARGET_NPC
                                       : tatlHoverActor->category == ACTORCAT_ENEMY ? MM_MIDNA_AUDIO_TARGET_ENEMY
                                                                                    : MM_MIDNA_AUDIO_TARGET_OTHER;
-            EnElf_PlayTatlSound(this, event, targetSfxId);
+            EnElf_PlayTatlSound(this, event, NA_SE_NONE);
         }
         this->fairyFlags |= 1;
     }
@@ -1760,8 +1769,7 @@ static s32 EnElf_TryDrawMidna(EnElf* this, PlayState* play) {
     u8 alpha;
     s32 blinkState = 0;
 
-    if (this->actor.params != FAIRY_TYPE_0 || !CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) ||
-        !MMMidnaResources_Exists(path)) {
+    if (this->actor.params != FAIRY_TYPE_0 || !MMCompanion_UseMidna() || !MMMidnaResources_Exists(path)) {
         return false;
     }
     /* Resolve through the resource manager each draw; retaining a raw pointer
@@ -1859,6 +1867,7 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
                 return;
             }
             Gfx* gfx = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Gfx));
+            bool useTatlCosmetics = &this->actor == player->tatlActor && !MMCompanion_UseNavi();
             f32 alphaScale;
             s32 envAlpha;
 
@@ -1877,7 +1886,7 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
 
             // 2S2H [Cosmetic] Only Tatl gets recolored; the other fairies share this actor but have their own
             // colors, and Tatl's are additionally driven by whatever she is currently pointing out.
-            if (&this->actor == player->tatlActor) {
+            if (useTatlCosmetics) {
                 gDPSetPrimColorOverride(gfx++, 0, 0x01, (u8)(s8)this->innerColor.r, (u8)(s8)this->innerColor.g,
                                         (u8)(s8)this->innerColor.b, (u8)(s8)(this->innerColor.a * alphaScale),
                                         COSMETIC_ID("World.TatlInner"));
@@ -1894,7 +1903,7 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
 
             gSPEndDisplayList(gfx);
 
-            if (&this->actor == player->tatlActor) {
+            if (useTatlCosmetics) {
                 gDPSetEnvColorOverride(POLY_XLU_DISP++, (u8)(s8)this->outerColor.r, (u8)(s8)this->outerColor.g,
                                        (u8)(s8)this->outerColor.b, (u8)(s8)(envAlpha * alphaScale),
                                        COSMETIC_ID("World.TatlOuter"));

@@ -87,7 +87,9 @@ void GameOver_Update(PlayState* play) {
             break;
 
         case GAMEOVER_DEATH_FADE_OUT:
-            if (CVarGetInteger("gEnhancements.Kaleido.GameOver", 0)) {
+            if (gSaveContext.gameMode == GAMEMODE_NORMAL &&
+                CVarGetInteger(GAME_OVER_SCREEN_CVAR, GAME_OVER_SCREEN_DEFAULT) &&
+                !CVarGetInteger("gEnhancements.DifficultyOptions.DeleteFileOnDeath", 0)) {
                 sGameOverTimer--;
 
                 if (sGameOverTimer == 0) {

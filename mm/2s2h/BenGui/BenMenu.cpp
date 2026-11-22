@@ -25,6 +25,7 @@
 #include "DeveloperTools/SaveEditor.h"
 #include "DeveloperTools/CollisionViewer.h"
 #include "2s2h/Enhancements/Enhancements.h"
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/Enhancements/GfxPatcher/AuthenticGfxPatches.h"
 #include "2s2h/PresetManager/PresetManager.h"
@@ -1622,16 +1623,22 @@ void BenMenu::AddEnhancements() {
         BlackMarketUI::DrawAppearance();
     });
 #endif
+    AddWidget(path, "Navi Companion", WIDGET_CVAR_CHECKBOX)
+        .CVar(MM_NAVI_COMPANION_CVAR)
+        .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Give Link Navi's blue glow, voices, and fairy sounds using 2Ship's native sound bank. "
+            "Navi takes priority over Midna while enabled."));
     AddWidget(path, "Midna Companion (Tatl)", WIDGET_CVAR_CHECKBOX)
-        .CVar("gEnhancements.MidnaCompanionMM")
+        .CVar(MM_MIDNA_COMPANION_CVAR)
         .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
             "Replace Tatl with Midna's model, animation and companion sounds. "
             "Requires the Midna companion pack in mods/2ship. Missing assets use Tatl's normal appearance or sounds. "
-            "Turn off to restore Tatl. Navi has a separate checkbox in the OoT menu. "
+            "This setting applies when Navi Companion is off. "
             "Enable to choose a sound for each event below."));
     AddWidget(path, "Midna Sound Effects", WIDGET_CUSTOM)
-        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.MidnaCompanionMM", 0); })
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !MMCompanion_UseMidna(); })
         .CustomFunction(DrawMMMidnaSoundAssignments);
     AddWidget(path, "Chest Style Matches Contents", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.ChestStyleMatchesContentsMM")
@@ -2483,6 +2490,13 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "When you lose 4 quarters of a heart you will permanently lose that heart container.\n\nDisabling this "
             "after the fact will not restore any received heart containers."));
+    AddWidget(path, "Show Game Over Screen", WIDGET_CVAR_CHECKBOX)
+        .CVar(GAME_OVER_SCREEN_CVAR)
+        .Options(
+            CheckboxOptions()
+                .DefaultValue(GAME_OVER_SCREEN_DEFAULT)
+                .Tooltip("Show the Continue Playing prompt after a normal defeat. Turn off to reload automatically. "
+                         "Delete File on Death takes priority."));
     AddWidget(path, "Delete File on Death", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.DifficultyOptions.DeleteFileOnDeath")
         .Options(CheckboxOptions().Tooltip("Dying will delete your file\n\n     " ICON_FA_EXCLAMATION_TRIANGLE

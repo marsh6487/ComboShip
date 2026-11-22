@@ -42,6 +42,11 @@
 #include "2s2h/Rando/WalletGi.h"
 #include "2s2h_assets.h"                                     // custom rando models (triforce, ocarina buttons, ...)
 #include "objects/gameplay_keep/gameplay_keep.h"             // stray-fairy skel/anim + soul flame DL
+#include "objects/gameplay_field_keep/gameplay_field_keep.h" // butterfly soul
+#include "objects/object_cow/object_cow.h"                   // cow soul
+#include "objects/object_dnt/object_dnt.h"                   // Business Scrub soul
+#include "objects/object_dog/object_dog.h"                   // dog soul
+#include "objects/object_niw/object_niw.h"                   // Cucco soul
 #include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
 #include "objects/object_sek/object_sek.h"                   // gOwlStatueOpenedDL
 #include "objects/object_gi_reserve00/object_gi_reserve00.h" // Moon's Tear item DL + texanim path
@@ -971,7 +976,7 @@ static int32_t MM_FillMinifrogAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
 
 static int32_t MM_FillAnimDrawInfo(RandoItemId id, CwItemAnimDrawInfo* out) {
     if (MM_FillBossSoulAnim(id, out) || MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) ||
-        MM_FillMiscSoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
+        MM_FillAnimalAndMiscSoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
         return 1;
     }
     return 0;
@@ -1541,7 +1546,7 @@ extern "C" COMBO_EXPORT int32_t MM_GetSoulMiniAnimDrawInfoById(int32_t itemId, C
             return 0;
         *out = CwItemAnimDrawInfo{};
         const auto id = static_cast<RandoItemId>(itemId);
-        return MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) || MM_FillMiscSoulAnim(id, out);
+        return MM_FillEnemySoulAnim(id, out) || MM_FillNpcSoulAnim(id, out) || MM_FillAnimalAndMiscSoulAnim(id, out);
     } catch (...) { return 0; }
 }
 

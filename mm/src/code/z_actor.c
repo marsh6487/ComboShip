@@ -38,6 +38,7 @@
 
 #include <string.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
@@ -523,7 +524,11 @@ void Attention_InitReticle(Attention* attention, ActorType actorCategory, PlaySt
 }
 
 void Attention_SetTatlState(Attention* attention, Actor* actor, ActorType actorCategory, PlayState* play) {
-    AttentionColor* attentionColor = &sAttentionColors[actorCategory];
+    static const AttentionColor naviIdle = { { 255, 255, 255, 255 }, { 0, 0, 255, 0 } };
+    const AttentionColor* attentionColor = &sAttentionColors[actorCategory];
+    if (actorCategory == ACTORCAT_PLAYER && MMCompanion_UseNavi()) {
+        attentionColor = &naviIdle;
+    }
 
     attention->tatlHoverPos.x = actor->focus.pos.x;
     attention->tatlHoverPos.y = actor->focus.pos.y + (actor->lockOnArrowOffset * actor->scale.y);

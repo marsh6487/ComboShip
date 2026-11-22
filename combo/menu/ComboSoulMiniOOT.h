@@ -192,6 +192,14 @@ inline constexpr Model Catalog[] = {
       "__OTR__objects/object_os_anime/gObjOsAnim_28DC", 16, 0, 0.007f, -20.0f }, // En_Hy
     { RG_SOUL_NPC_THIEVES, "__OTR__objects/object_ge1/gGerudoWhiteSkel",
       "__OTR__objects/object_ge1/gGerudoWhiteIdleAnim", 16, 0, 0.006f, -20.0f }, // En_Ge1
+    { RG_SOUL_ANIMAL_CUCCO, "__OTR__objects/object_niw/gCuccoSkel", "__OTR__objects/object_niw/gCuccoAnim", 16, 0,
+      0.016f, -12.0f }, // En_Niw
+    { RG_SOUL_ANIMAL_COW, "__OTR__objects/object_cow/gCowBodySkel", "__OTR__objects/object_cow/gCowBodyChewAnim", 6, 0,
+      0.006f, -20.0f }, // En_Cow
+    { RG_SOUL_ANIMAL_DOG, "__OTR__objects/object_dog/gDogSkel", "__OTR__objects/object_dog/gDogWalkAnim", 13, 0, 0.018f,
+      -12.0f }, // En_Dog
+    { RG_SOUL_ANIMAL_BUTTERFLY, "__OTR__objects/gameplay_field_keep/gButterflySkel",
+      "__OTR__objects/gameplay_field_keep/gButterflyAnim", 8, 1, 0.035f, 0.0f }, // En_Butte
     // Misc actors have their own native meshes; they are not boss-slot indices.
     { RG_SOUL_MISC_GS, "__OTR__objects/object_st/object_st_Skel_005298",
       "__OTR__objects/object_st/object_st_Anim_000304", 30, 1, 0.018f, 0.0f }, // En_Sw, gold variant
@@ -207,7 +215,9 @@ inline const Model* Find(int32_t id) {
 inline bool UsesDetailed(int32_t id) {
     if (!Find(id))
         return false;
-    const bool npc = (id >= RG_SOUL_NPC_SARIA && id <= RG_SOUL_NPC_THIEVES) || id == RG_SOUL_MISC_BUSINESS_SCRUB;
+    if (id >= RG_SOUL_ANIMAL_CUCCO && id <= RG_SOUL_MISC_BUSINESS_SCRUB)
+        return true;
+    const bool npc = id >= RG_SOUL_NPC_SARIA && id <= RG_SOUL_NPC_THIEVES;
     return npc ? !ComboSoulModels::SimplerNpc() : !ComboSoulModels::SimplerEnemy();
 }
 inline CwAnimSegBind& Segment(CwItemAnimDrawInfo& out, int seg, const char* path = nullptr) {
@@ -298,6 +308,14 @@ inline int32_t Describe(int32_t id, CwItemAnimDrawInfo* result) {
     out.flameSeg.xStep2 = 1;
     out.flameSeg.yStep2 = -8;
     switch (id) {
+        case RG_SOUL_ANIMAL_COW:
+            out.hiddenLimb = 5; // EnCow_OverrideLimbDraw hides the nose ring.
+            break;
+        case RG_SOUL_ANIMAL_DOG:
+            out.modelEnvColor[0] = out.modelEnvColor[1] = 255;
+            out.modelEnvColor[2] = 200;
+            out.modelEnvColor[3] = 0;
+            break;
         case RG_SOUL_MISC_GS:
             out.proceduralProfile = CW_ANIM_PROFILE_GOLD_SKULLTULA;
             break;

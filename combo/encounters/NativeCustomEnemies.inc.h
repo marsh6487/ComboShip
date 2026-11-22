@@ -1,5 +1,6 @@
 // Included once by each game's native adapter. No scene data is changed.
 #include "EncounterPolicy.h"
+#include "CustomEnemyHints.h"
 #include "NativeCustomEnemies.h"
 #include <cmath>
 #include <array>
@@ -175,6 +176,10 @@ extern "C" int CustomEnemies_Kind(int id) {
         if (ids[i] >= 0 && ids[i] == id)
             return i + 1;
     return 0;
+}
+static const CustomEncounters::EnemyHint* FindEnemyHint(int id) {
+    const int kind = CustomEnemies_Kind(id);
+    return kind == 0 ? nullptr : &CustomEncounters::EnemyHints[kind - 1];
 }
 extern "C" void CustomEnemies_ActorDestroyed(Actor* actor) {
     if (!actor)

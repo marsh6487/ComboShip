@@ -211,6 +211,34 @@ static void LegacySongNote() {
     assert(gfx.uploadedWidth == 16 && gfx.uploadedHeight == 24);
     puts("PASS legacy quest note uploads its full IA8 image without changing unrelated tiles");
 }
+
+static void LegacyHeartPiece() {
+    Interpreter gfx;
+    const auto init = std::make_shared<Ship::ResourceInitData>();
+    auto texture = std::make_shared<Texture>(init);
+    texture->ImageDataSize = 96 * 144;
+    texture->ImageData = new uint8_t[texture->ImageDataSize]{};
+    constexpr size_t pixel = 55 * 96 + 32;
+    texture->ImageData[pixel] = 0xAF;
+    auto& loaded = gfx.rdp.loaded_texture[0];
+    loaded.addr = texture->ImageData;
+    loaded.size_bytes = loaded.line_size_bytes = loaded.full_image_line_size_bytes = 48 * 48;
+    loaded.raw_tex_metadata = { 96, 144, 1, 1, texture, TextureType::GrayscaleAlpha8bpp };
+    gfx.rdp.texture_tile[0].line_size_bytes = 48;
+    for (const char* path :
+         { "icon_item_static_yar/gItemIconHeartPiece", "textures/icon_item_static/gHeartPieceIcon" }) {
+        for (char count : { '1', '2', '3' }) {
+            init->Path = std::string("alt/") + path + count + "Tex";
+            gfx.ImportTextureIA8(0, false);
+            assert(gfx.uploadedWidth == 96 && gfx.uploadedHeight == 144);
+            assert(gfx.texels[4 * pixel] == 0xAA && gfx.texels[4 * pixel + 3] == 0xFF);
+        }
+    }
+    init->Path = "icon_item_static_yar/gItemIconHeartPiece4Tex";
+    gfx.ImportTextureIA8(0, false);
+    assert(gfx.uploadedWidth == 48 && gfx.uploadedHeight == 48);
+    puts("PASS legacy MM and OoT quest heart textures upload all IA8 pixels");
+}
 } // namespace Fast
 
 int main(int argc, char** argv) {
@@ -233,5 +261,6 @@ int main(int argc, char** argv) {
     if (test == "all" || test == "valid") {
         Fast::ValidTextures();
         Fast::LegacySongNote();
+        Fast::LegacyHeartPiece();
     }
 }

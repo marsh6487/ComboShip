@@ -23,12 +23,6 @@
  * unregistered, in case the archive set changes after boot. Registration is idempotent
  * (gEnMiniblinId != -1 guard; all three register together).
  *
- * ---- Scissors Beetle Navi hint ----------------------------------------------------------
- * The reference ships a DEFINE_MESSAGE for textId 0x065D (naviEnemyId 0x5D + 0x600, see
- * z_player.c). SoH's message table has no 0x065D, so the text is served through the
- * OnOpenText hook with a CustomMessage (same pattern as picto_message.cpp). English only —
- * the reference's "german"/"french" placeholders were dropped.
- *
  * NOTE: like boss_remains_actor_reg.cpp, add this file to the VS solution by hand.
  */
 
@@ -38,7 +32,6 @@
 #include "global.h"
 #include "soh/ShipInit.hpp"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
-#include "soh/Enhancements/custom-message/CustomMessageManager.h"
 
 extern "C" {
 
@@ -92,9 +85,6 @@ static const char* const sSbeetleGatePath =
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_DRAW_CULLING_DISABLED)
 #define TRUTEFEL_SBEETLE_FLAGS (TRUTEFEL_MINIBLIN_FLAGS | ACTOR_FLAG_TALK_WITH_C_UP)
-
-// Scissors Beetle Navi hint (naviEnemyId 0x5D -> textId 0x600 + 0x5D)
-#define TRUTEFEL_SBEETLE_NAVI_TEXTID 0x065D
 
 void Trutefel_EnsureActorsRegistered(void) {
     // Idempotence guard: all three are registered together, so one id answers for all.
@@ -158,16 +148,6 @@ void Trutefel_EnsureActorsRegistered(void) {
     }
 }
 
-// Scissors Beetle Navi hint (reference sbeetle_message_data.h, english entry).
-// CustomMessage: & = newline, %c = light blue, %w = white (AutoFormat handles wrapping).
-static void Trutefel_BuildSbeetleNaviMessage(uint16_t* textId, bool* loadFromMessageTable) {
-    CustomMessage msg = CustomMessage("Scissors Beetle&%cIt attacks by throwing its pincers like "
-                                      "boomerangs! Keep moving, then strike when they return!%w");
-    msg.AutoFormat();
-    msg.LoadIntoFont();
-    *loadFromMessageTable = false;
-}
-
 static void Trutefel_RegisterHooks() {
     // ShipInit::InitAll can fire more than once (e.g. preset apply) — hooks register once.
     static bool sHooksRegistered = false;
@@ -190,11 +170,6 @@ static void Trutefel_RegisterHooks() {
             }
         });
     }
-
-    // Navi C-up text for the Scissors Beetle (safe to register even without the archive —
-    // the textId is only ever requested by a spawned En_Sbeetle).
-    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnOpenText>(TRUTEFEL_SBEETLE_NAVI_TEXTID,
-                                                                                Trutefel_BuildSbeetleNaviMessage);
 }
 
 static RegisterShipInitFunc sTrutefelEnemiesInit(Trutefel_RegisterHooks);

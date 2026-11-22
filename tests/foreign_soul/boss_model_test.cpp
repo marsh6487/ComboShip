@@ -117,7 +117,7 @@ static bool ComboDrawMorphaTentacleGi(PlayState* host, const char* owner,
 // to the full-catalog renderer fixture; neither boundary handles a boss ID.
 static int32_t MM_FillEnemySoulAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
 static int32_t MM_FillNpcSoulAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
-static int32_t MM_FillMiscSoulAnim(RandoItemId id, CwItemAnimDrawInfo*) {
+static int32_t MM_FillAnimalAndMiscSoulAnim(RandoItemId id, CwItemAnimDrawInfo*) {
     std::fprintf(stderr, "boss fixture unexpectedly reached a miscellaneous soul recipe for item %d\n",
                  static_cast<int>(id));
     std::abort();

@@ -29,10 +29,7 @@ s32 KaleidoScope_UpdateQuestStatusPoint(PauseContext* pauseCtx, s16 point);
 #include "mods/extended_inventory.h"
 #include "mods/spiritual_stones/spiritual_stones.h" // SpiritualStone_IsPassiveActive (stone dimming)
 
-extern const char* sCounterTextures[]; // GS-count digit textures (I8 8x16), shared with MM's page
-
-// CVar-persisted view toggle: 0 = MM quest page, 1 = OoT quest page.
-#define CVAR_OOT_QUEST_PAGE "gEnhancements.Kaleido.OotQuestPage"
+extern const char* sCounterTextures[]; // GS-count digit textures (I8 8x16)
 
 // OoT song-note colors — EXACT (soh z_kaleido_collect.c D_8082A164/17C/194).
 static const s16 sOotSongR[12] = { 150, 255, 100, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
@@ -81,11 +78,22 @@ static const char* sOotAgonyIconPath = "__OTR__textures/icon_item_24_static/gQue
 static const char* sOotGerudoIconPath = "__OTR__textures/icon_item_24_static/gQuestIconGerudosCardTex";
 static const char* sOotSkulltulaIconPath = "__OTR__textures/icon_item_24_static/gQuestIconGoldSkulltulaTex";
 static const char* sOotSongNotePath = "__OTR__textures/icon_item_static/gSongNoteTex";
-static const char* sOotHeartPiecePaths[] = {
+static const char* const sMmHeartPieceTextures[] = {
+    gItemIconHeartPiece1Tex,
+    gItemIconHeartPiece2Tex,
+    gItemIconHeartPiece3Tex,
+};
+static const char* const sOotHeartPiecePaths[] = {
     "__OTR__textures/icon_item_static/gHeartPieceIcon1Tex",
     "__OTR__textures/icon_item_static/gHeartPieceIcon2Tex",
     "__OTR__textures/icon_item_static/gHeartPieceIcon3Tex",
 };
+
+static u32 QuestStatus_HeartPieceCount(void) {
+    u32 count = GET_QUEST_HEART_PIECE_COUNT;
+    // Four pieces can be present briefly while the heart-container upgrade is being processed.
+    return count <= ARRAY_COUNT(sMmHeartPieceTextures) ? count : 0;
+}
 
 // OoT quest cursor points: 0-5 medallions, 6-0x11 songs, 0x12-0x14 stones, 0x15 agony, 0x16 gerudo,
 // 0x17 skulltula, 0x18 heart-piece pie. Points map 1:1 onto the quad indices of the layout tables.
@@ -374,11 +382,14 @@ static s32 OotQuest_Has(s32 bit); // defined below
 // Is this OoT quest point currently owned? Used for the label/notes/A-action, NOT for navigation —
 // OoT (and MM) both let the cursor rest on an empty slot, it just shows nothing.
 static s32 OotQuest_PointOwned(s16 point) {
-    if (point <= 0x17) {
-        return OotQuest_Has(point); // ootQuestItems bit index == quest point for 0..0x17
+    if (point == OOT_QUEST_SKULL_TOKEN) {
+        return Nei_Save()->ootGsCount != 0;
+    }
+    if ((u16)point < OOT_QUEST_SKULL_TOKEN) {
+        return OotQuest_Has(point); // ootQuestItems bit index == quest point
     }
     if (point == OOT_QUEST_POINT_HEART_PIECE) {
-        return (GET_SAVE_INVENTORY_QUEST_ITEMS >> QUEST_HEART_PIECE_COUNT) != 0;
+        return QuestStatus_HeartPieceCount() != 0;
     }
     return 0;
 }
@@ -575,7 +586,7 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
             OotQuest_DrawIcon(gfxCtx, vtx, 22, tex, 24, 24);
         }
     }
-    if (OotQuest_Has(OOT_QUEST_SKULL_TOKEN)) {
+    if (OotQuest_PointOwned(OOT_QUEST_SKULL_TOKEN)) {
         const char* tex = OotQuest_Tex(sOotSkulltulaIconPath);
         if (tex != NULL) {
             OotQuest_DrawIcon(gfxCtx, vtx, 23, tex, 24, 24);
@@ -583,18 +594,8 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
 
         // GS-count digits — soh 1:1: bind the 6 digit quads at vtx[164] (quads 41-46), shadow pass
         // then colored pass, leading zeros suppressed. Digit textures are I8 8x16 (sCounterTextures).
-        s16 c = Nei_Save()->ootGsCount;
-        s16 digits[3];
-        digits[0] = digits[1] = 0;
-        digits[2] = c;
-        while (digits[2] >= 100) {
-            digits[0]++;
-            digits[2] -= 100;
-        }
-        while (digits[2] >= 10) {
-            digits[1]++;
-            digits[2] -= 10;
-        }
+        s32 c = MIN(Nei_Save()->ootGsCount, 999);
+        s16 digits[3] = { c / 100, (c / 10) % 10, c % 10 };
 
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
@@ -623,12 +624,12 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
 
     // The count is local to this save. Use the artwork that fits the OoT heart recess.
     {
-        u32 hpCount = GET_SAVE_INVENTORY_QUEST_ITEMS >> QUEST_HEART_PIECE_COUNT;
+        u32 hpCount = QuestStatus_HeartPieceCount();
 
-        if (hpCount > 0 && hpCount <= ARRAY_COUNT(sOotHeartPiecePaths)) {
+        if (hpCount != 0) {
             const char* heart = OotQuest_Tex(sOotHeartPiecePaths[hpCount - 1]);
             if (heart == NULL) {
-                heart = gItemIcons[ITEM_HEART_PIECE_2 + hpCount - 1];
+                heart = sMmHeartPieceTextures[hpCount - 1];
             }
             gDPPipeSync(POLY_OPA_DISP++);
             gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
@@ -713,7 +714,7 @@ void KaleidoScope_DrawOotQuestName(PlayState* play) {
     // scrolled off this page the info panel's "to Map"/"to Equipment" label was drawn first and this
     // name landed on top of it — two texts stacked. Same during the save prompt / game over.
     // Only draw where MM itself would draw an item name: main state, cursor on the page, slot owned.
-    if (!CVarGetInteger(CVAR_OOT_QUEST_PAGE, 0) || !CVarGetInteger(CVAR_QUEST_INTERACT, 1) ||
+    if (!KaleidoScope_UsesOotQuestPage() || !CVarGetInteger(CVAR_QUEST_INTERACT, 1) ||
         (pauseCtx->pageIndex != PAUSE_QUEST) || (pauseCtx->state != PAUSE_STATE_MAIN) ||
         (pauseCtx->cursorSpecialPos != 0) || (sOotQuestCursorPoint > OOT_QUEST_POINT_MAX) ||
         !OotQuest_PointOwned(sOotQuestCursorPoint)) {
@@ -1059,7 +1060,7 @@ s32 OotQuest_HandleCursor(PlayState* play) {
     // Cursor works whenever the OoT quest page is shown and interaction is enabled (DEFAULT ON —
     // the earlier default-off was why the cursor "didn't move"). A on a song runs the learn-it minigame
     // by default; the "Pause Play" enhancement switches that to overworld-style play (with an ocarina).
-    if (!CVarGetInteger(CVAR_OOT_QUEST_PAGE, 0) || !CVarGetInteger(CVAR_QUEST_INTERACT, 1) ||
+    if (!KaleidoScope_UsesOotQuestPage() || !CVarGetInteger(CVAR_QUEST_INTERACT, 1) ||
         (pauseCtx->pageIndex != PAUSE_QUEST)) {
         // Not our page: make sure the Quartz modal can't stay latched across a page change.
         sQuartzMenuOpen = 0;
@@ -1288,14 +1289,9 @@ s16 sQuestRemainsEnvBlue[] = {
     150, // Unused
 };
 
-// 2S2H [Port] (and in the function) don't do pointer math and access the list of digits directly.
-extern const char* sCounterTextures[];
-
-void KaleidoScope_DrawOotQuestStatus(PlayState* play);
-
 void KaleidoScope_DrawQuestStatus(PlayState* play) {
     // Skijer's NEI: L on the quest page flips to the OoT collect layout (its own quest store).
-    if (CVarGetInteger(CVAR_OOT_QUEST_PAGE, 0)) {
+    if (KaleidoScope_UsesOotQuestPage()) {
         KaleidoScope_DrawOotQuestStatus(play);
         return;
     }
@@ -1367,9 +1363,7 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
     s16 i;
     s16 j;
     s16 k;
-    s16 skullTokenDigits[3];
-    u16 isDigitDrawn;
-    u32* questItemsPtr;
+    u32 hpCount = QuestStatus_HeartPieceCount();
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1583,12 +1577,7 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
         }
     }
 
-    //! FAKE: Used to load `0xF0000000` early
-    if ((GET_SAVE_INVENTORY_QUEST_ITEMS & 0xF0000000) != 0) {}
-    questItemsPtr = &gSaveContext.save.saveInfo.inventory.questItems;
-    if (1) {}
-
-    if ((*questItemsPtr >> QUEST_HEART_PIECE_COUNT) != 0) {
+    if (hpCount != 0) {
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
                           PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
@@ -1604,9 +1593,7 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
         gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
         gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
 
-        POLY_OPA_DISP = Gfx_DrawTexQuadIA8(
-            POLY_OPA_DISP,
-            gItemIcons[(0x7A + ((GET_SAVE_INVENTORY_QUEST_ITEMS & 0xF0000000) >> QUEST_HEART_PIECE_COUNT))], 48, 48, 0);
+        POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, sMmHeartPieceTextures[hpCount - 1], 48, 48, 0);
     }
 
     j += 4;
@@ -1756,60 +1743,6 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
                     pauseCtx->ocarinaStaff->pos = 0;
                     pauseCtx->ocarinaStaff->state = 0xFE;
                     pauseCtx->mainState = PAUSE_MAIN_STATE_SONG_PROMPT;
-                }
-            }
-        }
-    }
-
-    // Draw Skull Token Count
-    // QUEST_SKULL_TOKEN never properly set, see Item_Give(),
-    // Vertices not well placed, digits are not aligned and placed in unintended positions
-    if (CHECK_QUEST_ITEM(QUEST_SKULL_TOKEN) && ((play->sceneId == SCENE_KINSTA1) || (play->sceneId == SCENE_KINDAN2))) {
-        gDPPipeSync(POLY_OPA_DISP++);
-        gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
-                          PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-        gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 0);
-
-        skullTokenDigits[0] = skullTokenDigits[1] = 0;
-        skullTokenDigits[2] = Inventory_GetSkullTokenCount(play->sceneId);
-
-        while (skullTokenDigits[2] >= 100) {
-            skullTokenDigits[0]++;
-            skullTokenDigits[2] -= 100;
-        }
-
-        while (skullTokenDigits[2] >= 10) {
-            skullTokenDigits[1]++;
-            skullTokenDigits[2] -= 10;
-        }
-
-        //! @bug: &pauseCtx->questVtx[84] is the questVtx for skull tokens
-        gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[152], 24, 0);
-
-        // Loop over two sets of digits, the first is shadowed, the second is colored
-        for (k = 0, i = 0; k < 2; k++) {
-            if (k == 0) {
-                // shadow
-                gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 0, 0, 0, pauseCtx->alpha);
-            } else {
-                if (Inventory_GetSkullTokenCount(play->sceneId) == 100) {
-                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 200, 50, 50, pauseCtx->alpha);
-                } else {
-                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
-                }
-            }
-
-            isDigitDrawn = false;
-            for (j = 0; j < 3; j++, i += 4) {
-                if ((j >= 2) || (skullTokenDigits[j] != 0) || isDigitDrawn) {
-                    // 2S2H [Port] Don't do pointer math and access the texture directly.
-                    gDPLoadTextureBlock(POLY_OPA_DISP++, sCounterTextures[skullTokenDigits[j]], G_IM_FMT_I, G_IM_SIZ_8b,
-                                        8, 16, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
-                                        G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-
-                    gSP1Quadrangle(POLY_OPA_DISP++, i, i + 2, i + 3, i + 1, 0);
-
-                    isDigitDrawn = true;
                 }
             }
         }
@@ -2016,7 +1949,7 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
                 }
             } else {
                 // Heart Piece Count
-                if ((GET_SAVE_INVENTORY_QUEST_ITEMS >> QUEST_HEART_PIECE_COUNT) != 0) {
+                if (QuestStatus_HeartPieceCount() != 0) {
                     cursorItem = ITEM_HEART_CONTAINER;
                 } else {
                     cursorItem = PAUSE_ITEM_NONE;

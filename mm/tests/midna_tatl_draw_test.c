@@ -4,6 +4,7 @@
 #include <string.h>
 #include "tests/test_require.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h"
+#include "2s2h/Enhancements/Companion/CompanionStyle.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -11,7 +12,7 @@
 static Gfx commands[160], resource[1], body[1], markings[1], shimmer[1], allocated[4];
 static Gfx blinkHalf[1], blinkClosed[1];
 static Vtx pose[1];
-static int enabled = 1, giantMask, cueId;
+static int enabled = 1, naviEnabled, giantMask, cueId;
 static unsigned nativeDraws, midnaSetups, resourceChecks, resourceLoads, pushes, pops;
 static unsigned tatlPrimOverrides, tatlEnvOverrides;
 static int packPresent, loadSucceeds;
@@ -175,7 +176,10 @@ void* MMMidnaResources_Load(const char* path) {
     return testLoadTexture(path);
 }
 int32_t CVarGetInteger(const char* path, int32_t fallback) {
-    REQUIRE(strcmp(path, "gEnhancements.MidnaCompanionMM") == 0 && fallback == 0);
+    if (strcmp(path, MM_NAVI_COMPANION_CVAR) == 0) {
+        return naviEnabled;
+    }
+    REQUIRE(strcmp(path, MM_MIDNA_COMPANION_CVAR) == 0 && fallback == 0);
     return enabled;
 }
 s32 Cutscene_IsCueInChannel(PlayState* play, u16 type) {
@@ -243,14 +247,15 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
     EnElf_Draw(&fairy.actor, &play);
     REQUIRE(nativeDraws == expectNative);
     REQUIRE(midnaSetups == expectMidna);
-    REQUIRE(tatlPrimOverrides == (expectNative && fairyType == FAIRY_TYPE_0));
+    REQUIRE(tatlPrimOverrides == (expectNative && fairyType == FAIRY_TYPE_0 && !naviEnabled));
     REQUIRE(tatlEnvOverrides == tatlPrimOverrides);
     int enhanced = poc2Present && !poseMissing && !markingsMissing && !shimmerVerticesMissing &&
                    !shimmerVerticesFailed && !textureFailed && expectMidna;
     REQUIRE(pushes == pops && pushes == expectMidna + (enhanced ? 6 : 0));
     REQUIRE(memcmp(&before, &fairy, sizeof(fairy)) == 0);
     REQUIRE(memcmp(&playerBefore, &player, sizeof(player)) == 0);
-    if (fairyType != FAIRY_TYPE_0 || !enabled || giantMask || hiddenState || hiddenFlag || (firstPerson && !inFront)) {
+    if (fairyType != FAIRY_TYPE_0 || !enabled || naviEnabled || giantMask || hiddenState || hiddenFlag ||
+        (firstPerson && !inFront)) {
         REQUIRE(resourceChecks == 0 && resourceLoads == 0);
     }
     if (expectMidna) {
@@ -394,6 +399,11 @@ int main(void) {
     checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, 0, 0);
     giantMask = 0;
     /* Installed pack selects Midna only for the companion fairy. */
+    checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, 1, 0);
+    naviEnabled = 1;
+    checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, 0, 1);
+    checkLights(FAIRY_TYPE_0, 1, 1, 0, LIGHT_POINT_GLOW);
+    naviEnabled = 0;
     checkCase(FAIRY_TYPE_0, 1, 1, 0, 0, 0, 1, 1, 0);
     for (int type = FAIRY_TYPE_1; type <= FAIRY_TYPE_10; ++type)
         checkCase(type, 1, 1, 0, 0, 0, 1, 0, 1);

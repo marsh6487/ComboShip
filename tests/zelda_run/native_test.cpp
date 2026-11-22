@@ -88,8 +88,17 @@ int main() {
   assert(ZeldaRun_Select(&other, run) == run &&
          ZeldaRun_Select(nullptr, run) == run);
   wolf = true;
+#ifndef ZELDA_TEST_MM
+  transformed = true;
+#endif
   assert(ZeldaRun_Select(&player, run) == run);
+#ifndef ZELDA_TEST_MM
+  // OoT's form state has returned to human. The custom slot still remembers Wolf.
+  transformed = false;
+  assert(ZeldaRun_Select(&player, run) == selected);
+#endif
   wolf = false;
+  assert(ZeldaRun_Select(&player, run) == selected);
   mario = true;
   assert(ZeldaRun_Select(&player, run) == run);
   mario = false;

@@ -1032,8 +1032,7 @@ extern "C" void Randomizer_DrawBeanSprout(PlayState* play, GetItemEntry* getItem
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Owner-authored enemy/NPC miniatures share the foreign GI renderer in Combo.
-// Animal/misc entries and the original build retain the native token presentation.
+// Owner-authored soul miniatures share the foreign GI renderer in Combo.
 extern "C" void Randomizer_DrawShuffledSoul(PlayState* play, GetItemEntry* entry) {
 #ifdef COMBO_BUILD
     if (entry) {

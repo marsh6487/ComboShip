@@ -35,7 +35,11 @@ with tempfile.TemporaryDirectory(prefix='oot-soul-catalog-') as directory:
             recipe=next(r for r in recipes if r['id']==identity)
             body=recipe['skelPath'] or recipe['parts'][0]['dlPath']
             assert body.startswith('__OTR__objects/'+obj+'/'), (identity,body,obj)
-    print('PASS independent native object representatives for all 89 identities')
+    for key, obj in [('CUCCO', 'object_niw'), ('COW', 'object_cow'), ('DOG', 'object_dog'),
+                     ('BUTTERFLY', 'gameplay_field_keep')]:
+        recipe = next(r for r in recipes if r['id'] == 'RG_SOUL_ANIMAL_' + key)
+        assert recipe['skelPath'].startswith('__OTR__objects/' + obj + '/'), (key, recipe)
+    print('PASS independent native object representatives for the enemy, NPC and animal identities')
     if '--archive' in sys.argv:
         import zipfile, struct
         archive=zipfile.ZipFile(sys.argv[sys.argv.index('--archive')+1])

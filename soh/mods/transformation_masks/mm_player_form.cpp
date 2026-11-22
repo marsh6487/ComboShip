@@ -14778,6 +14778,7 @@ static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
 
             if (!MmForm_LoadFormSkeleton(play, gFormState.targetForm)) {
                 sNativeMaskInstantFallback = 0;
+                sForceInstantTransform = 0;
                 MMFORM_LOG("[MmForm] Skeleton load failed, aborting transform");
                 player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
                 gFormState.state = MMFORM_STATE_INACTIVE;
@@ -15001,7 +15002,7 @@ static void MmForm_UpdateDetransforming(Player* player, PlayState* play) {
         (gFormState.currentForm == MM_PLAYER_FORM_GARO || gFormState.currentForm == MM_PLAYER_FORM_GERUDO ||
          MmForm_IsNativeMaskForm(gFormState.currentForm) || wasWolf);
     u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sNativeMaskInstantFallback ||
-                          forceInstantForLocalForm;
+                          sForceInstantTransform || forceInstantForLocalForm;
 
     if (instantTransform) {
         // Instant de-transform: 5-frame flash
@@ -15043,6 +15044,7 @@ static void MmForm_UpdateDetransforming(Player* player, PlayState* play) {
 
         if (gFormState.cutsceneTimer >= 5) {
             sNativeMaskInstantFallback = 0;
+            sForceInstantTransform = 0;
             gFormState.flashAlpha = 0;
             player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
             gFormState.state = MMFORM_STATE_INACTIVE;
@@ -18688,9 +18690,10 @@ void MmForm_Update(PlayState* play, Player* player) {
     {
         static u8 sPikaModeOwned = 0; // mode (not the pokeball) holds the current Pikachu
         u8 modeOn = CVarGetInteger("gPikachuMode", 0) != 0;
-        u8 pikaActive = (gFormState.state == MMFORM_STATE_ACTIVE && gFormState.currentForm == MM_PLAYER_FORM_PIKACHU);
+        u8 pikaActive = MmForm_IsPikachuActive();
         if (modeOn && MmForm_IsEnabled()) {
             if (gFormState.state == MMFORM_STATE_INACTIVE && !(player->stateFlags1 & PLAYER_STATE1_DEAD)) {
+                WolfLinkForm_Select(0);
                 gFormState.targetForm = MM_PLAYER_FORM_PIKACHU;
                 gFormState.state = MMFORM_STATE_TRANSFORMING;
                 gFormState.cutsceneTimer = 0;
