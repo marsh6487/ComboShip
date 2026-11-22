@@ -2,7 +2,7 @@
 
 #include "NeiGiPresentation.h"
 #include "ComboCollectibleShimmer.h"
-#include "render/WalletGiShimmer.h"
+#include "combo/render/WalletGiShimmer.h"
 #include "randomizerEnums.h"
 #include "z64item.h"
 #include <libultraship/bridge/consolevariablebridge.h>

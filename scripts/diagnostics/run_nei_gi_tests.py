@@ -225,11 +225,6 @@ void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
             spell_producer = functions((ROOT / "combo/menu/ComboItemDrawMM.h").read_text())["MM_FillElementalSpellDrawInfo"]
             foreign_shim = """
 const ComboForeignDrawInfo* selectedForeignInfo = nullptr;
-void Randomizer_DrawWallet(PlayState*, GetItemEntry*) { assert(false && "unexpected native wallet draw"); }
-extern "C" s32 GetItem_GetDrawTableEntry(s32, void**, s32, s32*, f32*, s32*, uint8_t*) {
-    assert(false && "unexpected native wallet table lookup");
-    return 0;
-}
 int foreignFallbackCalls = 0;
 RandomizerCheck OOT_GetQueuedDrawCheck() { return RC_UNKNOWN_CHECK; }
 const ComboForeignDrawInfo* ComboResolveForeignDrawInfo(RandomizerCheck) { return selectedForeignInfo; }

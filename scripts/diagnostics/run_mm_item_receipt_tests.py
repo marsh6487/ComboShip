@@ -37,6 +37,9 @@ def block(source, start):
 
 source = (ROOT / 'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp').read_text()
 give = block(source, '.giveItem =')
+rando_header = (ROOT / 'mm/2s2h/Rando/Rando.h').read_text()
+starting_reward = 'inline constexpr bool IsStartingRewardCheck(RandoCheckId check) ' + block(
+    rando_header, 'inline constexpr bool IsStartingRewardCheck(')
 donor_catalog = (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text()
 donor_names = set(re.findall(r'itemTable\[RG_\w+\]\s*=\s*Item\(.*?Text\{\s*"([^"\n]*)"', donor_catalog))
 concrete_names = set(re.findall(r'"([^"\n]*)"',
@@ -110,6 +113,8 @@ struct StaticCheck { RandoCheckType randoCheckType; };
 const std::map<RandoCheckId,StaticCheck> Checks = {
  {RC_UNKNOWN, {RCTYPE_UNKNOWN}},
  {RC_WOODFALL_TEMPLE_BOSS_WARP, {RCTYPE_REMAINS}},
+ {RC_STARTING_ITEM_DEKU_MASK, {RCTYPE_UNKNOWN}},
+ {RC_STARTING_ITEM_SONG_OF_HEALING, {RCTYPE_UNKNOWN}},
 };
 std::string GetItemName(RandoItemId id,bool=true,RandoCheckId=RC_UNKNOWN) {return id==RI_OOT_EXT_MAGIC_CAPE ? "the Magic Cape" : "the Deku Leaf";}
 uint8_t GetIconForZMessage(RandoItemId) {return 0xF5;}
@@ -205,6 +210,18 @@ int main(int argc,char** argv) {
  Apply(&actor,&play);
  assert(granted==grantsBeforeBoss+1 && saves==savesBeforeBoss+1 && savedCheckObtained);
  assert(bossCheck.obtained && !bossCheck.eligible && !queued);
+ // A starting check grants even under the major-item cutscene policy.
+ flags=0;showCutscene=true;donorAvailable=true;
+ const int beforeStartingText=CustomMessage::shownCount;
+ const int beforeStartingGrant=granted;
+ const int beforeStartingDelivery=delivered;
+ param=RC_STARTING_ITEM_DEKU_MASK;checks[param]={RI_OOT_NEI_DEKU_LEAF};
+ Apply(&actor,&play);
+ assert(granted==beforeStartingGrant+1 && checks[RC_STARTING_ITEM_DEKU_MASK].obtained);
+ param=RC_STARTING_ITEM_SONG_OF_HEALING;checks[param]={RI_COMBO_FOREIGN};
+ Apply(&actor,&play);
+ assert(delivered==beforeStartingDelivery+1 && checks[RC_STARTING_ITEM_SONG_OF_HEALING].obtained);
+ assert(CustomMessage::shownCount==beforeStartingText);
  std::cout<<"queued native/foreign receipts, icons, bank attribution, grants, traps and remains persistence passed\n";
 }
 '''
@@ -312,7 +329,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tu = tmp / 'queue.cpp'
     helpers = (ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp').read_text()
     append = block(helpers, 'void Rando::AppendReceiptSource')
-    tu.write_text(preamble + '\nvoid Rando::AppendReceiptSource(CustomMessage::Entry& entry,const std::string& source) ' + append +
+    tu.write_text(preamble + '\nnamespace Rando { ' + starting_reward + ' }\n' +
+                  '\nvoid Rando::AppendReceiptSource(CustomMessage::Entry& entry,const std::string& source) ' + append +
                   '\nnamespace Rando::MiscBehavior { void Apply(Actor* actor,PlayState* play) ' + give +
                   '\n}\nusing Rando::MiscBehavior::Apply;\n' + checks_source)
     exe = tmp / 'queue'
