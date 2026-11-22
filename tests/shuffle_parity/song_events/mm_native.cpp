@@ -1,4 +1,5 @@
 #include "Rando/SongEvents.h"
+#include "Rando/EnemyDropProgress.h"
 #include "Rando/SoloEntrances.h"
 #include "Rando/VanillaCompatibility.h"
 #include "Rando/SongEventsNativeActors.h"
@@ -267,7 +268,16 @@ int main() {
     auto map=ComboRando::SongEvents::Generate(ComboRando::SongEvents::Game::Mm,88,true);
     nlohmann::json spoiler={{"songEvents",map}};SongEvents::Import(info,spoiler);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));
+    const auto defeats = Rando::EnemyDropProgress::DefeatedBit(RC_ENEMY_DROP_ALIEN) |
+                         Rando::EnemyDropProgress::DefeatedBit(RC_ENEMY_DROP_WOLFOS);
+    info.firstSlainEnemies = defeats;
     nlohmann::json savedJson=info;memset(info.songEvents,0,sizeof(info.songEvents));savedJson.get_to(info);
+    REQUIRE(nlohmann::json::parse(savedJson.dump()).get<RandoSaveInfo>().firstSlainEnemies == defeats);
+    auto legacy = savedJson;
+    legacy.erase("firstSlainEnemies");
+    auto reused = info;
+    legacy.get_to(reused);
+    REQUIRE(reused.firstSlainEnemies == 0);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));
     memset(info.songEvents,0,sizeof(info.songEvents));SongEvents::RestoreForOracle(info);
     REQUIRE(std::equal(map.begin(),map.end(),info.songEvents));

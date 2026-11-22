@@ -2464,7 +2464,7 @@ void Rando::RegisterMenu() {
             .CVar(Rando::SoulTracker::SoloPauseMapCvar)
             .Options(
                 std::make_shared<UIWidgets::CheckboxOptions>(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
-                    "Press L on the pause Map page to view collected and missing souls in this MM seed.")));
+                    "Press L on the pause Map page to view souls and any shuffled first-slay checks.")));
     }
 
 #ifdef COMBO_BUILD

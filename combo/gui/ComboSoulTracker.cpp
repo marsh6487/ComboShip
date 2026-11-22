@@ -39,12 +39,18 @@ class SoulWindow final : public Ship::GuiWindow {
         if (ImGui::BeginTabBar("##SoulGames")) {
             if (ImGui::BeginTabItem("Ocarina of Time")) {
                 static const auto read = reinterpret_cast<ReadSave>(Combo_ResolveSym("soh", "SOH_ReadSoulTrackerSave"));
+                static const auto readFirstSlain =
+                    reinterpret_cast<ReadFirstSlain>(Combo_ResolveSym("soh", "SOH_ReadFirstSlainSave"));
+                DrawFirstSlain(slot, readFirstSlain);
                 DrawGame(slot, read, mShowMissing);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Majora's Mask")) {
                 static const auto read =
                     reinterpret_cast<ReadSave>(Combo_ResolveSym("2ship", "MM_ReadSoulTrackerSave"));
+                static const auto readFirstSlain =
+                    reinterpret_cast<ReadFirstSlain>(Combo_ResolveSym("2ship", "MM_ReadFirstSlainSave"));
+                DrawFirstSlain(slot, readFirstSlain);
                 DrawGame(slot, read, mShowMissing);
                 ImGui::EndTabItem();
             }

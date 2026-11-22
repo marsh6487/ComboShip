@@ -443,6 +443,7 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
         { "randoInf", rando.randoInf },
         { "randoEvents", rando.randoEvents },
         { "randoSaveChecks", rando.randoSaveChecks },
+        { "firstSlainEnemies", rando.firstSlainEnemies },
         { "finalSeed", rando.finalSeed },
         { "songEvents", rando.songEvents },
         { "soloEntrances", Rando::SoloEntrances::Seed(rando) },
@@ -483,6 +484,7 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
         rando.randoSaveChecks[i] = savedChecks[i];
     }
     j.at("finalSeed").get_to(rando.finalSeed);
+    rando.firstSlainEnemies = j.value("firstSlainEnemies", uint64_t{ 0 });
     memset(rando.songEvents, 0, sizeof(rando.songEvents));
     if (j.contains("songEvents"))
         j.at("songEvents").get_to(rando.songEvents);

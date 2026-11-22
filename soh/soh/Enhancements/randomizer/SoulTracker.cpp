@@ -1,4 +1,5 @@
 #include "SoulTracker.h"
+#include "EnemyFirstDrops.h"
 #include "SoulShuffle.h"
 #include "combo/gui/SoulTrackerView.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -73,6 +74,21 @@ int32_t ReadOotSave(int32_t slot, VisitRow visit, void* context, bool includeBea
     return 1;
 }
 
+int32_t ReadOotFirstSlain(int32_t slot, VisitFirstSlain visit, void* context) {
+    if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO ||
+        !Randomizer_GetSettingValue(RSK_SHUFFLE_ENEMY_DROPS))
+        return 0;
+
+    namespace Drops = Rando::EnemyFirstDrops;
+    for (const auto& entry : Drops::Catalog) {
+        if (Drops::HasSeededCheck(entry.check) && Drops::IsAvailable(entry.check, Drops::SeedUsesMQ)) {
+            visit(context, entry.name,
+                  FirstSlainProgress(Flags_GetRandomizerInf(entry.defeatedFlag), Flags_GetRandomizerInf(entry.flag)));
+        }
+    }
+    return 1;
+}
+
 class SoulWindow final : public Ship::GuiWindow {
   public:
     using GuiWindow::GuiWindow;
@@ -92,6 +108,7 @@ class SoulWindow final : public Ship::GuiWindow {
         const auto read = [](int32_t slot, VisitRow visit, void* context) {
             return ReadOotSave(slot, visit, context, true);
         };
+        DrawFirstSlain(gSaveContext.fileNum, ReadOotFirstSlain);
         DrawGame(gSaveContext.fileNum, read, mShowMissing);
     }
 
@@ -108,5 +125,9 @@ void Rando::SoulTracker::RegisterWindow(Ship::Gui& gui) {
 #ifdef COMBO_BUILD
 extern "C" COMBO_EXPORT int32_t SOH_ReadSoulTrackerSave(int32_t slot, VisitRow visit, void* context) {
     return ReadOotSave(slot, visit, context, false);
+}
+
+extern "C" COMBO_EXPORT int32_t SOH_ReadFirstSlainSave(int32_t slot, VisitFirstSlain visit, void* context) {
+    return ReadOotFirstSlain(slot, visit, context);
 }
 #endif

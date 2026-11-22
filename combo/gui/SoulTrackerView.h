@@ -19,6 +19,46 @@ struct Row {
 };
 using SoulRows = std::array<std::vector<Row>, FamilyNames.size()>;
 
+inline constexpr ImU32 FirstSlainAccent = IM_COL32(234, 197, 120, 255);
+inline constexpr char FirstSlainHeading[] = "First Slain Enemies";
+inline constexpr char FirstSlainLegend[] = "Gold marks a recorded defeat.";
+
+inline constexpr std::array<const char*, 3> FirstSlainLabels = { "Unrecorded", "Defeated", "Collected" };
+
+inline void DrawFirstSlain(int slot, ReadFirstSlain read) {
+    if (!read)
+        return;
+
+    struct DropRow {
+        const char* name;
+        FirstSlainStatus status;
+    };
+    std::vector<DropRow> rows;
+    const auto append = [](void* context, const char* name, FirstSlainStatus status) {
+        static_cast<std::vector<DropRow>*>(context)->push_back({ name, status });
+    };
+    if (!read(slot, append, &rows))
+        return;
+    const auto recorded = std::count_if(rows.begin(), rows.end(),
+                                        [](const DropRow& row) { return row.status != FirstSlainStatus::Unrecorded; });
+    const auto header = std::string(FirstSlainHeading) + " (" + std::to_string(recorded) + "/" +
+                        std::to_string(rows.size()) + ")###FirstSlain";
+    if (!ImGui::CollapsingHeader(header.c_str()))
+        return;
+
+    const auto gold = ImGui::ColorConvertU32ToFloat4(FirstSlainAccent);
+    ImGui::TextColored(gold, "%s", FirstSlainLegend);
+    if (rows.empty())
+        ImGui::TextDisabled("No first-slay checks in this seed.");
+    for (const auto& [name, status] : rows) {
+        const char* label = FirstSlainLabels[static_cast<size_t>(status)];
+        if (status == FirstSlainStatus::Unrecorded)
+            ImGui::TextDisabled("%s (%s)", name, label);
+        else
+            ImGui::TextColored(gold, "%s (%s)", name, label);
+    }
+}
+
 inline void DrawGame(int slot, ReadSave readSave, bool showMissing) {
     SoulRows rows;
     const auto append = [](void* context, Family family, const char* name, int32_t owned) {
