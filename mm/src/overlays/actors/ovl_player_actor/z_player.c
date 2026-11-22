@@ -11,6 +11,7 @@
 #include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "audio/TwilightPrincessTargeting.h"
+#include "rando/CrossEntranceBoss.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
@@ -7137,7 +7138,8 @@ void func_808354A4(PlayState* play, s32 exitIndex, s32 arg2) {
 
         Scene_SetExitFade(play);
     } else {
-        if (arg2) {
+        // Boss doors use floor effect 2. Its native respawn flag bypasses the entrance shuffle.
+        if (arg2 && !Combo_MM_IsShuffledBossEntrance(play->nextEntrance)) {
             gSaveContext.respawn[RESPAWN_MODE_DOWN].entrance = play->nextEntrance;
             func_80169EFC(play);
             gSaveContext.respawnFlag = -2;

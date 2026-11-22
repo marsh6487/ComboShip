@@ -25,7 +25,7 @@ void ApplyRemainsHint(u16* textId, bool* loadFromMessageTable) {
               "for their remains.";
     } else {
         msg = "         %g{{boss}}%w:\n"
-              "Last seen %y{{location}}%w.";
+              "Remains are %y{{location}}%w.";
 
         switch (remainsHintIndex) {
             case 1:

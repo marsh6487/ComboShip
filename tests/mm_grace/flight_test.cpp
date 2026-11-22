@@ -64,6 +64,7 @@ f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** out, s32* id,
 }
 u32 SurfaceType_GetSceneExitIndex(CollisionContext*, CollisionPoly*, s32) { return floorExit; }
 int Entrance_OverrideNextIndex(...) { return 0; }
+int Combo_MM_IsShuffledBossEntrance(int32_t) { return 0; }
 int Scene_SetTransitionForNextEntrance(...) { return 0; }
 FloorEffect SurfaceType_GetFloorEffect(CollisionContext*, CollisionPoly*, s32) { return floorEffect; }
 void Scene_SetExitFade(PlayState* play) { ++fadeCalls; play->transitionType = TRANS_TYPE_FADE_BLACK; }

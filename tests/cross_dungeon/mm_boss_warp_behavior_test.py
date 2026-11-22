@@ -75,6 +75,8 @@ struct SaveContext { struct { int entrance=0, cutsceneIndex=0; struct { uint32_t
 static SaveContext gSaveContext;
 static int gDungeonBossWarpSceneId=-1;
 static int Combo_MM_CrossBossWarp(int) { return 0; }
+// These fixtures enter the completion branch, with no boss ingress through a shortcut.
+static int Combo_MM_IsShuffledBossEntrance(int32_t) { return 0; }
 enum { GAMEMODE_NORMAL=0, TRANS_TRIGGER_START=1, TRANS_TYPE_FADE_WHITE=2, ACTOR_DOOR_WARP1=3, PLAYER_CSACTION_9=9 };
 #define GET_PLAYER(play) (&nativePlayer)
 #define DOORWARP1_GET_FF00_1(actor) 0xFF
