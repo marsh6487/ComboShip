@@ -1,3 +1,4 @@
+#include "combo/rando/SongEventDisplay.h"
 #include "combo/rando/SongEventsMenu.h"
 #include "Rando/Rando.h"
 #include "MMEnvironment.h"
@@ -19,6 +20,7 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include <ship/window/gui/IconsFontAwesome4.h>
 #include "Rando/CheckTracker/CheckTracker.h"
+#include "Rando/CheckTracker/SoulTrackerModel.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "build.h"
 #include "2s2h/BenGui/BenMenu.h"
@@ -839,6 +841,20 @@ static void DrawCheckPoolTab() {
             CheckboxOptions({ { .tooltip = "Shuffle songs required by world events. Song items keep their own setting.",
                                 .disabled = disabled,
                                 .disabledTooltip = "Incompatible with Vanilla Logic." } }));
+    }
+    {
+        namespace SongEvents = ComboRando::SongEvents;
+        static const char* glyphDisplayOptions[] = {
+            SongEvents::kGlyphAndSongNameLabel,
+            SongEvents::kGlyphOnlyLabel,
+        };
+        WhatsNew::Scope highlight(SongEvents::kGlyphDisplayCvar, SongEvents::kGlyphDisplayLabel,
+                                  CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        UIWidgets::CVarCombobox(SongEvents::kGlyphDisplayLabel, SongEvents::kGlyphDisplayCvar, glyphDisplayOptions,
+                                UIWidgets::ComboboxOptions()
+                                    .ComponentAlignment(UIWidgets::ComponentAlignment::Right)
+                                    .LabelPosition(UIWidgets::LabelPosition::Near)
+                                    .Tooltip(SongEvents::kGlyphDisplayTooltip));
     }
     UIWidgets::CVarCombobox(
         "Songs", Rando::StaticData::Options[RO_SHUFFLE_SONGS].cvar, &songShuffleOptions,
@@ -2440,6 +2456,16 @@ void Rando::RegisterMenu() {
         win->DrawElement();
     });
 #endif
+
+    if (!Combo_IsCombinedGame()) {
+        mBenMenu->AddSidebarEntry("Rando", "Souls Tracker", 1);
+        path.sidebarName = "Souls Tracker";
+        mBenMenu->AddWidget(path, "Collected Souls on Pause Map", WIDGET_CVAR_CHECKBOX)
+            .CVar(Rando::SoulTracker::SoloPauseMapCvar)
+            .Options(
+                std::make_shared<UIWidgets::CheckboxOptions>(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
+                    "Press L on the pause Map page to view collected and missing souls in this MM seed.")));
+    }
 
 #ifdef COMBO_BUILD
     mBenMenu->AddSidebarEntry("Rando", "Entrance Tracker", 1);

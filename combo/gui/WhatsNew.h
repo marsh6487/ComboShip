@@ -19,6 +19,9 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gOpenWindows.SoulTracker", Kind::New, "Open the dedicated Souls Tracker for solo OoT randomizer seeds." },
+    { "gRandoEnhancements.SoulTrackerPauseMapMM", Kind::New,
+      "Choose whether solo 2Ship shows the Collected Souls control on the pause Map page." },
     { "gRandoSettings.IncludeZfgWallet", Kind::New,
       "Add ZFG's Wallet, an extra Progressive Wallet with an overflowing-rupee animation and a 9,999-rupee capacity." },
     { "gEnhancements.Cutscenes.SkipGetItemCutscenes", Kind::Updated,
@@ -61,10 +64,14 @@ inline constexpr Entry kControls[]{
     { "gRando.CSMC", Kind::Updated,
       "MM environmental checks also show their assigned reward category, including cross-game items." },
 
-    { "gRandoSettings.ShuffleSongEvents", Kind::New, "Shuffle songs required by OoT world events." },
+    { "gRandoSettings.ShuffleSongEvents", Kind::Updated,
+      "Shuffle songs required by OoT world events. Nearby interactions show animated song glyphs." },
+    { "gRandoEnhancements.SongEventGlyphDisplay", Kind::New,
+      "Choose whether shuffled song glyphs show the song name in both games." },
     { "gRandoSettings.ShuffleClock", Kind::New, "Lock OoT time until the Clock is found." },
     { "gRandoSettings.ClockStart", Kind::New, "Configure OoT time before finding the Clock." },
-    { "gRando.Options.RO_SHUFFLE_SONG_EVENTS", Kind::New, "Shuffle songs required by MM world events." },
+    { "gRando.Options.RO_SHUFFLE_SONG_EVENTS", Kind::Updated,
+      "Shuffle songs required by MM world events. Nearby interactions show animated song glyphs." },
     { "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS", Kind::New,
       "Give each MM lottery night its own reward, with daytime tickets and evening winnings." },
     { "gRando.Options.RO_INFINITE_UPGRADES", Kind::New,

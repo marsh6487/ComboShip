@@ -3,6 +3,8 @@
 #include "Rando/Rando.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#include "combo/ComboGameMode.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
 #include <ship/window/Window.h>
 #include <ship/window/gui/Gui.h>
@@ -33,6 +35,8 @@ std::size_t sPage = 0;
 constexpr const char* FamilyNames[] = { "Bosses", "Enemies", "NPCs / shopkeepers", "Animals", "Miscellaneous" };
 
 bool IsMapReady() {
+    if (!Combo_IsCombinedGame() && !CVarGetInteger(SoloPauseMapCvar, 1))
+        return false;
 #ifdef COMBO_BUILD
     if (!Combo_MmIsForeground())
         return false;

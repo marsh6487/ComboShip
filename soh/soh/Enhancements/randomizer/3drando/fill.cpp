@@ -64,19 +64,32 @@ PriceSettingsStruct merchantPrices = {
 
 static void PropagateTimeTravel(GetAccessibleLocationsStruct& gals, RandomizerGet ignore = RG_NONE,
                                 bool stopOnBeatable = false, bool addToPlaythrough = false) {
-    // special check for temple of time
-    if (gals.haveTimeAccess && gals.foundTempleOfTime && gals.validatedStartingRegion) {
-        if (!RegionTable(RR_ROOT)->Adult() &&
-            RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)
-                ->Child()) { // RANDOTODO: sphere weirdness, other age locations not propagated in this sphere
-            RegionTable(RR_ROOT)->adultDay = RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)->childDay;
-            RegionTable(RR_ROOT)->adultNight = RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)->childNight;
-            ProcessRegion(RegionTable(RR_ROOT), gals, ignore, stopOnBeatable, addToPlaythrough);
-        } else if (!RegionTable(RR_ROOT)->Child() && RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)->Adult()) {
-            RegionTable(RR_ROOT)->childDay = RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)->adultDay;
-            RegionTable(RR_ROOT)->childNight = RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME)->adultNight;
-            ProcessRegion(RegionTable(RR_ROOT), gals, ignore, stopOnBeatable, addToPlaythrough);
-        }
+    if (!gals.haveTimeAccess || !gals.foundTempleOfTime || !gals.validatedStartingRegion) {
+        return;
+    }
+
+    // The pedestal changes age in place and preserves time. Root access
+    // separately represents savewarp and warp songs as the new age.
+    Region* pedestal = RegionTable(RR_TOT_BEYOND_DOOR_OF_TIME);
+    Region* root = RegionTable(RR_ROOT);
+    const bool day = pedestal->childDay || pedestal->adultDay;
+    const bool night = pedestal->childNight || pedestal->adultNight;
+    const bool pedestalChanged = (day && (!pedestal->childDay || !pedestal->adultDay)) ||
+                                 (night && (!pedestal->childNight || !pedestal->adultNight));
+    const bool rootChanged =
+        (day && (!root->childDay || !root->adultDay)) || (night && (!root->childNight || !root->adultNight));
+
+    pedestal->childDay |= day;
+    pedestal->adultDay |= day;
+    pedestal->childNight |= night;
+    pedestal->adultNight |= night;
+    root->childDay |= day;
+    root->adultDay |= day;
+    root->childNight |= night;
+    root->adultNight |= night;
+    gals.logicUpdated |= pedestalChanged || rootChanged;
+    if (rootChanged) {
+        ProcessRegion(root, gals, ignore, stopOnBeatable, addToPlaythrough);
     }
 }
 
@@ -498,12 +511,11 @@ void ProcessRegion(Region* region, GetAccessibleLocationsStruct& gals, Randomize
     if (gals.haveTimeAccess) {
         region->ApplyTimePass();
     } else {
-        // If we're checking for TimePass access do that for each region as it's being updated.
-        // TimePass Access is satisfied when every AgeTime can reach a region with TimePass
-        // without the aid of TimePass. During this mode, TimePass won't update ToD access
-        // in any region.
+        // Entrance validation probes whether each age/time can reach a region
+        // where the clock can eventually advance. This structural check runs
+        // before applying the shuffled item pool, which may contain the Clock.
         // RANDOTODO can probably be removed after a ToD rework that accounts for having Dampe time access
-        if (region->TimePass()) {
+        if (region->timePass) {
             if (region->childDay) {
                 gals.timePassChildDay = true;
             }
@@ -546,6 +558,22 @@ void ProcessRegion(Region* region, GetAccessibleLocationsStruct& gals, Randomize
     logic->CurrentRegionKey = previousRegionKey;
 }
 
+static void SeedRegionAgeTime(Region* region, RandoAgeTime ageTime) {
+    if (ageTime == RAT_CHILD_DAY) {
+        region->childDay = true;
+        region->childNight = region->TimePass();
+    } else if (ageTime == RAT_CHILD_NIGHT) {
+        region->childNight = true;
+        region->childDay = region->TimePass();
+    } else if (ageTime == RAT_ADULT_DAY) {
+        region->adultDay = true;
+        region->adultNight = region->TimePass();
+    } else if (ageTime == RAT_ADULT_NIGHT) {
+        region->adultNight = true;
+        region->adultDay = region->TimePass();
+    }
+}
+
 // Return any of the targetLocations that are accessible in logic
 std::vector<RandomizerCheck> ReachabilitySearch(const std::vector<RandomizerCheck>& targetLocations,
                                                 RandomizerGet ignore /* = RG_NONE*/,
@@ -555,27 +583,20 @@ std::vector<RandomizerCheck> ReachabilitySearch(const std::vector<RandomizerChec
     auto ctx = Rando::Context::GetInstance();
     GetAccessibleLocationsStruct gals(0);
     ResetLogic(ctx, gals, !calculatingAvailableChecks);
-    if (startingRegion != RR_ROOT) {
-        gals.regionPool.insert(gals.regionPool.begin(), startingRegion);
-
-        const auto& region = RegionTable(startingRegion);
-        if (startingAgeTime == RAT_CHILD_DAY) {
-            region->childDay = true;
-            region->childNight = region->TimePass();
-        } else if (startingAgeTime == RAT_CHILD_NIGHT) {
-            region->childNight = true;
-            region->childDay = region->TimePass();
-        } else if (startingAgeTime == RAT_ADULT_DAY) {
-            region->adultDay = true;
-            region->adultNight = region->TimePass();
-        } else if (startingAgeTime == RAT_ADULT_NIGHT) {
-            region->adultNight = true;
-            region->adultDay = region->TimePass();
-        }
-    }
     if (calculatingAvailableChecks) {
         logic->Reset(false);
         logic->CalculatingAvailableChecks = true;
+        if (startingAgeTime != RAT_NONE) {
+            // Savewarps and warp songs start from the current age and time.
+            // The generated seed's starting spawn is only used for a from-start search.
+            auto* root = RegionTable(RR_ROOT);
+            root->ResetVariables();
+            SeedRegionAgeTime(root, startingAgeTime);
+        }
+    }
+    if (startingRegion != RR_ROOT) {
+        gals.regionPool.insert(gals.regionPool.begin(), startingRegion);
+        SeedRegionAgeTime(RegionTable(startingRegion), startingAgeTime);
     }
     do {
         gals.InitLoop();

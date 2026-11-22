@@ -198,7 +198,7 @@ void RegionTable_Init_HyruleField() {
         //Exits
         ENTRANCE(RR_LW_BRIDGE,              true),
         ENTRANCE(RR_GERUDO_VALLEY,          true),
-        ENTRANCE(RR_MARKET_ENTRANCE,        true),
+        ENTRANCE(RR_MARKET_ENTRANCE,        logic->IsAdult || logic->AtDay),
         ENTRANCE(RR_KAKARIKO_VILLAGE,       true),
         ENTRANCE(RR_ZR_FRONT,               true),
         ENTRANCE(RR_LON_LON_RANCH,          true),

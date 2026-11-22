@@ -1,8 +1,14 @@
-#ifdef COMBO_BUILD
-
+#include "SoulTracker.h"
 #include "SoulShuffle.h"
+#include "combo/gui/SoulTrackerView.h"
+#include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "soh/cvar_prefixes.h"
+#include <ship/window/gui/Gui.h>
+#include <ship/window/gui/GuiWindow.h>
+#include <memory>
+#ifdef COMBO_BUILD
 #include "ComboExport.h"
-#include "rando/SoulTrackerData.h"
+#endif
 #include "static_data.h"
 #include "z64.h"
 
@@ -30,9 +36,7 @@ constexpr RandomizerGet BossSouls[] = {
     RG_GOHMA_SOUL,    RG_KING_DODONGO_SOUL, RG_BARINADE_SOUL,    RG_PHANTOM_GANON_SOUL,
     RG_VOLVAGIA_SOUL, RG_MORPHA_SOUL,       RG_BONGO_BONGO_SOUL, RG_TWINROVA_SOUL,
 };
-} // namespace
-
-extern "C" COMBO_EXPORT int32_t SOH_ReadSoulTrackerSave(int32_t slot, VisitRow visit, void* context) {
+int32_t ReadOotSave(int32_t slot, VisitRow visit, void* context) {
     if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO)
         return 0;
 
@@ -67,4 +71,37 @@ extern "C" COMBO_EXPORT int32_t SOH_ReadSoulTrackerSave(int32_t slot, VisitRow v
     return 1;
 }
 
+class SoulWindow final : public Ship::GuiWindow {
+  public:
+    using GuiWindow::GuiWindow;
+
+  protected:
+    void InitElement() override {
+    }
+    void UpdateElement() override {
+    }
+    void DrawElement() override {
+        if (!GameInteractor::IsSaveLoaded() || !IS_RANDO) {
+            ImGui::TextDisabled("Load a randomizer save to view your souls.");
+            return;
+        }
+
+        ImGui::Checkbox("Show missing souls", &mShowMissing);
+        DrawGame(gSaveContext.fileNum, ReadOotSave, mShowMissing);
+    }
+
+  private:
+    bool mShowMissing = false;
+};
+} // namespace
+
+void Rando::SoulTracker::RegisterWindow(Ship::Gui& gui) {
+    gui.AddGuiWindow(std::make_shared<SoulWindow>(CVAR_WINDOW("SoulTracker"), WindowName, ImVec2(440.0f, 450.0f),
+                                                  ImGuiWindowFlags_NoFocusOnAppearing));
+}
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t SOH_ReadSoulTrackerSave(int32_t slot, VisitRow visit, void* context) {
+    return ReadOotSave(slot, visit, context);
+}
 #endif

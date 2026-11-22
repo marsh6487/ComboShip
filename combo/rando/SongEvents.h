@@ -2,6 +2,7 @@
 // Stable song/event identities follow OoTMM 0c0f8a8e. Host adapters own native usability.
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <stdexcept>
 #include <vector>
 namespace ComboRando::SongEvents {
@@ -123,9 +124,12 @@ inline constexpr const char* MmLabels[] = {
     "Baby Goron Lullaby",      "Sharp's Curse",
     "Clock Tower Rooftop",
 };
+inline constexpr uint8_t OotDefaults[] = { 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+inline constexpr uint8_t MmDefaults[] = { 14, 15, 17, 12, 12, 12, 12, 12, 14, 14, 15, 3, 19 };
 inline std::vector<uint8_t> Defaults(Game game) {
-    return game == Game::Oot ? std::vector<uint8_t>{ 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-                             : std::vector<uint8_t>{ 14, 15, 17, 12, 12, 12, 12, 12, 14, 14, 15, 3, 19 };
+    if (game == Game::Oot)
+        return { std::begin(OotDefaults), std::end(OotDefaults) };
+    return { std::begin(MmDefaults), std::end(MmDefaults) };
 }
 inline bool Playable(Game game, uint8_t song) {
     if (game == Game::Oot)

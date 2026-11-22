@@ -8,6 +8,7 @@
 namespace Rando::SoulTracker {
 
 using ComboRando::SoulTracker::Family;
+inline constexpr char SoloPauseMapCvar[] = "gRandoEnhancements.SoulTrackerPauseMapMM";
 
 struct Entry {
     RandoItemId item;

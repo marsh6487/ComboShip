@@ -39,6 +39,7 @@
 #include "soh/Enhancements/debugger/SohStatsWindow.h"
 #include "soh/Enhancements/debugger/valueViewer.h"
 #include "soh/Enhancements/gameplaystatswindow.h"
+#include "soh/Enhancements/randomizer/SoulTracker.h"
 #include "soh/Enhancements/randomizer/randomizer_check_tracker.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/Enhancements/randomizer/randomizer_hint_tracker.h"
@@ -275,6 +276,9 @@ void SetupGuiElements() {
     mItemTrackerSettingsWindow = std::make_shared<ItemTrackerSettingsWindow>(CVAR_WINDOW("ItemTrackerSettings"),
                                                                              "Item Tracker Settings", ImVec2(733, 472));
     gui->AddGuiWindow(mItemTrackerSettingsWindow);
+    if (!Combo_IsCombinedGame()) {
+        Rando::SoulTracker::RegisterWindow(*gui);
+    }
 
     mTimeSplitsWindow =
         std::make_shared<TimeSplits::TimesplitsWindow>(CVAR_WINDOW("TimeSplits"), "Time Splits", ImVec2(450, 660));
