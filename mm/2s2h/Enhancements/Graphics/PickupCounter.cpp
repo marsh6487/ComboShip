@@ -113,9 +113,12 @@ int IconItem(Kind kind) {
 
 #include "hud/PickupCounterWindow.inc"
 
+void DrawGibdoRequests();
+
 namespace {
 void RegisterPickupCounter() {
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnInterfaceDrawStart>(EnsurePickupCounterWindow);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnInterfaceDrawStart>(
+        [] { EnsurePickupCounterWindow(DrawGibdoRequests); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemGive>(
         [](u8 item) { NotePickup(PickupCounterHost::ReceiptKind(item)); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8, s8) { ResetPickupCounters(); });
