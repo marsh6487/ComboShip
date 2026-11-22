@@ -36,7 +36,7 @@ constexpr RandomizerGet BossSouls[] = {
     RG_GOHMA_SOUL,    RG_KING_DODONGO_SOUL, RG_BARINADE_SOUL,    RG_PHANTOM_GANON_SOUL,
     RG_VOLVAGIA_SOUL, RG_MORPHA_SOUL,       RG_BONGO_BONGO_SOUL, RG_TWINROVA_SOUL,
 };
-int32_t ReadOotSave(int32_t slot, VisitRow visit, void* context) {
+int32_t ReadOotSave(int32_t slot, VisitRow visit, void* context, bool includeBeanPatches) {
     if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO)
         return 0;
 
@@ -65,9 +65,11 @@ int32_t ReadOotSave(int32_t slot, VisitRow visit, void* context) {
         }
     }
 
-    const bool beans = Randomizer_GetSettingValue(RSK_SHUFFLE_BEAN_SOULS) != RO_GENERIC_OFF;
-    for (const auto item : Rando::StaticData::beanSouls)
-        visitItem(Family::Bean, item, beans);
+    if (includeBeanPatches) {
+        const bool beans = Randomizer_GetSettingValue(RSK_SHUFFLE_BEAN_SOULS) != RO_GENERIC_OFF;
+        for (const auto item : Rando::StaticData::beanSouls)
+            visitItem(Family::Bean, item, beans);
+    }
     return 1;
 }
 
@@ -87,7 +89,10 @@ class SoulWindow final : public Ship::GuiWindow {
         }
 
         ImGui::Checkbox("Show missing souls", &mShowMissing);
-        DrawGame(gSaveContext.fileNum, ReadOotSave, mShowMissing);
+        const auto read = [](int32_t slot, VisitRow visit, void* context) {
+            return ReadOotSave(slot, visit, context, true);
+        };
+        DrawGame(gSaveContext.fileNum, read, mShowMissing);
     }
 
   private:
@@ -102,6 +107,6 @@ void Rando::SoulTracker::RegisterWindow(Ship::Gui& gui) {
 
 #ifdef COMBO_BUILD
 extern "C" COMBO_EXPORT int32_t SOH_ReadSoulTrackerSave(int32_t slot, VisitRow visit, void* context) {
-    return ReadOotSave(slot, visit, context);
+    return ReadOotSave(slot, visit, context, false);
 }
 #endif
