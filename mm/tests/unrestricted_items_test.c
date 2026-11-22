@@ -22,6 +22,10 @@ bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
 s32 Player_GetEnvironmentalHazard(PlayState* context) {
     return hazard;
 }
+bool Player_IsDekuFlowerFlying(const Player* current) {
+    REQUIRE(current->transformation == PLAYER_FORM_HUMAN);
+    return false;
+}
 s16 CutsceneManager_GetCurrentCsId(void) {
     return CS_ID_NONE;
 }

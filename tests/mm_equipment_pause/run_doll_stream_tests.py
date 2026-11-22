@@ -45,7 +45,7 @@ struct Player { struct { void** skeleton;void* jointTable;int dListCount; } skel
 struct PlayState { struct { GraphicsContext* gfxCtx; } state; };
 static Player player;static Player* livePlayer=&player;
 static Gfx opa[1024],xlu[1024],work[1024],*POLY_OPA_DISP=opa,*POLY_XLU_DISP=xlu,*WORK_DISP=work;
-static Mtx matrices[8];static int matrixIndex,matrixDepth,creates;static bool mario,emitOpaque=true,emitXlu=true;
+static Mtx matrices[8];static int matrixIndex,matrixDepth,creates;static bool mario,pikachu,emitOpaque=true,emitXlu=true;
 static int gPauseLinkFrameBuffer=7;
 static Gfx gCullBackDList[1];
 #define GET_PLAYER(play) livePlayer
@@ -97,6 +97,11 @@ static void Command(Gfx* p,Op op,int value=0,Gfx* target=nullptr) { *p={op,targe
 #define gSPSegment(p,...) Command(p,State)
 int gfx_create_framebuffer(int,int,int,int,bool) { ++creates;return 7; }
 bool Sm64Kaleido_DrawForm(PlayState*) { return mario; }
+bool PikachuForm_DrawPause(PlayState*) {
+    if (!pikachu) return false;
+    Command(POLY_OPA_DISP++, Marker, 3);
+    return true;
+}
 void guPerspective(Mtx* m,u16*,...) { m->id=1; }
 void guLookAt(Mtx* m,...) { m->id=2; }
 void Matrix_Push() { ++matrixDepth; }void Matrix_Pop() { --matrixDepth; }
@@ -160,7 +165,7 @@ static void check(bool ok,const char* message) { ++checks;if(!ok){++failures;std
 static void Reset() {
     for(auto& c:opa)c={};for(auto& c:xlu)c={};for(auto& c:work)c={};
     POLY_OPA_DISP=opa;POLY_XLU_DISP=xlu;WORK_DISP=work;matrixIndex=matrixDepth=0;
-    draws.clear();activeFb=projection=renderMode=geometryMode=0;viewport=combine=false;livePlayer=&player;mario=false;
+    draws.clear();activeFb=projection=renderMode=geometryMode=0;viewport=combine=false;livePlayer=&player;mario=pikachu=false;
     player.skelAnime.skeleton=reinterpret_cast<void**>(&player);gPauseLinkFrameBuffer=7;
 }
 int main() {
@@ -190,6 +195,14 @@ int main() {
     Reset();gPauseLinkFrameBuffer=-1;mario=true;KaleidoEquip_RenderDollFB(&play);
     check(creates==1&&gPauseLinkFrameBuffer==7,"framebuffer created once before delegated Mario preview");
     check(WORK_DISP==work&&POLY_OPA_DISP==opa&&POLY_XLU_DISP==xlu,"delegated Mario preview emits no Link commands");
+    Reset();pikachu=true;KaleidoEquip_RenderDollFB(&play);
+    Command(WORK_DISP,End);Command(POLY_OPA_DISP,End);Command(POLY_XLU_DISP,End);
+    Execute(work);
+    check(draws.size()==1&&draws[0].marker==3&&draws[0].fb==7,
+          "Pikachu replaces the native doll in the same preview framebuffer");
+    const auto before=draws.size();
+    Execute(opa);Execute(xlu);
+    check(draws.size()==before&&activeFb==0,"Pikachu preview stays out of both main passes");
     std::printf("MM production doll stream checks: %d, failures: %d\n",checks,failures);
     return failures?1:0;
 }

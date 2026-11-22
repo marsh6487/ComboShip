@@ -937,7 +937,7 @@ void CosmeticEditorUpdateTick() {
     }
 }
 
-void CosmeticEditorDrawRow(CosmeticOption& option) {
+void CosmeticEditorDrawRow(CosmeticOption& option, bool compact) {
     if (CosmeticEditorIsSuppressed(option)) {
         return;
     }
@@ -959,7 +959,9 @@ void CosmeticEditorDrawRow(CosmeticOption& option) {
         }
     }
 
-    ImGui::SameLine((ImGui::CalcTextSize("Message Light Blue (None No Shadow)").x * 1.0f) + 60.0f);
+    if (!compact) {
+        ImGui::SameLine(ImGui::CalcTextSize("Message Light Blue (None No Shadow)").x + 60.0f);
+    }
     if (UIWidgets::Button(
             ("Random##" + std::string(option.label)).c_str(),
             UIWidgets::ButtonOptions().Size(ImVec2(80, 31)).Padding(ImVec2(2.0f, 0.0f)).Color(THEME_COLOR))) {

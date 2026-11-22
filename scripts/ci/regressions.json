@@ -2040,7 +2040,7 @@
     "origin": "gate",
     "native_abi": "explicit",
     "name": "Native MM bags, wallet and infinite upgrades: pools, runtime, starts, saves and foreign receipts",
-    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize\npython3 -B tests/shuffle_parity/wallet_receipts/run_tests.py --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-integration --sanitize",
+    "run": "python3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/native_test.cpp --sanitize\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/wallet_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --wallet-only --sanitize\npython3 -B tests/shuffle_parity/wallet_receipts/run_tests.py --sanitize\npython3 -B tests/oot_zfg_wallet/run_tests.py\npython3 -B tests/shuffle_parity/key_rings/run_tests.py --fixture tests/shuffle_parity/capacities/infinite_pool_test.cpp --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-only --sanitize\npython3 -B tests/shuffle_parity/capacities/run_runtime_tests.py --infinite-integration --sanitize",
     "env": {
       "ASAN_OPTIONS": "detect_leaks=0"
     }
@@ -2221,6 +2221,13 @@
     "native_abi": "explicit",
     "name": "Authored Clock resources, native and foreign routes, shimmer and effects-off",
     "run": "python3 -B tools/authored_clock/build.py --check\npython3 -B tools/authored_clock/verify.py\npython3 -B tests/authored_clock/run_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "native_abi": "explicit",
+    "name": "ZFG wallet overflow animation and progressive wallet shimmer in both games",
+    "run": "python3 -B tests/wallet_gi_model/run_tests.py\npython3 -B tests/oot_zfg_wallet/run_gi_tests.py\npython3 -B tests/mm_wallet/run_gi_tests.py"
   },
   {
     "suite": "render",

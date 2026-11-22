@@ -104,6 +104,7 @@ inline RandoItemId HintProgressiveFamily(RandoItemId item) {
         case RI_WALLET_ADULT:
         case RI_WALLET_GIANT:
         case RI_WALLET_TYCOON:
+        case RI_WALLET_ZFG:
             return RI_PROGRESSIVE_WALLET;
         case RI_SONG_LULLABY_INTRO:
         case RI_SONG_LULLABY:

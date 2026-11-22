@@ -1,4 +1,5 @@
 #include "RustyDoorKeys.h"
+#include "WalletProgression.h"
 #include "../../../../combo/ComboGameMode.h"
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "../../../../combo/menu/ComboToolReceiptText.h"
@@ -288,9 +289,12 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "mouvements cachés." },
 
     { RG_ROCS_CAPE, static_cast<int32_t>(ITEM_ROCS_CAPE),
-      "Your feather grew into the&%rRoc's Cape%w!&Jump, then hold the button to&%rglide%w gently to the ground.",
-      "Deine Feder wurde zum&%rRocs Umhang%w!&Springe und halte die Taste&um sanft zu %rgleiten%w.",
-      "Votre plume devient la&%rCape de Roc%w!&Sautez puis maintenez pour&%rplaner%w doucement." },
+      "You got %rRoc's Cape%w!&Jump from the ground or water.&Press the item button again&in midair to %gdouble "
+      "jump%w.",
+      "Du hast %rRocs Umhang%w erhalten!&Springe vom Boden oder Wasser.&Drücke die Item-Taste in der Luft&"
+      "erneut für einen %gDoppelsprung%w.",
+      "Vous obtenez la %rCape de Roc%w!&Sautez du sol ou de l'eau.&Appuyez de nouveau en l'air&"
+      "pour faire un %gdouble saut%w." },
 
     // Dual Cane per-skill textboxes (order: Statue keeps RG_CANE_OF_SOMARIA's own message).
     { RG_CANE_PACCI_FLIP, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
@@ -809,8 +813,6 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
     // upgrades from being gotten
     u8 infiniteUpgrades = GetRandoSettingValue(RSK_INFINITE_UPGRADES);
 
-    u8 numWallets = 2 + (u8)tycoonWallet + (infiniteUpgrades != RO_INF_UPGRADES_OFF ? 1 : 0);
-
     switch (randoGet) {
         case RG_NONE:
         case RG_HINT:
@@ -1094,7 +1096,14 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
         case RG_PROGRESSIVE_STRENGTH:
             return CUR_UPG_VALUE(UPG_STRENGTH) < 3 ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         case RG_PROGRESSIVE_WALLET:
-            return CUR_UPG_VALUE(UPG_WALLET) < numWallets ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
+            return OotWallet::NextUpgrade(CUR_UPG_VALUE(UPG_WALLET), Flags_GetRandomizerInf(RAND_INF_HAS_WALLET),
+                                          tycoonWallet, GetRandoSettingValue(RSK_INCLUDE_ZFG_WALLET),
+                                          OotWallet_HasZfg(), infiniteUpgrades != RO_INF_UPGRADES_OFF,
+                                          Flags_GetRandomizerInf(RAND_INF_HAS_INFINITE_MONEY)) != RG_BLUE_RUPEE
+                       ? CAN_OBTAIN
+                       : CANT_OBTAIN_ALREADY_HAVE;
+        case RG_ZFG_WALLET:
+            return OotWallet_HasZfg() ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
         case RG_PROGRESSIVE_SCALE:
             return CUR_UPG_VALUE(UPG_SCALE) < 2 ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         case RG_PROGRESSIVE_MAGIC_METER:
@@ -2190,6 +2199,21 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
                 Rupees_ChangeBy(999);
             }
             break;
+        case RG_ZFG_WALLET: {
+            const auto& randomizer = OTRGlobals::Instance->gRandomizer;
+            const bool alreadyOwned = OotWallet_HasZfg();
+            const int floor = OotWallet::NativeFloor(randomizer->GetRandoSettingValue(RSK_INCLUDE_TYCOON_WALLET));
+            if (CUR_UPG_VALUE(UPG_WALLET) < floor) {
+                Inventory_ChangeUpgrade(UPG_WALLET, floor);
+            }
+            Flags_SetRandomizerInf(RAND_INF_HAS_WALLET);
+            Flags_SetRandomizerInf(RAND_INF_HAS_ZFG_WALLET);
+            if (!alreadyOwned && randomizer->GetRandoSettingValue(RSK_FULL_WALLETS)) {
+                const int remaining = OOT_ZFG_WALLET_CAPACITY - gSaveContext.rupees;
+                Rupees_ChangeBy(std::clamp(remaining, 0, OOT_ZFG_WALLET_CAPACITY));
+            }
+            break;
+        }
         case RG_TRIFORCE:
             GameInteractor_SetTriforceHuntCreditsWarpActive(true);
             break;

@@ -7,7 +7,8 @@
 // The harness extracts the production owned-item adapter, native magic grants,
 // and logical magic gates. Other inventory actions are outside this test.
 enum RandoItemId { RI_SINGLE_MAGIC, RI_DOUBLE_MAGIC, RI_OOT_EXT_MAGIC_CAPE };
-enum { RANDO_INF_INFINITE_MAGIC };
+enum RandoInf { RANDO_INF_INFINITE_MAGIC };
+enum { SAVETYPE_VANILLA, SAVETYPE_RANDO };
 enum { ITEM_BOW, ITEM_ARROW_FIRE, ITEM_ARROW_ICE, ITEM_ARROW_LIGHT };
 static struct {
     struct {
@@ -18,15 +19,15 @@ static struct {
             } playerData;
         } saveInfo;
         struct {
+            int saveType = SAVETYPE_RANDO;
+            struct {
+                uint16_t randoInf[1]{};
+            } rando;
             NeiSaveData nei{};
         } shipSaveInfo;
     } save;
     int16_t magicCapacity = 0;
 } gSaveContext;
-static bool infiniteOwned;
-static bool RandoCapacity_InfiniteFlag(int) {
-    return infiniteOwned;
-}
 extern "C" NeiSaveData* Nei_Save() {
     return &gSaveContext.save.shipSaveInfo.nei;
 }
@@ -55,7 +56,6 @@ static void Check(bool ok, const char* message) {
 }
 static void Reset() {
     gSaveContext = {};
-    infiniteOwned = false;
 }
 static std::string Token(int required, int total, int level) {
     return "__combo_rpg_magic:" +
@@ -87,9 +87,12 @@ int main() {
               "owned Magic Cape preserves the native half-cost arrow gates");
         Check(bool(CAN_USE_DEKU_BUBBLE) == (capacity >= 2) && bool(CAN_GORON_SPIKE_ROLL) == (capacity >= 2),
               "Magic Cape does not lower independent bubble and Goron startup gates");
-        infiniteOwned = true;
+        auto& save = gSaveContext.save.shipSaveInfo;
+        save.rando.randoInf[RANDO_INF_INFINITE_MAGIC / 16] |= 1u << (RANDO_INF_INFINITE_MAGIC % 16);
         Check(bool(CAN_USE_MAGIC_ARROW(LIGHT)) == (capacity > 0) && bool(CAN_USE_DEKU_BUBBLE) == (capacity > 0),
               "Infinite Magic permits expensive actions after any magic capacity is acquired");
+        save.saveType = SAVETYPE_VANILLA;
+        Check(!RandoCapacity_InfiniteMagic(), "Vanilla saves ignore stored randomizer magic flags");
     }
     Reset();
     Apply(nlohmann::json::array({ Token(8, 96, 1) }));

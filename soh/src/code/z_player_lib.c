@@ -3256,7 +3256,8 @@ void Player_DrawPauseImpl(PlayState* play, void* gameplayKeep, void* linkObject,
     gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, colorFrameBuffer);
     gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
     gDPSetRenderMode(POLY_OPA_DISP++, G_RM_NOOP, G_RM_NOOP2);
-    gDPSetFillColor(POLY_OPA_DISP++, (GPACK_RGBA5551(0, 0, 0, 1) << 16) | GPACK_RGBA5551(0, 0, 0, 1));
+    // The equipment page provides the pane; the preview only supplies the player.
+    gDPSetFillColor(POLY_OPA_DISP++, GPACK_RGBA5551(0, 0, 0, 0));
     gDPFillRectangle(POLY_OPA_DISP++, 0, 0, width - 1, height - 1);
 
     gDPPipeSync(POLY_OPA_DISP++);

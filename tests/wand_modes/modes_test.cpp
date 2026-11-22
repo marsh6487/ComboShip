@@ -2,6 +2,7 @@
 #include "global.h"
 #include "mods/items/custom_items.h"
 #include "mods/items/helpers/equip_helper.h"
+#include "gameplay/OcarinaItemInput.h"
 #include "mods/items/helpers/target_select_helper.h"
 #include "mods/items/helpers/combat_helper.h"
 #include "mods/items/helpers/fx_helper.h"

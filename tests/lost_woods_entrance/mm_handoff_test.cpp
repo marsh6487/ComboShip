@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -44,7 +45,8 @@ extern "C" int ComboWoodfallPassage_AtReturn(PlayState* current, const Vec3f*) {
     return woodfallPassage && current && current->sceneId == SCENE_21MITURINMAE &&
            current->roomCtx.curRoom.num == 0;
 } // floor/wall services are exercised with the production endpoint in woodfall_geometry_test.cpp
-static int saves, switches, recordedRoute, kind, fwCaptures;
+static int saves, locationSaves, switches, recordedRoute, kind, fwCaptures;
+static bool autosaveEnabled, rememberLocation;
 static void require(bool condition, const char* message) {
     if (!condition) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }
 }
@@ -67,10 +69,15 @@ static void Return(int value) { ++switches; kind = value; }
 static void (*gComboReturnCallback)(int) = Return;
 static void SetOotRoute(int route) { recordedRoute = route; }
 static void* Combo_ResolveSym(const char*, const char*) { return (void*)SetOotRoute; }
-extern "C" s32 CVarGetInteger(const char*, s32) { return 0; }
+extern "C" s32 CVarGetInteger(const char* key, s32 fallback) {
+    if (std::strcmp(key, "gEnhancements.Saving.Autosave") == 0) return autosaveEnabled;
+    if (std::strcmp(key, "gEnhancements.Saving.RememberSaveLocation") == 0) return rememberLocation;
+    return fallback;
+}
 extern "C" void MM_CaptureFwDeparture(void) { ++fwCaptures; }
 void Combo_MM_FlushAccumulators() {}
 void SaveManager_SaveCurrentForCombo(bool = false) { ++saves; }
+void SavingEnhancements_AutosaveOnReset() { ++locationSaves; }
 
 static int regionalReturn;
 extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) { return 1; }
@@ -168,5 +175,17 @@ int main() {
                 recordedRoute == COMBO_PORTAL_OPENING_FOREST,
             "walking from the native arrival to the stump must return to the pink "
             "Fairy tunnel once");
+    autosaveEnabled = true;
+    EnterPassage(0);
+    MM_RequestComboReturn();
+    Frames();
+    require(saves == 5 && locationSaves == 0 && switches == 6 && kind == 1,
+            "reset with Remember off must keep the ordinary Combo autosave");
+    rememberLocation = true;
+    EnterPassage(0);
+    MM_RequestComboReturn();
+    Frames();
+    require(saves == 5 && locationSaves == 1 && switches == 7 && kind == 1,
+            "reset with Remember on must use the location-aware writer exactly once");
     std::puts("PASS: production MM forest handoff, Play/slot lifetime, reset, shuffled arrivals and Farore ownership");
 }

@@ -15,6 +15,7 @@ extern "C" void Partners_Reset(void);
 #include "../../combo/vanilla/ComboVanillaMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../combo/gameplay/CrossoverAssetPath.h"
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
 #include "CrashHandlerExt.h"
@@ -584,6 +585,14 @@ extern "C" const char* Nei_AssetDir(void) {
 #else
     return "nei";
 #endif
+}
+
+extern "C" const char* Nei_FindCrossoverAsset(const char* name) {
+    static thread_local std::string path;
+    path = Crossover::FindAsset(name, Nei_AssetDir(), false, [](const std::string& relativePath) {
+        return Ship::Context::LocateFileAcrossAppDirs(relativePath, appShortName);
+    });
+    return path.empty() ? nullptr : path.c_str();
 }
 
 void CheckAndCreateModFolder() {
@@ -4292,7 +4301,7 @@ void Combo_GrantResolvedOOT(const GetItemEntry& gie) {
 
 // Save-direct grant by itemTable name. Bracketed as a receive so the give choke does not share it
 // back to MM; the two exports below decide whether the item is then shared.
-static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
+static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted, bool allowZfgWallet = true) {
     if (!itemName)
         return false;
     RandomizerGet rg;
@@ -4317,13 +4326,16 @@ static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
         rg = it->second;
     }
     // Convert unobtainable items to a blue rupee while preserving shared-item receive suppression.
-    GetItemEntry gie = OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(rg) != CAN_OBTAIN
-                           ? ItemTableManager::Instance->RetrieveItemEntry(MOD_NONE, GI_RUPEE_BLUE)
-                           : Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
+    const bool obtainable = OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(rg) == CAN_OBTAIN;
+    GetItemEntry gie = obtainable ? Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy()
+                                  : ItemTableManager::Instance->RetrieveItemEntry(MOD_NONE, GI_RUPEE_BLUE);
+    const bool zfgWallet = gie.modIndex == MOD_RANDOMIZER && gie.getItemId == RG_ZFG_WALLET;
+    if (zfgWallet && !allowZfgWallet)
+        return false;
     FleetSharedReceiveGuard receiveGuard;
     Combo_GrantResolvedOOT(gie);
     if (granted)
-        *granted = rg;
+        *granted = zfgWallet ? RG_ZFG_WALLET : (!obtainable && rg == RG_PROGRESSIVE_ROCS ? RG_BLUE_RUPEE : rg);
     SPDLOG_INFO("[ComboShip] cross grant: granted '{}' into OOT save", itemName);
     return true;
 }
@@ -4337,13 +4349,34 @@ extern "C" COMBO_EXPORT void SOH_GrantCrossItem(const char* itemName) {
     }
 }
 
+extern "C" COMBO_EXPORT bool SOH_GrantBossWarpReward(int slot, const char* itemName) {
+    if (gSaveContext.fileNum != slot || !IS_RANDO)
+        return false;
+    RandomizerGet granted = RG_NONE;
+    if (!GrantOotItemByName(itemName, &granted))
+        return false;
+    FleetShared_OnNativeObtained(static_cast<int>(granted));
+    return true;
+}
+
+extern "C" COMBO_EXPORT void SOH_CaptureBossWarpRewardSave(int slot) {
+    if (gSaveContext.fileNum == slot && IS_RANDO)
+        SaveManager::Instance->SaveFile(slot);
+}
+
+extern "C" COMBO_EXPORT void SOH_WaitBossWarpRewardSaves() {
+    SaveManager::Instance->ThreadPoolWait();
+}
+
 // The peer's half of a shared item (MM obtained it): grant only, never share back.
 extern "C" COMBO_EXPORT void SOH_GrantSharedItem(const char* itemName) {
     if (Combo_IsVanilla()) {
         FleetShared_RequestPullFromPeer();
         return;
     }
-    GrantOotItemByName(itemName, nullptr);
+    // Wallet ownership beyond the packed tiers is reconciled as an absolute
+    // grant in Shared Wallets, so a legacy relative grant cannot award it.
+    GrantOotItemByName(itemName, nullptr, false);
 }
 
 // Mirror native magic without resolving a second progressive pickup. This is
@@ -4510,7 +4543,7 @@ extern "C" COMBO_EXPORT int SOH_GetSharedTier(int family) try {
             return gSaveContext.isMagicAcquired + gSaveContext.isDoubleMagicAcquired;
         }
         case ComboRando::SF_WALLET:
-            return CUR_UPG_VALUE(UPG_WALLET);
+            return OotWallet_HasZfg() ? ComboRando::kZfgWalletTier : CUR_UPG_VALUE(UPG_WALLET);
         case ComboRando::SF_HOOKSHOT:
             return INV_CONTENT(ITEM_HOOKSHOT) == ITEM_NONE ? 0 : (INV_CONTENT(ITEM_HOOKSHOT) == ITEM_LONGSHOT ? 2 : 1);
         case ComboRando::SF_FIRE_ARROWS:
@@ -4571,7 +4604,11 @@ extern "C" COMBO_EXPORT void SOH_RaiseSharedTier(int family, int tier) try {
                 rg = cur == 0 ? RG_MAGIC_SINGLE : RG_MAGIC_DOUBLE;
                 break;
             case ComboRando::SF_WALLET:
-                rg = cur == 0 ? RG_ADULT_WALLET : cur == 1 ? RG_GIANT_WALLET : RG_TYCOON_WALLET;
+                if (tier == ComboRando::kZfgWalletTier) {
+                    rg = RG_ZFG_WALLET;
+                } else {
+                    rg = cur == 0 ? RG_ADULT_WALLET : cur == 1 ? RG_GIANT_WALLET : RG_TYCOON_WALLET;
+                }
                 break;
             case ComboRando::SF_HOOKSHOT:
                 rg = cur == 0 ? RG_HOOKSHOT : RG_LONGSHOT;
@@ -5874,6 +5911,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
 
     nlohmann::json startingSouls = nlohmann::json::array();
     nlohmann::json soulOptions = nlohmann::json::object();
+    bool zfgWallet = false;
     nlohmann::json rpgMagic = { { "enabled", false } };
     nlohmann::json checks = nlohmann::json::array();
     nlohmann::json pool = nlohmann::json::array();
@@ -6071,6 +6109,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         }
 
         // ComboShip: accessibility settings the combo fill maps to an OotAccess mode (per-game relax).
+        zfgWallet = static_cast<bool>(ctx->GetOption(RSK_INCLUDE_ZFG_WALLET));
         accessibility["noLogic"] = ctx->GetOption(RSK_NO_LOGIC).Is(RO_GENERIC_ON);
         accessibility["allLocationsReachable"] = static_cast<bool>(ctx->GetOption(RSK_ALL_CHECKS_REACHABLE));
         accessibility["lockOverworldDoors"] = static_cast<bool>(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS));
@@ -6238,6 +6277,7 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         { "prices", std::move(prices) },
         { "iceTrapModels", std::move(iceTrapModels) },
         { "startingSouls", std::move(startingSouls) },
+        { "zfgWallet", zfgWallet },
         { "soulOptions", std::move(soulOptions) },
         { "rpgMagic", std::move(rpgMagic) },
         { "accessibility", std::move(accessibility) }

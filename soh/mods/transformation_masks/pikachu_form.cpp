@@ -21,7 +21,6 @@
 #include <math.h>
 #include <cstdio>
 #include <vector>
-#include <string>
 
 #include "z64.h"
 #include "macros.h"
@@ -32,11 +31,8 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #include <libultraship/bridge.h>
-#include <libultraship/libultraship.h> // Ship::Context::LocateFileAcrossAppDirs (anim .bin loader)
+#include "../../../combo/gameplay/CrossoverAssetPath.h"
 
-// Defined in OTRGlobals.cpp. Declared here rather than including that header, which drags the whole
-// OTRGlobals class into this TU for one accessor.
-extern "C" const char* Nei_AssetDir(void);
 // OPEN_DISPS/CLOSE_DISPS declare FrameInterpolation_Record* INSIDE the macro
 // without extern "C"; in a plain C++ (non-extern-"C") function that produces a
 // mangled unresolved symbol. This header pre-declares them with proper guards
@@ -518,15 +514,12 @@ static u8 PikaAnims_EnsureLoaded(void) {
         return 1;
     }
 
-    // Same convention as the other loose NEI assets (sm64.z64, …): the game's own NEI folder next to
-    // the exe. Lower-case for Linux/macOS case-sensitivity.
-    const std::string rel = std::string(Nei_AssetDir()) + "/pikachu_anims.bin";
-    std::string path = Ship::Context::LocateFileAcrossAppDirs(rel);
-    if (path.empty()) {
-        path = rel; // fallback: current working directory
+    const char* path = Nei_FindCrossoverAsset("pikachu_anims.bin");
+    if (path == nullptr) {
+        return 0;
     }
 
-    FILE* fp = fopen(path.c_str(), "rb"); // "rb" required on Windows (no CRLF translation)
+    FILE* fp = fopen(path, "rb");
     if (fp == NULL) {
         return 0;
     }

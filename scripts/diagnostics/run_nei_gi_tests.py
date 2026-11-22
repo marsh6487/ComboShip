@@ -11,7 +11,7 @@ import sys
 import struct
 import xml.etree.ElementTree as ET
 from run_time_pedestal_tests import block_from, functions
-from foreign_gi_fixture_dependencies import startup_foreign_receipt_boundary
+from foreign_gi_fixture_dependencies import MM_ZFG_WALLET_BOUNDARY, OOT_ZFG_WALLET_BOUNDARY, startup_foreign_receipt_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0", "-I" + str(ROOT)]
@@ -155,7 +155,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             foreign_draw += functions(foreign_source)["OOT_DrawForeignNativeEquipment"] + "\n" + functions(foreign_source)["OOT_DrawComboForeign"]
             mirror_helper = functions((ROOT / "combo/menu/ComboMagicMirrorForeign.h").read_text())["ComboDrawMagicMirrorForeign"]
             foreign_draw = ('extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "NEI dispatch selected Mirror"); }\n'
-                            + mirror_helper + '\n' + foreign_draw)
+                            + mirror_helper + '\n' + OOT_ZFG_WALLET_BOUNDARY + foreign_draw)
             if "--baseline-gold-overlays" in sys.argv:
                 foreign_draw=foreign_draw.replace("Kind::Gold","Kind::MarioMask")
             foreign_shop = functions(foreign_source.replace('extern "C" ', ''))["OOT_DrawComboForeignShop"]
@@ -277,7 +277,7 @@ void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
             mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
             mm_foreign_draw = functions(mm_foreign_source)["ComboInternRoutedPathOOT"] + "\n"
-            mm_foreign_draw += functions(mm_foreign_source)["MM_DrawComboForeign"]
+            mm_foreign_draw += MM_ZFG_WALLET_BOUNDARY + functions(mm_foreign_source)["MM_DrawComboForeign"]
             if "--baseline-gold-overlays" in sys.argv:
                 mm_foreign_draw=mm_foreign_draw.replace("Kind::Gold","Kind::MarioMask")
             mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(", mm_foreign_draw)))

@@ -263,26 +263,36 @@ void Grant(RandoItemId randoItemId) {
 namespace ComboRando {
 '''
     shared = comments(read('combo/rando/SharedItems.h'))
-    fixture += re.search(r'enum SharedFamily[^}]+};', shared, re.S)[0] + '\n}\n'
+    fixture += re.search(r'enum SharedFamily[^}]+};', shared, re.S)[0] + '\n'
+    fixture += re.search(r'inline constexpr int kZfgWalletTier = [^;]+;', shared)[0] + '\n}\n'
     fixture += declaration(read('mm/include/z64item.h'), 'ItemId') + '\n'
+    fixture += declaration(types, 'RandoInf') + '\n'
     fixture += '''
 #define COMBO_EXPORT
 #define IS_RANDO (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
 constexpr int SAVETYPE_RANDO=1;
 int inventory[256]{};
 #define INV_CONTENT(item) inventory[item]
-#define CUR_UPG_VALUE(upg) 0
+enum { UPG_QUIVER, UPG_BOMB_BAG, UPG_WALLET };
+int upgrades[3]{};
+#define CUR_UPG_VALUE(upg) upgrades[upg]
 #define CHECK_QUEST_ITEM(quest) 0
 struct { struct {
     struct { struct { int isMagicAcquired=0, isDoubleMagicAcquired=0; } playerData; } saveInfo;
     struct {
         int saveType=0;
+        struct { uint16_t randoInf[(RANDO_INF_MAX + 15) / 16]{}; } rando;
         struct { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE]{}; } nei;
     } shipSaveInfo;
 } save; } gSaveContext;
 '''
-    fixture += function(read('mm/include/rando_capacity.h'),
-                        'static inline int RandoCapacity_HasIndependentBombchuBag(void) {') + '\n'
+    capacity = read('mm/include/rando_capacity.h')
+    for signature in (
+        'static inline int RandoCapacity_HasFlag(RandoInf flag) {',
+        'static inline int RandoCapacity_HasZfgWallet(void) {',
+        'static inline int RandoCapacity_HasIndependentBombchuBag(void) {',
+    ):
+        fixture += function(capacity, signature) + '\n'
     fixture += '''
 constexpr int COMBO_RPG_MAGIC=3;
 bool rpgMagicEnabled=false;
@@ -297,6 +307,8 @@ int ComboRpg_IsEnabled(int) { return rpgMagicEnabled; }
     fixture += '(void)tier; ++downstreamGrants; } catch (...) { assert(false); }\n'
     fixture += '''
 int main() {
+    auto& walletFlags = gSaveContext.save.shipSaveInfo.rando.randoInf[RANDO_INF_WALLET_ZFG / 16];
+    walletFlags = 1u << (RANDO_INF_WALLET_ZFG % 16);
     for(int family=0; family<ComboRando::SF_COUNT; ++family) {
         assert(MM_GetSharedTier(family) == 0);
         MM_RaiseSharedTier(family, 1);
@@ -310,6 +322,11 @@ int main() {
     registry[FC_OOT_BOMBCHU_CAPACITY] = 0;
     // A loaded dormant save is valid even when no PlayState exists.
     gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+    upgrades[UPG_WALLET] = 3;
+    assert(MM_GetSharedTier(ComboRando::SF_WALLET) == ComboRando::kZfgWalletTier);
+    assert(upgrades[UPG_WALLET] == 3);
+    walletFlags = 0;
+    assert(MM_GetSharedTier(ComboRando::SF_WALLET) == 3);
     MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
     assert(downstreamGrants == 1);
     const int families[] = {ComboRando::SF_FIRE_ARROWS, ComboRando::SF_ICE_ARROWS, ComboRando::SF_LIGHT_ARROWS};
@@ -342,7 +359,7 @@ int main() {
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 1);
     nei.comboRpg.nativeMagicLevel = 2;
     assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
-    std::cout << "MM shared tiers: cleared save rejected, independent Bombchu ownership, dormant arrows and native RPG magic exact PASS\\n";
+    std::cout << "MM shared tiers: loaded-save guard, Bombchu ownership, ZFG wallet, dormant arrows and RPG magic PASS\\n";
 }
 '''
     run_cpp('mm_shared_tiers', fixture)

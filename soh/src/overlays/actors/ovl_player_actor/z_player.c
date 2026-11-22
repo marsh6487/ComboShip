@@ -1,6 +1,7 @@
 #include "scene_exit.h"
 #include "ui_visibility.h"
 #include "soh/Enhancements/audio/SeasonWeather.h"
+#include "audio/TwilightPrincessTargeting.h"
 #include "mods/partners/Partners.h"
 #include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
@@ -61,6 +62,7 @@
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "soh/frame_interpolation.h"
 #include "soh/OTRGlobals.h"
+#include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/savestate_serialize.h"
 
 #include <string.h>
@@ -4714,6 +4716,10 @@ void Player_UpdateZTargeting(Player* this, PlayState* play) {
                     // Lock-on was not started above. Set Parallel Mode.
                     if (!(this->stateFlags1 & (PLAYER_STATE1_PARALLEL | PLAYER_STATE1_LOCK_ON_FORCED_TO_RELEASE))) {
                         Player_SetParallel(this);
+                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL &&
+                            ResourceMgr_FileExists(TP_TARGET_CAMERA_CUE)) {
+                            Sfx_PlaySfxCentered(NA_SE_SY_LOCK_ON_HUMAN);
+                        }
                     }
                 }
             }

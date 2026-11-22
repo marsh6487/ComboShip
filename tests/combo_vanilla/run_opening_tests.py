@@ -175,7 +175,7 @@ void* Combo_ResolveSym(const char*,const char* symbol){
 }
 void FleetSync_ApplySharedState(const char*){++delivered;}
 void FleetShared_RequestPullFromPeer(){sPullPending=true;}
-void GrantMmItemByName(const char* name,void*){
+void GrantMmItemByName(const char* name,void*,bool = true){
     ++granted;
     for(const auto& pair:ComboRando::SharedSoulPairs) if(std::string(name)==pair.mmName){
         assert(receiveDepth>0); ownedSouls.insert(name); ++soulGrants; break;

@@ -187,8 +187,10 @@ int main() {
     for(auto option:Rando::VanillaCompatibility::UnsupportedOptions)
         values[Rando::StaticData::Options[option].cvar]=1;
     ShipInit::Init(Rando::StaticData::Options[RO_LOGIC].cvar);
-    for(auto option:Rando::VanillaCompatibility::UnsupportedOptions)
-        REQUIRE(CVarGetInteger(Rando::StaticData::Options[option].cvar,0)==0);
+    for(auto option:Rando::VanillaCompatibility::UnsupportedOptions) {
+        const bool retainSharedPreference = option == RO_SHUFFLE_ZFG_WALLET && Combo_IsCombinedGame();
+        REQUIRE(CVarGetInteger(Rando::StaticData::Options[option].cvar,0)==retainSharedPreference);
+    }
     REQUIRE(!IsCheckShownAsShuffled(check,filter));
     ImGui::DestroyContext();
     std::puts("PASS real native UI input, all option dispatch, pool/exclusion refresh, saved rings and accents");

@@ -4,6 +4,15 @@ from pathlib import Path
 from run_time_pedestal_tests import functions
 
 
+OOT_ZFG_WALLET_BOUNDARY = r'''
+static void OOT_DrawForeignZfgWallet(PlayState*) { assert(false && "unexpected OoT wallet dispatch"); }
+'''
+
+MM_ZFG_WALLET_BOUNDARY = r'''
+static void MM_DrawZfgWalletModel(PlayState*) { assert(false && "unexpected MM wallet dispatch"); }
+'''
+
+
 def startup_receipt_classifier(root: Path) -> str:
     """Retain the actual receipt-family predicate and public adapter."""
     source = (root / "soh/soh/Enhancements/Gameplay/ComboStartupReceipt.cpp").read_text()

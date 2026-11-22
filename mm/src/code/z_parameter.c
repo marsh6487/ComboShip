@@ -40,6 +40,9 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/gfxbridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
+#define PICKUP_COUNTER_WALLET_MM
+#include "../../../combo/hud/PickupCounterWallet.h"
+#undef PICKUP_COUNTER_WALLET_MM
 
 // mods/actors/master_cycle.c — the Master Cycle rides on Epona's actor, so every "is he on a horse"
 // test in the HUD answers yes for it too. None of what those tests do is right for a bike: they
@@ -2941,6 +2944,23 @@ void Interface_UpdateHudAlphas(PlayState* play, s16 dimmingAlpha) {
     }
 }
 
+static bool Interface_UpdateDekuFlightBButton(PlayState* play) {
+    bool ownsNuts = gSaveContext.save.saveInfo.inventory.items[SLOT_DEKU_NUT] == ITEM_DEKU_NUT;
+    bool buttonChanged = false;
+    u8 status = ownsNuts ? BTN_ENABLED : BTN_DISABLED;
+
+    if (ownsNuts && BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) != ITEM_DEKU_NUT) {
+        BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) = ITEM_DEKU_NUT;
+        Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
+        buttonChanged = true;
+    }
+    if (gSaveContext.buttonStatus[EQUIP_SLOT_B] != status) {
+        gSaveContext.buttonStatus[EQUIP_SLOT_B] = status;
+        buttonChanged = true;
+    }
+    return buttonChanged;
+}
+
 /**
  * A continuation of the if-else chain from Interface_UpdateButtonsPart1
  * Also used directly when opening the pause menu i.e. skips part 1
@@ -2953,6 +2973,19 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
     s16 restoreHudVisibility = false;
     // Apply the location cheat at read sites so scene/song rules survive live toggles.
     bool unrestrictedItems = CVarGetInteger("gCheats.UnrestrictedItems", 0);
+    bool dekuFlowerFlying = Player_IsDekuFlowerFlying(player);
+
+    // Flight can put a nut on B before Deku can shoot bubbles. Repair that temporary
+    // equipment before applying ordinary scene restrictions, including C and D-pad.
+    if (!dekuFlowerFlying && CUR_FORM == PLAYER_FORM_DEKU && player->transformation == PLAYER_FORM_DEKU) {
+        bool hasMagic = gSaveContext.save.saveInfo.playerData.isMagicAcquired;
+        u8 bItem = BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B);
+        if ((!hasMagic && bItem == ITEM_DEKU_NUT) || (hasMagic && bItem == ITEM_FD)) {
+            BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) = hasMagic ? ITEM_DEKU_NUT : ITEM_FD;
+            Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
+            restoreHudVisibility = true;
+        }
+    }
 
     if (CHECK_EVENTINF(EVENTINF_41)) {
         // Related to swamp boat (non-minigame)?
@@ -3113,14 +3146,8 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
         // #endregion
     } else if (CHECK_EVENTINF(EVENTINF_34)) {
         // Deku playground minigame
-        if (player->stateFlags3 & PLAYER_STATE3_1000000) {
-            if (gSaveContext.save.saveInfo.inventory.items[SLOT_DEKU_NUT] == ITEM_DEKU_NUT) {
-                BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) = ITEM_DEKU_NUT;
-                Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
-            } else {
-                gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_DISABLED;
-                restoreHudVisibility = true;
-            }
+        if (dekuFlowerFlying) {
+            restoreHudVisibility |= Interface_UpdateDekuFlightBButton(play);
         } else {
             if (gSaveContext.buttonStatus[EQUIP_SLOT_B] == BTN_DISABLED) {
                 gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_ENABLED;
@@ -3149,36 +3176,21 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
             Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
             restoreHudVisibility = false;
         }
-    } else if (player->stateFlags3 & PLAYER_STATE3_1000000) {
+    } else if (dekuFlowerFlying) {
         // Nuts on B (from flying as Deku Link)
-        if (gSaveContext.save.saveInfo.inventory.items[SLOT_DEKU_NUT] == ITEM_DEKU_NUT) {
-            if (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) != ITEM_DEKU_NUT) {
-                BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) = ITEM_DEKU_NUT;
-                Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
-                gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_ENABLED;
+        restoreHudVisibility |= Interface_UpdateDekuFlightBButton(play);
+        for (i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
+            if (gSaveContext.buttonStatus[i] != BTN_DISABLED) {
+                gSaveContext.buttonStatus[i] = BTN_DISABLED;
                 restoreHudVisibility = true;
             }
-        } else if (gSaveContext.buttonStatus[EQUIP_SLOT_B] == BTN_ENABLED) {
-            gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_DISABLED;
-            restoreHudVisibility = true;
         }
-
-        if (restoreHudVisibility) {
-            gSaveContext.buttonStatus[EQUIP_SLOT_C_LEFT] = BTN_DISABLED;
-            gSaveContext.buttonStatus[EQUIP_SLOT_C_DOWN] = BTN_DISABLED;
-            gSaveContext.buttonStatus[EQUIP_SLOT_C_RIGHT] = BTN_DISABLED;
-            // #region 2S2H [Dpad]
-            gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_RIGHT] = BTN_DISABLED;
-            gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_LEFT] = BTN_DISABLED;
-            gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_DOWN] = BTN_DISABLED;
-            gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_UP] = BTN_DISABLED;
-            // #endregion
+        for (i = EQUIP_SLOT_D_RIGHT; i <= EQUIP_SLOT_D_UP; i++) {
+            if (gSaveContext.shipSaveContext.dpad.status[i] != BTN_DISABLED) {
+                gSaveContext.shipSaveContext.dpad.status[i] = BTN_DISABLED;
+                restoreHudVisibility = true;
+            }
         }
-    } else if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired && (CUR_FORM == PLAYER_FORM_DEKU) &&
-               (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_DEKU_NUT)) {
-        // Nuts on B (as Deku Link)
-        BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) = ITEM_FD;
-        gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_DISABLED;
     } else if ((Player_GetEnvironmentalHazard(play) >= PLAYER_ENV_HAZARD_UNDERWATER_FLOOR) &&
                (Player_GetEnvironmentalHazard(play) <= PLAYER_ENV_HAZARD_UNDERWATER_FREE)) {
         // Swimming underwater
@@ -3374,7 +3386,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                             gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_DISABLED;
                         }
                     }
-                } else if (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_NONE) {
+                } else if (CUR_FORM == PLAYER_FORM_DEKU && BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_FD) {
                     if (gSaveContext.buttonStatus[EQUIP_SLOT_B] != BTN_DISABLED) {
                         restoreHudVisibility = true;
                         gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_DISABLED;
@@ -6990,7 +7002,7 @@ void Interface_DrawBButtonIcons(PlayState* play) {
     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
     gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
 
-    if (!interfaceCtx->bButtonInterfaceDoActionActive && (player->stateFlags3 & PLAYER_STATE3_1000000)) {
+    if (!interfaceCtx->bButtonInterfaceDoActionActive && Player_IsDekuFlowerFlying(player)) {
         if (gSaveContext.buttonStatus[EQUIP_SLOT_B] != BTN_DISABLED) {
             Interface_DrawItemIconTexture(play, interfaceCtx->iconItemSegment[EQUIP_SLOT_B], EQUIP_SLOT_B);
             gDPPipeSync(OVERLAY_DISP++);
@@ -9681,8 +9693,7 @@ void Interface_Draw(PlayState* play) {
             gDPSetEnvColor(OVERLAY_DISP++, sRupeeCounterIconEnvColors[CUR_UPG_VALUE(UPG_WALLET)].r,
                            sRupeeCounterIconEnvColors[CUR_UPG_VALUE(UPG_WALLET)].g,
                            sRupeeCounterIconEnvColors[CUR_UPG_VALUE(4)].b, 255);
-            if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+            if (PickupCounter_ShouldDrawWallet(play)) {
                 HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                 OVERLAY_DISP =
                     Gfx_DrawTexRectIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16, 1 << 10, 1 << 10);
@@ -9940,8 +9951,7 @@ void Interface_Draw(PlayState* play) {
                 gDPPipeSync(OVERLAY_DISP++);
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 0, 0, magicAlpha);
 
-                if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                    CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+                if (PickupCounter_ShouldDrawWallet(play)) {
                     HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                     OVERLAY_DISP = Gfx_DrawTexRectI8(OVERLAY_DISP, sCounterTextures[counterDigits[sp2CC]], 8, 16,
                                                      sp2CA + 1, 207, 8, 16, 1 << 10, 1 << 10);
@@ -9958,8 +9968,7 @@ void Interface_Draw(PlayState* play) {
                 }
 
                 // Keep native colors and digit preparation active when only the HUD counter is hidden.
-                if (!CVarGetInteger("gEnhancements.PickupCounter", 0) ||
-                    CVarGetInteger("gEnhancements.PickupCounterHideHudRupees", 0) != 1) {
+                if (PickupCounter_ShouldDrawWallet(play)) {
                     // #region 2S2H [Cosmetic] Hud Editor
                     HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_RUPEE_COUNTER);
                     if (HudEditor_ShouldOverrideDraw()) {

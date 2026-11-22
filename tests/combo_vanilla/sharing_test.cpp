@@ -95,10 +95,10 @@ static void Slate_GrantRune(unsigned char rune) { live.slateRunesOwned |= 1u << 
 static void Seasons_GrantSeason(unsigned char season) { live.seasonsOwned |= 1u << season; }
 static void Seasons_GrantRod() { live.seasonsRodOwned = 1; }
 #ifdef TEST_MM
-static void GrantMmItemByName(const char* name, void*) { assert(name && *name); ++legacyGrants; }
+static void GrantMmItemByName(const char* name, void*, bool = true) { assert(name && *name); ++legacyGrants; }
 #define GrantSharedItem MM_GrantSharedItem
 #else
-static void GrantOotItemByName(const char* name, void*) { assert(name && *name); ++legacyGrants; }
+static void GrantOotItemByName(const char* name, void*, bool = true) { assert(name && *name); ++legacyGrants; }
 #define GrantSharedItem SOH_GrantSharedItem
 #define INV_CONTENT(item) gSaveContext.inventory.items[SLOT_NAYRUS_LOVE]
 #endif

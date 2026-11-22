@@ -64,6 +64,9 @@ void GfxRenderingAPIOGL::SetUniforms(ShaderProgram* prg) const {
 
 void GfxRenderingAPIOGL::SetPerDrawUniforms() {
     glUniform1f(mCurrentShaderProgram->prim_depth_location, mCurrentPrimDepth);
+    if (mCurrentShaderProgram->model_opacity_location >= 0) {
+        glUniform1f(mCurrentShaderProgram->model_opacity_location, mCurrentModelOpacity);
+    }
 
     if (mCurrentShaderProgram->usedTextures[0] || mCurrentShaderProgram->usedTextures[1]) {
         GLint filtering[2] = { textures[mCurrentTextureIds[0]].filtering, textures[mCurrentTextureIds[1]].filtering };
@@ -265,6 +268,7 @@ std::string GfxRenderingAPIOGL::BuildFsShader(const CCFeatures& cc_features) {
         { "o_grayscale", cc_features.opt_grayscale },
         { "o_prim_depth", cc_features.opt_prim_depth },
         { "o_toon", cc_features.opt_toon },
+        { "o_model_opacity", cc_features.opt_model_opacity },
         { "o_textures", M_ARRAY(cc_features.usedTextures, bool, 2) },
         { "o_masks", M_ARRAY(cc_features.used_masks, bool, 2) },
         { "o_blend", M_ARRAY(cc_features.used_blend, bool, 2) },
@@ -528,6 +532,8 @@ ShaderProgram* GfxRenderingAPIOGL::CreateAndLoadNewShader(uint64_t shader_id0, u
     prg->frameCountLocation = glGetUniformLocation(shader_program, "frame_count");
     prg->noiseScaleLocation = glGetUniformLocation(shader_program, "noise_scale");
     prg->prim_depth_location = glGetUniformLocation(shader_program, "prim_depth");
+    prg->model_opacity_location =
+        cc_features.opt_model_opacity ? glGetUniformLocation(shader_program, "model_opacity") : -1;
     prg->texture_width_location = glGetUniformLocation(shader_program, "texture_width");
     prg->texture_height_location = glGetUniformLocation(shader_program, "texture_height");
     prg->texture_filtering_location = glGetUniformLocation(shader_program, "texture_filtering");
@@ -822,7 +828,7 @@ void GfxRenderingAPIOGL::Init() {
     glEnable(GL_DEPTH_CLAMP);
 #endif
     glDepthFunc(GL_LEQUAL);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     mFrameBuffers.resize(1); // for the default screen buffer
 
@@ -950,7 +956,7 @@ void GfxRenderingAPIOGL::StartDrawToFramebuffer(int fb_id, float noise_scale) {
     mCurrentFrameBuffer = fb_id;
 }
 
-void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth) {
+void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth, float clearAlpha) {
     if (mLastScissorEnabled != 0) {
         mLastScissorEnabled = 0;
         glDisable(GL_SCISSOR_TEST);
@@ -961,7 +967,7 @@ void GfxRenderingAPIOGL::ClearFramebuffer(bool color, bool depth) {
     // glStencilMask must allow the write for glClear to touch the stencil plane.
     glStencilMask(0xFF);
     glClearStencil(0);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, clearAlpha);
     glClear((color ? GL_COLOR_BUFFER_BIT : 0) | (depth ? (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT) : 0));
     glDepthMask(mCurrentDepthMask ? GL_TRUE : GL_FALSE);
     if (mLastScissorEnabled != 1) {

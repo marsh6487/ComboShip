@@ -265,14 +265,15 @@ struct ShaderProgram* GfxRenderingAPIMetal::CreateAndLoadNewShader(uint64_t shad
     // SOH [Enhancement] World light casting: declare the Stencil8 format on every pipeline (parallels the
     // unconditional depth format above), so pipelines stay consistent with the stencil-bearing render pass.
     pipeline_descriptor->setStencilAttachmentPixelFormat(MTL::PixelFormatStencil8);
-    if (cc_features.opt_alpha) {
+    if (cc_features.opt_alpha || cc_features.opt_model_opacity) {
         pipeline_descriptor->colorAttachments()->object(0)->setBlendingEnabled(true);
         pipeline_descriptor->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setDestinationRGBBlendFactor(
             MTL::BlendFactorOneMinusSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setRgbBlendOperation(MTL::BlendOperationAdd);
-        pipeline_descriptor->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorZero);
-        pipeline_descriptor->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+        pipeline_descriptor->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+        pipeline_descriptor->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(
+            MTL::BlendFactorOneMinusSourceAlpha);
         pipeline_descriptor->colorAttachments()->object(0)->setAlphaBlendOperation(MTL::BlendOperationAdd);
         pipeline_descriptor->colorAttachments()->object(0)->setWriteMask(MTL::ColorWriteMaskAll);
     } else {
@@ -636,11 +637,13 @@ void GfxRenderingAPIMetal::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, si
         mDrawUniforms.toonDebug = mToonDebug;
     }
 
-    if (textures_changed || mPrimDepthDirty || mShaderProgram->opt_toon ||
+    if (textures_changed || mPrimDepthDirty || mModelOpacityDirty || mShaderProgram->opt_toon ||
         current_framebuffer.mLastShaderProgram == nullptr) {
         mDrawUniforms.prim_depth = mCurrentPrimDepth;
+        mDrawUniforms.modelOpacity = mCurrentModelOpacity;
         current_framebuffer.mCommandEncoder->setFragmentBytes(&mDrawUniforms, sizeof(DrawUniforms), 1);
         mPrimDepthDirty = false;
+        mModelOpacityDirty = false;
     }
 
     if (current_framebuffer.mLastShaderProgram != mShaderProgram) {
@@ -1113,7 +1116,7 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale) 
     memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
 }
 
-void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
+void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth, float clearAlpha) {
     if (!color && !depth) {
         return;
     }
@@ -1127,7 +1130,9 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
     MTL::RenderPassColorAttachmentDescriptor* srcColorAttachment =
         framebuffer.mRenderPassDescriptor->colorAttachments()->object(0);
     MTL::LoadAction origLoadAction = srcColorAttachment->loadAction();
+    const auto origClearColor = srcColorAttachment->clearColor();
     if (color) {
+        srcColorAttachment->setClearColor({ 0.0, 0.0, 0.0, clearAlpha });
         srcColorAttachment->setLoadAction(MTL::LoadActionClear);
     }
 
@@ -1156,6 +1161,7 @@ void GfxRenderingAPIMetal::ClearFramebuffer(bool color, bool depth) {
 
     // Now that the command encoder is started, we set the original load actions back for the next frame's use
     srcColorAttachment->setLoadAction(origLoadAction);
+    srcColorAttachment->setClearColor(origClearColor);
     stencilAttachment->setLoadAction(origStencilLoadAction);
     if (depth && framebuffer.mHasDepthBuffer) {
         srcDepthAttachment->setLoadAction(origDepthLoadAction);

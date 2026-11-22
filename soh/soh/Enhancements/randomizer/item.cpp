@@ -1,4 +1,5 @@
 #include "item.h"
+#include "WalletProgression.h"
 #include "item_location.h"
 #include "OptionalNeiIcons.h"
 
@@ -160,7 +161,8 @@ std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursio
     std::shared_ptr<Rando::Context> ctx = Rando::Context::GetInstance();
     auto logic = ctx->GetLogic();
     RandomizerGet actual = RG_NONE;
-    const bool tycoonWallet = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_INCLUDE_TYCOON_WALLET);
+    const auto& randomizer = OTRGlobals::Instance->gRandomizer;
+    const bool tycoonWallet = randomizer->GetRandoSettingValue(RSK_INCLUDE_TYCOON_WALLET);
     const u8 infiniteUpgrades = OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_INFINITE_UPGRADES);
     switch (randomizerGet) {
         case RG_PROGRESSIVE_STICK_UPGRADE:
@@ -345,10 +347,12 @@ std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursio
                     actual = RG_PROGRESSIVE_ROCS;
                     break;
                 case ITEM_ROCS_FEATHER_SKIJER:
-                case ITEM_ROCS_CAPE:
                     actual = RG_ROCS_CAPE;
                     break;
+                case ITEM_ROCS_CAPE:
                 default:
+                    // Match the duplicate reward used by the native check and cross-game grant.
+                    actual = RG_BLUE_RUPEE;
                     break;
             }
             break;
@@ -373,34 +377,10 @@ std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursio
             }
             break;
         case RG_PROGRESSIVE_WALLET:
-            if (!logic->CheckRandoInf(RAND_INF_HAS_WALLET)) {
-                actual = RG_CHILD_WALLET;
-                break;
-            }
-            switch (logic->CurrentUpgrade(UPG_WALLET)) {
-                case 0:
-                    actual = RG_ADULT_WALLET;
-                    break;
-                case 1:
-                    actual = RG_GIANT_WALLET;
-                    break;
-                case 2:
-                    if (tycoonWallet) {
-                        actual = RG_TYCOON_WALLET;
-                        break;
-                    }
-                    // fallthrough
-                case 3:
-                case 4:
-                    if (infiniteUpgrades != RO_INF_UPGRADES_OFF) {
-                        actual = RG_WALLET_INF;
-                    } else {
-                        actual = tycoonWallet ? RG_TYCOON_WALLET : RG_GIANT_WALLET;
-                    }
-                    break;
-                default:
-                    break;
-            }
+            actual = OotWallet::NextUpgrade(
+                logic->CurrentUpgrade(UPG_WALLET), logic->CheckRandoInf(RAND_INF_HAS_WALLET), tycoonWallet,
+                randomizer->GetRandoSettingValue(RSK_INCLUDE_ZFG_WALLET), logic->CheckRandoInf(RAND_INF_HAS_ZFG_WALLET),
+                infiniteUpgrades != RO_INF_UPGRADES_OFF, logic->CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY));
             break;
         case RG_PROGRESSIVE_SCALE:
             if (!logic->CheckRandoInf(RAND_INF_CAN_SWIM)) {

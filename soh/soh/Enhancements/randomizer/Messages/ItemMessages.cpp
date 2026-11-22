@@ -466,6 +466,14 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     } else {
         rgid = player->getItemId;
     }
+    if (rgid == RG_ZFG_WALLET) {
+        msg = CustomMessage("You found %gZFG's Wallet%w!&It holds up to %y9,999 rupees%w.",
+                            "Du hast %gZFGs Geldbörse%w gefunden!&Sie fasst %y9.999 Rubine%w.",
+                            "Tu as trouvé %gla bourse de ZFG%w!&Elle contient %y9 999 rubis%w au maximum.",
+                            TEXTBOX_TYPE_BLUE);
+        msg.AutoFormat(ITEM_CUSTOM);
+        return;
+    }
     if (rgid == RG_RITO_MASK) {
         msg = CustomMessage("You found the %gRito Mask%w!&Wear it to take to the skies.", TEXTBOX_TYPE_BLUE);
         msg.receiptPresentation.singleBox = 1;

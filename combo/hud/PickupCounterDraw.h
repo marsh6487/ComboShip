@@ -46,13 +46,19 @@ inline void Spark(ImDrawList* draw, ImVec2 pos, float radius, ImU32 color) {
                         ImVec2(pos.x + radius * 0.65f, pos.y), ImVec2(pos.x, pos.y + radius * 0.2f), color);
 }
 
+inline void DrawItemTexture(ImDrawList* draw, ImTextureID texture, ImVec2 center, float scale, float alpha) {
+    const float radius = 15.0f * scale;
+    draw->AddImage(texture, ImVec2(center.x - radius, center.y - radius), ImVec2(center.x + radius, center.y + radius),
+                   ImVec2(0, 0), ImVec2(1, 1), Ink(255, 255, 255, alpha));
+}
+
 // Small faceted gem, independent of any optional texture pack. Ammo uses the
 // host's actual inventory icon; these silhouettes also cover a missing icon.
 inline void DrawIcon(ImDrawList* draw, Kind kind, ImVec2 center, float scale, float alpha, ImTextureID texture) {
     const auto p = [=](float x, float y) { return ImVec2(center.x + x * scale, center.y + y * scale); };
     const Palette accent = Accent(kind);
     if (texture) {
-        draw->AddImage(texture, p(-15, -15), p(15, 15), ImVec2(0, 0), ImVec2(1, 1), Ink(255, 255, 255, alpha));
+        DrawItemTexture(draw, texture, center, scale, alpha);
         return;
     }
     if (kind == Kind::Rupees) {

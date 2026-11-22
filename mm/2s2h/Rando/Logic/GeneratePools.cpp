@@ -522,11 +522,14 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         itemPool.push_back(RI_SONG_SARIA);
     }
 
-    // Tycoon's Wallet
+    // Optional wallet tiers each contribute one progressive copy.
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET]) {
         itemPool.push_back(RI_PROGRESSIVE_WALLET);
     }
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] == RO_GENERIC_YES) {
+        itemPool.push_back(RI_PROGRESSIVE_WALLET);
+    }
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_ZFG_WALLET] == RO_GENERIC_YES) {
         itemPool.push_back(RI_PROGRESSIVE_WALLET);
     }
 
@@ -600,6 +603,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // Remove starting items from the pool (but only one per entry in startingItems)
     for (RandoItemId startingItem : startingItems) {
         if (startingItem == RI_WALLET_CHILD && saveInfo.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET])
+            startingItem = RI_PROGRESSIVE_WALLET;
+        if (startingItem == RI_WALLET_ZFG && saveInfo.randoSaveOptions[RO_SHUFFLE_ZFG_WALLET])
             startingItem = RI_PROGRESSIVE_WALLET;
         auto it = std::find(itemPool.begin(), itemPool.end(), startingItem);
         if (it != itemPool.end()) {

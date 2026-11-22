@@ -91,6 +91,8 @@ def main():
              '-DIMGUI_DEFINE_MATH_OPERATORS=', '-DLOG_LEVEL_GAME_PRINTS=0', '-DFMT_HEADER_ONLY', '-Wno-narrowing', '-DSPDLOG_ACTIVE_LEVEL=6']
     if '// Solver inventory helpers begin' not in logic:
         flags += ['-DLEGACY_SOLVER_INVENTORY']
+    if 'OotWallet::NextUpgrade' in logic:
+        flags += ['-DOOT_ZFG_WALLET_FIXTURE']
     if args.sanitize:
         flags += ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
     flags += ['-D' + k + '=\"' + v + '\"' for k, v in re.findall(r'set\((CVAR_PREFIX_\w+)\s+\"([^\"]+)\"\)', read('CMake/soh-cvars.cmake'))]

@@ -47,6 +47,7 @@ typedef struct SSBBSkinMesh {
     u8 preserveRootMotion;
     u8 interpolateFrames;
     u8 useDefinitionScale; // ignore the shared SkinScale CVar for this mesh
+    u8 drawBindPose;       // allow this mesh to draw when no animation is installed
 } SSBBSkinMesh;
 
 // Initialize skin mesh runtime buffers (allocate Vtx double buffers)

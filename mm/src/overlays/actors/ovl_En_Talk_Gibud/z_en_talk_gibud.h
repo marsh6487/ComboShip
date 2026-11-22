@@ -13,6 +13,13 @@ struct EnTalkGibud;
 
 typedef void (*EnTalkGibudActionFunc)(struct EnTalkGibud*, PlayState*);
 
+typedef struct {
+    /* 0x0 */ PlayerItemAction itemAction;
+    /* 0x4 */ ItemId item;
+    /* 0x8 */ s32 amount;
+    /* 0xC */ s16 isBottledItem;
+} EnTalkGibudRequestedItem; // size = 0x10
+
 typedef enum EnTalkGibudBodyPart {
     /*  0 */ EN_TALK_GIBUD_BODYPART_0,
     /*  1 */ EN_TALK_GIBUD_BODYPART_1,
@@ -65,5 +72,7 @@ typedef struct EnTalkGibud {
     /* 0x3F6 */ u8 drawDmgEffType;
     /* 0x3F7 */ s8 unk_3F7; // related to player->unk_ADD
 } EnTalkGibud; // size = 0x3F8
+
+const EnTalkGibudRequestedItem* EnTalkGibud_GetPendingRequest(const Actor* actor, PlayState* play);
 
 #endif // Z_EN_TALK_GIBUD_H

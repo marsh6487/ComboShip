@@ -42,7 +42,7 @@ fade_black=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_FADE_BLACK,',transitions).
 constants+='\nconstexpr int TRANS_TYPE_FADE_BLACK='+fade_black+';\n'
 instant=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_INSTANT,',transitions).group(1)
 constants+='\nconstexpr int TRANS_TYPE_INSTANT='+instant+';\n'
-constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; bool isOwlSave=false; struct { int pauseSaveEntrance=-1,saveType=1; struct { struct { int version=0; } soloEntrances; } rando; } shipSaveInfo; } save;')
+constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; bool isOwlSave=false; struct { int pauseSaveEntrance=-1,saveType=1; struct { struct { int version=0; } soloEntrances; uint16_t discoveredEntrances[256]{}; uint16_t discoveredEntranceCount=0; } rando; } shipSaveInfo; } save;')
 scenes=(ROOT/'mm/include/tables/scene_table.h').read_text()
 for value,name in re.findall(r'/\*\s*(0x[0-9a-fA-F]+)\s*\*/\s*DEFINE_SCENE\([^,]+,\s*(SCENE_\w+)',scenes):
     if name!='SCENE_KAKUSIANA':constants+=f'\nconstexpr int {name}={value};'

@@ -4,6 +4,7 @@
 #include <ship/window/Window.h>
 #include <ship/window/gui/ConsoleWindow.h>
 #include "2s2h/BenPort.h"
+#include "2s2h/Enhancements/Saving/SavingEnhancements.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
@@ -153,8 +154,8 @@ static bool ResetHandler(std::shared_ptr<Ship::Console> Console, std::vector<std
     } else
 #endif
     {
-        STOP_GAMESTATE(gGameState);
-        SET_NEXT_GAMESTATE(gGameState, ConsoleLogo_Init, sizeof(ConsoleLogoState));
+        SavingEnhancements_AutosaveOnReset();
+        FleetCombo_DoLocalReset();
     }
     // GI-TODO
     // GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);

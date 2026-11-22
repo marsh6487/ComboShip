@@ -4,7 +4,9 @@ import os,subprocess,tempfile,re
 ROOT=Path(__file__).resolve().parents[3]
 with tempfile.TemporaryDirectory(prefix='song-event-native-') as td:
     source=(ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text();a=source.index('inline void to_json(json& j, const RandoSaveCheck&');b=source.index('inline void to_json(json& j, const Vec3f&',a)
-    (Path(td)/'mm_save_json.inc').write_text('using json=nlohmann::json;\n'+source[a:b])
+    (Path(td)/'mm_save_json.inc').write_text(
+        '#ifdef COMBO_BUILD\n#include "Rando/EntranceTrackerDiscovery.h"\n#endif\n'
+        'using json=nlohmann::json;\n'+source[a:b])
     message=(ROOT/'mm/src/code/z_message.c').read_text()
     a=message.index('            if ((sSongEventReservedSong >= 0')
     b=message.index('{',a);e=b+1;depth=1

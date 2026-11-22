@@ -19,6 +19,7 @@ static inline void CwDinsNativeActor_Init(MagicFire* fire, PlayState* play) {
     fire->nativeActive = fire->actor.id == ACTOR_MAGIC_FIRE && CwDinsNative_Is(&fire->actor);
 #endif
     fire->nativeFrame = -1;
+    fire->nativeSpreadScale = 0.0f;
     fire->nativePendingTicks = 0;
     fire->nativeLightAttempted = 0;
     fire->nativeLightNode = NULL;
@@ -159,6 +160,37 @@ static inline void CwDinsNativeActor_UpdateLight(MagicFire* fire) {
                                strength, (s16)(175 * tail));
 }
 
+static inline void CwDinsNativeActor_SetAttackBounds(MagicFire* fire, float radius, float height) {
+    const int growTicks = 30;
+    const int sweepStart = growTicks + 25 + 1;
+    const int sweepEnd = sweepStart + 14;
+    int frame = fire->nativeFrame;
+    fire->collider.dim.radius = (s16)radius;
+    fire->collider.dim.height = (s16)height;
+    fire->collider.dim.yShift = 0;
+    if (frame < sweepEnd) {
+        /* The stock spell uses a centered cylinder and makes its widest
+         * sweep as it burns out. Keep that reach on the original schedule,
+         * including torches below the cast point. The long remake hold
+         * outside that sweep uses its visible local reach. */
+        float stockScale = fire->nativeSpreadScale;
+        if (stockScale * 325.0f > fire->collider.dim.radius) {
+            fire->collider.dim.radius = stockScale * 325.0f;
+        }
+        fire->collider.dim.yShift = stockScale * -225.0f;
+        fire->collider.dim.height = stockScale * 450.0f;
+        if (fire->collider.dim.height + fire->collider.dim.yShift < (s16)height) {
+            fire->collider.dim.height = (s16)height - fire->collider.dim.yShift;
+        }
+        if (frame > 0 && frame < growTicks) {
+            Math_SmoothStepToF(&fire->nativeSpreadScale, 0.4f, 0.08f, 0.1f, 0.001f);
+        } else if (frame >= sweepStart) {
+            fire->nativeSpreadScale += 0.05f;
+        }
+    }
+    Collider_UpdateCylinder(&fire->actor, &fire->collider);
+}
+
 /* Returns true for the latched native cast, including wait/expiry. Legacy actors
  * never enter this path, even if the setting changes while they are alive. */
 static inline int CwDinsNativeActor_Update(MagicFire* fire, PlayState* play) {
@@ -220,10 +252,7 @@ static inline int CwDinsNativeActor_Update(MagicFire* fire, PlayState* play) {
     fire->alphaMultiplier = powf(1 - fade, .65f);
     fire->screenTintIntensity = 0;
     Actor_SetScale(&fire->actor, radius / 325.0f);
-    fire->collider.dim.radius = (s16)radius;
-    fire->collider.dim.height = (s16)height;
-    fire->collider.dim.yShift = 0;
-    Collider_UpdateCylinder(&fire->actor, &fire->collider);
+    CwDinsNativeActor_SetAttackBounds(fire, radius, height);
     /* Keep the original strong damage falloff. The extra interaction hold uses
      * the existing low-damage tail instead of prolonging the strong attack. */
     u8 damage = frame < CW_DINS_NATIVE_GROW_TICKS ? (u8)(55 - frame * 30 / CW_DINS_NATIVE_GROW_TICKS)

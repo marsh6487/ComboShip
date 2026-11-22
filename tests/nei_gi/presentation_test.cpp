@@ -15,6 +15,12 @@
 #include <string>
 #include <vector>
 
+void Randomizer_DrawWallet(PlayState*, GetItemEntry*) { assert(false && "unexpected native wallet draw"); }
+extern "C" s32 GetItem_GetDrawTableEntry(s32, void**, s32, s32*, f32*, s32*, uint8_t*) {
+  assert(false && "unexpected native wallet table lookup");
+  return 0;
+}
+
 #ifdef COMBO_BUILD
 extern bool ownerAlt;
 #endif

@@ -144,7 +144,6 @@
     "objects/object_triforce_piece_2/gTriforcePiece2DL_vtx_0",
     "objects/object_triforce_piece_2/gTriforcePiece2DL_vtx_1",
     "objects/object_triforce_piece_2/gTriforcePiece2DL_vtx_2",
-    "shaders/opengl/default.shader.glsl",
     "textures/buttons/ABtn.png",
     "textures/buttons/ABtnOutline.png",
     "textures/buttons/AnalogStick.png",

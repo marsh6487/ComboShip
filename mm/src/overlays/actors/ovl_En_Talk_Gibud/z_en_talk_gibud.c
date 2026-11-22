@@ -48,13 +48,6 @@ s32 EnTalkGibud_PlayerOutOfRange(EnTalkGibud* this, PlayState* play);
 void EnTalkGibud_TurnTowardsPlayer(EnTalkGibud* this, PlayState* play);
 s32 EnTalkGibud_MoveToIdealGrabPositionAndRotation(EnTalkGibud* this, PlayState* play);
 
-typedef struct {
-    /* 0x0 */ PlayerItemAction itemAction;
-    /* 0x4 */ ItemId item;
-    /* 0x8 */ s32 amount;
-    /* 0xC */ s16 isBottledItem;
-} EnTalkGibudRequestedItem; // size = 0x10
-
 typedef enum EnTalkGibudRequestedItemState {
     /* 0 */ EN_TALK_GIBUD_REQUESTED_ITEM_MET,
     /* 1 */ EN_TALK_GIBUD_REQUESTED_ITEM_NOT_ENOUGH_AMMO,
@@ -212,6 +205,22 @@ static EnTalkGibudRequestedItem sRequestedItemTable[] = {
     { PLAYER_IA_BOTTLE_BIG_POE, ITEM_BIG_POE, 1, true },
     { PLAYER_IA_BOTTLE_MILK, ITEM_MILK_BOTTLE, 1, true },
 };
+
+const EnTalkGibudRequestedItem* EnTalkGibud_GetPendingRequest(const Actor* actor, PlayState* play) {
+    if (play->sceneId != SCENE_REDEAD || actor->id != ACTOR_EN_TALK_GIBUD || actor->update == NULL ||
+        actor->draw == NULL) {
+        return NULL;
+    }
+    const EnTalkGibud* gibdo = (const EnTalkGibud*)actor;
+    if (gibdo->actionFunc == NULL || gibdo->actionFunc == EnTalkGibud_Dead || gibdo->actionFunc == EnTalkGibud_Revive ||
+        gibdo->actionFunc == EnTalkGibud_Disappear ||
+        (gibdo->switchFlag != SWITCH_FLAG_NONE && Flags_GetSwitch(play, gibdo->switchFlag)) ||
+        (u32)gibdo->requestedItemIndex >= ARRAY_COUNT(sRequestedItemTable)) {
+        return NULL;
+    }
+
+    return &sRequestedItemTable[gibdo->requestedItemIndex];
+}
 
 static InitChainEntry sInitChain[] = {
     ICHAIN_F32(lockOnArrowOffset, 2000, ICHAIN_CONTINUE),

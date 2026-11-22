@@ -1,4 +1,5 @@
 #include <initializer_list>
+#include "WalletProgression.h"
 #include "SoulShuffleEnemy.h"
 #include "SoulShuffle.h"
 #include "RustyDoorKeys.h"
@@ -326,6 +327,8 @@ bool Logic::HasItem(RandomizerGet itemName) {
             return CurrentUpgrade(UPG_WALLET) >= 2;
         case RG_TYCOON_WALLET:
             return CurrentUpgrade(UPG_WALLET) >= 3;
+        case RG_ZFG_WALLET:
+            return CheckRandoInf(RAND_INF_HAS_ZFG_WALLET);
             // Scales
         case RG_SILVER_SCALE:
             return CurrentUpgrade(UPG_SCALE) >= 1;
@@ -3047,21 +3050,55 @@ void Logic::ApplyItemEffect(Item& item, bool state) {
                     SetUpgrade(UPG_BULLET_BAG, newLevel);
                 } break;
                 case RG_PROGRESSIVE_WALLET: {
-                    auto realGI = item.GetGIEntry();
-                    if (realGI->itemId == RG_WALLET_INF && realGI->modIndex == MOD_RANDOMIZER) {
-                        SetRandoInf(RAND_INF_HAS_INFINITE_MONEY, true);
+                    const auto currentLevel = CurrentUpgrade(UPG_WALLET);
+                    auto& surplusCopies = customItemCounts[RG_PROGRESSIVE_WALLET];
+                    if (!state) {
+                        if (surplusCopies != 0) {
+                            --surplusCopies;
+                        } else if (CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY)) {
+                            SetRandoInf(RAND_INF_HAS_INFINITE_MONEY, false);
+                        } else if (CheckRandoInf(RAND_INF_HAS_ZFG_WALLET)) {
+                            SetRandoInf(RAND_INF_HAS_ZFG_WALLET, false);
+                        } else if (currentLevel == 0) {
+                            SetRandoInf(RAND_INF_HAS_WALLET, false);
+                        } else {
+                            SetUpgrade(UPG_WALLET, currentLevel - 1);
+                        }
                         break;
                     }
-                    auto currentLevel = CurrentUpgrade(UPG_WALLET);
-                    if (!CheckRandoInf(RAND_INF_HAS_WALLET) && state) {
+
+                    const auto reward = OotWallet::NextUpgrade(
+                        currentLevel, CheckRandoInf(RAND_INF_HAS_WALLET),
+                        ctx->GetOption(RSK_INCLUDE_TYCOON_WALLET).Get(), ctx->GetOption(RSK_INCLUDE_ZFG_WALLET).Get(),
+                        CheckRandoInf(RAND_INF_HAS_ZFG_WALLET),
+                        !ctx->GetOption(RSK_INFINITE_UPGRADES).Is(RO_INF_UPGRADES_OFF),
+                        CheckRandoInf(RAND_INF_HAS_INFINITE_MONEY));
+                    if (reward == RG_CHILD_WALLET) {
                         SetRandoInf(RAND_INF_HAS_WALLET, true);
-                    } else if (currentLevel == 0 && !state) {
-                        SetRandoInf(RAND_INF_HAS_WALLET, false);
+                    } else if (reward == RG_ZFG_WALLET) {
+                        SetRandoInf(RAND_INF_HAS_ZFG_WALLET, true);
+                    } else if (reward == RG_WALLET_INF) {
+                        SetRandoInf(RAND_INF_HAS_INFINITE_MONEY, true);
+                    } else if (reward == RG_BLUE_RUPEE) {
+                        ++surplusCopies;
                     } else {
-                        auto newLevel = currentLevel + (!state ? -1 : 1);
-                        SetUpgrade(UPG_WALLET, newLevel);
+                        SetUpgrade(UPG_WALLET, currentLevel + 1);
                     }
-                } break;
+                    break;
+                }
+                case RG_ZFG_WALLET:
+                    SetRandoInf(RAND_INF_HAS_ZFG_WALLET, state);
+                    if (state) {
+                        SetRandoInf(RAND_INF_HAS_WALLET, true);
+                        const auto floor = OotWallet::NativeFloor(ctx->GetOption(RSK_INCLUDE_TYCOON_WALLET).Get());
+                        if (CurrentUpgrade(UPG_WALLET) < floor) {
+                            SetUpgrade(UPG_WALLET, floor);
+                        }
+                    }
+                    break;
+                case RG_WALLET_INF:
+                    SetRandoInf(RAND_INF_HAS_INFINITE_MONEY, state);
+                    break;
                 case RG_PROGRESSIVE_SCALE: {
                     auto currentLevel = CurrentUpgrade(UPG_SCALE);
                     if (!CheckRandoInf(RAND_INF_CAN_SWIM) && state) {

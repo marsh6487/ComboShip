@@ -15,7 +15,7 @@ header = (ROOT/'soh/soh/Enhancements/randomizer/randomizer_entrance_tracker.h').
 assert ui.count('IsEntranceDiscovered(entrance.index)') == 2
 assert 'IsEntranceDiscovered(entrance.override)' not in ui
 if 'trackerSeedRevision != Combo_SOH_TrackerSeedRevision()' in ui:
-    draw = ui[ui.index('void EntranceTrackerWindow::DrawElement()'): ]
+    draw = ui[ui.index('void EntranceTrackerWindow::DrawElement()'):]
     assert draw.index('InitEntranceTrackingData();') < draw.index('GroupEntranceCounts')
 host = (ROOT/'combo/rando/CrossDungeonOotRuntime.inc.h').read_text()
 types = header[header.index('typedef enum {'):header.index('static std::map<int32_t, const char*> windowType')]
@@ -57,6 +57,14 @@ static const EntranceData data[] = {
  {0x3d4,0x88,{},"Ice Cavern","Zoras Fountain",ENTRANCE_GROUP_ZORAS_FOUNTAIN,ENTRANCE_GROUP_ZORAS_FOUNTAIN,ENTRANCE_TYPE_DUNGEON,"ice exit",0}};
 const EntranceData* GetEntranceData(s16 index) { for(const auto& d:data) if(d.index==index) return &d; return nullptr; }
 bool Entrance_EntranceIsNull(const EntranceOverride* e) {return e->index==0 && e->override==0 && e->destination==0;}
+static const char* MmDestinationLabel(int32_t entrance) {
+ return entrance == 0x405 ? "Zora Hall Shop" : nullptr;
+}
+void* Combo_ResolveSym(const char* owner, const char* symbol) {
+ assert(std::strcmp(owner, "2ship") == 0);
+ assert(std::strcmp(symbol, "MM_GetEntranceTrackerDestinationLabel") == 0);
+ return reinterpret_cast<void*>(&MmDestinationLabel);
+}
 ''' + metadata + r'''
 constexpr int RSK_SHUFFLE_ENTRANCES=0;
 struct FixtureShuffler { std::array<EntranceOverride,ENTRANCE_OVERRIDES_MAX_COUNT> entranceOverrides{}; };
@@ -109,6 +117,12 @@ int main() {
  EntranceOverride unknown{0,0x555,0,0x701,0};
  assert(GetDestinationData(unknown));
  assert(GetDestinationData(unknown)->destination.find("unknown")!=std::string::npos);
+ Dungeon ootShop{"oot:potion",{0,0x87},{0,0x120},{0,0x120}};
+ Dungeon mmShop{"mm:interior:zora_hall_rooms:5",{1,0x405},{1,0x202},{1,0x202}};
+ ootShop.pool = mmShop.pool = Pool::Shop;
+ trackerCatalogue = {ootShop,mmShop};
+ state.Install(Encode(trackerCatalogue,{1,0}));
+ assert(GetDestinationData({0,0x87,0,0x87,0})->destination=="MM Zora Hall Shop");
  std::cout << "tracker host/UI metadata tests passed\n";
 }
 '''

@@ -81,6 +81,9 @@ std::string GetItemTrackerItemName(TrackerItemType itemType, u32 itemId) {
             return "Shield (None)";
         } break;
         case TRACKER_ITEM_WALLET: {
+            if (RandoCapacity_HasZfgWallet()) {
+                return Rando::StaticData::Items[RI_WALLET_ZFG].name;
+            }
             if (CUR_UPG_VALUE(UPG_WALLET) >= 3) {
                 return Rando::StaticData::Items[RI_WALLET_TYCOON].name;
             }

@@ -1,3 +1,4 @@
+#include "../../../combo/actors/ZeldaRun.h"
 #include "../../../combo/gameplay/SwordElementOverride.h"
 #include "../../../combo/render/SpinAttackStyle.h"
 #ifdef COMBO_BUILD
@@ -17,6 +18,7 @@ bool Combo_OotIsForeground(void);
 #include "soh/Enhancements/FileSelectEnhancements.h"
 #include <soh/Enhancements/game-interactor/GameInteractor.h>
 #include <soh/OTRGlobals.h>
+#include <soh/Enhancements/cosmetics/CosmeticsEditor.h>
 #include <soh/Enhancements/cosmetics/authenticGfxPatches.h>
 #include <soh/Enhancements/TimeDisplay/TimeDisplay.h>
 #include "soh/Enhancements/Restorations/GetItemManipulation.h"
@@ -898,9 +900,6 @@ void SohMenu::AddMenuEnhancements() {
 #else
     auto spinForeground = +[] { return true; };
 #endif
-    ComboMenuPopout::EnsureWindow(mSohMenu, "Spin Attack##OOT", "gOpenWindows.SpinAttack", path.sectionName.c_str(),
-                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
-                                  ImVec2(440, 220), spinForeground);
     AddWidget(path, "Popout Spin Attack", WIDGET_WINDOW_BUTTON)
         .CVar("gOpenWindows.SpinAttack")
         .WindowName("Spin Attack##OOT")
@@ -919,6 +918,22 @@ void SohMenu::AddMenuEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
+    std::set<std::string> spinControls{ CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR };
+    for (const char* id : { "SpinAttack.Level1Primary", "SpinAttack.Level1Secondary", "SpinAttack.Level2Primary",
+                            "SpinAttack.Level2Secondary" }) {
+        auto& option = cosmeticOptions.at(id);
+        spinControls.insert(option.valuesCvar);
+        AddWidget(path, "Spin Attack " + option.label, WIDGET_CUSTOM)
+            .CVar(option.valuesCvar)
+            .RaceDisable(false)
+            .CustomFunction([&option](WidgetInfo&) {
+                if (!option.advancedOption || CVarGetInteger(CVAR_COSMETIC("AdvancedMode"), 0)) {
+                    DrawCosmeticRow(option, true);
+                }
+            });
+    }
+    ComboMenuPopout::EnsureWindow(mSohMenu, "Spin Attack##OOT", "gOpenWindows.SpinAttack", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), std::move(spinControls), ImVec2(440, 410), spinForeground);
     AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.ItemGetLightShaft")
         .RaceDisable(false)
@@ -984,6 +999,18 @@ void SohMenu::AddMenuEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Hides stowed swords, shields, and the scabbard, even while a weapon is drawn.\n"
             "Equipment held in the hands stays visible. Also applies to the pause-menu preview."));
+    AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
+        .CVar(ZELDA_RUN_CVAR)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip("Use the built-in Zelda-style empty-handed run."));
+    AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
+        .CVar(ZELDA_RUN_AGES_CVAR)
+        .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
+        .Options(
+            ComboboxOptions()
+                .DefaultIndex(ZELDA_RUN_BOTH)
+                .ComboMap({ { ZELDA_RUN_CHILD, "Child" }, { ZELDA_RUN_ADULT, "Adult" }, { ZELDA_RUN_BOTH, "Both" } })
+                .Tooltip("Choose which Link ages use Zelda Run. Transformation forms keep their own "
+                         "animations."));
     AddWidget(path, "Scale Adult Equipment as Child", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("ScaleAdultEquipmentAsChild"))
         .RaceDisable(false)
@@ -1025,8 +1052,8 @@ void SohMenu::AddMenuEnhancements() {
         .Options(ComboboxOptions()
                      .ComboMap(pickupRupeeHudOptions)
                      .DefaultIndex(0)
-                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
-                              "Turning off Pickup Counters restores the regular HUD."));
+                     .Tooltip("Hide the regular HUD rupee icon and digits outside shops. "
+                              "Your balance still appears while shopping."));
     AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar(CVAR_ENHANCEMENT("PickupCounterScale"))
         .RaceDisable(false)

@@ -32,7 +32,7 @@ fixture = r'''
 using u8 = unsigned char;
 struct Player {};
 struct Save { u8 pendantOwned = 1; u8 pendantEffectOff = 0; } save;
-static u8 selected, otherForm, mario, pakBody, o2rBody, beetle, kite, trident, customAction;
+static u8 selected, otherForm, mario, pikachu, pakBody, o2rBody, beetle, kite, trident, customAction;
 static const char* seasonalSkeleton;
 constexpr int CUSTOM_FORM_NONE = 0;
 Save* Nei_Save() { return &save; }
@@ -40,6 +40,7 @@ u8 ExtEquip_PendantOwned() { return save.pendantOwned; }
 u8 WolfLinkForm_IsSelected() { return selected; }
 int CustomForms_ActiveForm() { return otherForm; }
 u8 Sm64Mario_IsActive() { return mario; }
+int PikachuForm_IsSelected() { return pikachu; }
 int CVarGetInteger(const char*, int) { return 0; }
 u8 PakLoader_HasActiveBodyModel() { return pakBody; }
 const char* PakLoader_GetSeasonalSkeletonPath() { return seasonalSkeleton; }
@@ -70,7 +71,7 @@ int main() {
     save.pendantOwned = 0;
     save.pendantEffectOff = 0;
     check(!ExtEquip_PendantActive(), "unowned Pendant must remain inactive");
-    for (u8* owner : { &otherForm, &mario, &pakBody, &o2rBody, &beetle, &kite, &trident, &customAction }) {
+    for (u8* owner : { &otherForm, &mario, &pikachu, &pakBody, &o2rBody, &beetle, &kite, &trident, &customAction }) {
         *owner = 1;
         check(OwnerRejection(&player) != nullptr, "active body/tool actions must retain ownership");
         *owner = 0;
@@ -78,7 +79,7 @@ int main() {
     pakBody = 1;
     seasonalSkeleton = "__OTR__objects/object_link_child/gLinkChildSkel";
     check(OwnerRejection(&player) == nullptr, "installed seasonal outfit must allow Wolf activation");
-    for (u8* owner : { &otherForm, &mario, &o2rBody, &beetle, &kite, &trident, &customAction }) {
+    for (u8* owner : { &otherForm, &mario, &pikachu, &o2rBody, &beetle, &kite, &trident, &customAction }) {
         *owner = 1;
         check(OwnerRejection(&player) != nullptr, "seasonal outfit must preserve other body/tool ownership");
         *owner = 0;

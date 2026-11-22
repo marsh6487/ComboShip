@@ -33,7 +33,10 @@ fixture+=(mod_declaration.group(0) if mod_declaration else '')+'\n'
 fixture+='int ComboCollectibleShimmer_ProfileForDrawId(s16){return -1;}\n'+fns['MM_Op']+'\n'+fns['MM_OpV']+'\n'
 fixture+='int DescribeTools(const char* name,CwItemDrawInfo* out){assert(!strcmp(name,\"Dominion Rod\")||!strcmp(name,\"Elemental Wand\"));out->drawKind=CW_DRAW_KIND_CUSTOM_GI;out->dlistCount=1;out->scale=2.5f;out->dlists[0]=\"__OTR__objects/nei_legacy_gi/dominion_rod/gi_dl\";return 1;}\nvoid* Combo_ResolveSym(const char*,const char*){return (void*)DescribeTools;}\n'
 fixture+=fns['MM_FillImportedSwordFallback']+'\n'
-fixture+=fns['MM_FillCaneDrawInfo']+'\n'+mod_query+'\n'+fns['MM_IsProgressiveItem']+'\n'+fns['MM_FillElementalSpellDrawInfo']+'\n'+fns['MM_FillItemDrawInfo']
+for name in ('MM_FillCaneDrawInfo', 'MM_IsProgressiveItem', 'MM_FillElementalSpellDrawInfo',
+             'MM_FillWalletShimmer', 'MM_FillItemDrawInfo'):
+    fixture+=fns[name]+'\n'
+fixture+=mod_query+'\n'
 fixture+=r'''
 int main() {
  const RandoItemId ids[]={RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,

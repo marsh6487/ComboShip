@@ -83,6 +83,7 @@ typedef enum {
     CW_DRAW_KIND_MAGIC_MIRROR = 42,         /* receiving host draws authored procedural Mirror + leaves */
     CW_DRAW_KIND_MM_KEY_RING = 43,          /* metal/emblem/ring paths; op[0].a=count, .b=MM dungeon */
     CW_DRAW_KIND_SHUFFLED_SOUL = 44,        /* native token body dl0 + receiving-host boss flame, owner root dl1 */
+    CW_DRAW_KIND_ZFG_WALLET = 45,           /* receiving host draws its native wallet with overflowing rupees */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -252,6 +253,15 @@ static inline int32_t CwDescribeMagicMirror(CwItemDrawInfo* out) {
     return 1;
 }
 
+static inline int32_t CwDescribeZfgWallet(CwItemDrawInfo* out) {
+    if (out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    out->drawKind = CW_DRAW_KIND_ZFG_WALLET;
+    out->resolvedName = "ZFG's Wallet";
+    return 1;
+}
+
 /* Lowest dlists[] slot index each kind's handler blind-indexes, +1. Both resolvers reject a recipe
  * below this before caching it, so a handler can never submit a null display list. */
 static inline int32_t CwMinDlistsForKind(int32_t kind) {
@@ -282,6 +292,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:
         case CW_DRAW_KIND_MAGIC_MIRROR:
+        case CW_DRAW_KIND_ZFG_WALLET:
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             return 0; /* native kinds carry no resource lists; OPS bounds-checks every DL index */
         case CW_DRAW_KIND_SEASON_GI:

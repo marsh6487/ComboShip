@@ -212,27 +212,34 @@ int main() {
     }
     for (bool enabled : {false,true}) {
         for (bool tycoon : {false,true}) {
-            for (int count = 0; count <= 4; ++count) {
-                gSaveContext = {};
-                gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
-                auto& save = gSaveContext.save.shipSaveInfo.rando;
-                for (const auto& [id,row] : Rando::StaticData::Options) save.randoSaveOptions[id] = row.defaultValue;
-                save.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] = enabled;
-                save.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] = tycoon;
-                std::vector<RandoItemId> starts(count, RI_PROGRESSIVE_WALLET);
-                Rando::SetStartingItemsInSave(save,starts);
-                Rando::GrantStartingItems();
-                const int finite = std::min(count, 2 + int(enabled) + int(tycoon));
-                REQUIRE(CUR_UPG_VALUE(UPG_WALLET) == unsigned(std::max(0, finite - int(enabled))));
-                REQUIRE(bool(Flags_GetRandoInf(RANDO_INF_WALLET_CHILD)) == (enabled && count > 0));
-                REQUIRE(Rando::NativeWalletObtainable(false) == (count < 2 + int(enabled) + int(tycoon)));
-                REQUIRE(!Rando::NativeWalletObtainable(true));
-                json persisted = save;
-                auto restored = persisted.get<RandoSaveInfo>();
-                REQUIRE(restored.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] == enabled);
-                const int f = RANDO_INF_WALLET_CHILD;
-                REQUIRE(restored.randoInf[f / 16] == save.randoInf[f / 16]);
-                REQUIRE(Rando::GetStartingItemsFromSave(restored) == starts);
+            for (bool zfg : {false, true}) {
+                for (int count = 0; count <= 5; ++count) {
+                    gSaveContext = {};
+                    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+                    auto& save = gSaveContext.save.shipSaveInfo.rando;
+                    for (const auto& [id,row] : Rando::StaticData::Options) save.randoSaveOptions[id] = row.defaultValue;
+                    save.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] = enabled;
+                    save.randoSaveOptions[RO_SHUFFLE_TYCOON_WALLET] = tycoon;
+                    save.randoSaveOptions[RO_SHUFFLE_ZFG_WALLET] = zfg;
+                    std::vector<RandoItemId> starts(count, RI_PROGRESSIVE_WALLET);
+                    Rando::SetStartingItemsInSave(save,starts);
+                    Rando::GrantStartingItems();
+                    const int nativeCount = 2 + int(enabled) + int(tycoon);
+                    const int finite = std::min(count, nativeCount);
+                    REQUIRE(CUR_UPG_VALUE(UPG_WALLET) == unsigned(std::max(0, finite - int(enabled))));
+                    REQUIRE(bool(Flags_GetRandoInf(RANDO_INF_WALLET_CHILD)) == (enabled && count > 0));
+                    REQUIRE(bool(RandoCapacity_HasZfgWallet()) == (zfg && count > nativeCount));
+                    REQUIRE(Rando::NativeWalletObtainable(false) == (count < nativeCount + int(zfg)));
+                    REQUIRE(!Rando::NativeWalletObtainable(true));
+                    json persisted = save;
+                    auto restored = persisted.get<RandoSaveInfo>();
+                    REQUIRE(restored.randoSaveOptions[RO_SHUFFLE_CHILD_WALLET] == enabled);
+                    REQUIRE(restored.randoSaveOptions[RO_SHUFFLE_ZFG_WALLET] == zfg);
+                    for (const auto flag : { RANDO_INF_WALLET_CHILD, RANDO_INF_WALLET_ZFG }) {
+                        REQUIRE(restored.randoInf[flag / 16] == save.randoInf[flag / 16]);
+                    }
+                    REQUIRE(Rando::GetStartingItemsFromSave(restored) == starts);
+                }
             }
         }
     }

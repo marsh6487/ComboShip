@@ -3,17 +3,22 @@
 
 #include "z64.h"
 
-// Unified Pikachu behavior CVar: 0=Off, 1=Companion, 2=Transformation
-#define CVAR_SSBB_PIKACHU "gMods.Pikachu.Behavior"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define SSBB_PIKACHU_OFF 0
-#define SSBB_PIKACHU_REST 1
-#define SSBB_PIKACHU_ANIM 2
+// The native MM human player keeps its controls and collision in Pikachu Mode.
+s32 PikachuForm_IsSelected(void);
+void PikachuForm_Update(PlayState* play, Player* player);
+void PikachuForm_Destroy(void);
+s32 PikachuForm_Draw(PlayState* play, Player* player);
+s32 PikachuForm_DrawPause(PlayState* play);
 
-// Call from Player update to update SSBB characters
-void SSBBSpawn_Update(PlayState* play, Player* player);
+struct SSBBAnim;
+const struct SSBBAnim* PikachuForm_GetAnimation(s32 index);
 
-// Call from Player draw to render SSBB characters
-void SSBBSpawn_Draw(PlayState* play, Player* player);
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SSBB_SPAWN_H

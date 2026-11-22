@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from foreign_gi_fixture_dependencies import MM_ZFG_WALLET_BOUNDARY
 
 ROOT=Path(__file__).resolve().parents[2]
 def function(source,name):
@@ -44,7 +45,7 @@ fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('template<class...
 mirror_helper=function((ROOT/'combo/menu/ComboMagicMirrorForeign.h').read_text(),'ComboDrawMagicMirrorForeign')
 mirror_boundary='extern "C" void MagicMirror_DrawGI(PlayState*) { assert(false && "mask dispatch selected Mirror"); }\n'
 anim_path=function((ROOT/'combo/menu/ComboForeignAnim.h').read_text(),'CfaIsOtrPath')
-fixture=fixture.replace('/* HOST_DISPATCH */',anim_path+'\n'+mirror_boundary+mirror_helper+'\n'+foreign)
+fixture=fixture.replace('/* HOST_DISPATCH */',anim_path+'\n'+mirror_boundary+MM_ZFG_WALLET_BOUNDARY+mirror_helper+'\n'+foreign)
 # Named RG and ITEM ordering must match the real registrations and native table.
 ids=re.findall(r'RANDO_ENUM_ITEM\((RG_MM_MASK_\w+)\)',(ROOT/'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())
 assert len(ids)==24

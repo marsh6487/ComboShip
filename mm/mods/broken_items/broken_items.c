@@ -21,11 +21,6 @@ static const ALIGN_ASSET(2) char gPikaIconPikachuTex[] = dgPikaIconPikachuTex;
 #define CVAR_BROKEN_ITEMS_ENABLED "gBrokenItems.Enabled"
 #define CVAR_SM64_MARIO "gSm64Mario"
 
-// Pikachu MODE — persistent CVar like Mario's gSm64Mario. The per-frame watcher
-// in mm_player_form.cpp (MmForm_Update) sees the CVar and holds the Pikachu form
-// via the instant 5-frame flash (no mm.o2r transformation-cutscene anims).
-// This MODE coexists with the Pokeball ITEM (extended inventory page 2), which
-// keeps its classic transform flow + cutscene untouched.
 #define CVAR_PIKACHU_MODE "gPikachuMode"
 
 // The form the equipment page has EQUIPPED, which is not the same as the form currently worn:
@@ -57,20 +52,12 @@ static const BrokenCtrl sMarioControls[] = {
     { "D-Dn", "Wing Cap" },     { "D-Lf", "Metal Cap" }, { "D-Rt", "Vanish Cap" }, { "D-Up", "Fire (soon)" },
 };
 
-// Physical X / Y / RB are expected mapped to C-Left / C-Right / C-Down in the
-// input editor (right stick stays free for the camera). Rebindable: gPikaBind.*.
-static const BrokenCtrl sPikachuControls[] = {
-    { "A", "Fight/talk" },   { "B", "Electric" },      { "R", "Shield" },         { "C-Lf", "Jump" },
-    { "C-Rt", "Quick Atk" }, { "C-Dn", "Grass dash" }, { "D-Up", "GMax/Charge" }, { "D-Dn", "Iron Tail" },
-    { "D-Rt", "Dark bomb" }, { "D-Lf", "Sleep" },
-};
-
 typedef enum { BROKEN_MODE_LINK, BROKEN_MODE_MARIO, BROKEN_MODE_PIKACHU, BROKEN_MODE_COUNT } BrokenModeId;
 
 static const BrokenMode sModes[BROKEN_MODE_COUNT] = {
     { "LINK MODE", sLinkControls, ARRAY_COUNT(sLinkControls) },
     { "MARIO MODE", sMarioControls, ARRAY_COUNT(sMarioControls) },
-    { "PIKACHU MODE", sPikachuControls, ARRAY_COUNT(sPikachuControls) },
+    { "PIKACHU MODE", sLinkControls, ARRAY_COUNT(sLinkControls) },
 };
 
 // ---------------------------------------------------------------------------
@@ -105,11 +92,7 @@ s32 BrokenItems_Enabled(void) {
     return CVarGetInteger(CVAR_BROKEN_ITEMS_ENABLED, 0);
 }
 
-// Equips a mode (3-way, mutually exclusive CVars — like Mario, NOT a transform
-// call). The Pikachu form itself is engaged by the gPikachuMode watcher in
-// mm_player_form.cpp via the instant flash on the next gameplay frame. We
-// deliberately do NOT touch gSm64MarioMaskForce so Mario is no longer bound to
-// C-Down, and we never touch the pokeball-item transform flow.
+// Both the equipment page and the quick-transform binding use these mutually exclusive modes.
 static void BrokenItems_Equip(PlayState* play, s32 mode) {
     (void)play;
     extern s32 BrokenItems_FormUnlocked(s32 i);

@@ -117,7 +117,7 @@ class GfxRenderingAPI {
     virtual void StartDrawToFramebuffer(int fbId, float noiseScale) = 0;
     virtual void CopyFramebuffer(int fbDstId, int fbSrcId, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0,
                                  int dstY0, int dstX1, int dstY1) = 0;
-    virtual void ClearFramebuffer(bool color, bool depth) = 0;
+    virtual void ClearFramebuffer(bool color, bool depth, float clearAlpha = 1.0f) = 0;
     virtual void ClearDepthRegion(int x, int y, int w, int h) {
         // Default: full depth clear. Backends that support scissored depth clears
         // (e.g. OpenGL) should override for a more precise partial clear.
@@ -135,6 +135,13 @@ class GfxRenderingAPI {
     virtual void SetSrgbMode() = 0;
     virtual ImTextureID GetTextureById(int id) = 0;
     virtual void SetCurrentPrimDepth(float depth) = 0;
+
+    void SetCurrentModelOpacity(float opacity) {
+        if (mCurrentModelOpacity != opacity) {
+            mCurrentModelOpacity = opacity;
+            mModelOpacityDirty = true;
+        }
+    }
 
     // SOH [Enhancement] Toon lighting: the interpreter pushes the per-object dominant light here
     // before each batch; backends read the mToon* members in their per-draw uniform paths.
@@ -188,5 +195,7 @@ class GfxRenderingAPI {
     bool mSrgbMode = false;
     float mCurrentPrimDepth = 0.0f;
     bool mPrimDepthDirty = true;
+    float mCurrentModelOpacity = 1.0f;
+    bool mModelOpacityDirty = false;
 };
 } // namespace Fast

@@ -12,6 +12,7 @@ namespace Rando::VanillaCompatibility {
 // Vanilla assigns native rewards directly, so it cannot supply the added
 // progression items required by these restrictions or shuffle new locations.
 // This single policy serves UI edits, headless generation and imported saves.
+// clang-format off
 inline constexpr RandoOptionId UnsupportedOptions[] = {
     RO_SHUFFLE_BOSS_SOULS,
     RO_SHUFFLE_SWIM,
@@ -20,6 +21,7 @@ inline constexpr RandoOptionId UnsupportedOptions[] = {
     RO_PLENTIFUL_ITEMS,
     RO_CLOCK_SHUFFLE,
     RO_SHUFFLE_TYCOON_WALLET,
+    RO_SHUFFLE_ZFG_WALLET,
     RO_SHUFFLE_NPC_SOULS,
     RO_SHUFFLE_ANIMAL_SOULS,
     RO_SHUFFLE_MISC_SOULS,
@@ -53,6 +55,7 @@ inline constexpr RandoOptionId UnsupportedOptions[] = {
     RO_MIX_GROTTO_ENTRANCES,
     RO_MIX_OVERWORLD_ENTRANCES,
 };
+// clang-format on
 
 inline bool Unsupported(RandoOptionId option) {
     return std::find(std::begin(UnsupportedOptions), std::end(UnsupportedOptions), option) !=

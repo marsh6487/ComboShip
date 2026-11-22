@@ -12,8 +12,10 @@
 #include "Rando/SpinAttackGi.h"
 #include "Rando/NeiResourceRouting.h"
 #include "Rando/NeiGiPresentation.h"
+#include "Rando/WalletGi.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
+#include "ComboCollectibleShimmerDraw.h"
 #include "ComboRewardGi.h"
 #include "../../../combo/NeiClockGI.h"
 #include "ComboItemIconOwnership.h"
@@ -70,6 +72,15 @@ extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe w
 #include "ComboMaskShimmer.h"
 #include "ComboOotBottleShimmerMM.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
+
+#define COMBO_ZFG_WALLET_HOST_MM
+#include "render/ZfgWalletClassicRuntime.h"
+#include "render/ZfgWalletDraw.h"
+#undef COMBO_ZFG_WALLET_HOST_MM
+
+static void MM_DrawZfgWalletModel(PlayState* play) {
+    ComboZfgWallet::Draw(play, "mm");
+}
 
 #ifdef COMBO_BUILD
 #include "ComboGiReceiptTrace.h"
@@ -714,7 +725,7 @@ void DrawSparkles(RandoItemId randoItemId, Actor* actor) {
     EffectSsKirakira_SpawnDispersed(gPlayState, &newPos, &sVelocity, &sAccel, &sPrimColor, &sEnvColor, 2000, 16);
 }
 
-void DrawTycoonWallet() {
+static void DrawTycoonWallet() {
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
@@ -740,6 +751,21 @@ void DrawTycoonWallet() {
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)&gGiWalletRupeeInnerDL);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+}
+
+static void DrawWalletItem(RandoItemId id) {
+    if (id == RI_WALLET_ZFG) {
+        MM_DrawZfgWalletModel(gPlayState);
+    } else if (id == RI_WALLET_TYCOON) {
+        DrawTycoonWallet();
+    } else {
+        GetItem_Draw(gPlayState, Rando::StaticData::Items[id].drawId);
+    }
+
+    uint8_t color[4];
+    if (CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) && MM_WalletGi_ShimmerColor(id, color)) {
+        NeiGi_DrawTintedShimmerOverlay(gPlayState, color, nullptr);
+    }
 }
 
 // Skijer's NEI — OoT-only get-item models MM has no native GID/GI for (Deku Seeds slingshot ammo,
@@ -3408,8 +3434,13 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_TIME_PROGRESSIVE:
             DrawClock(randoItemId, actor);
             break;
+        case RI_WALLET_CHILD:
+        case RI_WALLET_ADULT:
+        case RI_WALLET_GIANT:
         case RI_WALLET_TYCOON:
-            DrawTycoonWallet();
+        case RI_WALLET_ZFG:
+        case RI_INFINITE_WALLET:
+            DrawWalletItem(randoItemId);
             break;
         case RI_PROGRESSIVE_LULLABY:
         case RI_PROGRESSIVE_MAGIC:

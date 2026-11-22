@@ -172,6 +172,8 @@
 // (see g_crossRMStack in src/fast/interpreter.cpp).
 #define G_COMBO_RM_PUSH 0x2a
 #define G_COMBO_RM_POP 0x2b
+#define G_MODEL_OPACITY_PUSH 0x2c
+#define G_MODEL_OPACITY_POP 0x2d
 #define G_DL_OTR_HASH 0x31
 #define G_VTX_OTR_HASH 0x32
 #define G_MARKER 0x33
@@ -2980,6 +2982,22 @@ typedef union Gfx {
 
 #define gsSPComboRMPop() \
     { (_SHIFTL(G_COMBO_RM_POP, 24, 8)), 0 }
+
+// Multiply default-shader model opacity by an unsigned 8-bit factor. Pair the
+// commands around the complete model, including child material display lists.
+#define gSPModelOpacityPush(pkt, alpha)                                 \
+    _DW({                                                               \
+        Gfx* _g = (Gfx*)(pkt);                                          \
+        _g->words.w0 = _SHIFTL(G_MODEL_OPACITY_PUSH, 24, 8);            \
+        _g->words.w1 = _SHIFTL(alpha, 0, 8);                           \
+    })
+
+#define gSPModelOpacityPop(pkt)                                         \
+    _DW({                                                               \
+        Gfx* _g = (Gfx*)(pkt);                                          \
+        _g->words.w0 = _SHIFTL(G_MODEL_OPACITY_POP, 24, 8);             \
+        _g->words.w1 = 0;                                              \
+    })
 
 #define gSPExtraGeometryMode(pkt, c, s)                                                 \
     _DW({                                                                               \

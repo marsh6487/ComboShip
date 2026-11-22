@@ -16,6 +16,10 @@ extern "C" {
 #include "macros.h"
 }
 
+#ifdef COMBO_BUILD
+#include "Rando/EntranceTrackerDiscovery.h"
+#endif
+
 using json = nlohmann::json;
 
 inline void to_json(json& j, const DpadSaveInfo& dpadEquips) {
@@ -451,6 +455,8 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
     };
 #ifdef COMBO_BUILD
     j["pendingTrapCount"] = rando.pendingTrapCount; // ComboShip: deferred cross-world traps
+    const auto discovered = Rando::EntranceTracker::Discovered(rando);
+    j["discoveredEntrances"] = std::vector<u16>(discovered.begin(), discovered.end());
 #endif
 }
 
@@ -509,6 +515,15 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("sariaPriorityItems").get_to(rando.sariaPriorityItems);
 #ifdef COMBO_BUILD
     rando.pendingTrapCount = j.value("pendingTrapCount", (u8)0); // tolerate pre-existing combo saves
+    rando.discoveredEntranceCount = 0;
+    if (auto discovered = j.find("discoveredEntrances"); discovered != j.end() && discovered->is_array()) {
+        for (const auto& index : *discovered) {
+            if (index.is_number_integer() && (index.is_number_unsigned() || index.get<int64_t>() >= 0) &&
+                index.get<uint64_t>() <= UINT16_MAX) {
+                Rando::EntranceTracker::Discover(rando, index.get<u16>());
+            }
+        }
+    }
 #endif
 }
 

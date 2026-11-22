@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#define PICKUP_COUNTER_WALLET_MM
+#include "hud/PickupCounterWallet.h"
+#undef PICKUP_COUNTER_WALLET_MM
+
 static int minimal, enabled, hidden, minimapDisabled;
 static int hearts, magic, buttons, bIcons, cIcons, aLabels, dIcons, clocks,
     minigames, timers;

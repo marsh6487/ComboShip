@@ -163,6 +163,7 @@ extern std::map<std::string, CosmeticOption> cosmeticOptions;
 }
 
 void CosmeticEditorResetElement(CosmeticOption& option, bool save = true);
+void CosmeticEditorDrawRow(CosmeticOption& option, bool compact = false);
 void ScanDynamicCosmetics();
 void DrawDynamicCosmetics();
 void ApplyDynamicCosmetics();

@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include "2s2h/Rando/RupeeCounterDigits.h"
+#define PICKUP_COUNTER_WALLET_MM
+#include "../../combo/hud/PickupCounterWallet.h"
+#undef PICKUP_COUNTER_WALLET_MM
 
 SaveContext gSaveContext;
 PlayState* gPlayState;

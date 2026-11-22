@@ -9,6 +9,7 @@ void SavingEnhancements_PersistSaveEntranceInfo();
 void SavingEnhancements_ClearSaveEntranceInfo();
 bool SavingEnhancements_CanSave();
 void SavingEnhancements_AdvancePlaytime();
+void SavingEnhancements_AutosaveOnReset();
 
 #ifdef __cplusplus
 }

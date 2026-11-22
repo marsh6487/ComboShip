@@ -24,11 +24,11 @@ s32 KaleidoScope_UpdateQuestStatusPoint(PauseContext* pauseCtx, s16 point);
 // Vtx grid (MM's pauseCtx->questVtx is sized for MM's 39-quad layout, too small for OoT's).
 // ============================================================================
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for the SW97 medallions
+#include "2s2h/Rando/NeiResourceRouting.h"
 #include "mods/nei_save.h"
 #include "mods/extended_inventory.h"
 #include "mods/spiritual_stones/spiritual_stones.h" // SpiritualStone_IsPassiveActive (stone dimming)
 
-extern void* OotAssets_LoadTexOrDList(const char* otrPath);
 extern const char* sCounterTextures[]; // GS-count digit textures (I8 8x16), shared with MM's page
 
 // CVar-persisted view toggle: 0 = MM quest page, 1 = OoT quest page.
@@ -118,19 +118,20 @@ static const char* sOotNamePaths[OOT_QUEST_POINT_MAX + 1] = {
     "__OTR__textures/item_name_static/gPieceofHeartItemNameENGTex",     // 0x18 Heart-piece pie
 };
 
-// Cache one companion texture per unique path (small fixed set; loaded once).
-//
-// MUST probe first: ResourceMgr_LoadTexOrDListByName (which OotAssets_LoadTexOrDList wraps) does
-// `GetResourceByName(path)->GetInitData()` with NO null check, so a path that isn't in the mounted
-// archives is a straight 0xC0000005 — not a NULL return. FileExists is the same guard the equipment
-// page's KaleidoEquip_OotTex uses. Skijer 2026-07-30 (crash on opening the pause menu).
-static void* OotQuest_Tex(const char* path) {
+// Keep local replacements and let the renderer resolve the texture path so the
+// selected archive's HD dimensions and texture format are preserved.
+static const char* OotQuest_Tex(const char* path) {
     extern u8 ResourceMgr_FileExists(const char* resName);
+    extern u8 ResourceMgr_FileAltExists(const char* resName);
+    extern bool ResourceMgr_IsAltAssetsEnabled(void);
 
-    if ((path == NULL) || !ResourceMgr_FileExists(path)) {
+    if (path == NULL) {
         return NULL;
     }
-    return OotAssets_LoadTexOrDList(path);
+    if (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path))) {
+        return path;
+    }
+    return NeiResource_Available(path) ? NeiResource_Route(path) : NULL;
 }
 
 // OoT-page song fingerings (OCARINA_BTN_* per note), song index 0..11 == quest point 6..17
@@ -434,10 +435,10 @@ static void OotQuest_SetupVtx(Vtx* vtx, s16 offsetY, u8 alpha, s16 cursorQuad) {
 }
 
 // Draw one texture quad (RGBA32 icon) at a computed quad index — binds its 4 verts then draws.
-static void OotQuest_DrawIcon(GraphicsContext* gfxCtx, Vtx* vtx, s16 quad, void* tex, u16 w, u16 h) {
+static void OotQuest_DrawIcon(GraphicsContext* gfxCtx, Vtx* vtx, s16 quad, const char* tex, u16 w, u16 h) {
     OPEN_DISPS(gfxCtx);
     gSPVertex(POLY_OPA_DISP++, &vtx[quad * 4], 4, 0);
-    KaleidoScope_DrawTexQuadRGBA32(gfxCtx, tex, w, h, 0);
+    KaleidoScope_DrawTexQuadRGBA32(gfxCtx, (void*)tex, w, h, 0);
     CLOSE_DISPS(gfxCtx);
 }
 
@@ -503,7 +504,7 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
             }
         }
         if (OotQuest_Has(OOT_QUEST_MEDALLION_FOREST + i)) {
-            void* tex = OotQuest_Tex(sOotMedallionIconPaths[i]);
+            const char* tex = OotQuest_Tex(sOotMedallionIconPaths[i]);
             if (tex != NULL) {
                 gDPPipeSync(POLY_OPA_DISP++);
                 gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
@@ -540,7 +541,7 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
     gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
     for (i = 0; i < 3; i++) {
         if (OotQuest_Has(OOT_QUEST_KOKIRI_EMERALD + i)) {
-            void* tex = OotQuest_Tex(sOotStoneIconPaths[i]);
+            const char* tex = OotQuest_Tex(sOotStoneIconPaths[i]);
             if (tex != NULL) {
                 u8 a = SpiritualStone_IsPassiveActive(i) ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
                 gDPPipeSync(POLY_OPA_DISP++);
@@ -554,19 +555,19 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
     if (OotQuest_Has(OOT_QUEST_STONE_OF_AGONY)) {
-        void* tex = OotQuest_Tex(sOotAgonyIconPath);
+        const char* tex = OotQuest_Tex(sOotAgonyIconPath);
         if (tex != NULL) {
             OotQuest_DrawIcon(gfxCtx, vtx, 21, tex, 24, 24);
         }
     }
     if (OotQuest_Has(OOT_QUEST_GERUDO_CARD)) {
-        void* tex = OotQuest_Tex(sOotGerudoIconPath);
+        const char* tex = OotQuest_Tex(sOotGerudoIconPath);
         if (tex != NULL) {
             OotQuest_DrawIcon(gfxCtx, vtx, 22, tex, 24, 24);
         }
     }
     if (OotQuest_Has(OOT_QUEST_SKULL_TOKEN)) {
-        void* tex = OotQuest_Tex(sOotSkulltulaIconPath);
+        const char* tex = OotQuest_Tex(sOotSkulltulaIconPath);
         if (tex != NULL) {
             OotQuest_DrawIcon(gfxCtx, vtx, 23, tex, 24, 24);
         }
@@ -692,7 +693,7 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
 void KaleidoScope_DrawOotQuestName(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
-    void* nameTex;
+    const char* nameTex;
     Vtx* nv;
     s16 y;
 
@@ -710,8 +711,6 @@ void KaleidoScope_DrawOotQuestName(PlayState* play) {
         return;
     }
 
-    // Existence probe only — the DRAW below passes the OTR PATH, not this pointer, so texture packs
-    // still get to substitute the name by name (see the HD-path rule used across the kaleido).
     nameTex = OotQuest_Tex(sOotNamePaths[sOotQuestCursorPoint]);
     if (nameTex == NULL) {
         return;
@@ -741,7 +740,7 @@ void KaleidoScope_DrawOotQuestName(PlayState* play) {
     gDPSetEnvColor(POLY_OPA_DISP++, 20, 30, 40, 0);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
     gSPVertex(POLY_OPA_DISP++, nv, 4, 0);
-    POLY_OPA_DISP = Gfx_DrawTexQuad4b(POLY_OPA_DISP, sOotNamePaths[sOotQuestCursorPoint], G_IM_FMT_IA, 128, 16, 0);
+    POLY_OPA_DISP = Gfx_DrawTexQuad4b(POLY_OPA_DISP, (void*)nameTex, G_IM_FMT_IA, 128, 16, 0);
 
     CLOSE_DISPS(gfxCtx);
 }
@@ -1447,13 +1446,13 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
             "__OTR__textures/icon_item_static/gItemIconScaleGoldenTex",
         };
         s16 upg = (Nei_Save()->ootUpgrades >> 9) & 7; // strength
-        void* tex;
+        const char* tex;
 
         if (upg > 0) {
             tex = OotQuest_Tex(sStrengthIcons[((upg > 3) ? 3 : upg) - 1]);
             if (tex != NULL) {
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
-                KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, tex, 32, 32, 0);
+                KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, (void*)tex, 32, 32, 0);
             }
         }
 
@@ -1464,7 +1463,7 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
             tex = OotQuest_Tex(sScaleIcons[((upg > 2) ? 2 : upg) - 1]);
             if (tex != NULL) {
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
-                KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, tex, 32, 32, 0);
+                KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, (void*)tex, 32, 32, 0);
             }
         }
 
@@ -1831,21 +1830,21 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
         { QUEST_REMAINS_ODOLWA, QUEST_SWORD, QUEST_HEART_PIECE, QUEST_REMAINS_TWINMOLD },     // QUEST_REMAINS_GYORG
         { QUEST_REMAINS_ODOLWA, QUEST_SHIELD, QUEST_REMAINS_GYORG, QUEST_REMAINS_GOHT },      // QUEST_REMAINS_TWINMOLD
         { QUEST_REMAINS_GOHT, QUEST_BOMB_BAG, QUEST_SWORD, CURSOR_TO_RIGHT },                 // QUEST_SHIELD
-        { QUEST_REMAINS_GYORG, QUEST_QUIVER, QUEST_SONG_STORMS, QUEST_SHIELD },               // QUEST_SWORD
+        { QUEST_REMAINS_GYORG, QUEST_QUIVER, QUEST_SONG_SUN, QUEST_SHIELD },                  // QUEST_SWORD
         { QUEST_SONG_TIME, CURSOR_NONE, CURSOR_TO_LEFT, QUEST_SONG_LULLABY },                 // QUEST_SONG_SONATA
         { QUEST_SONG_HEALING, CURSOR_NONE, QUEST_SONG_SONATA, QUEST_SONG_BOSSA_NOVA },        // QUEST_SONG_LULLABY
         { QUEST_SONG_EPONA, CURSOR_NONE, QUEST_SONG_LULLABY, QUEST_SONG_ELEGY },              // QUEST_SONG_BOSSA_NOVA
         { QUEST_SONG_SOARING, CURSOR_NONE, QUEST_SONG_BOSSA_NOVA, QUEST_SONG_OATH },          // QUEST_SONG_ELEGY
-        { QUEST_SONG_STORMS, CURSOR_NONE, QUEST_SONG_ELEGY, QUEST_QUIVER },                   // QUEST_SONG_OATH
-        { QUEST_SONG_SUN, CURSOR_NONE, QUEST_SONG_OATH, QUEST_SWORD },                        // QUEST_SONG_SARIA
+        { QUEST_SONG_STORMS, CURSOR_NONE, QUEST_SONG_ELEGY, QUEST_SONG_SARIA },               // QUEST_SONG_OATH
+        { QUEST_SONG_SUN, CURSOR_NONE, QUEST_SONG_OATH, QUEST_QUIVER },                       // QUEST_SONG_SARIA
         { QUEST_BOMBERS_NOTEBOOK, QUEST_SONG_SONATA, CURSOR_TO_LEFT, QUEST_SONG_HEALING },    // QUEST_SONG_TIME
         { QUEST_BOMBERS_NOTEBOOK, QUEST_SONG_LULLABY, QUEST_SONG_TIME, QUEST_SONG_EPONA },    // QUEST_SONG_HEALING
         { QUEST_HEART_PIECE, QUEST_SONG_BOSSA_NOVA, QUEST_SONG_HEALING, QUEST_SONG_SOARING }, // QUEST_SONG_EPONA
         { QUEST_HEART_PIECE, QUEST_SONG_ELEGY, QUEST_SONG_EPONA, QUEST_SONG_STORMS },         // QUEST_SONG_SOARING
-        { QUEST_HEART_PIECE, QUEST_SONG_OATH, QUEST_SONG_SOARING, QUEST_SWORD },              // QUEST_SONG_STORMS
+        { QUEST_HEART_PIECE, QUEST_SONG_OATH, QUEST_SONG_SOARING, QUEST_SONG_SUN },           // QUEST_SONG_STORMS
         { QUEST_HEART_PIECE, QUEST_SONG_SARIA, QUEST_SONG_STORMS, QUEST_SWORD },              // QUEST_SONG_SUN
         { CURSOR_NONE, QUEST_SONG_TIME, CURSOR_TO_LEFT, QUEST_HEART_PIECE },                  // QUEST_BOMBERS_NOTEBOOK
-        { QUEST_SWORD, CURSOR_NONE, QUEST_SONG_OATH, QUEST_BOMB_BAG },                        // QUEST_QUIVER
+        { QUEST_SWORD, CURSOR_NONE, QUEST_SONG_SARIA, QUEST_BOMB_BAG },                       // QUEST_QUIVER
         { QUEST_SHIELD, CURSOR_NONE, QUEST_QUIVER, CURSOR_TO_RIGHT },                         // QUEST_BOMB_BAG
         { QUEST_QUIVER, QUEST_SONG_TIME, CURSOR_TO_LEFT, QUEST_HEART_PIECE },                 // QUEST_SKULL_TOKEN
         { CURSOR_NONE, QUEST_SONG_STORMS, QUEST_BOMBERS_NOTEBOOK, QUEST_REMAINS_GYORG },      // QUEST_HEART_PIECE

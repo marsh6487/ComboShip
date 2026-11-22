@@ -107,35 +107,16 @@ static pfn_sm64_mario_tick_puppet p_sm64_mario_tick_puppet = NULL;
 static void* sDllHandle = NULL;
 
 // The NEI folder is per game in ComboShip, so the path is built, never a literal (OTRGlobals.h).
-extern const char* Nei_AssetDir(void);
-
-static s32 Sm64_FileExists(const char* path) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        return 0;
-    }
-    fclose(f);
-    return 1;
-}
-
-// Nei_AssetDir() is per game under ComboShip ("nei/soh"), but both builds drop sm64.dll next to the
-// executable, so the plain name is the fallback when the asset folder has no copy.
-static void Sm64_ResolveAssetPath(char* out, size_t size, const char* name) {
-    snprintf(out, size, "%s/%s", Nei_AssetDir(), name);
-    if (Sm64_FileExists(out)) {
-        return;
-    }
-    snprintf(out, size, "%s", name);
-}
+#include "../../../combo/gameplay/CrossoverAssetPath.h"
 
 static s32 Sm64_LoadDll(void) {
-    char libPath[128];
+    const char* libPath;
 
     if (sDllHandle)
         return 1;
 
-    Sm64_ResolveAssetPath(libPath, sizeof(libPath), SM64_LIB_NAME);
-    sDllHandle = SM64_LOAD_LIB(libPath);
+    libPath = Nei_FindCrossoverAsset(SM64_LIB_NAME);
+    sDllHandle = SM64_LOAD_LIB(libPath != NULL ? libPath : SM64_LIB_NAME);
     if (!sDllHandle) {
         lusprintf(__FILE__, __LINE__, 2, "[SM64] ERROR: Could not load %s\n", SM64_LIB_NAME);
         return 0;
@@ -177,7 +158,8 @@ static s32 Sm64_LoadDll(void) {
         (pfn_sm64_get_current_background_music)SM64_GET_PROC(sDllHandle, "sm64_get_current_background_music");
     p_sm64_play_music = (pfn_sm64_play_music)SM64_GET_PROC(sDllHandle, "sm64_play_music");
 
-    if (!p_sm64_global_init || !p_sm64_mario_create || !p_sm64_mario_tick) {
+    if (!p_sm64_global_init || !p_sm64_static_surfaces_load || !p_sm64_mario_create || !p_sm64_mario_tick ||
+        !p_sm64_mario_delete) {
         SM64_FREE_LIB(sDllHandle);
         sDllHandle = NULL;
         return 0;
@@ -422,12 +404,13 @@ static s32 Sm64_InitLibrary(void) {
 
     romPath = CVarGetString("gSm64RomPath", "");
     if (romPath == NULL || romPath[0] == '\0') {
-        static char romDefault[128];
-        Sm64_ResolveAssetPath(romDefault, sizeof(romDefault), "sm64.z64");
-        romPath = romDefault;
+        romPath = Nei_FindCrossoverAsset("sm64.z64");
+        if (romPath == NULL) {
+            romPath = Nei_FindCrossoverAsset("sm64.n64");
+        }
     }
 
-    sSm64RomData = Sm64_LoadRomFile(romPath, &romSize);
+    sSm64RomData = romPath != NULL ? Sm64_LoadRomFile(romPath, &romSize) : NULL;
 
     if (sSm64RomData == NULL) {
         lusprintf(__FILE__, __LINE__, 2, "[SM64] FAIL: ROM not found");
@@ -555,10 +538,20 @@ static u32 Sm64_LoadSceneSurfaces(PlayState* play) {
 // are stale and must be reloaded before mario_create can be trusted.
 static s16 sSm64SurfacesForScene = -1;
 
+static u8 sSm64LibraryRetryFrames = 0;
+
 s32 Sm64Mario_Init(PlayState* play, Player* player) {
 
-    if (!Sm64_InitLibrary())
-        return 0;
+    if (!sSm64Initialized) {
+        if (sSm64LibraryRetryFrames > 0) {
+            --sSm64LibraryRetryFrames;
+            return 0;
+        }
+        if (!Sm64_InitLibrary()) {
+            sSm64LibraryRetryFrames = 60;
+            return 0;
+        }
+    }
 
     if (sSm64MarioId >= 0)
         return 1;
@@ -2258,7 +2251,7 @@ u8 Sm64Kaleido_DrawForm(PlayState* play) {
         gDPSetColorImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, width, play->state.gfxCtx->curFrameBuffer);
         gDPSetCycleType(POLY_OPA_DISP++, G_CYC_FILL);
         gDPSetRenderMode(POLY_OPA_DISP++, G_RM_NOOP, G_RM_NOOP2);
-        gDPSetFillColor(POLY_OPA_DISP++, (GPACK_RGBA5551(0, 0, 0, 1) << 16) | GPACK_RGBA5551(0, 0, 0, 1));
+        gDPSetFillColor(POLY_OPA_DISP++, GPACK_RGBA5551(0, 0, 0, 0));
         gDPFillRectangle(POLY_OPA_DISP++, 0, 0, width - 1, height - 1);
         gDPPipeSync(POLY_OPA_DISP++);
 
@@ -2344,12 +2337,14 @@ u8 Sm64Mario_ShouldHideLink(void) {
     // EXCEPTION: when Mario is dead (HP 0) we must SHOW Link so his death /
     // game-over animation is visible instead of an invisible, frozen-looking
     // player (matches the IsActive yield above).
-    if (gSaveContext.health <= 0)
+    if (!sSm64Initialized || gSaveContext.health <= 0)
         return 0;
-    return CVarGetInteger("gSm64Mario", 0) != 0;
+    return CVarGetInteger("gSm64Mario", 0) != 0 &&
+           (sSm64SuspendActive || (sSm64MarioId >= 0 && sSm64OutBuffers.numTrianglesUsed > 0));
 }
 
 void Sm64Mario_Reset(void) {
+    sSm64LibraryRetryFrames = 0;
     lusprintf(__FILE__, __LINE__, 2, "[SM64] Reset: MarioId=%d surfacesForScene=%d", sSm64MarioId,
               sSm64SurfacesForScene);
     if (sSm64MarioId >= 0 && p_sm64_mario_delete) {

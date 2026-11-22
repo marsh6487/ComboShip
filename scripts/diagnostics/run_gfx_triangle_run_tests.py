@@ -110,6 +110,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxSpTri1Impl")
         if "Interpreter::TryReusePreludeMaterialBinding(" in source:
             names += ["Interpreter::GetBaseTexturePath", "Interpreter::TryReusePreludeMaterialBinding"]
+        if "gfx_model_opacity_push_handler_custom(" in source:
+            names += ["gfx_model_opacity_push_handler_custom", "gfx_model_opacity_pop_handler_custom"]
         if "TraceAutumnForestDraw(" in source:
             if "AutumnForestLayer(" in source:
                 names.insert(names.index("Interpreter::GfxSpTri1Impl"), "AutumnForestLayer")
@@ -136,6 +138,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
         flags = shlex.split(os.environ.get("GFX_TRIANGLE_TEST_CXXFLAGS", "-O3"))
         if "mIndexedTrianglesEnabled" in header:
             flags += ["-DGFX_HAS_INDEXED_TRIANGLES=1"]
+        if "CurrentModelOpacity()" in header:
+            flags += ["-DGFX_HAS_MODEL_OPACITY=1"]
         subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", *flags,
                         "-I" + str(build), "-I" + str(build / "fast"), "-I" + str(ROOT / "libultraship/include"),
                         str(ROOT / "libultraship/tests/gfx_triangle_run_test.cpp"), "-o", str(binary)], check=True)

@@ -119,16 +119,62 @@ for(int32_t mode : {0,1,2}) { raw.itemShimmer=mode;
     code='#include <initializer_list>\n'+code
     compile_run(code,host+': foreign cache preserves disabled, legacy and explicit-tint modes')
     provider=(ROOT/f'combo/menu/ComboItemDraw{host}.h').read_text()
-    start=provider.index('    const int32_t nativeShimmer = GetItem_GetShimmerColor(')
     if mm:
+        start=provider.index('    if (!wallet) {',provider.index('static int32_t MM_FillItemDrawInfo('))
         stop=provider.index('    if (it->second.drawId == GID_CHATEAU)',start)
         setup='struct Entry { struct { int drawId=1; } second; } entry; auto* it=&entry;'
     else:
+        start=provider.index('    const int32_t nativeShimmer = GetItem_GetShimmerColor(')
         stop=provider.index('    // Apply after native eligibility',start)
         setup='struct { int gid=1; } gi; uint8_t nativeShimmerColor[4]={};'
     boundary=provider[start:stop]
-    code='#include <cassert>\n#include <cstdint>\n#include <cstring>\n#include "ComboCollectibleShimmer.h"\nusing s16=int16_t;\nint mode=0;\nint GetItem_GetShimmerColor(s16 id,uint8_t c[4]) { assert(id==1); c[0]=13; c[1]=97; c[2]=241; c[3]=255; return mode; }\nint ComboCollectibleShimmer_ProfileForDrawId(s16 id) { assert(id==1); return 0; }\nstruct Raw { int32_t itemShimmer=0; int32_t stateDependent=0; uint8_t itemShimmerColor[4]={}; };\nvoid fill(Raw* out) {\n'+setup+'\n'+boundary+'}\n'
-    code+='int main() { Raw out; mode=0; fill(&out); assert(out.itemShimmer==0 && out.stateDependent==2);\nmode=2; fill(&out); assert(out.itemShimmer==2 && out.stateDependent==2 && out.itemShimmerColor[0]==13);\nmode=0; out=Raw{}; fill(&out); assert(out.itemShimmer==0 && out.stateDependent==2); }\n'
+    code = r'''
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+#include "ComboCollectibleShimmer.h"
+using s16 = int16_t;
+int mode = 0;
+bool wallet = false;
+int GetItem_GetShimmerColor(s16 id, uint8_t color[4]) {
+    assert(id == 1 && !wallet);
+    const uint8_t sample[4] = {13, 97, 241, 255};
+    std::memcpy(color, sample, sizeof(sample));
+    return mode;
+}
+int ComboCollectibleShimmer_ProfileForDrawId(s16 id) {
+    assert(id == 1);
+    return 0;
+}
+struct Raw {
+    int32_t itemShimmer = 0;
+    int32_t stateDependent = 0;
+    uint8_t itemShimmerColor[4] = {};
+};
+void fill(Raw* out) {
+''' + setup + '\n' + boundary + '}\n'
+    code += r'''
+int main() {
+    Raw out;
+    fill(&out);
+    assert(out.itemShimmer == 0 && out.stateDependent == 2);
+    mode = 2;
+    fill(&out);
+    assert(out.itemShimmer == 2 && out.stateDependent == 2 && out.itemShimmerColor[0] == 13);
+    mode = 0;
+    out = Raw{};
+    fill(&out);
+    assert(out.itemShimmer == 0 && out.stateDependent == 2);
+'''
+    if mm:
+        code += r'''
+    wallet = true;
+    out.itemShimmer = 2;
+    out.itemShimmerColor[0] = 255;
+    fill(&out);
+    assert(out.itemShimmer == 2 && out.itemShimmerColor[0] == 255);
+'''
+    code += '}\n'
     compile_run(code,host+': foreign descriptor retains mode2 and refreshes off/on/owner-color')
 
 

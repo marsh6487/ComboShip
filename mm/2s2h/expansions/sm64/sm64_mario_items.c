@@ -682,7 +682,7 @@ static void Sm64Mario_CaptureCapInputs(PlayState* play) {
     Input* in;
     const u16 reserved = BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
 
-    if (play == NULL || !Sm64Mario_IsActive()) {
+    if (play == NULL || !Sm64Mario_IsReady()) {
         sSm64CapPress = 0;
         return;
     }

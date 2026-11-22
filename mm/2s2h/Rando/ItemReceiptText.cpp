@@ -27,6 +27,7 @@
 #include "ComboResolve.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
+#include "Rando/EntranceTrackerNames.h"
 #include "Rando/SoloEntrances.h"
 #include "rando/SoloEntranceMmOverworld.h"
 #include <unordered_map>
@@ -753,6 +754,12 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, con
 }
 } // namespace
 
+#ifdef COMBO_BUILD
+std::string Rando::EntranceTracker::PortalSourceName(const ComboRando::CrossDungeon::Dungeon& portal) {
+    return InformationEntranceSource(portal);
+}
+#endif
+
 static bool BossSoulItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (const auto* soul = itemName ? ComboSoulReceiptText::Find(itemName) : nullptr) {
         using ComboSoulReceiptText::Language;
@@ -1155,6 +1162,10 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (id == RI_WALLET_ZFG) {
+        SetReceiptBody(entry, "You found %gZFG's Wallet%w!\nIt holds up to %y9,999 Rupees%w.");
+        return true;
+    }
     if (id == RI_OOT_NEI_RITO_MASK) {
         SetReceiptBody(entry, "You found the %gRito Mask%w!\nWear it to take to the skies.");
         return true;

@@ -19,12 +19,20 @@ struct Entry {
 };
 
 inline constexpr Entry kControls[]{
+    { "gRandoSettings.IncludeZfgWallet", Kind::New,
+      "Add ZFG's Wallet, an extra Progressive Wallet with an overflowing-rupee animation and a 9,999-rupee capacity." },
+    { "gEnhancements.Cutscenes.SkipGetItemCutscenes", Kind::Updated,
+      "2Ship randomizer starting checks arrive overhead on the first safe gameplay updates without stopping Link." },
+    { "gEnhancements.Graphics.GibdoRequestIcons", Kind::New,
+      "Show the item and quantity each nearby Gibdo requests in Beneath the Well." },
+    { "gEnhancements.Saving.RememberSaveLocation", Kind::New,
+      "In 2Ship, Autosave now remembers your last entrance when you reset from gameplay." },
     { "gEnhancements.PickupCounter", Kind::New,
       "Animated rupee and ammo counters follow Link after pickups, with item icons, current/capacity, "
       "a small pickup gain and icon glint. Available in both games; off by default." },
     { "gEnhancements.PickupCounterScale", Kind::New, "Adjust the size of the floating pickup counters." },
     { "gEnhancements.PickupCounterHideHudRupees", Kind::New,
-      "Optionally hide the regular rupee HUD while Pickup Counters is enabled; floating pickups stay visible." },
+      "Hide the regular rupee HUD outside shops while keeping the floating pickup counter." },
     { "gRandoSettings.ShuffleRitoMask", Kind::New,
       "Rito Mask: optional shared reward with authored get-item model and flight in both games. Choose it in the "
       "existing mask wheel in Combo or OoT; solo MM cycles its independently owned Rito and Bremen masks. Defaults "
@@ -460,12 +468,12 @@ inline constexpr Entry kControls[]{
     { "gEnhancements.SkijerNEI.UseVanillaHeldSwords", Kind::New,
       "Switch held swords to their original appearance while preserving selected custom models." },
     { "gEnhancements.ZeldaRun", Kind::New,
-      "Enable the optional POC7 Zelda-style empty-handed run, with Child, Adult or Both age selection." },
+      "Use the built-in Zelda-style empty-handed run under Graphics, with Child, Adult or Both age selection." },
     { "gEnhancements.SeasonalOutfits", Kind::New,
       "Automatically use an installed outfit set for the current season. Off or a missing outfit keeps your normal "
       "player model." },
-    { "gEnhancements.SkijerNEI.ItemEffects", Kind::New,
-      "Enable the integrated NEI pickup, shop and shuffled-item shimmer." },
+    { "gEnhancements.SkijerNEI.ItemEffects", Kind::Updated,
+      "Enable NEI pickup, shop and shuffled-item shimmer. Each progressive wallet tier has its own tint." },
     { "gCosmetics.Arrows.ElementalImpactSounds", Kind::New,
       "Use elemental impact sounds for fire, ice and light arrows." },
     { "gCosmetic.Arrows.ElementalImpactSounds", Kind::New,

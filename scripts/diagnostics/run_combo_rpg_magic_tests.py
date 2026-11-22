@@ -31,7 +31,8 @@ def main():
     helpers = functions(logic)
     helper = helpers["CanUseMagicAmount"] + "\n" + helpers["CanUseMagicArrowAmount"]
     capacity = (ROOT / "mm/include/rando_capacity.h").read_text()
-    infinite = functions(capacity)["RandoCapacity_InfiniteMagic"]
+    capacity_helpers = functions(capacity)
+    infinite = "\n".join(capacity_helpers[name] for name in ("RandoCapacity_HasFlag", "RandoCapacity_InfiniteMagic"))
     production = "static void GiveItemForOracle(RandoItemId ri) { switch (ri) {\n" + native + "} }\n"
     production += adapter + "\n" + infinite + "\nnamespace Rando::Logic {\n" + helper + "\n}\n"
     production += macro(logic, "HAS_MAGIC") + macro(logic, "CAN_USE_MAGIC_ARROW")

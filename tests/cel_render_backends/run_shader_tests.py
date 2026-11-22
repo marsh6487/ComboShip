@@ -113,6 +113,8 @@ int main(int argc,char** argv) {
   }
   for(int toon=0;toon<2;++toon) {
    f.opt_toon=toon;
+   for(int opacity=0;opacity<2;++opacity) {
+   f.opt_model_opacity=opacity;
    auto vertex=GL::expand(current[0],f,true);auto fragment=GL::expand(current[0],f);
    auto hlsl=DX::expand(current[1],f);auto msl=Metal::expand(current[2],f);
    const auto expected=GetShaderVertexLayout(f).numFloats;
@@ -123,16 +125,28 @@ int main(int argc,char** argv) {
    assert((fragment.find("toonNL")!=std::string::npos)==bool(toon));
    assert((hlsl.find("cbuffer PerToonCB : register(b3)")!=std::string::npos)==bool(toon));
    assert((msl.find("float3 normal")!=std::string::npos)==bool(toon));
-   if(!toon) {
+   assert((fragment.find("uniform float model_opacity")!=std::string::npos)==bool(opacity));
+   const auto glFade=fragment.find(f.opt_alpha?"texel.a *= model_opacity":"vec4(texel, model_opacity)");
+   const auto dxFade=hlsl.find(f.opt_alpha?"texel.a *= model_opacity":"float4(texel, model_opacity)");
+   const auto mslFade=msl.find(f.opt_alpha?"texel.w *= drawUniforms.modelOpacity":"float4(texel, drawUniforms.modelOpacity)");
+   assert((glFade!=std::string::npos)==bool(opacity));
+   assert((dxFade!=std::string::npos)==bool(opacity));
+   assert((mslFade!=std::string::npos)==bool(opacity));
+   if(opacity && f.opt_alpha && f.opt_alpha_threshold) {
+    assert(fragment.find("discard;") < glFade && hlsl.find("discard;") < dxFade &&
+           msl.find("discard_fragment();") < mslFade);
+   }
+   if(!toon && !opacity) {
     assert(neutral(vertex,false)==neutral(GL::expand(old[0],f,true),false));
     assert(neutral(fragment,false)==neutral(GL::expand(old[0],f),false));
     assert(neutral(hlsl,false)==neutral(DX::expand(old[1],f),false));
     assert(neutral(msl,true)==neutral(Metal::expand(old[2],f),true));
    }
-   std::string id=std::to_string(flags)+"-"+std::to_string(toon);
+   std::string id=std::to_string(flags)+"-"+std::to_string(toon)+"-"+std::to_string(opacity);
    std::ofstream(output/(id+".vert"))<<vertex;
    std::ofstream(output/(id+".frag"))<<fragment;
    ++count;
+   }
   }
  }
  std::cout<<"PASS "<<count<<" Prism variants per backend; neutral shader output matches host baseline\n";
@@ -141,10 +155,11 @@ int main(int argc,char** argv) {
 with tempfile.TemporaryDirectory(prefix='cel-prism-') as temp:
     directory = Path(temp)
     baseline = directory/'baseline'
+    baseline_ref = os.environ.get('GFX_SHADER_BASELINE_REF', 'badc4e09a5176b5d423926eed21d5d19a67ee87e')
     for name in ['opengl/default.shader.glsl', 'directx/default.shader.hlsl', 'metal/default.shader.metal']:
         path = baseline/name
         path.parent.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(['git', 'show', 'badc4e09a5176b5d423926eed21d5d19a67ee87e:libultraship/src/fast/shaders/'+name],
+        result = subprocess.run(['git', 'show', baseline_ref+':libultraship/src/fast/shaders/'+name],
                                 cwd=ROOT, env={**os.environ, 'GIT_NO_LAZY_FETCH': '1'}, check=True, capture_output=True)
         path.write_bytes(result.stdout)
     stub = directory/'include/spdlog/spdlog.h'

@@ -126,11 +126,18 @@ int main() {
     condition=[] {return true;};
     assert(MM_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
     gSaveContext={};play.sceneId=1000;gSaveContext.respawn[3].data=0x9A;
+    const auto& rando = gSaveContext.save.shipSaveInfo.rando;
     int32_t index=ENTRANCE(GROTTOS,4);
+    assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending);
+    assert(Rando::EntranceTracker::Discovered(rando).empty());
+    Combo_MM_CancelCrossDungeonTransition();
+    assert(Rando::EntranceTracker::Discovered(rando).empty());
     assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending);
     assert(!ComboCrossMmRuntime::PrepareSwitch());
     assert(Combo_MM_CompleteCrossDungeonTransition());
     assert(ComboCrossMmRuntime::PrepareSwitch() && queued==100);
+    const auto discovered = Rando::EntranceTracker::Discovered(rando);
+    assert(discovered.size() == 1 && discovered.front() == g->Entry());
     assert(gSaveContext.save.entrance==g->hole.entrance);
     assert(Combo_MM_SaveCrossDungeonCheckpoint()==g->Exit());
     assert(MM_QueueCrossDungeonArrival(g->Entry()));
@@ -202,8 +209,13 @@ int main() {
     assert(Combo_MM_CompleteCrossDungeonTransition());
     assert(ComboCrossMmRuntime::PrepareSwitch() && queued==potion.returnTo.index);
     assert(gSaveContext.save.entrance==bomb->entrance.index);
+    const auto shopDiscovery = Rando::EntranceTracker::Discovered(gSaveContext.save.shipSaveInfo.rando);
+    assert(shopDiscovery.size() == 1 && shopDiscovery.front() == bomb->exit.index);
     index=bomb->entrance.index;
     assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending->to==potion.entrance);
-    Combo_MM_CancelCrossDungeonTransition();
+    assert(Combo_MM_CompleteCrossDungeonTransition());
+    assert(ComboCrossMmRuntime::PrepareSwitch() && queued == potion.entrance.index);
+    const auto shopDiscoveries = Rando::EntranceTracker::Discovered(gSaveContext.save.shipSaveInfo.rando);
+    assert(shopDiscoveries.size() == 2 && shopDiscoveries.back() == bomb->entrance.index);
     std::cout<<"MM adapters: options, logical region/source identity, raw clocks, one-leg runtime, native saves and recovery PASS\n";
 }

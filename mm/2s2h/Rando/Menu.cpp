@@ -143,8 +143,13 @@ static void ApplyClockItemRendering(RandoItemId item, ImVec4& tintColor, std::st
 void ClearIncompatibleSetting() {
     const auto& logic = Rando::StaticData::Options[RO_LOGIC];
     if (CVarGetInteger(logic.cvar, logic.defaultValue) == RO_LOGIC_VANILLA) {
-        for (auto option : Rando::VanillaCompatibility::UnsupportedOptions)
+        for (auto option : Rando::VanillaCompatibility::UnsupportedOptions) {
+            if (option == RO_SHUFFLE_ZFG_WALLET && Combo_IsCombinedGame()) {
+                // The shared preference may still apply to the OoT pool.
+                continue;
+            }
             CVarClear(Rando::StaticData::Options[option].cvar);
+        }
     }
 }
 
@@ -393,6 +398,7 @@ static RegisterShipInitFunc refreshMetricsInit(RefreshMetrics,
                                                    "gRando.Options.RO_SHUFFLE_DEKU_STICK_BAG",
                                                    "gRando.Options.RO_SHUFFLE_DEKU_NUT_BAG",
                                                    "gRando.Options.RO_SHUFFLE_CHILD_WALLET",
+                                                   "gRandoSettings.IncludeZfgWallet",
                                                    "gRando.Options.RO_INFINITE_UPGRADES",
                                                    "gRando.Options.RO_SHUFFLE_LOTTERY_NIGHTS",
                                                    "gRando.Options.RO_SHUFFLE_ICICLE_DROPS",
@@ -1191,6 +1197,10 @@ static void DrawItemPoolTab() {
                      "Adds the Tycoon's Wallet (5,000 rupees) to the item pool\n"
                      "as a third progressive wallet upgrade.",
                      1);
+    ItemPoolCheckbox("ZFG's Wallet", RO_SHUFFLE_ZFG_WALLET,
+                     "Adds one Progressive Wallet that raises capacity to 9,999 rupees after your other finite "
+                     "wallet upgrades.",
+                     1);
     CVarCheckbox("Repeatable Rupee Purchases", Rando::StaticData::Options[RO_PURCHASE_INFINITE_RUPEES].cvar,
                  CheckboxOptions({ { .tooltip = "Shops can end up selling rupees as their randomized stock (e.g. a "
                                                 "Silver Rupee for 1 rupee). When enabled, those rupees can be "
@@ -1620,8 +1630,8 @@ static void DrawItemPoolTab() {
                 "Include Pikachu Pokeball", Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar,
                 CheckboxOptions({ { .tooltip = "Adds the Pikachu Pokeball to the pool. Finding it unlocks PIKACHU\n"
                                                "MODE on the equipment page's Crossover Items sub-page.\n"
-                                               "2Ship has no Pikachu transformation yet — the form selects but Link\n"
-                                               "does not change.\n\nNot considered by logic." } }))) {
+                                               "In 2Ship, Pikachu replaces human Link's model and keeps MM controls."
+                                               "\n\nNot considered by logic." } }))) {
             NeiRando_EnableCrossover();
         }
     }
@@ -1919,6 +1929,8 @@ static void DrawStartingItemsTab() {
                                 Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.Shared.Wallets", 0);
                             maxCount = 2 +
                                        !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TYCOON_WALLET].cvar, 0) +
+                                       (!IncompatibleWithLogicSetting(RO_SHUFFLE_ZFG_WALLET) &&
+                                        CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_ZFG_WALLET].cvar, 0)) +
                                        (!sharedWallets &&
                                         !!CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_CHILD_WALLET].cvar, 0));
                         }
@@ -2427,6 +2439,15 @@ void Rando::RegisterMenu() {
         win->Update();
         win->DrawElement();
     });
+#endif
+
+#ifdef COMBO_BUILD
+    mBenMenu->AddSidebarEntry("Rando", "Entrance Tracker", 1);
+    path.sidebarName = "Entrance Tracker";
+    mBenMenu->AddWidget(path, "Toggle Entrance Tracker", WIDGET_WINDOW_BUTTON)
+        .CVar(Combo_IsCombinedGame() ? "gOpenWindows.EntranceTracker" : "gWindows.EntranceTracker")
+        .WindowName("Entrance Tracker")
+        .Options(std::make_shared<UIWidgets::WindowButtonOptions>(UIWidgets::WindowButtonOptions().EmbedWindow(false)));
 #endif
 
     mBenMenu->AddSidebarEntry("Rando", "Check Tracker", 1);

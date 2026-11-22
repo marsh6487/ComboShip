@@ -106,6 +106,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_DEKU_STICK_BAG, "the", "Deku Stick Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
     RI(RI_DEKU_NUT_BAG, "the", "Deku Nut Bag", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_NUTS_1, GID_DEKU_NUTS),
     RI(RI_WALLET_CHILD, "the", "Child's Wallet", RITYPE_MAJOR, ITEM_NONE, GI_WALLET_ADULT, GID_WALLET_ADULT),
+    RI(RI_WALLET_ZFG, "", "ZFG's Wallet", RITYPE_LESSER, ITEM_NONE, GI_WALLET_GIANT, GID_WALLET_GIANT),
     RI(RI_INFINITE_BOW, "the", "Infinite Quiver", RITYPE_MAJOR, ITEM_NONE, GI_QUIVER_50, GID_QUIVER_50),
     RI(RI_INFINITE_BOMB_BAG, "the", "Infinite Bomb Bag", RITYPE_MAJOR, ITEM_NONE, GI_BOMB_BAG_40, GID_BOMB_BAG_40),
     RI(RI_INFINITE_STICKS, "", "Infinite Deku Sticks", RITYPE_MAJOR, ITEM_NONE, GI_DEKU_STICKS_1, GID_DEKU_STICK),
@@ -961,6 +962,7 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_WALLET_CHILD:
             return (const char*)gItemIcons[ITEM_WALLET_ADULT];
         case RI_INFINITE_WALLET:
+        case RI_WALLET_ZFG:
         case RI_WALLET_TYCOON:
             return (const char*)gItemIcons[ITEM_WALLET_GIANT];
         case RI_PROGRESSIVE_LULLABY:
@@ -1392,6 +1394,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_OOT_NEI_ROCS_FEATHER:
         case RI_OOT_PROGRESSIVE_ROC:
             return "__OTR__textures/icon_item_custom/gItemIconRocsFeatherTex";
+        case RI_OOT_NEI_ROCS_CAPE:
+            return "__OTR__textures/icon_item_custom/gItemIconRocsCapeTex";
         case RI_OOT_PROGRESSIVE_STICK_CAPACITY: // MM's own stick/nut icons; no upgrade art exists
             return (const char*)gItemIcons[ITEM_DEKU_STICK];
         case RI_OOT_PROGRESSIVE_NUT_CAPACITY:

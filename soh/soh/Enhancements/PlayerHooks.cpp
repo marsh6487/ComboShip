@@ -15,14 +15,13 @@ extern "C" {
 #include "mods/transformation_masks/mm_mask_wear.h"
 #include "mods/transformation_masks/gerudo_voice.h"
 #include "mods/items/logic/item_minish_cap.h"
+#include "mods/items/helpers/equip_helper.h"
 #include "expansions/sm64/sm64_mario.h"
 
 void Sw97_CuccoOnShieldBlock(Player* player, PlayState* play);
 MmPlayerTransformation MmForm_GetCurrentForm(void);
 u8 MmForm_IsKafeiFormActive(void);
-u8 Pacci_UltrahandModeActive(void);
 u8 MasterCycle_IsRiding(void);
-u8 Cryonis_ModeActive(void);
 void MmForm_StartDekuSpinFromOot(Player* player, PlayState* play);
 void MmForm_StartGoronCurlFromOot(Player* player, PlayState* play);
 u8 GerudoForm_IsActive(void);
@@ -107,7 +106,7 @@ static bool StatusIsResisted(s32 hitResponse) {
 // An empty B slot is how you tell OOT to leave the button alone — it is what keeps the sword in its
 // scabbard while a form, a mask or a mount owns the press.
 static s32 ResolveItemOnButton(PlayState* play, s32 index, s32 item) {
-    if ((index >= 4) && (Pacci_UltrahandModeActive() || MasterCycle_IsRiding() || Cryonis_ModeActive())) {
+    if (index >= 4 && index < ARRAY_COUNT(sButtonMasks) && ItemInput_ButtonIsClaimed(sButtonMasks[index])) {
         return ITEM_NONE;
     }
     if (index != 0) {

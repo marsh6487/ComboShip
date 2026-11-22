@@ -2,6 +2,7 @@
 // creator. ROM initialization and game serialization are service boundaries;
 // file writes use the production atomic writer against a real temporary
 // directory.
+#include "combo/rando/BossWarpRewardSave.h"
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaSave.h"
 #include "combo/vanilla/ComboVanillaRewards.h"
@@ -24,6 +25,7 @@ static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
 static bool Combo_PreserveStartupMmState() { return true; }
 static bool ComboIsValidSlot(int slot) { return slot >= 0 && slot < 3; }

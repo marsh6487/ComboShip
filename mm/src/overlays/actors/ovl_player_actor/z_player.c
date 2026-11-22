@@ -10,6 +10,7 @@
 #include "global.h"
 #include "2s2h/Rando/SoulShuffleRuntime.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "audio/TwilightPrincessTargeting.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
@@ -5596,6 +5597,10 @@ void Player_UpdateZTargeting(Player* this, PlayState* play) {
                     if (!(this->stateFlags1 & (PLAYER_STATE1_PARALLEL | PLAYER_STATE1_LOCK_ON_FORCED_TO_RELEASE)) &&
                         (Player_Action_95 != this->actionFunc)) {
                         Player_SetParallel(this);
+                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL &&
+                            ResourceMgr_FileExists(TP_TARGET_CAMERA_CUE)) {
+                            Audio_PlaySfx(NA_SE_SY_LOCK_ON_HUMAN);
+                        }
                     }
                 }
             }
@@ -12560,7 +12565,7 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
             doActionA = DO_ACTION_RETURN;
         } else if ((this->heldItemAction == PLAYER_IA_FISHING_ROD) && (this->unk_B28 != 0)) {
             doActionA = (this->unk_B28 == 2) ? DO_ACTION_REEL : DO_ACTION_NONE;
-        } else if (this->stateFlags3 & PLAYER_STATE3_2000) {
+        } else if ((this->stateFlags3 & PLAYER_STATE3_2000) && !(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
             doActionA = DO_ACTION_DOWN;
         } else if ((this->doorType != PLAYER_DOORTYPE_NONE) && (this->doorType != PLAYER_DOORTYPE_STAIRCASE) &&
                    !(this->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR)) {
@@ -14530,6 +14535,7 @@ skipUpdate:
     }
     Sm64Mario_UpdateAttackCollider(play, this);
     Sm64Mario_ScrubDamageState(play, this);
+    PikachuForm_Update(play, this);
 }
 
 void Player_DrawGameplay(PlayState* play, Player* this, s32 lod, Gfx* cullDList,
@@ -14659,8 +14665,8 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     if (wolfDrawn == 2) {
         return;
     }
-    if (wolfDrawn) {
-        // Keep MM's freeze shell and item/effect presentation while the Wolf mesh replaces Link.
+    if (wolfDrawn || PikachuForm_Draw(play, this)) {
+        // Keep MM's freeze shell and item/effect presentation with replacement meshes.
         OPEN_DISPS(play->state.gfxCtx);
         if (this->stateFlags2 & PLAYER_STATE2_4000) {
             f32 iceScale = this->unk_B48;
@@ -15008,6 +15014,7 @@ void Player_Destroy(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
     if (this == GET_PLAYER(play)) {
         WolfLinkHost_Destroy(play, this);
+        PikachuForm_Destroy();
         CustomItems_ResetTransientTools(this, play);
         DinFireSword_Reset();
         DinFireShield_Reset();
@@ -21208,18 +21215,25 @@ f32 D_8085D958[] = { 600.0f, 960.0f };
 Vec3f D_8085D960 = { -30.0f, 50.0f, 0.0f };
 Vec3f D_8085D96C = { 30.0f, 50.0f, 0.0f };
 
-// Flying as Deku?
+bool Player_IsDekuFlowerFlying(const Player* player) {
+    return (player->transformation == PLAYER_FORM_DEKU) && (player->actionFunc == Player_Action_94) &&
+           (player->stateFlags3 & PLAYER_STATE3_1000000) && !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND);
+}
+
+// Deku Flower launch and flight.
 void Player_Action_94(Player* this, PlayState* play) {
     if ((this->zoraBoomerangActor != NULL) && (this->zoraBoomerangActor->update == NULL)) {
         this->zoraBoomerangActor = NULL;
     }
 
-    if (Player_ActionHandler_13(this, play)) {
+    // A pending item or cutscene request can consume the action update without changing actions.
+    // Finish the grounded landing before processing such a request.
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
+        func_80837134(play, this);
         return;
     }
 
-    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
-        func_80837134(play, this);
+    if (Player_ActionHandler_13(this, play)) {
         return;
     }
 

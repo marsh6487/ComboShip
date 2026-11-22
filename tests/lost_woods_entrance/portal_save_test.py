@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Round-trip the real MM portal writer/loader through the real JSON converters.
+"""Round-trip MM portal and reset saves through the real JSON converters.
 
 Container I/O, migration and item-audit logging are explicit boundaries. Native
 scene-flag capture and SaveContext serialization/deserialization execute unchanged.
@@ -21,6 +21,9 @@ parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
 production = (ROOT / 'mm/2s2h/SaveManager/SaveManager.cpp').read_text()
 play = (ROOT / 'mm/src/code/z_play.c').read_text()
+sram = (ROOT / 'mm/src/code/z_sram_NES.c').read_text()
+saving = (ROOT / 'mm/2s2h/Enhancements/Saving/SavingEnhancements.cpp').read_text()
+autosave = (ROOT / 'mm/2s2h/Enhancements/Saving/AutoSave.cpp').read_text()
 
 
 def function(text, marker):
@@ -36,6 +39,7 @@ source = r'''
 #include "global.h"
 #include "BenJsonConversions.hpp"
 #include "ComboGameMode.h"
+#include "Enhancements/Saving/SavingEnhancements.h"
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 char gGitCommitHash[] = "portal-save-fixture";
@@ -48,6 +52,28 @@ GameState* gGameState;
 int gComboOwlBlobSlot = -1;
 static nlohmann::json disk;
 static int writes, failures;
+static int flashWrites, flushes;
+static bool rememberLocation, autosaveEnabled, canSave = true;
+s32 gFlashOwlSaveStartPages[] = {1, 129, 2, 130, 3, 131};
+s32 gFlashOwlSaveNumPages[] = {1, 1, 1, 1, 1, 1};
+extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
+    if (std::strcmp(key, "gEnhancements.Saving.RememberSaveLocation") == 0) return rememberLocation;
+    if (std::strcmp(key, "gEnhancements.Saving.Autosave") == 0) return autosaveEnabled;
+    return fallback;
+}
+extern "C" bool SavingEnhancements_CanSave() { return canSave; }
+extern "C" void SavingEnhancements_AdvancePlaytime() {}
+extern "C" void Combo_MM_FlushAccumulators() { ++flushes; }
+extern "C" void Sram_SetFlashPagesOwlSave(SramContext*, s32, s32) { std::abort(); }
+extern "C" void Sram_StartWriteToFlashOwlSave(SramContext*) { std::abort(); }
+extern "C" void SysFlashrom_WriteDataSync(void* buffer, u32 page, u32 count) {
+    if (page != (flashWrites == 0 ? 2U : 130U) || count != 1U) std::abort();
+    SaveContext snapshot{};
+    std::memcpy(&snapshot, buffer, offsetof(SaveContext, fileNum));
+    disk["owlSave"] = snapshot;
+    disk.erase("comboPortalSession");
+    ++flashWrites;
+}
 namespace ItemGrantAudit { struct Scope { explicit Scope(const char*) {} }; }
 namespace ComboRando::CrossDungeon { int ReadCheckpoint(const nlohmann::json&) { return -1; } }
 // This fixture exercises the existing seeded container path.
@@ -66,8 +92,9 @@ static void require(bool value,const char* message) {
 source += re.search(r'const uint32_t CURRENT_SAVE_VERSION = \d+;', production).group(0) + '\n'
 source += function(play, 's16 Play_GetOriginalSceneId(')
 source += function(play, 'void Play_SaveCycleSceneFlags(').replace('PlayState* this', 'PlayState* self').replace('this->', 'self->')
-source += function((ROOT / 'mm/src/code/z_sram_NES.c').read_text(), 'u16 Sram_CalcChecksum(').replace(
+source += function(sram, 'u16 Sram_CalcChecksum(').replace(
     'u8* dataPtr = data;', 'u8* dataPtr = (u8*)data;')
+source += function(sram, 'void func_8014546C(')
 for marker in ('static bool SaveManager_CapturePortalSession(', 'static void SaveManager_RestorePortalRespawns('):
     if marker in production:
         source += function(production, marker)
@@ -75,7 +102,16 @@ source += function(production, 'void SaveManager_SaveCurrentForCombo(')
 source += function(production, 'int SaveManager_LoadSaveFile(')
 title = (ROOT / 'mm/src/code/title_setup.c').read_text()
 source += 'void RestoreCycleFlags() {\n' + function(title, 'for (int i = 0; i < ARRAY_COUNT(gSaveContext.cycleSceneFlags); i++)') + '\n}\n'
-source += function((ROOT / 'mm/2s2h/Enhancements/Saving/SavingEnhancements.cpp').read_text(), 'void LoadRespawnData(')
+source += function(saving, 'void LoadRespawnData(')
+source += '\n' + '\n'.join(line for line in saving.splitlines() if line.startswith('#define CVAR_REMEMBER_SAVE_LOCATION')) + '\n'
+source += '\n'.join(line for line in autosave.splitlines() if line.startswith('#define CVAR_AUTOSAVE')) + '\n'
+source += 'static int lastScene, entranceToSave;\n'
+source += function(saving, 'extern "C" void SavingEnhancements_PersistSaveEntranceInfo(')
+source += function(saving, 'extern "C" void SavingEnhancements_ClearSaveEntranceInfo(')
+arrival = 'COND_HOOK(OnSceneInit, true, [](s8 sceneId, s8)'
+source += 'void ObserveScene(s8 sceneId)' + function(saving, arrival).split(arrival, 1)[1]
+source += function(autosave, 'static void WriteAutosave(')
+source += function(autosave, 'extern "C" void SavingEnhancements_AutosaveOnReset(')
 source += r'''
 template<class Function> void SavePortalSession(Function save) {
     if constexpr (std::is_invocable_v<Function,bool>) save(true);
@@ -84,6 +120,68 @@ template<class Function> void SavePortalSession(Function save) {
 template<class Function> void SaveWithoutPortalSession(Function save) {
     if constexpr (std::is_invocable_v<Function,bool>) save(false);
     else save();
+}
+static void CheckResetSave(PlayState& play, int mode) {
+    gComboGameMode=mode;
+    gSaveContext={};
+    gSaveContext.fileNum=1;
+    gSaveContext.flashSaveAvailable=true;
+    gSaveContext.gameMode=GAMEMODE_NORMAL;
+    gSaveContext.save.day=3;
+    gSaveContext.save.time=0xABCD;
+    gSaveContext.eventInf[2]=0x55;
+    gSaveContext.respawn[RESPAWN_MODE_TOP].pos.y=24;
+    lastScene=entranceToSave=-1;
+    disk=nlohmann::json::object();
+    flashWrites=flushes=0;
+    static u8 buffer[SAVE_BUFFER_SIZE]{};
+    play.sramCtx.saveBuf=buffer;
+    play.sceneId=SCENE_10YUKIYAMANOMURA;
+    play.actorCtx.sceneFlags.chest=0x31;
+    const auto mountainEntrance=ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 1);
+    gSaveContext.save.entrance=mountainEntrance;
+
+    // A player may turn the checkbox on after entering the scene.
+    rememberLocation=false;
+    autosaveEnabled=true;
+    ObserveScene(play.sceneId);
+    SavingEnhancements_AutosaveOnReset();
+    rememberLocation=true;
+    autosaveEnabled=false;
+    SavingEnhancements_AutosaveOnReset();
+    autosaveEnabled=true;
+    canSave=false;
+    SavingEnhancements_AutosaveOnReset();
+    canSave=true;
+    play.gameOverCtx.state=GAMEOVER_DEATH_START;
+    SavingEnhancements_AutosaveOnReset();
+    play.gameOverCtx.state=GAMEOVER_INACTIVE;
+    play.transitionTrigger=TRANS_TRIGGER_START;
+    SavingEnhancements_AutosaveOnReset();
+    play.transitionTrigger=TRANS_TRIGGER_OFF;
+    require(flashWrites==0 && flushes==0, "disabled or unsafe resets must leave the previous save alone");
+
+    SavingEnhancements_AutosaveOnReset();
+    require(flashWrites==(mode==COMBO_GAME_BOTH ? 1 : 2) && flushes==(mode==COMBO_GAME_BOTH ? 1 : 0),
+            "reset must write the right slot and only keep a separate backup in Solo MM");
+    require(!gSaveContext.save.isOwlSave && gSaveContext.save.shipSaveInfo.pauseSaveEntrance==-1,
+            "writing the reset checkpoint must clean up live owl metadata");
+    const auto snapshot=disk.at("owlSave").get<SaveContext>();
+    require(snapshot.save.isOwlSave && snapshot.save.shipSaveInfo.pauseSaveEntrance==mountainEntrance &&
+            snapshot.save.saveInfo.playerData.savedSceneId==play.sceneId && snapshot.save.day==3 &&
+            snapshot.save.time==0xABCD && snapshot.eventInf[2]==0x55 &&
+            snapshot.save.shipSaveInfo.respawn[RESPAWN_MODE_TOP].pos.y==24 &&
+            snapshot.save.saveInfo.permanentSceneFlags[play.sceneId].chest==0x31,
+            "reset must preserve Mountain Village's entrance, current cycle state, scene flags and respawns");
+
+    const auto grotto=ENTRANCE(GROTTOS, 4);
+    gSaveContext.save.entrance=grotto;
+    ObserveScene(SCENE_KAKUSIANA);
+    gSaveContext.save.entrance=mountainEntrance;
+    ObserveScene(play.sceneId);
+    SavingEnhancements_PersistSaveEntranceInfo();
+    require(gSaveContext.save.shipSaveInfo.pauseSaveEntrance==grotto,
+            "a positioned grotto exit must keep its previous native save entrance");
 }
 int main() {
     PlayState play{}; gPlayState=&play; gGameState=&play.state; play.state.running=true;
@@ -163,7 +261,9 @@ int main() {
         SavePortalSession(SaveManager_SaveCurrentForCombo);
     }
     require(writes==completedWrites && disk==completedDisk, "invalid slots must never write a portal snapshot");
-    std::puts("PASS portal save: three slots, both Remember settings, complete progress and invalid-state write guards");
+    CheckResetSave(play, COMBO_GAME_BOTH);
+    CheckResetSave(play, COMBO_GAME_MM);
+    std::puts("PASS MM portal and reset saves: slots, native checkpoints, complete progress and safe write guards");
 }
 '''
 

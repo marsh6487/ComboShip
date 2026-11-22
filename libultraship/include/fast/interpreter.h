@@ -90,6 +90,7 @@ enum class ShaderOpts {
     PRIM_DEPTH,
     PRISM_SHADER, // 16-bit width
     TOON = 33, // Preserve Prism shader id bits 17..32.
+    MODEL_OPACITY,
     MAX
 };
 
@@ -123,6 +124,7 @@ struct CCFeatures {
     bool opt_grayscale;
     bool opt_prim_depth;
     bool opt_toon; // SOH [Enhancement] toon lighting
+    bool opt_model_opacity;
     bool usedTextures[2];
     bool used_masks[2];
     bool used_blend[2];
@@ -722,6 +724,10 @@ class Interpreter {
 
     typedef size_t ShaderId;
     std::stack<ShaderId> mShaderStack;
+    std::vector<float> mModelOpacity;
+    float CurrentModelOpacity() const {
+        return mModelOpacity.empty() ? 1.0f : mModelOpacity.back();
+    }
     size_t mShadersIndex = 0;
     int mInterpolationIndex;
     int mInterpolationIndexTarget;

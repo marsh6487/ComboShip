@@ -1196,21 +1196,27 @@ void TestOcarinaOwnsMirrorShortcut() {
       assert(std::memcmp(&nativeInput, &play.state.input[0], sizeof(Input)) == 0);
     }
     // Native pull-out/playing and forced-pull ownership may precede messages.
-    for (int phase = 0; phase < 3; ++phase) {
+    for (int phase = 0; phase < 4; ++phase) {
       Reset();
 #ifdef MIRROR_OOT
       if (phase == 0) player.stateFlags2 = PLAYER_STATE2_OCARINA_PLAYING;
       else if (phase == 1) player.stateFlags3 = PLAYER_STATE3_FORCE_PULL_OCARINA;
-      else {
+      else if (phase == 2) {
         player.itemAction = PLAYER_IA_OCARINA_OF_TIME;
         player.stateFlags1 = PLAYER_STATE1_START_CHANGING_HELD_ITEM;
+      } else {
+        player.itemAction = PLAYER_IA_OCARINA_FAIRY;
+        player.unk_6AD = 4;
       }
 #else
       if (phase == 0) player.stateFlags2 = PLAYER_STATE2_USING_OCARINA;
       else if (phase == 1) player.stateFlags3 = PLAYER_STATE3_20;
-      else {
+      else if (phase == 2) {
         player.itemAction = PLAYER_IA_OCARINA;
         player.stateFlags3 = PLAYER_STATE3_START_CHANGING_HELD_ITEM;
+      } else {
+        player.itemAction = PLAYER_IA_OCARINA;
+        player.unk_AA5 = PLAYER_UNKAA5_5;
       }
 #endif
       play.state.input[0].cur.button = play.state.input[0].press.button = button;

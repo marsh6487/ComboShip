@@ -298,7 +298,9 @@ bool GenerateItemPool() {
     }
     //clang-format on
 
-    int extraWallets = (ctx->GetOption(RSK_SHUFFLE_CHILD_WALLET) ? 1 : 0) + (ctx->GetOption(RSK_INCLUDE_TYCOON_WALLET) ? 1 : 0);
+    int extraWallets = (ctx->GetOption(RSK_SHUFFLE_CHILD_WALLET) ? 1 : 0) +
+                       (ctx->GetOption(RSK_INCLUDE_TYCOON_WALLET) ? 1 : 0) +
+                       (ctx->GetOption(RSK_INCLUDE_ZFG_WALLET) ? 1 : 0);
     int startWallet = ctx->GetOption(RSK_STARTING_WALLET).Get();
     AddItemToPool(RG_PROGRESSIVE_WALLET, std::max(0, 3 + infiniteProgressive + extraWallets - startWallet),
                                          std::max(0, 2 + infiniteProgressive + extraWallets - startWallet),

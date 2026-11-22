@@ -137,9 +137,9 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolve::NotReady; // MM's rando state isn't up — retry, don't freeze
     }
-    if (rcStatic == 0 ||
-        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI &&
-         raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR)) {
+    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_SEASON_GI &&
+                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT &&
+                          raw.drawKind != CW_DRAW_KIND_MAGIC_MIRROR && raw.drawKind != CW_DRAW_KIND_ZFG_WALLET)) {
         // ComboShip: no static DL row — try the animated ABI (MM stray fairies). MM only describes
         // the item; ComboForeignAnim_Draw (combo/menu/ComboForeignAnim.h) loads + draws it.
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -164,7 +164,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
 
     if (raw.drawKind == CW_DRAW_KIND_MM_KEY_RING && !CwValidMmKeyRingRecipe(&raw))
         return ComboForeignResolve::Unknown;
-    if (raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR && (raw.dlistCount != 0 || raw.opCount != 0))
+    if ((raw.drawKind == CW_DRAW_KIND_MAGIC_MIRROR || raw.drawKind == CW_DRAW_KIND_ZFG_WALLET) &&
+        (raw.dlistCount != 0 || raw.opCount != 0))
         return ComboForeignResolve::Unknown;
     static constexpr char kOtrPrefix[] = "__OTR__";
     int32_t n = raw.dlistCount < CW_DRAW_MAX_DLISTS ? raw.dlistCount : CW_DRAW_MAX_DLISTS;
@@ -1090,6 +1091,10 @@ inline void OOT_DrawForeignNativeEquipment(PlayState* play, GetItemEntry* entry,
     Matrix_Pop();
 }
 
+inline void OOT_DrawForeignZfgWallet(PlayState* play) {
+    OOT_DrawZfgWalletModel(play);
+}
+
 // Draw a foreign (MM-bound) item's real MM model at the current model matrix. Any resolution
 // failure falls back to the sentinel (the RG_COMBO_FOREIGN entry's blue rupee), so we never draw
 // blank. Mirror of MM_DrawComboForeign (combo/menu/ComboForeignDrawMM.h).
@@ -1253,6 +1258,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             if (!ComboBottleContents_Draw(play, ComboBottleContents_Profile(info->dls[0]))) {
                 OOT_DrawForeignSimple(play, info);
             }
+            break;
+        case CW_DRAW_KIND_ZFG_WALLET:
+            OOT_DrawForeignZfgWallet(play);
             break;
         case CW_DRAW_KIND_MM_KEY_RING:
             ComboMmKeyRing::Draw(play, static_cast<int>(info->ops[0].b), info->dls[0], info->dls[1], info->dls[2],

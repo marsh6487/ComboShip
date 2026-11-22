@@ -1,6 +1,14 @@
 from pathlib import Path
-import os,re,subprocess,tempfile
+import hashlib,os,re,struct,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[2]
+
+data=(ROOT/'combo/actors/ZeldaRunPoc8.h').read_text().split('kFrameData[][kWordsPerFrame] = {',1)[1].split('};',1)[0]
+frames=[[int(word) for word in re.findall(r'-?\d+',frame)] for frame in re.findall(r'\{([^{}]*)\}',data)]
+assert len(frames)==20 and all(len(frame)==67 for frame in frames)
+motion=b''.join(struct.pack('<67h',*frame) for frame in frames)
+assert hashlib.sha256(motion).hexdigest()=='be5036ae036d6617fcb7f0887330ebe8dec9279972b86c647135ce78399e57c9'
+print('PASS built-in motion matches the accepted POC8 byte for byte',flush=True)
+
 def block(source,name):
     match=re.search(r'static bool '+name+r'\([^{}]*\)\s*\{',source)
     assert match,name

@@ -162,6 +162,7 @@ void ScanCustomCosmetics();
 bool HasCustomCosmetics();
 void DrawCustomCosmetics();
 void ApplyCustomCosmetics();
+void DrawCosmeticRow(CosmeticOption& cosmeticOption, bool compact = false);
 union Gfx;
 void ApplyCustomCosmeticsToDisplayListCopy(const char* materialPath, Gfx* instructions, size_t count);
 void RandomizeColor(CosmeticOption& cosmeticOption, bool manual = true);

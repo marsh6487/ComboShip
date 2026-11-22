@@ -31,7 +31,9 @@ with tempfile.TemporaryDirectory(prefix='mm-environment-') as td:
  src=(ROOT/'mm/src/code/z_actor.c').read_text();a=src.index('    SetActorListIndex(actor, currentActorListIndex);');b=src.index('    // #endregion',a)
  (build/'environment_actor_index.inc').write_text(src[a:b])
  src=(ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text();a=src.index('inline void to_json(json& j, const RandoSaveCheck&');b=src.index('inline void to_json(json& j, const Vec3f&',a)
- (build/'environment_json.inc').write_text('using json=nlohmann::json;\n'+src[a:b])
+ (build/'environment_json.inc').write_text(
+  '#ifdef COMBO_BUILD\n#include "Rando/EntranceTrackerDiscovery.h"\n#endif\n'
+  'using json=nlohmann::json;\n'+src[a:b])
  inventory=(ROOT/'mm/src/code/z_inventory.c').read_text()
  (build/'environment_slots.inc').write_text('extern "C" {\n'+re.search(r'^u8 gItemSlots\[77\] = \{.*?^\};',inventory,re.M|re.S)[0]+'\n'+'\n'.join(re.search(r'^(?:u32|u8) '+name+r'\[\] = \{.*?^\};',inventory,re.M|re.S)[0] for name in ('gBitFlags','gUpgradeMasks','gUpgradeShifts'))+'\n}')
  (build/'environment_slots.inc').write_text((build/'environment_slots.inc').read_text().replace('1 <<','1u <<'))

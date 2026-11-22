@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix='authored-clock-') as folder:
     # The actual native MM switch arm is exercised with a deliberate half-day
     # mismatch: an alias must call DrawOotClock and never DrawClock(DAY1).
     start=mm.index('        case RI_OOT_CLOCK:',mm.index('void Rando::DrawResolvedItem'))
-    end=mm.index('        case RI_WALLET_TYCOON:',start)
+    end=mm.index('        case RI_WALLET_CHILD:',start)
     (temp/'clock_mm_dispatch.inc').write_text('static void ClockDispatch(int randoItemId) { Actor* actor=nullptr; switch(randoItemId) {\n'+mm[start:end]+'default: break; }}')
     for host,source,name in [('oot',of,'ComboForeignDrawInfo'),('mm',mf,'ComboForeignDrawInfoOOT')]:
         f=functions(source.replace('inline void ','void '))
@@ -65,6 +65,9 @@ with tempfile.TemporaryDirectory(prefix='authored-clock-') as folder:
                       {prefix+'_DrawForeignCustomGi',prefix+'_DrawForeignWeaponFlame'})
         boundaries='\n'.join('template<class... A> static bool '+fn+'(A&&...) { assert(false && "unrelated foreign item draw"); return false; }'
                              for fn in unused)
+        wallet=prefix+'_DrawZfgWalletModel'
+        if wallet+'(' in compositor:
+            boundaries += '\nstatic void '+wallet+'(PlayState*) { assert(false && "unrelated wallet draw"); }'
         if host=='oot':
             # Retain the real receipt classifier; ordinary Clock draws must not
             # enter the separately tested frozen startup-receipt path.

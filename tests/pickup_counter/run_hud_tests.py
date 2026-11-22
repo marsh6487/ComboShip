@@ -24,14 +24,12 @@ def block(source, start):
 
 sources = {host: (ROOT / host / "src/code/z_parameter.c").read_text() for host in ("soh", "mm")}
 tycoon = (ROOT / "mm/2s2h/Rando/MiscBehavior/TycoonWallet.cpp").read_text()
-guards = []
 for name, source in [*sources.items(), ("tycoon", tycoon)]:
-    matches = list(re.finditer(r'if \(!CVarGetInteger\([^{};]+PickupCounterHideHudRupees[^{};]+\) \{', source))
-    assert len(matches) == (2 if name == "soh" else 3), (name, len(matches))
-    guards += [source[m.start():source.index("{", m.start())].strip()[3:].strip()[1:-1] for m in matches]
+    count = source.count("if (PickupCounter_ShouldDrawWallet(play))")
+    assert count == (2 if name == "soh" else 3), (name, count)
     if name != "tycoon":
         for method in ("Interface_Update", "Rupees_ChangeBy", "Inventory_ChangeAmmo"):
-            assert "PickupCounterHideHudRupees" not in function(source, method), (name, method)
+            assert "PickupCounter_ShouldDrawWallet" not in function(source, method), (name, method)
 
 native = sources["mm"]
 guard = re.search(r"\bif\s*\([^;{}]*\bVB_DRAW_RUPEE_COUNTER\b[^;{}]*\)\s*\{", native)
@@ -42,7 +40,7 @@ production += "OPEN_DISPS(play->state.gfxCtx);\n" + block(native, guard.start())
 production += "\nCLOSE_DISPS(play->state.gfxCtx);\n}\n"
 production += function(tycoon, "DrawTycoonRupeeCounter")
 fixture = (ROOT / "tests/mm_wallet/rupee_draw_test.c").read_text()
-fixture = '#include "soh/soh/cvar_prefixes.h"\n' + fixture
+fixture = fixture.replace("../../combo/hud/PickupCounterWallet.h", "combo/hud/PickupCounterWallet.h")
 fixture = fixture.replace("static bool nativeFullUi = true;", "static bool nativeFullUi = true;\nstatic int pickup, hideHud;")
 fixture = fixture.replace("int32_t CVarGetInteger(const char* name, int32_t defaultValue) { return defaultValue; }", '''
 int32_t CVarGetInteger(const char* name, int32_t defaultValue) {
@@ -51,20 +49,35 @@ int32_t CVarGetInteger(const char* name, int32_t defaultValue) {
     return defaultValue;
 }
 ''')
-fixture = fixture.replace("int main(int argc, char** argv) {", "\n".join(
-    f"static int Gate{i}(void) {{ return {condition}; }}" for i, condition in enumerate(guards)) +
-    "\nint main(int argc, char** argv) {")
 extra = '''
+    play.state.running = true;
+    play.sceneId = SCENE_20SICHITAI2;
     for (pickup = 0; pickup <= 1; ++pickup) {
         for (hideHud = 0; hideHud <= 2; ++hideHud) {
             const bool show = !pickup || hideHud != 1;
             checkDraw(1667, 2, 0, show ? "1667" : "");
             checkDraw(5000, 3, 1, show ? "5000" : "");
-            /* ACTUAL_GUARDS */
         }
     }
+    pickup = hideHud = 1;
+    play.sceneId = SCENE_8ITEMSHOP;
+    checkDraw(1667, 2, 0, "1667");
+    checkDraw(5000, 3, 1, "5000");
+    nativeFullUi = false;
+    checkDraw(1667, 2, 0, "");
+    nativeFullUi = true;
+    play.sceneId = SCENE_20SICHITAI2;
+    static Actor merchant = { .id = ACTOR_EN_AKINDONUTS };
+    play.msgCtx.talkActor = &merchant;
+    play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+    checkDraw(1667, 2, 0, "1667");
+    checkDraw(5000, 3, 1, "5000");
+    play.msgCtx.msgMode = MSGMODE_NONE;
+    checkDraw(1667, 2, 0, "");
+    checkDraw(5000, 3, 1, "");
+    play.msgCtx.talkActor = NULL;
     pickup = hideHud = 0;
-'''.replace("/* ACTUAL_GUARDS */", "\n".join(f"REQUIRE(Gate{i}() == show);" for i in range(len(guards))))
+'''
 fixture = fixture.replace("    // The same native draw block", extra + "\n    // The same native draw block")
 
 with tempfile.TemporaryDirectory(prefix="pickup-hud-") as directory:
@@ -90,6 +103,11 @@ with tempfile.TemporaryDirectory(prefix="pickup-hud-") as directory:
                             "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-Wno-discarded-qualifiers",
                             "-Werror=implicit-function-declaration", "-fsyntax-only",
                             str(ROOT / host / "src/code/z_parameter.c")], check=True)
+            wallet_policy = temp / "wallet_policy"
+            host_policy = ["-DPICKUP_COUNTER_WALLET_MM"] if host == "mm" else []
+            subprocess.run([*compiler, "-std=gnu11", *hostflags, *mode, *host_policy,
+                            str(ROOT / "tests/pickup_counter/wallet_shop_test.c"), "-o", str(wallet_policy)], check=True)
+            subprocess.run([str(wallet_policy)], check=True)
             if host == "mm":
                 binary = temp / "test"
                 subprocess.run([*compiler, "-std=gnu11", "-g", "-O1", *hostflags, *mode, "-I" + str(temp),

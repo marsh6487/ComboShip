@@ -19,11 +19,13 @@ GameInteractor* GameInteractor::Instance;
 static PlayState play;
 static Player player;
 static int skipLevel=0;
-static int frame, offers, grantCount, grantFrame, receiptMessages, firstVisible=-1;
+static int frame, offers, grantCount, grantFrame, receiptMessages, notifications, firstVisible=-1;
 static std::vector<std::unique_ptr<EnItem00>> actors;
 static std::vector<RandoCheckId> granted;
-static constexpr auto firstCheck=RC_STARTING_ITEM_DEKU_MASK;
-static constexpr auto secondCheck=RC_STARTING_ITEM_SONG_OF_HEALING;
+static constexpr auto firstCheck=RC_CLOCK_TOWN_SOUTH_CHEST_LOWER;
+static constexpr auto secondCheck=RC_CLOCK_TOWN_SOUTH_CHEST_UPPER;
+static constexpr auto dekuCheck=RC_STARTING_ITEM_DEKU_MASK;
+static constexpr auto songCheck=RC_STARTING_ITEM_SONG_OF_HEALING;
 void CustomItem00_Init(Actor*,PlayState*);
 void CustomItem00_Update(Actor*,PlayState*);
 
@@ -31,7 +33,7 @@ void CustomItem00_Update(Actor*,PlayState*);
 // remain the real production types. This minimal Options mirrors used fields.
 namespace Notification {
 struct Options {const char* itemIcon=nullptr; std::string message,suffix;};
-void Emit(Options) {}
+void Emit(Options) { ++notifications; }
 }
 extern "C" {
 u16 gEquipNegMasks[]={0xFFF0,0xFF0F,0xF0FF,0x0FFF};
@@ -103,7 +105,7 @@ void MMAnchor_BroadcastCrossItem(int,const char*,const char*) {abort();}
 }
 void SaveManager_SaveCurrentForCombo() {abort();}
 namespace Rando {
-void LatchComboForeign(RandoCheckId) {abort();}
+void LatchComboForeign(RandoCheckId check) { assert(check == songCheck); }
 const char* ComboForeignLatchedName(RandoCheckId) {return nullptr;}
 uint8_t ComboForeignMessageIcon(RandoCheckId) {return 0;}
 bool ApplyForeignItemReceiptText(const char*,CustomMessage::Entry&,RandoCheckId) {return false;}
@@ -112,8 +114,17 @@ const std::string& GetCheckDisplayName(RandoCheckId) {static std::string name="f
 }
 namespace MiscBehavior {
 void OfferTrapItem() {abort();}
-const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId) {return nullptr;}
-void SendForeignCheck(RandoCheckId) {abort();}
+const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
+    static const ComboRando::ForeignItem item = {
+        .itemGame = ComboRando::GAME_OOT, .itemName = "Hookshot", .displayName = "Hookshot (OOT)", .advancement = true,
+    };
+    return check == songCheck ? &item : nullptr;
+}
+void SendForeignCheck(RandoCheckId check) {
+    assert(check == songCheck && RANDO_SAVE_CHECKS[check].obtained);
+    ++notifications; // Production sends its own receipt once it persists the check.
+    GiveItem(RI_COMBO_FOREIGN, check);
+}
 bool ShouldShowForeignCutscene(RandoCheckId) {return true;}
 void BroadcastCheckObtainedIfFirst(RandoCheckId,RandoItemId,bool) {}
 }
@@ -136,7 +147,7 @@ static void require(bool condition,const char* label) {
 }
 static void reset() {
     play={};player={};gSaveContext={};actors.clear();granted.clear();
-    frame=offers=grantCount=receiptMessages=0;grantFrame=firstVisible=-1;skipLevel=0;
+    frame=offers=grantCount=receiptMessages=notifications=0;grantFrame=firstVisible=-1;skipLevel=0;
     gPlayState=&play;play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&player.actor;
     gSaveContext.save.playerForm=PLAYER_FORM_HUMAN;
     Rando::MiscBehavior::CheckQueueReset();
@@ -161,23 +172,51 @@ int main() {
             gSaveContext.save.saveInfo.playerData.threeDayResetCount==1 &&
             CHECK_WEEKEVENTREG(WEEKEVENTREG_59_04) && CHECK_WEEKEVENTREG(WEEKEVENTREG_31_04),
             "actual randomizer initialization skips first-cycle arrival dialogue and starts human in South Clock Town");
-    require(RANDO_SAVE_CHECKS[firstCheck].eligible && RANDO_SAVE_CHECKS[secondCheck].eligible,
+    require(RANDO_SAVE_CHECKS[dekuCheck].eligible && RANDO_SAVE_CHECKS[songCheck].eligible,
             "actual producer makes both starting checks immediately eligible");
-    RANDO_SAVE_CHECKS[firstCheck].randoItemId=RI_RUPEE_GREEN;
-    RANDO_SAVE_CHECKS[secondCheck].randoItemId=RI_RUPEE_GREEN;
+    Rando::StaticData::Checks = {{dekuCheck, {}}, {songCheck, {}}};
+    RANDO_SAVE_CHECKS[dekuCheck].randoItemId = RI_MASK_DEKU;
+    Rando::StaticData::Items[RI_MASK_DEKU].randoItemType = RITYPE_MAJOR;
+#ifdef COMBO_BUILD
+    RANDO_SAVE_CHECKS[songCheck].randoItemId = RI_COMBO_FOREIGN;
+#else
+    RANDO_SAVE_CHECKS[songCheck].randoItemId = RI_RUPEE_GREEN;
+#endif
     PlayerAgeProperties properties{};properties.unk_24=10;player.ageProperties=&properties;
     Player_StartMode_D(&play,&player);
     require(player.av2.actionVar2==-20 && (player.stateFlags1 & PLAYER_STATE1_20000000),
             "real stationary arrival mode sets negative20 counter and blocking cutscene flag");
     play.transitionTrigger=TRANS_TRIGGER_END;play.transitionMode=TRANS_MODE_SETUP;
     queueAndProcess();
-    require(actors.empty() && interactor.events.size()==1 && queuedCheck==firstCheck,
+    require(actors.empty() && interactor.events.size()==1 && queuedCheck==dekuCheck,
             "authentic incoming-transition/arrival state blocks already-eligible starting check");
+    require(!std::get<GIEventGiveItem>(interactor.events.front()).showGetItemCutscene,
+            "a major starter uses overhead even when full item cutscenes are enabled");
     play.transitionTrigger=TRANS_TRIGGER_OFF;play.transitionMode=TRANS_MODE_OFF;queueAndProcess();
     require(actors.empty(),"arrival player flag independently blocks after fade ends");
-    player.stateFlags1 &= ~PLAYER_STATE1_20000000;queueAndProcess();
-    require(actors.size()==1,"starting-check event spawns on first call after arrival and transition clear");
-    std::puts("PASS: authentic starting checks/initialization; native start-D counter-20 and cutscene bit; arrival gates independently block then release immediately");
+    player.stateFlags1 &= ~PLAYER_STATE1_20000000;
+    gSaveContext.screenScaleFlag = true;
+    gSaveContext.screenScale = 800.0f;
+    player.speedXZ = 4.0f;
+    queueAndProcess();
+    require(actors.size()==1 && grantCount==0,"starting check spawns on the first safe queue-processing pass");
+    tickItem(actors.back().get());
+    require(grantCount==1 && grantFrame==1 && granted[0]==dekuCheck && firstVisible==1,
+            "first startup check grants and appears on its first item update");
+    queueAndProcess();
+    require(actors.size()==2,"the second startup check can spawn while the first receipt is still visible");
+    tickItem(actors.back().get());
+    require(grantCount==2 && grantFrame==2 && granted[1]==songCheck,"the second starter grants on its first update");
+    require(receiptMessages==0 && offers==0 && player.actor.freezeTimer==0 && player.speedXZ==4.0f && notifications==2,
+            "starting awards retain feedback without a textbox, animated handoff, freeze, or change in movement");
+    require(gSaveContext.screenScaleFlag && gSaveContext.screenScale==800.0f,
+            "startup delivery leaves native viewport state unchanged");
+    require(RANDO_SAVE_CHECKS[dekuCheck].obtained && RANDO_SAVE_CHECKS[songCheck].obtained,
+            "both starting checks are recorded");
+    queueAndProcess();
+    require(actors.size()==2 && interactor.events.empty() && grantCount==2,
+            "neither startup check queues again");
+    std::puts("PASS: starter checks wait for safe gameplay, then grant overhead on their first updates without interruption");
 
     reset();play.msgCtx.msgMode=MSGMODE_TEXT_DISPLAYING;
     for(frame=1;frame<=9;++frame) queueAndProcess();

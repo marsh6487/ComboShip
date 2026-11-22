@@ -9,6 +9,7 @@
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
 #include "BenMenu.h"
+#include "CosmeticEditor.h"
 #include "../../../combo/gui/MenuControlPopout.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/ComboGameMode.h"
@@ -1391,8 +1392,8 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Replaces Link with Mario from Super Mario 64, driven by libsm64. Mario keeps SM64 "
             "physics and animations.\n\n"
-            "Requires sm64.dll next to 2ship.exe (shipped automatically) and a valid SM64 US "
-            "Z64 ROM (sm64.z64) placed next to 2ship.exe or pointed to via the gSm64RomPath CVar.\n\n"
+            "Requires a US Super Mario 64 ROM in big-endian format (sm64.z64). "
+            "Place it in nei/ or set gSm64RomPath to its location.\n\n"
             "C-Left = Cappy, C-Right = Roll; these override equipped MM items in those slots.\n"
             "C-Down keeps its equipped item. D-pad controls Wing, Metal, Vanish, and Fire caps."));
     AddWidget(path, "Mario Mask C-Down Toggle", WIDGET_CVAR_CHECKBOX)
@@ -1509,7 +1510,9 @@ void BenMenu::AddEnhancements() {
             "in South Clock Town, unless Remember Save Location is enabled."));
     AddWidget(path, "Remember Save Location", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Saving.RememberSaveLocation")
-        .Options(CheckboxOptions().Tooltip("When loading a save, places Link at the last entrance he went through."));
+        .Options(CheckboxOptions().Tooltip(
+            "Resume at the entrance saved by Pause Menu Save or Autosave. With Autosave enabled, resetting from "
+            "gameplay also saves your current entrance. Song of Time starts the next cycle in Clock Town."));
     AddWidget(path, "Autosave", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Saving.Autosave")
         .Options(CheckboxOptions().Tooltip(
@@ -1603,12 +1606,16 @@ void BenMenu::AddEnhancements() {
         .Options(ComboboxOptions()
                      .ComboMap(&pickupRupeeHudOptions)
                      .DefaultIndex(0)
-                     .Tooltip("Hide the regular HUD rupee icon and digits while keeping the floating pickup counter. "
-                              "Turning off Pickup Counters restores the regular HUD."));
+                     .Tooltip("Hide the regular HUD rupee icon and digits outside shops. "
+                              "Your balance still appears while shopping."));
     AddWidget(path, "Pickup Counter Size: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gEnhancements.PickupCounterScale")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.PickupCounter", 0); })
         .Options(FloatSliderOptions().Min(0.65f).Max(1.5f).DefaultValue(1.0f).Format("%.2fx"));
+    AddWidget(path, "Gibdo Request Icons", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Graphics.GibdoRequestIcons")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Show the requested item and quantity above nearby Gibdos in Beneath the Well before talking to them."));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
 #ifdef COMBO_BUILD
     AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
@@ -1641,21 +1648,12 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
-    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
-                                  path.sidebarName.c_str(), { CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR },
-                                  ImVec2(420, 220),
-#ifdef COMBO_BUILD
-                                  Combo_MmIsForeground
-#else
-                                  []() { return true; }
-#endif
-    );
     AddWidget(path, "Popout Spin Attack", WIDGET_WINDOW_BUTTON)
         .CVar("gWindows.SpinAttackMM")
         .WindowName("Spin Attack##MM")
         .HideInSearch(true)
         .Options(std::make_shared<WindowButtonOptions>(WindowButtonOptions().EmbedWindow(false).Tooltip(
-            "Keep the spin style and elemental effect controls open while playing.")));
+            "Keep spin attack settings and colors open while playing.")));
     AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
         .CVar(CW_SPIN_STYLE_CVAR)
         .Options(ComboboxOptions()
@@ -1669,6 +1667,30 @@ void BenMenu::AddEnhancements() {
             "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
             "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
             "Turning this off changes appearance only. Native magic costs are unchanged."));
+    std::set<std::string> spinControls{ CW_SPIN_STYLE_CVAR, CW_SPIN_ELEMENT_EFFECTS_CVAR };
+    static const char* const spinCosmetics[] = { "Effects.SpinSlashCharge", "Effects.SpinSlashBurst",
+                                                 "Effects.GreatSpinCharge", "Effects.GreatSpinBurst" };
+    for (const char* id : spinCosmetics) {
+        auto& option = cosmeticOptions.at(id);
+        spinControls.insert(option.valuesCvar);
+        AddWidget(path, option.label, WIDGET_CUSTOM).CVar(option.valuesCvar).CustomFunction([](WidgetInfo& widget) {
+            for (const char* id : spinCosmetics) {
+                auto& option = cosmeticOptions.at(id);
+                if (widget.cVar == option.valuesCvar) {
+                    CosmeticEditorDrawRow(option, true);
+                    return;
+                }
+            }
+        });
+    }
+    ComboMenuPopout::EnsureWindow(mBenMenu, "Spin Attack##MM", "gWindows.SpinAttackMM", path.sectionName.c_str(),
+                                  path.sidebarName.c_str(), std::move(spinControls), ImVec2(420, 410),
+#ifdef COMBO_BUILD
+                                  Combo_MmIsForeground
+#else
+                                  []() { return true; }
+#endif
+    );
     AddWidget(path, "Item Get Light Shaft", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.ItemGetLightShaft")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
@@ -1726,18 +1748,14 @@ void BenMenu::AddEnhancements() {
             "overcast sky faces; takes effect after changing scenes. MM moon is unchanged."));
     AddWidget(path, "Zelda Run", WIDGET_CVAR_CHECKBOX)
         .CVar(ZELDA_RUN_CVAR)
-        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Use the latest POC7 Zelda-style empty-handed run. Requires the optional animation pack. "
-            "Independent of seasonal outfits; walking and weapon-running animations stay unchanged."));
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip("Use the built-in Zelda-style empty-handed run."));
     AddWidget(path, "Zelda Run Ages", WIDGET_CVAR_COMBOBOX)
         .CVar(ZELDA_RUN_AGES_CVAR)
         .PreFunc([](WidgetInfo& info) { info.options->disabled = !CVarGetInteger(ZELDA_RUN_CVAR, 0); })
-        .Options(
-            ComboboxOptions()
-                .DefaultIndex(ZELDA_RUN_BOTH)
-                .ComboMap(&zeldaRunAgeOptions)
-                .Tooltip(
-                    "Choose which Link ages use the optional run. Transformation forms keep their own animations."));
+        .Options(ComboboxOptions()
+                     .DefaultIndex(ZELDA_RUN_BOTH)
+                     .ComboMap(&zeldaRunAgeOptions)
+                     .Tooltip("Choose which Link ages use Zelda Run. Transformation forms keep their own animations."));
     AddWidget(path, "Seasonal Player Outfits", WIDGET_CVAR_CHECKBOX)
         .CVar(SEASONAL_OUTFITS_CVAR)
         .Options(CheckboxOptions().DefaultValue(false).Tooltip("Automatically use outfits for the current season. Off "
@@ -2065,7 +2083,8 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "Skip Item Get Cutscene", WIDGET_CVAR_COMBOBOX)
         .CVar("gEnhancements.Cutscenes.SkipGetItemCutscenes")
         .Options(ComboboxOptions()
-                     .Tooltip("Note: This only works in Randomizer currently.")
+                     .Tooltip("Choose which randomizer pickups skip their get-item cutscenes. "
+                              "The two starting checks always appear overhead and let you keep moving.")
                      .ComboVec(&skipGetItemCutscenesOptions));
 
     // Dialogue Enhancements
@@ -2522,7 +2541,7 @@ void BenMenu::AddEnhancements() {
                 .DefaultIndex(DekuGuardSearchBallsOptions::DEKU_GUARD_SEARCH_BALLS_NIGHT_ONLY)
                 .ComboVec(&dekuGuardSearchBallsOptions));
     AddWidget(path, "Gibdo Trade Sequence Options", WIDGET_CVAR_COMBOBOX)
-        .CVar("gEnhancements.DifficultyOptions.GibdoTradeSequence")
+        .CVar(GIBDO_TRADE_SEQUENCE_CVAR)
         .Options(
             ComboboxOptions()
                 .Tooltip("Changes the way the Gibdo Trade Sequence works:\n"
@@ -3373,6 +3392,11 @@ void BenMenu::AddNEI() {
     // ===================== Tab: Custom Items =====================
     WidgetPath itemsPath = { "Skijer's NEI", "Custom Items", SECTION_COLUMN_1 };
     AddWidget(itemsPath, "Custom Items", WIDGET_SEPARATOR_TEXT);
+    AddWidget(itemsPath, "NEI item shimmer", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.SkijerNEI.ItemEffects")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Adds glints to supported NEI pickups, shop displays and shuffled world items. "
+            "Each progressive wallet tier uses its own tint."));
     AddWidget(itemsPath, "Custom Items Page", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.CustomItems.Enabled")
         .Options(CheckboxOptions()
@@ -3647,7 +3671,8 @@ void BenMenu::AddNEI() {
             "Form selector (Link / Mario / Pikachu) on the equipment page's transform sub-page (L cycles).\n"
             "Mario needs the Mario Mask and Pikachu needs the Pokeball; both are randomizer items\n"
             "(see 'Include Mario Mask' / 'Include Pikachu Pokeball' in the rando item pool).\n"
-            "Pikachu has no transformation in 2Ship yet — the form selects but Link does not change."));
+            "Pikachu replaces human Link's model and keeps MM controls. Install pikachu_anims.bin "
+            "in nei/ for movement animations."));
 
     // Quick transform. The pad button is read straight from SDL (CrossoverHotkey_Tick in
     // BenPort.cpp) because Back/Select has no N64 button to map it onto.

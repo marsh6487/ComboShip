@@ -5,6 +5,7 @@
 #include "mods/combo_rpg.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "Rando/MiscBehavior/MiscBehavior.h"
+#include "Rando/Wallets.h"
 #include "2s2h/BenPort.h"
 static MtxF csmcMatrixStack[20];
 MtxF* sCurrentMatrix=csmcMatrixStack;

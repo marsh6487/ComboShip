@@ -42,6 +42,7 @@
 #include "ship/utils/Utils.h"
 #include "ship/Context.h"
 #include "ship/config/ConsoleVariable.h"
+#include "libultraship/bridge/resourcebridge.h"
 
 #include "libultraship/libultra/os.h"
 
@@ -188,6 +189,7 @@ void Interpreter::Flush() {
             mRenderCost.MutableReport().submittedTriangles += mBufVboNumTris;
         }
         mRapi->SetCurrentPrimDepth((float)mRdp->prim_depth / N64_PRIM_DEPTH_MAX);
+        mRapi->SetCurrentModelOpacity(CurrentModelOpacity());
         // SOH [Enhancement] Push the dominant toon light for this batch. The backend only consumes it
         // when the bound shader is a toon variant, so it is a no-op for ordinary draws.
         mRapi->SetToonLighting(mRsp->toon_light_dir, mRsp->toon_light_color, mRsp->toon_ambient);
@@ -2341,6 +2343,8 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
     // original path; only the enabled specialization reads/writes cached state.
     ColorCombiner* comb;
     bool use_alpha, use_blend_color, use_fog, use_grayscale, use_toon;
+    const bool useModelOpacity = !mModelOpacity.empty() && !is_rect && mShaderStack.empty() &&
+                                 mModelOpacity.back() < 1.0f;
     uint32_t tm = 0;
     uint32_t tex_width[2]{}, tex_height[2]{}, tex_width2[2]{}, tex_height2[2]{}, effective_tile[2];
     uint8_t numInputs;
@@ -2371,7 +2375,7 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         bool zbuffer_enabled = (mRsp->geometry_mode & G_ZBUFFER) == G_ZBUFFER;
         bool prim_depth_enabled = (mRdp->other_mode_l & G_ZS_PRIM) != 0;
         bool depth_test = (zbuffer_enabled || prim_depth_enabled) && (mRdp->other_mode_l & Z_CMP) == Z_CMP;
-        bool depth_mask = (mRdp->other_mode_l & Z_UPD) == Z_UPD;
+        bool depth_mask = !useModelOpacity && (mRdp->other_mode_l & Z_UPD) == Z_UPD;
         uint8_t depth_test_and_mask = (depth_test ? 1 : 0) | (depth_mask ? 2 : 0);
         if (depth_test_and_mask != mRenderingState.depth_test_and_mask) {
             Flush();
@@ -2458,6 +2462,9 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
 
         if (use_toon) {
             cc_options |= SHADER_OPT(TOON);
+        }
+        if (useModelOpacity) {
+            cc_options |= SHADER_OPT(MODEL_OPACITY);
         }
         cc_options |= ShaderIdMask(mShaderStack.empty() ? -1 : static_cast<int16_t>(mShaderStack.top()));
 
@@ -2626,10 +2633,11 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
             mRapi->LoadShader(prg);
             mRenderingState.mShaderProgram = prg;
         }
-        if (use_alpha != mRenderingState.alpha_blend) {
+        const bool blend = use_alpha || useModelOpacity;
+        if (blend != mRenderingState.alpha_blend) {
             Flush();
-            mRapi->SetUseAlpha(use_alpha);
-            mRenderingState.alpha_blend = use_alpha;
+            mRapi->SetUseAlpha(blend);
+            mRenderingState.alpha_blend = blend;
         }
 
         mRapi->ShaderGetInfo(prg, &numInputs, usedTextures);
@@ -4331,6 +4339,18 @@ void Interpreter::GfxDpFillRectangle(int32_t ulx, int32_t uly, int32_t lrx, int3
     }
     uint32_t mode = (mRdp->other_mode_h & (3U << G_MDSFT_CYCLETYPE));
 
+    // A full transparent-black fill of a separate render target (such as the
+    // equipment preview) must write alpha zero. The opaque fill shader emits
+    // alpha one, so clear the target directly and keep the current depth.
+    if (mode == G_CYC_FILL && mFbActive && mActiveFrameBuffer != mFrameBuffers.end() && mRdp->fill_color.r == 0 &&
+        mRdp->fill_color.g == 0 && mRdp->fill_color.b == 0 && mRdp->fill_color.a == 0 && ulx == 0 && uly == 0 &&
+        lrx == (static_cast<int32_t>(mActiveFrameBuffer->second.orig_width) - 1) * 4 &&
+        lry == (static_cast<int32_t>(mActiveFrameBuffer->second.orig_height) - 1) * 4) {
+        Flush();
+        mRapi->ClearFramebuffer(true, false, 0.0f);
+        return;
+    }
+
     // Expand fullscreen fill rects to cover widescreen viewports.
     // Without this, screen clears and fades only cover the native 4:3 area.
     if (ulx == 0 && uly == 0) {
@@ -5239,6 +5259,23 @@ bool gfx_combo_rm_pop_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
     return false;
 }
 
+bool gfx_model_opacity_push_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
+    gfx->Flush();
+    gfx->mTriangleState.valid = false;
+    const float factor = ((*cmd0)->words.w1 & 255) / 255.0f;
+    gfx->mModelOpacity.push_back(gfx->CurrentModelOpacity() * factor);
+    return false;
+}
+
+bool gfx_model_opacity_pop_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
+    if (!gfx->mModelOpacity.empty()) {
+        gfx->Flush();
+        gfx->mTriangleState.valid = false;
+        gfx->mModelOpacity.pop_back();
+    }
+    return false;
+}
+
 // TODO handle special OTR opcodes later...
 bool gfx_branch_z_otr_handler_f3dex2(Interpreter* gfx, F3DGfx** cmd0) {
     // Push return address
@@ -5446,6 +5483,10 @@ static bool IsValidResolvedAddress(uintptr_t addr) {
 // Resolve the same owner marker as the DL handler, scoped to this lookup so later host icons
 // keep using their own RM. A missing/invalid owner must never borrow a same-named host texture.
 static std::shared_ptr<Fast::Texture> ComboLoadTextureResource(const char* fileName) {
+    constexpr std::string_view pausePageRoute = "__OTR__@pause-page:";
+    if (std::string_view(fileName).starts_with(pausePageRoute)) {
+        return std::dynamic_pointer_cast<Fast::Texture>(ResourceLoadPausePageTile(fileName));
+    }
     auto rm = ActiveResMgr();
     static constexpr char kOtrPrefix[] = "__OTR__";
     if (strncmp(fileName, kOtrPrefix, sizeof(kOtrPrefix) - 1) == 0 && fileName[sizeof(kOtrPrefix) - 1] == '@') {
@@ -6406,6 +6447,8 @@ static constexpr UcodeHandler otrHandlers = {
     { OTR_G_COMBO_RM_PUSH,
       { "G_COMBO_RM_PUSH", gfx_combo_rm_push_handler_custom } },                // G_COMBO_RM_PUSH (0x2a)
     { OTR_G_COMBO_RM_POP, { "G_COMBO_RM_POP", gfx_combo_rm_pop_handler_custom } }, // G_COMBO_RM_POP (0x2b)
+    { OTR_G_MODEL_OPACITY_PUSH, { "G_MODEL_OPACITY_PUSH", gfx_model_opacity_push_handler_custom } },
+    { OTR_G_MODEL_OPACITY_POP, { "G_MODEL_OPACITY_POP", gfx_model_opacity_pop_handler_custom } },
     { OTR_G_DL_OTR_HASH, { "G_DL_OTR_HASH", gfx_dl_otr_hash_handler_custom } }, // G_DL_OTR_HASH (0x31)
     { OTR_G_VTX_OTR_HASH, { "G_VTX_OTR_HASH", gfx_vtx_hash_handler_custom } },  // G_VTX_OTR_HASH (0x32)
     { OTR_G_MARKER, { "G_MARKER", gfx_marker_handler_otr } },                   // G_MARKER (0X33)
@@ -6649,6 +6692,7 @@ void Interpreter::SpReset() {
     mTriangleState.valid = false;
     mIndexedVertexMask = 0;
     mTriangleStateReuseAllowed = false;
+    mModelOpacity.clear();
     mRdp->toon = false;
     mRdp->toon_shadow = false;
     mRsp->toon_key_valid = false;
@@ -7209,6 +7253,7 @@ void gfx_cc_get_features(uint64_t shader_id0, uint64_t shader_id1, struct CCFeat
     cc_features->opt_grayscale = (shader_id1 & SHADER_OPT(GRAYSCALE)) != 0;
     cc_features->opt_prim_depth = (shader_id1 & SHADER_OPT(PRIM_DEPTH)) != 0;
     cc_features->opt_toon = (shader_id1 & SHADER_OPT(TOON)) != 0; // SOH [Enhancement] toon lighting
+    cc_features->opt_model_opacity = (shader_id1 & SHADER_OPT(MODEL_OPACITY)) != 0;
 
     cc_features->clamp[0][0] = shader_id1 & SHADER_OPT(TEXEL0_CLAMP_S);
     cc_features->clamp[0][1] = shader_id1 & SHADER_OPT(TEXEL0_CLAMP_T);

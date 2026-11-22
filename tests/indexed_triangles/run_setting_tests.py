@@ -21,6 +21,7 @@ def run(sanitize):
     start=source.index('void Interpreter::Run(Gfx* commands,')
     run_prefix=source[source.index('{',start)+1:source.index('const bool sampled = ',start)]
     setter=block(header,'    void SetIndexedTrianglesEnabled(')
+    opacity=block(header,'    float CurrentModelOpacity() const')
     flush=block(source,'void Interpreter::Flush()')
     fixture=r'''
 #include <algorithm>
@@ -55,8 +56,10 @@ struct RenderOperationScope {RenderOperationScope(Probe*,RenderCostOperation){}}
 constexpr float N64_PRIM_DEPTH_MAX=32767.0f;
 struct Backend {
  bool supported=true;int draws=0,indexedDraws=0;
+ float opacity=1.0f;
  bool SupportsIndexedTriangles(){return supported;}
  void SetCurrentPrimDepth(float){}
+ void SetCurrentModelOpacity(float value){opacity=value;}
  void SetToonLighting(float*,float*,float*){}
  void DrawTriangles(float*,size_t,size_t){++draws;}
  void DrawIndexedTriangles(float*,size_t,const uint16_t*,size_t,size_t){++indexedDraws;}
@@ -73,6 +76,8 @@ struct Interpreter {
  bool mBufUsesIndices=false,mBufIndexable=false;
  bool mPreludeMaterialBindingReuseEnabled=false;
  const void* mPreludeMaterialBoundResources[2]{};
+ std::vector<float> mModelOpacity;
+ /* OPACITY */
  void Flush();
  /* SETTER */
  void BeginRun(){/* RUN */}
@@ -143,13 +148,17 @@ int main(int argc,char** argv) {
  gfx.Pending(false);vars.saved["gEnhancements.IndexedTriangles"]=1;gfx.BeginRun();
  assert(gfx.mIndexedTrianglesEnabled && gfx.backend.draws==1 && gfx.mBufVboLen==0);
  gfx.Pending(true);gfx.BeginRun();assert(gfx.mBufVboLen==12 && gfx.backend.indexedDraws==0);
+ gfx.mModelOpacity.push_back(0.5f);
  vars.saved["gEnhancements.IndexedTriangles"]=0;gfx.BeginRun();
  assert(!gfx.mIndexedTrianglesEnabled && gfx.backend.indexedDraws==1 && gfx.mBufVboLen==0);
+ assert(gfx.backend.opacity==0.5f);
  assert(gfx.mIndexedVertexMask==0 && gfx.mTriangleState.packedVertexMask==0);
  vars.saved["gEnhancements.IndexedTriangles"]=1;gfx.BeginRun();assert(gfx.mIndexedTrianglesEnabled);
  assert(vars.saved.at("gEnhancements.IndexedTriangles")==1 && "explicit opt-in preference was overwritten");
+ gfx.mModelOpacity.clear();
  vars.saved.erase("gEnhancements.IndexedTriangles");gfx.Pending(true);gfx.BeginRun();
  assert(!gfx.mIndexedTrianglesEnabled && gfx.backend.indexedDraws==2);
+ assert(gfx.backend.opacity==1.0f);
  Fast::Interpreter unsupported;unsupported.backend.supported=false;unsupported.Pending(false);
  vars.saved["gEnhancements.IndexedTriangles"]=1;unsupported.BeginRun();
  assert(!unsupported.mIndexedTrianglesEnabled && unsupported.backend.indexedDraws==0 && unsupported.mBufVboLen==12);
@@ -183,6 +192,7 @@ int main(int argc,char** argv) {
         text=(ROOT/path).read_text()
         native.append('namespace '+namespace+' {\nbool Checkbox(const char* label,bool* value,const CheckboxOptions&){return ImGui::Checkbox(label,value);}\n'+block(text,'bool CVarCheckbox(')+'\n}\n')
     fixture=fixture.replace('/* SETTER */',setter).replace('/* RUN */',run_prefix).replace('/* FLUSH */',flush)
+    fixture=fixture.replace('/* OPACITY */',opacity)
     fixture=fixture.replace('/* OOT */',menus[0]).replace('/* MM */',menus[1])
     fixture=fixture.replace('/* CVAR_BRIDGE */',cvars).replace('/* NATIVE_CHECKBOXES */','\n'.join(native)).replace('/* SHARED_CHECKBOX */',shared)
     with tempfile.TemporaryDirectory(prefix='indexed-setting-') as td:

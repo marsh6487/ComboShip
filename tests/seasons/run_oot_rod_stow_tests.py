@@ -25,7 +25,6 @@ fixture = fixture.replace('#include "mods/items/custom_items_stow.c"', r'''
 #include "mods/extended_inventory.h"
 #include "mods/extended_equipment.h"
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
-PlayState* gPlayState = &play;
 u32 gUpgradeMasks[8]; u8 gUpgradeShifts[8];
 static s16 sFloorType;
 static f32 D_80854784[] = {120,240,360};

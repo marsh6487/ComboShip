@@ -4,6 +4,7 @@
 #include "variables.h"
 #include "macros.h"
 #include "mods/items/helpers/equip_helper.h"
+#include "gameplay/OcarinaItemInput.h"
 #include "mods/items/helpers/fx_helper.h"
 #include "mods/extended_inventory.h"
 #include "mods/extended_player.h"

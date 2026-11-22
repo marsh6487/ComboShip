@@ -20,6 +20,7 @@ typedef struct MagicFire {
     u8 nativeActive;
     u8 nativePendingTicks;
     u8 nativeLightAttempted;
+    f32 nativeSpreadScale;
     LightInfo nativeLightInfo;
     LightNode* nativeLightNode;
     uint32_t nativeAudioHandle;

@@ -35,6 +35,8 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-skin-') as td:
                             native_body('mm/src/code/graph.c', 'void Graph_CloseDisps(') + '\n' +
                             native_body('mm/src/code/z_rcp.c', 'void Gfx_SetupDL25_Opa(') + '\n')
     options = ['-DMM_WOLF_SKIN_OPTIONS'] if 'preserveRootMotion' in (ROOT/'mm/expansions/ssbb/ssbb_skin.h').read_text() else []
+    if 'drawBindPose' in (ROOT/'mm/expansions/ssbb/ssbb_skin.h').read_text():
+        options.append('-DMM_PIKACHU_BIND_POSE_OPTION')
     objects = []
     for i, source in enumerate(['mm/expansions/ssbb/ssbb_skin.c', 'mm/src/code/z_skin_matrix.c',
                               'mm/expansions/ssbb/characters/pikachu_ssbb_skin.c',

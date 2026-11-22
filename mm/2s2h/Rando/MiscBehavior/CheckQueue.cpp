@@ -11,6 +11,10 @@
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
+#include "2s2h/BenPort.h"
+#include "ComboExport.h"
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include "rando/CrossForeign.h"           // ComboShip: cross-world foreign-item marker map
 #include "2s2h/SaveManager/SaveManager.h" // ComboShip: persist delivered cross items into the MM save
 // ComboShip: Anchor shared-progression co-op — broadcast a locally-obtained check to teammates.
@@ -147,6 +151,77 @@ extern "C" void Rando_CancelMagicMirrorStump(void) {
 }
 #endif
 
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT const char* MM_DrainBossWarpReward(int slot, bool (*grantPeer)(int, const char*)) {
+    if (!Combo_IsCombinedGame() || !IS_RANDO || slot < 0 || slot > 2 || gSaveContext.fileNum != slot)
+        return nullptr;
+
+    constexpr RandoCheckId bosses[] = {
+        RC_WOODFALL_TEMPLE_BOSS_WARP,
+        RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+        RC_GREAT_BAY_TEMPLE_BOSS_WARP,
+        RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP,
+    };
+    for (const auto rc : bosses) {
+        auto& check = RANDO_SAVE_CHECKS[rc];
+        if (!check.eligible || check.cycleObtained || check.randoItemId == RI_NONE)
+            continue;
+        if (!grantPeer)
+            return "";
+
+        static std::string result;
+        const auto placed = check.randoItemId;
+        const bool acquired = check.obtained;
+        if (placed == RI_COMBO_FOREIGN) {
+            const auto* foreign = Rando::MiscBehavior::MM_LookupForeign(rc);
+            if (!foreign)
+                continue;
+            if (foreign->trap) {
+                gSaveContext.save.shipSaveInfo.rando.pendingTrapCount++;
+                result = "Trap";
+            } else {
+                if (!acquired) {
+                    Rando::LatchComboForeign(rc);
+                    result = ComboRando::ShownForeignName(*foreign, Rando::ComboForeignLatchedName(rc));
+                    if (!grantPeer(foreign->itemGame, foreign->itemName.c_str()))
+                        continue;
+                }
+            }
+            if (!acquired)
+                MMAnchor_BroadcastCrossItem(foreign->itemGame, foreign->itemName.c_str(),
+                                            Rando::StaticData::GetCheckDisplayName(rc).c_str());
+        } else {
+            const Ship::ResourceManagerScope scope(Ship::CrossRMRegistry::Get("mm"));
+            auto item = Rando::ConvertItem(placed, rc);
+            if (item == RI_JUNK)
+                item = Rando::CurrentJunkItem(rc);
+            if (!Rando::StaticData::Items.contains(item))
+                continue;
+            result = Rando::StaticData::GetItemName(item, false, rc);
+            struct DormantScope {
+                bool previous = Rando::gComboDormantGive;
+                DormantScope() {
+                    Rando::gComboDormantGive = true;
+                }
+                ~DormantScope() {
+                    Rando::gComboDormantGive = previous;
+                }
+            } dormant;
+            Rando::GiveItem(item, rc);
+            Combo_MM_FlushAccumulators();
+        }
+        check.obtained = true;
+        check.cycleObtained = true;
+        check.eligible = false;
+        Rando::MiscBehavior::BroadcastCheckObtainedIfFirst(rc, placed, acquired);
+        SaveManager_SaveCurrentForCombo();
+        // Native MM repeats a cycle check without paying its cross-world reward a second time.
+        return placed == RI_COMBO_FOREIGN && acquired ? "" : result.c_str();
+    }
+    return nullptr;
+}
+#endif
+
 // This function handles queuing up item gives that the player has been marked as eligible for. If you are looking for
 // the behavior of the actual giving itself, the heavy lifting is done by the GameInteractor queue. This function is
 // currently called every frame, and loops through the entire list of checks, this works for now but as the check list
@@ -165,22 +240,43 @@ void Rando::MiscBehavior::CheckQueue() {
         auto randoSaveCheck = RANDO_SAVE_CHECKS[randoCheckId];
 
         if (randoSaveCheck.eligible) {
+#ifdef COMBO_BUILD
+            if (Combo_IsCombinedGame() && randoStaticCheck.randoCheckType == RCTYPE_REMAINS &&
+                gPlayState->sceneId == randoStaticCheck.sceneId)
+                continue;
+#endif
             queued = true;
             queuedCheck = randoCheckId;
 
-            GameInteractor::Instance->events.emplace_back(GIEventGiveItem{
-                .showGetItemCutscene =
+            // Starting checks arrive overhead as soon as gameplay permits, so
+            // they never take movement back from the player for an item receipt.
+            const bool showGetItemCutscene =
+                !IsStartingRewardCheck(randoCheckId) &&
+                (
 #ifdef COMBO_BUILD
-                    // Foreign checks decide by the foreign item's home-game importance.
-                (randoSaveCheck.randoItemId == RI_COMBO_FOREIGN)
-                    ? Rando::MiscBehavior::ShouldShowForeignCutscene(randoCheckId)
-                    :
+                    randoSaveCheck.randoItemId == RI_COMBO_FOREIGN
+                        ? ShouldShowForeignCutscene(randoCheckId)
+                        :
 #endif
-                    Rando::StaticData::ShouldShowGetItemCutscene(ConvertItem(randoSaveCheck.randoItemId, randoCheckId)),
+                        StaticData::ShouldShowGetItemCutscene(ConvertItem(randoSaveCheck.randoItemId, randoCheckId)));
+
+            GameInteractor::Instance->events.emplace_back(GIEventGiveItem{
+                .showGetItemCutscene = showGetItemCutscene,
                 .param = (int16_t)randoCheckId,
                 .giveItem =
                     [](Actor* actor, PlayState* play) {
                         auto& randoSaveCheck = RANDO_SAVE_CHECKS[CUSTOM_ITEM_PARAM];
+                        const bool startingReward = Rando::IsStartingRewardCheck((RandoCheckId)CUSTOM_ITEM_PARAM);
+#ifdef COMBO_BUILD
+                        if (Combo_IsCombinedGame() &&
+                            Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM)).randoCheckType ==
+                                RCTYPE_REMAINS &&
+                            !randoSaveCheck.eligible) {
+                            queued = false;
+                            queuedCheck = RC_UNKNOWN;
+                            return;
+                        }
+#endif
 #ifdef COMBO_BUILD
                         if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP &&
                             !MagicMirror_CommitStumpRewardToken()) {
@@ -235,12 +331,14 @@ void Rando::MiscBehavior::CheckQueue() {
                             Rando::AppendReceiptSource(entry, BankRewardSourceSuffix(cid));
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                                 CustomMessage::SetActiveCustomMessage(entry.msg, entry);
-                            } else if (entry.capeVisibilityChoice ||
-                                       Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
+                            } else if (!startingReward && (entry.capeVisibilityChoice ||
+                                                           Rando::MiscBehavior::ShouldShowForeignCutscene(cid))) {
                                 CustomMessage::StartTextbox(entry.autoFormat && !entry.capeVisibilityChoice
                                                                 ? entry.msg + "\x1C\x02\x10"
                                                                 : entry.msg,
                                                             entry);
+                            } else if (startingReward && foreignTrap) {
+                                Notification::Emit({ .message = CustomMessage::RemoveColorCodes(entry.msg) });
                             }
                             randoSaveCheck.cycleObtained = true;
                             randoSaveCheck.obtained = true;
@@ -300,7 +398,8 @@ void Rando::MiscBehavior::CheckQueue() {
                             message = GetTrapMessage();
                             // We need to remove the Color Codes if the player is skipping Item Get Cutscenes as the
                             // Notification Emit doesnt support it.
-                            if (CVarGetInteger("gEnhancements.Cutscenes.SkipGetItemCutscenes", 0) >= 2) {
+                            if (startingReward ||
+                                CVarGetInteger("gEnhancements.Cutscenes.SkipGetItemCutscenes", 0) >= 2) {
                                 message = CustomMessage::RemoveColorCodes(message);
                             }
                         }
@@ -318,15 +417,15 @@ void Rando::MiscBehavior::CheckQueue() {
                         bool overheadReceiptOpened = false;
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
-                        } else if (entry.capeVisibilityChoice ||
-                                   Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
+                        } else if (!startingReward && (entry.capeVisibilityChoice ||
+                                                       Rando::StaticData::ShouldShowGetItemCutscene(randoItemId))) {
                             CustomMessage::StartTextbox(entry.autoFormat && !entry.capeVisibilityChoice
                                                             ? entry.msg + "\x1C\x02\x10"
                                                             : entry.msg,
                                                         entry);
                             overheadReceiptOpened = true;
                         } else {
-                            if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
+                            if (startingReward || Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
                                 Notification::Emit({
                                     .itemIcon = Rando::StaticData::GetIconTexturePath(randoItemId),
                                     .message = prefix,
@@ -359,7 +458,10 @@ void Rando::MiscBehavior::CheckQueue() {
                                                                            randoSaveCheck.randoItemId, wasObtained);
 #endif
 #ifdef COMBO_BUILD
-                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP)
+                        if (CUSTOM_ITEM_PARAM == RC_LOST_WOODS_MAGIC_MIRROR_STUMP ||
+                            (Combo_IsCombinedGame() &&
+                             Rando::StaticData::Checks.at(static_cast<RandoCheckId>(CUSTOM_ITEM_PARAM))
+                                     .randoCheckType == RCTYPE_REMAINS))
                             SaveManager_SaveCurrentForCombo();
 #endif
                         CUSTOM_ITEM_PARAM = randoItemId;

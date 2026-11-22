@@ -403,6 +403,7 @@ static void checkNativePaletteSemantics(void) {
                     continue;
                 REQUIRE(sampleCount < ARRAY_COUNT(sampled));
                 sampled[sampleCount++] = texture;
+                const uint32_t defaultTint = strstr(texture, "/ribbon") ? 0xFFE6CC : 0xFFFFFF;
                 for (int pixel = 0; pixel < 4; ++pixel) {
                     float texel[4], result[4];
                     nativeTexel(texture, .15f + pixel * .20f, .35f + pixel * .10f, texel);
@@ -412,7 +413,8 @@ static void checkNativePaletteSemantics(void) {
                     for (int channel = 0; channel < 3; ++channel) {
                         float p = ((primary >> (16 - 8 * channel)) & 255) / 255.0f;
                         float s = ((secondary >> (16 - 8 * channel)) & 255) / 255.0f;
-                        float expected = palette ? s + (p - s) * brightness : texel[channel];
+                        float tint = ((defaultTint >> (16 - 8 * channel)) & 255) / 255.0f;
+                        float expected = palette ? s + (p - s) * brightness : texel[channel] * tint;
                         if (fabsf(result[channel] - expected) >= .00001f)
                             fprintf(
                                 stderr,
@@ -429,8 +431,8 @@ static void checkNativePaletteSemantics(void) {
             REQUIRE(sampleCount == (tick < CW_DINS_BURN_FIRST_FRAME ? 4 : 7));
         }
     }
-    puts("PASS native palette pixels: actual RGBA samples and packed GBI preserve default RGB, map both colors, retain "
-         "alpha and geometry");
+    puts("PASS native palette pixels: actual RGBA samples and packed GBI apply the default ribbon tint, map both "
+         "colors, retain alpha and geometry");
 }
 
 static void checkNativePaletteResources(void) {

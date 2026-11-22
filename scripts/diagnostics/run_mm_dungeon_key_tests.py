@@ -41,6 +41,7 @@ master_case = owner_sword[owner_sword.index('        case RG_TRUE_MASTER_SWORD:'
 # RandoItemId and leaving the producer's header dependencies behind.
 item_enum = '''#include "mm/2s2h/Rando/Types.h"
 #include "mm/2s2h/Rando/SoulShuffle.h"
+#include "mm/2s2h/Rando/WalletGi.h"
 #include "mm/assets/objects/object_gi_sutaru/object_gi_sutaru.h"
 #include "mm/assets/objects/gameplay_keep/gameplay_keep.h"
 constexpr RandoItemId RI_TEST_SWORD = static_cast<RandoItemId>(RI_MAX + 1);
@@ -57,7 +58,8 @@ parts = {
     'OWNER_MASTER_CASE': master_case,
     'PRODUCER': clock_descriptor(ROOT) + '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',
                                                    'MM_FillImportedSwordFallback', 'MM_FillCaneDrawInfo', 'MM_IsSwordAppearanceDependent',
-                                                   'MM_FillElementalSpellDrawInfo', 'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
+                                                   'MM_FillElementalSpellDrawInfo', 'MM_FillWalletShimmer',
+                                                   'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),
 }

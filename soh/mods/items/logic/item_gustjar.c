@@ -17,6 +17,7 @@
 #include "../custom_items.h"
 #include "../helpers/camera_helper.h"
 #include "../helpers/equip_helper.h"
+#include "../../../../combo/gameplay/OcarinaItemInput.h"
 #include "../helpers/fx_helper.h"
 #include "../objects/object_tornado.h" // shared wind cone + spiral ribbons
 #include "macros.h"
@@ -739,7 +740,7 @@ void Handle_GustJar(Player* this, PlayState* play) {
         static const u16 sGjUnequipButtons = BTN_A | BTN_B | BTN_START | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP |
                                              BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
         u16 mask = sGjUnequipButtons & ~input.equippedButton;
-        if (play->state.input[0].press.button & mask) {
+        if (OcarinaItemInput_FilterDpad(play, play->state.input[0].press.button) & mask) {
             GustJar_Unequip(play, this);
             return;
         }

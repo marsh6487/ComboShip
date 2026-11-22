@@ -3,16 +3,22 @@
 #include "rando/SoloEntranceMmRuntime.h"
 #include "ComboGameMode.h"
 #include "rando/CrossEntranceMmGrottos.inc.h"
+#include "mm/2s2h/Rando/EntranceTrackerDiscovery.h"
 extern "C" int Combo_MM_GiantsEscape(int32_t* entrance, int32_t* cutscene, int consume);
 namespace ComboCrossMmRuntime {
 using namespace ComboRando::CrossDungeon;
 static RuntimeState state(1);
 static std::optional<RuntimeState::Transition> pending;
+static uint64_t trackerRevision = 0;
 static bool departureFadeComplete = false;
 static std::optional<Endpoint> pendingBossRecovery;
 static bool bossDeathRecoveryRequested = false;
 static CheckpointState checkpoint;
 static int32_t localDungeonArrival = -1;
+static void DiscoverEntrance(int32_t source) {
+    if (IS_RANDO)
+        Rando::EntranceTracker::Discover(gSaveContext.save.shipSaveInfo.rando, source);
+}
 static bool ValidEntrance(int32_t index) {
     if (index < 0 || index > 0xFFFF)
         return false;
@@ -87,6 +93,7 @@ static bool PrepareSwitch() {
     const int32_t nativeCheckpoint = ComboMmMaterializeGrotto(transition.checkpoint.index);
     gSaveContext.save.entrance = nativeCheckpoint;
     gSaveContext.save.shipSaveInfo.pauseSaveEntrance = nativeCheckpoint;
+    DiscoverEntrance(transition.source);
     checkpoint.SetSource(transition.checkpoint.index);
     SPDLOG_INFO("[CrossDungeon] MM -> OoT entrance {:#x}; source checkpoint {:#x}", transition.to.index,
                 transition.checkpoint.index);
@@ -127,6 +134,7 @@ extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
                 throw std::invalid_argument("unknown MM boss source recovery entrance");
         }
     ComboCrossMmRuntime::state.Install(seed);
+    ++ComboCrossMmRuntime::trackerRevision;
     SPDLOG_INFO("[EntranceTrace] mm-runtime-install routes={} checkpoint={:#x}", routes.size(),
                 ComboCrossMmRuntime::checkpoint.Saved());
     Combo_MM_CancelCrossDungeonTransition();
@@ -279,6 +287,7 @@ extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
         gSaveContext.save.cutsceneIndex = 0;
     }
     if (transition->to.game == 1) {
+        DiscoverEntrance(transition->source);
         localDungeonArrival = transition->arrivalCheckpoint && transition->arrivalCheckpoint->game == 1
                                   ? transition->arrivalCheckpoint->index
                                   : state.RecoveryForArrival(transition->to.index);

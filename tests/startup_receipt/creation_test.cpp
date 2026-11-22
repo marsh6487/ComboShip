@@ -1,6 +1,7 @@
 // Integrate the real launcher BEGIN, foreign loader, OoT capture and Letter
 // save seam, with native save/item types and boundary doubles for catalogs,
 // grants, native serialization and hook registration.
+#include "combo/rando/BossWarpRewardSave.h"
 #include "combo/vanilla/ComboVanillaFile.h"
 #include "combo/vanilla/ComboVanillaRewards.h"
 #include "combo/rando/StartupCheckReceiptState.h"
@@ -26,6 +27,7 @@ static std::mutex g_containerMutex;
 static std::map<int, json> g_containerCache;
 static std::map<int, ComboVanilla::Creation> g_vanillaCreations;
 static std::map<int, ComboVanilla::Receipt> g_vanillaReceipts;
+static std::map<int, ComboRando::BossWarpRewardSave> g_bossWarpRewardWrites;
 static std::map<int, std::shared_ptr<ComboStartupReceipt::MmCompletion>> g_startupCompletions;
 static std::map<int, uint32_t> g_startupAckRetries;
 static uint32_t g_startupGeneration;

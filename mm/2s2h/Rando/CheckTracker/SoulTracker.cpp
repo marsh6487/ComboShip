@@ -13,7 +13,9 @@
 #include <string>
 
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
 #include "ComboMenuSharedContext.h"
+#include "rando/SoulTrackerData.h"
 bool Combo_MmIsForeground(void);
 #endif
 
@@ -52,6 +54,10 @@ bool HaveSoulOptions() {
     bool enabled = false;
     ForEach([&](const Entry& entry) { enabled = enabled || RANDO_SAVE_OPTIONS[entry.option] != 0; });
     return enabled;
+}
+
+const char* SoulName(const Entry& entry) {
+    return entry.name ? entry.name : Rando::StaticData::Items.at(entry.item).name;
 }
 
 void Consume(Input& input, u16 buttons) {
@@ -154,9 +160,8 @@ class SoulsWindow final : public Ship::GuiWindow {
         for (std::size_t row = 0; row < RowsPerPage && sPage * RowsPerPage + row < rows.size(); ++row) {
             const auto& entry = rows[sPage * RowsPerPage + row];
             const bool collected = Flags_GetRandoInf(entry.flag) != 0;
-            const char* name = entry.name ? entry.name : Rando::StaticData::Items.at(entry.item).name;
             text(0, 62 + row * 23, collected ? IM_COL32(140, 235, 165, 255) : IM_COL32(185, 190, 200, 255),
-                 std::string(collected ? "[Owned]  " : "[Missing]  ") + name);
+                 std::string(collected ? "[Owned]  " : "[Missing]  ") + SoulName(entry));
         }
         text(0, 348, IM_COL32(210, 220, 235, 255),
              "Page " + std::to_string(sPage + 1) + "/" + std::to_string(PageCount(rows.size())));
@@ -180,3 +185,18 @@ RegisterShipInitFunc init([] {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(HandleInput);
 });
 } // namespace
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t MM_ReadSoulTrackerSave(int32_t slot, ComboRando::SoulTracker::VisitRow visit,
+                                                       void* context) {
+    if (slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO)
+        return 0;
+
+    Rando::SoulTracker::ForEach([&](const Rando::SoulTracker::Entry& entry) {
+        const bool owned = Flags_GetRandoInf(entry.flag) != 0;
+        if (RANDO_SAVE_OPTIONS[entry.option] || owned)
+            visit(context, entry.family, SoulName(entry), owned);
+    });
+    return 1;
+}
+#endif

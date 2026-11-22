@@ -68,6 +68,12 @@ items = (ROOT / 'mm/2s2h/Rando/StaticData/Items.cpp').read_text()
 catalog = items[items.index('#define RI('):items.index('// clang-format off')]
 catalog += '\nnamespace Rando::StaticData { std::map<RandoItemId, RandoStaticItem> Items = ' + \
     block(items, 'std::map<RandoItemId, RandoStaticItem> Items') + ';\n}\n#undef RI\n'
+# The real queue classifies the check separately from the item it grants.
+checks = (ROOT / 'mm/2s2h/Rando/StaticData/Checks.cpp').read_text()
+check_macro = checks[checks.index('#define RC('):checks.index('// clang-format off')]
+check_row = next(line for line in checks.splitlines() if line.strip().startswith('RC(RC_CLOCK_TOWER_ROOF_OCARINA,'))
+catalog += check_macro + '\nnamespace Rando::StaticData { std::map<RandoCheckId, RandoStaticCheck> Checks = {\n' + \
+    check_row + '\n};\n}\n#undef RC\n'
 glue = (ROOT / 'mm/2s2h/FleetShipCombo/FleetComboItemsGlue.cpp').read_text()
 catalog += 'namespace { const int sFcNative[] = ' + block(glue, 'const int sFcNative[]') + ';\n'
 catalog += 'std::unordered_map<int,int>& ReverseMap() ' + block(glue, 'ReverseMap()') + '\n}\n'

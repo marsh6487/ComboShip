@@ -39,6 +39,7 @@
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Rando/DungeonItemVisuals.h"
 #include "2s2h/Rando/SpinAttackGi.h"
+#include "2s2h/Rando/WalletGi.h"
 #include "2s2h_assets.h"                                     // custom rando models (triforce, ocarina buttons, ...)
 #include "objects/gameplay_keep/gameplay_keep.h"             // stray-fairy skel/anim + soul flame DL
 #include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
@@ -996,6 +997,7 @@ static bool MM_IsProgressiveItem(RandoItemId id) {
         case RI_OOT_PROGRESSIVE_HAMMER:
         case RI_OOT_PROGRESSIVE_MASTER_SWORD:
         case RI_OOT_PROGRESSIVE_BGS:
+        case RI_OOT_PROGRESSIVE_ROC:
         case RI_PROGRESSIVE_BOW:
         case RI_PROGRESSIVE_BOMB_BAG:
         case RI_PROGRESSIVE_WALLET:
@@ -1054,6 +1056,14 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
         case RI_OOT_NEI_MARIO_MASK:
             name = "Mario Mask";
             break;
+        case RI_OOT_NEI_ROCS_FEATHER:
+            // The OoT name "Roc's Feather" is reserved for its other feather.
+            out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+            out->dlistCount = 1;
+            out->xluStartIndex = -1;
+            out->scale = 0.5f;
+            out->dlists[0] = "__OTR__@oot:objects/object_nei_rocs_feather/rocs_feather_dl";
+            return 1;
         case RI_OOT_IRON_KNUCKLE_AXE:
         case RI_OOT_EXT_CANE_OF_BYRNA:
         case RI_OOT_EXT_CHAMPIONS_TUNIC:
@@ -1101,7 +1111,6 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
         case RI_OOT_NEI_TIME_GATE:
         case RI_OOT_NEI_WHIP:
         case RI_OOT_NEI_ZONAI_PERMAFROST:
-        case RI_OOT_NEI_ROCS_FEATHER:
         case RI_OOT_NEI_ROCS_CAPE: {
             const auto item = Rando::StaticData::Items.find(id);
             if (item == Rando::StaticData::Items.end())
@@ -1249,6 +1258,15 @@ static int32_t MM_FillCaneDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     return 1;
 }
 
+static bool MM_FillWalletShimmer(RandoItemId id, CwItemDrawInfo* out) {
+    if (!MM_WalletGi_ShimmerColor(id, out->itemShimmerColor))
+        return false;
+    out->itemShimmer =
+        CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) ? CW_ITEM_SHIMMER_TINTED : CW_ITEM_SHIMMER_NONE;
+    out->stateDependent = 2;
+    return true;
+}
+
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (id == RI_OOT_CLOCK)
         return NeiClockGi::Describe(out, NeiClockGi::OpaqueMM,
@@ -1262,6 +1280,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     // still reaches MM_FillSongDrawInfo.
     if (MM_IsProgressiveItem(id)) {
         RandoItemId resolved = Rando::ConvertItem(id);
+        // A maxed Roc chain takes the fixed Red Rupee from MM_GrantCrossItem.
+        if (id == RI_OOT_PROGRESSIVE_ROC && resolved == RI_JUNK)
+            resolved = RI_RUPEE_RED;
         if (resolved != RI_UNKNOWN && resolved != id) {
             id = resolved;
             progressiveConverted = true;
@@ -1286,6 +1307,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (it == Rando::StaticData::Items.end()) {
         return 0;
     }
+    if (id == RI_WALLET_ZFG) {
+        CwDescribeZfgWallet(out);
+        MM_FillWalletShimmer(id, out);
+        return 1;
+    }
     CwItemDrawInfo nei{};
     if (MM_FillElementalSpellDrawInfo(id, out))
         return 1;
@@ -1297,6 +1323,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     out->neiShimmer = nei.neiShimmer;
     out->itemShimmer = nei.itemShimmer;
+    const bool wallet = MM_FillWalletShimmer(id, out);
     if (nei.neiShimmer)
         out->stateDependent = 2;
     if (MM_FillCaneDrawInfo(id, out))
@@ -1412,9 +1439,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)it->second.drawId, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
-    if (nativeShimmer)
-        out->itemShimmer = nativeShimmer;
+    if (!wallet) {
+        const int32_t nativeShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
+        if (nativeShimmer)
+            out->itemShimmer = nativeShimmer;
+    }
     if (ComboCollectibleShimmer_ProfileForDrawId((s16)it->second.drawId) >= 0)
         out->stateDependent = 2; // Keep opt-in and owning-game color/rainbow live, including while disabled.
     if (it->second.drawId == GID_CHATEAU) {

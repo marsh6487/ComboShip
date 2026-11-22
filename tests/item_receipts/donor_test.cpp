@@ -253,6 +253,7 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Rune: Sheikah Sensor", RG_DESIRE_SENSOR},
     {"Cane of Somaria", RG_CANE_OF_SOMARIA},
     {"Progressive Roc", RG_PROGRESSIVE_ROCS},
+    {"Roc's Cape", RG_ROCS_CAPE},
     {"Stone of Agony", RG_STONE_OF_AGONY},
     {"Magic Meter", RG_MAGIC_SINGLE},
     {"Enhanced Magic Meter", RG_MAGIC_DOUBLE},
@@ -1394,6 +1395,9 @@ int main(int argc, char** argv) {
              agony = read("Stone of Agony");
   assert(cane.find("Statue") != std::string::npos &&
          roc.find("high jump") != std::string::npos);
+  const auto cape = read("Roc's Cape");
+  assert(cape.find("Roc's Cape") != std::string::npos &&
+         cape.find("double jump") != std::string::npos);
   stateAdvanced =
       true; // grant happened; recollection still refers to the frozen identity
   assert(read("Cane of Somaria") == cane &&

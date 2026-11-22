@@ -14,6 +14,7 @@ static bool bossDeathRecoveryRequested = false;
 
 static void ClearRuntime() {
     state.Install(nullptr);
+    ++ComboCrossMmRuntime::trackerRevision;
     checkpoint.Arrive(-1, false);
     localArrival = -1;
     bossDeathRecoveryRequested = false;
@@ -69,6 +70,7 @@ extern "C" COMBO_EXPORT int MM_SetSoloEntranceRuntimeSeed(const char* raw) try {
     const auto catalogue = Rando::SoloEntrances::CatalogueForSave(*candidate);
     using namespace ComboSoloMmRuntime;
     state.InstallValidated(seed, routes, catalogue);
+    ++ComboCrossMmRuntime::trackerRevision;
     checkpoint.Arrive(-1, false);
     localArrival = -1;
     bossDeathRecoveryRequested = false;
@@ -236,6 +238,7 @@ extern "C" int Combo_MM_SoloEntranceTransition(int32_t* index) {
         route = state.Lookup(Phase::AfterNative, source);
     if (!route || route->to.game != 1)
         return 0;
+    ComboCrossMmRuntime::DiscoverEntrance(route->source);
     if (route->to.index != *index) {
         gSaveContext.nextCutsceneIndex = 0xFFEF;
         gSaveContext.save.cutsceneIndex = 0;
@@ -252,4 +255,9 @@ extern "C" int Combo_MM_SoloEntranceTransition(int32_t* index) {
     gSaveContext.respawnFlag = 0;
     *index = ComboMmMaterializeGrotto(route->to.index);
     return 0;
+}
+
+const ComboRando::CrossDungeon::RuntimeState& Rando::EntranceTracker::GetRuntime(uint64_t& revision) {
+    revision = ComboCrossMmRuntime::trackerRevision;
+    return Combo_IsCombinedGame() ? ComboCrossMmRuntime::state : ComboSoloMmRuntime::state;
 }
