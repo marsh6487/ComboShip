@@ -82,6 +82,7 @@ static Gfx* Mesh(const char* path) {
 
 extern "C" {
 SaveContext gSaveContext;
+s32 sPlayerLod;
 u16 gEquipMasks[] = { 0xF, 0xF0, 0xF00, 0xF000 };
 u8 gEquipShifts[] = { 0, 4, 8, 12 };
 extern MtxF* sMatrixStack;

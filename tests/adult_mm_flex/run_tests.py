@@ -150,9 +150,11 @@ def main():
     player = (ROOT / "mm/src/code/z_player_lib.c").read_text()
     graph = (ROOT / "mm/src/code/graph.c").read_text()
     graphics = (ROOT / "mm/src/code/stubs.c").read_text()
-    production = re.search(r"static const char\* sLimbNearDL\[.*?\n};", adult, re.S)[0] + "\n"
+    production = re.search(r"^#define ALC\(.*$", adult, re.M)[0] + "\n"
+    production += re.search(r"static const char\* sLimbNearDL\[.*?\n};", adult, re.S)[0] + "\n"
     production += "\n".join(re.findall(r"^static Gfx\* sDL_\w+;[^\n]*", adult, re.M)) + "\n"
-    for name in ("AdultLink_LoadDL", "AdultLink_LoadModelDL", "AdultLink_Setup", "AdultLink_ApplyNeiHeldHand",
+    for name in ("AdultLink_LoadDL", "AdultLink_LoadModelDL", "AdultLink_SeasonalChildEquipment",
+                 "AdultLink_Setup", "AdultLink_ApplyNeiHeldHand",
                  "AdultLink_ApplyRootTransform", "AdultLink_OverrideLimb"):
         production += function(adult, name) + "\n"
     production += 'extern "C" {\n'
