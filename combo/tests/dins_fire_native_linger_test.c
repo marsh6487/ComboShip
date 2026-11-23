@@ -46,18 +46,27 @@ int main(void) {
                 const CwDinsQuad* accepted = &original.quads[i];
                 REQUIRE(current->s == accepted->s && current->t == accepted->t);
                 REQUIRE(current->sSpan == accepted->sSpan && current->tSpan == accepted->tSpan);
-                REQUIRE(current->primary == (current->spark == 2 ? 0xFFE6CC : accepted->primary));
+                REQUIRE(current->primary == (i < 4 ? 0xFFC884 : accepted->primary));
                 REQUIRE(current->secondary == accepted->secondary);
                 for (int v = 0; v < 4; ++v) {
                     REQUIRE(current->p[v].x == accepted->p[v].x && current->p[v].y == accepted->p[v].y &&
                             current->p[v].z == accepted->p[v].z);
-                    REQUIRE(current->alpha[v] ==
-                            (current->spark == 3 ? (3 * accepted->alpha[v] + 2) / 5 : accepted->alpha[v]));
+                    int alpha = accepted->alpha[v];
+                    if (i < 4) {
+                        alpha = (alpha * 3 + 5) / 10;
+                        if (i != 0)
+                            alpha = (alpha * 2 + 2) / 5;
+                    } else if (current->spark == 3) {
+                        alpha = (alpha * 3 + 2) / 5;
+                    } else if (current->spark == 2) {
+                        alpha = (int)fmin(255, nearbyint(((alpha * 9 + 4) / 8) * (current->band < 2 ? 1.31 : 1.14)));
+                    }
+                    REQUIRE(current->alpha[v] == alpha);
                 }
             }
         }
         if (frame >= CW_DINS_NATIVE_GROW_TICKS && frame <= CW_DINS_NATIVE_FADE_START_FRAME) {
-            REQUIRE(mesh.quads[0].alpha[0] == 88);
+            REQUIRE(mesh.quads[0].alpha[0] == 44);
             REQUIRE(CwDins_NativeRadius(frame / (float)CW_DINS_NATIVE_RATE) == CwDins_NativeRadius(.4f));
             for (int band = 0; band < 6; ++band) {
                 const CwDinsQuad* q = &mesh.quads[4 + band * 96];
@@ -76,7 +85,7 @@ int main(void) {
             int phase = frame - CW_DINS_NATIVE_FADE_START_FRAME;
             CwDinsFireRemake_BuildFireRecipe(&original, 40 + phase, 40, 12, right, up, 0xFFC800, 0xFF0000);
             REQUIRE(mesh.count == original.count);
-            REQUIRE(abs(mesh.quads[0].alpha[0] - (3 * original.quads[0].alpha[0] + 2) / 5) <= 1);
+            REQUIRE(abs(mesh.quads[0].alpha[0] - (3 * original.quads[0].alpha[0] + 5) / 10) <= 1);
             REQUIRE(fabsf(mesh.quads[0].p[1].x - original.quads[0].p[1].x) < .0001f);
             for (int band = 0; band < 6; ++band) {
                 const CwDinsQuad* q = &mesh.quads[4 + band * 96];
@@ -91,10 +100,16 @@ int main(void) {
         }
     }
     CwDinsFireRemake_BuildNativeFire(&mesh, 25, right, up, 0x5BE3CF, 0x22358A);
+    CwDinsFireRemake_BuildFireRecipe(&original, 25, 40, 12, right, up, 0x5BE3CF, 0x22358A);
+    REQUIRE(mesh.count == original.count);
     for (size_t i = 0; i < mesh.count; ++i) {
         const CwDinsQuad* q = &mesh.quads[i];
         if (q->spark == 2 || q->spark == 3)
             REQUIRE(q->palette && q->primary == 0x5BE3CF && q->secondary == 0x22358A);
+        for (int v = 0; v < 4; ++v) {
+            int alpha = original.quads[i].alpha[v];
+            REQUIRE(q->alpha[v] == (q->spark == 3 ? (3 * alpha + 2) / 5 : alpha));
+        }
     }
     CwDinsFireRemake_BuildNativeFire(&mesh, CW_DINS_NATIVE_FIRE_TICKS, right, up, 0xFFC800, 0xFF0000);
     REQUIRE(mesh.count == 0);
@@ -103,7 +118,6 @@ int main(void) {
     puts("PASS native linger lifetime: 138 fire updates; six usable seconds after recovery before 12-update burnout");
     puts("PASS continuous motion: accepted angular and unwrapped UV steps through every hold update; no loop reset or "
          "slowdown");
-    puts("PASS native material polish: lower warm glow, amber ribbon highlights, and preserved geometry and fade "
-         "timing");
+    puts("PASS native material: open center, bright lower ribbons, unchanged custom palette and fade timing");
     return 0;
 }
