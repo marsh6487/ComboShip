@@ -74,7 +74,8 @@ def main():
                            "2s2h/GameInteractor/GameInteractor.h")
             prefix = '#include "global.h"\n#include "din_fire_sword.h"\n#include <assert.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n'
             prefix += '#include "' + hook_header + '"\n'
-            if host == "mm": prefix += '#include "mods/combo_rpg.h"\n'
+            if host == "mm":
+                prefix += '#include "mods/combo_rpg.h"\n#include <libultraship/bridge/consolevariablebridge.h>\n'
             collision_source = directory / "finish_collision.c"
             collision_source.write_text(prefix + lifecycle + "\n".join(collision[name] for name in collision_names))
             immune_actor = "En_Rd" if host == "soh" else "En_Am"
