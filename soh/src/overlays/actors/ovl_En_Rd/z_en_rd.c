@@ -1,6 +1,7 @@
 #include "z_en_rd.h"
 #include "objects/object_rd/object_rd.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/ResourceManagerHelpers.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 // Returns 1 when Link wears any mask that pacifies Redeads/Gibdos: Gibdo Mask,
