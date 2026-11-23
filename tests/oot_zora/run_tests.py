@@ -39,10 +39,27 @@ if "MmForm_TickActionAnimation" not in names:
     footer = re.search(r"// Always tick animation.*?\n    \{(.*?)\n    \}\n\}", source, re.S).group(1)
     bodies += "\nstatic void MmForm_TickActionAnimation(PlayState* play, s32 dispatchedAction) {" + footer + "\n}\n"
 native = function((ROOT / "soh/src/code/z_player_lib.c").read_text(), "func_80090480")
+player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
+equipment_source = (ROOT / "soh/soh/Enhancements/customequipment.cpp").read_text()
+swim_actions = "\n\n".join(function(player_source, name) for name in (
+    "func_80838F18", "Player_Action_8084D610", "Player_Action_8084DAB4",
+))
+recovery_case = equipment_source.split("case VB_PLAYER_ANIM_SITE_JUMPSLASH_RECOVERY: {", 1)[1].split(
+    "\n                break;", 1
+)[0]
+jump_slash_animations = function(source, "MmForm_GetJumpSlashAnim")
+if "LinkAnimationHeader* MmForm_GetJumpSlashRecoveryAnim(" in source:
+    jump_slash_animations += "\n\n" + function(source, "MmForm_GetJumpSlashRecoveryAnim")
+jump_slash_animations += (
+    "\nstatic LinkAnimationHeader* RunJumpSlashRecoveryHook(Player* player, LinkAnimationHeader* animation) {\n"
+    "    LinkAnimationHeader** animOut = &animation;\n" + recovery_case + "\n    return animation;\n}\n"
+)
 with tempfile.TemporaryDirectory(prefix="oot-zora-") as temp:
     directory = Path(temp)
     (directory / "zora_actions.inc").write_text(enum + "\n" + bodies)
     (directory / "native_melee.inc").write_text(native)
+    (directory / "native_swim.inc").write_text(swim_actions)
+    (directory / "jump_slash_animations.inc").write_text(jump_slash_animations)
     binary = str(directory / "zora")
     compiler_flags = [*flags(), "-I" + temp, "-g", "-O1", "-fno-pie", "-no-pie",
                       "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
@@ -51,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix="oot-zora-") as temp:
         compiler_flags.append("-DZORA_COLLISION_FIX")
     subprocess.run([os.environ.get("CC", "cc"), *compiler_flags,
                     str(ROOT / "tests/oot_zora/actions_test.c"), "-lm", "-o", binary], check=True)
-    cases = sys.argv[1:] or ["timing", "dolphin", "jump"]
+    cases = sys.argv[1:] or ["timing", "dolphin", "jump", "bottom-walk", "jump-landing-clip", "jump-recovery"]
     if not sys.argv[1:] and "MmForm_UpdateMelee" in names:
         cases += ["melee", "trails", "ticks", "landing-trail", "trail-allocation", "punch-order", "dolphin-landing-tick"]
     for case in cases:

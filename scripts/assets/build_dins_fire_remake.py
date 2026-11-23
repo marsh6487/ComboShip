@@ -7,8 +7,8 @@ The fixed-function material uses baked 20 Hz burnout samples, including the
 accepted unwrapped horizontal UV scroll and alpha-driven erosion. The old
 flameTex/sparkTex recovery resources are reproduced without any byte changes.
 Neutral RGB companions retain exact source alpha for the native two-color
-cosmetic material. Timing-independent resources retain their pre-linger bytes;
-burnout resources are rebaked at the shared contract's actual later fire age.
+cosmetic material. The default ribbons receive the reviewed contrast and
+gold-to-ember grade after encoding and burnout erosion.
 --check compares every generated host resource, manifest and name declaration.
 --check-native validates the committed outputs without the optional source PNGs.
 """
@@ -39,7 +39,7 @@ ATLAS_SHA256 = "9705407ffa7226f6d4f704a7b20575d66e4aa704759ef3a0670309de78fc186e
 LEGACY_SOURCE_SHA256 = "f65fb5a8355103131a6a6536ab86879fdce3d17de0b52aaf8a7f4ee8a14d17b9"
 PRE_LINGER_PROVENANCE_SHA256 = "b50d500f9322ee023b9ed1e978a40b54471fd6a612dd43c4afb3cd4bafb41769"
 TIMING_INDEPENDENT_RESOURCE_SET_SHA256 = "67e95a75d182d584c4102a2c4563dff360c68efd3b56be18d9782c0d129b4d3d"
-COMMITTED_MANIFEST_SHA256 = "4fccacef519654f3ac5d2aed6f4004ee7c332b82cfdd2dc2d865510cc79b2874"
+COMMITTED_MANIFEST_SHA256 = "abe5c6f721d3bdcbb7bf67499d55a7b06bcd67c1b9a84316d12a8d646ca8e8ba"
 LEGACY_SHA256 = {
     "flameTex": "dc2d51de60b2ba9bd55b9f3497a312b44ae99654ecf9730ad140f06f82158ff4",
     "sparkTex": "45c863532059d5dd7a3469217ae408b0938b9e9ad26e9b052e163fd40a200d4f",
@@ -163,6 +163,31 @@ def smooth(value: float) -> float:
 
 def byte(value: float) -> int:
     return round(min(1.0, max(0.0, value)) * 255)
+
+
+def default_ribbon_material(source: bytes, fire_frame: int | None) -> bytes:
+    """Grade only encoded default ribbons, with coverage keyed from the original art."""
+    fade = (fire_frame - FADE_START_FRAME) / TIMING_BASES["CW_DINS_NATIVE_FADE_TICKS"] if fire_frame is not None else 0
+    heat = 1 - smooth((fade - .36) / .55)
+    tint = (1, .48 + (.75 - .48) * heat, .24 + (.51 - .24) * heat)
+    gold = (255, .94 * 255, .64 * 255)
+    coverage = []
+    highlight = []
+    for intensity in range(25501):
+        luminance = intensity / 25500
+        coverage.append(.18 + .82 * smooth((luminance - .64) / .30))
+        highlight.append(smooth((luminance - .86) / .125) * (.13 + .87 * heat))
+
+    result = bytearray(source)
+    for offset in range(92, len(source), 4):
+        r, g, b, a = source[offset:offset + 4]
+        intensity = 21 * r + 64 * g + 15 * b
+        peak = highlight[intensity]
+        for channel, value in enumerate((r, g, b)):
+            tinted = value * tint[channel]
+            result[offset + channel] = round(tinted + (gold[channel] - tinted) * peak)
+        result[offset + 3] = round(a * coverage[intensity])
+    return bytes(result)
 
 
 def halo_image(neutral: bool = False) -> Image.Image:
@@ -392,17 +417,26 @@ def generated_resources() -> tuple[dict[str, bytes], dict]:
                           "header_byte_identical_to_source": True,
                           "rgb_encoding": "round_half_up(0.299*R + 0.587*G + 0.114*B) replicated into RGB"}
     textures.update(palette_textures)
-    timing_independent = {name: data for name, data in textures.items() if not Path(name).name.startswith("ribbonBurn")}
-    if len(timing_independent) != 12 or canonical_resource_hash(timing_independent) != TIMING_INDEPENDENT_RESOURCE_SET_SHA256:
+    ungraded_rows = {name: data for name, data in textures.items() if not Path(name).name.startswith("ribbonBurn")}
+    if len(ungraded_rows) != 12 or canonical_resource_hash(ungraded_rows) != TIMING_INDEPENDENT_RESOURCE_SET_SHA256:
         raise ValueError("Timing-independent row/halo/trail/legacy resource bytes changed")
-    if any(sha(data) != previous["timing_independent_resources"][name] for name, data in timing_independent.items()):
+    if any(sha(data) != previous["timing_independent_resources"][name] for name, data in ungraded_rows.items()):
         raise ValueError("Timing-independent resource differs from immutable pre-linger checkpoint")
+    for name, source in colored_textures.items():
+        if not name.removeprefix(PREFIX).startswith("ribbon"):
+            continue
+        entry = metadata[name]
+        data = default_ribbon_material(source, entry.get("fire_frame"))
+        textures[name] = colored_textures[name] = data
+        entry.update(validate_resource(data, tuple(entry["physical_size"]), RGBA32_TYPE),
+                     ungraded_rgba_sha256=sha(source))
+    timing_independent = {name: textures[name] for name in ungraded_rows}
     palette_decoded = sum(metadata[name]["payload_bytes"] for name in palette_textures)
     decoded = sum(item["payload_bytes"] for item in metadata.values())
     if len(palette_textures) != 70 or len(textures) != 144 or decoded > 72 * 1024 * 1024:
         raise ValueError("Native resource count or bounded decoded-memory budget changed")
     manifest = {
-        "candidate": "Din's Fire six-second usable-linger candidate",
+        "candidate": "Din's Fire brighter crests and open center",
         "baseline_commit": "cd12567fe1c0d64a205e1d360165cb000166f159",
         "baseline_tree": "97da3eb62dbcab604927d2af3f902a46a6f681b8",
         "timing": {"header": TIMING_HEADER_PATH, "header_sha256": sha(TIMING_HEADER_BYTES),
@@ -418,12 +452,12 @@ def generated_resources() -> tuple[dict[str, bytes], dict]:
                    "provenance": "tools/dins_fire_remake/pre_linger_resource_provenance.json",
                    "provenance_sha256": PRE_LINGER_PROVENANCE_SHA256,
                    "canonical_resource_sets": previous["canonical_resource_sets"],
-                   "preserved_resource_count": len(timing_independent),
+                   "preserved_resource_count": sum(textures[name] == data for name, data in ungraded_rows.items()),
                    "timing_independent_sha256": TIMING_INDEPENDENT_RESOURCE_SET_SHA256,
                    "derived_burnout_replaced": 2 * 6 * BURN_FRAME_COUNT,
                    "previous_frames_half_open": previous["burnout_frames_half_open"],
                    "replacement_frames_half_open": [BURN_FIRST_FRAME, BURN_FIRST_FRAME + BURN_FRAME_COUNT],
-                   "scope": "Only derived colored/neutral burnout changes; source art and all non-burn resource bytes remain exact"},
+                   "scope": "The ungraded rows match the checkpoint before the default ribbon material grade"},
         "source": {"path": "tools/dins_fire_remake/" + ATLAS_NAME, "sha256": ATLAS_SHA256,
                    "size": [1536, 1024], "mode": "RGBA", "bytes": len(atlas_bytes),
                    "origin": "Accepted Dins_Fire_Burnout_and_Light_Study_Recipe.zip atlas; bytes preserved unchanged",
@@ -435,20 +469,26 @@ def generated_resources() -> tuple[dict[str, bytes], dict]:
                    "encoding": "Grayscale luminance, Lanczos 256px; intensity replicated into RGBA"},
         "spark": {"origin": "Exact analytical core/halo/cross/diagonal glint in the encoder", "black_border": True},
         "palette": {"resource_count": len(palette_textures), "base_resources": 4, "burnout_resources": 66,
-                    "source": "Already encoded native colored resources; no new source-image conversion",
+                    "source": "Native RGBA before the default ribbon material grade",
                     "rgb_formula": "floor((299*R + 587*G + 114*B + 500) / 1000), replicated into R/G/B",
-                    "alpha": "Each alpha byte is identical to the corresponding colored texture",
+                    "alpha": "Each alpha byte is identical to the ungraded colored source",
                     "metadata": "Each 92-byte resource header is identical to its colored source",
                     "cosmetic_entries": ["Magic.DinsPrimary", "Magic.DinsSecondary"],
                     "material_contract": "secondary + (primary-secondary)*neutral_RGB; original texture alpha * vertex alpha",
-                    "selection_contract": "Use only when native Primary/Secondary differ from their defaults; default path retains original RGBA",
+                    "selection_contract": "Use only when native Primary/Secondary differ from their defaults",
                     "missing_burnout_contract": "Use the selected neutral moving base; never fall back to colored RGB"},
+        "default_ribbon_material": {
+            "luminance": "0.21*R + 0.64*G + 0.15*B from ungraded native RGB",
+            "coverage": "source alpha * (0.18 + 0.82*smoothstep((luminance-0.64)/0.30))",
+            "color": "Warm orange to ember-orange, with white-gold highlights on bright crests",
+            "scope": "The three default rows and 66 default burnout samples; custom palette bytes are unchanged",
+        },
         "canonical_resource_sets": {
             "format": "SHA256 of sorted UTF-8 name + NUL + resource SHA256 + LF records",
             "colored_and_recovery": {"count": len(colored_textures), "sha256": canonical_resource_hash(colored_textures)},
             "palette": {"count": len(palette_textures), "sha256": canonical_resource_hash(palette_textures)},
             "all": {"count": len(textures), "sha256": canonical_resource_hash(textures)},
-            "timing_independent": {"count": len(timing_independent), "sha256": TIMING_INDEPENDENT_RESOURCE_SET_SHA256},
+            "timing_independent": {"count": len(timing_independent), "sha256": canonical_resource_hash(timing_independent)},
         },
         "burnout": {"band_rows": list(BAND_ROWS), "band_start_seconds": list(BURN_STARTS),
                     "end_seconds": END_SECONDS, "release_seconds": FIRE_START_SECONDS, "native_hz": NATIVE_RATE,
@@ -460,7 +500,7 @@ def generated_resources() -> tuple[dict[str, bytes], dict]:
                     "detail_formula": "0.025*burn*(sin(u*41.9+v*123.4+band*1.1)+0.5*sin(u*103.7-v*271.1))",
                     "alpha_formula": "alpha * smoothstep((alpha+detail-(burn**0.80*0.68-0.08))/0.20), if burn>0",
                     "runtime_sampling": "local U on baked frames; original unwrapped scroll is baked",
-                    "color": "original RGB sampled with the accepted scroll; vertex tint remains native",
+                    "color": "original RGB sampled with the accepted scroll, then graded for the default material",
                     "limit": "Half-resolution and 8-bit encoding; visual/runtime parity requires gameplay evidence"},
         "loader_contract": {
             "texture_type_source": "libultraship/include/fast/resource/type/Texture.h",
@@ -477,7 +517,7 @@ def generated_resources() -> tuple[dict[str, bytes], dict]:
                           "palette_companion_decoded_bytes_per_host": palette_decoded,
                           "decoded_limit_bytes_per_host": 72 * 1024 * 1024,
                           "maximum_texture_dimension": 768,
-                          "loading": "Default colors use only original RGBA; resolve neutral companions only for custom colors and selected fade frames on demand"},
+                          "loading": "Choose default RGBA or neutral companion resources by palette; resolve selected fade frames on demand"},
         "resources": metadata,
         "hosts": ["soh", "mm"],
         "cvar": "gEnhancements.DinsFireRemake",

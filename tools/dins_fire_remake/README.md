@@ -129,14 +129,15 @@ the offline reference renderer.
 
 ## Native Primary/Secondary cosmetic colors
 
-The 12 timing-independent resources retain their exact pre-linger bytes. The
-66 default colored burnout resources are intentionally rebaked for the later
-phase, then their 66 neutral companions are derived from those new bytes.
-Default native Din colors continue to use the accepted full-color artwork. Editing either existing
+The default material grades the three encoded ribbon rows and all 66 baked
+burnout samples. It reduces coverage on softer flame detail, preserves bright
+crests, and shifts those crests from gold to ember-orange as the fire fades.
+The grade runs after the existing burnout erosion so fire timing and UV motion
+continue to use the original recipe. Editing either existing
 `Magic.DinsPrimary` or `Magic.DinsSecondary` color selects 70 neutral companions:
 three ribbon bases, 66 burned ribbon samples and the warm halo.
 
-Each companion is derived **from the already encoded colored resource**. Its
+Each companion is derived **from the encoded resource before the default grade**. Its
 RGB channels all contain the nearest-byte luminance
 `0.299 R + 0.587 G + 0.114 B`, computed with exact integer coefficients and
 half-up rounding:
@@ -156,11 +157,10 @@ are preserved in its companion.
 The native custom-color material maps the neutral RGB between the two existing
 editor colors: `Secondary + (Primary - Secondary) * gray`, retaining texture
 alpha × vertex alpha. This lets either color recolor the flame without retaining
-orange from the accepted artwork. The default material still uses the original
-RGBA. If a selected neutral burnout variant is missing, the renderer uses the
+orange from the accepted artwork. If a selected neutral burnout variant is missing, the renderer uses the
 neutral moving base instead of introducing colored-source pixels.
 
-The timing-independent set is enforced by canonical SHA256
+The ungraded timing-independent set is enforced by canonical SHA256
 `67e95a75d182d584c4102a2c4563dff360c68efd3b56be18d9782c0d129b4d3d`.
 It contains the three colored bases, three neutral bases, both colored/white
 halos plus the neutral halo, the trail, and the two protected recovery textures.
@@ -175,10 +175,10 @@ The canonical representation is sorted UTF-8 records of
 
 | Canonical resource set | Count | SHA256 |
 | --- | --- | --- |
-| Timing-independent, unchanged | 12 | `67e95a75d182d584c4102a2c4563dff360c68efd3b56be18d9782c0d129b4d3d` |
-| Default colored and recovery | 74 | `b137c178d9adb2552c46cce0bfb365c7984fc2413f758b9ba4abc88166e2dc2a` |
+| Timing-independent after grade | 12 | `4fd9372912939561ec1ab1138d9fbfded367041a18f88b0e524c1afba08fb63b` |
+| Default colored and recovery | 74 | `736f050789a8ecc7a46818dab4ca7e9a813bd285cd73584feefa106219e7f8aa` |
 | Neutral palette companions | 70 | `8029f0252523085257e5b00d138dbbd61b50d60d3d4036528f948d4873ba10fe` |
-| Complete current set | 144 | `41363e07fd630c7ca2f19ad2a770b21b0ae04106a79b07948eea0ea93dd2e6ba` |
+| Complete current set | 144 | `0ce2e3d0699c7f664b1aa3052a6e11654218cdfd2b08c5738da67a034c65ee0b` |
 
 ## Memory, regeneration and archive
 
@@ -197,7 +197,7 @@ physical/logical dimensions and frame/band provenance. The encoder enforces a
 dimension of 768. These are available-resource payload totals, not a measured
 running-game cache or peak-memory claim.
 
-The verified deterministic later-phase private-asset archive is
+The pre-grade private-asset archive was
 **31,904,120 bytes (30.43 MiB)**, SHA256
 `3f0c4a6f83520733bfab0e3de82fe0ec6b75c34dcfbf9079935e84add951b13c`.
 
@@ -234,8 +234,9 @@ pre-linger burnout filenames for frames 41–51. Unknown files are never removed
 `--check` regenerates the expected bytes in memory and compares every output,
 then confirms actual host byte parity and exact 144-resource directory closure.
 The accepted source hash, protected recovery hashes, pre-linger provenance and
-all 12 timing-independent resource hashes are checked in either mode. Every neutral companion is checked for equal RGB channels and
-byte-identical alpha/header data against its colored source. The encoder uses no NumPy or
+timing-independent resource hashes are checked in either mode. Regeneration
+checks each neutral companion for equal RGB channels and byte-identical
+alpha/header data against its ungraded source. The encoder uses no NumPy or
 image-generation dependency.
 
 `--archive` writes a deterministic ZIP/O2R containing all 144 privately named

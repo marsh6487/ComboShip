@@ -20,7 +20,7 @@
       7.4
     ],
     "burn_formula": "smoothstep(clamp((time-band_start)/(end_seconds-band_start),0,1)) ** 1.35",
-    "color": "original RGB sampled with the accepted scroll; vertex tint remains native",
+    "color": "original RGB sampled with the accepted scroll, then graded for the default material",
     "detail_formula": "0.025*burn*(sin(u*41.9+v*123.4+band*1.1)+0.5*sin(u*103.7-v*271.1))",
     "end_seconds": 7.95,
     "fire_frames_half_open": [
@@ -35,15 +35,15 @@
     "source_v": "(atlas_row_start + local_v*atlas_row_height) / 1024",
     "variants": 66
   },
-  "candidate": "Din's Fire six-second usable-linger candidate",
+  "candidate": "Din's Fire brighter crests and open center",
   "canonical_resource_sets": {
     "all": {
       "count": 144,
-      "sha256": "41363e07fd630c7ca2f19ad2a770b21b0ae04106a79b07948eea0ea93dd2e6ba"
+      "sha256": "0ce2e3d0699c7f664b1aa3052a6e11654218cdfd2b08c5738da67a034c65ee0b"
     },
     "colored_and_recovery": {
       "count": 74,
-      "sha256": "b137c178d9adb2552c46cce0bfb365c7984fc2413f758b9ba4abc88166e2dc2a"
+      "sha256": "736f050789a8ecc7a46818dab4ca7e9a813bd285cd73584feefa106219e7f8aa"
     },
     "format": "SHA256 of sorted UTF-8 name + NUL + resource SHA256 + LF records",
     "palette": {
@@ -52,11 +52,17 @@
     },
     "timing_independent": {
       "count": 12,
-      "sha256": "67e95a75d182d584c4102a2c4563dff360c68efd3b56be18d9782c0d129b4d3d"
+      "sha256": "4fd9372912939561ec1ab1138d9fbfded367041a18f88b0e524c1afba08fb63b"
     }
   },
   "cvar": "gEnhancements.DinsFireRemake",
   "cvar_default": 0,
+  "default_ribbon_material": {
+    "color": "Warm orange to ember-orange, with white-gold highlights on bright crests",
+    "coverage": "source alpha * (0.18 + 0.82*smoothstep((luminance-0.64)/0.30))",
+    "luminance": "0.21*R + 0.64*G + 0.15*B from ungraded native RGB",
+    "scope": "The three default rows and 66 default burnout samples; custom palette bytes are unchanged"
+  },
   "hosts": [
     "soh",
     "mm"
@@ -80,14 +86,14 @@
     "decoded_bytes_per_host": 72976384,
     "decoded_limit_bytes_per_host": 75497472,
     "default_set_decoded_bytes_per_host": 36664320,
-    "loading": "Default colors use only original RGBA; resolve neutral companions only for custom colors and selected fade frames on demand",
+    "loading": "Choose default RGBA or neutral companion resources by palette; resolve selected fade frames on demand",
     "maximum_texture_dimension": 768,
     "palette_companion_decoded_bytes_per_host": 36312064,
     "resource_bytes_per_host": 72989632,
     "resource_count_per_host": 144
   },
   "palette": {
-    "alpha": "Each alpha byte is identical to the corresponding colored texture",
+    "alpha": "Each alpha byte is identical to the ungraded colored source",
     "base_resources": 4,
     "burnout_resources": 66,
     "cosmetic_entries": [
@@ -99,8 +105,8 @@
     "missing_burnout_contract": "Use the selected neutral moving base; never fall back to colored RGB",
     "resource_count": 70,
     "rgb_formula": "floor((299*R + 587*G + 114*B + 500) / 1000), replicated into R/G/B",
-    "selection_contract": "Use only when native Primary/Secondary differ from their defaults; default path retains original RGBA",
-    "source": "Already encoded native colored resources; no new source-image conversion"
+    "selection_contract": "Use only when native Primary/Secondary differ from their defaults",
+    "source": "Native RGBA before the default ribbon material grade"
   },
   "pre_linger_checkpoint": {
     "canonical_resource_sets": {
@@ -120,7 +126,7 @@
     },
     "commit": "28cd69306bfb4a8d13cac8f5d8810ef85758d306",
     "derived_burnout_replaced": 132,
-    "preserved_resource_count": 12,
+    "preserved_resource_count": 9,
     "previous_frames_half_open": [
       41,
       52
@@ -131,7 +137,7 @@
       127,
       138
     ],
-    "scope": "Only derived colored/neutral burnout changes; source art and all non-burn resource bytes remain exact",
+    "scope": "The ungraded rows match the checkpoint before the default ribbon material grade",
     "timing_independent_sha256": "67e95a75d182d584c4102a2c4563dff360c68efd3b56be18d9782c0d129b4d3d",
     "tree": "2dc62dab292882801112e71b996123b2aaef12a1"
   },
@@ -316,11 +322,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "cecacb8feb736703c00034b96a3dd38c65a6f3f5336c8f451c3b60fe0db95b5d",
-      "alpha_sum": 15083936,
-      "alpha_zero_pixels": 28954,
+      "alpha_sha256": "a5d8814d64fc70165a74166adddbffddfeab358a18bdaaa24dbbbf1a4ffce10f",
+      "alpha_sum": 10477719,
+      "alpha_zero_pixels": 56740,
       "atlas_row": 0,
       "bytes": 528476,
       "flag_names": [
@@ -337,20 +343,21 @@
         768,
         172
       ],
-      "pixel_sha256": "4960de420f590c592d2339b7505165b8f6cfc78a1ae825461be463b947b04470",
+      "pixel_sha256": "179d11db478899b9e455a0ab082f70ee132e7d2cb2ec219c57585c15246b9dee",
       "rgb_channels_equal": false,
       "rgba_intensity_equal": false,
       "scales": [
         1.0,
         1.0
       ],
-      "sha256": "bdf7e9916fdce7fd655f8b6eb82d45b0c3a9220c151c05d70219e32be78b69d6",
+      "sha256": "ccc10aa76e36e285931af1699e840f9cd7a2fccf5cbd09f8d7caf37d25a844e6",
       "source_rows_half_open": [
         0,
         343
       ],
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "bdf7e9916fdce7fd655f8b6eb82d45b0c3a9220c151c05d70219e32be78b69d6",
       "version": 1
     },
     "custom/dins_fire_remake/ribbon1PaletteTex": {
@@ -407,9 +414,9 @@
         0,
         255
       ],
-      "alpha_sha256": "546fa5904ef05377c062e4e2c11e22e91f93617603c74871a8060686afd7eb03",
-      "alpha_sum": 16181722,
-      "alpha_zero_pixels": 16205,
+      "alpha_sha256": "e13d943db4c2f9bc27ed4c4c053d894ebbcc46347dd94c6a7ed576d2972c5a90",
+      "alpha_sum": 11453248,
+      "alpha_zero_pixels": 46663,
       "atlas_row": 1,
       "bytes": 500828,
       "flag_names": [
@@ -426,20 +433,21 @@
         768,
         163
       ],
-      "pixel_sha256": "dc6de49e788159d0a8b851d50980673fb01085c7f53217182d74aacdcdc7708e",
+      "pixel_sha256": "f0dff0c28b3891513bb1bd816bdd4563630c0bb481b5fee5d249b6d46c4a80ec",
       "rgb_channels_equal": false,
       "rgba_intensity_equal": false,
       "scales": [
         1.0,
         1.0
       ],
-      "sha256": "ea06fb76eccdfd054a02e226b5cabe887164eaf27b0c7ac3a332bf23d4b2896a",
+      "sha256": "84dfea60159aaeba4b5f8f2e11381a2500f0a08485fe45394caba40492f20be5",
       "source_rows_half_open": [
         343,
         668
       ],
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ea06fb76eccdfd054a02e226b5cabe887164eaf27b0c7ac3a332bf23d4b2896a",
       "version": 1
     },
     "custom/dins_fire_remake/ribbon2PaletteTex": {
@@ -494,11 +502,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "835839b2712cb5f694b6a38444b123c0da25db3ddda74cae380d23c469cb751e",
-      "alpha_sum": 16782417,
-      "alpha_zero_pixels": 22959,
+      "alpha_sha256": "df2a32bfa5a2d7e7d9fc98af11118e50b89fab11f9e8e2761d308064c62440a9",
+      "alpha_sum": 11942113,
+      "alpha_zero_pixels": 49556,
       "atlas_row": 2,
       "bytes": 546908,
       "flag_names": [
@@ -515,20 +523,21 @@
         768,
         178
       ],
-      "pixel_sha256": "8b6c9c4435726fff4bdd293c7b4f33c60cec1bcaeb6f2a6f099c79136f832fea",
+      "pixel_sha256": "053436df29587c5dfe9adaee5493097e58e593b73703d750531cb61dec477031",
       "rgb_channels_equal": false,
       "rgba_intensity_equal": false,
       "scales": [
         1.0,
         1.0
       ],
-      "sha256": "08637eb145de7c54a51a3e89a156b13aa57ab2725b1afe6651fd7e708b29115b",
+      "sha256": "57a8f15d1f16e4adc68c3c128a291ee92fe70c4c3b40aaef9143f8cd6ba4ac1f",
       "source_rows_half_open": [
         668,
         1024
       ],
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "08637eb145de7c54a51a3e89a156b13aa57ab2725b1afe6651fd7e708b29115b",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_127PaletteTex": {
@@ -590,9 +599,9 @@
         0,
         253
       ],
-      "alpha_sha256": "1475658845010100fcb285bd8a21b81aa085685744d73e30ff9f48a3e4ce7c7f",
-      "alpha_sum": 15084049,
-      "alpha_zero_pixels": 28713,
+      "alpha_sha256": "8d28db3ef35a102d9c42eb7dca3867bd12d828bcd8284e55041f71527f918c9c",
+      "alpha_sum": 10478025,
+      "alpha_zero_pixels": 56501,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.0,
@@ -613,7 +622,7 @@
         768,
         172
       ],
-      "pixel_sha256": "80442e7b173fde55fe12a49fa7a86e30ac11921c9ebc78a00590f88fdbbb3184",
+      "pixel_sha256": "ecf436b9d41f5d8f7620f1b35acca33f27b9892151b63ce2ed656524176859ed",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_41Tex",
       "previous_phase_sha256": "ebd35bc71d144aa60cf2d011c3eaac449ec6f61cb0b9eb799fdd3794a6ce9aa9",
       "rgb_channels_equal": false,
@@ -623,11 +632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "bfe90df8582d9f5448ce4e85b948354792044ac9a54ea057a02568bd0d9e2d10",
+      "sha256": "2ad4d034b3dc9fb5d912fe20faef23374856ed7dd950737e417da14482a3b3cd",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "bfe90df8582d9f5448ce4e85b948354792044ac9a54ea057a02568bd0d9e2d10",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_128PaletteTex": {
@@ -687,11 +697,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "88d2cc9a8e51733be5de502904e40030c5a5af6d654693efc25bf87c4073a601",
-      "alpha_sum": 15037784,
-      "alpha_zero_pixels": 57266,
+      "alpha_sha256": "0c365d5de23b5d3380de6236ca483c46f858b3643bd922acebbba0441a7d6996",
+      "alpha_sum": 10470076,
+      "alpha_zero_pixels": 61242,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.0006433633102339829,
@@ -712,7 +722,7 @@
         768,
         172
       ],
-      "pixel_sha256": "140b849b73cbfd905c7bfb1d30255a87afb9eea0cb35c0f3d0c6382185830138",
+      "pixel_sha256": "f153180e53a43f2157ec00b37c428f0f8ba45fbde6145b75fe6389ddb80f507f",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_42Tex",
       "previous_phase_sha256": "549def9943d0c929859145ed71f31e49e609e44aa6c9fb979f3cb0815688b2f3",
       "rgb_channels_equal": false,
@@ -722,11 +732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "5504dc861bf3981fb374722107d6c1680fde8560b08e9b059f08470b5779d717",
+      "sha256": "38071f30e0c52560583651ff61594ea4fc1cfb2d6f9eb1a981873e9d2461212c",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "5504dc861bf3981fb374722107d6c1680fde8560b08e9b059f08470b5779d717",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_129PaletteTex": {
@@ -788,9 +799,9 @@
         0,
         253
       ],
-      "alpha_sha256": "44208690da081fdc2ac7f0bac62a1fd2ffd82c437e8cf41a7982de8e06751d03",
-      "alpha_sum": 15025958,
-      "alpha_zero_pixels": 59663,
+      "alpha_sha256": "1bafe2eee2b794ff3a3611624cf00a1d4e36d4b87bb42e2d3ae51984ff9ed464",
+      "alpha_sum": 10466920,
+      "alpha_zero_pixels": 62085,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.01727986842302099,
@@ -811,7 +822,7 @@
         768,
         172
       ],
-      "pixel_sha256": "935a4f3d3b8725627cda8f04293e51d9fe8cd77e716b483c174a49689ecc460e",
+      "pixel_sha256": "28c8e9c2d7ce5ed37c1863b72709100cc0957a918ac5584c5ebc56ef21b180ff",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_43Tex",
       "previous_phase_sha256": "d7bda8eff38077fef62940aba4961be1289263f429d9e81bc781fea97310f8d8",
       "rgb_channels_equal": false,
@@ -821,11 +832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "9a7b8599790300f5b2b1a0621e2ad7e1c8561bcf5eacf9c86cb3e2fbce864425",
+      "sha256": "bba2df8a6d0261fb9e63f9872ce50373b5bc849deac87f19e4b707143798881b",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "9a7b8599790300f5b2b1a0621e2ad7e1c8561bcf5eacf9c86cb3e2fbce864425",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_130PaletteTex": {
@@ -885,11 +897,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "6abb4920d5f902e5048a83c3a4a0fc1344fcfad4b07487d50e5f15d9466dfa83",
-      "alpha_sum": 14996786,
-      "alpha_zero_pixels": 63175,
+      "alpha_sha256": "f67fdc73d58ef78a2ead46b26cd00a4b4f4c11d3d71868c1c0fe6f856a1f9ef8",
+      "alpha_sum": 10459060,
+      "alpha_zero_pixels": 64043,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.0671043431658381,
@@ -910,7 +922,7 @@
         768,
         172
       ],
-      "pixel_sha256": "99c3ba7b142d87983b24df467680ac6640732573ecc117607303ce6c5f94e224",
+      "pixel_sha256": "f642bdddf152ff70a47e9137db01b090393db58f65612c2d85f613525a0626ba",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_44Tex",
       "previous_phase_sha256": "62c97103bbf344fdc03b8bfffad2e4a67dd9ad02fd38bb56a7405ee4ae90b888",
       "rgb_channels_equal": false,
@@ -920,11 +932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "e6ad8a192d52997b914d0b8600141da9b2d05f635c9964734312e6a64de78078",
+      "sha256": "ede9d33701dc07762bbfcf64f6999d4b528adb6f10ca3c075a4d23328c9acf0c",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "e6ad8a192d52997b914d0b8600141da9b2d05f635c9964734312e6a64de78078",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_131PaletteTex": {
@@ -984,11 +997,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "37c686ca03d09ff18ddd38a005ddaf0a732b6eb0426d929af1e15761fa36d2f8",
-      "alpha_sum": 14943446,
-      "alpha_zero_pixels": 65417,
+      "alpha_sha256": "80781a1242679391440646a916c23371cd1308752c64121ab3dc8c25d307dd1f",
+      "alpha_sum": 10445788,
+      "alpha_zero_pixels": 65831,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.15451986406432733,
@@ -1009,7 +1022,7 @@
         768,
         172
       ],
-      "pixel_sha256": "1bd184f4004fce1a2d881c9edbdcccf3cf17818ee70d42aa415b5f5574088837",
+      "pixel_sha256": "64c7fe2963bc53565dafe5a74753c6755fb89951b47545d8f81f28457b74fd29",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_45Tex",
       "previous_phase_sha256": "60195ade64f8b1ec31a1437ba0b9c6981a36c08a98bdd3b7ab08fb3f110dfac3",
       "rgb_channels_equal": false,
@@ -1019,11 +1032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ee8435d9dceea8fedbd4bcb541ffab0033431fc346a97ff6f267aec983c73e42",
+      "sha256": "0dce8ed9b0f4842838b35ac9a7dc519ba0ac93cdb644bccd4033e58ea70fb33f",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ee8435d9dceea8fedbd4bcb541ffab0033431fc346a97ff6f267aec983c73e42",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_132PaletteTex": {
@@ -1085,9 +1099,9 @@
         0,
         253
       ],
-      "alpha_sha256": "241be74d8e1c2b144137e48e1275816d16ece3713c49c23e7fcaaf9a936a2319",
-      "alpha_sum": 14860047,
-      "alpha_zero_pixels": 67198,
+      "alpha_sha256": "cb228ab6416579efeb80788f8f1961abeb59db14513b9e3c142afedb1b52e353",
+      "alpha_sum": 10424784,
+      "alpha_zero_pixels": 67442,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.2761671557153706,
@@ -1108,7 +1122,7 @@
         768,
         172
       ],
-      "pixel_sha256": "332bd17e77cb0120236a74c8964dfeec2435b28e716250bedbe714045dde33b2",
+      "pixel_sha256": "d8e78b9fa75391cf2bbd2e6e7c3d7282c303f44380e011d7640532fb8fd5b869",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_46Tex",
       "previous_phase_sha256": "d0757b05856b719ab500f8102a0b6ff0a535854d349b3cc7cf981fb3a7298e70",
       "rgb_channels_equal": false,
@@ -1118,11 +1132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ba52f8552d0cb8951f5035c805440bcb689da16ccdcc74fd9de2ae6c94b32a43",
+      "sha256": "8593f749168319bedde3b4d383a58e814d0e5da51377e387b88c3658c9de3d0f",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ba52f8552d0cb8951f5035c805440bcb689da16ccdcc74fd9de2ae6c94b32a43",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_133PaletteTex": {
@@ -1182,11 +1197,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "7b3e788e80a2add1a3569ba5845e689bf59637de54667d0279b70e5af17eba43",
-      "alpha_sum": 14754874,
-      "alpha_zero_pixels": 68830,
+      "alpha_sha256": "7f33a45be617ce2ccbaa8e46a4736be9956ccf82b1c2b1e5249df431bd3f90a6",
+      "alpha_sum": 10398262,
+      "alpha_zero_pixels": 68996,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.4231349059826091,
@@ -1207,7 +1222,7 @@
         768,
         172
       ],
-      "pixel_sha256": "8df4c582f7d150cb6c277e28db745b110db678778795b563505c68cfc9c0e83a",
+      "pixel_sha256": "07821707087a6624369475c1e59593b36a8818a55224ec79fc2f120e938bfec4",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_47Tex",
       "previous_phase_sha256": "51a79be97b490f65d7c76b8d7a0935a66a1f0bd0abffe952a8b973c776b6f8ff",
       "rgb_channels_equal": false,
@@ -1217,11 +1232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "02d4d54b67a776299a297e08be9f508acde70b264873fc232a9b6cf7c404ef91",
+      "sha256": "7513bf5756990dc6b210889f189bf6e23631681a58c4e87d899271790c1d55d5",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "02d4d54b67a776299a297e08be9f508acde70b264873fc232a9b6cf7c404ef91",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_134PaletteTex": {
@@ -1281,11 +1297,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "b777584510bccdd67ac4748760ed2da9e3165e88d182872011624c84d872c525",
-      "alpha_sum": 14610899,
-      "alpha_zero_pixels": 70174,
+      "alpha_sha256": "35f036e19b9521ff4bd894ea99d40cb3a44eb78daadece9355c742bfb344d8e4",
+      "alpha_sum": 10360945,
+      "alpha_zero_pixels": 70286,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.5823780080712372,
@@ -1306,7 +1322,7 @@
         768,
         172
       ],
-      "pixel_sha256": "0ce4faf0100ebc87d0c7b3a6bf7b6572e44d93e88c4406b7e8fcee4510cac897",
+      "pixel_sha256": "f943231c5577fe9823b8af99fa489305cec4f6b168b90e7e3e82d2ba81a52bd6",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_48Tex",
       "previous_phase_sha256": "8c92d3b5ae095b2d1980529c8c32fb0110662fc8d96ae097500e291a4c258ab6",
       "rgb_channels_equal": false,
@@ -1316,11 +1332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "bf147b62c87118e6909d490d84fee31dc7e5f805c3f3686d88a981a5b3635e5f",
+      "sha256": "cdab137cd389ddba73e95a7e53fe7dea3dcdd4155c976f750e5ad2a57dd2cef9",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "bf147b62c87118e6909d490d84fee31dc7e5f805c3f3686d88a981a5b3635e5f",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_135PaletteTex": {
@@ -1382,9 +1399,9 @@
         0,
         253
       ],
-      "alpha_sha256": "55c62010bcd10bb960c808f77aa0bd6023239f98bf2f4d884fa37432faaf7db1",
-      "alpha_sum": 14451177,
-      "alpha_zero_pixels": 71378,
+      "alpha_sha256": "79f6830672f208409a32a79652186ac62349f624aadb22ae62dd60548e0e07e0",
+      "alpha_sum": 10318611,
+      "alpha_zero_pixels": 71491,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.7378699331128932,
@@ -1405,7 +1422,7 @@
         768,
         172
       ],
-      "pixel_sha256": "389c6515663accfe37d7f27a528dff0da693a24743bb1f0dce6c0f8e653a489d",
+      "pixel_sha256": "9452a9aed7f139fd5ac2f602bf03b522e87f90c52ee5d9cf066ed71a80d62975",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_49Tex",
       "previous_phase_sha256": "12df844348e8e10804196801a5e989d1ea2d012eabef8b37d679420c01f716e3",
       "rgb_channels_equal": false,
@@ -1415,11 +1432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ab8758be9ee4e02154534d29865d63c1377040f053f364e34c529967ca369ad7",
+      "sha256": "dc86a129d7f51ccbc3cdc002d68386cde06b249518795c277f3975078b1f6a96",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ab8758be9ee4e02154534d29865d63c1377040f053f364e34c529967ca369ad7",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_136PaletteTex": {
@@ -1479,11 +1497,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "3a0bfd09aefc60f51213c99491ed486fd322d7482d209c80cf5a24e309f6641d",
-      "alpha_sum": 14290318,
-      "alpha_zero_pixels": 72356,
+      "alpha_sha256": "651d96053ffbcebb236713d18a89d2b91f2afb932d48fa1057ea2ef3e61dd3bb",
+      "alpha_sum": 10275046,
+      "alpha_zero_pixels": 72452,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.8716826714270459,
@@ -1504,7 +1522,7 @@
         768,
         172
       ],
-      "pixel_sha256": "cf16fec36f81a2a6b520505a68cfce1c22a734a487edc97a16713fafd5fac68e",
+      "pixel_sha256": "39ba64cd38fdd74118ecb502a72b0ba5b281ca3f4f48ca1fb1c98dad3700f4b9",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_50Tex",
       "previous_phase_sha256": "44b5512852eb12493ae6ba95ac9aba796cb1847f991f29b69c0ebe6c85345a59",
       "rgb_channels_equal": false,
@@ -1514,11 +1532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "df081e38e2532bc4fb02b83cc57df8f609c5f83f494f01915f4a2c3eb94a2efe",
+      "sha256": "65b79b6cf7029335d767eff1035ba22d60ee29c7e29b7c6d8c80b67027f5528c",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "df081e38e2532bc4fb02b83cc57df8f609c5f83f494f01915f4a2c3eb94a2efe",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn0_137PaletteTex": {
@@ -1580,9 +1599,9 @@
         0,
         253
       ],
-      "alpha_sha256": "d985abe06fb294b05e481b1b9706d72182fa21987abd073b3a6e29d9f5ecef6c",
-      "alpha_sum": 14134538,
-      "alpha_zero_pixels": 73097,
+      "alpha_sha256": "0b74024656dd16c1b50e49c951896e1e28af57d0a797222b362dde74a6adac15",
+      "alpha_sum": 10231913,
+      "alpha_zero_pixels": 73196,
       "atlas_row": 0,
       "band": 0,
       "burn": 0.9651158666082658,
@@ -1603,7 +1622,7 @@
         768,
         172
       ],
-      "pixel_sha256": "0dd58e07cfc08bf03a3a6c2ff02b0b60d74566fbab2f27efa546177fbd138eed",
+      "pixel_sha256": "82daf5178a7a5681242fc944d3c504e6d78a547cce1add29ac44e416e56496f3",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn0_51Tex",
       "previous_phase_sha256": "10ab222384b312a03d5c1fe82b38a61e3fbc8986f4c816e1e8379f31a4091f8d",
       "rgb_channels_equal": false,
@@ -1613,11 +1632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "36ef60d14cf8755b721b95af0c93fdfb158bb7d9dda05be11d64c4fb0077fa40",
+      "sha256": "3aaf359b8c8342efeb3d5f9927ada24faec637b36e0a43d30011d9b56bd852df",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "36ef60d14cf8755b721b95af0c93fdfb158bb7d9dda05be11d64c4fb0077fa40",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_127PaletteTex": {
@@ -1679,9 +1699,9 @@
         0,
         255
       ],
-      "alpha_sha256": "508d2c33af3e6202df941a8070bfc4809de1a4f84bedf291d091a1beeba815d1",
-      "alpha_sum": 16181698,
-      "alpha_zero_pixels": 16032,
+      "alpha_sha256": "28d6607598ddb94e29f26a8b518cb5a1946cf164e8b55b16ba45a4dc3f6ef2a1",
+      "alpha_sum": 11453086,
+      "alpha_zero_pixels": 46476,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.0,
@@ -1702,7 +1722,7 @@
         768,
         163
       ],
-      "pixel_sha256": "e93bfcddc652149ca7d6996e342cd690712761d70a602daf5cfdeeaeae362119",
+      "pixel_sha256": "3cf4724d3f97b2f16509071a0554ed6eb0cf939f2a3595bf7d10c05f2060afd1",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_41Tex",
       "previous_phase_sha256": "f87c354013dd8183c748d83fa6a20f58e1129aa43c3cc92d78c8e2bb6935c08c",
       "rgb_channels_equal": false,
@@ -1712,11 +1732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b6acdf70a147590ab75812705aec180dfce249ea876b5aab95ad88969e516401",
+      "sha256": "c6bf48fafb8befed4f8fb2aad2902da7f4f55a9aaeb2a700160e6b051db0db93",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b6acdf70a147590ab75812705aec180dfce249ea876b5aab95ad88969e516401",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_128PaletteTex": {
@@ -1778,9 +1799,9 @@
         0,
         255
       ],
-      "alpha_sha256": "dc1e683907c8cfce65394197737183fc9b0b3e85665fda340591486f917b8862",
-      "alpha_sum": 16133069,
-      "alpha_zero_pixels": 47163,
+      "alpha_sha256": "9cd51077cce8d0486cb16b7259bafd06026ba158c22d699ca620ae54db09c22a",
+      "alpha_sum": 11444935,
+      "alpha_zero_pixels": 51521,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.0036519113157123693,
@@ -1801,7 +1822,7 @@
         768,
         163
       ],
-      "pixel_sha256": "80b7efa2883a6a1dfd25dd8f02425abb40808166916b0272818c1a6c8f6bdd2b",
+      "pixel_sha256": "8904067430437ef0dca573384d5bc779c551d9eabdf7f7e9b646eefc7bd97a36",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_42Tex",
       "previous_phase_sha256": "9edd5a8a66f2c3f984d242a6d1dc68944b77ef593c63f0ea9ae5330eb0c7785c",
       "rgb_channels_equal": false,
@@ -1811,11 +1832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "3445c0bb9f4833d87cf6b28a308c045815521bc7b727336fd57b983c9c043814",
+      "sha256": "bfbbcf3cf02ed62c992c42da376158ae8fa3f982de06703b352291702ef0fcd9",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "3445c0bb9f4833d87cf6b28a308c045815521bc7b727336fd57b983c9c043814",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_129PaletteTex": {
@@ -1877,9 +1899,9 @@
         0,
         255
       ],
-      "alpha_sha256": "1974f63e071bd4d7df93c5a988eee7c20e7da96cba08bccaa5aef6e06f3191b0",
-      "alpha_sum": 16116919,
-      "alpha_zero_pixels": 51171,
+      "alpha_sha256": "1c1d1216ce65c02675f133d2bb346b78eb1bd90248cdeb2ed9a0a50d33118586",
+      "alpha_sum": 11440640,
+      "alpha_zero_pixels": 52901,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.02978855334058764,
@@ -1900,7 +1922,7 @@
         768,
         163
       ],
-      "pixel_sha256": "e7421d8e90c1586dc5f692615e0f160198ad5c6a0f87495c81cd415da99038da",
+      "pixel_sha256": "4da6aa0abf9bb8fa42db4dea70a09c6046ef944851a7ccc0222416fb1a046286",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_43Tex",
       "previous_phase_sha256": "c9296f08a7856b5502c760438a802eb15b0017a267fe7031fceb221987f8514c",
       "rgb_channels_equal": false,
@@ -1910,11 +1932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a0211c94f43e5f2ef3e75df0b3349ab84be7bdd83a139cd59b32e6abce117159",
+      "sha256": "564a5e76748d5dcde1db4d9da63fdb0ebeca6ad8e1c8ba9f701ce61a00a19fd6",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a0211c94f43e5f2ef3e75df0b3349ab84be7bdd83a139cd59b32e6abce117159",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_130PaletteTex": {
@@ -1976,9 +1999,9 @@
         0,
         255
       ],
-      "alpha_sha256": "2b21f1901d0777ba55c1968d73bd3a9ccd60601cac7e1ee2e373c26d3b64e781",
-      "alpha_sum": 16088898,
-      "alpha_zero_pixels": 53884,
+      "alpha_sha256": "3f1c20a3ccc6dbf26258b0e647f7c720dfdab21b056f9fef9ad6e91099a38db8",
+      "alpha_sum": 11432809,
+      "alpha_zero_pixels": 54426,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.08911328364522565,
@@ -1999,7 +2022,7 @@
         768,
         163
       ],
-      "pixel_sha256": "0f603dccf614052cb20ca2a5567419c69bccc39eacf32f82769938964eede900",
+      "pixel_sha256": "2239d250f129ae1befa827b4b885b97478a1994ca7b9d5e5bae542d711d86cda",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_44Tex",
       "previous_phase_sha256": "27ef372adc07a00155edaeb538147461f97befcc328a3d08b077ad11e668a7f1",
       "rgb_channels_equal": false,
@@ -2009,11 +2032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "725d4314d864f31717041fb2c529d11eeeb99a27df3913495364ecd01d0eba48",
+      "sha256": "fb96ad323d4395cf09ee11844625e1293b581678f60034cd198e544a555119b5",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "725d4314d864f31717041fb2c529d11eeeb99a27df3913495364ecd01d0eba48",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_131PaletteTex": {
@@ -2075,9 +2099,9 @@
         0,
         255
       ],
-      "alpha_sha256": "aadb95d52b6c73d528a4863206fc2f74e3380e8ba43ed1dd90fbe3520c3d6a45",
-      "alpha_sum": 16045224,
-      "alpha_zero_pixels": 55621,
+      "alpha_sha256": "f4ef8f554a08b5a9847657bb2fe955477f83e3ba36e8a6402b7671580f0a6b55",
+      "alpha_sum": 11421635,
+      "alpha_zero_pixels": 55863,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.18304559003938733,
@@ -2098,7 +2122,7 @@
         768,
         163
       ],
-      "pixel_sha256": "ebd02ee282c0f3afe411732b0c7a777a36d2e813b0d83dba11deacf554b38538",
+      "pixel_sha256": "df85ff682e5be75bf3fc05452ca23c4a0016ab83a2692a9253799bac48d29798",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_45Tex",
       "previous_phase_sha256": "327e8e47fc59179d61c23ccbb57ff344c706ffd06c7adad121d1501b0a51867c",
       "rgb_channels_equal": false,
@@ -2108,11 +2132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "35a1a0a472fa1da3684df14b293169e937869f6741fdf64fba31fa71ee41b9c8",
+      "sha256": "e9c6aa28dce9ba2df57ccc0ab25f0cb0eeb18d684ecfa62c9041a4abfb07f419",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "35a1a0a472fa1da3684df14b293169e937869f6741fdf64fba31fa71ee41b9c8",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_132PaletteTex": {
@@ -2174,9 +2199,9 @@
         0,
         255
       ],
-      "alpha_sha256": "e307d05ba3e614103edd806db474f53502001c4e7f728539798e776ab54a8dd8",
-      "alpha_sum": 15975152,
-      "alpha_zero_pixels": 56881,
+      "alpha_sha256": "daf4146dd5d64521c4658fe696e1e5d6f0001eb0dde19c9110605669e6d6aa65",
+      "alpha_sum": 11403031,
+      "alpha_zero_pixels": 57046,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.30704156756891965,
@@ -2197,7 +2222,7 @@
         768,
         163
       ],
-      "pixel_sha256": "a43f5864ebcb5437d1b57f3f9cf8e0d13d790f8072b617ec39d88460dfce8214",
+      "pixel_sha256": "be8dda40f45f473806751e6927736b4d5c6e6cf63c3c0a00b721ec3240159ea5",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_46Tex",
       "previous_phase_sha256": "0229e21664d403629fe71569a6a72ba0b462e566964b8ec4707efa56f8e7019f",
       "rgb_channels_equal": false,
@@ -2207,11 +2232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "322f6a84c71651bdbc8de091cc8599be9db569c342be12b65063a967f22cb594",
+      "sha256": "acb5ab7a77279f97dc16be6fe259ddfd85c2f01112ccb3f687b2a8e228f5cca5",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "322f6a84c71651bdbc8de091cc8599be9db569c342be12b65063a967f22cb594",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_133PaletteTex": {
@@ -2273,9 +2299,9 @@
         0,
         255
       ],
-      "alpha_sha256": "e15aa13833f29501667d561d418e04468c556d101b6f3b8b2fa9dff21e95e363",
-      "alpha_sum": 15880544,
-      "alpha_zero_pixels": 58034,
+      "alpha_sha256": "16d1df20912ce4efe80bc19ee7fee51490a87a8c7f5fdd55eb7e98988c6054b7",
+      "alpha_sum": 11379079,
+      "alpha_zero_pixels": 58144,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.45214202505526413,
@@ -2296,7 +2322,7 @@
         768,
         163
       ],
-      "pixel_sha256": "ea6e03a1ed2e4f3f6fac23b48e40ff2d720d94d89ebaf5553dae67b213e67919",
+      "pixel_sha256": "e27d32c2fd691ae35848d52395ceda6a67718c4cd89af0384720fbebb4f081c9",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_47Tex",
       "previous_phase_sha256": "88d2d547a65a9712afe45c449ba1436803345d8833345fffd24d0950b7f505d9",
       "rgb_channels_equal": false,
@@ -2306,11 +2332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b25752d03dbbc288b0a060f728b297154fefc410a495d45ada450108d7441c3c",
+      "sha256": "5503f49f7ec3c52b836f231cffdb3f73dd966f9cbb5a3da5fc71043a52420a56",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b25752d03dbbc288b0a060f728b297154fefc410a495d45ada450108d7441c3c",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_134PaletteTex": {
@@ -2372,9 +2399,9 @@
         0,
         255
       ],
-      "alpha_sha256": "c6ab970e076cd65e7e523408f71ed5ed54cef16e96ed84033c1d5153bd55d2d5",
-      "alpha_sum": 15768569,
-      "alpha_zero_pixels": 59123,
+      "alpha_sha256": "665940a0008a5fff8585f53a0d7f38a951ac99ce5abd1e89601c0b8f33d0c659",
+      "alpha_sum": 11352450,
+      "alpha_zero_pixels": 59224,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.6060674375265731,
@@ -2395,7 +2422,7 @@
         768,
         163
       ],
-      "pixel_sha256": "bc42f50f4f8a2202459838fd86aae6c4b8a1562e9b06ef4b44ada46595096d71",
+      "pixel_sha256": "4c4eb4d2482a2734874e2e5ef5124729af583583b99c3e49aa446eb95f2f0c01",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_48Tex",
       "previous_phase_sha256": "7d549155b0d13158a72e49bd8777dc19c4eb0a39a0c8b51360f933bbb10d7675",
       "rgb_channels_equal": false,
@@ -2405,11 +2432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "d4598b895055942608b2a04cdea4140be3f89a17de192c668276c00860df47d1",
+      "sha256": "e157b5d108fd43fabbd16a52cd8c46e25bd226dccdc721b67300cb97690afb24",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "d4598b895055942608b2a04cdea4140be3f89a17de192c668276c00860df47d1",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_135PaletteTex": {
@@ -2471,9 +2499,9 @@
         0,
         255
       ],
-      "alpha_sha256": "a13193c60544cef20b3b2ca8afef28e3d8d31215c056e4140489dfa9f8b12e1d",
-      "alpha_sum": 15624420,
-      "alpha_zero_pixels": 60092,
+      "alpha_sha256": "21d5dc9a3a04f6c486c4cb81feef1bc17ec97d6aba14a1d57041f33db9eeffeb",
+      "alpha_sum": 11314920,
+      "alpha_zero_pixels": 60178,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.754148285193871,
@@ -2494,7 +2522,7 @@
         768,
         163
       ],
-      "pixel_sha256": "3e28b9872322c1f518870487e53d6e8bf8f2f599c8db05d14f393a6457bdacbb",
+      "pixel_sha256": "c1c063ed0e74cc60d147f2a2b234cc5b0ceda38971d15e514000c4187760d59d",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_49Tex",
       "previous_phase_sha256": "f7ea0cce8437304adadd0b8269c372a4cabcf0269b61dd53a0726eda2f79a5eb",
       "rgb_channels_equal": false,
@@ -2504,11 +2532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "49203b5baf32cb7706c66dfd582dbc68ae6a51977cff2603bf55cfe84a309815",
+      "sha256": "70fc1d135e26dd65eb7b0840f97b0ea128ce3c313d5887e4fdd7551c53e2ee24",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "49203b5baf32cb7706c66dfd582dbc68ae6a51977cff2603bf55cfe84a309815",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_136PaletteTex": {
@@ -2570,9 +2599,9 @@
         0,
         255
       ],
-      "alpha_sha256": "568e7409c9a613a55c2cb5c590b9fbc2b37d0a617e6fef59fb06f2ce61c14467",
-      "alpha_sum": 15470737,
-      "alpha_zero_pixels": 60910,
+      "alpha_sha256": "560da52b310103dc086cc0fdcea6237b559a41aef6510a14f36c6db5f4128a9e",
+      "alpha_sum": 11274579,
+      "alpha_zero_pixels": 60981,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.8802181529256677,
@@ -2593,7 +2622,7 @@
         768,
         163
       ],
-      "pixel_sha256": "0bf4938b40f78f7cdb80e169a91e768013c24d9dc0a69d5ef70c238f746a6344",
+      "pixel_sha256": "c322bb4139407936d23b82f47fac711a807ea3e239920cb9020d0c19c533ed6e",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_50Tex",
       "previous_phase_sha256": "00adc9e9bdaf7c90a02d33a36847f152f8ae5f9ae2a5a75b8ab0839813df2546",
       "rgb_channels_equal": false,
@@ -2603,11 +2632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a335e97a1eb0317a90457e4f14f76ec3d336101e98ffb1d4d0d9f05d7d234ebe",
+      "sha256": "5f3427a0c73e6f21796c30a716e58c1108bb2a4ad97f8a9b50c0834972e2788e",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a335e97a1eb0317a90457e4f14f76ec3d336101e98ffb1d4d0d9f05d7d234ebe",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn1_137PaletteTex": {
@@ -2669,9 +2699,9 @@
         0,
         255
       ],
-      "alpha_sha256": "9d160ed0b70998f98ddcd0cfc6314c2b8b73daf73100cc8c6eec19bfeb8dc0fb",
-      "alpha_sum": 15357353,
-      "alpha_zero_pixels": 61513,
+      "alpha_sha256": "041e746cffe21e48c92c224e5ff3284a83c985794d74022e33994d102c24d28e",
+      "alpha_sum": 11246333,
+      "alpha_zero_pixels": 61602,
       "atlas_row": 1,
       "band": 1,
       "burn": 0.9675594381827171,
@@ -2692,7 +2722,7 @@
         768,
         163
       ],
-      "pixel_sha256": "ab79183cc7e8d8fa7038566260fa9543d3b7e939d89c3cfcc22edfaf6ef06201",
+      "pixel_sha256": "7f692eb5c76a818dac9a2e5b7cd7dc18dfd27842bea305f4be813adda7659eb0",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn1_51Tex",
       "previous_phase_sha256": "eb72d84008edc2bba439ccaa0bbd8595a8ac922050459908c19287a694fed949",
       "rgb_channels_equal": false,
@@ -2702,11 +2732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "15074e02c3b5fc55319dab70fc5a851b6faca9eaccef395556638173fd5a696b",
+      "sha256": "c27f0a1e2bae3ed8e82517271c5bd761a6cc045063eaf9096dc872ae49c9bb3f",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "15074e02c3b5fc55319dab70fc5a851b6faca9eaccef395556638173fd5a696b",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_127PaletteTex": {
@@ -2768,9 +2799,9 @@
         0,
         253
       ],
-      "alpha_sha256": "3f30c16c79246b68dd99d45bbeed6d44ab3030bbf48350a4984cb1c08062dc9b",
-      "alpha_sum": 16733492,
-      "alpha_zero_pixels": 55328,
+      "alpha_sha256": "002a8b391e77e0a1011cf5521c99fa6485694b4a794ce7208cc03468a44454cf",
+      "alpha_sum": 11929023,
+      "alpha_zero_pixels": 59452,
       "atlas_row": 2,
       "band": 2,
       "burn": 8.260082965849475e-05,
@@ -2791,7 +2822,7 @@
         768,
         178
       ],
-      "pixel_sha256": "5e9d5dd6fcbc2835af579230c4ea5752a0537d35da0f2f49f8b453456759efa1",
+      "pixel_sha256": "187e45e15a067f32fad0187698e07525553718f2dff2ad9a0e4209e5062e1d63",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_41Tex",
       "previous_phase_sha256": "9c316e91d72cb18386e340edafa64aed16387cef85e4dc17eb4606aed9cc4207",
       "rgb_channels_equal": false,
@@ -2801,11 +2832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "dcde8328ef18eba35bba3dc528ec62ecb7ee1d53bf38431974782cadd1ce4e36",
+      "sha256": "e9dfbf01dbcb0e3247f686deae2abb0a75c4f908c009f469572857e62296c3fa",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "dcde8328ef18eba35bba3dc528ec62ecb7ee1d53bf38431974782cadd1ce4e36",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_128PaletteTex": {
@@ -2865,11 +2897,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "2db65b919a629f8a5fe0dc069526d2af9ba9fd700b8d2d220374bc52f7bfeb7a",
-      "alpha_sum": 16727446,
-      "alpha_zero_pixels": 56057,
+      "alpha_sha256": "2abfe1d4fdd7845c293fc7c7af29e96282268e998e8c30d188fb9e2a7e1da2d2",
+      "alpha_sum": 11926570,
+      "alpha_zero_pixels": 60212,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.009584403177020367,
@@ -2890,7 +2922,7 @@
         768,
         178
       ],
-      "pixel_sha256": "cec189554ec576306908eb64d5b2980ffcf2a373a7313125f2a7b5c713403681",
+      "pixel_sha256": "d2e57823b1bf43bd628ad7af9c455081d4c0d05c0a249fc5b8c0eef1383a3ac8",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_42Tex",
       "previous_phase_sha256": "d1f57485f8ebd860f86397c9b887d1f99cef36f43b6bb97485d946d103eaab5a",
       "rgb_channels_equal": false,
@@ -2900,11 +2932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "6875c15d3e2c50a4da468f60c750a53518b6d1ca3f402e8660311ce09d6345a4",
+      "sha256": "f544ca7b1048300b54b8d7b948be5011b5b8be4e84e4eb0c7178762391fa26b9",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "6875c15d3e2c50a4da468f60c750a53518b6d1ca3f402e8660311ce09d6345a4",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_129PaletteTex": {
@@ -2966,9 +2999,9 @@
         0,
         253
       ],
-      "alpha_sha256": "d5699246692ad72cbfeba616fa2ffc04ac7848aedc0bd05e59a0125625fbc816",
-      "alpha_sum": 16706071,
-      "alpha_zero_pixels": 61108,
+      "alpha_sha256": "75762d4a1d4672cc5a959e001ccb0beccb071a050d6712dbc7eb03ffb3e9d3e9",
+      "alpha_sum": 11920499,
+      "alpha_zero_pixels": 62181,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.045027216018647294,
@@ -2989,7 +3022,7 @@
         768,
         178
       ],
-      "pixel_sha256": "bfb801931f744a04dc3f51a009036482227684285f62be6c3306881bb603d5f5",
+      "pixel_sha256": "ccc3c615188f37791aa38739520040f3b801074127c5171c6369258a6dda3160",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_43Tex",
       "previous_phase_sha256": "b111525b5efe0410280facdab759802e20ac9351768de3ce28fa7ed2e36be85d",
       "rgb_channels_equal": false,
@@ -2999,11 +3032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b0e16e19c9d41f39d5c4c1c51ee9c7b76d91fb3c9498d2f431044897df8615c5",
+      "sha256": "93c80e85bdc024968b4a4be04733820e9198a7fe5f205c16d401629bcb55ade2",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b0e16e19c9d41f39d5c4c1c51ee9c7b76d91fb3c9498d2f431044897df8615c5",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_130PaletteTex": {
@@ -3065,9 +3099,9 @@
         0,
         253
       ],
-      "alpha_sha256": "ab1f98f3f9f58a714a7100a2cac753ae3d103f8e0611a06ff06df2a53f4fe04b",
-      "alpha_sum": 16668789,
-      "alpha_zero_pixels": 63183,
+      "alpha_sha256": "632725b76768624ecc42b1955fd870eae542a6c8a4df4fd112365749397b9022",
+      "alpha_sum": 11910037,
+      "alpha_zero_pixels": 63645,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.11252265479153968,
@@ -3088,7 +3122,7 @@
         768,
         178
       ],
-      "pixel_sha256": "ca3464f660620364b7547624cfff15c58a3c25b889c60044532af5906652feb9",
+      "pixel_sha256": "b40f78bcbe322f18f1ae3121666529c82e3e815c4511ccbea7e0de249fb772c6",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_44Tex",
       "previous_phase_sha256": "2cef86c7be4f5522d14c2e88a0a52fbb02514ad2746e8327490bc1d8b4576d14",
       "rgb_channels_equal": false,
@@ -3098,11 +3132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a9859e5f0cda6892d3c5a735c4e6a3b444a18b9244e0e51808f1f870e75e328d",
+      "sha256": "0bc5627edce50cf2ab49ee239c86b73df8023212dada906a0fafee383bf315c0",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a9859e5f0cda6892d3c5a735c4e6a3b444a18b9244e0e51808f1f870e75e328d",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_131PaletteTex": {
@@ -3164,9 +3199,9 @@
         0,
         253
       ],
-      "alpha_sha256": "d4d39e90e65b8186c3f68c3a24f6eb6a181298c7b95952c8d8dbb81b010eba3e",
-      "alpha_sum": 16611639,
-      "alpha_zero_pixels": 64942,
+      "alpha_sha256": "bf8c20896178b130aa466d69605aa79f9aa3fe3de9da124feebbeb2a86f0e443",
+      "alpha_sum": 11893096,
+      "alpha_zero_pixels": 65190,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.2115099596121767,
@@ -3187,7 +3222,7 @@
         768,
         178
       ],
-      "pixel_sha256": "fe71960412787f0edf436654ae569a24639760c9fca6a3ba9f63941088946c5c",
+      "pixel_sha256": "b8c95290dc8bb4a8cffebc595f77710aacca2886f1e1139b6f80f0f6ed2903d9",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_45Tex",
       "previous_phase_sha256": "1e6de805c31460912f47a1d1b62c758944f471fee2abcc5f1769e18a1e92744f",
       "rgb_channels_equal": false,
@@ -3197,11 +3232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "1506c75d9ad652e4b1e5d02766f0e2d867a1c6434965c790e0ab5b4cca6fae3b",
+      "sha256": "eb4718ec0106c9a9527c7fa6867aa713821648dc35c5012e059e18c311badb23",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "1506c75d9ad652e4b1e5d02766f0e2d867a1c6434965c790e0ab5b4cca6fae3b",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_132PaletteTex": {
@@ -3261,11 +3297,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "418a3febd1fde2f5cf64153448c65100a97ead9499bf6da00fa39328d816501b",
-      "alpha_sum": 16537263,
-      "alpha_zero_pixels": 66416,
+      "alpha_sha256": "c8652a9c980815476ee78465c0793e4d369aa1baea87650845d1410fc04ddc23",
+      "alpha_sum": 11872134,
+      "alpha_zero_pixels": 66562,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.33673233013569226,
@@ -3286,7 +3322,7 @@
         768,
         178
       ],
-      "pixel_sha256": "2664147d07931844b1cb07ef469eaf9a5efd1d193024bc209beb892b9dc61535",
+      "pixel_sha256": "48d0316f90777690b3c65c94521e5b8230e385fdff3a36f72dd59a35dab4c694",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_46Tex",
       "previous_phase_sha256": "a550f2d2c826992d4c12d75578d0725adc63b834b8544d252e72a1c3e6249ae4",
       "rgb_channels_equal": false,
@@ -3296,11 +3332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "f99b2c505ed71f54e9cfdc44100245ee79e3b18d5f71d6164f13b1774cbfa914",
+      "sha256": "c1f8232a7eab7e1f4f276ca5bcfd3cdf1a41e643a23bb91467feaab2707c9ef8",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "f99b2c505ed71f54e9cfdc44100245ee79e3b18d5f71d6164f13b1774cbfa914",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_133PaletteTex": {
@@ -3362,9 +3399,9 @@
         0,
         253
       ],
-      "alpha_sha256": "1bd7a7748216103b64b0a18c8a6c92ebf87e994e17daa84640c1c13d54d63bab",
-      "alpha_sum": 16436549,
-      "alpha_zero_pixels": 67565,
+      "alpha_sha256": "1dd0c0eb20f9961d0e0537da11e1223f30523663b9fd0882db598f1d598200b5",
+      "alpha_sum": 11845369,
+      "alpha_zero_pixels": 67687,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.47937787076709093,
@@ -3385,7 +3422,7 @@
         768,
         178
       ],
-      "pixel_sha256": "439c48f1d07ac3983d57643d8d4ccaade528d83f3d4ad68726ebb5a41cbbac57",
+      "pixel_sha256": "e52c05c35c97ed0d77125e28c1a6fae21896bc7c12ab26a1d3e1a2fbcec4a650",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_47Tex",
       "previous_phase_sha256": "8568979c28d2b0b7df94be7db0bdcae119f74bab2bec760bf3b0cedc1b9350aa",
       "rgb_channels_equal": false,
@@ -3395,11 +3432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "414d3e15ffe6bc287787f593458f43ab0359eed6e7a8a354ac1b92973ce0bff7",
+      "sha256": "06b7ecb15d41259bf9ee6a24453299c8498d6bcdde746793095d9c23ec959331",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "414d3e15ffe6bc287787f593458f43ab0359eed6e7a8a354ac1b92973ce0bff7",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_134PaletteTex": {
@@ -3461,9 +3499,9 @@
         0,
         253
       ],
-      "alpha_sha256": "34ea3ca15f546d2fc627e99c245612fde2c7c8349d3f28033767b49f846e2b04",
-      "alpha_sum": 16319773,
-      "alpha_zero_pixels": 68637,
+      "alpha_sha256": "78b57bfa68362f42056ce4399c31cbd8ae6bb673766818d02aa5b91b80f5642c",
+      "alpha_sum": 11812576,
+      "alpha_zero_pixels": 68716,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.6279447116494886,
@@ -3484,7 +3522,7 @@
         768,
         178
       ],
-      "pixel_sha256": "41666f9b2e9bce51fc38c57779ecffc175899cd07d57210fda8f7dffc07d084f",
+      "pixel_sha256": "fcc246e060c3d44c08dade7f6518712f093e24bcd7b2cd9922c79d912a7a3623",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_48Tex",
       "previous_phase_sha256": "c48b4b1f064b9709ed3975a0dcfa146b6a98bd7741cae8e53d8a93c13dbbf6ad",
       "rgb_channels_equal": false,
@@ -3494,11 +3532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "6cf68a413d10dd20071766b587b2c7be72280eafd7e498bbf789ff21ea3db4f9",
+      "sha256": "77e01074a8a3463335bd968becb06150b9e543c75a094d57bc3bb0b9bd085e62",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "6cf68a413d10dd20071766b587b2c7be72280eafd7e498bbf789ff21ea3db4f9",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_135PaletteTex": {
@@ -3558,11 +3597,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "ce9592d804797c96fcc5bc7a7cbdec95e251449c68a42dd31652af0595383557",
-      "alpha_sum": 16193540,
-      "alpha_zero_pixels": 69537,
+      "alpha_sha256": "f3da632c44baa46f42d397b59706d08f911e8a60abeb91dea0563ca29f449069",
+      "alpha_sum": 11776959,
+      "alpha_zero_pixels": 69627,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.7690026084854944,
@@ -3583,7 +3622,7 @@
         768,
         178
       ],
-      "pixel_sha256": "48fadd95e2ca27b373939595b14d959800348eb50a69b06e02414aaf521fd751",
+      "pixel_sha256": "8af4cfb4b3bcd41311c7313225f7b58718f504a68f179ba5a4d0cd07feae9a65",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_49Tex",
       "previous_phase_sha256": "27012d24b9109b4a9d4f2d99161f19f953c1f2888baa5fb2eadbff9d439c7421",
       "rgb_channels_equal": false,
@@ -3593,11 +3632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "34f00c94c4889397b962aca9c3d106aae888842f332586b5ffd797a1f0bd17ea",
+      "sha256": "f114d698285f879580975c69c8a8b8f821a7b4b385d41fa2a434c5609764c95c",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "34f00c94c4889397b962aca9c3d106aae888842f332586b5ffd797a1f0bd17ea",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_136PaletteTex": {
@@ -3659,9 +3699,9 @@
         0,
         253
       ],
-      "alpha_sha256": "efcd4f7bcdecc1df28927ad043de4640145d9c304a865cf020e867bee6aa7c01",
-      "alpha_sum": 16055940,
-      "alpha_zero_pixels": 70262,
+      "alpha_sha256": "efde0c01d5f6e160ac586ba01780f4f135e9b0438950d5f8e1470dfd224f28bb",
+      "alpha_sum": 11739382,
+      "alpha_zero_pixels": 70338,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.8879387020724777,
@@ -3682,7 +3722,7 @@
         768,
         178
       ],
-      "pixel_sha256": "43b94f4edbd3d0eadbca7892f3be8a363176f20c4119361468ebfe6e311f20d4",
+      "pixel_sha256": "525fb36b7681199284c5c5958595e64c947e99edab390f8eb9a4f53776038f5e",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_50Tex",
       "previous_phase_sha256": "b32e5d70bade1b0a056e10dddb56484364d17a01a23d50ccc99cc8ffa6699e60",
       "rgb_channels_equal": false,
@@ -3692,11 +3732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ced2466732502064225cbfab2176032fccb791c9dc0bbc9f371c4e573ea742a5",
+      "sha256": "9687f9091f55a628d5e5a3768525dc8781043037418be58bc10cb87d13a29a64",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ced2466732502064225cbfab2176032fccb791c9dc0bbc9f371c4e573ea742a5",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn2_137PaletteTex": {
@@ -3758,9 +3799,9 @@
         0,
         253
       ],
-      "alpha_sha256": "49456674a05e9014a88659b8164425f7faf16d9dcc2917eb30bc58c3f0998bfd",
-      "alpha_sum": 15945254,
-      "alpha_zero_pixels": 70846,
+      "alpha_sha256": "7fb8c74c91e654792f7b89de6dc9077616caaa591a2f2fcb4cba1ed93ed67bfe",
+      "alpha_sum": 11708034,
+      "alpha_zero_pixels": 70936,
       "atlas_row": 2,
       "band": 2,
       "burn": 0.9697555617999077,
@@ -3781,7 +3822,7 @@
         768,
         178
       ],
-      "pixel_sha256": "b53374d8ae13ef14fff527d3fc66550dfcc09a875974fa60bec20fd1f2e443e8",
+      "pixel_sha256": "16c151ccd0522ca5170f6c06bb02ebebabcf56b7d7057779a001bb6e79d623ca",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn2_51Tex",
       "previous_phase_sha256": "40445f1e2def163cc1be511e122a02cce2ede892e93f5fc9f85c96f73d8ce479",
       "rgb_channels_equal": false,
@@ -3791,11 +3832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "1164efdbcfdbc4695f8b5a48c57bdde5055d4165bdd4cb399265a1402054e32c",
+      "sha256": "0737f8949aeab7aa41060ab358a1662ef07e08887ffbc5e6d50d228120a8cddc",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "1164efdbcfdbc4695f8b5a48c57bdde5055d4165bdd4cb399265a1402054e32c",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_127PaletteTex": {
@@ -3857,9 +3899,9 @@
         0,
         253
       ],
-      "alpha_sha256": "5c660d28c24f845ae8b213aef1121f8f9b844dbe9ee7e372e2db680beb1daa77",
-      "alpha_sum": 15037691,
-      "alpha_zero_pixels": 56542,
+      "alpha_sha256": "16657991c2f499db8410c538fe7d3b3144507cbd7d5beb1594a0a10f91f5a93e",
+      "alpha_sum": 10469601,
+      "alpha_zero_pixels": 61142,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.0014142023160080668,
@@ -3880,7 +3922,7 @@
         768,
         172
       ],
-      "pixel_sha256": "37de979a62ebd760c1bafc695e06de031ecc02c240a91c7edeea069a7764dcf2",
+      "pixel_sha256": "f5e2958497208b788a544a02dcebf32b480682ede28edcdcc2ccac8ef9e9632a",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_41Tex",
       "previous_phase_sha256": "ba79ebf91fd976be5c1c01395818c88fd0caabee1233b5ee61e4942d1974b5cc",
       "rgb_channels_equal": false,
@@ -3890,11 +3932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a91e8af2afabfcbb7972dff4fcdd5e670d8743671405c37516f86927783c44db",
+      "sha256": "e93ea9e19b28da72bbf90898ec263779bda93daa5537cbbbd12bbefd843a8b51",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a91e8af2afabfcbb7972dff4fcdd5e670d8743671405c37516f86927783c44db",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_128PaletteTex": {
@@ -3956,9 +3999,9 @@
         0,
         253
       ],
-      "alpha_sha256": "cffd0bf23b1e457a78d59f6636d4a4779306dc7897dc434b09332f99028cb279",
-      "alpha_sum": 15025346,
-      "alpha_zero_pixels": 59771,
+      "alpha_sha256": "39b440c15f2e58fd50440c9b02df9e32fcad4f19040cc41b6dbd00be19eacfd9",
+      "alpha_sum": 10466721,
+      "alpha_zero_pixels": 62226,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.018392749598343833,
@@ -3979,7 +4022,7 @@
         768,
         172
       ],
-      "pixel_sha256": "057e13854dc4fd89f9f9555149056765046a2ca22c304883f5498bd07b67d08d",
+      "pixel_sha256": "6df6bc7ce7fdd74780cb10e51ed8f74316732eb3ea9307908dc8653ad19a86bd",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_42Tex",
       "previous_phase_sha256": "056bfc472f6e6fe5d3a99292363d33f8b1a9b7149a7c75dab7d2dce25d70595a",
       "rgb_channels_equal": false,
@@ -3989,11 +4032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "719fba83c8d27829a5f5b89cace001c4a92c25583939af8fab1f55bafc7ae365",
+      "sha256": "eb6b762cd2692755cf25befa2a16bc604d27727aafa02627b6a23bedfb20b6d0",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "719fba83c8d27829a5f5b89cace001c4a92c25583939af8fab1f55bafc7ae365",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_129PaletteTex": {
@@ -4053,11 +4097,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "8c46a1505568c732744e8f0652f8cc17312e6a7877f20bf41576cbd9b71a4385",
-      "alpha_sum": 15000816,
-      "alpha_zero_pixels": 63125,
+      "alpha_sha256": "d76b92f3750ee8ec0c94ae3200f43f67baef839dcf7867c90a0be0d52e414a23",
+      "alpha_sum": 10460060,
+      "alpha_zero_pixels": 64002,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.06246215922592466,
@@ -4078,7 +4122,7 @@
         768,
         172
       ],
-      "pixel_sha256": "a7bd6acacdc54096c105266961d453d1af7e5e8be3ee997a635954a11f2f0b25",
+      "pixel_sha256": "a0bd43d6a8942ee119b36b933b5fc2c20df26560a4d42214971ec70fdf2465f0",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_43Tex",
       "previous_phase_sha256": "b6056171e6042be566401a78bc7581fe406bdfd10d91dbda5cbbbc411e9ed9e0",
       "rgb_channels_equal": false,
@@ -4088,11 +4132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ebc444ed67b372df4471d6b979a4b505021c55263eab556e28ada0b2bfb07c67",
+      "sha256": "bee60f494e30c4d85c14d725a2678a4bc18117042ff8ff179bb0e76f5bad2b27",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ebc444ed67b372df4471d6b979a4b505021c55263eab556e28ada0b2bfb07c67",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_130PaletteTex": {
@@ -4152,11 +4197,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "bdd22f0c7afb7bd6e856fc82bbb6378cf0f70a7747e8e72eb2cb6231e041b432",
-      "alpha_sum": 14954273,
-      "alpha_zero_pixels": 65038,
+      "alpha_sha256": "2b2e83017cfa16bf90dafde41aa5bb297db12b6807c786ad44d18496768ecc1b",
+      "alpha_sum": 10448393,
+      "alpha_zero_pixels": 65496,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.1368324668152712,
@@ -4177,7 +4222,7 @@
         768,
         172
       ],
-      "pixel_sha256": "dd74be402a88070edaf6c8ae3f0b577b3ba913ec57de06ec2eb1e137b3c8fe65",
+      "pixel_sha256": "ad76981aba7725056c3de7c699319cc835c7c1d2ac92a950d8ea19c9cf931916",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_44Tex",
       "previous_phase_sha256": "4f1c06969703e02bf88b4c83712263d7ee84cb8af0afe811396d68fd2ee1bbe2",
       "rgb_channels_equal": false,
@@ -4187,11 +4232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "cc4398a81431795472f62632fdc5b237a094bd44fe440a6e14830a1708041cda",
+      "sha256": "38f49d83caea37364a1c05a879262885f9ecc7984b7852fa6ef52fd68ddf9032",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "cc4398a81431795472f62632fdc5b237a094bd44fe440a6e14830a1708041cda",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_131PaletteTex": {
@@ -4253,9 +4299,9 @@
         0,
         253
       ],
-      "alpha_sha256": "35996075d34c141720b7f48a5a9a2ca1734a20d6c61550069f1056bf91710dce",
-      "alpha_sum": 14885089,
-      "alpha_zero_pixels": 66750,
+      "alpha_sha256": "1c3dbecc728e939d55adaf67bc632fcf6fb738ea1bd550c84af200990ace033b",
+      "alpha_sum": 10430728,
+      "alpha_zero_pixels": 66983,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.2396156845683404,
@@ -4276,7 +4322,7 @@
         768,
         172
       ],
-      "pixel_sha256": "ffb5f74a938b36debb50da04ff6e90a0d3fe5434789be1fcee0cecb3fd8c175a",
+      "pixel_sha256": "14fe934e01afb513f9e7253a2c8e0a18d3a9288d0c64c47d10b85644369d19ea",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_45Tex",
       "previous_phase_sha256": "dc530d20b104084ed5906143f9285cee40e2fe6c18b844558537ecc3607ef18f",
       "rgb_channels_equal": false,
@@ -4286,11 +4332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "f4434f331c44d6d394e6e856ca8d5c15bda85e75fb417b0a3e47f02c586b089c",
+      "sha256": "44ffa9cabd7516e70b9b1028af539ee1ba16b39da8bb81a1a191300f66e9a806",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "f4434f331c44d6d394e6e856ca8d5c15bda85e75fb417b0a3e47f02c586b089c",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_132PaletteTex": {
@@ -4352,9 +4399,9 @@
         0,
         253
       ],
-      "alpha_sha256": "c6fce49814f706373667f1dd6446e1061355ece6931c55b5a53d902467599d93",
-      "alpha_sum": 14795224,
-      "alpha_zero_pixels": 68267,
+      "alpha_sha256": "bc2d0322b10dcbca9172bb3149cc55a6f42e25a672ecc538abbeb88d3f2bc943",
+      "alpha_sum": 10408545,
+      "alpha_zero_pixels": 68451,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.3651606912755386,
@@ -4375,7 +4422,7 @@
         768,
         172
       ],
-      "pixel_sha256": "f2f7d64fdd94a53a4a8ee9f800a8b3ecfa6a2679b9354847d01831813d5a4054",
+      "pixel_sha256": "e2b4417261af82438f7e66b7900fe0ab4e198047279ecb38657a1c3442107910",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_46Tex",
       "previous_phase_sha256": "06c7899285475d91cc72698ff7cf6b75505ada59f69e8cf6d84ae7815cb3f5c0",
       "rgb_channels_equal": false,
@@ -4385,11 +4432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "3bc6d65d9f0d421b00814b734e6ac961e1b47a0a91f7425317700f65ef153b17",
+      "sha256": "1af88b02b342f81e29b0cf0df5ea4468dba2e591277ef3f91bccaa0501decc72",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "3bc6d65d9f0d421b00814b734e6ac961e1b47a0a91f7425317700f65ef153b17",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_133PaletteTex": {
@@ -4449,11 +4497,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "a47554b541bdd7b269677a3f930b52f6a1cb421dd8b6bcf3a28abf7b76236182",
-      "alpha_sum": 14687964,
-      "alpha_zero_pixels": 69571,
+      "alpha_sha256": "08881ed2947af509b564ff56e4ee6d5961889d064e0ac805e9d55642a3f7874c",
+      "alpha_sum": 10380930,
+      "alpha_zero_pixels": 69703,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.5049243715969315,
@@ -4474,7 +4522,7 @@
         768,
         172
       ],
-      "pixel_sha256": "4977eaf2b1eff09ec37b9d7fddb208a20da9d54f752f8215b973f1fb5e692bc7",
+      "pixel_sha256": "62d40d2ae3a07d1f9fa69cb8c334038bbd18ec8b61fa9634847eca31267cb67c",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_47Tex",
       "previous_phase_sha256": "29e426b9b208222c8fb131708a974d21d38628dfc4e2ec67c5ae6010479f89d8",
       "rgb_channels_equal": false,
@@ -4484,11 +4532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a87f066bf644f007ed69164459625aa65d0f9cd35539c6d9234d42ef54e27f3e",
+      "sha256": "d968d583d0be2a3b8e8561ba2a171fef7fb7bc6094bfeec03665e609fc94f314",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a87f066bf644f007ed69164459625aa65d0f9cd35539c6d9234d42ef54e27f3e",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_134PaletteTex": {
@@ -4548,11 +4597,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "f3623851192d73498f8a005c138cfbbeb9dc5208efcfac1665d69da67f3a05e9",
-      "alpha_sum": 14547264,
-      "alpha_zero_pixels": 70705,
+      "alpha_sha256": "4c357821702dbf4559a57ed6a9b0a46cdcad0612f6dfedf70e9fd0788c9afef4",
+      "alpha_sum": 10344410,
+      "alpha_zero_pixels": 70809,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.6481679298202565,
@@ -4573,7 +4622,7 @@
         768,
         172
       ],
-      "pixel_sha256": "b61f62ee02d1b69cb2d3b4ed9c4072aefa0e473ada8f8392601b3cfebdfb90a3",
+      "pixel_sha256": "334d081de32a6157fa3e5124508d7c668ea445a3ff219dbd17aaf580a8c28f37",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_48Tex",
       "previous_phase_sha256": "e4299a66025a5fa66e197c140c33ed63fd3b8b5cacff833d60a840d498a3ba5f",
       "rgb_channels_equal": false,
@@ -4583,11 +4632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "bc563ffd859520d2abfb346a57c6780437f167ff7f98523f800cb272f04435ca",
+      "sha256": "66b06e2f3f6a521a33ce7d6efb1b9ddc6aac6d6b6e8aa0b5b7fc9532aad2100d",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "bc563ffd859520d2abfb346a57c6780437f167ff7f98523f800cb272f04435ca",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_135PaletteTex": {
@@ -4649,9 +4699,9 @@
         0,
         253
       ],
-      "alpha_sha256": "a937c9a0b89af8b7c016738b7d56508d7b67bf94397d84a437c67a0ecbdc7ba1",
-      "alpha_sum": 14395624,
-      "alpha_zero_pixels": 71757,
+      "alpha_sha256": "d7924b91a1f3f10e4dbd5d5d136d926721cdce8e0abd4598ff6375c113c56ca2",
+      "alpha_sum": 10303650,
+      "alpha_zero_pixels": 71847,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.782587782465834,
@@ -4672,7 +4722,7 @@
         768,
         172
       ],
-      "pixel_sha256": "e1afce32541e5d019578a34a15759165d4a8985911714a109987153d5f0f7578",
+      "pixel_sha256": "e4625b5ae3dc3b17fa9a1d4069e907564d09e4e2d95b051047de92d6e34b0f7b",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_49Tex",
       "previous_phase_sha256": "08779c864edd733ca72e8eb70e0431d9a5e7c5ac01c64b1e6373d7f79e060044",
       "rgb_channels_equal": false,
@@ -4682,11 +4732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b3deff6475995d772954d07955c0c1219b4028c340a7d62708e9aa9d02e75c78",
+      "sha256": "e8de04224032580ffa930b8068b65aabed0b498bba7926c6af155e27247afcee",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b3deff6475995d772954d07955c0c1219b4028c340a7d62708e9aa9d02e75c78",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_136PaletteTex": {
@@ -4748,9 +4799,9 @@
         0,
         253
       ],
-      "alpha_sha256": "0aecf169d7154f7456fd658cc24f8fcfabfd68f1e8ff456057ea78f0d33d29f1",
-      "alpha_sum": 14246534,
-      "alpha_zero_pixels": 72523,
+      "alpha_sha256": "aab3ed275c2010d55b10a4ada516b4e50867f1699e77b63e467e898dbb4b431a",
+      "alpha_sum": 10263081,
+      "alpha_zero_pixels": 72633,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.8949436288368308,
@@ -4771,7 +4822,7 @@
         768,
         172
       ],
-      "pixel_sha256": "32ad8e041319a0959739a6ccd2eb5940045f53a236b8ba7cc7acde135663b122",
+      "pixel_sha256": "5b600e8e44e2e8e8db3ead0f9a243acea0f0a35b58aae7b711b61a630caf6027",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_50Tex",
       "previous_phase_sha256": "abc324e9a1ef8c6401054865350be11614e52a34cc47278f4d1f9337e3da3906",
       "rgb_channels_equal": false,
@@ -4781,11 +4832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "db4b5c34438d063e5ce5a4497450b68314da70fdfbd9ad1316a88ad5c886cdd8",
+      "sha256": "691d52e00824a937963151a8087d5dd809266fc94d8be7c0ae38506f689ed119",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "db4b5c34438d063e5ce5a4497450b68314da70fdfbd9ad1316a88ad5c886cdd8",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn3_137PaletteTex": {
@@ -4845,11 +4897,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "3ca5ed9ca80369df688f1c0844e460358470286e9d5a527e1e0f007adc8f645b",
-      "alpha_sum": 14139103,
-      "alpha_zero_pixels": 73130,
+      "alpha_sha256": "9848bd587b6b1889b31854b686cbf0ec66757262efd97bcee616ac42185a0c63",
+      "alpha_sum": 10233778,
+      "alpha_zero_pixels": 73215,
       "atlas_row": 0,
       "band": 3,
       "burn": 0.9717364783048485,
@@ -4870,7 +4922,7 @@
         768,
         172
       ],
-      "pixel_sha256": "9c0e6b141ba2821cb2add360e4f84424f859e1574e0a89176619fea853ca8790",
+      "pixel_sha256": "b66432c9abfb021ede023eae02d4a45139e9aa6d941c3ba7bf72c5b880e4e28e",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn3_51Tex",
       "previous_phase_sha256": "e78ab4e3ee4498e34ca4299a821b9abf6e42518a48b0c667484d64cac5d0cd08",
       "rgb_channels_equal": false,
@@ -4880,11 +4932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "cd539edc4bd3e0fd2d09f18c7b58992eb95ad04d21392e00498c69b5c27013f1",
+      "sha256": "dc4f698545d6893c812cbcd1e1ccf34324342b47faa5ee63be5bb52ec1ba41df",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "cd539edc4bd3e0fd2d09f18c7b58992eb95ad04d21392e00498c69b5c27013f1",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_127PaletteTex": {
@@ -4946,9 +4999,9 @@
         0,
         255
       ],
-      "alpha_sha256": "6b885d4cfd8bd65ce0a10b4e90cc7a22df3c8bc436f05d0cac4fc472833f7d71",
-      "alpha_sum": 16131604,
-      "alpha_zero_pixels": 47024,
+      "alpha_sha256": "6a770b3157b8edbcb9b6a202ddcef4eae64f7cb016c283796f99b94ac71978d7",
+      "alpha_sum": 11443935,
+      "alpha_zero_pixels": 51488,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.004975222312652857,
@@ -4969,7 +5022,7 @@
         768,
         163
       ],
-      "pixel_sha256": "0ebff8c3324c233db28d92aa64c9136202b9ba1e27891d952a85f7703436f3d5",
+      "pixel_sha256": "e0c506c7ab4499b7d8de76c3c80953b18981a8fa141a8177ebc5da11399ddb9b",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_41Tex",
       "previous_phase_sha256": "7995701709c044087a9e0ffcbfdd074271cd89a16ed915ce626ca79ada6d24fb",
       "rgb_channels_equal": false,
@@ -4979,11 +5032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b12e338c2d8906bbf49b216eab7ece18c1e5341ae4aa2d2bef0a046feae12a99",
+      "sha256": "a15bda071a7cd65510b7d82e2dbb7a8bfe565e76d756d8acc4600dac5084bd0d",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b12e338c2d8906bbf49b216eab7ece18c1e5341ae4aa2d2bef0a046feae12a99",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_128PaletteTex": {
@@ -5045,9 +5099,9 @@
         0,
         255
       ],
-      "alpha_sha256": "3e94e67185a3b87a1e9f64fa5014ba96e5951d06e462c3a0cf0e479284dc872c",
-      "alpha_sum": 16116994,
-      "alpha_zero_pixels": 51150,
+      "alpha_sha256": "a69861a2d07ff9aef9a0a90aa637ecab9ad8f6e6a300edae84b41d6f980376b2",
+      "alpha_sum": 11440060,
+      "alpha_zero_pixels": 52880,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.02978855334058811,
@@ -5068,7 +5122,7 @@
         768,
         163
       ],
-      "pixel_sha256": "56c350a9aeb22c0d6b854784d75beaa826d5e33c2a61d7efef1b4a46dd52aea4",
+      "pixel_sha256": "2d81141e11070b93bd6054aa2a2854b42b627da3e630c5a103606d6720050517",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_42Tex",
       "previous_phase_sha256": "fb3a1df68ce807804a1a30650ee17998cf0d386505d202a83a5ef395cfd6639a",
       "rgb_channels_equal": false,
@@ -5078,11 +5132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "7d2d8719626515badd6dd6f5d94dcccb2bdd8c5a575aba63b3958cce96e279ce",
+      "sha256": "77a19446e02626934d5fb3b2ba94166b5d7ffac0640560b66ac27ebe32f2bd1a",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "7d2d8719626515badd6dd6f5d94dcccb2bdd8c5a575aba63b3958cce96e279ce",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_129PaletteTex": {
@@ -5142,11 +5197,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        254
       ],
-      "alpha_sha256": "a6850d9e95eeae83b3073a927d28b41232451cb5962edd6c85c289537ac7c3bc",
-      "alpha_sum": 16092729,
-      "alpha_zero_pixels": 53780,
+      "alpha_sha256": "e8ade3ebd39d52d1812d8ade3d05bed9fd153e3f9159ce7353941eed1e13ec09",
+      "alpha_sum": 11433559,
+      "alpha_zero_pixels": 54340,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.08159377660684033,
@@ -5167,7 +5222,7 @@
         768,
         163
       ],
-      "pixel_sha256": "766ecb240f457c131a549634eb73c3e897a7972be4d660300774e0d5f26176f6",
+      "pixel_sha256": "6ea4ce2720a74844934e7fedb5f6ae36316a12c5f8f71f0702c7fae842ff309e",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_43Tex",
       "previous_phase_sha256": "32af89a2feee2a3a6fd4f97384193a5cd7fc38b85419d82f4262c58da27f3738",
       "rgb_channels_equal": false,
@@ -5177,11 +5232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "d223d5f9021af6ec414dad1879f25eae3dbe9f21c4e371462aed37b952207648",
+      "sha256": "645e512c10f6e46569815f3e378c0f759338a095124409a486abf8c64a79ff28",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "d223d5f9021af6ec414dad1879f25eae3dbe9f21c4e371462aed37b952207648",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_130PaletteTex": {
@@ -5243,9 +5299,9 @@
         0,
         255
       ],
-      "alpha_sha256": "85a0ae5d1fe026751c6a32d917e99a993c77a666f0fe5c989584972d88d69d82",
-      "alpha_sum": 16055657,
-      "alpha_zero_pixels": 55331,
+      "alpha_sha256": "743b6bb36543db907a16c22af088307b282e8cddb3173179c8ab8a840f843a1d",
+      "alpha_sum": 11423395,
+      "alpha_zero_pixels": 55612,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.16163718278332243,
@@ -5266,7 +5322,7 @@
         768,
         163
       ],
-      "pixel_sha256": "49e810734cf23b4bb5ffdfa9a4fb4c7098ea122d5078610472e704512bf60018",
+      "pixel_sha256": "aabb06584dc8503c16491eb898b679c6fe065d278d946f0160c350581815bcb7",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_44Tex",
       "previous_phase_sha256": "1cf717989319c5698cf8927b402d2eaa3a9c4dfbecc2e83b6c2ea6cdaea44b90",
       "rgb_channels_equal": false,
@@ -5276,11 +5332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "b2a3f41dfb8278d58da37008f2eed726a25c1069dd82c890b208f19d05970373",
+      "sha256": "9731fa394ee5152e0d8b50d664637f6d99f95dfe8bfeb77b0f2d9c1debf03194",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "b2a3f41dfb8278d58da37008f2eed726a25c1069dd82c890b208f19d05970373",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_131PaletteTex": {
@@ -5342,9 +5399,9 @@
         0,
         255
       ],
-      "alpha_sha256": "b5ccbd201715c57563271e7622578818444949b2a76975623aa51af2dba1376d",
-      "alpha_sum": 15997937,
-      "alpha_zero_pixels": 56520,
+      "alpha_sha256": "d830c36e891c511ff22817884f14c680f489427cef69ac39bef2de7be2db712f",
+      "alpha_sum": 11408590,
+      "alpha_zero_pixels": 56686,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.2671461901577449,
@@ -5365,7 +5422,7 @@
         768,
         163
       ],
-      "pixel_sha256": "7a08f0e6c041eb2b31831e3acb565b6d0929665e53878426e2cd300312d06b11",
+      "pixel_sha256": "aeb314754fa67666bfb583d11f02ed8896e96f542b0ec9b1ecc9f248a99b850e",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_45Tex",
       "previous_phase_sha256": "f06030cc046a230bc078baf9c56b2e71537aaf68d09904f63d6067bf0e0fd9b7",
       "rgb_channels_equal": false,
@@ -5375,11 +5432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "41490142cbf04d675d14100705bb2e0d154b8d4ff156e46be8cbb74e56efa817",
+      "sha256": "060f7f90418e6270cb8ea79cf8f1222f0bab3b44829ad4cdca62a3492c5e58c7",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "41490142cbf04d675d14100705bb2e0d154b8d4ff156e46be8cbb74e56efa817",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_132PaletteTex": {
@@ -5441,9 +5499,9 @@
         0,
         255
       ],
-      "alpha_sha256": "ca1cf6a7320efcade2b3842a75fe690afba70dba854db821991e9fb460fd2462",
-      "alpha_sum": 15918943,
-      "alpha_zero_pixels": 57592,
+      "alpha_sha256": "034cb368e5cd3e7b70e1e1f978cbfc5453f24e5d28ea354463133fff824abe20",
+      "alpha_sum": 11388880,
+      "alpha_zero_pixels": 57696,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.39229204894837416,
@@ -5464,7 +5522,7 @@
         768,
         163
       ],
-      "pixel_sha256": "9fafbcc547d3aa7019135ae91e403ac14a690d74f4e3fa23052b3a40e2bde1c0",
+      "pixel_sha256": "146c20c75aa5f3253996aee5911a44987c3b1a1684fb82d886ac825de7f5994f",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_46Tex",
       "previous_phase_sha256": "28ef969328c01262b1ab8c079dab1aed640d6fec0abb10bfa196c9282772e102",
       "rgb_channels_equal": false,
@@ -5474,11 +5532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "2208986594d29847b4777b284cf0028a17210c36adf1e174af0ef635b0bdc2b8",
+      "sha256": "06aa4b9e7c473528c8d8c39071d837ac4520d2a54af8ad5b5c0548c0bc016126",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "2208986594d29847b4777b284cf0028a17210c36adf1e174af0ef635b0bdc2b8",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_133PaletteTex": {
@@ -5540,9 +5599,9 @@
         0,
         255
       ],
-      "alpha_sha256": "3dde07e322f2703bf4b5c3087f8a5fa76bb867be19461fc099096f0da0385ba7",
-      "alpha_sum": 15821389,
-      "alpha_zero_pixels": 58610,
+      "alpha_sha256": "e800f7919c762f4f25c3105718057e478a86f917d3792810f7cdc212accb43e2",
+      "alpha_sum": 11364627,
+      "alpha_zero_pixels": 58711,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.5288728595327462,
@@ -5563,7 +5622,7 @@
         768,
         163
       ],
-      "pixel_sha256": "97d05af868bc77295ddeff9309b1ef10e509e41bfe89fb5820a3c1cc2930f095",
+      "pixel_sha256": "d2a0cdfe69ce1f8c3d590f9a998029c3826246be911c26dd5056854636decbad",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_47Tex",
       "previous_phase_sha256": "17091c8ffc509113f01bef7051d11a168eb72bb489d2c849dedd8e923edf9e26",
       "rgb_channels_equal": false,
@@ -5573,11 +5632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "3b80d7a63f18ae09c76cb5867988706f00c07ff5967f84b7de9912a9d7a01075",
+      "sha256": "633ad970cfbf504eff90d944d44f5521bdf94de7095a1ce44c87156ef3ef91f8",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "3b80d7a63f18ae09c76cb5867988706f00c07ff5967f84b7de9912a9d7a01075",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_134PaletteTex": {
@@ -5637,11 +5697,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        254
       ],
-      "alpha_sha256": "05717f2cfd6313d6c88e99a209f46c4d93378f7b3e9cc40157aec968d2e6e6b9",
-      "alpha_sum": 15708453,
-      "alpha_zero_pixels": 59565,
+      "alpha_sha256": "eeb4b9155179d537bab9f17df21949549eee465e26e66a8184ce43738c8646a3",
+      "alpha_sum": 11336309,
+      "alpha_zero_pixels": 59654,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.6668826405094438,
@@ -5662,7 +5722,7 @@
         768,
         163
       ],
-      "pixel_sha256": "505c5477c4efcb416bf371b64c65d4a774bc736e63279f83f33305a2e97d0aca",
+      "pixel_sha256": "3c5c7dd5587d527c852cf3797b8fbf32f95652d505bb6cdc46fdf832e20637f4",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_48Tex",
       "previous_phase_sha256": "289b3038073f5db16062c8fc3c9ffa32d0b7079bf01801bb85231f5f6c224d0b",
       "rgb_channels_equal": false,
@@ -5672,11 +5732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "ea157f1ccbb25810dd938cdfce6e47714192e4726043ab3b638ea0281efb7b47",
+      "sha256": "1468a14100565b436e569ff4226f422ad05b7e2bb1b15bf1c580783724988dad",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "ea157f1ccbb25810dd938cdfce6e47714192e4726043ab3b638ea0281efb7b47",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_135PaletteTex": {
@@ -5738,9 +5799,9 @@
         0,
         255
       ],
-      "alpha_sha256": "22ca4c7c841ad31c9ac118b47336bff3e83bf490f5fbe1eb1cfcf5519139b25a",
-      "alpha_sum": 15579214,
-      "alpha_zero_pixels": 60390,
+      "alpha_sha256": "78b953160a23895f35e9c74d37c1cbd23a28ed1dea611acb67701d2b9f4ed411",
+      "alpha_sum": 11302968,
+      "alpha_zero_pixels": 60474,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.7950393253725443,
@@ -5761,7 +5822,7 @@
         768,
         163
       ],
-      "pixel_sha256": "2619e419e6d8f0bf0eb5f8964e9d2fb7a57b89f2d9a5eba7147b4d6b7990ea05",
+      "pixel_sha256": "c7e796df9750d76750d4f92269243354585cf8225bc01820fb714a582e5e45b2",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_49Tex",
       "previous_phase_sha256": "300b44b3d2dce5254fe5a446f606fb3e0e6992a131ad932760c6b5c4b753135f",
       "rgb_channels_equal": false,
@@ -5771,11 +5832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "c47408f8b0796e404634c60468737cf2e5d55fb3d1a8d9a5ea81890791dceeac",
+      "sha256": "9fbd48eccf771dc0f04df3a44577d52721ac4956b38ff517c4671da79c307872",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "c47408f8b0796e404634c60468737cf2e5d55fb3d1a8d9a5ea81890791dceeac",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_136PaletteTex": {
@@ -5837,9 +5899,9 @@
         0,
         255
       ],
-      "alpha_sha256": "f931e379e076e533315fcb20e08bc036a0e81b85d52a10347e7c53a32d172154",
-      "alpha_sum": 15438465,
-      "alpha_zero_pixels": 61111,
+      "alpha_sha256": "431cb30d28d128088d493fc2a9370e24bb7fb9706495816749f91faaa0b86c7f",
+      "alpha_sum": 11266281,
+      "alpha_zero_pixels": 61187,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.9013177628926846,
@@ -5860,7 +5922,7 @@
         768,
         163
       ],
-      "pixel_sha256": "acce10c9ad3cae26452721cb88e7e4a4689dd528a37df2d4ee7c54f61c6ad8f9",
+      "pixel_sha256": "58eb463b940e88a42a9b8c88c5b517ce1a7d60e1fa5b813f15450e7f246a96b7",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_50Tex",
       "previous_phase_sha256": "54b2d461898108169dbb78a7014284afb55e31d47a37b9f52f9dae1f8edfd3d9",
       "rgb_channels_equal": false,
@@ -5870,11 +5932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "70f2cb5879c7b3ade267cf878701f1cf3d1cf707b9034969dc8ca28f547f8445",
+      "sha256": "4dc198b74741152c858d5c16bfbb51308f2dea9e8270d724410b7f24903e15d2",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "70f2cb5879c7b3ade267cf878701f1cf3d1cf707b9034969dc8ca28f547f8445",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn4_137PaletteTex": {
@@ -5936,9 +5999,9 @@
         0,
         255
       ],
-      "alpha_sha256": "f80bd4442970db2513c91b7ae42f4b72175b2b7a67480e6ea07bd3c144c6398c",
-      "alpha_sum": 15330702,
-      "alpha_zero_pixels": 61641,
+      "alpha_sha256": "d8e28317e9b390cf035bab028a09b5f08e5e5457d9d8ea0e009c268b8072e44f",
+      "alpha_sum": 11236654,
+      "alpha_zero_pixels": 61752,
       "atlas_row": 1,
       "band": 4,
       "burn": 0.9735293554245567,
@@ -5959,7 +6022,7 @@
         768,
         163
       ],
-      "pixel_sha256": "8663bb5dcc3328c7448cf4ad4eb6951b396a41c5a6d27d9e5011f7d38c99b23b",
+      "pixel_sha256": "71dcc7de657f49f3b6aa1e184f20343c6c6ccae96323c14edf3afa115a91db36",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn4_51Tex",
       "previous_phase_sha256": "ef2d9b4d62d15aeb8e53a49abe3282bb2435a2f61faabfecd3e7de85cc915c7e",
       "rgb_channels_equal": false,
@@ -5969,11 +6032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "f8019e95fedfa6e1bc81634b4cf98c4b6613b5013a63ae7166562804a83a5425",
+      "sha256": "bce33c3ae05265f99a78cacedbbd1f3daf484c11501b4b751d8a2c02fbb3a57f",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "f8019e95fedfa6e1bc81634b4cf98c4b6613b5013a63ae7166562804a83a5425",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_127PaletteTex": {
@@ -6035,9 +6099,9 @@
         0,
         253
       ],
-      "alpha_sha256": "b6637bc01039ea68f6f8c56b20cc39f4e9c48f6fd373ee05a31ec01094fc188e",
-      "alpha_sum": 16782235,
-      "alpha_zero_pixels": 22840,
+      "alpha_sha256": "3b6255d9ee186ff13f5c33a187bc37308b5a61b5b7ea7fbf1b9f79502a157edb",
+      "alpha_sum": 11942779,
+      "alpha_zero_pixels": 49402,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.0,
@@ -6058,7 +6122,7 @@
         768,
         178
       ],
-      "pixel_sha256": "528f93f9fc798c6cf4bc503adae72e814f3a2303733d072d04cbe396737a28ee",
+      "pixel_sha256": "072bad84822dfb61d90d46042d1ee780baf1827ce92e359a6ede2cdc7aaac6f0",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_41Tex",
       "previous_phase_sha256": "a89e144f2df65cff42409afad3397342696fd7f38c7eda248c3ce35f29f71b43",
       "rgb_channels_equal": false,
@@ -6068,11 +6132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "52efb2959f80be2ee35ce352bff3d417b54c20f4ebdba994b0434943e17238a7",
+      "sha256": "9ecf0c0d64ef666cbd9108b80d35dc1f156f41e9091f9ef7ddeb8aeb64f571d8",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.4,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "52efb2959f80be2ee35ce352bff3d417b54c20f4ebdba994b0434943e17238a7",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_128PaletteTex": {
@@ -6134,9 +6199,9 @@
         0,
         253
       ],
-      "alpha_sha256": "423854491071736a5f7e0ef9173d7ae75755619742db784921a8b0e4d6244a9b",
-      "alpha_sum": 16728858,
-      "alpha_zero_pixels": 56571,
+      "alpha_sha256": "c7712cd0a80ec0e286e2fa8d01210e947669aaede1f08ef51fcf02fb6e489e41",
+      "alpha_sum": 11928569,
+      "alpha_zero_pixels": 59952,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.00624737983971877,
@@ -6157,7 +6222,7 @@
         768,
         178
       ],
-      "pixel_sha256": "d8f978aaaf78d075860cd78629fae0fa1fc13a4af47724e8eb7e67c88e7af52f",
+      "pixel_sha256": "3a56e8cb9dbba4e82e012e5071456e9d40e74466399277dcabf1f5d316487d41",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_42Tex",
       "previous_phase_sha256": "5dea17ea597c6dbace7f7c8e9e7d7d1cea75371e5b3ba9d2b9209fbb515b7eec",
       "rgb_channels_equal": false,
@@ -6167,11 +6232,12 @@
         1.0,
         1.0
       ],
-      "sha256": "21fecc4875fe9408e0e8a3cd111d4857def6427b3f3fad3f733a49d898478bef",
+      "sha256": "4448c53409d6e86be8191564e959d758c4fb1a7bdd2f470460108bbafae9f0d9",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.45,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "21fecc4875fe9408e0e8a3cd111d4857def6427b3f3fad3f733a49d898478bef",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_129PaletteTex": {
@@ -6233,9 +6299,9 @@
         0,
         253
       ],
-      "alpha_sha256": "943724669f282c2103006697ea9236ba55c099eda761a75a77056b33718e2c43",
-      "alpha_sum": 16710057,
-      "alpha_zero_pixels": 60456,
+      "alpha_sha256": "1673087f1f1e814d3e45cbe33cf1361d4deef0b5248266580844317198718f41",
+      "alpha_sum": 11922001,
+      "alpha_zero_pixels": 61847,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.037100341786397706,
@@ -6256,7 +6322,7 @@
         768,
         178
       ],
-      "pixel_sha256": "acc0ee1e80baea57c5a3b8c688db8e433e5410099a36b53463bc0ff4fca488bd",
+      "pixel_sha256": "f466b23deed7e444c7a80dcc9edaa8ed253f689362abd7a45114fb7b4ad2ca51",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_43Tex",
       "previous_phase_sha256": "086ed4b199b71525c84de87e92c35f5d1cde932059cef3fc72d1d95a8e2a3e20",
       "rgb_channels_equal": false,
@@ -6266,11 +6332,12 @@
         1.0,
         1.0
       ],
-      "sha256": "d2ac3844a099c354e38698f812a1fcf574037fc7076de9596852cc4c660ab1ea",
+      "sha256": "0be1f0ff000a00583de91d6e18753355cc199231f6a9f14d76203c98e9a38ef2",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.5,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "d2ac3844a099c354e38698f812a1fcf574037fc7076de9596852cc4c660ab1ea",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_130PaletteTex": {
@@ -6330,11 +6397,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "79b04bb53ff55d3c79fdb2fd02ed2df4346ddc09907a9b18c0b30980bbf06bd0",
-      "alpha_sum": 16676044,
-      "alpha_zero_pixels": 62979,
+      "alpha_sha256": "1b3fc3c977bd296c56218a56ca4452d734194683eab8b9b6a60febff3d0bda9d",
+      "alpha_sum": 11911729,
+      "alpha_zero_pixels": 63450,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.10067649663771613,
@@ -6355,7 +6422,7 @@
         768,
         178
       ],
-      "pixel_sha256": "f404b57f483f38dc1b4a3e84814cc415be480962bd080e058a5864421532f941",
+      "pixel_sha256": "bc8b2a56d38be7e5574b0ea5749663188382a5a175478d676b4c57cf2dbf6d91",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_44Tex",
       "previous_phase_sha256": "3625f7cdb90970a862bb0531423824ce98752750302df0533c22ea06f2afc372",
       "rgb_channels_equal": false,
@@ -6365,11 +6432,12 @@
         1.0,
         1.0
       ],
-      "sha256": "92918ff2c2e9cf2e9900d009033d06a59fbb585161f910d3c7246868bcf6d8b9",
+      "sha256": "5a7a2ded653f8f6d13739c7e7d382d9ea441215b3afb168e113f3d3b675b6477",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.55,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "92918ff2c2e9cf2e9900d009033d06a59fbb585161f910d3c7246868bcf6d8b9",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_131PaletteTex": {
@@ -6429,11 +6497,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "cca7c86dcff503748e0fd9f02405ee08af873affbccde92767c176a8016eca08",
-      "alpha_sum": 16622498,
-      "alpha_zero_pixels": 64770,
+      "alpha_sha256": "c41c3763c4f767a721a49f2c5261d1e46dbc3daaec24951a1c93676f042e9dca",
+      "alpha_sum": 11895876,
+      "alpha_zero_pixels": 65054,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.19730614593467558,
@@ -6454,7 +6522,7 @@
         768,
         178
       ],
-      "pixel_sha256": "5aad02081220bf44b04a89c72838347fcc66ac74281177873e0a554a9f0540d1",
+      "pixel_sha256": "4fab1c2f551093a97b177418e8d62615b6752a1289ff107f9de7dee6f4177e98",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_45Tex",
       "previous_phase_sha256": "3fc5e224a60081c7f380e1f664e7e07abaf3a42853419b61b26859078206b765",
       "rgb_channels_equal": false,
@@ -6464,11 +6532,12 @@
         1.0,
         1.0
       ],
-      "sha256": "00bf7b4a0aaa0c38e73077b9c664cc97ccb9271dc52707750756554a5227e3c8",
+      "sha256": "5b392d9ae66c9423b0ff59de68d4636dc79cc4f065f53f6b6b7feb42d7d0f85c",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.6,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "00bf7b4a0aaa0c38e73077b9c664cc97ccb9271dc52707750756554a5227e3c8",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_132PaletteTex": {
@@ -6530,9 +6599,9 @@
         0,
         253
       ],
-      "alpha_sha256": "6bf036b84c33bf7aa7bac701a3d10f16cd322d134f6e1753397afb6f3a031098",
-      "alpha_sum": 16545399,
-      "alpha_zero_pixels": 66243,
+      "alpha_sha256": "de3e3b8e184c6ad3215cfdf1d935a3e6a7f651dfdd7f779f3f6ef6dc06858db2",
+      "alpha_sum": 11875037,
+      "alpha_zero_pixels": 66399,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.3220410362598449,
@@ -6553,7 +6622,7 @@
         768,
         178
       ],
-      "pixel_sha256": "9be6c1aa500442b291e46543168ade9c5bd8913fde6995a6f082e6cc0b4354c3",
+      "pixel_sha256": "0de7d720d53e89a5c960865271ab0a4f88b4845c6e6b5e32da13af6b4ae90d7c",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_46Tex",
       "previous_phase_sha256": "dc14cb3e43070c1f8d5081b1317892edd1e3e62300402d29ee38a018b2f4d43a",
       "rgb_channels_equal": false,
@@ -6563,11 +6632,12 @@
         1.0,
         1.0
       ],
-      "sha256": "c17bd3c1be2612a23b2273d024488e9fc30bface78e943ed72a9bf5c4c41f247",
+      "sha256": "ea9f30e82b268b93f7e7e0944e5d829157019d32bcf05dc0e2575147fc425a92",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.65,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "c17bd3c1be2612a23b2273d024488e9fc30bface78e943ed72a9bf5c4c41f247",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_133PaletteTex": {
@@ -6629,9 +6699,9 @@
         0,
         253
       ],
-      "alpha_sha256": "cf44e106d3ca2d2c83225f04fbfbbf74cb27dfcb50eaa88a8bcd6774d2052b01",
-      "alpha_sum": 16446488,
-      "alpha_zero_pixels": 67456,
+      "alpha_sha256": "9c480f0d5a9b86146da0dbbbb5bd8f6d2eec252b8abbf2668e9ff3d21a26ae59",
+      "alpha_sum": 11847423,
+      "alpha_zero_pixels": 67573,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.46597653649602777,
@@ -6652,7 +6722,7 @@
         768,
         178
       ],
-      "pixel_sha256": "896ec800f0b65f2055301c5c73e98cc06cf0a2e2d541fee6cc0293fef12df2ff",
+      "pixel_sha256": "8ba689f91d15a498b87dd6cf34c1256609d1b0b2dd3d37ec7a53e9a87baee771",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_47Tex",
       "previous_phase_sha256": "5dcdf267a4850b1377480b5579ce2029dff293b5e6484828f96334d7a16a80c9",
       "rgb_channels_equal": false,
@@ -6662,11 +6732,12 @@
         1.0,
         1.0
       ],
-      "sha256": "a338e65cee5fcdfb10caa5b9f59931ffdbea30215d7db462b1113c21ebf4611b",
+      "sha256": "7e0d11fb82b9ca41d93a0bbefd410510b6f7eb57902631aa0b3ffc6c91ea12a3",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.7,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "a338e65cee5fcdfb10caa5b9f59931ffdbea30215d7db462b1113c21ebf4611b",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_134PaletteTex": {
@@ -6728,9 +6799,9 @@
         0,
         253
       ],
-      "alpha_sha256": "439cafb7f8fce57fdb27e23c0a91ea5fa55d4fabb54795afc3c73936c26fbe63",
-      "alpha_sum": 16328417,
-      "alpha_zero_pixels": 68555,
+      "alpha_sha256": "2325c358fd621cbcee531870eb7554bb72a347e9e32edabb3b68cafb02f0131a",
+      "alpha_sum": 11815116,
+      "alpha_zero_pixels": 68645,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.617222422038854,
@@ -6751,7 +6822,7 @@
         768,
         178
       ],
-      "pixel_sha256": "c623f47ce6a2701e38532b712bba9d63ac171441574190b48bd56c3c50eb6664",
+      "pixel_sha256": "83d5a3cbb69c1c408f42d0d9af7e8ea7937f047142190116ead0fbc67be1b457",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_48Tex",
       "previous_phase_sha256": "ed6a9796fd6eeee49ba6dddb5b6fff4f3c1cc178ce56288d3f9254b988eb689f",
       "rgb_channels_equal": false,
@@ -6761,11 +6832,12 @@
         1.0,
         1.0
       ],
-      "sha256": "268d394426a4e69008f05240666eb446557ebee3ddf469d9b5e4c3fdcd914706",
+      "sha256": "1936ca833de3d08cca967d2613e57678183af724b4b4b7c9262232c8cd694a62",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.75,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "268d394426a4e69008f05240666eb446557ebee3ddf469d9b5e4c3fdcd914706",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_135PaletteTex": {
@@ -6827,9 +6899,9 @@
         0,
         253
       ],
-      "alpha_sha256": "24cd3b042ebd939247c767cb66902544bebfbfc9ac79e13d4fea63f7c1e077cb",
-      "alpha_sum": 16196814,
-      "alpha_zero_pixels": 69502,
+      "alpha_sha256": "cf6c781a2e76323c3f6527f8ba0d5b3c360cb9022603f3b09db245ea4e5a7df5",
+      "alpha_sum": 11777327,
+      "alpha_zero_pixels": 69569,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.7617432839040896,
@@ -6850,7 +6922,7 @@
         768,
         178
       ],
-      "pixel_sha256": "88a05900e7800cbfce64e062770c4207e6fa1320cbae516d8d963b9d787a7dc5",
+      "pixel_sha256": "e0a79415e424d4caa1d23f33a25efd4effb6b8d427d973b90484214c0ef47db8",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_49Tex",
       "previous_phase_sha256": "3d0e625d5c05c9a563660fa2bad72b835a4f2897a598e1816e3a6879e56bab36",
       "rgb_channels_equal": false,
@@ -6860,11 +6932,12 @@
         1.0,
         1.0
       ],
-      "sha256": "2618affb28e8ceaeb1fa4ca579773f61f8cbfd030f690b99e7fc48e9414fd119",
+      "sha256": "b80d615dbb9ad8b3329478131430e87302fa6f01691f11ef3deb39b3b8e04f89",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.8,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "2618affb28e8ceaeb1fa4ca579773f61f8cbfd030f690b99e7fc48e9414fd119",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_136PaletteTex": {
@@ -6924,11 +6997,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        254
+        253
       ],
-      "alpha_sha256": "ac2b23c6b9a0652ff505641c92e869648430f608c5b6010599d581ae3ba1855c",
-      "alpha_sum": 16058307,
-      "alpha_zero_pixels": 70243,
+      "alpha_sha256": "3cbe0658a890abe9f9758eb0c0609ecb6e7ac0a9fd6ab85b1a2cac5f5c245720",
+      "alpha_sum": 11738676,
+      "alpha_zero_pixels": 70318,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.8841737158235798,
@@ -6949,7 +7022,7 @@
         768,
         178
       ],
-      "pixel_sha256": "c4b84ee038be4cf47ddbb02f4bad964cec389e105225eae765fbe11da184adeb",
+      "pixel_sha256": "e8b538e7cbb1f51bd30861dc841c177f6e586fe9a0054855b198737798c19005",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_50Tex",
       "previous_phase_sha256": "0cd42104a3a6eff2cd8bd8e9c215383e243b6ce2a40af43827a8415c0cdb4c78",
       "rgb_channels_equal": false,
@@ -6959,11 +7032,12 @@
         1.0,
         1.0
       ],
-      "sha256": "1ee7823b8639dd64e6cfc1e143f67b8bf2574baf58c9931e1a6496d1d85de817",
+      "sha256": "83e37edb9f1a230935ae8602cdb4a779b271b3cfa227021bb8bb555ae513165f",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.85,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "1ee7823b8639dd64e6cfc1e143f67b8bf2574baf58c9931e1a6496d1d85de817",
       "version": 1
     },
     "custom/dins_fire_remake/ribbonBurn5_137PaletteTex": {
@@ -7023,11 +7097,11 @@
       "alpha_matches_any_rgb_channel": false,
       "alpha_range": [
         0,
-        255
+        253
       ],
-      "alpha_sha256": "f6ae0cd7b5e650dde244b013773fafde19ac142b983ca5212f5ca69825d34f27",
-      "alpha_sum": 15953734,
-      "alpha_zero_pixels": 70847,
+      "alpha_sha256": "c79df6df09430e3ef9e46c12f40d7efbd58b5021d480cc434d5d0336262a43d7",
+      "alpha_sum": 11709540,
+      "alpha_zero_pixels": 70934,
       "atlas_row": 2,
       "band": 5,
       "burn": 0.9686862846355024,
@@ -7048,7 +7122,7 @@
         768,
         178
       ],
-      "pixel_sha256": "22a1d89b7577170dfe6767cfacf879976c3102c372202ae5dc227ecebc317835",
+      "pixel_sha256": "08fdb369ac8a8068194f3cc996e40a419bf47e12437d40dd1d5331d6344fe32c",
       "previous_phase_resource": "custom/dins_fire_remake/ribbonBurn5_51Tex",
       "previous_phase_sha256": "cb112fd39e866d849f7a9b600acad436d136a30d1c3578b7edd2e04bc0ffc975",
       "rgb_channels_equal": false,
@@ -7058,11 +7132,12 @@
         1.0,
         1.0
       ],
-      "sha256": "21892a80b5fd76451965c7c4d97bcb15e04c4bdb5f5d09ee9e0534d5db018a47",
+      "sha256": "54278415121e5baa701fc00985a7343302e1f3647facc4b48e5485368bcd4853",
       "shift_from_previous_frames": 86,
       "time_seconds": 7.9,
       "type": 1,
       "type_name": "RGBA32bpp",
+      "ungraded_rgba_sha256": "21892a80b5fd76451965c7c4d97bcb15e04c4bdb5f5d09ee9e0534d5db018a47",
       "version": 1
     },
     "custom/dins_fire_remake/sparkTex": {

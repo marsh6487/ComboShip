@@ -542,15 +542,25 @@ static inline void CwDinsFireRemake_BuildNativeFire(CwDinsMesh* mesh, int frame,
     CwDinsFireRemake_BuildFireRecipe(mesh, frame, CW_DINS_NATIVE_FADE_START_FRAME, CW_DINS_NATIVE_FADE_TICKS, right, up,
                                      primary, secondary);
 
-    // Keep the authored texture and coverage. Reduce the layered warm glow and
-    // tint the full-color ribbon highlights toward amber for clearer flame detail.
+    // The recipe begins with a ground glow and three interior glow cards.
     for (size_t i = 0; i < mesh->count; ++i) {
         CwDinsQuad* q = &mesh->quads[i];
         if (q->spark == 3) {
-            for (int v = 0; v < 4; ++v)
-                q->alpha[v] = (uint8_t)((q->alpha[v] * 3 + 2) / 5);
+            const int sustainedGlow = i < 4 && !q->palette;
+            if (sustainedGlow) {
+                q->primary = 0xFFC884;
+            }
+            for (int v = 0; v < 4; ++v) {
+                int alpha = (q->alpha[v] * (sustainedGlow ? 3 : 6) + 5) / 10;
+                q->alpha[v] = (uint8_t)(sustainedGlow && i != 0 ? (alpha * 2 + 2) / 5 : alpha);
+            }
         } else if (q->spark == 2 && !q->palette) {
-            q->primary = 0xFFE6CC;
+            // The default atlas carries its own gold-to-ember color grade.
+            double gain = q->band < 2 ? 1.31 : 1.14;
+            for (int v = 0; v < 4; ++v) {
+                int alpha = (q->alpha[v] * 9 + 4) / 8;
+                q->alpha[v] = (uint8_t)fmin(255, nearbyint(alpha * gain));
+            }
         }
     }
 }

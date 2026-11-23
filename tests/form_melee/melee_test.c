@@ -111,7 +111,7 @@ static struct {
     f32 zoraPunchCollisionFrame, punchCollisionFrame;
     s32 punchTrailEffectIndex, punchTrailEffectIndexR;
     SkelAnime formSkelAnime;
-    LinkAnimationHeader *idleAnim, *cutterAttack, *punchA, *punchB;
+    LinkAnimationHeader *idleAnim, *cutterAttack, *punchA, *punchB, *jumpKickEnd;
 } gFormState;
 static Player player;
 static Actor enemy;

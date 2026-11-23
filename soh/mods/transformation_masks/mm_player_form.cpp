@@ -4103,9 +4103,12 @@ static void MmForm_SetAction(GoronActionId action, PlayState* play, LinkAnimatio
     if (anim != NULL) {
         f32 morphFrames = -8.0f;
         if (gFormState.currentForm == MM_PLAYER_FORM_ZORA || gFormState.currentForm == MM_PLAYER_FORM_GORON) {
-            // MM's PlayOnceAdjusted advances one keyframe per gameplay update.
-            // OoT's LinkAnimation_Update multiplies by 1.5 at R_UPDATE_RATE=3.
-            if ((action >= GORON_ACT_PUNCH_A && action <= GORON_ACT_PUNCH_C) || action == MMFORM_ACT_JUMP_KICK) {
+            const bool zoraKickLanding = gFormState.currentForm == MM_PLAYER_FORM_ZORA && action == GORON_ACT_LAND &&
+                                         anim == gFormState.jumpKickEnd;
+            // Match PlayOnceAdjusted: one keyframe per gameplay update. A
+            // separate landing morph would blend the airborne flip into contact.
+            if ((action >= GORON_ACT_PUNCH_A && action <= GORON_ACT_PUNCH_C) || action == MMFORM_ACT_JUMP_KICK ||
+                zoraKickLanding) {
                 playSpeed *= 2.0f / 3.0f;
                 morphFrames = 0.0f;
             } else if (action == GORON_ACT_PUNCH_END) {
@@ -17623,16 +17626,26 @@ LinkAnimationHeader* MmForm_GetJumpSlashAnim(s32 phase) {
     if (gFormState.state != MMFORM_STATE_ACTIVE)
         return NULL;
 
-    // Zora: pz_jumpAT for airborne, pz_jumpATend for landing/recovery
+    // Zora: pz_jumpAT for takeoff and pz_jumpATend for ground contact.
     if (gFormState.jumpKick != NULL) {
         if (phase == PLAYER_MWA_JUMPSLASH_START || phase == PLAYER_MWA_FLIPSLASH_START) {
             return gFormState.jumpKick;
         }
         if (phase == PLAYER_MWA_JUMPSLASH_FINISH || phase == PLAYER_MWA_FLIPSLASH_FINISH) {
-            return gFormState.jumpKickEnd ? gFormState.jumpKickEnd : gFormState.jumpKick;
+            return gFormState.jumpKickEnd;
         }
     }
     return NULL;
+}
+
+LinkAnimationHeader* MmForm_GetJumpSlashRecoveryAnim(Player* player) {
+    if (gFormState.state == MMFORM_STATE_ACTIVE && gFormState.currentForm == MM_PLAYER_FORM_ZORA &&
+        gFormState.jumpKick != NULL) {
+        // The landing action already played pz_jumpATend. MM recovers into
+        // pz_wait or link_normal_waitR_free, depending on hostile lock-on.
+        return Player_CheckHostileLockOn(player) ? gFormState.ztargetIdleR : gFormState.idleAnim;
+    }
+    return MmForm_GetJumpSlashAnim(player->meleeWeaponAnimation);
 }
 
 // Called from z_player.c Handler_10: launch Zora jump kick (1:1 MM Player_Action_29).

@@ -16385,6 +16385,14 @@ void Player_Action_8084DAB4(Player* this, PlayState* play) {
 
     if (!Player_TryActionHandlerList(play, this, sActionHandlerList11, true) &&
         !func_8083D12C(play, this, sControlInput)) {
+        // Zora can put on his heavy boots during a targeted swim. Swim wait
+        // handles the descent and starts ground movement as soon as he lands.
+        if (this->currentBoots == PLAYER_BOOTS_IRON && TransformMasks_IsTransformed() &&
+            MmForm_GetCurrentForm() == MM_PLAYER_FORM_ZORA) {
+            func_80838F18(play, this);
+            return;
+        }
+
         Player_GetMovementSpeedAndYaw(this, &sp2C, &sp2A, SPEED_MODE_LINEAR, play);
 
         if (sp2C == 0.0f) {

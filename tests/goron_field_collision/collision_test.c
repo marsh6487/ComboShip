@@ -24,7 +24,7 @@ static struct {
     u8 meleeActive, jumpKickActive, zoraJumpTrailActive;
     s32 punchTrailEffectIndex, punchTrailEffectIndexR;
     SkelAnime formSkelAnime;
-    LinkAnimationHeader *idleAnim, *cutterAttack;
+    LinkAnimationHeader *idleAnim, *cutterAttack, *jumpKickEnd;
     f32 savedShadowScale, punchCollisionFrame;
 } gFormState;
 static u8 sRollOwnsPause;

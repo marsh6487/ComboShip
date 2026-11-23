@@ -370,7 +370,10 @@ static void checkNativePaletteSemantics(void) {
                 originalVertexBytes = vertexBytes;
                 memcpy(savedVertices, vertices, vertexBytes);
             } else {
-                REQUIRE(vertexBytes == originalVertexBytes && !memcmp(savedVertices, vertices, vertexBytes));
+                REQUIRE(vertexBytes == originalVertexBytes);
+                for (size_t i = 0; i < vertexBytes / sizeof(Vtx); ++i) {
+                    REQUIRE(!memcmp(&savedVertices[i * sizeof(Vtx)], &vertices[i], offsetof(Vtx, v.cn[3])));
+                }
             }
             const char* texture = NULL;
             const char* sampled[8] = { 0 };
@@ -403,7 +406,7 @@ static void checkNativePaletteSemantics(void) {
                     continue;
                 REQUIRE(sampleCount < ARRAY_COUNT(sampled));
                 sampled[sampleCount++] = texture;
-                const uint32_t defaultTint = strstr(texture, "/ribbon") ? 0xFFE6CC : 0xFFFFFF;
+                const uint32_t defaultTint = strstr(texture, "/halo") ? 0xFFC884 : 0xFFFFFF;
                 for (int pixel = 0; pixel < 4; ++pixel) {
                     float texel[4], result[4];
                     nativeTexel(texture, .15f + pixel * .20f, .35f + pixel * .10f, texel);
@@ -431,7 +434,7 @@ static void checkNativePaletteSemantics(void) {
             REQUIRE(sampleCount == (tick < CW_DINS_BURN_FIRST_FRAME ? 4 : 7));
         }
     }
-    puts("PASS native palette pixels: actual RGBA samples and packed GBI apply the default ribbon tint, map both "
+    puts("PASS native palette pixels: actual RGBA samples and packed GBI apply the default material, map both "
          "colors, retain alpha and geometry");
 }
 

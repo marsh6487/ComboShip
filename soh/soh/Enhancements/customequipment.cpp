@@ -1037,6 +1037,7 @@ static RegisterShipInitFunc initFuncSm64PreUpdateCommon(RegisterSm64PreUpdateCom
 // throw, func_80831F00 melee start.
 extern "C" {
 LinkAnimationHeader* MmForm_GetJumpSlashAnim(s32 phase);
+LinkAnimationHeader* MmForm_GetJumpSlashRecoveryAnim(Player* player);
 LinkAnimationHeader* MmForm_GetZoraBoomerangAnim(s32 phase);
 }
 
@@ -1126,7 +1127,7 @@ static void RegisterPlayerAnimOverrideNEI() {
                 // Jump-slash recovery: transformed + mwa in [FLIPSLASH_FINISH, JUMPSLASH_FINISH]
                 if (TransformMasks_IsTransformed() && (player->meleeWeaponAnimation >= PLAYER_MWA_FLIPSLASH_FINISH) &&
                     (player->meleeWeaponAnimation <= PLAYER_MWA_JUMPSLASH_FINISH)) {
-                    LinkAnimationHeader* formAnim = MmForm_GetJumpSlashAnim(player->meleeWeaponAnimation);
+                    LinkAnimationHeader* formAnim = MmForm_GetJumpSlashRecoveryAnim(player);
                     if (formAnim != nullptr) {
                         *animOut = formAnim;
                     }
