@@ -61,7 +61,9 @@ extern "C" NeiSaveData* Nei_Save() {
 extern "C" u16 Nei_GetOwnedItem(u8 slot) {
     return Nei_Save()->ownedItems[slot - 24];
 }
+extern "C" {
 #include "weather_seasons.inc"
+}
 
 extern "C" void Skybox_Calculate128(SkyboxContext*, s32) {
     ++skyRebuilds;

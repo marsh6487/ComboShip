@@ -203,7 +203,8 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
 
 extern "C" int MMWeather_IsWinterWater(const PlayState* play) {
     return play != nullptr && gSaveContext.gameMode == GAMEMODE_NORMAL &&
-           ((Seasons_SeasonCount() != 0 && Seasons_GetSeason() == SEASON_WINTER) || SelectedSeason() == SEASON_WINTER);
+           ((Seasons_SeasonOwned(SEASON_WINTER) && Seasons_GetSeason() == SEASON_WINTER) ||
+            SelectedSeason() == SEASON_WINTER);
 }
 
 extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {

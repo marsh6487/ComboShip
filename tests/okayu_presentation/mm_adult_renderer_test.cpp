@@ -72,7 +72,9 @@ void gSPDisplayList(Gfx* command,Gfx* display) { __gSPDisplayList(command,displa
 u16 gEquipMasks[] = {0xf, 0xf0, 0xf00, 0xf000};
 u8 gEquipShifts[] = {0, 4, 8, 12};
 PlayerModelType sPlayerLeftHandType, sPlayerRightHandType;
+s32 sPlayerLod;
 bool ResourceMgr_IsAltAssetsEnabled() { return alt; }
+int ResourceMgr_OTRSigCheck(char* path) { return path && std::strncmp(path, "__OTR__", 7) == 0; }
 u8 ResourceMgr_FileExists(const char* path) { return meshes.contains(path); }
 u8 ResourceMgr_FileAltExists(const char*) { return 0; }
 Gfx* ResourceMgr_LoadGfxByName(const char* path) { return meshes.contains(path) ? Mesh(path) : nullptr; }
