@@ -38,7 +38,11 @@ def main() -> None:
     player_source = ROOT / "mm/src/code/z_player_lib.c"
     adult_source = (ROOT / "mm/mods/items/logic/adult_link_render.cpp").read_text()
     extended_source = (ROOT / "mm/mods/extended_equipment.c").read_text()
-    adult_hand_helper = function(adult_source, "AdultLink_ApplyRootTransform") + "\n" + function(adult_source, "AdultLink_ApplyNeiHeldHand")
+    child_path = next(line for line in adult_source.splitlines() if line.startswith("#define ALC("))
+    adult_hand_helper = child_path + "\n" + "\n".join(
+        function(adult_source, name) for name in ("AdultLink_SeasonalChildEquipment", "AdultLink_ApplyRootTransform",
+                                                  "AdultLink_ApplyNeiHeldHand")
+    )
     adult_callback = function(adult_source, "AdultLink_OverrideLimb")
     extended_back_draw = function(extended_source, "ExtEquip_DrawShieldBackDL")
     cc = shlex.split(os.environ.get("CC", "cc"))

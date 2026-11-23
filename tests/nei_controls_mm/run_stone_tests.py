@@ -21,7 +21,11 @@ static const char donorIcon[] = "__OTR__@oot:textures/icon_item_24_static/gQuest
 u8 ResourceMgr_FileExists(const char* path) { assert(path == questIcon); return localQuestTex; }
 u8 ResourceMgr_FileAltExists(const char* path) { assert(path == questIcon); return localAltQuestTex; }
 bool ResourceMgr_IsAltAssetsEnabled() { return altQuestEnabled; }
-int NeiResource_Available(const char* path) { assert(path == questIcon); return donorQuestTex; }
+int NeiResource_Available(const char* path) {
+    if (!path || std::strncmp(path, "__OTR__", 7) != 0) return 0;
+    assert(path == questIcon);
+    return donorQuestTex;
+}
 const char* NeiResource_Route(const char* path) { assert(path == questIcon); return donorIcon; }
 
 
@@ -108,6 +112,8 @@ def main():
  buttons=read('mm/mods/ext_buttons/ext_buttons.cpp');collect=read('mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_collect.c');stone=read('mm/mods/spiritual_stones/spiritual_stones.cpp')
  first=collect.index('    if (point >= 0x12 && point <= 0x14 && OotQuest_Has(point))');last=collect.index('    // Stone of Agony',first)
  code=PREFIX+claim_definition(read)+EXTRA+'\n'+buttons[buttons.index('u16 ExtButton_GetItem'):buttons.rindex('} // extern')]
+ if 'static const char* OotQuest_LocalTex(' in collect:
+  code+='\n'+function(collect,'OotQuest_LocalTex')
  code+='\n'+function(collect,'OotQuest_Tex')+'\n'+function(stone,'SpiritualStone_TogglePassive')
  code+='\nvoid StoneSelect(PlayState* play,Input* input){s16 point=sOotQuestCursorPoint;\n'+collect[first:last]+'}\n'
  code+='\n'+function(stone,'StoneItemId')+'\n'+function(stone,'SpiritualStone_TickHold')+CHECKS

@@ -61,11 +61,18 @@ constexpr int MM_NA_SE_PL_PUT_OUT_ITEM = 1, MM_NA_SE_IT_SET_TRANSFORM_MASK = 2,
 constexpr float ZORA_SWIM_THRESHOLD = 20;
 static u8 sNativeMaskInstantFallback = 0, sForceInstantTransform = 0, sCutsceneMaskAnim = 0;
 static bool selected = true, instant = false, loadOk = true, pikachuMode = false;
+static struct { bool pokeballOwned = true; } save;
 static int loads = 0, soundsIn = 0, soundsOut = 0, formTicks = 0, restricted = 0, restored = 0;
 #define MMFORM_LOG(...) ((void)0)
 #define GET_ACTIVE_CAM(play) (0)
 #define MMFORM_IS_ZORA_SWIM() (gFormState.currentForm == MM_PLAYER_FORM_ZORA)
-int CVarGetInteger(const char* name, int) { return std::strcmp(name, "gPikachuMode") == 0 ? pikachuMode : instant; }
+int CVarGetInteger(const char* name, int fallback) {
+    if (std::strcmp(name, "gPikachuMode") == 0) return pikachuMode;
+    if (std::strcmp(name, "gSm64Mario") == 0) return fallback;
+    return instant;
+}
+int BrokenItems_Enabled() { return true; }
+auto* Nei_Save() { return &save; }
 u8 MmForm_IsEnabled() { return true; }
 u8 WolfLinkForm_IsSelected() { return selected; }
 void WolfLinkForm_Select(u8 wolf) { selected = wolf; }

@@ -89,6 +89,9 @@ static std::shared_ptr<Ship::IResource> PlayerFlexSkin_Load(const std::string &p
   return found == sSkinResources.end() ? nullptr : found->second;
 }
 #include "../../combo/actors/PlayerFlexSkinBridge.inc"
+#include "../../combo/actors/SeasonalIdle.h"
+
+extern "C" void PlayerFlexSkin_LoadSeasonalIdle(PlayState*, const void*, void**, Vec3s*, SeasonalIdleDraw*) {}
 
 // Only renderer state is local; the resolver body is extracted unchanged.
 class Interpreter {
