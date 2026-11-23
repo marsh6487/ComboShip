@@ -559,8 +559,9 @@ void RegisterNEIMenu() {
         .PreFunc(
             [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
         .Options(CheckboxOptions().Tooltip(
-            "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
-            "Off keeps the fixed Mirror on the stump. Works independently of Enable Custom Items."));
+            "Adds one Magic Mirror to the item pool. The Lost Woods stump stays optional in Combo.\n"
+            "In single-game mode, the stump reward shuffles too. Off keeps the Mirror on the stump.\n"
+            "Independent of Enable Custom Items."));
     mSohMenu
         ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), "Start with Rod of Seasons",
                          WIDGET_CVAR_CHECKBOX)

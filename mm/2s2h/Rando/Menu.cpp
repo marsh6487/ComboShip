@@ -1775,8 +1775,9 @@ static void DrawItemPoolTab() {
             "Shuffle Magic Mirror", mirrorCvar,
             CheckboxOptions(
                 { { .tooltip =
-                        "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
-                        "Off keeps the fixed Mirror on the stump. Independent of Shuffle NEI Custom Items." } }));
+                        "Adds one Magic Mirror to the item pool. The Lost Woods stump stays optional in Combo.\n"
+                        "In single-game mode, the stump reward shuffles too. Off keeps the Mirror on the stump.\n"
+                        "Independent of Shuffle NEI Custom Items." } }));
     }
     {
         WhatsNew::Scope releaseHighlight(Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar, nullptr,

@@ -231,8 +231,21 @@ static void TestAllRainbowCosmetics() {
     entry.option = MakeCosmeticOption("test.custom", "test.custom.Color", "test.custom.Rainbow", "test.custom.Locked",
                                       "test.custom.Changed", "Custom material", COSMETICS_GROUP_MAX,
                                       { 80, 90, 100, 255 }, false, true, false);
-    entry.bindings = { { "custom/material", material, 0, true, 77, 3, 4 },
-                       { "custom/material", material, 1, false, 91, 0, 0 } };
+    entry.bindings = {
+        { .materialPath = "custom/material",
+          .material = material,
+          .commandIndex = 0,
+          .defaultA = 77,
+          .editedA = 77,
+          .primM = 3,
+          .primL = 4 },
+        { .materialPath = "custom/material",
+          .material = material,
+          .commandIndex = 1,
+          .isPrimColor = false,
+          .defaultA = 91,
+          .editedA = 91 },
+    };
     customCosmeticEntries.push_back(entry);
     CVarSetInteger(entry.option.changedCvar, 1);
     CVarSetInteger(entry.option.rainbowCvar, 1);
