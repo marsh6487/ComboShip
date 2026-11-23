@@ -66,6 +66,7 @@ typedef struct EnElf {
     /* 0x26C */ EnElfUnkFunc unk_26C;
     /* 0x270 */ EnElfActionFunc actionFunc;
     u16 midnaBlinkTimer; // Optional companion presentation; visible update time only.
+    Actor* naviAudioTarget;
 } EnElf;
 
 #endif // Z_EN_ELF_H

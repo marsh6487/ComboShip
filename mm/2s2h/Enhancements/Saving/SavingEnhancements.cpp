@@ -4,6 +4,7 @@
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "SavingEnhancements.h"
 
 extern "C" {
 #include <variables.h>
@@ -144,6 +145,32 @@ extern "C" void SavingEnhancements_AdvancePlaytime() {
         gSaveContext.save.shipSaveInfo.filePlaytime += timestamp - gSaveContext.shipSaveContext.lastTimeLog;
         gSaveContext.shipSaveContext.lastTimeLog = timestamp;
     }
+}
+
+extern "C" void SavingEnhancements_WriteOwlSnapshot(PlayState* play, bool immediate) {
+    const bool currentOwlSaveState = gSaveContext.save.isOwlSave;
+    gSaveContext.save.isOwlSave = true;
+    SavingEnhancements_PersistSaveEntranceInfo();
+    SavingEnhancements_AdvancePlaytime();
+    Play_SaveCycleSceneFlags(play);
+    gSaveContext.save.saveInfo.playerData.savedSceneId = play->sceneId;
+    func_8014546C(&play->sramCtx);
+
+    const int flashSlot = gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER;
+    if (immediate) {
+        // Reset is about to leave PlayState. Solo MM also writes the native backup page.
+        SysFlashrom_WriteDataSync(play->sramCtx.saveBuf, gFlashOwlSaveStartPages[flashSlot],
+                                  gFlashOwlSaveNumPages[flashSlot]);
+        if (!Combo_IsCombinedGame()) {
+            SysFlashrom_WriteDataSync(play->sramCtx.saveBuf, gFlashOwlSaveStartPages[flashSlot] + 0x80,
+                                      gFlashOwlSaveNumPages[flashSlot]);
+        }
+    } else {
+        Sram_SetFlashPagesOwlSave(&play->sramCtx, gFlashOwlSaveStartPages[flashSlot], gFlashOwlSaveNumPages[flashSlot]);
+        Sram_StartWriteToFlashOwlSave(&play->sramCtx);
+    }
+    gSaveContext.save.isOwlSave = currentOwlSaveState;
+    SavingEnhancements_ClearSaveEntranceInfo();
 }
 
 void DeleteOwlSave() {

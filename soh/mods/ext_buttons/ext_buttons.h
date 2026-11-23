@@ -37,8 +37,8 @@ void ExtButton_ClearItem(s32 btn);
 // Enabled, unclaimed C/D-pad inputs carrying an effective full item ID.
 u16 ExtButton_GetInputMask(u16 item);
 
-// Pause assignment: adding an NEI D-pad shortcut preserves C bindings;
-// assigning to C moves existing copies and swaps the displaced item once.
+// Pause assignment: NEI D-pad shortcuts relocate within the D-pad and preserve C bindings.
+// Assigning to C searches both button banks and swaps the displaced item once.
 // Native items retain inventory-slot swaps. Empty/sold-out selections are unchanged.
 s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot);
 

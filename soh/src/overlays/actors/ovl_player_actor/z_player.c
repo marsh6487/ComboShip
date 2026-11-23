@@ -4716,9 +4716,8 @@ void Player_UpdateZTargeting(Player* this, PlayState* play) {
                     // Lock-on was not started above. Set Parallel Mode.
                     if (!(this->stateFlags1 & (PLAYER_STATE1_PARALLEL | PLAYER_STATE1_LOCK_ON_FORCED_TO_RELEASE))) {
                         Player_SetParallel(this);
-                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL &&
-                            ResourceMgr_FileExists(TP_TARGET_CAMERA_CUE)) {
-                            Sfx_PlaySfxCentered(NA_SE_SY_LOCK_ON_HUMAN);
+                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL) {
+                            SOHTwilightPrincessTargeting_PlayCamera();
                         }
                     }
                 }
@@ -12813,6 +12812,7 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
         s32 doAction = DO_ACTION_NONE;
 
         if (!Player_InBlockingCsMode(play, this)) {
+            DoAction formAction = MmForm_GetAButtonDoAction(this);
             if (this->stateFlags1 & PLAYER_STATE1_FIRST_PERSON) {
                 doAction = DO_ACTION_RETURN;
             } else if ((this->heldItemAction == PLAYER_IA_FISHING_POLE) && (this->unk_860 != 0)) {
@@ -12883,6 +12883,8 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
                     sp24 = (D_80854784[CUR_UPG_VALUE(UPG_SCALE)] - this->actor.yDistToWater) / 40.0f;
                     sp24 = CLAMP(sp24, 0, 7);
                     doAction = sDiveNumberDoActions[sp24];
+                } else if (formAction != DO_ACTION_NONE) {
+                    doAction = formAction;
                 } else if (sp1C && !(this->stateFlags2 & PLAYER_STATE2_UNDERWATER)) {
                     doAction = DO_ACTION_DIVE;
                 } else if (!sp1C && (!(this->stateFlags1 & PLAYER_STATE1_SHIELDING) || Player_IsZTargeting(this) ||

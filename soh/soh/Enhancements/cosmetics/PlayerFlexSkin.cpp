@@ -1,4 +1,6 @@
 #include "global.h"
+#include "soh/resource/type/PlayerAnimation.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/resource/type/Array.h"
 #include "soh/resource/type/Skeleton.h"
@@ -19,3 +21,9 @@ static std::shared_ptr<Ship::IResource> PlayerFlexSkin_Load(const std::string& p
     return manager->LoadResource(path);
 }
 #include "../../../../combo/actors/PlayerFlexSkinBridge.inc"
+
+static bool PlayerFlexSkin_SeasonalIdleHostEligible(const Player& player) {
+    return player.unk_6AD == 0 && !(player.stateFlags1 & PLAYER_STATE1_IN_WATER) &&
+           !(player.stateFlags2 & PLAYER_STATE2_CRAWLING) && !TransformMasks_IsTransformedAny();
+}
+#include "../../../../combo/actors/SeasonalIdleBridge.inc"

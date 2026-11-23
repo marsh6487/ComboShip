@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_haka_water.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_hakach_objects/object_hakach_objects.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
@@ -123,8 +124,8 @@ void BgHakaWater_Draw(Actor* thisx, PlayState* play) {
 
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (u8)(0.765f * temp));
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, play->gameplayFrames % 128, play->gameplayFrames % 128, 32, 32,
-                                  1, 0, (0 - play->gameplayFrames) % 128, 32, 32, 1, 1, 0, -1));
+               Gfx_TwoTexWaterScroll(play, 0, play->gameplayFrames % 128, play->gameplayFrames % 128, 32, 32, 1, 0,
+                                     (0 - play->gameplayFrames) % 128, 32, 32, 1, 1, 0, -1));
 
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPDisplayList(POLY_XLU_DISP++, gBotwWaterRingDL);

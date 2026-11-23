@@ -52,6 +52,8 @@ static void MidnaAudio_Mix(s16 *buffer, size_t frames) {
   }
 }
 static void MidnaAudio_Reset() { ++midnaResets; }
+[[maybe_unused]] static void SOHTwilightPrincessTargeting_Mix(s16 *, size_t) {}
+[[maybe_unused]] static void SOHTwilightPrincessTargeting_Reset() {}
 #if TEST_AUDIO_WORKER_EMOTES
 static void ComboEmotes_MixAudio(s16 *buffer, size_t frames) {
   for (size_t i = 0; i < frames * 2; ++i) {

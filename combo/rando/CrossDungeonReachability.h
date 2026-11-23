@@ -1,7 +1,6 @@
 #pragma once
 #include "CrossDungeonSeed.h"
 #include "CrossEntranceBossMap.h"
-#include "MagicMirrorShuffle.h"
 
 #include <unordered_set>
 
@@ -81,10 +80,8 @@ JointReach QueryJoint(const Oracle& oot, const Oracle& mm, const std::vector<std
         // Destination safety uses this query's inventory/time settings in both native hosts.
         changed |= collect(ootExits, 0);
         changed |= collect(mmExits, 1);
-        if (!changed) {
-            MagicMirrorShuffle::AddOotRoute(result.oot, result.mm);
+        if (!changed)
             return result;
-        }
     }
     throw std::runtime_error("cross-dungeon oracle did not converge");
 }

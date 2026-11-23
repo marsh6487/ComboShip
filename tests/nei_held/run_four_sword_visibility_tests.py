@@ -93,6 +93,7 @@ int CVarGetInteger(const char* name,int) { return !strcmp(name,"DinFireSword") &
 bool HasLegacyGiMod(const Presentation&,bool) { return false; }
 bool HasRedesignGiMod(const Presentation&) { return false; }
 bool HasResource(const char*) { return true; }
+int ResourceMgr_IsLegacyZssLongswordGi() { return 0; }
 int OOT_NeiAltAssetsEnabled() { return altOn; }
 int OOT_NeiResourceExists(const char*) { return true; }
 void Randomizer_DrawCaneSomariaUpgrade() {}

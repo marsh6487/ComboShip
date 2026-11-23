@@ -116,8 +116,50 @@ int main() {
     // Literal 31 is OoT's travel cell; MM uses its disjoint native equip band.
 #ifdef MIRROR_FIXTURE_MM
     constexpr u8 travelSlot = 79;
+    constexpr u8 rodSlot = 95;
+    constexpr bool dpadCarriesExtendedSlot = true;
 #else
     constexpr u8 travelSlot = 31;
+    constexpr u8 rodSlot = 47;
+    constexpr bool dpadCarriesExtendedSlot = false;
+#endif
+    constexpr u16 rod = 0x0223;
+    for (int source = 4; source <= 7; ++source) {
+        for (int target = 4; target <= 7; ++target) {
+            if (source == target) continue;
+            for (u16 displaced : {u16(ITEM_NONE), u16(9), u16(0x0209)}) {
+                Reset();
+                Put(1, rod, SLOT_NONE);
+                Put(source, rod, rodSlot);
+                const u8 displacedSlot = displaced == ITEM_NONE ? SLOT_NONE : displaced == 9 ? 11 : 86;
+                Put(target, displaced, displacedSlot);
+                Equip(&play, target, rod, rodSlot);
+                Check(Item(target) == rod, "Rod lands on the selected D-pad direction");
+                Check(Item(source) == displaced, "Rod moves between D-pad directions instead of copying");
+                const u8 expectedSlot = displaced >= 0x0200 && !dpadCarriesExtendedSlot ? SLOT_NONE : displacedSlot;
+                Check(Slot(source) == expectedSlot, "Displaced item retains its host slot convention");
+                Check(Item(1) == rod && sIconLoads[1] == 0,
+                      "Moving a Rod shortcut preserves its separate C assignment");
+                Check(sIconLoads[source] == 1, "The old Rod shortcut refreshes exactly once");
+            }
+        }
+    }
+    Reset();
+    Put(4, rod, rodSlot);
+    Put(5, rod, rodSlot);
+    Put(6, rod, rodSlot);
+    Equip(&play, 5, rod, rodSlot);
+    Check(Item(5) == rod && Item(4) == ITEM_NONE && Item(6) == ITEM_NONE &&
+              Slot(4) == SLOT_NONE && Slot(6) == SLOT_NONE,
+          "Reassigning a Rod cleans up legacy duplicate D-pad shortcuts and their slots");
+#ifdef MIRROR_FIXTURE_MM
+    Reset();
+    DPAD_BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_D_LEFT) = (u8)rod;
+    DPAD_SLOT_EQUIP(0, EQUIP_SLOT_D_LEFT) = rodSlot;
+    gSaveContext.save.shipSaveInfo.nei.ownedItems[rodSlot - 72] = rod;
+    Equip(&play, 4, rod, rodSlot);
+    Check(Item(4) == rod && Item(5) == ITEM_NONE && Slot(5) == SLOT_NONE,
+          "A truncated Rod shortcut also moves without leaving an old binding");
 #endif
     for (int source = 1; source <= 7; ++source) {
         for (int target = 1; target <= 7; ++target) {
@@ -128,9 +170,9 @@ int main() {
                 Put(target, displaced, displaced >= 0x0200 || displaced == ITEM_NONE ? SLOT_NONE : 11);
                 Equip(&play, target, EXT_ITEM_MAGIC_MIRROR, travelSlot);
                 Check(Item(target) == EXT_ITEM_MAGIC_MIRROR, "Mirror lands on requested button");
-                const bool independent = target >= 4;
+                const bool independent = target >= 4 && source < 4;
                 Check(Item(source) == (independent ? EXT_ITEM_MAGIC_MIRROR : displaced),
-                      "D-pad shortcut preserves other bindings; C moves use swap behavior");
+                      "A D-pad shortcut preserves C bindings; relocation swaps within the D-pad");
                 Check(sIconLoads[target] > 0 && (independent ? sIconLoads[source] == 0 : sIconLoads[source] > 0),
                       "Only changed HUD icons refresh");
                 for (int other = 1; other <= 7; ++other)
@@ -180,5 +222,5 @@ int main() {
               !ExtButton_EquipMagicMirror(&play, 8, EXT_ITEM_MAGIC_MIRROR, travelSlot),
           "Mirror helper rejects B and out-of-range indices");
 #endif
-    std::puts("PASS: native C/D Mirror assignment contract, native swaps, full IDs, unrelated slots");
+    std::puts("PASS: Rod and Mirror D-pad relocation, C shortcuts, native swaps, full IDs and unrelated slots");
 }

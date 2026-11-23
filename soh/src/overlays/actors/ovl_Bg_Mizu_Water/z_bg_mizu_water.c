@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_mizu_water.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_mizu_objects/object_mizu_objects.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 
@@ -337,8 +338,8 @@ void BgMizuWater_Draw(Actor* thisx, PlayState* play) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
 
     gSPSegment(POLY_XLU_DISP++, 0x0C,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, -gameplayFrames * 1, gameplayFrames * 1, 32, 32, 1, 0,
-                                  -gameplayFrames * 1, 32, 32, -1, 1, 0, -1));
+               Gfx_TwoTexWaterScroll(play, 0, -gameplayFrames * 1, gameplayFrames * 1, 32, 32, 1, 0,
+                                     -gameplayFrames * 1, 32, 32, -1, 1, 0, -1));
 
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 

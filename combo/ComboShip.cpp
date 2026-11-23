@@ -43,6 +43,7 @@
 #include "rando/CrossDungeonGeneration.h"
 #include "rando/OotDungeonLayouts.h"
 #include "rando/BlackMarket.h"
+#include "rando/RpgStats.h"
 #include "gui/ComboGenProgress.h"
 #include "ComboExtract.h"
 #include "ComboLaunchOptions.h"
@@ -1312,6 +1313,8 @@ typedef int (*FnGetSharedTier)(int family);
 typedef void (*FnRaiseSharedTier)(int family, int tier);
 typedef void (*FnSetSharedChangedCb)(void (*)(int, int));
 typedef void (*FnSetSharedTickCb)(void (*)(void));
+static bool (*SOH_GetRpgMagicProgress)(int, ComboRpgState*) = nullptr;
+static void (*MM_ApplyRpgMagicProgress)(int, const ComboRpgState*) = nullptr;
 static FnSetComboSharedItems SOH_SetComboSharedItems = nullptr;
 // MM's mirror of the OOT setter — mask-gated vendor pokes (e.g. Bombchu Bag family) read it.
 static FnSetComboSharedItems MM_SetComboSharedItems = nullptr;
@@ -2083,6 +2086,11 @@ static void Combo_OnSharedChanged(int game, int fileNum) try {
 static void Combo_SharedReconcileNow() try {
     if (!ComboIsValidSlot(g_comboCompletionSlot) || g_MmSaveInMemorySlot != g_comboCompletionSlot)
         return; // A failed dormant load must never reconcile stale memory from another slot.
+    // RPG magic is owned by OoT, including pickups found in MM. Bring over its progress as
+    // soon as the grant lands, independently of the optional native Shared Magic family.
+    ComboRpgState magic{};
+    if (SOH_GetRpgMagicProgress && MM_ApplyRpgMagicProgress && SOH_GetRpgMagicProgress(g_comboCompletionSlot, &magic))
+        MM_ApplyRpgMagicProgress(g_comboCompletionSlot, &magic);
     if (g_sharedMask == 0 || !SOH_GetSharedTier || !MM_GetSharedTier || !SOH_RaiseSharedTier || !MM_RaiseSharedTier)
         return;
     for (int i = 0; i < ComboRando::SF_COUNT; ++i) {
@@ -2203,7 +2211,7 @@ static void Combo_SharedTick() try {
     if (g_comboCompletionSlot < 0 || g_MmSaveInMemorySlot != g_comboCompletionSlot)
         return;
     Combo_DrainBossWarpReward(g_comboCompletionSlot, ComboAnchor::sActiveGame.load());
-    if (!g_sharedReconcilePending || g_sharedMask == 0)
+    if (!g_sharedReconcilePending)
         return;
     g_sharedReconcilePending = false; // clear BEFORE raising — a raise re-fires the poke and re-arms it
     Combo_SharedReconcileNow();
@@ -2442,6 +2450,13 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             fail(e.what());
             return;
         }
+        // No Logic is the only preset that can use the compatibility fill without both native searches.
+        const auto ootAccess = ComboRando::OotAccessFromDump(sohDump);
+        if (!haveOracles && ootAccess != ComboRando::OotAccess::NO_LOGIC) {
+            fail("Combo generation with logic enabled requires both native reachability oracles. Use matching game "
+                 "DLLs.");
+            return;
+        }
         resolvedMmStart = mmStart; // these dumps used it, so whatever spoiler they end up in must record it
         if (goal.hunt) {
             const int pieces = ComboRando::CountPoolTriforcePieces(sohDump, mmDump);
@@ -2507,7 +2522,6 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
 
         // ComboShip: honor OOT's logic/ALR settings per-game (MM stays all-reachable). The fill gates MM
         // on the portal region via ootOracle.GetPortalOpen; NO_LOGIC bypasses it.
-        ComboRando::OotAccess ootAccess = ComboRando::OotAccessFromDump(sohDump);
         auto result =
             ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, ootOracle, mmOracle, progress, forcedOot,
                                                ootAccess, goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
@@ -4172,6 +4186,8 @@ int main(int argc, char** argv) {
     MM_GetSharedTier = (FnGetSharedTier)GetSym(mmModule, "MM_GetSharedTier");
     SOH_RaiseSharedTier = (FnRaiseSharedTier)GetSym(sohModule, "SOH_RaiseSharedTier");
     MM_RaiseSharedTier = (FnRaiseSharedTier)GetSym(mmModule, "MM_RaiseSharedTier");
+    SOH_GetRpgMagicProgress = (decltype(SOH_GetRpgMagicProgress))GetSym(sohModule, "SOH_GetRpgMagicProgress");
+    MM_ApplyRpgMagicProgress = (decltype(MM_ApplyRpgMagicProgress))GetSym(mmModule, "MM_ApplyRpgMagicProgress");
     SOH_SetSharedChangedCb = (FnSetSharedChangedCb)GetSym(sohModule, "SOH_SetSharedChangedCb");
     MM_SetSharedChangedCb = (FnSetSharedChangedCb)GetSym(mmModule, "MM_SetSharedChangedCb");
     SOH_SetSharedTickCb = (FnSetSharedTickCb)GetSym(sohModule, "SOH_SetSharedTickCb");

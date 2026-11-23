@@ -15,6 +15,7 @@ using NeiGi::Kind;
 /* ITEM_IDS */
 bool ootAlt=true,mmAlt=false,legacyMod=false,mmLegacyMod=false;
 bool dinFireSword=false;
+bool legacyZssLongswordGi=false;
 namespace Ship {
 struct ResourceManager { bool IsAltAssetsEnabled() const { return ootAlt; } };
 struct CrossRMRegistry {
@@ -30,6 +31,7 @@ int32_t OOT_NeiAltAssetsEnabled(){return ootAlt;}
 int CVarGetInteger(const char* key,int){return !strcmp(key,"DinFireSword")&&dinFireSword;}
 const char* NeiResource_Route(const char* path){return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*){return mmLegacyMod;}
+int ResourceMgr_IsLegacyZssLongswordGi(){return legacyZssLongswordGi;}
 int ResourceMgr_IsIkanaShieldGiAvailable(){assert(false && "sword toggle must not query the native shield pair");return 0;}
 std::set<std::string> resources;
 int32_t OOT_NeiEnsureGiBaseOwner(){return 1;}
@@ -152,6 +154,19 @@ int main(){
         }else assert(info.drawKind==CW_DRAW_KIND_CUSTOM_GI&&strstr(info.dlists[0],"object_custom_equip"));
         assert(ootAlt==donor&&mmAlt==host&&"GI selection mutated either owner's global asset state");
     }
+    ootAlt = mmAlt = legacyZssLongswordGi = true;
+    CwItemDrawInfo zss{};
+    assert(!CwAltSwordGi(RG_BIGGORON_SWORD, &zss));
+    assert(MM_DescribeNeiGi(RI_OOT_BIGGORON_SWORD, &zss));
+    assert(zss.drawKind == CW_DRAW_KIND_NEI_GI && zss.neiShimmer == int(Kind::BiggoronSword) + 1);
+    assert(!std::strcmp(zss.dlists[0], "__OTR__objects/nei_gi_redesign/biggoron_sword/gi_dl"));
+    assert(CwAltSwordGi(RG_GIANTS_KNIFE, &zss) && zss.neiShimmer == int(Kind::GiantsKnife) + 1);
+    assert(MM_DescribeNeiGi(RI_GREAT_FAIRY_SWORD, &zss));
+    assert(zss.drawKind == CW_DRAW_KIND_NEI_GI && zss.neiShimmer == int(Kind::GreatFairySword) + 1);
+    dinFireSword = true;
+    assert(MM_DescribeNeiGi(RI_OOT_BIGGORON_SWORD, &zss));
+    assert(zss.drawKind == CW_DRAW_KIND_CUSTOM_GI && std::strstr(zss.dlists[0], "/progressive/bgs/"));
+    dinFireSword = legacyZssLongswordGi = false;
     // A foreign OoT award must honor MM's independent Alt state, including
     // repeated draws through the resolver's cached producer function.
     for(const auto& award:{std::pair{"Master Sword","master_sword"},std::pair{"Giant's Knife","giants_knife"}})

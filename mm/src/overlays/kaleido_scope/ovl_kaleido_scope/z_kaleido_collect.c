@@ -132,9 +132,7 @@ static const char* sOotNamePaths[OOT_QUEST_POINT_MAX + 1] = {
     "__OTR__textures/item_name_static/gPieceofHeartItemNameENGTex",     // 0x18 Heart-piece pie
 };
 
-// Keep local replacements and let the renderer resolve the texture path so the
-// selected archive's HD dimensions and texture format are preserved.
-static const char* OotQuest_Tex(const char* path) {
+static const char* OotQuest_LocalTex(const char* path) {
     extern u8 ResourceMgr_FileExists(const char* resName);
     extern u8 ResourceMgr_FileAltExists(const char* resName);
     extern bool ResourceMgr_IsAltAssetsEnabled(void);
@@ -145,7 +143,27 @@ static const char* OotQuest_Tex(const char* path) {
     if (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path))) {
         return path;
     }
+    return NULL;
+}
+
+// Keep local replacements and let the renderer resolve their texture metadata.
+static const char* OotQuest_Tex(const char* path) {
+    const char* local = OotQuest_LocalTex(path);
+    if (local != NULL) {
+        return local;
+    }
     return NeiResource_Available(path) ? NeiResource_Route(path) : NULL;
+}
+
+static const char* OotQuest_HeartPieceTex(u32 count) {
+    const char* path = sOotHeartPiecePaths[count - 1];
+
+    // Match the companion OoT page's overlay before consulting MM's replacements.
+    if (NeiResource_Available(path)) {
+        return NeiResource_Route(path);
+    }
+    const char* local = OotQuest_LocalTex(path);
+    return local != NULL ? local : sMmHeartPieceTextures[count - 1];
 }
 
 // OoT-page song fingerings (OCARINA_BTN_* per note), song index 0..11 == quest point 6..17
@@ -627,17 +645,13 @@ void KaleidoScope_DrawOotQuestStatus(PlayState* play) {
         u32 hpCount = QuestStatus_HeartPieceCount();
 
         if (hpCount != 0) {
-            const char* heart = OotQuest_Tex(sOotHeartPiecePaths[hpCount - 1]);
-            if (heart == NULL) {
-                heart = sMmHeartPieceTextures[hpCount - 1];
-            }
             gDPPipeSync(POLY_OPA_DISP++);
             gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
                               PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 70, 50, pauseCtx->alpha);
             gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
             gSPVertex(POLY_OPA_DISP++, &vtx[24 * 4], 4, 0);
-            POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, heart, 48, 48, 0);
+            POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, OotQuest_HeartPieceTex(hpCount), 48, 48, 0);
         }
     }
 

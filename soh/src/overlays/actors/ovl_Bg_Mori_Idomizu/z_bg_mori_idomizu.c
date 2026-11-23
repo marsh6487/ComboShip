@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_mori_idomizu.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_mori_objects/object_mori_objects.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
@@ -173,8 +174,8 @@ void BgMoriIdomizu_Draw(Actor* thisx, PlayState* play) {
     gDPSetEnvColor(POLY_XLU_DISP++, 0, 0, 0, 128);
 
     gSPSegment(POLY_XLU_DISP++, 0x09,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0x7F - (gameplayFrames & 0x7F), gameplayFrames % 0x80, 0x20,
-                                  0x20, 1, gameplayFrames & 0x7F, gameplayFrames % 0x80, 0x20, 0x20, -1, 1, 1, 1));
+               Gfx_TwoTexWaterScroll(play, 0, 0x7F - (gameplayFrames & 0x7F), gameplayFrames % 0x80, 0x20, 0x20, 1,
+                                     gameplayFrames & 0x7F, gameplayFrames % 0x80, 0x20, 0x20, -1, 1, 1, 1));
 
     gSPDisplayList(POLY_XLU_DISP++, gMoriIdomizuWaterDL);
 

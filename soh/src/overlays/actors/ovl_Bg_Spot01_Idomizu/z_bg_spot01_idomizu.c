@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_spot01_idomizu.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_spot01_objects/object_spot01_objects.h"
 
 #define FLAGS ACTOR_FLAG_DRAW_CULLING_DISABLED
@@ -91,8 +92,8 @@ void BgSpot01Idomizu_Draw(Actor* thisx, PlayState* play) {
 
     frames = play->state.frames;
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 127 - frames % 128, frames & 0x7F, 32, 32, 1, frames % 128,
-                                  frames & 0x7F, 32, 32, -1, 1, 1, 1));
+               Gfx_TwoTexWaterScroll(play, 0, 127 - frames % 128, frames & 0x7F, 32, 32, 1, frames % 128, frames & 0x7F,
+                                     32, 32, -1, 1, 1, 1));
 
     gSPDisplayList(POLY_XLU_DISP++, gKakarikoWellWaterDL);
 

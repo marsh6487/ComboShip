@@ -44,7 +44,10 @@ static Gfx* sFinalLeftHand;
 static Gfx* sFinalRightHand;
 static unsigned sMissingMeshLoads;
 
+#include "combo/actors/SeasonalIdle.h"
+
 // The adult matrix-layout fixture uses ordinary rigid model companions.
+extern "C" void PlayerFlexSkin_LoadSeasonalIdle(PlayState*, const void*, void**, Vec3s*, SeasonalIdleDraw*) {}
 extern "C" const void* PlayerFlexSkin_GetPlan(void**, s32) { return nullptr; }
 extern "C" s32 PlayerFlexSkin_MatrixCount(const void*) { return 0; }
 extern "C" void PlayerFlexSkin_BlendMatrix(const void*, s32, const MtxF*, MtxF*) { CHECK(false); }

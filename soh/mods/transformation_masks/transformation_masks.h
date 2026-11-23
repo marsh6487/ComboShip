@@ -233,6 +233,8 @@ u8 TransformMasks_IsFDSkinMode(void);
 u8 TransformMasks_IsTransformedAny(void);
 
 MmPlayerTransformation MmForm_GetCurrentForm(void);
+DoAction MmForm_GetAButtonDoAction(Player* player);
+DoAction MmForm_GetBButtonDoAction(Player* player);
 
 // OCARINA_INSTRUMENT_* the song replay should be voiced with, MM's
 // sPlayerFormOcarinaInstruments[CUR_FORM]. DEFAULT for forms whose instrument is not one

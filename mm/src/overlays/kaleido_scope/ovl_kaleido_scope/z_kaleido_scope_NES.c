@@ -29,6 +29,7 @@ void KaleidoScope_DrawEquipment(PlayState* play);
 void KaleidoScope_UpdateEquipmentCursor(PlayState* play);
 void* KaleidoEquip_GetNameTex(void);
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/Enhancements/Saving/BetterSaveMenu.h"
 #include "2s2h/Enhancements/Saving/SavingEnhancements.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 
@@ -3533,6 +3534,17 @@ void KaleidoScope_Update(PlayState* play) {
 
     KaleidoEquip_UpdateSwordElement(play);
 
+    const MmBetterSaveMenuResult betterSave = BetterSaveMenu_Update(play);
+    if (betterSave == MM_BETTER_SAVE_CLOSE_PAUSE) {
+        Interface_SetAButtonDoAction(play, DO_ACTION_NONE);
+        pauseCtx->state = PAUSE_STATE_UNPAUSE_SETUP;
+        sPauseMenuVerticalOffset = -6240.0f;
+        Audio_PlaySfx_PauseMenuOpenOrClose(SFX_PAUSE_MENU_CLOSE);
+    }
+    if (betterSave != MM_BETTER_SAVE_INACTIVE) {
+        return;
+    }
+
     if (pauseCtx->state != PAUSE_STATE_MAIN || pauseCtx->pageIndex != PAUSE_ITEM ||
         pauseCtx->mainState != PAUSE_MAIN_STATE_IDLE) {
         KaleidoScope_ResetItemCycling();
@@ -3788,38 +3800,25 @@ void KaleidoScope_Update(PlayState* play) {
                             pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_RETURN_TO_MENU;
                         } else {
                             Audio_PlaySfx(NA_SE_SY_PIECE_OF_HEART);
-                            // 2S2H [Enhancement] Persist this in case the user is 0th daying
-                            bool currentOwlSaveState = gSaveContext.save.isOwlSave;
-                            if (CVarGetInteger("gEnhancements.Saving.PauseSave", 0)) {
-                                gSaveContext.save.isOwlSave = true;
-                                SavingEnhancements_PersistSaveEntranceInfo();
-                                SavingEnhancements_AdvancePlaytime();
-                            }
-                            Play_SaveCycleSceneFlags(play);
-                            gSaveContext.save.saveInfo.playerData.savedSceneId = play->sceneId;
-                            func_8014546C(sramCtx);
-                            if (!gSaveContext.flashSaveAvailable ||
-                                gSaveContext.fileNum ==
-                                    255) { // 2S2H [Enhancement] Don't let them save if they are in debug save
-                                pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_5;
+                            bool canWrite = gSaveContext.flashSaveAvailable && gSaveContext.fileNum != 255;
+                            if (canWrite && CVarGetInteger("gEnhancements.Saving.PauseSave", 0)) {
+                                SavingEnhancements_WriteOwlSnapshot(play, false);
+                                pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_4;
                             } else {
-                                if (CVarGetInteger("gEnhancements.Saving.PauseSave", 0)) {
-                                    Sram_SetFlashPagesOwlSave(
-                                        sramCtx,
-                                        gFlashOwlSaveStartPages[gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER],
-                                        gFlashOwlSaveNumPages[gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER]);
-                                    Sram_StartWriteToFlashOwlSave(sramCtx);
-                                    gSaveContext.save.isOwlSave = currentOwlSaveState;
-                                    SavingEnhancements_ClearSaveEntranceInfo();
-                                } else {
+                                Play_SaveCycleSceneFlags(play);
+                                gSaveContext.save.saveInfo.playerData.savedSceneId = play->sceneId;
+                                func_8014546C(sramCtx);
+                                if (canWrite) {
                                     // ComboShip: without the multiplier this indexed another slot's pages.
                                     Sram_SetFlashPagesDefault(
                                         sramCtx,
                                         gFlashSaveStartPages[gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER],
                                         gFlashSaveNumPages[gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER]);
                                     Sram_StartWriteToFlashDefault(sramCtx);
+                                    pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_4;
+                                } else {
+                                    pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_5;
                                 }
-                                pauseCtx->savePromptState = PAUSE_SAVEPROMPT_STATE_4;
                             }
                             sDelayTimer = 90;
                         }
@@ -4408,6 +4407,7 @@ void KaleidoScope_Update(PlayState* play) {
             gSaveContext.hudVisibility = HUD_VISIBILITY_IDLE;
             Interface_SetHudVisibility(sUnpausedHudVisibility);
             Audio_SetPauseState(false);
+            BetterSaveMenu_OnUnpause(play);
             break;
 
         default:

@@ -19,6 +19,19 @@ static int RunMqLayoutTests() {
     auto set = [](const char* suffix, int value) {
         CVarSetInteger((std::string("gRandoSettings.") + suffix).c_str(), value);
     };
+    constexpr uint32_t nightSeed = 3790647587u;
+    context->SetSeed(0);
+    Check(ComboRando::SongEvents::ClockStart(2, context->GetSeed()) == 0x8000,
+          "the prior Context seed resolves Random Clock Start to day");
+    SOH_SetComboRandoSeed(nightSeed);
+    SOH_PrepRandoContext();
+    EnsureOracleInit();
+    Check(context->GetSeed() == nightSeed && ComboRando::SongEvents::ClockStart(2, context->GetSeed()) == 0xe000,
+          "the generation oracle uses the same night start as the saved Combo seed");
+    SOH_SetComboRandoSeed(0);
+    SOH_PrepRandoContext();
+    Check(context->GetSeed() == 0 && ComboRando::SongEvents::ClockStart(2, context->GetSeed()) == 0x8000,
+          "the next seed can replace a prepared night start with a day start");
     auto trials = [&]() {
         unsigned result = 0;
         for (auto* trial : context->GetTrials()->GetTrialList())

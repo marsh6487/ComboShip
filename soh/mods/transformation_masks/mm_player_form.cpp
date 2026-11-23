@@ -1,4 +1,5 @@
 #include "mods/equipment/nei_equipment_presentation.h"
+#include "../../../combo/actors/ZoraLocomotion.h"
 #include "../../../combo/vanilla/ComboVanillaMode.h"
 /**
  * mm_player_form.cpp - MM Transformation Masks Form System
@@ -39,6 +40,8 @@
 #include "mods/transformation_masks/keaton_reflector.h"
 #include "mods/extended_inventory.h"
 #include "mods/extended_equipment.h"
+#include "mods/broken_items/broken_items.h"
+#include "mods/nei_save.h"
 #include "mods/anim_translator/mm_anim_loader.h"
 #include "mods/sound_translator/mm_sfx_ids.h"
 #include "mods/mm_sources/objects/object_link_goron.h"
@@ -2597,6 +2600,17 @@ extern "C" void GaroForm_DrawProjectiles(PlayState* play);
 
 extern "C" void KafeiForm_Reset(void);
 
+static LinkAnimationHeader* MmForm_LoadLocomotionAnim(MmPlayerTransformation form, const char* zoraPath,
+                                                      const char* fallbackPath, s16 fallbackFrames, u8 limbCount) {
+    if (form == MM_PLAYER_FORM_ZORA) {
+        LinkAnimationHeader* clip = ResourceMgr_LoadPlayerAnimAsHeaderInPlace(zoraPath, false);
+        if (clip != NULL && clip->common.frameCount >= ZORA_LOCOMOTION_MIN_FRAMES) {
+            return clip;
+        }
+    }
+    return fallbackPath != NULL ? MmAnim_LoadByPath(fallbackPath, fallbackFrames, limbCount) : NULL;
+}
+
 static u8 MmForm_LoadFormSkeleton(PlayState* play, MmPlayerTransformation form) {
     // Pikachu and Wolf Link share the internal custom-skeleton slot.  Their
     // renderers/assets remain separate and the trigger item selects the owner.
@@ -2725,7 +2739,8 @@ static u8 MmForm_LoadFormSkeleton(PlayState* play, MmPlayerTransformation form) 
         if (form == MM_PLAYER_FORM_GARO) {
             gFormState.idleAnim = GaroForm_LoadAnimPublic(props->idleAnimPath);
         } else {
-            gFormState.idleAnim = MmAnim_LoadByPath(props->idleAnimPath, props->idleAnimFrames, (u8)props->limbCount);
+            gFormState.idleAnim = MmForm_LoadLocomotionAnim(form, ZORA_LOCOMOTION_IDLE_PATH, props->idleAnimPath,
+                                                            props->idleAnimFrames, (u8)props->limbCount);
         }
         if (gFormState.idleAnim == NULL) {
             MMFORM_LOG("[MmForm] FAIL: idle anim not found in mm.o2r: %s", props->idleAnimPath);
@@ -2733,19 +2748,10 @@ static u8 MmForm_LoadFormSkeleton(PlayState* play, MmPlayerTransformation form) 
             return 0;
         }
 
-        // Load walk animation
-        gFormState.walkAnim = NULL;
-        if (props->walkAnimPath != NULL) {
-            gFormState.walkAnim = MmAnim_LoadByPath(props->walkAnimPath, props->walkAnimFrames, (u8)props->limbCount);
-            if (gFormState.walkAnim == NULL) {}
-        }
-
-        // Load run animation (from 2Ship D_8085BE84: all forms share link_normal_run_free)
-        gFormState.runAnim = NULL;
-        if (props->runAnimPath != NULL) {
-            gFormState.runAnim = MmAnim_LoadByPath(props->runAnimPath, props->runAnimFrames, (u8)props->limbCount);
-            if (gFormState.runAnim == NULL) {}
-        }
+        gFormState.walkAnim = MmForm_LoadLocomotionAnim(form, ZORA_LOCOMOTION_WALK_PATH, props->walkAnimPath,
+                                                        props->walkAnimFrames, (u8)props->limbCount);
+        gFormState.runAnim = MmForm_LoadLocomotionAnim(form, ZORA_LOCOMOTION_RUN_PATH, props->runAnimPath,
+                                                       props->runAnimFrames, (u8)props->limbCount);
 
         // =========================================================================
         // Phase 2: Batch load form-specific combat animations
@@ -17480,6 +17486,69 @@ MmPlayerTransformation MmForm_GetCurrentForm(void) {
     return (MmPlayerTransformation)gFormState.currentForm;
 }
 
+DoAction MmForm_GetAButtonDoAction(Player* player) {
+    if (gFormState.state != MMFORM_STATE_ACTIVE || gFormState.goronAction == MMFORM_ACT_SHIELD) {
+        return DO_ACTION_NONE;
+    }
+
+    switch (gFormState.currentForm) {
+        case MM_PLAYER_FORM_GORON:
+            if (MMFORM_ON_GROUND(player) && gFormState.maruChange && !MmForm_IsGoronRolling()) {
+                return DO_ACTION_MM_CURL;
+            }
+            break;
+        case MM_PLAYER_FORM_ZORA:
+            if (gFormState.swimState > 0 && gFormState.waterRoll && !gFormState.fastSwimActive &&
+                (!MMFORM_ON_GROUND(player) || fabsf(player->linearVelocity) < 1.0f)) {
+                return DO_ACTION_MM_SWIM;
+            }
+            break;
+        case MM_PLAYER_FORM_DEKU:
+            if (MMFORM_ON_GROUND(player) && gFormState.dekuSpinAttack &&
+                gFormState.goronAction != MMFORM_ACT_DEKU_FLOWER && gFormState.goronAction != MMFORM_ACT_DEKU_SPIN) {
+                return DO_ACTION_MM_ATTACK;
+            }
+            break;
+    }
+    return DO_ACTION_NONE;
+}
+
+DoAction MmForm_GetBButtonDoAction(Player* player) {
+    if (gFormState.state != MMFORM_STATE_ACTIVE || gFormState.goronAction == MMFORM_ACT_SHIELD) {
+        return DO_ACTION_NONE;
+    }
+
+    switch (gFormState.currentForm) {
+        case MM_PLAYER_FORM_GORON:
+            if (!MmForm_IsGoronRolling()) {
+                return DO_ACTION_MM_PUNCH;
+            }
+            if (gFormState.goronAction == GORON_ACT_GORON_ROLL && MMFORM_ON_GROUND(player) &&
+                gFormState.rollSpikeActive == 0) {
+                return DO_ACTION_MM_POUND;
+            }
+            break;
+        case MM_PLAYER_FORM_ZORA:
+            if (gFormState.fastSwimActive) {
+                break;
+            }
+            if ((player->stateFlags1 & PLAYER_STATE1_IN_WATER) && !MMFORM_ON_GROUND(player)) {
+                return player->currentBoots == PLAYER_BOOTS_IRON ? DO_ACTION_MM_SURFACE : DO_ACTION_MM_DIVE;
+            }
+            if (player->heldItemAction != PLAYER_IA_BOOMERANG) {
+                return DO_ACTION_MM_PUNCH;
+            }
+            break;
+        case MM_PLAYER_FORM_DEKU:
+            if (gFormState.dekuBowReady && gFormState.goronAction != MMFORM_ACT_DEKU_FLOWER &&
+                gFormState.goronAction != MMFORM_ACT_DEKU_FLY) {
+                return DO_ACTION_MM_SHOOT;
+            }
+            break;
+    }
+    return DO_ACTION_NONE;
+}
+
 // MM's sPlayerFormOcarinaInstruments[CUR_FORM], for the one place that needs it: the song
 // replay, which resets to DEFAULT and then re-selects the form's instrument
 // (z_message.c MSGMODE_SETUP_DISPLAY_SONG_PLAYED).
@@ -18702,9 +18771,11 @@ void MmForm_Update(PlayState* play, Player* player) {
     // is INACTIVE (turn on) or when it owns the active Pikachu (turn off).
     {
         static u8 sPikaModeOwned = 0; // mode (not the pokeball) holds the current Pikachu
-        u8 modeOn = CVarGetInteger("gPikachuMode", 0) != 0;
+        u8 modeOn = BrokenItems_Enabled() && CVarGetInteger("gPikachuMode", 0) != 0 && Nei_Save()->pokeballOwned &&
+                    !CVarGetInteger("gSm64Mario", 0);
         u8 pikaActive = MmForm_IsPikachuActive();
-        if (modeOn && MmForm_IsEnabled()) {
+        // Crossover Pikachu uses its own skeleton and animation pack.
+        if (modeOn) {
             if (gFormState.state == MMFORM_STATE_INACTIVE && !(player->stateFlags1 & PLAYER_STATE1_DEAD)) {
                 WolfLinkForm_Select(0);
                 gFormState.targetForm = MM_PLAYER_FORM_PIKACHU;

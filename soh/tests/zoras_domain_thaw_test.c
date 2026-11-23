@@ -1,5 +1,6 @@
 #include "global.h"
 #include "mods/extended_inventory.h"
+#include "soh/Enhancements/audio/SeasonWeather.h"
 #include "overlays/actors/ovl_Bg_Spot07_Taki/z_bg_spot07_taki.h"
 #include "scenes/overworld/spot07/spot07_scene.h"
 #include <stdio.h>
@@ -18,6 +19,7 @@ SaveContext gSaveContext;
 PlayState* gPlayState;
 int zoraWaterLook;
 static int alwaysThawed, legacyIce, registrations, deletions, alive[2], causticY;
+static int previewSeason = -2, waterScrolls, frozenWaterScrolls;
 static PlayState play;
 static GraphicsContext gfx;
 static Gfx opaque[64], translucent[64], scroll[16];
@@ -35,6 +37,9 @@ int32_t CVarGetInteger(const char* name, int32_t fallback) {
     }
     if (!strcmp(name, CVAR_ENHANCEMENT("ZorasDomainIce"))) {
         return legacyIce;
+    }
+    if (!strcmp(name, SOH_SEASON_WEATHER_CVAR("Season"))) {
+        return previewSeason;
     }
     return fallback;
 }
@@ -99,6 +104,21 @@ Gfx* Gfx_TwoTexScrollEx(GraphicsContext* current, s32 tile1, u32 x1, u32 y1, s32
     if (width1 == 64 && height1 == 32 && width2 == 64 && height2 == 32) {
         causticY = y2;
     }
+    if (tile1 == 4 && tile2 == 5) {
+        REQUIRE(x1 == 7 && y1 == 10 && x2 == 19 && y2 == 22);
+        REQUIRE(width1 == 16 && height1 == 32 && width2 == 64 && height2 == 128);
+        REQUIRE(dx1 == 1 && dy1 == -3 && dx2 == 6 && dy2 == -8);
+        ++waterScrolls;
+    }
+    return scroll;
+}
+Gfx* Gfx_TwoTexScroll(GraphicsContext* current, s32 tile1, u32 x1, u32 y1, s32 width1, s32 height1, s32 tile2, u32 x2,
+                      u32 y2, s32 width2, s32 height2) {
+    REQUIRE(current == &gfx && (x1 | y1 | x2 | y2) == 0);
+    if (tile1 == 4 && tile2 == 5) {
+        REQUIRE(width1 == 16 && height1 == 32 && width2 == 64 && height2 == 128);
+    }
+    ++frozenWaterScrolls;
     return scroll;
 }
 
@@ -255,6 +275,27 @@ static void WaterAndCaustics(void) {
     }
 }
 
+static void WinterWaterScroll(void) {
+    Configure(0, -1, 0, 0);
+    waterScrolls = frozenWaterScrolls = 0;
+    const s32 interior = SCENE_WATER_TEMPLE;
+    for (int mode = 0; mode < 5; ++mode) {
+        play.sceneNum = mode == 4 ? SCENE_ZORAS_DOMAIN : interior;
+        alwaysThawed = mode == 4;
+        previewSeason = mode == 1 ? SEASON_WINTER : -1;
+        nei.season = mode >= 2 ? SEASON_WINTER : SEASON_OFF;
+        nei.seasonsRodOwned = mode >= 2;
+        nei.seasonsOwned = mode >= 2 ? NEI_SEASONS_MASK : 0;
+        gSaveContext.gameMode = mode == 3 ? GAMEMODE_TITLE_SCREEN : GAMEMODE_NORMAL;
+        for (int tick = 0; tick < 3; ++tick) {
+            play.gameplayFrames += 47;
+            REQUIRE(Gfx_TwoTexWaterScroll(&play, 4, 7, 10, 16, 32, 5, 19, 22, 64, 128, 1, -3, 6, -8) == scroll);
+        }
+    }
+    REQUIRE(frozenWaterScrolls == 6 && waterScrolls == 9);
+    previewSeason = -2;
+}
+
 static void WideWaterRestoration(void) {
     Configure(1, SEASON_SUMMER, 0, 0);
     waterBoxes[0].ySurface = 70000;
@@ -279,6 +320,7 @@ int main(void) {
     ActorMatrix();
     LiveToggle();
     WaterAndCaustics();
+    WinterWaterScroll();
     WideWaterRestoration();
     puts("PASS age/season/legacy matrix, native water display lists, collision toggles, save immutability, caustics");
     return 0;

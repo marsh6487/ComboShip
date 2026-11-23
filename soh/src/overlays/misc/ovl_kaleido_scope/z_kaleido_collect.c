@@ -2,7 +2,6 @@
 #include <string.h> // Skijer's NEI: memcpy/strlen (MM name panel injection)
 #include "textures/parameter_static/parameter_static.h"
 #include "textures/icon_item_static/icon_item_static.h"
-#include "textures/icon_item_24_static/icon_item_24_static.h" // dgQuestIconGoldSkulltulaTex (quad 21)
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -1414,14 +1413,6 @@ void KaleidoScope_DrawMmQuestStatus(PlayState* play, GraphicsContext* gfxCtx) {
         if (upg > 0) {
             MmPage_DrawQuadTex(gfxCtx, 20, sBombBagTexs[((upg > 3) ? 3 : upg) - 1], 32, 32, 0, 0);
         }
-    }
-
-    // --- Gold Skulltula token (quad 21) ---
-    // The quad has always been in MM's layout table and the cursor could land on it, but nothing was
-    // ever drawn here, so the slot read as broken. OoT's token count lives in gsTokens; the icon is
-    // OoT's own 24x24 quest icon (the count itself is shown by the name/counter box). Skijer 2026-07-29
-    if (gSaveContext.inventory.gsTokens > 0) {
-        MmPage_DrawQuadTex(gfxCtx, 21, dgQuestIconGoldSkulltulaTex, 24, 24, 0, 0);
     }
 
     // --- Heart piece count (MM 48x48 IA8 pie icons; OoT stores the count in questItems bits 28+) ---

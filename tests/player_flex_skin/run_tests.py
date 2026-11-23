@@ -70,4 +70,8 @@ with tempfile.TemporaryDirectory(prefix='player-flex-skin-') as directory:
             bridge = temporary / f'bridge-{host}-{mode}'
             run([os.environ.get('CXX', 'c++'), '-std=c++20', *native, 'tests/player_flex_skin/bridge_test.cpp', '-Wl,--gc-sections', '-o', str(bridge)])
             run([str(bridge)])
+            idle = temporary / f'idle-{host}-{mode}'
+            run([os.environ.get('CXX', 'c++'), '-std=c++20', *native, 'tests/player_flex_skin/seasonal_idle_test.cpp',
+                 '-Wl,--gc-sections', '-o', str(idle)])
+            run([str(idle)])
             print('PASS', host, mode, flush=True)

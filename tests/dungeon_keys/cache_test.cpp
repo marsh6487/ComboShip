@@ -134,6 +134,7 @@ extern "C" int32_t OOT_NeiAltAssetsEnabled() { return ownerAltEnabled; }
 extern "C" int32_t OOT_NeiResourceExists(const char *path) {
   return ownerResources.contains(path);
 }
+int ResourceMgr_IsLegacyZssLongswordGi() { return 0; }
 static int OwnerCVar(const char *, int) { return ownerDin; }
 #define CVAR_ENHANCEMENT(x) x
 #define CVarGetInteger OwnerCVar

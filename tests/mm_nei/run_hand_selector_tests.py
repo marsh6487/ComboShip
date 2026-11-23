@@ -17,7 +17,9 @@ def extract(source,name):
  return source[start:pos]
 names=['Player_OverrideLimbDrawGameplayDefault','Player_OverrideLimbDrawGameplayFirstPerson','Player_ApplyNeiHeldHand']
 nf={n:extract(native,n) for n in names}
-af={n:extract(adult.replace('extern "C" ',''),n) for n in ['AdultLink_UsesAdultPresentation','AdultLink_ApplyNeiHeldHand','AdultLink_ApplyRootTransform','AdultLink_OverrideLimb']}
+af={n:extract(adult.replace('extern "C" ',''),n) for n in [
+    'AdultLink_UsesAdultPresentation', 'AdultLink_SeasonalChildEquipment', 'AdultLink_ApplyNeiHeldHand',
+    'AdultLink_ApplyRootTransform', 'AdultLink_OverrideLimb', 'AdultLink_OverrideFirstPerson', 'AdultLink_ShouldHide']}
 native_start=native.index('            u8 handIsSpokenFor =')
 native_end=native.index('            // ⚠️ ESTE OCULTADO',native_start)
 native_sword=native[native_start:native_end]
@@ -37,13 +39,31 @@ prefix=r'''
 SaveContext gSaveContext{};
 PlayState* gPlayState=nullptr;
 u16 gEquipMasks[4]{};u8 gEquipShifts[4]{};
-bool mode=false,lantern=false,hook=true,hasHand=true,claimedHand=false;
+bool mode=false,lantern=false,hook=true,hasHand=true,claimedHand=false,hasGreatFairy=false;
 int form=CUSTOM_FORM_NONE, sPlayerLod=0,sPlayerLeftHandType=0,sPlayerRightHandType=0;
-u8 sReady=0,sIsChildRig=0,sIsMod=0,sIsForm=0;
+u8 sReady=0,sIsChildRig=0,sIsMod=0,sIsForm=0,sIsSeasonalRig=0;
 bool extOwnsSwordDL=false,odwalda=false,goht=false,gold=false,customBody=false,heldEnabled=false,dinSelected=false;
 int heldCalls=0,tunicR=30,tunicG=105,tunicB=27;
 FlexSkeletonHeader skel{},*sSkel=nullptr;
 Gfx nativeLeft{},nativeRight{},adultLeft{},adultRight{},customHand{},replacement{},vanillaHook{},swordMesh{},dinHand{};
+Gfx outfitGear{};
+Gfx* nativeSelection=&vanillaHook;
+Gfx* nativeAim=nullptr;
+std::string selectedSeasonalSlot;
+bool allowSeasonalSlot=true,useGreatFairyLook=true,selectedOutfit=false,usingAlt=false;
+int invalidated=0;
+#define ALC(sym) "__OTR__objects/object_link_child/" sym
+Gfx* AdultLink_LoadModelDL(const char* path) {
+ selectedSeasonalSlot=path;
+ return allowSeasonalSlot ? &outfitGear : nullptr;
+}
+int ResourceMgr_OTRSigCheck(char* path){return path && std::strncmp(path,"__OTR__",7)==0;}
+bool Player_IsHoldingHookshot(Player*){return 0;}
+void PakLoader_FrameBegin(){}
+const char* PakLoader_GetSeasonalSkeletonPath(){return selectedOutfit ? "__OTR__objects/seasonal_outfits/din/child/winter/gLinkChildSkel" : nullptr;}
+bool ResourceMgr_IsAltAssetsEnabled(){return usingAlt;}
+s32 AdultLink_Setup(){return 1;}
+void AdultLink_OnFormChanged(){++invalidated;}
 static Gfx heldScratch[8]{};
 static std::array<std::array<Gfx,8>,16> swordFrames;
 static unsigned swordAllocations=0;
@@ -67,11 +87,12 @@ u8 Trident_GoldenArmor(){return gold;}
 u8 Player_IsCustomLinkModel(Player*){return customBody;}
 // Active Four Sword is covered by the dedicated Four Sword visibility fixture.
 u8 FourSword_IsEquipped(){return 0;}
-u8 WeaponUpgrade_HasGreatFairy(){return 0;}
+u8 WeaponUpgrade_HasGreatFairy(){return hasGreatFairy;}
 s32 CVarGetInteger(const char* name,s32 fallback){
  if(std::strstr(name,"TunicR"))return tunicR;
  if(std::strstr(name,"TunicG"))return tunicG;
  if(std::strstr(name,"TunicB"))return tunicB;
+ if(std::strstr(name,"BgsUsesGfsLook"))return useGreatFairyLook;
  return fallback;
 }
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dl,void* hand,Player* p,u8 r,u8 g,u8 b){
@@ -95,7 +116,8 @@ Gfx* capturedHand=nullptr;
 bool NeiArticulated_ApplySwitchHookHand(PlayState*,Player*,Gfx** dl,Gfx* hand){if(!hook||!hand)return false;capturedHand=hand;*dl=&replacement;return true;}
 u8 ResourceMgr_FileExists(const char*){return hasHand;}
 Gfx* ResourceMgr_LoadGfxByName(const char* p){resolved=p;return resolved=="human_left"?&nativeLeft:&nativeRight;}
-s32 Player_OverrideLimbDrawGameplayDefault(PlayState*,s32,Gfx** dl,Vec3f*,Vec3s*,Actor* actor){auto p=(Player*)actor;sPlayerLeftHandType=p->leftHandType;sPlayerRightHandType=p->rightHandType;*dl=&vanillaHook;return 0;}
+s32 Player_OverrideLimbDrawGameplayDefault(PlayState*,s32,Gfx** dl,Vec3f*,Vec3s*,Actor* actor){auto p=(Player*)actor;sPlayerLeftHandType=p->leftHandType;sPlayerRightHandType=p->rightHandType;*dl=nativeSelection;return 0;}
+s32 Player_OverrideLimbDrawGameplayFirstPerson(PlayState*,s32,Gfx** dl,Vec3f*,Vec3s*,Actor*){*dl=nativeAim;return 0;}
 '''
 prefix+='\n'.join(re.findall(r'^static Gfx\* sDL_\w+;',adult,re.M))+'\n'
 checks=r'''
@@ -189,10 +211,69 @@ int main(){
  }
  sIsMod=sIsForm=sIsChildRig=0;extOwnsSwordDL=odwalda=goht=false;p.actor.scale.y=.01f;form=CUSTOM_FORM_NONE;
  dinSelected=true;second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(second==&dinHand);
+ dinSelected=heldEnabled=hook=false;
+ sIsSeasonalRig=sIsChildRig=sIsForm=1;
+ p.leftHandType=PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
+ p.rightHandType=PLAYER_MODELTYPE_RH_SHIELD;
+ for (const char* slot : {ALC("gLinkHumanLeftHandHoldingRazorSwordDL"), ALC("gLinkHumanLeftHandHoldingGreatFairysSwordDL")}) {
+  nativeSelection=(Gfx*)slot;
+  second=&customHand;
+  AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+  assert(second==&outfitGear&&selectedSeasonalSlot==slot);
+ }
+ for (const char* slot : {ALC("gLinkHumanRightHandHoldingHerosShieldDL"), ALC("gLinkHumanRightHandHoldingOcarinaDL")}) {
+  nativeSelection=(Gfx*)slot;
+  second=&customHand;
+  AdultLink_OverrideLimb(&play,PLAYER_LIMB_RIGHT_HAND,&second,&pos,&rot,&p.actor);
+  assert(second==&outfitGear&&selectedSeasonalSlot==slot);
+ }
+ nativeSelection=&vanillaHook;
+ second=&customHand;
+ AdultLink_OverrideLimb(&play,PLAYER_LIMB_RIGHT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&vanillaHook);
+ p.unk_AA5=PLAYER_UNKAA5_3;
+ for (const char* slot : {ALC("object_link_child_DL_018490"), ALC("object_link_child_DL_017B40")}) {
+  nativeAim=(Gfx*)slot; second=&customHand;
+  AdultLink_OverrideFirstPerson(&play,PLAYER_LIMB_RIGHT_HAND,&second,&pos,&rot,&p.actor);
+  assert(second==&outfitGear&&selectedSeasonalSlot==slot);
+ }
+ nativeAim=(Gfx*)ALC("gLinkHumanLeftHandClosedDL");second=&customHand;
+ AdultLink_OverrideFirstPerson(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&outfitGear&&selectedSeasonalSlot==ALC("gLinkHumanLeftHandClosedDL"));
+ p.heldItemAction=PLAYER_IA_SLINGSHOT;
+ nativeAim=&vanillaHook;second=&customHand;
+ AdultLink_OverrideFirstPerson(&play,PLAYER_LIMB_RIGHT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&outfitGear&&selectedSeasonalSlot==ALC("gLinkChildRightArmStretchedSlingshotDL"));
+ nativeAim=nullptr;second=&customHand;
+ AdultLink_OverrideFirstPerson(&play,PLAYER_LIMB_RIGHT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==nullptr);
+ sIsChildRig=0;
+ p.leftHandType=PLAYER_MODELTYPE_LH_TWO_HAND_SWORD;
+ p.heldItemId=ITEM_SWORD_GREAT_FAIRY;p.heldItemAction=PLAYER_IA_SWORD_TWO_HANDED;
+ second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&outfitGear&&selectedSeasonalSlot==ALC("gLinkHumanLeftHandHoldingGreatFairysSwordDL"));
+ allowSeasonalSlot=false;
+ second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&vanillaHook);
+ allowSeasonalSlot=hasGreatFairy=true;
+ p.heldItemId=ITEM_SWORD_BGS;p.heldItemAction=PLAYER_IA_SWORD_TWO_HANDED;
+ second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&outfitGear);
+ useGreatFairyLook=false;sDL_LHBgs=&adultLeft;
+ second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(second==&adultLeft);
+ mode=false;gSaveContext.save.playerForm=PLAYER_FORM_HUMAN;selectedOutfit=true;
+ assert(AdultLink_ShouldHide()&&invalidated==1);
+ assert(AdultLink_ShouldHide()&&invalidated==1);
+ usingAlt=true;assert(AdultLink_ShouldHide()&&invalidated==2);
+ selectedOutfit=false;assert(!AdultLink_ShouldHide()&&invalidated==3);
+ usingAlt=false;assert(!AdultLink_ShouldHide()&&invalidated==3);
  std::cout<<"PASS native/adult held sword fists, isolated frame compounds/colors, form/equipment/Din priority and original final hand selectors\n";
 }
 '''
-parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_ApplyRootTransform'],af['AdultLink_OverrideLimb'],
+parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_SeasonalChildEquipment'],
+       af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_ApplyRootTransform'],af['AdultLink_OverrideLimb'],af['AdultLink_OverrideFirstPerson'],
+       af['AdultLink_ShouldHide'],
        'static void ApplyNativeSwordStage(PlayState* play,Player* player,Gfx** dList){\n'+native_sword+'\n}']
 with tempfile.TemporaryDirectory(prefix='mm-nei-hands-') as td:
  path=Path(td)/'hands.cpp';path.write_text(prefix+'\n'.join(parts)+checks);binary=Path(td)/'hands'

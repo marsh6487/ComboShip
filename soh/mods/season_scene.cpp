@@ -27,6 +27,7 @@
 #include <algorithm>
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/Graphics/ZorasDomain.h"
+#include "soh/Enhancements/audio/SeasonWeather.h"
 // Not a .h: mods/*.h is globbed with CONFIGURE_DEPENDS, and a new header there forces a full CMake
 // regeneration on the next build.
 #include "season_water_dls.inc"
@@ -83,6 +84,14 @@ extern PlayState* gPlayState;
 
 static u8 SeasonScene_Active(void) {
     return (Seasons_SeasonCount() != 0) && (Seasons_GetSeason() != SEASON_OFF);
+}
+
+extern "C" s32 SeasonScene_IsWaterScrollFrozen(const PlayState* play) {
+    if (!play || gSaveContext.gameMode != GAMEMODE_NORMAL || ZorasDomain_IsAlwaysThawed(play)) {
+        return false;
+    }
+    return (Seasons_SeasonCount() != 0 && Seasons_GetSeason() == SEASON_WINTER) ||
+           CVarGetInteger(SOH_SEASON_WEATHER_CVAR("Season"), -2) == SEASON_WINTER;
 }
 
 /**

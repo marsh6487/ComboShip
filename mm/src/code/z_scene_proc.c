@@ -2,6 +2,7 @@
 #include "global.h"
 #include "BenPort.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #include <string.h>
 
 s32 sMatAnimStep;
@@ -388,6 +389,54 @@ void AnimatedMat_DrawTexCycle(PlayState* play, s32 segment, void* params) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Animated room segments bound to stock water surfaces. Keep shared segment
+// numbers and material scrolls on caustics, sky, and other scenery independent.
+static u16 Scene_WinterWaterScrollSegments(PlayState* play, AnimatedMaterial* matAnim) {
+    static const u16 waterSegments[SCENE_MAX] = {
+        [SCENE_20SICHITAI2] = 1 << 0xA,
+        [SCENE_KAKUSIANA] = (1 << 0x8) | (1 << 0xC),
+        [SCENE_HAKASHITA] = 1 << 0xA,
+        [SCENE_IKANA] = 1 << 0xA,
+        [SCENE_INISIE_N] = 1 << 0x9,
+        [SCENE_OPENINGDAN] = 1 << 0x8,
+        [SCENE_MITURIN] = (1 << 0x8) | (1 << 0x9),
+        [SCENE_SYATEKI_MIZU] = 1 << 0x8,
+        [SCENE_PIRATE] = (1 << 0xC) | (1 << 0xD),
+        [SCENE_SINKAI] = 1 << 0xC,
+        [SCENE_YOUSEI_IZUMI] = 1 << 0xA,
+        [SCENE_KINSTA1] = 1 << 0x8,
+        [SCENE_TENMON_DAI] = 1 << 0xB,
+        [SCENE_LABO] = 1 << 0xA,
+        [SCENE_33ZORACITY] = 1 << 0xB,
+        [SCENE_8ITEMSHOP] = (1 << 0x8) | (1 << 0x9),
+        [SCENE_30GYOSON] = 1 << 0x9,
+        [SCENE_31MISAKI] = (1 << 0xC) | (1 << 0xD),
+        [SCENE_TORIDE] = 1 << 0x8,
+        [SCENE_20SICHITAI] = 1 << 0xA,
+        [SCENE_24KEMONOMITI] = 1 << 0x8,
+        [SCENE_SEA] = 1 << 0xA,
+        [SCENE_LAST_ZORA] = 1 << 0x9,
+        [SCENE_35TAKI] = (1 << 0x9) | (1 << 0xC) | (1 << 0xD),
+        [SCENE_REDEAD] = (1 << 0x8) | (1 << 0xB),
+        [SCENE_BANDROOM] = (1 << 0x9) | (1 << 0xC),
+        [SCENE_10YUKIYAMANOMURA] = (1 << 0xA) | (1 << 0xB),
+        [SCENE_SEA_BS] = 1 << 0x8,
+        [SCENE_DANPEI] = (1 << 0x8) | (1 << 0x9),
+        [SCENE_10YUKIYAMANOMURA2] = 1 << 0xA,
+        [SCENE_17SETUGEN2] = 1 << 0xA,
+        [SCENE_RANDOM] = 1 << 0x8,
+        [SCENE_YADOYA] = 1 << 0x8,
+        [SCENE_ALLEY] = 1 << 0x8,
+        [SCENE_INSIDETOWER] = 1 << 0x8,
+        [SCENE_CLOCKTOWER] = (1 << 0x8) | (1 << 0x9),
+    };
+    if (matAnim == NULL || matAnim != play->sceneMaterialAnims || (u32)play->sceneId >= SCENE_MAX ||
+        !waterSegments[play->sceneId] || !MMWeather_IsWinterWater(play)) {
+        return 0;
+    }
+    return waterSegments[play->sceneId];
+}
+
 /**
  * This is the main function that handles the animated material system.
  * There are six different animated material types, which should be set in the provided `AnimatedMaterial`.
@@ -399,6 +448,7 @@ void AnimatedMat_DrawMain(PlayState* play, AnimatedMaterial* matAnim, f32 alphaR
     };
     s32 segmentAbs;
     s32 segment;
+    const u16 winterWater = Scene_WinterWaterScrollSegments(play, matAnim);
     if (ResourceMgr_OTRSigCheck(matAnim) != 0)
         matAnim = ResourceMgr_LoadAnimByName(matAnim);
 
@@ -410,7 +460,19 @@ void AnimatedMat_DrawMain(PlayState* play, AnimatedMaterial* matAnim, f32 alphaR
         do {
             segment = matAnim->segment;
             segmentAbs = ABS_ALT(segment) + 7;
-            matAnimDrawHandlers[matAnim->type](play, segmentAbs, Lib_SegmentedToVirtual(matAnim->params));
+            void* params = Lib_SegmentedToVirtual(matAnim->params);
+            if ((matAnim->type == 0 || matAnim->type == 1) && (u32)segmentAbs < 16 &&
+                (winterWater & (1u << segmentAbs))) {
+                // Zero the step itself so Gfx_*TexScrollEx also stops interpolating between offsets.
+                const AnimatedMatTexScrollParams* scroll = params;
+                AnimatedMatTexScrollParams still[2];
+                for (s32 i = 0; i <= matAnim->type; i++) {
+                    still[i] = (AnimatedMatTexScrollParams){ 0, 0, scroll[i].width, scroll[i].height };
+                }
+                matAnimDrawHandlers[matAnim->type](play, segmentAbs, still);
+            } else {
+                matAnimDrawHandlers[matAnim->type](play, segmentAbs, params);
+            }
             matAnim++;
         } while (segment >= 0);
     }

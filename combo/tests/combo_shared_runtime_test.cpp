@@ -1,12 +1,14 @@
 #include "rando/SharedItems.h"
 #include "rando/CrossWorldRando.h"
 #include "rando/CrossDungeonCoordinator.h"
+#include "rando/RpgStats.h"
 #include <mutex>
 #include <atomic>
 #include <cassert>
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
+#include <string_view>
 static int g_comboCompletionSlot = -1, g_MmSaveInMemorySlot = -1;
 static bool Combo_PreserveStartupMmState() {
     return true;
@@ -37,6 +39,18 @@ static auto SOH_GetSharedTier = getOot;
 static auto MM_GetSharedTier = getMm;
 static auto SOH_RaiseSharedTier = raiseOot;
 static auto MM_RaiseSharedTier = raiseMm;
+static int ootMagicLevel = 0, mmMagicLevel = 0;
+static bool getRpgMagicProgress(int slot, ComboRpgState* progress) {
+    assert(slot == g_comboCompletionSlot);
+    progress->level[COMBO_RPG_MAGIC] = ootMagicLevel;
+    return ootMagicLevel != 0;
+}
+static void applyRpgMagicProgress(int slot, const ComboRpgState* progress) {
+    assert(slot == g_MmSaveInMemorySlot);
+    mmMagicLevel = progress->level[COMBO_RPG_MAGIC];
+}
+static auto SOH_GetRpgMagicProgress = getRpgMagicProgress;
+static auto MM_ApplyRpgMagicProgress = applyRpgMagicProgress;
 static void (*SOH_GetCurrentPlayerName)(unsigned char*) = nullptr;
 static void (*MM_SetCheckPrices)(const char*) = nullptr;
 static nlohmann::json mmSettings = { { "menuSetting", 9 } }, settingsAtSave;
@@ -75,9 +89,12 @@ static int setRuntimeSeed(int game, const char* raw) {
     return 1;
 }
 static int crossGrants = 0;
-static void grantOot(const char*) {
+static void grantOot(const char* item) {
     ++crossGrants;
-    tiers[0][ComboRando::SF_GORON_MASK] = 1;
+    if (std::string_view(item) == "Magic Stat Upgrade")
+        ++ootMagicLevel;
+    else
+        tiers[0][ComboRando::SF_GORON_MASK] = 1;
 }
 static void grantMm(const char*) {
     ++crossGrants;
@@ -234,5 +251,23 @@ int main() {
     MM_Anchor_PumpDormant = nullptr;
     PumpDormant();
     check(!g_sharedReconcilePending, "absent dormant pump must not schedule shared reconcile");
+    g_sharedMask = 0;
+    ComboAnchor::sActiveGame = 1;
+    const int slot = g_comboCompletionSlot;
+    g_MmSaveInMemorySlot = 0;
+    DeliverCrossItem(0, "Magic Stat Upgrade", "mm:Magic Chest");
+    Combo_SharedTick();
+    check(ootMagicLevel == 1 && mmMagicLevel == 0 && g_sharedReconcilePending,
+          "dormant OoT grants one stat and a stale MM slot cannot receive it");
+    g_MmSaveInMemorySlot = slot;
+    Combo_SharedTick();
+    check(mmMagicLevel == 1 && !g_sharedReconcilePending,
+          "MM-first receives its magic without a switch or any optional shared families");
+    DeliverCrossItem(0, "Magic Stat Upgrade", "mm:Magic Chest");
+    Combo_SharedTick();
+    check(ootMagicLevel == 1 && mmMagicLevel == 1, "a duplicate check cannot advance either magic stat");
+    mmMagicLevel = 0;
+    Combo_SharedReconcileNow();
+    check(mmMagicLevel == 1, "slot binding repairs saves with unmirrored RPG magic");
     std::cout << "combo shared launcher slot and cross-delivery checks passed\n";
 }

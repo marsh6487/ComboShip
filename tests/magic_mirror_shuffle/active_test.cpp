@@ -4,7 +4,8 @@
 using namespace ComboRando;
 using Json = nlohmann::json;
 static std::vector<std::string> owned[2];
-static bool forestFree = true, woodsFree = false, overworld[2] = {true, true};
+static constexpr const char* kStump = "Lost Woods Magic Mirror Stump";
+static bool overworld[2] = {true, true};
 static bool Has(int game, const char *name) {
   return std::find(owned[game].begin(), owned[game].end(), name) !=
          owned[game].end();
@@ -17,15 +18,12 @@ static const char *Get(int game) {
   static std::string cache[2];
   Json checks = Json::array();
   if (game == 0) {
-    checks = {"Start 1", "Start 2", "Start 3", "Start 4"};
-    if (forestFree || Has(0, "Forest Key"))
-      checks.push_back(MagicMirrorShuffle::kOotAccessProbe);
+    checks = {"Start 1", "Start 2", "Start 3", "Start 4",
+              "__combo_magic_mirror_lost_woods_access"};
     if (Has(0, "Portal Key") && Has(0, "Forest Key"))
       checks.push_back("Ganon");
   } else if (overworld[1]) {
-    checks = {"MM Chest"};
-    if (woodsFree)
-      checks.push_back(MagicMirrorShuffle::kMmStumpCheck);
+    checks = {"MM Chest", "MM Spare Chest"};
     if (Has(1, "MM Goal Key"))
       checks.push_back("Moon Majora Pot 01");
   }
@@ -65,10 +63,12 @@ static Json Dump(bool mm) {
     dump["items"].push_back(row);
   };
   if (mm) {
-    dump["checks"].push_back({{"name", MagicMirrorShuffle::kMmStumpCheck}});
     dump["checks"].push_back({{"name", "MM Chest"}});
+    dump["checks"].push_back({{"name", "MM Spare Chest"}});
+    dump["fixed"].push_back({{"check", kStump}, {"item", "Junk"}, {"advancement", false}});
     item("Magic Mirror", true);
     item("MM Goal Key", true);
+    item("Junk", false);
   } else {
     for (const char *name : {"Start 1", "Start 2", "Start 3", "Start 4"})
       dump["checks"].push_back({{"name", name}});
@@ -83,40 +83,29 @@ int main() {
   const auto ootDump = Dump(false).dump(), mmDump = Dump(true).dump();
   for (bool cross : {false, true}) {
     auto [oot, mm] = Oracles(cross);
-    for (bool free : {false, true})
-      for (bool woods : {false, true}) {
-        forestFree = free;
-        woodsFree = woods;
-        for (uint32_t seed = 1; seed <= 4; ++seed) {
-          const auto result =
-              CrossWorldCombinedFill(ootDump, mmDump, seed, oot, mm);
-          REQUIRE(result.success);
-          const auto placements =
-              ParseSpoilerPlacements(result.spoilerJson, ootDump, mmDump);
-          REQUIRE(placements.size() == 6);
-          int mirrors = 0, stumps = 0;
-          for (const auto &p : placements) {
-            mirrors += p.item == "Magic Mirror";
-            if (p.checkGame == GAME_MM &&
-                p.check == MagicMirrorShuffle::kMmStumpCheck) {
-              ++stumps;
-              if (!free && !woods)
-                REQUIRE(p.item != "Forest Key");
-            }
-            REQUIRE(p.check != MagicMirrorShuffle::kOotAccessProbe);
-          }
-          REQUIRE(mirrors == 1 && stumps == 1);
-          const auto replay =
-              RunPlaythrough(result.spoilerJson, oot, mm, "Mirror active path",
-                             Restore, nullptr, ootDump, mmDump);
-          REQUIRE(replay.beatable && replay.unreachableOot == 0 &&
-                  replay.unreachableMm == 0);
+    for (uint32_t seed = 1; seed <= 4; ++seed) {
+      const auto result = CrossWorldCombinedFill(ootDump, mmDump, seed, oot, mm);
+      REQUIRE(result.success);
+      const auto placements = ParseSpoilerPlacements(result.spoilerJson, ootDump, mmDump);
+      REQUIRE(placements.size() == 7);
+      int mirrors = 0, stumps = 0;
+      for (const auto& p : placements) {
+        mirrors += p.item == "Magic Mirror";
+        if (p.checkGame == GAME_MM && p.check == kStump) {
+          ++stumps;
+          REQUIRE(p.item == "Junk");
         }
       }
-    // Direct/plando proof: stump can hold the key to the MAIN portal and be
-    // collected through Lost Woods first, without making all Termina reachable.
-    forestFree = true;
-    woodsFree = false;
+      REQUIRE(mirrors == 1 && stumps == 1);
+      const auto replay = RunPlaythrough(result.spoilerJson, oot, mm, "optional Mirror stump",
+                                         Restore, nullptr, ootDump, mmDump);
+      REQUIRE(replay.beatable && replay.unreachableOot == 0 && replay.unreachableMm == 1);
+      const auto required = PareDownPlaythrough(result.spoilerJson, oot, mm, Restore, ootDump, mmDump);
+      REQUIRE(!required.requiredByCheck.contains("mm:" + std::string(kStump)));
+    }
+
+    // An older placement that requires the stump to unlock the portal cannot
+    // pass replay, even if an older OoT oracle still emits the forest probe.
     Json spoiler = {
         {"oot",
          {{"Start 1", "Magic Mirror"},
@@ -124,46 +113,26 @@ int main() {
           {"Start 3", "Blue Rupee"},
           {"Start 4", "Blue Rupee"}}},
         {"mm",
-         {{MagicMirrorShuffle::kMmStumpCheck, "Portal Key"},
-          {"MM Chest", "MM Goal Key"}}},
+         {{kStump, "Portal Key"}, {"MM Chest", "MM Goal Key"}}},
         {"foreign",
          Json::array({{{"checkGame", "oot"},
                        {"checkName", "Start 1"},
                        {"itemGame", "mm"},
                        {"itemName", "Magic Mirror"}},
                       {{"checkGame", "mm"},
-                       {"checkName", MagicMirrorShuffle::kMmStumpCheck},
+                       {"checkName", kStump},
                        {"itemGame", "oot"},
                        {"itemName", "Portal Key"}}})}};
-    auto replay = RunPlaythrough(spoiler.dump(), oot, mm,
-                                 "stump before main portal", Restore);
-    REQUIRE(replay.beatable && replay.unreachableMm == 0);
+    REQUIRE(!RunPlaythrough(spoiler.dump(), oot, mm, "required shortcut fails", Restore).beatable);
     const auto required = PareDownPlaythrough(spoiler.dump(), oot, mm, Restore);
-    REQUIRE(required.requiredByCheck.at(
-        "mm:" + std::string(MagicMirrorShuffle::kMmStumpCheck)));
+    REQUIRE(required.candidateCount == 0 && required.replayedCount == 1);
     if (cross) {
       const auto joint =
           CrossDungeon::QueryJoint(oot, mm, {}, {}, false, QueryReachable);
-      REQUIRE(joint.mm.contains(MagicMirrorShuffle::kMmStumpCheck));
+      REQUIRE(!joint.mm.contains(kStump));
       REQUIRE(!joint.mm.contains("MM Chest"));
     }
-    // Negative: the missing entrance requirement cannot justify itself on the
-    // stump.
-    forestFree = false;
-    spoiler["oot"]["Start 2"] = "Portal Key";
-    spoiler["mm"][MagicMirrorShuffle::kMmStumpCheck] = "Forest Key";
-    spoiler["foreign"][1]["itemName"] = "Forest Key";
-    replay =
-        RunPlaythrough(spoiler.dump(), oot, mm, "self lock must fail", Restore);
-    REQUIRE(!replay.beatable);
-    // The genuine alternative MM Woods of Mystery route resolves that same
-    // arrangement.
-    woodsFree = true;
-    replay = RunPlaythrough(spoiler.dump(), oot, mm,
-                            "native Woods of Mystery route", Restore);
-    REQUIRE(replay.beatable);
   }
   puts("PASS actual CrossWorldCombinedFill/RunPlaythrough/PareDown/QueryJoint: "
-       "32 seeds, one Mirror/check, both forest routes, closed portal, "
-       "candidate self-lock rejected");
+       "one shuffled Mirror, optional stump, required shortcut rejected");
 }

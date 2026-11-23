@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <string_view>
 
 SaveContext gSaveContext{};
 u32 gUpgradeMasks[8]{};
@@ -33,12 +34,59 @@ static s16 sFloorType;
 static f32 D_80854784[] = {120.0f, 240.0f, 360.0f};
 static bool submerged;
 
+/* FORM_STATES */
+static struct {
+  MmFormStateId state;
+  MmPlayerTransformation currentForm;
+  GoronActionId goronAction;
+  LinkAnimationHeader* maruChange;
+  LinkAnimationHeader* waterRoll;
+  LinkAnimationHeader* dekuSpinAttack;
+  LinkAnimationHeader* dekuBowReady;
+  int swimState;
+  bool fastSwimActive;
+  int rollSpikeActive;
+} gFormState;
+static LinkAnimationHeader animation;
+#define MMFORM_ON_GROUND(player) ((player)->actor.bgCheckFlags & BGCHECKFLAG_GROUND)
+/* FORM_PROMPTS */
+
+static bool mmHasLabels, localHasLabels;
+namespace Ship {
+struct ArchiveManager {
+  bool hasLabels;
+  bool HasFile(std::string_view key) {
+    assert(key.starts_with("do_action_static/gDoAction") && key.ends_with("ENGTex"));
+    return hasLabels;
+  }
+  ArchiveManager* GetArchiveManager() { return this; }
+};
+struct CrossRMRegistry {
+  static ArchiveManager* Get(std::string_view owner) {
+    assert(owner == "mm");
+    static ArchiveManager mm;
+    mm.hasLabels = mmHasLabels;
+    return &mm;
+  }
+  static ArchiveManager* GetOrActive(std::string_view owner) {
+    assert(owner == "oot");
+    static ArchiveManager oot;
+    oot.hasLabels = localHasLabels;
+    return &oot;
+  }
+};
+} // namespace Ship
+/* RESOURCE_ROUTE */
+
 extern "C" int32_t CVarGetInteger(const char *key, int32_t fallback) {
   return std::strcmp(key, "gMods.BlastMask.Instant") == 0 ? instant : fallback;
 }
 extern "C" s32 MmMaskWear_GetCurrent(void) { return sCurrentMmMask; }
 extern "C" MmPlayerTransformation MmForm_GetCurrentForm(void) {
-  return MM_PLAYER_FORM_HUMAN;
+  return gFormState.currentForm;
+}
+extern "C" u8 TransformMasks_IsTransformedAny(void) {
+  return gFormState.state != MMFORM_STATE_INACTIVE;
 }
 u8 GaroForm_VanillaWantsAButton(Player *) { return 0; }
 u8 GerudoMhr_LOwnsB(void) { return 0; }
@@ -115,6 +163,7 @@ static void Reset() {
   play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
   play.interfaceCtx.doActionSegment = actionSegments;
   play.interfaceCtx.unk_1F0 = 0xFFFF;
+  play.interfaceCtx.bAlpha = 255;
   player.actor.category = ACTORCAT_PLAYER;
   player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
   player.actor.world.pos = {123.0f, 456.0f, -789.0f};
@@ -127,6 +176,10 @@ static void Reset() {
   sBlastARequested = false;
   sBlastBRequested = false;
   instant = spawnFails = submerged = false;
+  mmHasLabels = false;
+  localHasLabels = true;
+  gFormState = {};
+  gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
   explosions = scales = 0;
   gSaveContext = {};
   gSaveContext.linkAge = LINK_AGE_ADULT;
@@ -185,7 +238,69 @@ static void AssertBTexture(const char *expected) {
   assert(BlastTest_BIconCount == 0);
 }
 
+static void TestFormAndMaskPrompts() {
+  Reset();
+  mmHasLabels = true;
+  gSaveContext.language = LANGUAGE_FRA;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionExplodeENGTex");
+  sCurrentMmMask = ITEM_MM_MASK_KAMARO;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionDanceENGTex");
+  sCurrentMmMask = ITEM_MM_MASK_BREMEN;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionMarchENGTex");
+  play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
+  assert(DrawB() == nullptr);
+  play.msgCtx.msgMode = MSGMODE_NONE;
+  play.shootingGalleryStatus = 2;
+  assert(DrawB() == nullptr && BlastTest_BIconCount == 1);
+  play.shootingGalleryStatus = 0;
+
+  gFormState.state = MMFORM_STATE_ACTIVE;
+  gFormState.currentForm = MM_PLAYER_FORM_GORON;
+  gFormState.maruChange = &animation;
+  Player_UpdateInterface(&play, &player);
+  assert(play.interfaceCtx.unk_1F0 == DO_ACTION_MM_CURL);
+  assert(std::strcmp(actionSegments[1], "__OTR__@mm:do_action_static/gDoActionCurlENGTex") == 0);
+  player.doorType = PLAYER_DOORTYPE_HANDLE;
+  Player_UpdateInterface(&play, &player);
+  assert(play.interfaceCtx.unk_1F0 == DO_ACTION_OPEN);
+  player.doorType = PLAYER_DOORTYPE_NONE;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionPunchENGTex");
+  gFormState.goronAction = GORON_ACT_GORON_ROLL;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionPoundENGTex");
+  gFormState.rollSpikeActive = 1;
+  assert(DrawB() == nullptr);
+
+  gFormState.currentForm = MM_PLAYER_FORM_ZORA;
+  gFormState.goronAction = GORON_ACT_IDLE;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionPunchENGTex");
+  player.stateFlags1 = PLAYER_STATE1_IN_WATER;
+  player.actor.bgCheckFlags = BGCHECKFLAG_WATER;
+  gFormState.swimState = 1;
+  gFormState.waterRoll = &animation;
+  Player_UpdateInterface(&play, &player);
+  assert(play.interfaceCtx.unk_1F0 == DO_ACTION_MM_SWIM);
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionDiveENGTex");
+  player.currentBoots = PLAYER_BOOTS_IRON;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionSurfaceENGTex");
+  player.actor.bgCheckFlags |= BGCHECKFLAG_GROUND;
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionPunchENGTex");
+
+  player.stateFlags1 = 0;
+  gFormState.currentForm = MM_PLAYER_FORM_DEKU;
+  gFormState.dekuSpinAttack = gFormState.dekuBowReady = &animation;
+  Player_UpdateInterface(&play, &player);
+  assert(play.interfaceCtx.unk_1F0 == DO_ACTION_MM_ATTACK);
+  AssertBTexture("__OTR__@mm:do_action_static/gDoActionShootENGTex");
+  mmHasLabels = false;
+  AssertBTexture("__OTR__do_action_static/gDoActionShootENGTex");
+  localHasLabels = false;
+  assert(DrawB() == nullptr);
+  Interface_LoadActionLabel(&play.interfaceCtx, DO_ACTION_MM_ATTACK, 0);
+  assert(std::strcmp(actionSegments[0], gEmptyTexture) == 0);
+}
+
 int main() {
+  TestFormAndMaskPrompts();
   Reset();
   Input simultaneous = Press(BTN_A | BTN_B);
   play.state.input[0] = simultaneous;

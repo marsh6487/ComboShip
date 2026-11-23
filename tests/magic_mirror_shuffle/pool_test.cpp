@@ -47,7 +47,7 @@ int main() {
       RI_OOT_NEI_MAGIC_MIRROR};
   StaticData::Items[RI_OOT_NEI_MAGIC_MIRROR].randoItemType = RITYPE_MAJOR;
   StaticData::Items[RI_OOT_SONG_COMMAND_MELODY].randoItemType = RITYPE_MAJOR;
-  // Native room entrance; combined also relays the actual OoT Lost Woods route.
+  // The native MM route still supports the standalone shuffle.
   Logic::Regions[RR_WOODS_OF_MYSTERY]
       .checks[RC_LOST_WOODS_MAGIC_MIRROR_STUMP] = {[] { return true; }, "true"};
   for (int mode : {COMBO_GAME_MM, COMBO_GAME_BOTH}) {
@@ -81,13 +81,18 @@ int main() {
             Logic::GeneratePools(*save, checks, items);
             REQUIRE(std::count(items.begin(), items.end(), RI_OOT_SONG_COMMAND_MELODY) == !startingSong);
             const bool enabled = mode == COMBO_GAME_BOTH ? request : option;
+            const bool fillable = enabled && mode == COMBO_GAME_MM;
             REQUIRE(save->randoSaveOptions[RO_SHUFFLE_MAGIC_MIRROR] == enabled);
             REQUIRE(std::count(checks.begin(), checks.end(),
-                               RC_LOST_WOODS_MAGIC_MIRROR_STUMP) == enabled);
+                               RC_LOST_WOODS_MAGIC_MIRROR_STUMP) == fillable);
             REQUIRE(std::count(items.begin(), items.end(),
                                RI_OOT_NEI_MAGIC_MIRROR) == enabled);
-            REQUIRE(checks.size() == offChecks.size() + enabled);
+            REQUIRE(checks.size() == offChecks.size() + fillable);
             REQUIRE(items.size() == offItems.size() + enabled);
+            if (enabled && mode == COMBO_GAME_BOTH) {
+              const auto& stump = save->randoSaveChecks[RC_LOST_WOODS_MAGIC_MIRROR_STUMP];
+              REQUIRE(stump.shuffled && stump.skipped && stump.randoItemId == RI_JUNK);
+            }
             // Live preview is authoritative even when the frozen generation
             // value and native solo preference disagree with it.
             previewMirror = !request;
@@ -102,14 +107,13 @@ int main() {
                     previewEnabled);
             REQUIRE(std::count(previewChecks.begin(), previewChecks.end(),
                                RC_LOST_WOODS_MAGIC_MIRROR_STUMP) ==
-                    previewEnabled);
+                    (previewEnabled && mode == COMBO_GAME_MM));
             REQUIRE(std::count(previewItems.begin(), previewItems.end(),
                                RI_OOT_NEI_MAGIC_MIRROR) == previewEnabled);
             REQUIRE(requestMirror == request);
           }
       }
   }
-  puts("PASS native MM generator: OFF/ON, NEI independent, Plentiful unique, "
-       "solo/combined +1/+1, authoritative shared OFF/ON and live preview "
-       "separate from frozen generation");
+  puts("PASS native MM generator: one shuffled Mirror, optional Combo stump, "
+       "solo shuffle, NEI independence, Plentiful and shared live preview");
 }

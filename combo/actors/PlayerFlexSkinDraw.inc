@@ -1,23 +1,51 @@
 // Native C glue included once by each host's FlexLOD implementation.
 // PLAYER_FLEX_SKIN_STORE uses that host's native Matrix_ToMtx signature.
 #include "PlayerFlexSkin.h"
+#include "SeasonalIdle.h"
 static const void* sPlayerFlexSkinPlan;
 typedef struct {
     Gfx* commands[32];
     Gfx* originals[32];
     s32 count;
+    SeasonalIdleDraw idle;
 } PlayerFlexSkinFrame;
 static PlayerFlexSkinFrame* sPlayerFlexSkinFrame;
 
-static void PlayerFlexSkin_RecordDraw(Gfx* command, s32 limbIndex, Gfx* selected, Gfx* original) {
-    if (sPlayerFlexSkinPlan != NULL && sPlayerFlexSkinFrame != NULL && selected != original &&
-        selected != NULL && original != NULL && sPlayerFlexSkinFrame->count < 32 &&
-        selected == PlayerFlexSkin_SelectLimb(sPlayerFlexSkinPlan, limbIndex, original, original)) {
-        s32 index = sPlayerFlexSkinFrame->count++;
-        sPlayerFlexSkinFrame->commands[index] = command;
-        sPlayerFlexSkinFrame->originals[index] = original;
+static void PlayerFlexSkin_AddIdleArmRotation(s32 limbIndex, Vec3s* rotation) {
+    const s32 arm = limbIndex - SEASONAL_IDLE_FIRST_ARM;
+    if (sPlayerFlexSkinFrame != NULL && sPlayerFlexSkinFrame->idle.active &&
+        arm >= 0 && arm < SEASONAL_IDLE_ARM_COUNT) {
+        const Vec3s* delta = &sPlayerFlexSkinFrame->idle.rotations[arm];
+        rotation->x = (s16)((u16)rotation->x + (u16)delta->x);
+        rotation->y = (s16)((u16)rotation->y + (u16)delta->y);
+        rotation->z = (s16)((u16)rotation->z + (u16)delta->z);
     }
 }
+
+static Gfx* PlayerFlexSkin_SelectDraw(s32 limbIndex, Gfx* selected, Gfx* original, Gfx** rigid) {
+    *rigid = selected;
+    const s32 hand = limbIndex == 16 ? 0 : limbIndex == 19 ? 1 : -1;
+    if (hand >= 0 && selected != NULL && original != NULL && sPlayerFlexSkinFrame != NULL) {
+        const SeasonalIdleDraw* idle = &sPlayerFlexSkinFrame->idle;
+        if (idle->active && idle->rigid[hand] != NULL &&
+            (selected == original || selected == idle->ordinary[hand][0] ||
+             selected == idle->ordinary[hand][1] || selected == idle->ordinary[hand][2])) {
+            *rigid = idle->rigid[hand];
+            return sPlayerFlexSkinPlan != NULL && idle->weighted[hand] != NULL ? idle->weighted[hand] : *rigid;
+        }
+    }
+    return PlayerFlexSkin_SelectLimb(sPlayerFlexSkinPlan, limbIndex, selected, original);
+}
+
+static void PlayerFlexSkin_RecordDraw(Gfx* command, Gfx* selected, Gfx* rigid) {
+    if (sPlayerFlexSkinPlan != NULL && sPlayerFlexSkinFrame != NULL && selected != rigid &&
+        selected != NULL && rigid != NULL && sPlayerFlexSkinFrame->count < 32) {
+        s32 index = sPlayerFlexSkinFrame->count++;
+        sPlayerFlexSkinFrame->commands[index] = command;
+        sPlayerFlexSkinFrame->originals[index] = rigid;
+    }
+}
+
 static void PlayerFlexSkin_RestoreRigidDraws(void) {
     s32 i;
     if (sPlayerFlexSkinFrame == NULL)

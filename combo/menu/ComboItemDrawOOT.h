@@ -207,6 +207,8 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
     }
     if (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && OOT_NeiResourceExists(fire))
         selected = fire;
+    else if (rg == RG_BIGGORON_SWORD && OOT_NeiResourceExists(selected) && ResourceMgr_IsLegacyZssLongswordGi())
+        return 0;
     if (!CwCustomGi(out, selected, .04f))
         return 0;
     // This route returns before the authored descriptor. Carry the concrete

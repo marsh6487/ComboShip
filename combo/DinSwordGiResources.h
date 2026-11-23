@@ -1,4 +1,6 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <initializer_list>
 
@@ -22,6 +24,23 @@ inline constexpr Resources profiles[] = {
 };
 inline constexpr char coreTexture[] = "__OTR__objects/din_fire_sword/poc1/CoreTex";
 inline constexpr char flameTexture[] = "__OTR__objects/din_fire_sword/poc1/FlameTex";
+
+// The old Malon Fuller Frame ZSS equipment pack publishes a longsword at the
+// same global Alt path as intentional GI models. Match the actual resolved
+// root's vertex/texture references and command stream, independent of archive
+// names and load order.
+template <class Instruction> bool IsLegacyZssLongsword(const Instruction* commands, std::size_t count) {
+    if (!commands || count != 535 || commands[10].words.w0 != 0x9BE4CB5B || commands[10].words.w1 != 0xACE832B1 ||
+        commands[12].words.w0 != 0x889020A3 || commands[12].words.w1 != 0xE8874D84) {
+        return false;
+    }
+    uint64_t fingerprint = 0xCBF29CE484222325;
+    for (std::size_t i = 0; i < count; ++i) {
+        fingerprint = (fingerprint ^ static_cast<uint32_t>(commands[i].words.w0)) * 0x100000001B3;
+        fingerprint = (fingerprint ^ static_cast<uint32_t>(commands[i].words.w1)) * 0x100000001B3;
+    }
+    return fingerprint == 0x3E3F4BB1875AE1B5;
+}
 
 template <class Available> int SelectedProfile(const char* path, bool enabled, bool alt, Available available) {
     if (!path || !enabled || !alt)

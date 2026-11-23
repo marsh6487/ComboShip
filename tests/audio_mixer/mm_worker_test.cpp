@@ -51,6 +51,8 @@ static void MMMidnaAudio_Mix(s16 *buffer, size_t frames) {
   ++midnaCalls;
 }
 static void MMMidnaAudio_Reset() { ++midnaResets; }
+[[maybe_unused]] static void MMOptionalSfx_Mix(s16 *, size_t) {}
+[[maybe_unused]] static void MMOptionalSfx_Reset() {}
 #if TEST_AUDIO_WORKER_EMOTES
 static void ComboEmotes_MixAudio(s16 *buffer, size_t frames) {
   for (size_t i = 0; i < frames * 2; ++i) {

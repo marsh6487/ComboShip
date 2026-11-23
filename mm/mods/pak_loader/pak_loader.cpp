@@ -42,7 +42,7 @@ extern PlayState* gPlayState;
 #include <cstdint>
 #include <zlib.h>
 #include "../../../combo/PakNativeData.h"
-#include "../../../combo/actors/SeasonalOutfits.h"
+#include "../../../combo/actors/SeasonalOutfitsConfig.h"
 #include "mods/extended_inventory.h"
 
 // Upper bound for an estimated zobj decompression buffer. A player .zobj is a
@@ -2637,6 +2637,15 @@ extern "C" const char* PakLoader_GetSeasonalSkeletonPath(void) {
     return (AdultLink_IsActive() != 0) ? model.o2rAdultSkelOtr : model.o2rChildSkelOtr;
 }
 
+extern "C" Gfx* PakLoader_GetSeasonalOpenHand(u8 left) {
+    const char* path = PakLoader_GetSeasonalSkeletonPath();
+    if (!path || SeasonalOutfits::Season(path, true) < 0)
+        return nullptr;
+    const auto& slots = sModels[sSeasonalModelIndex].adultEquipDLs;
+    const auto hand = slots.find(left ? 0x5098 : 0x50B0);
+    return hand == slots.end() ? nullptr : hand->second;
+}
+
 extern "C" void PakLoader_SwapSkeleton(Player* player) {
     if (sGetActiveIndex() < 0 || sGetActiveIndex() >= (s32)sModels.size())
         return;
@@ -4526,6 +4535,7 @@ extern "C" void PakLoader_Init(void) {
     if (!Ship::Context::GetRawInstance())
         return;
 
+    SeasonalOutfits::MigrateOutfitSetConfig();
     sInitialized = 1;
     PAK_LOG("Initializing...");
 

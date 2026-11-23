@@ -151,6 +151,9 @@ def main():
         seed_start = otr.index("static uint64_t sComboRandoSeed =")
         seed_end = otr.index("static const PriceSettingsStruct", seed_start)
         seed_state = otr[seed_start:seed_end]
+        reward_topology_start = otr.index("struct ComboRewardTopologySnapshot")
+        reward_topology_end = otr.index("sComboRewardTopology;", reward_topology_start) + len("sComboRewardTopology;")
+        seed_state += "\n" + otr[reward_topology_start:reward_topology_end] + "\n"
         for state in ("sOracleInitialized", "sComboContextPrepared", "sComboRecordedMqDungeons",
                       "sComboRecordedQuestAssets", "sComboFinalizingQuestAssets", "sComboPreparedQuestAssets"):
             if state not in seed_state:

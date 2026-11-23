@@ -7,6 +7,7 @@
 #include <vector>
 #include "global.h"
 #include "combo/actors/PlayerFlexSkin.h"
+#include "combo/actors/SeasonalIdle.h"
 #include "combo/actors/PlayerFlexSkinPolicy.h"
 static MtxF current;
 static std::vector<MtxF> stack;
@@ -15,13 +16,15 @@ static Mtx storage[256];
 static size_t used, lastAllocation;
 static int planFlag, failure, postCount;
 static void** target;
-static bool nested;
+static bool nested, idleMode;
+static int idleArmCount;
 static PlayState* activePlay;
 static void** nestedSkeleton;
 static Vec3s* activeJoints;
 static std::vector<Gfx*> commands;
 static std::vector<uintptr_t> segments;
 static Gfx rigid[1], weighted[1], equipment[1];
+static Gfx openAlias[1], idleRigid[1], idleWeighted[1];
 extern "C" {
 #ifdef PLAYER_SKIN_MM
 void SkelAnime_DrawFlexLodWithXlu(PlayState*, void**, Vec3s*, s32, OverrideLimbDrawFlex, PostLimbDrawFlex, Actor*, s32);
@@ -32,8 +35,19 @@ s32 NativeNpcPose_SkinMatrixCount(const void*) { return 0; }
 void NativeNpcPose_BlendSkinMatrix(const void*, s32, const MtxF*, MtxF*) { assert(false); }
 float NativeNpcPose_GetDrawScale(void**) { return 1; }
 #endif
+void PlayerFlexSkin_LoadSeasonalIdle(PlayState*, const void* actor, void** skeleton, Vec3s*, SeasonalIdleDraw* out) {
+    if (!idleMode || !actor || skeleton != target)
+        return;
+    out->active = true;
+    out->rotations[0].x = 120;
+    out->rotations[2].x = 80;
+    out->rotations[5].x = -60;
+    out->ordinary[0][2] = openAlias;
+    out->rigid[0] = idleRigid;
+    out->weighted[0] = idleWeighted;
+}
 const void* PlayerFlexSkin_GetPlan(void** skeleton, s32 count) {
-    return planFlag && skeleton == target && count == 2 ? &planFlag : nullptr;
+    return planFlag && skeleton == target && count == (idleMode ? 4 : 2) ? &planFlag : nullptr;
 }
 s32 PlayerFlexSkin_MatrixCount(const void* plan) { return plan ? 1 : 0; }
 Gfx* PlayerFlexSkin_SelectLimb(const void* plan, s32, Gfx* selected, Gfx* original) {
@@ -75,7 +89,13 @@ void Matrix_Push(void) { stack.push_back(current); }
 void Matrix_Pop(void) { assert(!stack.empty()); current = stack.back(); stack.pop_back(); }
 void Matrix_Put(MtxF* matrix) { current = *matrix; }
 void Matrix_TranslateRotateZYX(Vec3f* pos, Vec3s* rot) {
-    assert(rot->x == 0 && rot->y == 0 && rot->z == 0);
+    assert(rot->y == 0 && rot->z == 0);
+    if (idleMode && rot->x != 0) {
+        assert(rot->x == -60 || rot->x == 80 || rot->x == 120);
+        ++idleArmCount;
+    } else {
+        assert(rot->x == 0);
+    }
     current.xw += pos->x; current.yw += pos->y; current.zw += pos->z;
 }
 #ifdef PLAYER_SKIN_MM
@@ -110,6 +130,8 @@ static s32 Override(PlayState*, s32 index, Gfx** dl, Vec3f*, Vec3s*, Actor*) {
 #else
 static s32 Override(PlayState*, s32 index, Gfx** dl, Vec3f*, Vec3s*, void*) {
 #endif
+    if (idleMode && index == 16)
+        *dl = failure == 3 ? equipment : openAlias;
     if (index == 2 && (failure == 3 || failure == 5)) *dl = equipment;
     if (index == 2 && failure == 4) *dl = nullptr;
     return false;
@@ -175,5 +197,30 @@ int main() {
             failure = 1;
         }
     }
+    LodLimb shoulder{{0, 20, 0}, 15, LIMB_DONE, {rigid, rigid}};
+    LodLimb left{{-10, 0, 0}, LIMB_DONE, 18, {rigid, rigid}};
+    LodLimb right{{10, 0, 0}, LIMB_DONE, LIMB_DONE, {rigid, rigid}};
+    root.child = 13;
+    void* fall[21]{}; fall[0] = &root; fall[13] = &shoulder; fall[15] = &left; fall[18] = &right;
+    Vec3s fallJoints[22]{};
+    Actor player{};
+    target = fall; idleMode = true; nested = false;
+    for (int test=0; test<5; ++test) {
+        idleArmCount = 0;
+        commands.clear(); values.clear(); segments.clear(); used = 0;
+        gfx.polyOpa.p = opa; gfx.polyOpa.d = opa + 4096;
+        gfx.polyXlu.p = xlu; gfx.polyXlu.d = xlu + 128;
+        planFlag = test != 1;
+        failure = test == 2 ? 1 : test == 3 ? 3 : 0;
+        SkelAnime_DrawFlexLodWithXlu(&play, fall, fallJoints, 4, Override, nullptr, test == 4 ? nullptr : &player, 0);
+        assert(fallJoints[14].x == 0 && fallJoints[16].x == 0 && fallJoints[19].x == 0);
+        assert(idleArmCount == (test == 4 ? 0 : 3));
+        int hits = 0;
+        Gfx* expected = test == 0 ? idleWeighted : test == 3 ? equipment : test == 4 ? openAlias : idleRigid;
+        for (Gfx* command = opa; command < gfx.polyOpa.p; ++command)
+            hits += command->words.w1 == reinterpret_cast<uintptr_t>(expected);
+        assert(hits == 1);
+    }
+    std::puts("PASS seasonal free idle: draw-local rotations, native/rigid hand selection, rollback, equipment priority and no remote spill");
     std::puts("PASS native player FlexLOD: palette slots, callback/pose preservation, opaque+XLU binding, arena fallback, packing rollback, nested scope");
 }

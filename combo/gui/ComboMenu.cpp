@@ -25,8 +25,10 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <cstdio>
+#include <string_view>
 #include <unordered_set>
 #include "ComboResolve.h"
 
@@ -456,7 +458,6 @@ struct HubEntry {
         ENGINE,
         OOT_RANDO,
         MM_RANDO,
-        SHARED_SEED_INFORMATION,
         COMBO_GEN,
         COMBO_PLANDO,
         COMBO_TRACKER,
@@ -517,23 +518,100 @@ void AppendSectionEntries(std::vector<HubEntry>& out, const char* groupLabel, Hu
     }
 }
 
-constexpr const char* kMapCompassInformation = "gRandoSettings.MapsCompassesGiveInformation";
+enum class ShuffleGroup { Gear, Songs, Abilities, Upgrades, World, Fishing, Fairies, Shops, Souls, Count };
 
-const CwWidget* FindWidgetByCvar(const ComboRando::GameMenu& game, const char* cvar) {
-    if (!game.loaded || !game.menu)
-        return nullptr;
-    for (int s = 0; s < game.menu->sectionCount; ++s) {
-        const CwSection& section = game.menu->sections[s];
-        for (int sb = 0; sb < section.sidebarCount; ++sb) {
-            const CwSidebar& side = section.sidebars[sb];
-            for (int w = 0; w < side.widgetCount; ++w) {
-                const CwWidget& widget = side.widgets[w];
-                if (widget.cvar && std::strcmp(widget.cvar, cvar) == 0)
-                    return &widget;
-            }
+ShuffleGroup OotShuffleGroup(const CwWidget& widget) {
+    if (widget.column == 1)
+        return ShuffleGroup::Shops;
+
+    std::string_view key = widget.cvar ? widget.cvar : "";
+    constexpr std::string_view prefix = "gRandoSettings.";
+    if (key.starts_with(prefix))
+        key.remove_prefix(prefix.size());
+
+    const auto matches = [key](std::initializer_list<std::string_view> keys) {
+        return std::find(keys.begin(), keys.end(), key) != keys.end();
+    };
+    if (matches({ "ShuffleSongs", "ShuffleSongEvents", "gRandoEnhancements.SongEventGlyphDisplay", "ShuffleClock",
+                  "ClockStart", "ShuffleOcarinas", "ShuffleOcarinaButtons", "ShuffleScarecrowsSong" }))
+        return ShuffleGroup::Songs;
+    if (matches({ "ShuffleSwim", "ShuffleGrab", "ShuffleClimb", "ShuffleCrawl", "ShuffleSpeak", "ShuffleOpenChest" }))
+        return ShuffleGroup::Abilities;
+    if (matches({ "ShuffleTokens",   "ShuffleFreestanding",   "ShuffleWonderItems",   "ShuffleSilver",
+                  "ShuffleBeehives", "ShuffleCows",           "ShufflePots",          "ShuffleGrass",
+                  "ShuffleCrates",   "ShuffleBoulders",       "ShuffleRocks",         "ShuffleTrees",
+                  "ShuffleBushes",   "ShuffleEnemyDrops",     "ShuffleIcicles",       "ShuffleRedIce",
+                  "ShuffleSigns",    "ShuffleFrogSongRupees", "ShuffleChestMinigame", "Shuffle100GSReward",
+                  "ShuffleBeanSouls" }))
+        return ShuffleGroup::World;
+    if (matches({ "Fishsanity", "FishsanityPondCount", "FishsanityAgeSplit", "ShuffleFishingPole" }))
+        return ShuffleGroup::Fishing;
+    if (matches({ "ShuffleFountainFairies", "ShuffleStoneFairies", "ShuffleBeanFairies", "ShuffleFairySpots",
+                  "ShuffleButterflyFairies" }))
+        return ShuffleGroup::Fairies;
+    if (matches(
+            { "ShuffleBossSouls", "ShuffleEnemySouls", "ShuffleNpcSouls", "ShuffleAnimalSouls", "ShuffleMiscSouls" }))
+        return ShuffleGroup::Souls;
+    if (matches({ "RocsFeather", "SkeletonKey" }))
+        return ShuffleGroup::Gear;
+    return widget.column == 2 ? ShuffleGroup::Upgrades : ShuffleGroup::Gear;
+}
+
+void DrawOotShuffles(const CwSidebar& sidebar, const ComboRando::GameMenu& game) {
+    constexpr int columns = 3;
+    constexpr auto groupCount = static_cast<size_t>(ShuffleGroup::Count);
+    struct Group {
+        const char* title;
+        int column;
+    };
+    constexpr std::array<Group, groupCount> groups{ {
+        { "Gear & Quest Items", 0 },
+        { "Songs & Time", 0 },
+        { "Abilities", 0 },
+        { "Wallets & Upgrades", 0 },
+        { "World Checks", 1 },
+        { "Fishing", 1 },
+        { "Fairy Checks", 1 },
+        { "Shops & Merchants", 1 },
+        { "Souls", 2 },
+    } };
+    std::array<std::vector<const CwWidget*>, groupCount> widgets;
+    for (int i = 0; i < sidebar.widgetCount; ++i) {
+        const auto& widget = sidebar.widgets[i];
+        if (widget.kind == CW_SEPARATOR_TEXT && widget.name) {
+            const std::string_view label = widget.name;
+            if (label == "Shuffle Items" || label == "Shuffle Shops & Merchants" || label == "Additional Items" ||
+                label == "Souls")
+                continue;
         }
+        widgets[static_cast<size_t>(OotShuffleGroup(widget))].push_back(&widget);
     }
-    return nullptr;
+
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    const float width = (available.x - ImGui::GetStyle().ItemSpacing.x * (columns - 1)) / columns;
+    for (int column = 0; column < columns; ++column) {
+        ImGui::PushID(column);
+        ImGui::BeginChild("##OotShuffleColumn", ImVec2(width, available.y), 0, ImGuiWindowFlags_NoTitleBar);
+        for (size_t i = 0; i < groups.size(); ++i) {
+            const auto& group = groups[i];
+            if (group.column != column || widgets[i].empty())
+                continue;
+            const auto category = static_cast<ShuffleGroup>(i);
+            if (category == ShuffleGroup::Souls) {
+                ImGui::SeparatorText(group.title);
+            } else if (!ImGui::CollapsingHeader(group.title, category == ShuffleGroup::Gear
+                                                                 ? ImGuiTreeNodeFlags_DefaultOpen
+                                                                 : ImGuiTreeNodeFlags_None)) {
+                continue;
+            }
+            for (const auto* widget : widgets[i])
+                ComboRando::RenderWidget(*widget, game, 90 / columns);
+        }
+        ImGui::EndChild();
+        ImGui::PopID();
+        if (column + 1 < columns)
+            ImGui::SameLine();
+    }
 }
 // Render one game's tracker sidebar inline (linear; the tracker sidebars are single-column).
 // Structural skips: the sidebar's main-window toggle (identified by its CVar — the combo master
@@ -1416,14 +1494,6 @@ void ComboMenu::DrawSharedPanel() {
                     ++it;
                 }
             }
-            if (FindWidgetByCvar(model.Oot(), kMapCompassInformation)) {
-                HubEntry information;
-                information.label = "Map & Compass Information";
-                information.group = "Shared Seed Settings";
-                information.kind = HubEntry::SHARED_SEED_INFORMATION;
-                information.game = &model.Oot();
-                shared.push_back(std::move(information));
-            }
             if (!shared.empty())
                 groups.push_back({ "Shared Seed Settings", std::move(shared) });
             if (!oot.empty())
@@ -1544,24 +1614,10 @@ void ComboMenu::DrawSharedPanel() {
         ComboSync::DrawSyncSharedPanel();
     } else if (active->kind == HubEntry::COMBO_NETWORK) {
         DrawNetworkSharedPanel();
-    } else if (active->kind == HubEntry::SHARED_SEED_INFORMATION) {
-        if (const auto* widget = FindWidgetByCvar(*active->game, kMapCompassInformation)) {
-            RenderWidget(*widget, *active->game);
-        }
     } else {
         const CwSidebar& side = active->game->menu->sections[active->sectionIndex].sidebars[active->sidebarIndex];
-        if (active->kind == HubEntry::OOT_RANDO) {
-            // Hide only the relocated control; never mutate the game's exported model.
-            std::vector<CwWidget> widgets;
-            for (int w = 0; w < side.widgetCount; ++w) {
-                const auto& widget = side.widgets[w];
-                if (!widget.cvar || std::strcmp(widget.cvar, kMapCompassInformation) != 0)
-                    widgets.push_back(widget);
-            }
-            CwSidebar filtered = side;
-            filtered.widgets = widgets.data();
-            filtered.widgetCount = static_cast<int32_t>(widgets.size());
-            RenderSidebarWidgets(filtered, *active->game);
+        if (active->kind == HubEntry::OOT_RANDO && active->label == "Shuffles") {
+            DrawOotShuffles(side, *active->game);
         } else {
             RenderSidebarWidgets(side, *active->game);
         }

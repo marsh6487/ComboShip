@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_spot07_taki.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_spot07_object/object_spot07_object.h"
 #include "mods/extended_inventory.h" // Skijer's NEI: Seasons_* — Winter freezes it, Summer thaws it
 #include "soh/Enhancements/Graphics/ZorasDomain.h"
@@ -141,8 +142,8 @@ void BgSpot07Taki_Draw(Actor* thisx, PlayState* play) {
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, ((frames * -1) & 0x7F), ((frames * 1) & 0x7F), 32, 32, 1,
-                                  ((frames * 1) & 0x7F), ((frames * 1) & 0x7F), 32, 32, -1, 1, 1, 1));
+               Gfx_TwoTexWaterScroll(play, 0, ((frames * -1) & 0x7F), ((frames * 1) & 0x7F), 32, 32, 1,
+                                     ((frames * 1) & 0x7F), ((frames * 1) & 0x7F), 32, 32, -1, 1, 1, 1));
 
     if (!isFrozen) {
         gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 128);

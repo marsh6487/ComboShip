@@ -69,6 +69,7 @@ enum {
 #define VT_FGCOL(x) ""
 #define VT_RST ""
 #define osSyncPrintf(...) ((void)0)
+#define PLAYER_STATE1_DEAD 1u
 
 static void Require(bool condition, const char* message) {
     if (!condition) {
@@ -121,6 +122,7 @@ struct Player {
     Actor actor;
     int* ageProperties;
     int itemAction, heldItemAction, heldItemId;
+    unsigned stateFlags1;
 };
 struct PlayState {
     int shootingGalleryStatus, bombchuBowlingStatus;
@@ -162,6 +164,10 @@ static struct {
 static u8 sDekuBubbleActive, sZoraBoomerangActive;
 static bool extBackup, windHandles, formEnabled = true, combined = true, vanillaNewFile, allowPreflight = true;
 static bool vanillaPreflight = true, debugQuest, gerudoAnims, ritoAnims, bowActive;
+static bool crossoverEnabled, pikaMode, marioMode;
+static struct {
+    bool pokeballOwned;
+} neiSave;
 static int softReloads, nativeLoads, nativeCreates, saveWrites, nativeMaskEndCalls;
 static std::string forcedModel;
 static std::shared_ptr<std::vector<std::shared_ptr<int>>> sPinnedFormResources;
@@ -225,6 +231,14 @@ static u8 RitoItem_FormEnabled() {
 static bool WolfLinkForm_IsSelected() {
     return false;
 }
+static void WolfLinkForm_Select(int) {
+}
+static bool BrokenItems_Enabled() {
+    return crossoverEnabled;
+}
+static auto Nei_Save() {
+    return &neiSave;
+}
 static void WolfLinkForm_Cleanup() {
 }
 static void PikachuForm_Cleanup() {
@@ -233,7 +247,17 @@ static bool MaskProgression_CanTransform(int) {
     return true;
 }
 static int CVarGetInteger(const char* key, int fallback) {
-    return std::string(key) == "gCombo.NewFileVanilla" ? vanillaNewFile : fallback;
+    const std::string name(key);
+    if (name == "gCombo.NewFileVanilla") {
+        return vanillaNewFile;
+    }
+    if (name == "gPikachuMode") {
+        return pikaMode;
+    }
+    if (name == "gSm64Mario") {
+        return marioMode;
+    }
+    return fallback;
 }
 static void CVarSetInteger(const char*, int) {
 }
@@ -433,7 +457,30 @@ int main(int argc, char** argv) {
     Require(argc == 2, "case required");
     const std::string test = argv[1];
     ArmDeparted();
-    if (test == "scene") {
+    if (test == "pikachu-selector") {
+        MmForm_DiscardSaveSession();
+        formEnabled = false;
+        gFormState.initialized = 1;
+        crossoverEnabled = pikaMode = true;
+        MmForm_Update(&play, &player);
+        Require(gFormState.state == MMFORM_STATE_INACTIVE, "Pikachu bypassed Poké Ball ownership");
+
+        neiSave.pokeballOwned = marioMode = true;
+        MmForm_Update(&play, &player);
+        Require(gFormState.state == MMFORM_STATE_INACTIVE, "Pikachu activated during Mario mode");
+
+        marioMode = false;
+        MmForm_Update(&play, &player);
+        Require(gFormState.state == MMFORM_STATE_TRANSFORMING &&
+                    gFormState.targetForm == MM_PLAYER_FORM_PIKACHU && sForceInstantTransform,
+                "Crossover Pikachu required Transformation Masks");
+
+        gFormState.state = MMFORM_STATE_ACTIVE;
+        gFormState.currentForm = MM_PLAYER_FORM_PIKACHU;
+        pikaMode = false;
+        MmForm_Update(&play, &player);
+        Require(gFormState.state == MMFORM_STATE_DETRANSFORMING, "selector left Pikachu active when deselected");
+    } else if (test == "scene") {
         sFleetPendingForm = -1;
         sPendingSoftReload = 0;
         sPendingReactivate = 0;

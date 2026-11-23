@@ -137,15 +137,13 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
         item -= 0xB5 - ITEM_BOW_FIRE;
         slot = SLOT_BOW;
     }
-    if (neiItem && button >= PAUSE_EQUIP_D_RIGHT) {
-        // D-pad NEI bindings are independent shortcuts. Assigning one must not
-        // swap its displaced item into a C slot or remove an existing C binding.
-        ExtButton_WriteEquip(play, button, item, slot);
-        return true;
-    }
+    // Keep NEI shortcuts independent of C while relocating the same item
+    // between D-pad directions. A C assignment still searches both banks.
+    const bool dpadShortcut = neiItem && button >= PAUSE_EQUIP_D_RIGHT;
+    const s32 firstSource = dpadShortcut ? PAUSE_EQUIP_D_RIGHT : PAUSE_EQUIP_C_LEFT;
     u8 displacedSlot = ExtButton_GetEquipSlot(button);
     bool moved = displaced == item;
-    for (s32 other = PAUSE_EQUIP_C_LEFT; other <= PAUSE_EQUIP_D_UP; ++other) {
+    for (s32 other = firstSource; other <= PAUSE_EQUIP_D_UP; ++other) {
         if (other == button) {
             continue;
         }
@@ -153,13 +151,12 @@ s32 ExtButton_EquipItem(PlayState* play, s32 button, u16 item, u8 slot) {
         // Match exact identities even when older C/D saves have different slot
         // metadata. Shared progressive cells still use the family checks below.
         if ((otherItem == item && item != ITEM_NONE && item != PAUSE_ITEM_NONE) ||
-            (item < 0x0200 && slot != SLOT_NONE && ExtButton_GetEquipSlot(other) == slot &&
+            (!dpadShortcut && item < 0x0200 && slot != SLOT_NONE && ExtButton_GetEquipSlot(other) == slot &&
              // Page-0 OoT virtual slots and page-1 custom equip slots both use
              // 72..79 in existing saves. A matching byte is not a matching cell
              // across those families. Keep true shared/progressive-cell swaps.
              ExtButton_IsVirtualOotItem(item) == ExtButton_IsVirtualOotItem(otherItem))) {
-            // C-button relocation consumes every old shortcut, including a C
-            // source preceding D-pad duplicates. Return the displaced item once.
+            // Return the displaced item once and clear any extra copies.
             ExtButton_WriteEquip(play, other, moved ? ITEM_NONE : displaced, moved ? SLOT_NONE : displacedSlot);
             moved = true;
         }

@@ -31,7 +31,8 @@ static const char* Checks(int game) {
 static uint8_t Portal() { return daytime || HasClock(); }
 static const char* OotExits() { return route ? "[{\"game\":1,\"index\":10}]" : "[]"; }
 static const char* MmExits() {
-    return ((route && Arrival(1, 10)) || (worldReturn && accessState[1].value("overworld", true))) ? "[{\"game\":0,\"index\":20}]" : "[]";
+    const bool exitReachable = worldReturn ? accessState[1].value("overworld", true) : (route && Arrival(1, 10));
+    return exitReachable ? "[{\"game\":0,\"index\":20}]" : "[]";
 }
 static OracleFns Oot() {
     return {[] {}, [](const char* raw) { owned[0] = Json::parse(raw).get<std::vector<std::string>>(); },
@@ -67,16 +68,18 @@ static CombinedFillResult SharedRoomKey() {
     route = false;
     return result;
 }
-static CombinedFillResult FixedBehindMm() {
+static CombinedFillResult FixedBehindMm(GameId start = GAME_MM) {
+    accessState[0] = accessState[1] = {{"overworld", true}, {"arrivals", Json::array()}};
     auto oot = Dump(0), mm = Dump(1);
     oot["pool"] = Json::array();
     oot["checks"] = Json::array();
     oot["fixed"] = Json::array({{{"check", "Fixed Clock"}, {"item", "Clock"},
                                   {"advancement", true}, {"validate", true}}});
     worldReturn = true;
+    route = start == GAME_OOT;
     auto result = CrossWorldCombinedFill(oot.dump(), mm.dump(), 52, Oot(), Mm(), nullptr, "",
-                                        OotAccess::ALL_REACHABLE, {}, GAME_MM);
-    worldReturn = false;
+                                        OotAccess::ALL_REACHABLE, {}, start);
+    worldReturn = route = false;
     return result;
 }
 static void Clean() {
@@ -95,10 +98,18 @@ int main(int argc, char**) {
     const auto fixed = FixedBehindMm();
     assert(!fixed.success && fixed.error.find("not re-openable") != std::string::npos);
     Clean();
+    // A valid arrival grants the foreign dungeon's checks. It cannot certify
+    // progression that requires Clock Town while the Happy Mask Shop is shut.
+    const auto ootTrapped = FixedBehindMm(GAME_OOT);
+    assert(!ootTrapped.success && ootTrapped.error.find("ootAdvUnreachable=1") != std::string::npos);
+    Clean();
     assert(SharedRoomKey().success); Clean();
     auto missing = Oot(); missing.GetPortalOpen = nullptr;
-    assert(!CrossWorldCombinedFill(Dump(0).dump(), Dump(1).dump(), 51, missing, Mm(), nullptr, "",
-                                  OotAccess::ALL_REACHABLE, {}, GAME_MM).success);
+    for (const auto start : {GAME_OOT, GAME_MM}) {
+        const auto result = CrossWorldCombinedFill(Dump(0).dump(), Dump(1).dump(), 51, missing, Mm(), nullptr, "",
+                                                   OotAccess::ALL_REACHABLE, {}, start);
+        assert(!result.success && result.error.find("GetPortalOpen") != std::string::npos);
+    }
     early = true;
     const auto clockEarly = Fill();
     assert(clockEarly.success);
