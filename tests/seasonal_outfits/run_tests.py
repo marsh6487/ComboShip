@@ -159,18 +159,39 @@ print('PASS seasonal OoT gameplay and aiming aliases, ownership priority and GI 
 
 with tempfile.TemporaryDirectory(prefix='seasonal-outfit-config-') as directory:
     path = Path(directory)
-    bridge = path / 'libultraship/bridge/consolevariablebridge.h'
-    bridge.parent.mkdir(parents=True)
-    bridge.write_text('bool CVarExists(const char*);\nvoid CVarCopy(const char*, const char*);\nvoid CVarClear(const char*);\n')
+    context = path / 'ship/Context.h'
+    context.parent.mkdir()
+    context.write_text(r'''
+#pragma once
+#include "ship/config/ConsoleVariable.h"
+namespace Ship {
+class Context {
+  public:
+    static Context* GetRawInstance() {
+        static Context context;
+        return &context;
+    }
+    std::shared_ptr<ConsoleVariable> GetConsoleVariables() const { return variables; }
+  private:
+    std::shared_ptr<ConsoleVariable> variables = std::make_shared<ConsoleVariable>();
+};
+}
+''')
     (path / 'test.cpp').write_text(r'''
 #include "combo/actors/SeasonalOutfitsConfig.h"
 #include <cassert>
 #include <map>
 
-std::map<std::string, std::string> cvars;
-bool CVarExists(const char* key) { return cvars.count(key) != 0; }
-void CVarCopy(const char* from, const char* to) { cvars[to] = cvars.at(from); }
-void CVarClear(const char* key) { cvars.erase(key); }
+static std::map<std::string, std::string> cvars;
+namespace Ship {
+ConsoleVariable::ConsoleVariable() = default;
+ConsoleVariable::~ConsoleVariable() = default;
+std::shared_ptr<CVar> ConsoleVariable::Get(const char* key) {
+    return cvars.contains(key) ? std::make_shared<CVar>() : nullptr;
+}
+void ConsoleVariable::CopyVariable(const char* from, const char* to) { cvars[to] = cvars.at(from); }
+void ConsoleVariable::ClearVariable(const char* key) { cvars.erase(key); }
+}
 
 int main() {
     const char* oldSet = "gEnhancements.SeasonalOutfits.Set";
@@ -190,7 +211,9 @@ int main() {
     assert(!CVarExists(oldSet));
 }
 ''')
-    subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(path), '-I', str(ROOT),
-                    str(path / 'test.cpp'), '-o', str(path / 'test')], check=True)
+    bridge = ROOT / 'libultraship/src/libultraship/bridge/consolevariablebridge.cpp'
+    subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
+                    '-Wl,--gc-sections', '-I', str(path), '-I', str(ROOT), '-I', str(ROOT / 'libultraship/include'),
+                    str(path / 'test.cpp'), str(bridge), '-o', str(path / 'test')], check=True)
     subprocess.run([str(path / 'test')], check=True)
 print('PASS seasonal configuration migration and non-conflicting persistence keys')

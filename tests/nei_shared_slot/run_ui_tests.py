@@ -305,12 +305,20 @@ int main() {
         else:
             checks = checks.replace("/* SET_BUTTONS */", r'''
         sGraceHourglassSelectorActive = 0;
+        std::memset(gSaveContext.equips.buttonItems, ITEM_NONE, sizeof(gSaveContext.equips.buttonItems));
+        std::memset(gSaveContext.equips.cButtonSlots, SLOT_NONE, sizeof(gSaveContext.equips.cButtonSlots));
         // Low-byte Grace is a raw native equip, never a full-ID marker.
         ExtButton_SetItem(1, ITEM_HYLIAS_GRACE);
         gSaveContext.equips.cButtonSlots[0] = SLOT_PHANTOM_HOURGLASS;
         assert(ExtButton_GetItem(1) == ITEM_NONE);
-        for (s32 button : {1, 4, 5})
-            CompleteNativeButtonEquip(&play, button, first, SLOT_PHANTOM_HOURGLASS);
+        CompleteNativeButtonEquip(&play, 1, first, SLOT_PHANTOM_HOURGLASS);
+        CompleteNativeButtonEquip(&play, 4, first, SLOT_PHANTOM_HOURGLASS);
+        CompleteNativeButtonEquip(&play, 5, first, SLOT_PHANTOM_HOURGLASS);
+        assert(ExtButton_GetItem(1) == first && ExtButton_GetItem(5) == first);
+        assert(ExtButton_GetItem(4) == ITEM_NONE && EXT_BUTTON_ITEM(4) == 0);
+        // Old saves may still contain two D-pad copies. Exercise wheel updates
+        // for both without using the current assignment path to create them.
+        ExtButton_WriteEquip(4, first, SLOT_PHANTOM_HOURGLASS);
         CompleteNativeButtonEquip(&play, 2, ITEM_BOW, SLOT_BOW);
         CompleteNativeButtonEquip(&play, 6, EXT_ITEM_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE);
         CompleteNativeButtonEquip(&play, 3, ITEM_STICK, SLOT_STICK);

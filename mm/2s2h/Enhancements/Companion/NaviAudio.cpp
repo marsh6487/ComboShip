@@ -16,7 +16,7 @@ enum Clip {
     Listen,
     ClipCount,
 };
-enum Voice { Camera, Speech, VoiceCount };
+enum Voice { CameraVoice, Speech, VoiceCount };
 ComboOptionalSfx::Mixer<ClipCount, VoiceCount> sMixer;
 
 std::vector<int16_t> ReadNaviCue(const std::shared_ptr<Ship::ArchiveManager>& mmArchives,
@@ -53,7 +53,7 @@ void MMOptionalSfx_Init() {
 }
 
 extern "C" void MMTwilightPrincessTargeting_PlayCamera(void) {
-    sMixer.Play(CameraCue, Camera);
+    sMixer.Play(CameraCue, CameraVoice);
 }
 
 extern "C" bool MMCompanionAudio_TryPlay(MMMidnaAudioEvent event) {
