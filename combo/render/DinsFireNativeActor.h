@@ -161,32 +161,23 @@ static inline void CwDinsNativeActor_UpdateLight(MagicFire* fire) {
 }
 
 static inline void CwDinsNativeActor_SetAttackBounds(MagicFire* fire, float radius, float height) {
-    const int growTicks = 30;
-    const int sweepStart = growTicks + 25 + 1;
-    const int sweepEnd = sweepStart + 14;
+    const int stockGrowTicks = 30;
+    const float stockSweepGrowth = 13 * 0.05f;
     int frame = fire->nativeFrame;
-    fire->collider.dim.radius = (s16)radius;
-    fire->collider.dim.height = (s16)height;
-    fire->collider.dim.yShift = 0;
-    if (frame < sweepEnd) {
-        /* The stock spell uses a centered cylinder and makes its widest
-         * sweep as it burns out. Keep that reach on the original schedule,
-         * including torches below the cast point. The long remake hold
-         * outside that sweep uses its visible local reach. */
-        float stockScale = fire->nativeSpreadScale;
-        if (stockScale * 325.0f > fire->collider.dim.radius) {
-            fire->collider.dim.radius = stockScale * 325.0f;
-        }
-        fire->collider.dim.yShift = stockScale * -225.0f;
-        fire->collider.dim.height = stockScale * 450.0f;
-        if (fire->collider.dim.height + fire->collider.dim.yShift < (s16)height) {
-            fire->collider.dim.height = (s16)height - fire->collider.dim.yShift;
-        }
-        if (frame > 0 && frame < growTicks) {
-            Math_SmoothStepToF(&fire->nativeSpreadScale, 0.4f, 0.08f, 0.1f, 0.001f);
-        } else if (frame >= sweepStart) {
-            fire->nativeSpreadScale += 0.05f;
-        }
+    float stockScale = fire->nativeSpreadScale;
+    if (frame >= CW_DINS_NATIVE_FADE_START_FRAME) {
+        /* Reach the stock spell's widest and lowest bounds on the last live fade update. */
+        float sweep = (frame - CW_DINS_NATIVE_FADE_START_FRAME) / (float)(CW_DINS_NATIVE_FADE_TICKS - 1);
+        stockScale += stockSweepGrowth * sweep;
+    }
+    fire->collider.dim.radius = fmaxf((s16)radius, stockScale * 325.0f);
+    fire->collider.dim.yShift = stockScale * -225.0f;
+    fire->collider.dim.height = stockScale * 450.0f;
+    if (fire->collider.dim.height + fire->collider.dim.yShift < (s16)height) {
+        fire->collider.dim.height = (s16)height - fire->collider.dim.yShift;
+    }
+    if (frame > 0 && frame < stockGrowTicks) {
+        Math_SmoothStepToF(&fire->nativeSpreadScale, 0.4f, 0.08f, 0.1f, 0.001f);
     }
     Collider_UpdateCylinder(&fire->actor, &fire->collider);
 }

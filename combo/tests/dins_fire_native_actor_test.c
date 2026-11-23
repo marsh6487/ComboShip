@@ -511,6 +511,7 @@ static void usableLinger(void) {
     REQUIRE(arrow.actor.params == ARROW_NORMAL_PARAM && ignitionSounds == 1);
 }
 static void stockAttackBounds(void) {
+    enum { stockSweepStart = 56 };
     Cylinder16 stock[CW_DINS_NATIVE_FIRE_TICKS];
     int stockFrames = 0;
     reset(0);
@@ -526,21 +527,27 @@ static void stockAttackBounds(void) {
 
     reset(1);
     release();
+    Cylinder16 previous = { 0 };
     for (int frame = 0; frame < CW_DINS_NATIVE_FIRE_TICKS; ++frame) {
         if (frame > 0)
             step();
         Cylinder16* bounds = &fire.collider.dim;
-        if (frame < stockFrames) {
+        if (frame < stockSweepStart) {
             REQUIRE(bounds->radius >= stock[frame].radius);
             REQUIRE(bounds->yShift == stock[frame].yShift);
             REQUIRE(bounds->yShift + bounds->height + .0001f >= stock[frame].yShift + stock[frame].height);
-            if (frame == stockFrames - 1)
-                REQUIRE(bounds->radius == stock[frame].radius);
-        } else {
+        } else if (frame <= CW_DINS_NATIVE_FADE_START_FRAME) {
             float localRadius = CwDins_NativeRadius(frame / (float)CW_DINS_NATIVE_RATE);
-            REQUIRE(bounds->radius == (s16)localRadius && bounds->yShift == 0);
+            REQUIRE(bounds->radius == (s16)localRadius);
+            REQUIRE(bounds->yShift == stock[stockSweepStart - 1].yShift);
+        } else {
+            REQUIRE(bounds->radius > previous.radius && bounds->yShift < previous.yShift);
         }
+        previous = *bounds;
     }
+    REQUIRE(fabsf(previous.radius - stock[stockFrames - 1].radius) < .001f);
+    REQUIRE(fabsf(previous.yShift - stock[stockFrames - 1].yShift) < .001f);
+    REQUIRE(fabsf(previous.height - stock[stockFrames - 1].height) < .001f);
     step();
     NATIVE_DESTROY(&fire.actor, &play);
 }
@@ -572,30 +579,31 @@ static void stockRangeTorchPuzzle(void) {
     step();
     REQUIRE(attacks == 0 && torchSwitch == -1);
     release();
-    for (int frame = 0; frame < CW_DINS_NATIVE_FIRE_TICKS; ++frame) {
-        if (frame > 0)
+    /* The final collision can be read on expiry. MM then activates the switch
+     * and finishes lighting the last torch on its next two updates. */
+    for (int frame = 0; frame <= CW_DINS_NATIVE_FIRE_TICKS + 2; ++frame) {
+        for (int i = 0; i < ARRAY_COUNT(torches); ++i) {
+            ObjSyokudai_Update(&torches[i].actor, &play);
+        }
+        if (frame > 0 && frame <= CW_DINS_NATIVE_FIRE_TICKS)
             step();
+        if (frame >= CW_DINS_NATIVE_FIRE_TICKS)
+            continue;
+
         REQUIRE(lastAttack == &fire.collider.base && lastAttack->atFlags == (AT_ON | AT_TYPE_PLAYER));
         for (int i = 0; i < ARRAY_COUNT(torches); ++i) {
-            ObjSyokudai* torch = &torches[i];
-            ObjSyokudai_Update(&torch->actor, &play);
-            Collider* flame = &TORCH_FLAME(*torch).base;
+            Collider* flame = &TORCH_FLAME(torches[i]).base;
             REQUIRE(flame->acFlags == (AC_ON | AC_TYPE_PLAYER));
             CollisionCheck_AC_CylVsCyl(&play, &play.colChkCtx, lastAttack, flame);
         }
-        if (frame == 56)
+        if (frame == CW_DINS_NATIVE_FADE_START_FRAME)
             REQUIRE(torchSwitch == -1 && torchIgnitions == 1);
-        /* Only the sweep should reach the final torch. Allow one native
-         * update to read the AC hit and an additional MM cutscene update. */
-        if (frame == 71)
-            REQUIRE(torchSwitch == torchFlag && torchIgnitions == groupSize);
     }
+    REQUIRE(torchSwitch == torchFlag && torchIgnitions == groupSize);
     for (int i = 0; i < groupSize; ++i)
         REQUIRE(TORCH_TIMER(torches[i]) != 0);
     for (int i = groupSize; i < ARRAY_COUNT(torches); ++i)
         REQUIRE(TORCH_TIMER(torches[i]) == 0);
-    REQUIRE(torchIgnitions == groupSize);
-    step();
     NATIVE_DESTROY(&fire.actor, &play);
 }
 static void cancellationsAndFallback(void) {
@@ -754,7 +762,7 @@ int main(void) {
     audioOwnershipAndLegacy();
     puts("PASS native Din actor: release, 138-update anchored fire, six usable seconds, original damage falloff, late "
          "stick/arrow ignition, magic/light cleanup, cancellation and legacy guards");
-    puts("PASS native Din torch puzzle: stock attack reach and native grouped switch activation");
+    puts("PASS native Din torch puzzle: fade-timed stock sweep and native grouped switch activation");
     puts("PASS native Din audio routing: authored contact/release, anchored age publication, generation-qualified "
          "kill/direct destroy, unchanged stock release and stick ignition");
     return 0;
