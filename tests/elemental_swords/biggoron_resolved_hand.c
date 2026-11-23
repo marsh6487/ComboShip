@@ -8,6 +8,8 @@
 #ifdef BIGGORON_TEST_MM
 #include "mods/nei_oot_compat.h"
 #include "objects/object_link_child/object_link_child.h"
+#else
+#include "mods/pak_loader/pak_loader.h"
 #endif
 
 #define REQUIRE(check)                                                  \
@@ -58,6 +60,9 @@ void* HarpoonSkinSync_ResolvePlayerLimbDL(const char* path) {
 }
 void* CustomForms_ResolveVanillaResource(const char* path) {
     return NULL;
+}
+Gfx* PakLoader_GetSeasonalDLOverride(const char* path) {
+    return NULL; // No seasonal outfit is active in the native resource fixture.
 }
 #endif
 #include "biggoron_native_production.inc"

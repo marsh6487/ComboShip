@@ -28,6 +28,8 @@ void CollisionCheck_ApplyDamage(PlayState *, CollisionCheckContext *,
                                 Collider *, ColliderInfo *);
 #endif
 #ifdef SWORD_FINISH_SOUL_GATE
+#include "soh/Enhancements/randomizer/SoulShuffleRuntime.h"
+
 // Configuration is a service seam; eligibility, native actor mapping and saved
 // ownership reads execute the production C++ gate and actual C flag getter.
 static u8 soulOptions[RSK_MAX];
