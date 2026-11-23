@@ -17,6 +17,7 @@ static struct {
     u8 comboBPressed, comboBufferTimer;
     SkelAnime formSkelAnime;
     LinkAnimationHeader *idleAnim, *fishSwim, *waterRoll, *gerudoPowerJumpMid, *fallAnim, *jumpKick, *cutterAttack;
+    LinkAnimationHeader *jumpKickEnd, *ztargetIdleR;
     u8 meleeActive, jumpKickActive, punchTrailActive, wallRecoilActive, zoraJumpTrailActive;
     u8 zoraSwimTrailActive[2], punchTrailActiveR;
     s32 zoraSwimTrailIndex[2], punchTrailEffectIndex, punchTrailEffectIndexR;
@@ -107,8 +108,56 @@ void EffectBlure_AddVertex(EffectBlure* effect, Vec3f* tip, Vec3f* base) {
     effectIndices[effectCursor++] = (int)(effect - effects); ++vertices;
 }
 void EffectBlure_AddSpace(EffectBlure* effect) {}
+
+/* Keep the host's action handoff real. Stub its animation and input services. */
+static Input* sControlInput = &play.state.input[0];
+static s8 sActionHandlerList11[] = { 0 };
+static LinkAnimationHeader gPlayerAnim_link_swimer_swim_wait;
+static LinkAnimationHeader landingClip = {{13}, NULL}, targetIdleClip = {{8}, NULL};
+static s32 hostileLockOn;
+static s32 landingSounds;
+#define GET_PLAYER_ANIM(group, type) (&landingClip)
+#define SPEED_MODE_LINEAR 0.0f
+
+void Player_Action_8084D610(Player* p, PlayState* c);
+s32 Player_SetupAction(PlayState* c, Player* p, PlayerActionFunc action, s32 flags) {
+    p->actionFunc = action;
+    return 1;
+}
+void Player_AnimChangeLoopSlowMorph(PlayState* c, Player* p, LinkAnimationHeader* animation) {
+    p->skelAnime.animation = animation;
+}
+static s32 Player_IsTalking(PlayState* c) { return false; }
+static s32 Player_TryActionHandlerList(PlayState* c, Player* p, s8* handlers, s32 updateUpperBody) { return false; }
+static s32 func_8083D12C(PlayState* c, Player* p, Input* input) { return false; }
+static void func_80832CB0(PlayState* c, Player* p, LinkAnimationHeader* animation) {}
+static void func_8084B000(Player* p) {}
+static void func_8084B158(PlayState* c, Player* p, Input* in, f32 speed) {}
+static void GroundAction(Player* p, PlayState* c) {}
+static void func_8083A098(Player* p, LinkAnimationHeader* animation, PlayState* c) {
+    Player_SetupAction(c, p, GroundAction, 1);
+    p->skelAnime.animation = animation;
+}
+void Player_PlayLandingSfx(Player* p) { ++landingSounds; }
+s32 Player_GetMovementSpeedAndYaw(Player* p, f32* speed, s16* yaw, f32 mode, PlayState* c) {
+    *speed = 5.0f;
+    *yaw = p->actor.shape.rot.y;
+    return true;
+}
+s32 Player_CheckHostileLockOn(Player* p) { return hostileLockOn; }
+s32 Player_IsZTargetingWithHostileUpdate(Player* p) { return hostileLockOn; }
+static void func_8084D574(PlayState* c, Player* p, s16 yaw) {}
+static void func_8084D5CC(PlayState* c, Player* p) {}
+static void func_8084D980(PlayState* c, Player* p, f32* speed, s16* yaw) {}
+static void func_8084AEEC(Player* p, f32* speed, f32 target, s16 yaw) { *speed = target; }
+static void func_8084D530(Player* p, f32* speed, f32 target, s16 yaw) { *speed = target; }
+u8 TransformMasks_IsTransformed(void) { return gFormState.state == MMFORM_STATE_ACTIVE; }
+MmPlayerTransformation MmForm_GetCurrentForm(void) { return gFormState.currentForm; }
+
 #include "native_melee.inc"
+#include "native_swim.inc"
 #include "zora_actions.inc"
+#include "jump_slash_animations.inc"
 
 static void reset(void) {
     memset(&gFormState, 0, sizeof(gFormState)); memset(&player, 0, sizeof(player));
@@ -130,6 +179,12 @@ int main(int argc, char** argv) {
         assert(recordedSpeed == 1 && recordedMorph == 0);
         MmForm_SetAction(MMFORM_ACT_JUMP_KICK, &play, &clip, 1, ANIMMODE_ONCE);
         assert(fabsf(recordedSpeed - 2.0f/3.0f) < .00001f && recordedMorph == 0);
+        gFormState.jumpKickEnd = &landingClip;
+        MmForm_SetAction(GORON_ACT_LAND, &play, &landingClip, 1, ANIMMODE_ONCE);
+        assert(fabsf(recordedSpeed - 2.0f/3.0f) < .00001f && recordedMorph == 0 &&
+               "Zora's landing must match the host clock without blending the flip back in");
+        MmForm_SetAction(GORON_ACT_LAND, &play, &clip, 1, ANIMMODE_ONCE);
+        assert(recordedSpeed == 1 && recordedMorph == -8);
         gFormState.currentForm = MM_PLAYER_FORM_GORON;
         MmForm_SetAction(GORON_ACT_PUNCH_A, &play, &clip, 1, ANIMMODE_ONCE);
         assert(fabsf(recordedSpeed - 2.0f/3.0f) < .00001f && recordedMorph == 0 &&
@@ -157,6 +212,52 @@ int main(int argc, char** argv) {
         MmForm_UpdateMelee(&player, &play);
 #endif
         assert(gFormState.meleeActive && "actual jump action must enable the missing leg collision path");
+    } else if (!strcmp(argv[1], "bottom-walk")) {
+        hostileLockOn = 1;
+        player.stateFlags1 = PLAYER_STATE1_IN_WATER;
+        player.actionFunc = Player_Action_8084DAB4;
+        player.currentBoots = PLAYER_BOOTS_KOKIRI;
+        player.actionFunc(&player, &play);
+        assert(player.actionFunc == Player_Action_8084DAB4 && player.linearVelocity > 0.0f);
+
+        // B equips heavy boots during targeted swimming.
+        player.currentBoots = PLAYER_BOOTS_IRON;
+        player.actor.bgCheckFlags = BGCHECKFLAG_WATER;
+        player.actor.yDistToWater = 108.0f;
+        player.actionFunc(&player, &play);
+        assert(player.actionFunc == Player_Action_8084D610 && "targeted swim must release to the sinking action");
+        player.actionFunc(&player, &play);
+        assert(player.actionFunc == Player_Action_8084D610 && player.linearVelocity == 0.0f);
+
+        // The room 3 floor is 261 units below the mod's water surface.
+        player.actor.bgCheckFlags |= BGCHECKFLAG_GROUND;
+        player.actor.yDistToWater = 261.0f;
+        player.actionFunc(&player, &play);
+        assert(player.actionFunc == GroundAction && player.skelAnime.animation == &landingClip);
+        assert(landingSounds == 1 && player.currentBoots == PLAYER_BOOTS_IRON);
+
+        gFormState.state = 0;
+        player.actionFunc = Player_Action_8084DAB4;
+        player.actionFunc(&player, &play);
+        assert(player.actionFunc == Player_Action_8084DAB4 && player.linearVelocity > 0.0f);
+    } else if (!strcmp(argv[1], "jump-landing-clip")) {
+        gFormState.jumpKick = &clip;
+        gFormState.jumpKickEnd = &landingClip;
+        assert(MmForm_GetJumpSlashAnim(PLAYER_MWA_FLIPSLASH_START) == &clip);
+        assert(MmForm_GetJumpSlashAnim(PLAYER_MWA_JUMPSLASH_FINISH) == &landingClip);
+        gFormState.jumpKickEnd = NULL;
+        assert(MmForm_GetJumpSlashAnim(PLAYER_MWA_FLIPSLASH_FINISH) == NULL && "missing landing must use the host fallback");
+    } else if (!strcmp(argv[1], "jump-recovery")) {
+        gFormState.jumpKick = &clip;
+        gFormState.jumpKickEnd = &landingClip;
+        gFormState.ztargetIdleR = &targetIdleClip;
+        player.meleeWeaponAnimation = PLAYER_MWA_JUMPSLASH_FINISH;
+        assert(RunJumpSlashRecoveryHook(&player, &fish) == gFormState.idleAnim && "recovery must not replay the landing");
+        hostileLockOn = 1;
+        player.meleeWeaponAnimation = PLAYER_MWA_FLIPSLASH_FINISH;
+        assert(RunJumpSlashRecoveryHook(&player, &fish) == &targetIdleClip);
+        gFormState.state = 0;
+        assert(RunJumpSlashRecoveryHook(&player, &fish) == &fish);
     }
 #ifdef ZORA_COLLISION_FIX
     else if (!strcmp(argv[1], "melee")) {
