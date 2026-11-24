@@ -22,7 +22,10 @@ prefix='#include "mods/extended_inventory.h"\n'+prefix
 for name in ['Player_GetItemOnButton', 'Player_Dpad_GetItemOnButton']:
  function = production_function(prefix, name)
  prefix = prefix.replace(function, '')
-prefix=prefix.replace('void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){}','static void Seasons_Stow(PlayState*,Player*);\nvoid CustomItems_PutAwayHeldItems(Player* p,PlayState* play){Seasons_Stow(play,p);}')
+# Route the shared fixture's native put-away call through the Rod's cleanup.
+prefix=prefix.replace(production_function(prefix,'CustomItems_PutAwayHeldItems'),
+                      'static void Seasons_Stow(PlayState*,Player*);\n'
+                      'void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){Seasons_Stow(play,p);}',1)
 prefix=prefix.replace('void Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;p->heldItemAction=p->itemAction=action;p->modelGroup=p->nextModelGroup;}','void Player_InitItemAction(PlayState*,Player*,PlayerItemAction);\nvoid Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;Player_InitItemAction(play,p,action);}')
 prefix=prefix.replace('void Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;}','s32 Player_UpperAction_ChangeHeldItem(Player*,PlayState*);\nvoid Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;p->upperActionFunc=Player_UpperAction_ChangeHeldItem;}')
 prefix+=r'''
