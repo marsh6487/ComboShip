@@ -81,16 +81,13 @@ s32 ExtButton_EquipItem(PlayState* play, s32 btn, u16 item, u8 slot) {
     const bool neiItem = item >= 0x80 || item == ITEM_MM_LETTER_KAFEI || item == ITEM_MM_SPECIAL_DELIVERY ||
                          (item == ITEM_LENS && Picto_IsOwned() && Picto_IsOnLensActive()) ||
                          (item == ITEM_BOMB && PowerKeg_IsOwned() && PowerKeg_IsOnBombActive());
-    // Adding a D-pad shortcut preserves C bindings. Moving back to C below
-    // consumes existing copies of this exact item across both button banks.
-    if (neiItem && btn >= 4) {
-        ExtButton_WriteEquip(btn, item, slot);
-        return true;
-    }
+    // A D-pad shortcut can coexist with a C binding. Moving it within the
+    // D-pad consumes the old direction; moving to C searches both banks.
+    const s32 firstSource = neiItem && btn >= 4 ? 4 : 1;
     const u16 displaced = ExtButton_GetItem(btn);
     const u8 displacedSlot = gSaveContext.equips.cButtonSlots[btn - 1];
     bool moved = displaced == item;
-    for (s32 other = 1; other < (s32)ARRAY_COUNT(gSaveContext.equips.buttonItems); ++other) {
+    for (s32 other = firstSource; other < (s32)ARRAY_COUNT(gSaveContext.equips.buttonItems); ++other) {
         if (other == btn) {
             continue;
         }

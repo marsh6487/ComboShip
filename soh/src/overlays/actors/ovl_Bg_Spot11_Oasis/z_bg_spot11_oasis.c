@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_spot11_oasis.h"
+#include "mods/season_water_scroll.h"
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "objects/object_spot11_obj/object_spot11_obj.h"
 
@@ -155,8 +156,8 @@ void BgSpot11Oasis_Draw(Actor* thisx, PlayState* play) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 127 - (gameplayFrames % 128), (gameplayFrames * 1) % 128, 32,
-                                  32, 1, gameplayFrames % 128, (gameplayFrames * 1) % 128, 32, 32, -1, 1, 1, 1));
+               Gfx_TwoTexWaterScroll(play, 0, 127 - (gameplayFrames % 128), (gameplayFrames * 1) % 128, 32, 32, 1,
+                                     gameplayFrames % 128, (gameplayFrames * 1) % 128, 32, 32, -1, 1, 1, 1));
     gSPDisplayList(POLY_XLU_DISP++, gDesertColossusOasisDL);
     CLOSE_DISPS(play->state.gfxCtx);
 }

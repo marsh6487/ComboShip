@@ -31,6 +31,7 @@ struct CustomCosmeticBinding {
     size_t commandIndex = 0;
     bool isPrimColor = true;
     uint8_t defaultA = 255;
+    uint8_t editedA = 255;
     uint8_t primM = 0;
     uint8_t primL = 0;
 };
@@ -223,8 +224,8 @@ static void RefreshCustomCosmeticOption(CustomCosmeticEntry& entry) {
                                       COSMETICS_GROUP_MAX, entry.option.defaultColor, false, true, false);
 }
 
-static Color_RGBA8 GetCustomCosmeticColor(const CustomCosmeticEntry& entry) {
-    if (CVarGetInteger(entry.option.changedCvar, 0)) {
+static Color_RGBA8 GetCustomCosmeticColor(const CustomCosmeticEntry& entry, bool changed) {
+    if (changed) {
         return CVarGetColor(entry.option.valuesCvar, entry.option.defaultColor);
     }
 
@@ -324,7 +325,8 @@ bool IsCustomKafeiModelActive() {
 
 void ApplyDynamicCosmetics() {
     for (const auto& entry : customCosmeticEntries) {
-        Color_RGBA8 color = GetCustomCosmeticColor(entry);
+        const bool changed = CVarGetInteger(entry.option.changedCvar, 0) != 0;
+        const Color_RGBA8 color = GetCustomCosmeticColor(entry, changed);
 
         for (const auto& binding : entry.bindings) {
             if (binding.material == nullptr || binding.commandIndex >= binding.material->Instructions.size()) {
@@ -333,7 +335,8 @@ void ApplyDynamicCosmetics() {
 
             if (binding.isPrimColor) {
                 binding.material->Instructions[binding.commandIndex] =
-                    gsDPSetPrimColor(binding.primM, binding.primL, color.r, color.g, color.b, binding.defaultA);
+                    gsDPSetPrimColor(binding.primM, binding.primL, color.r, color.g, color.b,
+                                     changed ? binding.editedA : binding.defaultA);
             } else {
                 binding.material->Instructions[binding.commandIndex] =
                     gsDPSetEnvColor(color.r, color.g, color.b, binding.defaultA);
@@ -553,6 +556,9 @@ void ScanDynamicCosmetics() {
             binding.commandIndex = commandIndex;
             binding.isPrimColor = isPrimColor;
             binding.defaultA = static_cast<uint8_t>(child->IntAttribute("A"));
+            const int editedA = child->IntAttribute("CosmeticAlphaWhenChanged", binding.defaultA);
+            binding.editedA =
+                isPrimColor && editedA >= 0 && editedA <= 255 ? static_cast<uint8_t>(editedA) : binding.defaultA;
             binding.primM = static_cast<uint8_t>(child->IntAttribute("M"));
             binding.primL = static_cast<uint8_t>(child->IntAttribute("L"));
             customCosmeticEntries[entryIndex].bindings.push_back(std::move(binding));

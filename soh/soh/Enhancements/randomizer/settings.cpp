@@ -2349,7 +2349,6 @@ void Settings::CreateOptions() {
                                   &mOptions[RSK_SHUFFLE_SCARECROWS_SONG],
                                   &mOptions[RSK_SHUFFLE_GERUDO_MEMBERSHIP_CARD],
                                   &mOptions[RSK_SHUFFLE_MASKS],
-                                  &mOptions[RSK_SHUFFLE_RITO_MASK],
                                   &mOptions[RSK_FISHSANITY],
                                   &mOptions[RSK_FISHSANITY_POND_COUNT],
                                   &mOptions[RSK_FISHSANITY_AGE_SPLIT],

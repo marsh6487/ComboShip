@@ -824,7 +824,9 @@ const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*a
     // standalone weapon pack. Neither path uses the player fist/body DL.
     if (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && available(fire))
         return fire;
-    return available(selected) ? selected : nullptr;
+    if (!available(selected) || (item.effect == Kind::BiggoronSword && ResourceMgr_IsLegacyZssLongswordGi()))
+        return nullptr;
+    return selected;
 }
 
 bool HasRedesignGiMod(const Presentation& item) {

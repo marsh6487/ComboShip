@@ -9,7 +9,9 @@
 #include <fast/resource/type/DisplayList.h>
 #include <libultraship/bridge/resourcebridge.h>
 #include <ship/Context.h>
+#include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include <stb_image.h>
 
 #include "ResourceManagerHelpers.h"
@@ -36,8 +38,6 @@ extern "C" {
 #include "ComboExport.h"
 // ComboShip: audio loads pinned to OOT's own RM — the audio thread races active-RM swaps
 // (ResourceManagerScope) made on other threads.
-#include <ship/resource/CrossRMRegistry.h>
-#include <ship/resource/ResourceManagerScope.h>
 #define COMBO_OWN_RM() (Ship::CrossRMRegistry::GetOrActive("oot"))
 #else
 #define COMBO_OWN_RM() (Ship::Context::GetRawInstance()->GetResourceManager())
@@ -315,6 +315,19 @@ extern "C" uint8_t ResourceMgr_FileAltExists(const char* filePath) {
     }
 
     return ExtensionCache.contains(path);
+}
+
+extern "C" const char* ResourceMgr_ResolveMmHudLabel(const char* mmPath, const char* localPath) {
+    const char* key = localPath + sizeof("__OTR__") - 1;
+    // The resident 2Ship manager owns both the stock texture and the enabled
+    // 2Ship mods. Fast3D applies that manager's normal Alternate Assets policy.
+    if (const auto mm = Ship::CrossRMRegistry::Get("mm"); mm && mm->GetArchiveManager()->HasFile(key)) {
+        return mmPath;
+    }
+
+    // OoT can also run with a companion mm.o2r and no resident 2Ship engine.
+    const auto local = Ship::CrossRMRegistry::GetOrActive("oot");
+    return local && local->GetArchiveManager()->HasFile(key) ? localPath : nullptr;
 }
 
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() {
@@ -1067,6 +1080,20 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* pa
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
     return NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,
                                                   CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_IsLegacyZssLongswordGi(void) {
+#ifdef COMBO_BUILD
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+#else
+    const auto owner = COMBO_OWN_RM();
+#endif
+    if (!owner)
+        return 0;
+    Ship::ResourceManagerScope scope(owner);
+    const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(
+        owner->LoadResource("alt/objects/object_custom_equip/gCustomLongswordDL"));
+    return model && DinSwordGi::IsLegacyZssLongsword(model->Instructions.data(), model->Instructions.size());
 }
 
 extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* const* paths, int count, float scale,

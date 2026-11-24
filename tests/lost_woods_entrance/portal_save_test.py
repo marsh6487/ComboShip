@@ -39,7 +39,9 @@ source = r'''
 #include "global.h"
 #include "BenJsonConversions.hpp"
 #include "ComboGameMode.h"
+#include "Enhancements/Saving/BetterSaveMenu.h"
 #include "Enhancements/Saving/SavingEnhancements.h"
+#include "CustomMessage/CustomMessage.h"
 extern "C" {
 int gComboGameMode = COMBO_GAME_BOTH;
 char gGitCommitHash[] = "portal-save-fixture";
@@ -53,19 +55,26 @@ int gComboOwlBlobSlot = -1;
 static nlohmann::json disk;
 static int writes, failures;
 static int flashWrites, flushes;
-static bool rememberLocation, autosaveEnabled, canSave = true;
+static bool rememberLocation, autosaveEnabled, betterSaveEnabled, canSave = true;
 s32 gFlashOwlSaveStartPages[] = {1, 129, 2, 130, 3, 131};
 s32 gFlashOwlSaveNumPages[] = {1, 1, 1, 1, 1, 1};
 extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
     if (std::strcmp(key, "gEnhancements.Saving.RememberSaveLocation") == 0) return rememberLocation;
     if (std::strcmp(key, "gEnhancements.Saving.Autosave") == 0) return autosaveEnabled;
+    if (std::strcmp(key, "gEnhancements.Saving.BetterSaveMenu") == 0) return betterSaveEnabled;
     return fallback;
 }
 extern "C" bool SavingEnhancements_CanSave() { return canSave; }
 extern "C" void SavingEnhancements_AdvancePlaytime() {}
 extern "C" void Combo_MM_FlushAccumulators() { ++flushes; }
-extern "C" void Sram_SetFlashPagesOwlSave(SramContext*, s32, s32) { std::abort(); }
-extern "C" void Sram_StartWriteToFlashOwlSave(SramContext*) { std::abort(); }
+extern "C" void Sram_SetFlashPagesOwlSave(SramContext* sram, s32 page, s32 count) {
+    sram->curPage = page;
+    sram->numPages = count;
+}
+extern "C" void Sram_StartWriteToFlashOwlSave(SramContext* sram) {
+    SysFlashrom_WriteDataSync(sram->saveBuf, sram->curPage, sram->numPages);
+    sram->status = 7;
+}
 extern "C" void SysFlashrom_WriteDataSync(void* buffer, u32 page, u32 count) {
     if (page != (flashWrites == 0 ? 2U : 130U) || count != 1U) std::abort();
     SaveContext snapshot{};
@@ -87,6 +96,35 @@ static void SaveManager_WriteSaveFile(const std::filesystem::path&,nlohmann::jso
 static int SaveManager_LoadFailedForCombo(int code) { ++failures; return code; }
 static void require(bool value,const char* message) {
     if (!value) { std::fprintf(stderr,"FAIL: %s\n",message); std::exit(1); }
+}
+
+static std::string prompt;
+void CustomMessage::SetActiveCustomMessage(std::string text, Entry) { prompt = text; }
+extern "C" {
+s32 gHorseIsMounted;
+u32 gBitFlags[32];
+SceneEntranceTableEntry sSceneEntranceTable[ENTR_SCENE_MAX]{};
+s32 gSceneEntranceTableCount = ENTR_SCENE_MAX;
+s32 Entrance_GetSceneIdAbsolute(u16 entrance) {
+    return sSceneEntranceTable[entrance >> 9].table[(entrance >> 4) & 0x1F][entrance & 0xF].sceneId;
+}
+void Message_StartTextbox(PlayState* play, u16 id, Actor*) {
+    play->msgCtx.currentTextId = id;
+    play->msgCtx.msgMode = MSGMODE_TEXT_DONE;
+    play->msgCtx.textboxEndType = prompt.ends_with('\xC3') ? TEXTBOX_ENDTYPE_THREE_CHOICE : TEXTBOX_ENDTYPE_TWO_CHOICE;
+}
+void Message_CloseTextbox(PlayState* play) {
+    play->msgCtx.msgMode = MSGMODE_TEXT_CLOSING;
+    play->msgCtx.textboxEndType = TEXTBOX_ENDTYPE_DEFAULT;
+}
+u8 Message_GetState(MessageContext* ctx) {
+    return ctx->msgMode == MSGMODE_TEXT_DONE ? TEXT_STATE_CHOICE : TEXT_STATE_NONE;
+}
+bool Message_ShouldAdvance(PlayState* play) { return CONTROLLER1(&play->state)->press.button & BTN_A; }
+void Interface_SetAButtonDoAction(PlayState*, u16) {}
+void Audio_PlaySfx(u16) {}
+void Audio_PlaySfx_MessageDecide() {}
+void AudioOcarina_SetInstrument(u8) {}
 }
 '''
 source += re.search(r'const uint32_t CURRENT_SAVE_VERSION = \d+;', production).group(0) + '\n'
@@ -110,7 +148,7 @@ source += function(saving, 'extern "C" void SavingEnhancements_PersistSaveEntran
 source += function(saving, 'extern "C" void SavingEnhancements_ClearSaveEntranceInfo(')
 arrival = 'COND_HOOK(OnSceneInit, true, [](s8 sceneId, s8)'
 source += 'void ObserveScene(s8 sceneId)' + function(saving, arrival).split(arrival, 1)[1]
-source += function(autosave, 'static void WriteAutosave(')
+source += function(saving, 'extern "C" void SavingEnhancements_WriteOwlSnapshot(')
 source += function(autosave, 'extern "C" void SavingEnhancements_AutosaveOnReset(')
 source += r'''
 template<class Function> void SavePortalSession(Function save) {
@@ -120,6 +158,102 @@ template<class Function> void SavePortalSession(Function save) {
 template<class Function> void SaveWithoutPortalSession(Function save) {
     if constexpr (std::is_invocable_v<Function,bool>) save(false);
     else save();
+}
+static void CheckBetterSave(PlayState& play, int selected, bool validEntrance) {
+    gSaveContext = {};
+    play = {};
+    betterSaveEnabled = true;
+    rememberLocation = true;
+    canSave = true;
+    flashWrites = 0;
+    gSaveContext.fileNum = 1;
+    gSaveContext.save.day = 3;
+    gSaveContext.save.time = 0xABCD;
+    gSaveContext.save.saveInfo.playerData.rupees = 84;
+    std::memcpy(gSaveContext.save.saveInfo.playerData.newf, "ZELDA3", 6);
+    gSaveContext.respawn[RESPAWN_MODE_RETURN].entrance = ENTRANCE(TERMINA_FIELD, 0);
+
+    static EntranceTableEntry spawn[] = { { SCENE_00KEIKOKU, 6, 0 } };
+    static EntranceTableEntry* entrances[7] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, spawn };
+    sSceneEntranceTable[ENTR_SCENE_TERMINA_FIELD].tableCount = ARRAY_COUNT(entrances);
+    sSceneEntranceTable[ENTR_SCENE_TERMINA_FIELD].table = entrances;
+    const s32 entrance = ENTRANCE(TERMINA_FIELD, 6);
+    gSaveContext.save.entrance = validEntrance ? entrance + 3 : ENTRANCE(TERMINA_FIELD, 7);
+    entranceToSave = gSaveContext.save.entrance;
+    play.sceneId = SCENE_00KEIKOKU;
+    play.actorCtx.sceneFlags.chest = 0x91;
+    static Player player{};
+    static Actor horse{};
+    player.rideActor = &horse;
+    horse.world.pos = { 11, 22, 33 };
+    horse.shape.rot.y = 42;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    gHorseIsMounted = true;
+    gBitFlags[QUEST_SONG_EPONA] = 1U << QUEST_SONG_EPONA;
+    SET_QUEST_ITEM(QUEST_SONG_EPONA);
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    static u8 buffer[SAVE_BUFFER_SIZE];
+    play.sramCtx.saveBuf = buffer;
+    auto& press = CONTROLLER1(&play.state)->press.button;
+
+    press = BTN_B;
+    betterSaveEnabled = false;
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_INACTIVE, "disabled menu must leave pause handling alone");
+    betterSaveEnabled = true;
+    play.sramCtx.status = 7;
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_INACTIVE, "must wait for an existing save");
+    play.sramCtx.status = 0;
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_HANDLED && prompt.ends_with('\xC2'),
+            "B opens a two-choice save prompt");
+    press = BTN_A;
+    if (selected < 0) {
+        play.msgCtx.choiceIndex = 1;
+        require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_CLOSE_PAUSE && flashWrites == 0,
+                "No closes the prompt without writing");
+        return;
+    }
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_HANDLED && flashWrites == 1,
+            "Yes writes one current-cycle owl snapshot");
+    const auto saved = disk.at("owlSave").get<SaveContext>();
+    require(saved.save.day == 3 && saved.save.time == 0xABCD && saved.save.saveInfo.playerData.rupees == 84 &&
+            saved.save.shipSaveInfo.pauseSaveEntrance == entranceToSave &&
+            saved.save.saveInfo.permanentSceneFlags[SCENE_00KEIKOKU].chest == 0x91,
+            "Better Save records the clock, inventory, scene flags, and normal resume entrance");
+    require(!gSaveContext.save.isOwlSave &&
+            BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_HANDLED &&
+            play.pauseCtx.savePromptState == PAUSE_SAVEPROMPT_STATE_BETTER_SAVING && flashWrites == 1,
+            "the second prompt waits until the save and first textbox finish");
+    press = 0;
+    play.sramCtx.status = 0;
+    play.msgCtx.msgMode = MSGMODE_NONE;
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_HANDLED &&
+            prompt.ends_with(validEntrance ? '\xC3' : '\xC2'),
+            "the destination prompt includes exactly the usable choices");
+    press = BTN_A;
+    play.msgCtx.choiceIndex = selected;
+    require(BetterSaveMenu_Update(&play) == MM_BETTER_SAVE_CLOSE_PAUSE && play.transitionTrigger == TRANS_TRIGGER_OFF,
+            "the destination waits for native pause cleanup before starting a fade");
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    BetterSaveMenu_OnUnpause(&play);
+    if (selected == 0) {
+        require(play.transitionTrigger == TRANS_TRIGGER_OFF && !BetterSaveMenu_ConsumeDirectTransition(&play),
+                "Continue must leave the running scene alone");
+        require(gHorseIsMounted, "continuing keeps Epona mounted");
+    } else {
+        const s32 expected = validEntrance && selected == 1 ? entrance : ENTRANCE(SOUTH_CLOCK_TOWN, 0);
+        require(play.nextEntrance == expected && play.transitionTrigger == TRANS_TRIGGER_START &&
+                play.transitionType == TRANS_TYPE_FADE_BLACK && gSaveContext.respawnFlag == 0 &&
+                gSaveContext.nextCutsceneIndex == 0xFFEF && gSaveContext.gameMode == GAMEMODE_NORMAL &&
+                gSaveContext.save.day == 3 && gSaveContext.save.time == 0xABCD &&
+                gSaveContext.save.saveInfo.playerData.rupees == 84 &&
+                gSaveContext.respawn[RESPAWN_MODE_RETURN].entrance == ENTRANCE(TERMINA_FIELD, 0),
+                "return uses the resolved spawn or Clock Town and keeps the live cycle and grotto exit");
+        require(BetterSaveMenu_ConsumeDirectTransition(&play) && !BetterSaveMenu_ConsumeDirectTransition(&play),
+                "only the requested return bypasses entrance shuffle");
+        const auto& parked = gSaveContext.save.saveInfo.horseData;
+        require(!gHorseIsMounted && parked.sceneId == play.sceneId && parked.pos.y == 22 && parked.yaw == 42,
+                "travel leaves Epona parked in the original scene");
+    }
 }
 static void CheckResetSave(PlayState& play, int mode) {
     gComboGameMode=mode;
@@ -264,12 +398,15 @@ int main() {
     CheckResetSave(play, COMBO_GAME_BOTH);
     CheckResetSave(play, COMBO_GAME_MM);
     std::puts("PASS MM portal and reset saves: slots, native checkpoints, complete progress and safe write guards");
+    for (int choice : {-1, 0, 1, 2}) CheckBetterSave(play, choice, true);
+    CheckBetterSave(play, 1, false);
+    std::puts("PASS MM Better Save Menu: cancel, one owl save, wait, continue, scene return and Clock Town");
 }
 '''
 
 with tempfile.TemporaryDirectory(prefix='portal-save-') as directory:
     cpp=Path(directory)/'test.cpp'; binary=Path(directory)/'test'; cpp.write_text(source)
-    includes=['.','mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo']
+    includes=['.','mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','libultraship/include','combo','combo/menu']
     command=[os.environ.get('CXX','c++'),'-std=c++20','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2',
              '-DFMT_HEADER_ONLY','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
              *['-I'+str(ROOT/path) for path in includes]]
@@ -278,6 +415,7 @@ with tempfile.TemporaryDirectory(prefix='portal-save-') as directory:
     # The real SaveContext JSON converters serialize and validate Solo MM
     # entrance layouts; link their production codec instead of replacing it.
     result=subprocess.run([*command,str(cpp),str(ROOT/'mm/2s2h/Rando/SoloEntrances.cpp'),
+                           str(ROOT/'mm/2s2h/Enhancements/Saving/BetterSaveMenu.cpp'),
                            '-o',str(binary)],capture_output=True,text=True)
     if result.returncode: raise SystemExit(result.stderr[:6500])
     subprocess.run([str(binary)],check=True,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))

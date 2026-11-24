@@ -5,6 +5,7 @@
  */
 
 #include "z_bg_spot06_objects.h"
+#include "mods/season_water_scroll.h"
 #include "objects/object_spot06_objects/object_spot06_objects.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 
@@ -451,11 +452,11 @@ void BgSpot06Objects_DrawLakeHyliaWater(BgSpot06Objects* this, PlayState* play) 
     gameplayFrames = play->state.frames;
 
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, -gameplayFrames, gameplayFrames, 32, 32, 1, gameplayFrames,
-                                  gameplayFrames, 32, 32, -1, 1, 1, 1));
+               Gfx_TwoTexWaterScroll(play, 0, -gameplayFrames, gameplayFrames, 32, 32, 1, gameplayFrames,
+                                     gameplayFrames, 32, 32, -1, 1, 1, 1));
     gSPSegment(POLY_XLU_DISP++, 0x09,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, -gameplayFrames, gameplayFrames * 6, 32, 32, 1, gameplayFrames,
-                                  gameplayFrames * 6, 32, 32, -1, 6, 1, 6));
+               Gfx_TwoTexWaterScroll(play, 0, -gameplayFrames, gameplayFrames * 6, 32, 32, 1, gameplayFrames,
+                                     gameplayFrames * 6, 32, 32, -1, 6, 1, 6));
 
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 128);
 

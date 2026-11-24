@@ -14,7 +14,7 @@ static const char ALIGN_ASSET(2) sMedallionFire2Tex[] = "__OTR__custom/medallion
 // Struct (merged from z_magic_fire.h)
 // ============================================================
 
-struct MagicFire;
+enum { SW97_FIRE_LIMB_COUNT = 4 };
 
 typedef struct MagicFire {
     /* 0x0000 */ Actor actor;
@@ -25,6 +25,7 @@ typedef struct MagicFire {
     /*        */ s16 actionTimer;
     /*        */ SkelAnimeCurve skelCurve;
     /*        */ Vec3f colliderScale;
+    LimbTransform transforms[SW97_FIRE_LIMB_COUNT];
 } MagicFire;
 
 // Runtime actor ID (assigned by ActorDB in sw97_init.cpp)
@@ -447,7 +448,8 @@ static SkelCurveLimb sLimb1 = { 0xFF, 0x02, { NULL, sDList1 } };
 static SkelCurveLimb sLimb2 = { 0xFF, 0x03, { NULL, sDList2 } };
 static SkelCurveLimb sLimb3 = { 0xFF, 0xFF, { NULL, sDList3 } };
 static SkelCurveLimb* sLimbs[] = { &sLimb0, &sLimb1, &sLimb2, &sLimb3 };
-static SkelCurveLimbList sLimbList = { sLimbs, 0x04 };
+static SkelCurveLimbList sLimbList = { sLimbs, ARRAY_COUNT(sLimbs) };
+_Static_assert(ARRAY_COUNT(sLimbs) == SW97_FIRE_LIMB_COUNT, "Fire spell transforms must cover every limb");
 
 // ============================================================
 // Actor functions
@@ -466,17 +468,15 @@ void MagicFire_Init(Actor* thisx, PlayState* play) {
     this->actor.room = -1;
 
     this->colliderScale.x = this->colliderScale.y = this->colliderScale.z = 0.0f;
-    SkelCurve_Init(play, &this->skelCurve, &sLimbList, &sTransformUpdIdx);
+    this->skelCurve.limbCount = sLimbList.limbCount;
+    this->skelCurve.limbList = sLimbList.limbs;
+    this->skelCurve.transforms = this->transforms;
     SkelCurve_SetAnim(&this->skelCurve, &sTransformUpdIdx, 0.0f, 10000.0f, 25.0f, 1.0f);
     this->alphaMultiplier = 1.0f;
 }
 
 void MagicFire_Destroy(Actor* thisx, PlayState* play) {
-    MagicFire* this = THIS;
-
     func_800876C8(play);
-
-    SkelCurve_Destroy(play, &this->skelCurve);
 }
 
 void MagicFire_UpdateBeforeCast(Actor* thisx, PlayState* play) {

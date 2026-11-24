@@ -284,7 +284,7 @@ struct PlayState { int sceneNum{},sceneId{}; Player player; ActorContext actorCt
 #define GET_PLAYER(play) (&(play)->player)
 using Gfx=int;
 struct LightInfo { int radius=100; bool glow=true; };
-struct EnElf { Actor actor; u32 fairyFlags{}; void* elfMsg{};
+struct EnElf { Actor actor; u32 fairyFlags{}; void* elfMsg{}; Actor* naviAudioTarget{};
  void (*actionFunc)(EnElf*,PlayState*){}; int timer{};
  LightInfo lightInfoGlow,lightInfoNoGlow; };
 static int normalUpdates,bodyDraws,attentionDraws,actionCalls,blinks,idleCalls,searches,talkQueues;
@@ -335,7 +335,7 @@ int main() {
 #endif
    bodyDraws=attentionDraws=normalUpdates=actionCalls=blinks=idleCalls=searches=0;
    fairy.lightInfoGlow={100,true}; fairy.lightInfoNoGlow={100,false};
-   fairy.fairyFlags=0x30; fairy.elfMsg=&keeper;
+   fairy.fairyFlags=0x30; fairy.elfMsg=&keeper; fairy.naviAudioTarget=&keeper;
    fairy.actor.flags=ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
    play.player.naviTextId=play.player.tatlTextId=-1; play.player.stateFlags2=1;
    UPDATE(&fairy.actor,&play); EnElf_Draw(&fairy.actor,&play);
@@ -346,6 +346,7 @@ int main() {
            "hidden companion retained separately rendered halo or illumination");
      check(play.player.naviTextId==0 || play.player.tatlTextId==0,"shop companion text did not clear");
      check(play.player.stateFlags2==0 && fairy.elfMsg==nullptr,"stale companion prompt survived");
+     if(HOST==COMBO_GAME_MM) check(fairy.naviAudioTarget==nullptr,"stale Navi audio target survived");
    } else check(normalUpdates==1 && actionCalls==1,"ordinary scene/fairy update did not pass through");
    ATTENTION_DRAW;
    check(attentionDraws==(quiet?0:1),"shop attention arrow/reticle still reached rendering");

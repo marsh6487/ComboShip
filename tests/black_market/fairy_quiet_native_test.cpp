@@ -5,7 +5,7 @@
 #ifdef FAIRY_QUIET_OOT
 #include "soh/Enhancements/audio/MidnaAudio.h"
 #else
-#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/NaviAudio.h"
 #endif
 #if __has_include("BlackMarketFairy.h")
 #include "BlackMarketFairy.h"
@@ -67,7 +67,10 @@ GameInfo *gGameInfo = &info;
 #define EnElf_PlayTatlSound(...) ((void)0)
 #define QuestHint_GetTatlTextId(...) 0
 #define Actor_TalkOfferAccepted(...) false
-#define MMMidnaAudio_TryPlay(...) true
+extern "C" bool MMCompanionAudio_TryPlay(MMMidnaAudioEvent event) {
+  assert(event == MM_MIDNA_AUDIO_TALK);
+  return true;
+}
 #define MMMidnaAudio_UpdateIdle(...) ((void)0)
 #define Audio_PlaySfx_AtPosWithReverb(...) ((void)0)
 #define func_8088FE64 nullptr

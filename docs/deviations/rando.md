@@ -1616,6 +1616,19 @@ safeguard: loading an existing seed preserves its exact items, entrances, Clock 
 The change adds no authored-bridge or Song of Time reset edge to the solver. The production fill
 regression lives in `tests/cross_dungeon/clock_return_test.cpp`.
 
+### Routes credited during Combo generation
+
+- With logic enabled, both native reachability searches are required. Generation reports an error
+  if either search is unavailable. The compatibility fill is reserved for an explicit OoT No Logic preset.
+- The search starts with the seed's chosen game, inventory, time, and entrance layout. It uses the
+  seed's settings and enabled tricks. The Happy Mask Shop opens MM's overworld when reachable. A
+  shuffled entrance grants access to its destination and the exits reachable from there under native rules.
+- The Magic Mirror, the authored cross-game bridges, and a Song of Time reset from a foreign dungeon
+  are outside the progression proof. With Mirror shuffle enabled, the Combo Lost Woods stump holds
+  a bonus reward and the Mirror can appear in the normal item pool.
+- When OoT starts locked at night, the search uses that same night start. If progression needs the
+  Happy Mask Shop, the Clock has to be obtainable through the routes in logic before the shop opens.
+
 ### Clock pickup tutorial in either game (2026-11-12)
 
 The passive OoT Clock has a shared English, German and French pickup tutorial in

@@ -3008,19 +3008,42 @@ void func_80086D5C(s32* buf, u16 size) {
     }
 }
 
-void Interface_LoadActionLabel(InterfaceContext* interfaceCtx, u16 action, s16 loadOffset) {
-    static void* sDoActionTextures[] = { gAttackDoActionENGTex, gCheckDoActionENGTex };
-    if ((action >= DO_ACTION_MAX) && (action != DO_ACTION_EXPLODE)) {
-        action = DO_ACTION_NONE;
+static const char* Interface_GetMmActionLabel(u16 action) {
+    // The English textures are also the ones 2Ship uses for these actions in
+    // every language. Preserve the original resource keys for texture packs.
+#define MM_ACTION_LABEL(id, label)                                                                       \
+    case id: {                                                                                           \
+        static const ALIGN_ASSET(2) char local[] = "__OTR__do_action_static/gDoAction" #label "ENGTex";  \
+        static const ALIGN_ASSET(2) char mm[] = "__OTR__@mm:do_action_static/gDoAction" #label "ENGTex"; \
+        return ResourceMgr_ResolveMmHudLabel(mm, local);                                                 \
     }
+    switch (action) {
+        MM_ACTION_LABEL(DO_ACTION_EXPLODE, Explode)
+        MM_ACTION_LABEL(DO_ACTION_MM_CURL, Curl)
+        MM_ACTION_LABEL(DO_ACTION_MM_PUNCH, Punch)
+        MM_ACTION_LABEL(DO_ACTION_MM_POUND, Pound)
+        MM_ACTION_LABEL(DO_ACTION_MM_SWIM, Swim)
+        MM_ACTION_LABEL(DO_ACTION_MM_DIVE, Dive)
+        MM_ACTION_LABEL(DO_ACTION_MM_SURFACE, Surface)
+        MM_ACTION_LABEL(DO_ACTION_MM_ATTACK, Attack)
+        MM_ACTION_LABEL(DO_ACTION_MM_SHOOT, Shoot)
+        MM_ACTION_LABEL(DO_ACTION_MM_MARCH, March)
+        MM_ACTION_LABEL(DO_ACTION_MM_DANCE, Dance)
+        default:
+            return NULL;
+    }
+#undef MM_ACTION_LABEL
+}
 
-    // The MM pack already supplies the same 48x16 IA4 action texture used by OoT.
-    // It has only an English asset, so do not synthesize missing locale paths.
-    char* doAction =
-        action == DO_ACTION_EXPLODE ? "__OTR__do_action_static/gDoActionExplodeENGTex" : actionsTbl[action];
-
+void Interface_LoadActionLabel(InterfaceContext* interfaceCtx, u16 action, s16 loadOffset) {
+    const char* doAction;
     static char newName[4][512];
-    if ((action != DO_ACTION_EXPLODE) && (gSaveContext.language != LANGUAGE_ENG)) {
+    if (action >= DO_ACTION_MAX) {
+        doAction = Interface_GetMmActionLabel(action);
+    } else {
+        doAction = action == DO_ACTION_NONE ? NULL : actionsTbl[action];
+    }
+    if (action < DO_ACTION_MAX && doAction != NULL && gSaveContext.language != LANGUAGE_ENG) {
         size_t length = strlen(doAction);
         strcpy(newName[loadOffset], doAction);
         if (gSaveContext.language == LANGUAGE_FRA) {
@@ -3039,8 +3062,7 @@ void Interface_LoadActionLabel(InterfaceContext* interfaceCtx, u16 action, s16 l
         doAction = newName[loadOffset];
     }
 
-    char* segment = interfaceCtx->doActionSegment[loadOffset];
-    interfaceCtx->doActionSegment[loadOffset] = action != DO_ACTION_NONE ? doAction : gEmptyTexture;
+    interfaceCtx->doActionSegment[loadOffset] = (char*)(doAction != NULL ? doAction : gEmptyTexture);
     gSegments[7] = interfaceCtx->doActionSegment[loadOffset];
 }
 
@@ -5935,6 +5957,21 @@ extern void GerudoHud_DrawImGui(void);
 // Dual Cane (Somaria / Pacci) skill wheel — soh/Enhancements/CaneWheelHud.cpp.
 extern void CaneWheelHud_DrawImGui(void);
 
+static const char* Interface_GetPlayerBActionLabel(PlayState* play, Player* player) {
+    if (player == NULL || gSaveContext.buttonStatus[0] == BTN_DISABLED ||
+        (player->stateFlags1 & (PLAYER_STATE1_TALKING | PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS)) ||
+        play->pauseCtx.state != 0 || play->pauseCtx.debugState != 0 || play->msgCtx.msgMode != MSGMODE_NONE ||
+        play->transitionMode != TRANS_MODE_OFF || Player_InBlockingCsMode(play, player)) {
+        return NULL;
+    }
+
+    DoAction action = MmForm_GetBButtonDoAction(player);
+    if (action == DO_ACTION_NONE && !TransformMasks_IsTransformedAny()) {
+        action = MmMaskWear_GetBButtonDoAction(play, player);
+    }
+    return Interface_GetMmActionLabel(action);
+}
+
 void Interface_Draw(PlayState* play) {
     static s16 magicArrowEffectsR[] = { 255, 100, 255 };
     static s16 magicArrowEffectsG[] = { 0, 100, 255 };
@@ -6334,9 +6371,13 @@ void Interface_Draw(PlayState* play) {
         gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
         gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
 
-        // Keep the native B prompt's priority without touching A's transition textures.
-        s32 blastMaskB = !interfaceCtx->unk_1FA && MmMaskWear_CanUseBlastB(play, player);
-        if (!interfaceCtx->unk_1FA && !blastMaskB) {
+        bool bButtonHasAmmo = (player != NULL && PLAYER_ON_REAL_HORSE(player)) || (play->shootingGalleryStatus > 1) ||
+                              (play->sceneNum == SCENE_BOMBCHU_BOWLING_ALLEY && Flags_GetSwitch(play, 0x38));
+        // The interface and minigames own B before the player's form or mask.
+        const char* playerBAction = !interfaceCtx->unk_1FA && !bButtonHasAmmo && interfaceCtx->bAlpha != 0
+                                        ? Interface_GetPlayerBActionLabel(play, player)
+                                        : NULL;
+        if (!interfaceCtx->unk_1FA && playerBAction == NULL) {
             // B Button Icon & Ammo Count
             if (gSaveContext.equips.buttonItems[0] != ITEM_NONE) {
                 if (fullUi && !TransformMasks_IsTransformed()) {
@@ -6344,8 +6385,7 @@ void Interface_Draw(PlayState* play) {
                                                   PikaMode_ButtonIcon(0, ExtInv_GetItemIcon(ExtButton_GetItem(0))), 0);
                 }
 
-                if (PLAYER_ON_REAL_HORSE(player) || (play->shootingGalleryStatus > 1) ||
-                    ((play->sceneNum == SCENE_BOMBCHU_BOWLING_ALLEY) && Flags_GetSwitch(play, 0x38))) {
+                if (bButtonHasAmmo) {
 
                     if (!fullUi && !TransformMasks_IsTransformed()) {
                         Interface_DrawItemIconTexture(
@@ -6415,10 +6455,9 @@ void Interface_Draw(PlayState* play) {
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
 
             gDPLoadTextureBlock_4b(
-                OVERLAY_DISP++,
-                blastMaskB ? "__OTR__do_action_static/gDoActionExplodeENGTex" : interfaceCtx->doActionSegment[1],
-                G_IM_FMT_IA, DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(), 0, G_TX_NOMIRROR | G_TX_WRAP,
-                G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+                OVERLAY_DISP++, playerBAction != NULL ? playerBAction : interfaceCtx->doActionSegment[1], G_IM_FMT_IA,
+                DO_ACTION_TEX_WIDTH(), DO_ACTION_TEX_HEIGHT(), 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP,
+                G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
 
             R_B_LABEL_DD = (1 << 10) / (WREG(37 + languageOffset) / 100.0f);
             gSPWideTextureRectangle(OVERLAY_DISP++, BbtnPosX << 2, BbtnPosY << 2,

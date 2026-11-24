@@ -30,7 +30,7 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 #include "interface/week_static/week_static.h"
 #include "misc/title_static/title_static.h"
 #include "BenPort.h"
-#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/NaviAudio.h"
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include <string.h>
 #include "2s2h/BenGui/HudEditor.h"
@@ -5318,12 +5318,12 @@ void Interface_SetTatlCall(PlayState* play, u16 tatlCallState) {
         (play->csCtx.state == CS_STATE_IDLE)) {
         if (GameInteractor_Should(VB_PLAY_TATL_CALL_AUDIO, true)) {
             if (tatlCallState == TATL_STATE_2B) {
-                if (!isCompanion || !MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_CALL)) {
+                if (!isCompanion || !MMCompanionAudio_TryPlay(MM_MIDNA_AUDIO_CALL)) {
                     Audio_PlaySfx(NA_SE_VO_NAVY_CALL);
                 }
             }
             if (tatlCallState == TATL_STATE_2A) {
-                if (!isCompanion || !MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_HINT)) {
+                if (!isCompanion || !MMCompanionAudio_TryPlay(MM_MIDNA_AUDIO_HINT)) {
                     Audio_PlaySfx_AtPosWithReverb(&gSfxDefaultPos, NA_SE_VO_NA_HELLO_2, 0x20);
                 }
             }

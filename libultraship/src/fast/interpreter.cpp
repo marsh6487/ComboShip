@@ -999,49 +999,52 @@ void Interpreter::ImportTextureIA4(int tile, bool importReplacement) {
 }
 
 void Interpreter::ImportTextureIA8(int tile, bool importReplacement) {
-    const RawTexMetadata* metadata = &mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata;
+    const auto& tileState = mRdp->texture_tile[tile];
+    const auto& loaded = mRdp->loaded_texture[tileState.tmem_index];
+    const RawTexMetadata* metadata = &loaded.raw_tex_metadata;
     const uint8_t* addr =
         importReplacement && (metadata->resource != nullptr)
             ? mMaskedTextures.find(GetBaseTexturePath(metadata->resource->GetInitData()->Path))->second.replacementData
-            : mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].addr;
+            : loaded.addr;
 
     if (addr == nullptr) {
         SPDLOG_ERROR("ImportTextureIA8: null texture address for tile {}", tile);
         return;
     }
 
-    uint32_t sizeBytes = mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].size_bytes;
-    uint32_t fullImageLineSizeBytes =
-        mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].full_image_line_size_bytes;
-    uint32_t lineSizeBytes = mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].line_size_bytes;
+    uint32_t sizeBytes = loaded.size_bytes;
+    uint32_t fullImageLineSizeBytes = loaded.full_image_line_size_bytes;
 
-    uint32_t width = GetEffectiveLineSize(lineSizeBytes, fullImageLineSizeBytes, sizeBytes,
-                                          mRdp->texture_tile[tile].line_size_bytes);
+    uint32_t width = GetEffectiveLineSize(loaded.line_size_bytes, fullImageLineSizeBytes, sizeBytes,
+                                          tileState.line_size_bytes);
     uint32_t height = width > 0 ? sizeBytes / width : 0;
 
     if (fullImageLineSizeBytes == sizeBytes) {
         fullImageLineSizeBytes = width;
     }
 
-    // Legacy HD quest icons have no scale fields. Keep the display list's logical
-    // tile and decode the full image when the archive supplies a packed IA8 replacement.
-    if (!importReplacement && metadata->resource && metadata->type == TextureType::GrayscaleAlpha8bpp) {
+    // Decode packed HD quest icons at their physical size, keeping the logical tile for UVs.
+    if (!importReplacement && metadata->resource && addr == metadata->resource->ImageData &&
+        metadata->type == TextureType::GrayscaleAlpha8bpp) {
         const auto init = metadata->resource->GetInitData();
-        if (init && init->ResourceVersion == 0) {
+        if (init) {
             const auto path = GetBaseTexturePath(init->Path);
-            const bool songNote = width == 16 && height == 24 && path == "textures/icon_item_static/gSongNoteTex";
+            const bool songNote = init->ResourceVersion == 0 && width == 16 && height == 24 &&
+                                  path == "textures/icon_item_static/gSongNoteTex";
             constexpr std::string_view heartPieces[] = {
                 "icon_item_static_yar/gItemIconHeartPiece1Tex", "textures/icon_item_static/gHeartPieceIcon1Tex",
                 "icon_item_static_yar/gItemIconHeartPiece2Tex", "textures/icon_item_static/gHeartPieceIcon2Tex",
                 "icon_item_static_yar/gItemIconHeartPiece3Tex", "textures/icon_item_static/gHeartPieceIcon3Tex",
             };
             const bool heartPiece =
-                width == 48 && height == 48 &&
+                tileState.line_size_bytes == 48 && loaded.orig_size_bytes == 48 * 48 &&
                 std::find(std::begin(heartPieces), std::end(heartPieces), path) != std::end(heartPieces);
             const uint32_t imageWidth = metadata->width;
             const uint32_t imageHeight = metadata->height;
-            if ((songNote || heartPiece) && imageWidth >= width && imageHeight >= height &&
-                (imageWidth > width || imageHeight > height)) {
+            const uint32_t logicalWidth = heartPiece ? 48 : width;
+            const uint32_t logicalHeight = heartPiece ? 48 : height;
+            if ((songNote || heartPiece) && imageWidth >= logicalWidth && imageHeight >= logicalHeight &&
+                (imageWidth > logicalWidth || imageHeight > logicalHeight)) {
                 const uint32_t maxSize = std::min(8192, mRapi->GetMaxTextureSize());
                 if (imageWidth <= maxSize && imageHeight <= maxSize &&
                     imageWidth * imageHeight == metadata->resource->GetPointerSize()) {

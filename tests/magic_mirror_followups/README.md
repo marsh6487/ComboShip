@@ -10,7 +10,8 @@ production helper call. Engine state and the external animation/audio/icon APIs
 are minimal fixtures; no game assets or window are required.
 
 Checks cover every distinct C/D source/target pair, empty/native/extended
-displacement, ordinary items moved onto Mirror, old duplicate cleanup, full
+displacement, Rod of Seasons relocation between all D-pad directions, ordinary
+items moved onto Mirror, old duplicate cleanup, full
 u16 IDs, unrelated sentinel slots, B/age/form preservation, and native-only
 equip ownership. Both player variants verify one existing chime at actual
 casting start, silence for rejected casts and cancelled put-away, no repetition
@@ -22,8 +23,9 @@ cannot expose the process task list. This is source/native-fixture evidence,
 not a full ComboShip build, Windows runtime test, audible quality assessment,
 or game acceptance.
 
-In game, equip Mirror from C-left to the other C buttons and D-pad over empty
-and occupied buttons, then cast outdoors after Yes. Expect one Mirror mapping,
-the normal displaced-item move, and one brief treasure-appearance chime when
-Farore's casting motion starts. Check No/B cancellation and an ineligible
-indoor cast remain silent. Existing scene/game/solo safety checks are unchanged.
+In game, move the Rod of Seasons or Mirror between D-pad directions over empty
+and occupied buttons. Expect one D-pad mapping for the moved item, a swap with
+an occupied target, and preservation of any separate C binding. Moving the
+item to C consumes its old mappings. Check that Mirror's accepted outdoor
+cast plays one brief treasure-appearance chime when Farore's casting motion
+starts, and that cancellation and ineligible casts remain silent.

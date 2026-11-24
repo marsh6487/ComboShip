@@ -33,6 +33,7 @@ def run(out, sanitize):
     header = ROOT / "soh/soh/Enhancements/Graphics/ZorasDomain.h"
     if header.exists():
         water += '#include "soh/Enhancements/Graphics/ZorasDomain.h"\n'
+    water += '#include "soh/Enhancements/audio/SeasonWeather.h"\n'
     water += 'extern "C" int zoraWaterLook;\n'
     water += '#define SEASON_WATER_GONE (-32000)\n#define SEASON_MAX_WATERBOXES 32\n'
     for name in ("sSuppressedHeader", "sWaterSurfaceBackup", "sSuppressedCount"):
@@ -41,7 +42,8 @@ def run(out, sanitize):
     water += '\nstatic void SeasonScene_SetWaterLook(u8 look) { zoraWaterLook = look; }\n'
     water += extract(scene, ["SeasonScene_Active", "SeasonScene_RestoreWaterBoxes",
                             "SeasonScene_SuppressWaterBoxes", "SeasonScene_WaterLook"])
-    water += 'extern "C" ' + production_function(source.replace('extern "C" ', ''), "SeasonScene_UpdateWater")
+    for name in ("SeasonScene_IsWaterScrollFrozen", "SeasonScene_UpdateWater"):
+        water += '\nextern "C" ' + production_function(source.replace('extern "C" ', ''), name)
     (out / "water.cpp").write_text(water)
 
     base = ["-O1", "-g", "-DNDEBUG", "-DF3DEX_GBI_2", "-DCONTROLLERBUTTONS_T=uint32_t",

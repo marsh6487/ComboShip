@@ -30,6 +30,12 @@ def player_functions(negative=False):
     body = use[:end] + "\n}\n}\n}\n"
     body += "\n".join(source[name] for name in
                       ("Player_PutAwayHeldItem", "Player_ActionHandler_Roll", "Player_InitItemAction"))
+    native_mitts = extract.functions((ROOT / path).read_text())
+    mitts = extract.functions((ROOT / "soh/mods/items/logic/item_mitts.c").read_text())
+    body += "\n" + "\n".join(native_mitts[name] for name in
+                          ("Player_IsEnteringMittsClimb", "Player_SetupWaitForPutAway"))
+    body += "\n" + "\n".join(mitts[name] for name in
+                          ("Mitts_Activate", "Mitts_Deactivate", "Mitts_OnEquip", "Mitts_IsAssigned", "Handle_MogmaMitts"))
     hud = source["Player_UpdateInterface"]
     start = hud.index("else if (((this->heldItemAction >= PLAYER_IA_SWORD_MASTER)") + len("else ")
     candidate = extract.block_from(hud, start)

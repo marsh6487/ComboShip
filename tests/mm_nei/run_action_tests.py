@@ -30,28 +30,30 @@ run('mitts_climb_entry', r'''
 #include "mods/items/logic/item_mitts.h"
 CustomItemState gCustomItemState{};u8 gMogmaMittsClimbActive=0,gMogmaMittsForceGauntlets=0;
 ItemEquipState sMittsEquipState{};s8 sMittsPrevInvinc=0;ItemInputState next{};
-bool magic=true;int consumed=0,stows=0,climbs=0,sounds=0;
+bool magic=true,mittsAssigned=true;int consumed=0,stows=0,climbs=0,sounds=0;
 void ItemInput_Update(ItemInputState* out,u8,Player*,PlayState*){*out=next;}
 u8 ItemInput_IsBlockedEx(Player*,PlayState*,u8){return 0;}
+u8 ItemEquip_GetItemOnSlot(u8 slot){return mittsAssigned&&slot==4?ITEM_MOGMA_MITTS:ITEM_NONE;}
 s32 ItemMagic_HasEnough(PlayState*,s16){return magic;}
 void ItemMagic_Consume(PlayState*,s16){++consumed;}
 void Audio_PlayActorSound2(Actor*,u16){++sounds;}
 void ItemEquip_PlayEquipSFXForAction(PlayState*,Player*,s32){}
 void ItemEquip_PlayUnequipSFXForAction(PlayState*,Player*,s32){}
 void Player_Action_WaitForPutAway(Player*,PlayState*);
-void func_80837C20(PlayState*,Player*){++climbs;}
+void func_80837C20(PlayState*,Player* p){++climbs;p->actionFunc=nullptr;}
 void func_80837BF8(PlayState*,Player*){}
 void OtherAction(PlayState*,Player*){}
 s32 Player_SetAction(PlayState*,Player* p,PlayerActionFunc f,s32){p->actionFunc=f;return true;}
 bool func_8083249C(Player*){return true;}
 s32 PlayerAnimation_Update(PlayState*,SkelAnime*){return 0;}
 s32 Player_UpdateUpperBody(Player*,PlayState*){return 0;}
-s32 CustomItems_HasStowableHeldItem(Player*){return mmActive;}
+static s32 Player_IsEnteringMittsClimb(const Player* p);
+s32 CustomItems_HasStowableHeldItem(Player* p){return mmActive&&!Player_IsEnteringMittsClimb(p);}
 void Player_UseItem(PlayState*,Player*,ItemId);
 ''', [body(equip, n) for n in ['ItemInput_CheckDamage', 'ItemEquip_Update']] +
-    [body(mitts, n) for n in ['Mitts_Activate', 'Mitts_Deactivate', 'Mitts_OnEquip', 'Mitts_OnUnequip', 'Handle_MogmaMitts']] +
-    ['void Player_UseItem(PlayState* play,Player* p,ItemId item){assert(item==ITEM_NONE);++stows;Mitts_OnUnequip(play,p);sMittsEquipState.isEquipped=0;p->heldItemAction=PLAYER_IA_NONE;}'] +
-    [body(player, n) for n in ['Player_PutAwayHeldItem', 'Player_SetupWaitForPutAwayWithCs', 'Player_SetupWaitForPutAway', 'Player_Action_WaitForPutAway']], r'''
+    [body(mitts, n) for n in ['Mitts_Activate', 'Mitts_Deactivate', 'Mitts_OnEquip', 'Mitts_OnUnequip', 'Mitts_IsAssigned', 'Handle_MogmaMitts']] +
+    ['void Player_UseItem(PlayState* play,Player* p,ItemId item){assert(item==ITEM_NONE);++stows;if(!Player_IsEnteringMittsClimb(p)){Mitts_OnUnequip(play,p);sMittsEquipState.isEquipped=0;}p->heldItemAction=PLAYER_IA_NONE;}'] +
+    [body(player, n) for n in ['Player_IsEnteringMittsClimb', 'Player_PutAwayHeldItem', 'Player_SetupWaitForPutAwayWithCs', 'Player_SetupWaitForPutAway', 'Player_Action_WaitForPutAway']], r'''
 Player p{};PlayState play{};p.heldItemAction=PLAYER_IA_MOGMA_MITTS;next.wasEquipped=next.isPressed=1;
 Handle_MogmaMitts(&p,&play);assert(mmActive&&gMogmaMittsClimbActive&&gMogmaMittsForceGauntlets);
 next.isPressed=0;
@@ -59,8 +61,12 @@ assert(!Player_SetupWaitForPutAway(&play,&p,func_80837C20));
 assert(!stows&&mmActive&&p.heldItemAction==PLAYER_IA_MOGMA_MITTS);
 p.stateFlags1|=PLAYER_STATE1_CLIMBING_LADDER;Player_Action_WaitForPutAway(&p,&play);
 assert(climbs==1&&mmActive);
+next.wasEquipped=0;
 for(int i=0;i<MITTS_DRAIN_INTERVAL;i++)Handle_MogmaMitts(&p,&play);
 assert(consumed==1&&mmActive&&gMogmaMittsClimbActive);
+next.wasEquipped=1;next.otherButtonPressed=1;Handle_MogmaMitts(&p,&play);
+assert(mmActive&&gMogmaMittsClimbActive);
+next.otherButtonPressed=0;
 magic=false;for(int i=0;i<MITTS_DRAIN_INTERVAL;i++)Handle_MogmaMitts(&p,&play);
 assert(!mmActive&&!gMogmaMittsClimbActive&&!gMogmaMittsForceGauntlets);
 next.isPressed=1;Handle_MogmaMitts(&p,&play);assert(!mmActive);
@@ -76,6 +82,14 @@ next.isPressed=0;p.invincibilityTimer=1;Handle_MogmaMitts(&p,&play);
 assert(!mmActive&&!gMogmaMittsClimbActive);
 p.heldItemAction=PLAYER_IA_MOGMA_MITTS;
 assert(Player_SetupWaitForPutAway(&play,&p,func_80837C20)&&stows==4); // inactive Mitts are ordinary held equipment
+p.invincibilityTimer=0;next.isPressed=0;Handle_MogmaMitts(&p,&play);
+p.heldItemAction=PLAYER_IA_NONE;next.isPressed=1;Handle_MogmaMitts(&p,&play);assert(mmActive);
+assert(!Player_SetupWaitForPutAway(&play,&p,func_80837C20)&&stows==4&&mmActive);
+p.heldItemAction=PLAYER_IA_SWORD_KOKIRI;
+assert(Player_SetupWaitForPutAway(&play,&p,func_80837C20)&&stows==5&&mmActive);
+assert(p.heldItemAction==PLAYER_IA_NONE);
+mittsAssigned=false;next.wasEquipped=next.isPressed=0;Handle_MogmaMitts(&p,&play);
+assert(!mmActive&&!gMogmaMittsClimbActive);
 ''')
 
 leaf = 'mm/mods/items/logic/item_dekuleaf.c'

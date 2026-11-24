@@ -3,6 +3,7 @@
 #include "variables.h"
 #include "macros.h"
 #include "din_fire_sword.h"
+#include "mods/broken_items/broken_items.h"
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "mods/nei_save.h"
@@ -43,6 +44,9 @@ int gComboVanillaMode = 0;
 NeiSaveData* Nei_Save() {
     static NeiSaveData state{};
     return &state;
+}
+s32 BrokenItems_Enabled(void) {
+    return false;
 }
 }
 PlayState* gPlayState;

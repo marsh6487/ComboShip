@@ -36,6 +36,7 @@ def main():
     bodies = "\n".join((
         function(wrapper, 'extern "C" void gDPSetTileSizeLerp('),
         function(wrapper, 'extern "C" void gSPSegment('),
+        function(rcp, "Gfx* Gfx_TwoTexScroll("),
         function(rcp, "Gfx* Gfx_TwoTexScrollEx("),
         function(scene, "void func_8009EE44("),
     ))
@@ -48,6 +49,7 @@ def main():
     ))
     fixture = r'''
 #include "global.h"
+#include "mods/season_water_scroll.h"
 #include <array>
 #include <cassert>
 #include <cstdio>
@@ -63,6 +65,8 @@ def main():
 SaveContext gSaveContext{};
 extern "C" { u8 gItemSlots[56]{}; }
 static bool shuffleTrade, hasTradeFlag;
+static bool winterWater;
+extern "C" s32 SeasonScene_IsWaterScrollFrozen(const PlayState*) { return winterWater; }
 static int chickenCries;
 extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey key) {
     assert(key == RSK_SHUFFLE_ADULT_TRADE); return shuffleTrade;
@@ -80,8 +84,9 @@ extern "C" char* ResourceMgr_LoadIfDListByName(char*) { return nullptr; }
 static std::vector<Gfx> arena(256);
 static size_t used;
 extern "C" void* Graph_Alloc(GraphicsContext*, size_t bytes) {
-    assert(bytes == 12 * sizeof(Gfx) && used + 12 <= arena.size());
-    auto* result = arena.data() + used; used += 12; return result;
+    const size_t count = bytes / sizeof(Gfx);
+    assert((count == 5 || count == 12) && used + count <= arena.size());
+    auto* result = arena.data() + used; used += count; return result;
 }
 /* DRAW */
 using F3DGfx = Gfx;
@@ -101,11 +106,11 @@ static void Same(const Gfx* actual, const Gfx* expected, size_t count) {
         assert(actual[i].words.w1 == expected[i].words.w1);
     }
 }
-static void Bound(const Gfx& command, int segment, const Gfx* expected) {
+static void Bound(const Gfx& command, int segment, const Gfx* expected, size_t count = 12) {
     Gfx binding{};
     gSPSegment(&binding, segment, reinterpret_cast<uintptr_t>(expected));
     assert(command.words.w0 == binding.words.w0);
-    Same(reinterpret_cast<const Gfx*>(command.words.w1), expected, 12);
+    Same(reinterpret_cast<const Gfx*>(command.words.w1), expected, count);
 }
 int main() {
     GraphicsContext gfx{}; PlayState play{}; Player player{};
@@ -151,6 +156,19 @@ int main() {
         }
 #endif
     }
+    winterWater = true;
+    for (u32 frame : {51u, 109u}) {
+        Gfx opa[8]{}, xlu[8]{};
+        gfx.polyOpa.p=opa; gfx.polyXlu.p=xlu; used=0;
+        play.gameplayFrames=frame;
+        func_8009EE44(&play);
+        Bound(xlu[0],8,Gfx_TwoTexScrollEx(&gfx,0,frame%128,0,32,16,1,frame%128,0,32,16,1,0,1,0));
+        Bound(xlu[1],9,Gfx_TwoTexScroll(&gfx,0,0,0,32,32,1,0,0,32,32),5);
+#ifdef COMBO_BUILD
+        Bound(xlu[2],10,Gfx_TwoTexScrollEx(&gfx,0,0,frame%64,32,16,1,0,frame%64,32,16,0,1,0,1));
+#endif
+    }
+    winterWater = false;
     auto draw=[&] {
         static Gfx opa[8],xlu[8]; gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;used=0;func_8009EE44(&play);
     };

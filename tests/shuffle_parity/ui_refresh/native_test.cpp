@@ -100,8 +100,7 @@ int main() {
             {[] { return true; }, "UI pool candidate membership"};
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
-    // This is the actual custom MM card, with the actual CVarCheckbox/ImGui
-    // input and real pool generator. It is not a synthetic flat-menu control.
+    // The shared checkbox adds the item while the authored stump stays optional.
     for (int oot : {0, 1}) for (int mm : {0, 1}) {
         values[ComboRando::MagicMirrorSettings::OotCvar] = oot;
         values[ComboRando::MagicMirrorSettings::MmCvar] = mm;
@@ -110,7 +109,9 @@ int main() {
         const int beforeMirrorChecks = checksInPool, beforeMirrorItems = itemsInPool;
         Click(DrawMirror);
         REQUIRE(CVarGetInteger(ComboRando::MagicMirrorSettings::SharedCvar, -1) == 1);
-        REQUIRE(checksInPool == beforeMirrorChecks + 1 && itemsInPool == beforeMirrorItems + 1);
+        REQUIRE(checksInPool == beforeMirrorChecks && itemsInPool == beforeMirrorItems + 1);
+        REQUIRE(setOfItemsInPool.contains(RI_OOT_NEI_MAGIC_MIRROR));
+        REQUIRE(!setOfChecksInPool.contains(RC_LOST_WOODS_MAGIC_MIRROR_STUMP));
         REQUIRE(values[ComboRando::MagicMirrorSettings::OotCvar] == oot && values[ComboRando::MagicMirrorSettings::MmCvar] == mm);
         Click(DrawMirror);
         REQUIRE(CVarGetInteger(ComboRando::MagicMirrorSettings::SharedCvar, -1) == 0);

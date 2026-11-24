@@ -1,7 +1,7 @@
 /**
  * sm64_mario.c - libsm64 integration for Ship of Harkinian
  *
- * Loads sm64.dll DYNAMICALLY at runtime via LoadLibrary/GetProcAddress.
+ * Loads the libsm64 shared library at runtime.
  * Pure C, #included into z_player.c via the expansions section.
  */
 
@@ -101,10 +101,10 @@ u8 gIvanPossessActive = 0;
 
 // The names are libsm64's own Makefile output per platform, so a build of the fork drops in as is.
 #ifdef _WIN32
-#include <windows.h>
-#define SM64_LOAD_LIB(path) LoadLibraryA(path)
-#define SM64_GET_PROC(h, name) (void*)GetProcAddress((HMODULE)(h), name)
-#define SM64_FREE_LIB(h) FreeLibrary((HMODULE)(h))
+#include <SDL_loadso.h>
+#define SM64_LOAD_LIB(path) SDL_LoadObject(path)
+#define SM64_GET_PROC(h, name) SDL_LoadFunction((h), (name))
+#define SM64_FREE_LIB(h) SDL_UnloadObject(h)
 #define SM64_LIB_NAME "sm64.dll"
 #else
 #include <dlfcn.h>
@@ -203,7 +203,8 @@ static s32 Sm64_LoadDll(void) {
     libPath = Nei_FindCrossoverAsset(SM64_LIB_NAME);
     sDllHandle = SM64_LOAD_LIB(libPath != NULL ? libPath : SM64_LIB_NAME);
     if (!sDllHandle) {
-        lusprintf(__FILE__, __LINE__, 2, "[SM64] ERROR: Could not load %s\n", SM64_LIB_NAME);
+        lusprintf(__FILE__, __LINE__, 2, "[SM64] ERROR: Could not load %s\n",
+                  libPath != NULL ? libPath : SM64_LIB_NAME);
         return 0;
     }
 
@@ -437,7 +438,7 @@ static ColliderCylinderInit sSm64MetalColliderInit = {
 // =============================================================================
 
 static uint8_t* Sm64_LoadRomFile(const char* path, size_t* outSize) {
-    FILE* f = fopen(path, "rb");
+    FILE* f = Nei_OpenCrossoverFile(path);
     if (!f)
         return NULL;
 

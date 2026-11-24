@@ -510,6 +510,72 @@ static void BaseOnlyAltEnabledCase() {
     Check(copy[0].words.w1 == 0x78828c63, "null Alt owner cannot suppress the real base binding");
 }
 
+static void EditedAlphaCase() {
+    auto archive = ResetFixture();
+    const std::string basePath = "objects/seasonal_outfits/din/child/autumn/Materials/gLinkChildCosmeticHair";
+    const std::string altPath = "alt/" + basePath;
+    archive->files["CosmeticEntries"] = std::make_shared<Ship::File>(
+        "<Entries><Entry CosmeticEntry='Young Din Fall Hair' CosmeticType='Prim' MaterialPath='" + basePath +
+        "'/>"
+        "<Entry CosmeticEntry='Young Din Fall Hair' CosmeticType='Prim' MaterialPath='" +
+        altPath +
+        "'/>"
+        "<Entry CosmeticEntry='Young Din Fall Hair' CosmeticType='Env' MaterialPath='" +
+        basePath + "'/></Entries>");
+    const std::string xml =
+        "<DisplayList><SetPrimColor CosmeticEntry='Young Din Fall Hair' R='220' G='30' B='10' A='0' M='9' L='7' "
+        "CosmeticAlphaWhenChanged='255'/><SetPrimColor CosmeticEntry='Young Din Fall Hair' R='220' G='30' B='10' "
+        "A='42' CosmeticAlphaWhenChanged='256'/><SetEnvColor CosmeticEntry='Young Din Fall Hair' R='220' G='30' "
+        "B='10' A='83' CosmeticAlphaWhenChanged='255'/></DisplayList>";
+    const std::vector<Gfx> pristine = { gsDPSetPrimColor(9, 7, 220, 30, 10, 0), gsDPSetPrimColor(0, 0, 220, 30, 10, 42),
+                                        gsDPSetEnvColor(220, 30, 10, 83), gsSPEndDisplayList() };
+    const auto base = Material(archive, basePath, xml, pristine);
+    const auto alt = Material(archive, altPath, xml, pristine);
+    auto resourceManager = Ship::Context::GetRawInstance()->resources;
+    ScanCustomCosmetics();
+    Check(customCosmeticEntries.size() == 1, "Base and Alt overlay aliases share one picker");
+    auto entry = Entry("Young Din Fall Hair");
+    if (!entry) {
+        return;
+    }
+    CVarSetColor(entry->option.valuesCvar, { 0, 0, 0, 7 });
+    ApplyCustomCosmetics();
+    Check(base->Instructions[0].words.w1 == pristine[0].words.w1 &&
+              alt->Instructions[0].words.w1 == pristine[0].words.w1,
+          "an unused saved value keeps the default overlay transparent");
+
+    CVarSetInteger(entry->option.changedCvar, 1);
+    ApplyCustomCosmetics();
+    Check(base->Instructions[0].words.w0 == pristine[0].words.w0 && base->Instructions[0].words.w1 == 255 &&
+              alt->Instructions[0].words.w1 == 255,
+          "editing to black activates both aliases without borrowing picker alpha");
+    Check(base->Instructions[1].words.w1 == 42 && base->Instructions[2].words.w1 == 83,
+          "invalid edited alpha and environment commands retain material alpha");
+    auto copy = pristine;
+    ApplyCustomCosmeticsToDisplayListCopy(basePath.c_str(), copy.data(), copy.size());
+    Check(copy[0].words.w1 == 255, "base transient copy gets the edited alpha");
+
+    resourceManager->altAssets = true;
+    ScanCustomCosmetics();
+    copy = pristine;
+    ApplyCustomCosmeticsToDisplayListCopy(basePath.c_str(), copy.data(), copy.size());
+    Check(copy[0].words.w1 == 255, "Alt transient copy gets the edited alpha");
+
+    entry = Entry("Young Din Fall Hair");
+    if (!entry) {
+        Check(false, "Alt rescan preserves the overlay picker");
+        return;
+    }
+    ResetCustomCosmeticColor(*entry);
+    ApplyCustomCosmetics();
+    ApplyCustomCosmeticsToDisplayListCopy(basePath.c_str(), copy.data(), copy.size());
+    Check(alt->Instructions[0].words.w1 == pristine[0].words.w1 && copy[0].words.w1 == pristine[0].words.w1,
+          "reset restores transparent Alt overlay in cached materials and transient copies");
+    resourceManager->altAssets = false;
+    ScanCustomCosmetics();
+    Check(base->Instructions[0].words.w1 == pristine[0].words.w1, "return to Base keeps the overlay reset");
+}
+
 int main() {
     ScannerAndSceneCases();
     FormGroupingCases();
@@ -517,6 +583,7 @@ int main() {
     CustomDirectoryFormCases();
     AltOwnershipCase();
     BaseOnlyAltEnabledCase();
+    EditedAlphaCase();
     if (failures)
         return 1;
     std::cout

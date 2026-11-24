@@ -48,6 +48,7 @@ void* MmAssets_LoadFromOotArchive(const char* path, size_t* outSize);
 bool ResourceMgr_IsAltAssetsEnabled(void);
 uint8_t ResourceMgr_FileExists(const char* path);
 Gfx* ResourceMgr_LoadGfxByName(const char* path);
+int ResourceMgr_OTRSigCheck(char* path);
 // Loads a skeleton by name; with alt-assets on it resolves the "alt/" (mod) version first. Returns the
 // header or NULL (e.g. an un-indexed oot.o2r-only base with no mod present). See HarpoonDummyPlayer.
 SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
@@ -68,6 +69,7 @@ extern PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX];
 // The native override resolves running/NEI empty-hand states into these types.
 extern PlayerModelType sPlayerLeftHandType;
 extern PlayerModelType sPlayerRightHandType;
+extern s32 sPlayerLod;
 
 // NEI custom-item in-hand draw dispatcher (beetle, cane of somaria, ball&chain, ...). In the vanilla
 // path it runs AFTER the skeleton draw (which we skip via the early return), reading the world-space
@@ -108,6 +110,7 @@ void FrameInterpolation_RecordCloseChild(void);
 
 // OTR path helper (all adult DLs live under this object).
 #define ALB(sym) "__OTR__objects/object_link_boy/" sym
+#define ALC(sym) "__OTR__objects/object_link_child/" sym
 
 // Limb index -> near display list OTR path. NULL = control bone (no geometry) -> drawn invisible.
 static const char* sLimbNearDL[ADULT_LINK_LIMB_COUNT] = {
@@ -275,6 +278,16 @@ static Gfx* AdultLink_LoadModelDL(const char* otrPath) {
                    : NULL;
     }
     return AdultLink_LoadDL(otrPath);
+}
+
+static Gfx* AdultLink_SeasonalChildEquipment(Gfx* nativeDL) {
+    // A native hand may already be a resolved DL or a compound owned by
+    // another item renderer. Only its original canonical asset can opt in.
+    if (!sIsSeasonalRig || !nativeDL || ResourceMgr_OTRSigCheck(reinterpret_cast<char*>(nativeDL)) != 1)
+        return nullptr;
+    const char* path = reinterpret_cast<const char*>(nativeDL);
+    constexpr char prefix[] = ALC("");
+    return std::strncmp(path, prefix, sizeof(prefix) - 1) == 0 ? AdultLink_LoadModelDL(path) : nullptr;
 }
 
 // A form/mode change invalidates every cached model resource; the next draw re-runs the setup with the
@@ -515,14 +528,12 @@ static s32 AdultLink_Setup(void) {
     sDL_RHSlingshot = NULL;
 
     if (sIsChildRig) {
-        // Child rig: MM's own child equipment already fits, so the hand overrides stay off (NULL lets the
-        // vanilla override result stand while holding); only the back setup uses the form's child combos.
         sDL_LHOpen = NULL;
-        sDL_LHClosed = NULL;
+        sDL_LHClosed = sIsSeasonalRig ? AdultLink_LoadModelDL(ALC("gLinkHumanLeftHandClosedDL")) : nullptr;
         sDL_LHSword = NULL;
         sDL_LHBgs = NULL;
         sDL_RHOpen = NULL;
-        sDL_RHClosed = NULL;
+        sDL_RHClosed = sIsSeasonalRig ? AdultLink_LoadModelDL(ALC("gLinkHumanRightHandClosedDL")) : nullptr;
         sDL_RHShield = NULL;
         sDL_RHBow = NULL;
         sDL_RHOcarina = NULL;
@@ -646,8 +657,10 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
 
         case PLAYER_LIMB_LEFT_HAND:
             if (sIsChildRig) {
-                // Held items keep the vanilla MM-child DL (right scale); empty hands are the form's own.
-                if (p->leftHandType == PLAYER_MODELTYPE_LH_OPEN || p->leftHandType == PLAYER_MODELTYPE_LH_CLOSED) {
+                if (Gfx* gear = AdultLink_SeasonalChildEquipment(*dList)) {
+                    *dList = gear;
+                } else if (p->leftHandType == PLAYER_MODELTYPE_LH_OPEN ||
+                           p->leftHandType == PLAYER_MODELTYPE_LH_CLOSED) {
                     *dList = skelDL;
                 }
                 break;
@@ -658,7 +671,9 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 if (!sIsMod)
                     DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_MASTER);
             } else if (sPlayerLeftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD && p->heldItemId == ITEM_SWORD_BGS &&
-                       !WeaponUpgrade_HasGreatFairy() && sDL_LHBgs != NULL) {
+                       (!WeaponUpgrade_HasGreatFairy() ||
+                        (sIsSeasonalRig && !CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1))) &&
+                       sDL_LHBgs != NULL) {
                 *dList = sDL_LHBgs;
                 if (!sIsMod)
                     DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_BGS);
@@ -669,8 +684,16 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 *dList = sDL_LHClosed;
             } else if (sPlayerLeftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
                        sPlayerLeftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD) {
-                // Keep the native exact equipped/NEI choice as fallback. The
-                // shared resolver below composes that sword with this rig's fist.
+                // The native GFS list is a child combined hand. A seasonal
+                // archive can supply the two-handed grip in adult scale.
+                if (sIsSeasonalRig && sPlayerLeftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD &&
+                    ((p->heldItemId == ITEM_SWORD_GREAT_FAIRY && p->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) ||
+                     (p->heldItemId == ITEM_SWORD_BGS && p->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED &&
+                      WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)))) {
+                    if (Gfx* greatFairy = AdultLink_LoadModelDL(ALC("gLinkHumanLeftHandHoldingGreatFairysSwordDL"))) {
+                        *dList = greatFairy;
+                    }
+                }
             } else {
                 *dList = skelDL; // open / bottle / mod hand -> the skeleton's own hand
             }
@@ -678,7 +701,15 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
 
         case PLAYER_LIMB_RIGHT_HAND:
             if (sIsChildRig) {
-                if (p->rightHandType == PLAYER_MODELTYPE_RH_OPEN || p->rightHandType == PLAYER_MODELTYPE_RH_CLOSED) {
+                Gfx* gear =
+                    sIsSeasonalRig && *dList != nullptr && p->heldItemAction == PLAYER_IA_SLINGSHOT
+                        ? AdultLink_LoadModelDL(sPlayerLod == 0 ? ALC("gLinkChildRightHandHoldingSlingshotNearDL")
+                                                                : ALC("gLinkChildRightHandHoldingSlingshotFarDL"))
+                        : AdultLink_SeasonalChildEquipment(*dList);
+                if (gear != nullptr) {
+                    *dList = gear;
+                } else if (p->rightHandType == PLAYER_MODELTYPE_RH_OPEN ||
+                           p->rightHandType == PLAYER_MODELTYPE_RH_CLOSED) {
                     *dList = skelDL;
                 }
                 break;
@@ -766,10 +797,10 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             *dList = dinHand;
     }
     AdultLink_ApplyNeiHeldHand(play, p, limbIndex, dList,
-                               sIsChildRig ? skelDL
-                                           : (limbIndex == PLAYER_LIMB_LEFT_HAND
-                                                  ? (sDL_LHClosed != NULL ? sDL_LHClosed : skelDL)
-                                                  : (sDL_RHClosed != NULL ? sDL_RHClosed : skelDL)));
+                               sIsChildRig && !sIsSeasonalRig ? skelDL
+                                                              : (limbIndex == PLAYER_LIMB_LEFT_HAND
+                                                                     ? (sDL_LHClosed != NULL ? sDL_LHClosed : skelDL)
+                                                                     : (sDL_RHClosed != NULL ? sDL_RHClosed : skelDL)));
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return ret;
 }
@@ -783,8 +814,22 @@ static s32 AdultLink_OverrideFirstPerson(PlayState* play, s32 limbIndex, Gfx** d
     // limbs after the native FP visibility decision.
     s32 ret = Player_OverrideLimbDrawGameplayFirstPerson(play, limbIndex, dList, pos, rot, actor);
     AdultLink_ApplyRootTransform(limbIndex, pos);
-    if (sIsChildRig || p->unk_AA5 != PLAYER_UNKAA5_3)
+    if (p->unk_AA5 != PLAYER_UNKAA5_3)
         return ret;
+    if (sIsChildRig) {
+        if (sIsSeasonalRig && *dList != nullptr) {
+            // Slingshot has already been loaded by the native callback;
+            // left arm/hand and bow/hookshot still carry their native paths.
+            Gfx* gear = limbIndex == PLAYER_LIMB_RIGHT_HAND && p->heldItemAction == PLAYER_IA_SLINGSHOT
+                            ? AdultLink_LoadModelDL(ALC("gLinkChildRightArmStretchedSlingshotDL"))
+                            : AdultLink_SeasonalChildEquipment(*dList);
+            if (gear != nullptr)
+                *dList = gear;
+            if (limbIndex == PLAYER_LIMB_RIGHT_HAND)
+                AdultLink_ApplyNeiHeldHand(play, p, limbIndex, dList, sDL_RHClosed);
+        }
+        return ret;
+    }
     Gfx* weaponDL = sDL_FPBow;
     if (Player_IsHoldingHookshot(p))
         weaponDL = sDL_FPHookshot;
@@ -931,9 +976,12 @@ extern "C" s32 AdultLink_ShouldHide(void) {
     PakLoader_FrameBegin();
     const char* selectedOutfit = PakLoader_GetSeasonalSkeletonPath();
     static std::string lastOutfit;
+    static bool lastSeasonalAlt = false;
     const std::string outfit = selectedOutfit ? selectedOutfit : "";
-    if (outfit != lastOutfit) {
+    const bool seasonalAlt = selectedOutfit != nullptr && ResourceMgr_IsAltAssetsEnabled();
+    if (outfit != lastOutfit || seasonalAlt != lastSeasonalAlt) {
         lastOutfit = outfit;
+        lastSeasonalAlt = seasonalAlt;
         AdultLink_OnFormChanged();
     }
     // The menu's Force Form combobox changes the active form without going through CustomForms_Toggle.

@@ -42,6 +42,14 @@ s32 Player_SetupAction(PlayState* state, Player* p, PlayerActionFunc action, s32
 LinkAnimationHeader* Player_GetIdleAnim(Player* p) {
     return (LinkAnimationHeader*)gPlayerAnim_link_normal_wait;
 }
+static s32 Player_IsEnteringMittsClimb(const Player* p) {
+    return false;
+}
+
+s32 CustomItems_HasStowableHeldItem(Player* p) {
+    return false;
+}
+
 s32 Player_PutAwayHeldItem(PlayState* state, Player* p) {
     return false;
 }

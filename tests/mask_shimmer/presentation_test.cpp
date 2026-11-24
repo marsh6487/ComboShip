@@ -48,6 +48,8 @@ static std::vector<std::string> paths;
 #ifdef HOST_MM
 // Archive ownership boundary for the extracted native MM GI dispatcher.
 static std::string legacyModPath;
+static bool blueLocal, blueOwner, blueCompanion;
+extern "C" const char* NeiResource_Route(const char* path);
 #endif
 
 extern "C" {
@@ -72,6 +74,10 @@ void gSPDisplayList(Gfx* p, Gfx* dl) {
     __gSPDisplayList(p, dl);
 }
 Gfx* ResourceMgr_LoadGfxByName(const char* path) {
+#ifdef HOST_MM
+    if (blueLocal && strstr(path, "objects/object_gi_fire/"))
+        return (Gfx*)(strstr(path, "Chamberstick") ? "local-stick" : "local-flame");
+#endif
     if (strstr(path, "gEffSparklesDL")) ++resourceLoads;
     return missingSparkle && strstr(path, "gEffSparklesDL") ? nullptr : &resource;
 }
@@ -220,12 +226,31 @@ void DrawCustomItemDiamondByPath(PlayState*, const char* path, Gfx**, u8*, float
 #endif
 /* PRODUCTION_SEASON_DRAWS */
 /* PRODUCTION_NEI_NATIVE_DISPATCH */
+static int blueScrollCalls;
 #ifndef HOST_MM
 struct ComboForeignDrawInfo { const char* dls[2]; };
-static int restoredBlueSegments, blueScrollCalls;
+static int restoredBlueSegments;
 void OOT_RestoreForeignSegs(PlayState*, const int32_t* segs, int32_t count) {
     assert(count==1 && segs[0]==8); ++restoredBlueSegments;
 }
+#else
+Gfx gEmptyDL[1];
+extern "C" int ResourceMgr_IsModAsset(const char* path) {
+    return blueLocal && strstr(path, "objects/object_gi_fire/");
+}
+extern "C" int NeiResource_Available(const char* path) {
+    assert(strstr(path, "objects/object_gi_fire/"));
+    return blueOwner;
+}
+extern "C" const char* NeiResource_Route(const char* path) {
+    assert(blueOwner && strstr(path, "objects/object_gi_fire/"));
+    return strstr(path, "Chamberstick") ? "__OTR__@oot:stick" : "__OTR__@oot:flame";
+}
+void* OotAssets_LoadGfxDirect(const char* path) {
+    assert(strstr(path, "objects/object_gi_fire/"));
+    return blueCompanion ? (void*)(strstr(path, "Chamberstick") ? "companion-stick" : "companion-flame") : nullptr;
+}
+#endif
 extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*, s32 tile1, u32 x1, u32 y1,
     s32 w1, s32 h1, s32 tile2, u32 x2, u32 y2, s32 w2, s32 h2,
     s32 dx1, s32 dy1, s32 dx2, s32 dy2) {
@@ -233,7 +258,6 @@ extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*, s32 tile1, u32 x1, u32 y1,
     assert(tile2==1 && x2==47 && y2==uint32_t(-47*8) && w2==16 && h2==32);
     assert(dx1==0 && dy1==0 && dx2==1 && dy2==-8); ++blueScrollCalls; return &resource;
 }
-#endif
 /* PRODUCTION_BLUE_FIRE */
 
 static void ModelDraw(PlayState*, s16 id) {
@@ -551,6 +575,26 @@ int main() {
     }
 #endif
 #ifdef HOST_MM
+    play.state.frames=47;
+    const char* bluePaths[][2]={{"companion-stick", "companion-flame"},
+                               {"__OTR__@oot:stick", "__OTR__@oot:flame"}, {"local-stick", "local-flame"}};
+    for (int mode=0; mode<3; ++mode) {
+        blueCompanion=true;
+        blueOwner=mode>=1;
+        blueLocal=mode==2;
+        Reset(47); DrawOotBlueFireBottle();
+        assert(paths.size()>=2 && paths[0]==bluePaths[mode][0] && paths[1]==bluePaths[mode][1]);
+        assert(blueScrollCalls==mode+1 && depth==0 && stack.empty());
+        bool clearedScroll=false;
+        for (const Gfx* cmd=xlu; cmd<gfx.polyXlu.p; ++cmd)
+            clearedScroll |= cmd->words.w1==reinterpret_cast<uintptr_t>(gEmptyDL);
+        assert(clearedScroll);
+    }
+    blueCompanion=blueOwner=blueLocal=false;
+    sDrawItemTable[GID_BOTTLE].drawFunc=ModelDraw;
+    Reset(47); DrawOotBlueFireBottle();
+    assert(paths.size()==1 && paths[0]=="__OTR__fixture/mask" && blueScrollCalls==3);
+    puts("PASS 2Ship Blue Fire companion, OoT owner, local override, missing-asset fallback and segment restoration");
     Reset(47); DrawOotRutosLetter();
     uint8_t letterColor[4]; ComboMaskShimmerColor(0,letterColor); Check(letterColor, true, "oot");
     assert(paths.size()==2);

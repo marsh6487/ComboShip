@@ -6,6 +6,8 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "mods/pak_loader/pak_loader.h"
+#include "../../../combo/actors/PlayerFlexSkin.h"
 
 #include "message_data_static.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -533,6 +535,9 @@ void GameState_Destroy(GameState* gameState) {
     ResourceMgr_ClearSkeletons();
 
     if (ResourceMgr_IsAltAssetsEnabled()) {
+        // The next scene needs a fresh skeleton and matching weighted plan.
+        PakLoader_InvalidateO2rSkeletons();
+        PlayerFlexSkin_ClearCache();
         ResourceUnloadDirectory("alt/*");
         gfx_texture_cache_clear();
     }

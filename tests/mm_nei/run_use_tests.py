@@ -299,6 +299,7 @@ run('native_stow_ownership',r'''
 #include "mods/items/logic/item_rod_ice.h"
 #include "mods/items/logic/item_rod_light.h"
 CustomItemState gCustomItemState{};ItemEquipState sMittsEquipState{};int stops=0,suppress=0;
+bool mittsClimbEntry=false;
 u8 seasonsDrawn=0;
 static u8 slateDrawn;
 static PlayState* slateStowPlay;
@@ -326,6 +327,7 @@ void Whip_Stop(Player*,PlayState*){++stops;whipActive=0;}
 void ItemInput_SuppressUntilRelease(u8,PlayState*){++suppress;}
 void DekuLeaf_Stop(Player*,PlayState*){gCustomItemState.dekuLeafActive=0;}
 void Shovel_Stop(Player*,PlayState*){gCustomItemState.shovelActive=0;}
+static s32 Player_IsEnteringMittsClimb(const Player*){return mittsClimbEntry;}
 ''',[body('mm/mods/items/custom_items_stow.c',n) for n in ['CustomItems_CanStowWhip','CustomItems_HasStowableHeldItem','CustomItems_PutAwayHeldItems']],r'''
 Player p{},remote{};PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
 assert(!CustomItems_HasStowableHeldItem(&p));
@@ -346,6 +348,16 @@ CustomItems_PutAwayHeldItems(&p,&play);assert(stops==2&&suppress==2);
 whipActive=1;whipState=WHIP_STATE_SWINGING;CustomItems_PutAwayHeldItems(&p,&play);assert(whipActive);
 whipState=WHIP_STATE_LAUNCHED;CustomItems_PutAwayHeldItems(&p,&play);assert(whipActive);
 CustomItems_PutAwayHeldItems(nullptr,&play);assert(!CustomItems_HasStowableHeldItem(nullptr));
+whipActive=0;gCustomItemState.mogmaMittsActive=1;sMittsEquipState.isEquipped=1;mittsClimbEntry=true;
+assert(!CustomItems_HasStowableHeldItem(&p));
+gCustomItemState.lanternEquipped=1;
+assert(CustomItems_HasStowableHeldItem(&p));
+CustomItems_PutAwayHeldItems(&p,&play);
+assert(gCustomItemState.mogmaMittsActive&&sMittsEquipState.isEquipped&&!gCustomItemState.lanternEquipped);
+mittsClimbEntry=false;
+assert(CustomItems_HasStowableHeldItem(&p));
+CustomItems_PutAwayHeldItems(&p,&play);
+assert(!gCustomItemState.mogmaMittsActive&&!sMittsEquipState.isEquipped);
 ''')
 # Integration checks complement the executable native lifecycle cases.
 ps=source(player)
@@ -381,6 +393,7 @@ static u16 sPlayerItemButtons[]={BTN_B,BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT};
 static u16 sDpadItemButtons[]={BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
 static ItemInputState netInput;
 static int transitions,initializations;static u8 animationDestination;
+static int stows;
 static int equipmentToggles;static u16 toggledEquipment;
 void ExtEquip_ToggleFromCButton(u16 item){++equipmentToggles;toggledEquipment=item;}
 static int dpadEnabled;
@@ -429,7 +442,7 @@ s32 RocsFeatherVanilla_TryUse(PlayState* play,Player* p,s32 item){return 0;}
 u8 CustomForms_UseItem(Player* p,ItemId item){return 0;}
 void WolfLinkHost_OnUseItem(PlayState* play,Player* p,s32 item){}
 void WolfLinkHost_RestorePlayerInput(Player* p,Input* input){}
-void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){}
+void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){++stows;}
 void ItemEquip_BeginItemChangeSound(PlayState* play,Player* p,s32 action){}
 s32 OotSpells_TryUseItem(PlayState* play,Player* p,PlayerItemAction a,ItemId item){return 0;}
 void func_808318C0(PlayState* play){}
@@ -459,7 +472,7 @@ void ResetCaller(Player* p,PlayState* play,u8 held,u16 press){
  gSaveContext.save.saveInfo.equips.buttonItems[0][EQUIP_SLOT_C_LEFT]=ITEM_NET;
  netInput=(ItemInputState){.wasEquipped=1,.otherButtonPressed=1,.equippedButton=BTN_CLEFT};
  sNetActive=1;sNetEquipState=(ItemEquipState){.isEquipped=1};
- transitions=initializations=dpadEnabled=equipmentToggles=0;toggledEquipment=ITEM_NONE;
+ transitions=initializations=stows=dpadEnabled=equipmentToggles=0;toggledEquipment=ITEM_NONE;
  sPlayerUseHeldItem=sPlayerHeldItemButtonIsHeldDown=0;
 }
 '''
@@ -607,6 +620,26 @@ run_equipment_caller('extended_equipment_native_toggle',r'''
  assert(!equipmentToggles&&p.heldItemId==ITEM_SWORD_KOKIRI);
  ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,0);requestedC=ITEM_EXT_TUNIC_2;
  play.state.input[0].cur.button=BTN_CLEFT;Player_UpdateItems(&p,&play);assert(!equipmentToggles);
+''')
+
+run_equipment_caller('slate_button_does_not_stow',r'''
+ Player p;PlayState play;
+ const u16 buttons[]={BTN_CLEFT,BTN_DDOWN};
+ for(unsigned i=0;i<ARRAY_COUNT(buttons);i++){
+  ResetCaller(&p,&play,ITEM_NONE,buttons[i]);dpadEnabled=1;
+  p.heldItemAction=p.itemAction=PLAYER_IA_NONE;
+  requestedC=i==0?ITEM_EXT_BUTTON:ITEM_NONE;
+  requestedD=i==1?ITEM_EXT_BUTTON:ITEM_NONE;
+  assert(ExtPlayer_GetItemAction(ITEM_EXT_BUTTON)==PLAYER_IA_NONE);
+  play.state.input[0].cur.button=buttons[i];
+  Player_UpdateItems(&p,&play);
+  assert(!stows&&p.heldItemButton==0&&"Slate press must not trigger native stow");
+  play.state.input[0].press.button=0;
+  Player_UpdateItems(&p,&play);
+  assert(!sPlayerHeldItemButtonIsHeldDown);
+  Player_UseItem(&play,&p,ITEM_NONE);
+  assert(stows==1);
+ }
 ''')
 
 # Custom tools see raw presses before the native button dispatcher. Run the complete

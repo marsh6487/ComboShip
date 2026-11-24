@@ -64,6 +64,7 @@ void Player_Action_8084E3C4(Player*,PlayState*) {}
 void Player_Action_8084D3E4(Player*,PlayState*) {}
 s32 Player_CanThrowCarriedActor(Player*,Actor*) {return 0;}
 s32 Player_InBlockingCsMode(PlayState*,Player* p) {return p->csAction!=0;}
+DoAction MmForm_GetAButtonDoAction(Player*) {return DO_ACTION_NONE;}
 s32 Player_CheckHostileLockOn(Player*) {return 0;}
 int Player_IsZTargeting(Player*) {return 0;}
 s32 Player_FriendlyLockOnOrParallel(Player*) {return 0;}

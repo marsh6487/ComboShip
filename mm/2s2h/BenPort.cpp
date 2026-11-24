@@ -71,7 +71,7 @@ extern "C" void Horse_ResetMountState(void);
 #include <time.h>
 #endif
 #include <ship/audio/AudioPlayer.h>
-#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/NaviAudio.h"
 #include "variables.h"
 #include "z64.h"
 #include "z64save.h"
@@ -599,10 +599,13 @@ extern "C" const char* Nei_AssetDir(void) {
 
 extern "C" const char* Nei_FindCrossoverAsset(const char* name) {
     static thread_local std::string path;
-    path = Crossover::FindAsset(name, Nei_AssetDir(), true, [](const std::string& relativePath) {
-        return Ship::Context::LocateFileAcrossAppDirs(relativePath, appShortName);
-    });
+    path = Crossover::FindAsset(name, Nei_AssetDir(), true, Ship::Context::GetAppDirectoryPath(appShortName),
+                                Ship::Context::GetAppBundlePath());
     return path.empty() ? nullptr : path.c_str();
+}
+
+extern "C" FILE* Nei_OpenCrossoverFile(const char* path) {
+    return Crossover::OpenFile(path);
 }
 
 static bool RemoveArchiveAcrossAppDirs(const std::string& fileName) {
@@ -1489,12 +1492,14 @@ void OTRAudio_Thread() {
 #endif
             MMWeatherAudio_Mix(audio_buffer, totalFrames);
             MMMidnaAudio_Mix(audio_buffer, totalFrames);
+            MMOptionalSfx_Mix(audio_buffer, totalFrames);
             ComboEmotes_MixAudio(audio_buffer, totalFrames);
 
             // Preserve final-output ownership: every native and private voice is muted
             // together while MM is inactive; no sequence or user volume is changed.
             if (gFscAudioMuted.load(std::memory_order_relaxed)) {
                 MMMidnaAudio_Reset();
+                MMOptionalSfx_Reset();
                 memset(audio_buffer, 0, totalFrames * kChannels * sizeof(int16_t));
             }
 #ifdef COMBO_BUILD
@@ -1522,6 +1527,7 @@ extern "C" void OTRAudio_Init() {
     if (!audio.running) {
         MMWeather_Reset();
         MMMidnaAudio_Init();
+        MMOptionalSfx_Init();
         audio.processing = false;
         audio.framesPerUpdate = 1;
         audio.running = true;
@@ -1556,6 +1562,7 @@ extern "C" void OTRAudio_Exit() {
     } catch (const std::exception& e) { SPDLOG_ERROR("[MMAudioPCM] capture save failed: {}", e.what()); }
 #endif
     MMMidnaAudio_Reset();
+    MMOptionalSfx_Reset();
     MMWeather_Reset();
     MMWeatherAudio_Shutdown();
 #ifndef COMBO_BUILD
@@ -5785,6 +5792,44 @@ extern "C" COMBO_EXPORT void MM_GrantSharedItem(const char* itemName) {
     }
     // The Shared Wallets tier bridge mirrors concrete ZFG ownership.
     GrantMmItemByName(itemName, nullptr, false);
+}
+
+extern "C" COMBO_EXPORT void MM_ApplyRpgMagicProgress(int slot, const ComboRpgState* in) {
+    if (!in || slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO ||
+        !ComboRpgState_Enabled(in, COMBO_RPG_MAGIC))
+        return;
+
+    auto& state = Nei_Save()->comboRpg;
+    auto& data = gSaveContext.save.saveInfo.playerData;
+    const int16_t previousCapacity = ComboRpgState_MagicCapacity(&state, 0);
+    const uint8_t previousLevel = state.level[COMBO_RPG_MAGIC];
+    const uint8_t required = ComboRpgState_Required(in, COMBO_RPG_MAGIC);
+    const uint8_t level = std::min(std::max(previousLevel, in->level[COMBO_RPG_MAGIC]), required);
+    const uint8_t nativeLevel = std::max(state.nativeMagicLevel, in->nativeMagicLevel);
+    const bool rulesChanged = !ComboRpgState_Enabled(&state, COMBO_RPG_MAGIC) ||
+                              state.required[COMBO_RPG_MAGIC] != required || state.magicTotal != in->magicTotal;
+    const bool progressChanged = previousLevel != level || state.nativeMagicLevel != nativeLevel;
+    state.knownMask |= 1 << COMBO_RPG_MAGIC;
+    state.enabledMask |= 1 << COMBO_RPG_MAGIC;
+    state.level[COMBO_RPG_MAGIC] = level;
+    state.required[COMBO_RPG_MAGIC] = required;
+    state.magicTotal = in->magicTotal;
+    state.nativeMagicLevel = nativeLevel;
+
+    const int16_t capacity = ComboRpgState_MagicCapacity(&state, 0);
+    const bool newMagic =
+        capacity > 0 && (!data.isMagicAcquired || capacity > previousCapacity || level > previousLevel);
+    const bool missingDoubleMeter = capacity > MAGIC_NORMAL_METER && !data.isDoubleMagicAcquired;
+    if (newMagic || missingDoubleMeter) {
+        data.isMagicAcquired = true;
+        if (capacity > MAGIC_NORMAL_METER)
+            data.isDoubleMagicAcquired = true;
+        if (newMagic)
+            data.magic = gSaveContext.magicFillTarget = capacity;
+        data.magicLevel = 0; // Let the native HUD rebuild its meter on the next eligible tick.
+    }
+    if (rulesChanged || progressChanged || newMagic || missingDoubleMeter)
+        SaveManager_SaveCurrentForCombo();
 }
 
 extern "C" COMBO_EXPORT void MM_ApplySharedMagicFloor(int tier) {

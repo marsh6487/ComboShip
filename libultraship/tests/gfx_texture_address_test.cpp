@@ -74,7 +74,7 @@ class Interpreter {
     struct LoadedTexture {
         RawTexMetadata raw_tex_metadata{};
         const uint8_t* addr{};
-        uint32_t size_bytes{}, line_size_bytes{}, full_image_line_size_bytes{};
+        uint32_t orig_size_bytes{}, size_bytes{}, line_size_bytes{}, full_image_line_size_bytes{};
     };
     struct {
         LoadedTexture loaded_texture[1];
@@ -84,10 +84,10 @@ class Interpreter {
     } rdp;
     decltype(rdp)* mRdp = &rdp;
     struct {
-        int GetMaxTextureSize() { return 256; }
+        int GetMaxTextureSize() { return 512; }
     } api;
     decltype(api)* mRapi = &api;
-    std::vector<uint8_t> texels = std::vector<uint8_t>(256 * 256 * 4);
+    std::vector<uint8_t> texels = std::vector<uint8_t>(512 * 512 * 4);
     uint8_t* mTexUploadBuffer = texels.data();
     struct MaskedTexture {
         const uint8_t* replacementData;
@@ -222,7 +222,7 @@ static void LegacyHeartPiece() {
     texture->ImageData[pixel] = 0xAF;
     auto& loaded = gfx.rdp.loaded_texture[0];
     loaded.addr = texture->ImageData;
-    loaded.size_bytes = loaded.line_size_bytes = loaded.full_image_line_size_bytes = 48 * 48;
+    loaded.orig_size_bytes = loaded.size_bytes = loaded.line_size_bytes = loaded.full_image_line_size_bytes = 48 * 48;
     loaded.raw_tex_metadata = { 96, 144, 1, 1, texture, TextureType::GrayscaleAlpha8bpp };
     gfx.rdp.texture_tile[0].line_size_bytes = 48;
     for (const char* path :
@@ -238,6 +238,33 @@ static void LegacyHeartPiece() {
     gfx.ImportTextureIA8(0, false);
     assert(gfx.uploadedWidth == 48 && gfx.uploadedHeight == 48);
     puts("PASS legacy MM and OoT quest heart textures upload all IA8 pixels");
+}
+
+static void UnscaledHdHeartPiece() {
+    Interpreter gfx;
+    const auto init = std::make_shared<Ship::ResourceInitData>();
+    init->ResourceVersion = 1;
+    init->Path = "alt/textures/icon_item_static/gHeartPieceIcon1Tex";
+    auto texture = std::make_shared<Texture>(init);
+    constexpr uint32_t edge = 384;
+    texture->ImageDataSize = edge * edge;
+    texture->ImageData = new uint8_t[texture->ImageDataSize]{};
+    // One quarter is opaque. The native-size byte prefix is entirely empty.
+    for (uint32_t y = 8; y < edge / 2; ++y) {
+        std::fill_n(texture->ImageData + y * edge, edge / 2, 0x7F);
+    }
+    auto& loaded = gfx.rdp.loaded_texture[0];
+    loaded.addr = texture->ImageData;
+    loaded.orig_size_bytes = loaded.size_bytes = loaded.line_size_bytes = loaded.full_image_line_size_bytes = 48 * 48;
+    loaded.raw_tex_metadata = { edge, edge, 1, 1, texture, TextureType::GrayscaleAlpha8bpp };
+    gfx.rdp.texture_tile[0].line_size_bytes = 48;
+
+    gfx.ImportTextureIA8(0, false);
+    assert(gfx.uploadedWidth == edge && gfx.uploadedHeight == edge);
+    assert(gfx.texels[4 * (edge / 4 * edge + edge / 4) + 3] == 0xFF);
+    assert(gfx.texels[4 * (edge / 4 * edge + edge * 3 / 4) + 3] == 0);
+    assert(gfx.texels[4 * (edge * 3 / 4 * edge + edge / 4) + 3] == 0);
+    puts("PASS unscaled 384px Quest Status heart preserves the transparent quarters");
 }
 } // namespace Fast
 
@@ -262,5 +289,6 @@ int main(int argc, char** argv) {
         Fast::ValidTextures();
         Fast::LegacySongNote();
         Fast::LegacyHeartPiece();
+        Fast::UnscaledHdHeartPiece();
     }
 }

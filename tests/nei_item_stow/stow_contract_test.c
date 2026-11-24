@@ -4,6 +4,7 @@
 #include "global.h"
 #include "mods/extended_player.h"
 #include "mods/items/helpers/equip_helper.c"
+#include "mods/items/logic/item_mitts.h"
 #include "mods/items/logic/item_rod_fire.h"
 #include "mods/items/logic/item_rod_ice.h"
 #include "mods/items/logic/item_rod_light.h"
@@ -21,6 +22,17 @@ PlayState *gPlayState = &play;
 static Input *sControlInput;
 static s32 sUpperBodyIsBusy;
 static ItemEquipState sMittsEquipState;
+static s8 sMittsPrevInvinc;
+u8 gMogmaMittsClimbActive, gMogmaMittsForceGauntlets;
+static s32 Player_IsEnteringMittsClimb(const Player *p);
+static void Mitts_Deactivate(void);
+void Player_Action_WaitForPutAway(Player *p, PlayState *s) {}
+void func_8083A3B0(PlayState *s, Player *p) {}
+s32 Player_SetupAction(PlayState *s, Player *p, PlayerActionFunc action,
+                       s32 flags) {
+  p->actionFunc = action;
+  return 1;
+}
 static int cleanups[8];
 static int transformed, form, lockedOn, canRoll, rollCalls, vetoStow, stowHooks;
 static int claimed, intercept, instantPutaway, fdSword;
@@ -52,7 +64,7 @@ static void GustJar_Unequip(PlayState *s, Player *p) {
 }
 static void Mitts_OnUnequip(PlayState *s, Player *p) {
   ++cleanups[5];
-  gCustomItemState.mogmaMittsActive = 0;
+  Mitts_Deactivate();
 }
 static void BallChain_Stop(Player *p, PlayState *s) {
   ++cleanups[6];
@@ -65,7 +77,14 @@ static void Whip_Stop(Player *p, PlayState *s) {
 #ifndef REAL_SEASONS_STOW
 u8 Seasons_IsDrawn(void) { return 0; }
 static void Seasons_Stow(PlayState* play, Player* player) {}
+f32 gSfxDefaultFreqAndVolScale;
+s8 gSfxDefaultReverb;
+void Audio_PlaySoundGeneral(u16 sound, Vec3f *pos, u8 token, f32 *freq,
+                            f32 *volume, s8 *reverb) {}
 #endif
+void Audio_PlayActorSound2(Actor *actor, u16 sfxId) {}
+s32 Flags_GetRandomizerInf(RandomizerInf flag) { return 0; }
+u8 ExtEquip_CapeOwned(void) { return 0; }
 static u8 sSlateFixtureDrawn;
 u8 Slate_IsDrawn(void) { return sSlateFixtureDrawn; }
 void Slate_PutAway(PlayState* s, Player* p) { sSlateFixtureDrawn=0; }
@@ -88,6 +107,8 @@ static void Reset(void) {
   memset(sStowedItemButtons, 0, sizeof(sStowedItemButtons));
   memset(sStowedItemFrames, 0, sizeof(sStowedItemFrames));
   memset(&sMittsEquipState, 0, sizeof(sMittsEquipState));
+  sMittsPrevInvinc = 0;
+  gMogmaMittsClimbActive = gMogmaMittsForceGauntlets = 0;
   memset(cleanups, 0, sizeof(cleanups));
   memset(gSaveContext.equips.buttonItems, ITEM_NONE,
          sizeof(gSaveContext.equips.buttonItems));
@@ -178,6 +199,45 @@ static void TestClassifierAndCleanup(void) {
 static void ReadyLantern(void) {
   gCustomItemState.lanternEquipped = 1;
   sControlInput->press.button = BTN_A;
+}
+
+static void TestMittsClimb(void) {
+  Reset();
+  gSaveContext.equips.buttonItems[4] = ITEM_MOGMA_MITTS;
+  gSaveContext.magicCapacity = gSaveContext.magic = 16;
+  sControlInput->press.button = BTN_DUP;
+  Handle_MogmaMitts(&player, &play);
+  assert(mmActive && gMogmaMittsClimbActive && gMogmaMittsForceGauntlets);
+
+  player.heldItemAction = player.itemAction = PLAYER_IA_MOGMA_MITTS;
+  assert(!Player_SetupWaitForPutAway(&play, &player, func_8083A3B0));
+  assert(mmActive && !CleanupCount());
+
+  player.heldItemAction = player.itemAction = PLAYER_IA_NONE;
+  assert(!Player_SetupWaitForPutAway(&play, &player, func_8083A3B0));
+  ReadyLantern();
+  assert(Player_SetupWaitForPutAway(&play, &player, func_8083A3B0));
+  assert(mmActive && cleanups[0] == 1 && cleanups[5] == 0);
+
+  player.stateFlags1 |= PLAYER_STATE1_CLIMBING_LADDER;
+  player.actionFunc = NULL;
+  gSaveContext.buttonStatus[5] = BTN_DISABLED;
+  sControlInput->press.button = BTN_A;
+  for (int i = 0; i < MITTS_DRAIN_INTERVAL; ++i) {
+    ++play.gameplayFrames;
+    Handle_MogmaMitts(&player, &play);
+  }
+  assert(mmActive && gSaveContext.magic == 15);
+
+  player.stateFlags1 &= ~PLAYER_STATE1_CLIMBING_LADDER;
+  ++play.gameplayFrames;
+  Handle_MogmaMitts(&player, &play);
+  assert(mmActive);
+
+  gSaveContext.equips.buttonItems[4] = ITEM_NONE;
+  ++play.gameplayFrames;
+  Handle_MogmaMitts(&player, &play);
+  assert(!mmActive && !gMogmaMittsClimbActive && !gMogmaMittsForceGauntlets);
 }
 static void TestPlayerEntries(void) {
   Reset();
@@ -412,6 +472,7 @@ int main(void) {
   assert(!Slate_IsDrawn() && player.heldItemAction==PLAYER_IA_NONE);
   TestNativeSoundLifetime();
   TestClassifierAndCleanup();
+  TestMittsClimb();
   TestPlayerEntries();
   TestHudCandidateAndCooldown();
   TestInputSuppression();

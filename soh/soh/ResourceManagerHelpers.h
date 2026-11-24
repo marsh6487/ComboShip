@@ -38,6 +38,7 @@ void ResourceMgr_UnloadResource(const char* resName);
 char** ResourceMgr_ListFiles(const char* searchMask, int* resultSize);
 uint8_t ResourceMgr_FileExists(const char* resName);
 uint8_t ResourceMgr_FileAltExists(const char* resName);
+const char* ResourceMgr_ResolveMmHudLabel(const char* mmPath, const char* localPath);
 void ResourceMgr_UnloadOriginalWhenAltExists(const char* resName);
 uint8_t ResourceMgr_TexIsRaw(const char* texPath);
 uint8_t ResourceMgr_ResourceIsBackground(char* texPath);
@@ -91,6 +92,7 @@ bool ResourceMgr_IsAltAssetsEnabled();
 // Archive provenance, respecting the resource owner and its current Alt mode.
 int ResourceMgr_IsModAsset(const char* path);
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+int ResourceMgr_IsLegacyZssLongswordGi(void);
 // Selected root type check for complete legacy tunic recipes; no retained pointers.
 int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);

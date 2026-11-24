@@ -34,33 +34,6 @@ void DrawAutosaveIcon() {
     }
 }
 
-static void WriteAutosave(PlayState* play, bool resetting) {
-    const bool currentOwlSaveState = gSaveContext.save.isOwlSave;
-    gSaveContext.save.isOwlSave = true;
-    SavingEnhancements_PersistSaveEntranceInfo();
-    SavingEnhancements_AdvancePlaytime();
-    Play_SaveCycleSceneFlags(play);
-    gSaveContext.save.saveInfo.playerData.savedSceneId = play->sceneId;
-    func_8014546C(&play->sramCtx);
-
-    const int flashSlot = gSaveContext.fileNum * FLASH_SAVE_MAIN_MULTIPLIER;
-    if (resetting) {
-        // The game is about to leave PlayState. Finish the write without starting the
-        // in-game save timer. Solo MM also writes the native backup page.
-        SysFlashrom_WriteDataSync(play->sramCtx.saveBuf, gFlashOwlSaveStartPages[flashSlot],
-                                  gFlashOwlSaveNumPages[flashSlot]);
-        if (!Combo_IsCombinedGame()) {
-            SysFlashrom_WriteDataSync(play->sramCtx.saveBuf, gFlashOwlSaveStartPages[flashSlot] + 0x80,
-                                      gFlashOwlSaveNumPages[flashSlot]);
-        }
-    } else {
-        Sram_SetFlashPagesOwlSave(&play->sramCtx, gFlashOwlSaveStartPages[flashSlot], gFlashOwlSaveNumPages[flashSlot]);
-        Sram_StartWriteToFlashOwlSave(&play->sramCtx);
-    }
-    gSaveContext.save.isOwlSave = currentOwlSaveState;
-    SavingEnhancements_ClearSaveEntranceInfo();
-}
-
 extern "C" void SavingEnhancements_AutosaveOnReset() {
     PlayState* play = gPlayState;
     if (!CVAR_AUTOSAVE || !CVarGetInteger("gEnhancements.Saving.RememberSaveLocation", 0) || !play ||
@@ -74,7 +47,7 @@ extern "C" void SavingEnhancements_AutosaveOnReset() {
     if (Combo_IsCombinedGame())
         Combo_MM_FlushAccumulators();
 #endif
-    WriteAutosave(play, true);
+    SavingEnhancements_WriteOwlSnapshot(play, true);
 }
 
 void HandleAutoSave() {
@@ -102,7 +75,7 @@ void HandleAutoSave() {
         lastSaveTimestamp = GetUnixTimestamp();
         iconTimer = 100;
 
-        WriteAutosave(gPlayState, false);
+        SavingEnhancements_WriteOwlSnapshot(gPlayState, false);
     }
 }
 

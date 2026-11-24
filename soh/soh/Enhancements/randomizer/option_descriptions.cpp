@@ -10,7 +10,8 @@ void Settings::CreateOptionDescriptions() {
         "Collecting the item shows its information; press C-Up on an owned Map or Compass on the dungeon map "
         "page to read it again, including with Start With Maps/Compasses. "
         "The Temple of Time altar stops revealing reward locations; progression requirements remain. "
-        "Bottom of the Well and Ice Cavern have no boss reward hints. Ordinary/masterful hints are unchanged.";
+        "Bottom of the Well and Ice Cavern have no boss reward hints. Ordinary/masterful hints are unchanged. "
+        "In Combo, this applies to both games.";
     mOptionDescriptions[RSK_SW97_SPELLS] =
         "Sage Spells: the elemental medallions grant elemental damage with magic cost.\n"
         "  - Spell: Medallion alone acts as a passive elemental source (Fire Medallion = Din's Fire equivalent for "

@@ -65,7 +65,7 @@ s8 Player_ItemToItemAction(s32 item) {
     if(item==ITEM_MM_MASK_KEATON)return PLAYER_IA_MM_MASK_KEATON;
     if(item==ITEM_MM_MASK_BUNNY)return PLAYER_IA_MM_MASK_BUNNY;
     if(item==ITEM_MM_MASK_TRUTH)return PLAYER_IA_MM_MASK_TRUTH;
-    return item==ITEM_NONE?PLAYER_IA_NONE:PLAYER_IA_SWORD_MASTER;
+    return item==ITEM_NONE || item==ITEM_EXT_BUTTON ? PLAYER_IA_NONE : PLAYER_IA_SWORD_MASTER;
 }
 s32 Player_ItemIsItemAction(s32 item,s32 action) {return Player_ItemToItemAction(item)==action;}
 s32 Player_ItemIsInUse(Player* player,s32 item) {return Player_ItemToItemAction(item)==player->heldItemAction;}
@@ -120,6 +120,23 @@ int main(int argc,char** argv) {
         assert(nativeUses==1 && nativeItem==ITEM_EXT_BOOTS_2 && "Pendant was misrouted to Climb Boots");
         puts("PASS OoT native player dispatch: all twelve equipment C/D toggles; Pendant keeps native item path");return 0;
     }
+    if(argc>1 && !strcmp(argv[1],"slate")) {
+        Player player{};sControlInput=&play.state.input[0];
+        for(int button=1;button<8;button++) {
+            memset(gSaveContext.equips.buttonItems,ITEM_NONE,sizeof(gSaveContext.equips.buttonItems));
+            ExtButton_SetItem(button,EXT_ITEM_SHEIKAH_SLATE);
+            player.heldItemAction=player.itemAction=PLAYER_IA_NONE;
+            player.heldItemButton=0;
+            play.state.input[0].cur.button=play.state.input[0].press.button=masks[button];
+            Player_ProcessItemButtons(&player,&play);
+            assert(nativeUses==0 && player.heldItemButton==0 && "Slate press must not trigger native stow");
+            play.state.input[0].press.button=0;
+            sHeldItemButtonIsHeldDown=0;
+            Player_ProcessItemButtons(&player,&play);
+            assert(!sHeldItemButtonIsHeldDown);
+        }
+        puts("PASS OoT Slate C/D inputs leave native item state and stow alone");return 0;
+    }
     if(argc>1 && !strcmp(argv[1],"names")) {
         for(int row=0;row<4;row++) for(int col=1;col<4;col++) {
             play.pauseCtx.cursorY[PAUSE_EQUIP]=row;play.pauseCtx.cursorX[PAUSE_EQUIP]=col;
@@ -162,7 +179,7 @@ with tempfile.TemporaryDirectory(prefix="oot-equipment-controls-") as td:
     for combo in (False,True):
         binary=Path(td)/("combo" if combo else "solo")
         subprocess.run([os.environ.get("CXX","c++"),*flags,*( ["-DCOMBO_BUILD"] if combo else []),*includes,str(source),"-o",str(binary)],check=True)
-        for mode in ("assignment","names","toggle","dispatch","masks"):
+        for mode in ("assignment","names","toggle","dispatch","masks","slate"):
             result=subprocess.run([str(binary),mode],env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0","UBSAN_OPTIONS":"halt_on_error=1"})
             failed |= result.returncode != 0
 sys.exit(int(failed))

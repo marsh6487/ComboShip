@@ -1171,6 +1171,19 @@ extern "C" s32 MmMaskWear_CanUseBlastB(PlayState* play, Player* player) {
            play->transitionMode == TRANS_MODE_OFF && !Player_InBlockingCsMode(play, player);
 }
 
+extern "C" DoAction MmMaskWear_GetBButtonDoAction(PlayState* play, Player* player) {
+    switch (sCurrentMmMask) {
+        case ITEM_MM_MASK_BLAST:
+            return MmMaskWear_CanUseBlastB(play, player) ? DO_ACTION_EXPLODE : DO_ACTION_NONE;
+        case ITEM_MM_MASK_BREMEN:
+            return DO_ACTION_MM_MARCH;
+        case ITEM_MM_MASK_KAMARO:
+            return DO_ACTION_MM_DANCE;
+        default:
+            return DO_ACTION_NONE;
+    }
+}
+
 extern "C" void MmMaskWear_FilterBlastB(PlayState* play, Player* player, Input* input) {
     sBlastBRequested = false;
     if (input != nullptr && MmMaskWear_CanUseBlastB(play, player)) {

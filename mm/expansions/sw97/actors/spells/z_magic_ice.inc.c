@@ -14,7 +14,7 @@ static const char ALIGN_ASSET(2) sMedallionWaterTex[] = "__OTR__custom/medallion
 // Struct (merged from z_magic_ice.h)
 // ============================================================
 
-struct MagicIce;
+enum { SW97_ICE_LIMB_COUNT = 5 };
 
 typedef struct MagicIce {
     /* 0x0000 */ Actor actor;
@@ -26,6 +26,7 @@ typedef struct MagicIce {
     /*        */ SkelCurve skelCurve;
     /*        */ Vec3f colliderScale;
     /*        */ u8 floeSpawned; // Skijer's NEI: one-shot guard for the ice-floe platform spawn
+    s16 transforms[SW97_ICE_LIMB_COUNT][9];
 } MagicIce;
 
 // Runtime actor ID (assigned by ActorDB in sw97_init.cpp)
@@ -513,8 +514,9 @@ static SkelCurveLimb* sIceLimbs[] = {
 };
 static SkelCurveLimbList sIceLimbList = {
     sIceLimbs,
-    0x05,
+    ARRAY_COUNT(sIceLimbs),
 };
+_Static_assert(ARRAY_COUNT(sIceLimbs) == SW97_ICE_LIMB_COUNT, "Water spell transforms must cover every limb");
 
 // ============================================================
 // Ice shelter melt helper
@@ -550,17 +552,15 @@ void MagicIce_Init(Actor* thisx, PlayState* play) {
     this->actor.room = -1;
 
     this->colliderScale.x = this->colliderScale.y = this->colliderScale.z = 0.0f;
-    SkelCurve_Init(play, &this->skelCurve, &sIceLimbList, &sIceTransformUpdIdx);
+    this->skelCurve.limbCount = sIceLimbList.limbCount;
+    this->skelCurve.skeleton = sIceLimbList.limbs;
+    this->skelCurve.jointTable = this->transforms;
     SkelCurve_SetAnim(&this->skelCurve, &sIceTransformUpdIdx, 0.0f, 10000.0f, 0.0f, 1.0f);
     this->alphaMultiplier = 1.0f;
 }
 
 void MagicIce_Destroy(Actor* thisx, PlayState* play) {
-    MagicIce* this = THIS;
-
     func_800876C8(play);
-
-    SkelCurve_Destroy(play, &this->skelCurve);
 }
 
 static void MagicIce_UpdateBeforeCast(Actor* thisx, PlayState* play) {

@@ -52,7 +52,8 @@ def main():
         game_flags += ["-I" + str(ROOT / path) for path in
                        ("mm/include", "mm/include/PR", "mm/src", "mm/2s2h", "mm/assets", "mm/mods",
                         "libultraship/include", "libultraship/src", "combo", "combo/menu")]
-        for source in ("mm/src/code/z_kankyo.c", "mm/src/code/z_play.c", "mm/src/code/z_vr_box.c",
+        native_compiler = shlex.split(os.environ.get("CC", "cc"))
+        for source in ("mm/src/code/z_kankyo.c", "mm/src/code/z_play.c", "mm/src/code/z_vr_box.c", "mm/src/code/z_scene_proc.c",
                        "mm/src/overlays/actors/ovl_En_Bom/z_en_bom.c",
                        "mm/src/overlays/actors/ovl_En_Bombf/z_en_bombf.c",
                        "mm/src/overlays/actors/ovl_En_Test6/z_en_test6.c",
@@ -60,18 +61,31 @@ def main():
                        "mm/src/overlays/actors/ovl_Door_Warp1/z_door_warp1.c",
                        "mm/src/overlays/actors/ovl_Dm_Hina/z_dm_hina.c",
                        "mm/src/overlays/actors/ovl_player_actor/z_player.c"):
-            result = subprocess.run([*shlex.split(os.environ.get("CC", "cc")), "-std=gnu17",
+            result = subprocess.run([*native_compiler, "-std=gnu17",
                                      "-fsyntax-only", "-DNDEBUG", "-Wno-int-conversion",
                                      "-Wno-incompatible-pointer-types", "-I" + str(ROOT / "mm"),
                                      *game_flags, str(ROOT / source)], capture_output=True, text=True)
             if result.returncode:
                 raise RuntimeError(result.stdout + result.stderr)
             print("PASS real-header weather syntax:", source, flush=True)
+        scene = (ROOT / "mm/src/code/z_scene_proc.c").read_text()
+        (build / "winter_water_scene.inc").write_text("\n".join(
+            production_function(scene, name) for name in
+            ("AnimatedMat_TexScroll", "AnimatedMat_TwoLayerTexScroll",
+             "Scene_WinterWaterScrollSegments", "AnimatedMat_DrawMain")))
+        executable = build / "winter_water_scroll_test"
+        result = subprocess.run([*native_compiler, "-std=gnu17", *game_flags, "-Wno-incompatible-pointer-types",
+                                 "-I" + str(ROOT / "mm"), "-I" + str(build),
+                                 str(ROOT / "mm/tests/winter_water_scroll_test.c"), "-o", str(executable)],
+                                capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError(result.stdout + result.stderr)
+        subprocess.run([str(executable)], check=True)
         executable = build / "weather_bridge_test"
         inventory = (ROOT / "mm/mods/extended_inventory.c").read_text()
         (build / "weather_seasons.inc").write_text("\n".join(
             production_function(inventory, name) for name in
-            ("Seasons_HasRod", "Seasons_SeasonOwned", "Seasons_SeasonAt",
+            ("Seasons_HasRod", "Seasons_SeasonOwned", "Seasons_SeasonCount", "Seasons_SeasonAt",
              "Seasons_GetSeason", "Seasons_SetSeason")))
         environment = (ROOT / "mm/src/code/z_kankyo.c").read_text()
         play = (ROOT / "mm/src/code/z_play.c").read_text()

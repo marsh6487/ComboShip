@@ -6,7 +6,6 @@ extern "C" void Partners_Reset(void);
 
 #include "soh/Enhancements/randomizer/RustyDoorKeys.h"
 #include "rando/CrossDungeonCatalogue.h"
-#include "rando/MagicMirrorShuffle.h"
 #include "rando/MagicMirrorSettingsSnapshot.h"
 #include "rando/RitoMaskSettingsSnapshot.h"
 #include "Enhancements/randomizer/SoulShuffle.h"
@@ -77,6 +76,7 @@ extern "C" void Partners_Reset(void);
 #include "Enhancements/controls/SohInputEditorWindow.h"
 #include "Enhancements/audio/AudioCollection.h"
 #include "Enhancements/audio/WeatherSamplePlayer.h"
+#include "audio/TwilightPrincessTargeting.h"
 #include "Enhancements/debugconsole.h"
 #include "Enhancements/randomizer/randomizer.h"
 #include "Enhancements/randomizer/dungeon.h"
@@ -589,10 +589,13 @@ extern "C" const char* Nei_AssetDir(void) {
 
 extern "C" const char* Nei_FindCrossoverAsset(const char* name) {
     static thread_local std::string path;
-    path = Crossover::FindAsset(name, Nei_AssetDir(), false, [](const std::string& relativePath) {
-        return Ship::Context::LocateFileAcrossAppDirs(relativePath, appShortName);
-    });
+    path = Crossover::FindAsset(name, Nei_AssetDir(), false, Ship::Context::GetAppDirectoryPath(appShortName),
+                                Ship::Context::GetAppBundlePath());
     return path.empty() ? nullptr : path.c_str();
+}
+
+extern "C" FILE* Nei_OpenCrossoverFile(const char* path) {
+    return Crossover::OpenFile(path);
 }
 
 void CheckAndCreateModFolder() {
@@ -1505,6 +1508,7 @@ void OTRAudio_Thread() {
 
         WeatherSamplePlayer_Mix(audio_buffer, total_frames);
         MidnaAudio_Mix(audio_buffer, total_frames);
+        SOHTwilightPrincessTargeting_Mix(audio_buffer, total_frames);
         ComboEmotes_MixAudio(audio_buffer, total_frames);
 
         // Fleet Ship Combo: silence OoT's output while it's the inactive game. audio_buffer holds
@@ -1512,6 +1516,7 @@ void OTRAudio_Thread() {
         // without stopping any sequence (positions keep advancing -> bit-exact resume).
         if (gFscAudioMuted.load(std::memory_order_relaxed)) {
             MidnaAudio_Reset();
+            SOHTwilightPrincessTargeting_Reset();
             memset(audio_buffer, 0, total_samples * sizeof(int16_t));
         }
 
@@ -1602,6 +1607,7 @@ void OTRAudio_Init() {
 
     if (!audio.running) {
         MidnaAudio_Init();
+        SOHTwilightPrincessTargeting_Init();
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1629,6 +1635,7 @@ extern "C" size_t fontMapSize;
 
 extern "C" void OTRAudio_Exit() {
     WeatherSamplePlayer_Reset();
+    SOHTwilightPrincessTargeting_Reset();
     // Tell the audio thread to stop
     {
         std::unique_lock<std::mutex> Lock(audio.mutex);
@@ -4379,6 +4386,16 @@ extern "C" COMBO_EXPORT void SOH_GrantSharedItem(const char* itemName) {
     GrantOotItemByName(itemName, nullptr, false);
 }
 
+extern "C" COMBO_EXPORT bool SOH_GetRpgMagicProgress(int slot, ComboRpgState* out) {
+    if (!out || slot < 0 || slot > 2 || gSaveContext.fileNum != slot || !IS_RANDO)
+        return false;
+    const auto state = FleetRpg::Read();
+    if (!ComboRpgState_Enabled(&state, COMBO_RPG_MAGIC) || state.level[COMBO_RPG_MAGIC] == 0)
+        return false;
+    *out = state;
+    return true;
+}
+
 // Mirror native magic without resolving a second progressive pickup. This is
 // save-only, so it is safe for both a live OoT check and a dormant OoT save.
 extern "C" COMBO_EXPORT void SOH_ApplySharedMagicFloor(int tier) {
@@ -5683,6 +5700,8 @@ extern "C" COMBO_EXPORT void SOH_PrepRandoContext(void) {
         // spoiler reload builds the native check/item pools.
 #ifdef COMBO_BUILD
         if (sComboRandoSeedSet) {
+            // Reachability also reads the seed directly, including Random Clock Start.
+            ctx->SetSeed(static_cast<uint32_t>(sComboRandoSeed));
             Random_Init(sComboRandoSeed);
         }
 #endif
@@ -7457,9 +7476,6 @@ extern "C" COMBO_EXPORT const char* Combo_SOH_Rando_GetReachableChecks(void) {
     sComboPortalOpen = portal->Child() || portal->Adult();
 #endif
     nlohmann::json out = nlohmann::json::array();
-    if (Combo_IsCombinedGame() && ctx->GetOption(RSK_SHUFFLE_MAGIC_MIRROR) &&
-        RegionTable(RR_THE_LOST_WOODS)->HasAccess())
-        out.push_back(ComboRando::MagicMirrorShuffle::kOotAccessProbe);
     for (RandomizerCheck rc : reachable) {
         const std::string& name = Rando::StaticData::GetLocation(rc)->GetName();
         if (!name.empty())

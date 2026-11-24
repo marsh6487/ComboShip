@@ -263,7 +263,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             // the item pool. Every other check keeps its item in the pool and is marked as skipped with junk in its
             // place. That leaves an inbalance in the pools that will get sorted automatically if there is enough space.
             if (saveInfo.randoSaveOptions[RO_LOGIC] != RO_LOGIC_VANILLA) {
-                if (std::binary_search(excludedChecks.begin(), excludedChecks.end(), randoCheckId)) {
+                // Combo's authored forest is optional. Use the usual excluded-check reward
+                // while keeping the single Magic Mirror in the shuffled item pool.
+                if ((randoCheckId == RC_LOST_WOODS_MAGIC_MIRROR_STUMP && Combo_IsCombinedGame()) ||
+                    std::binary_search(excludedChecks.begin(), excludedChecks.end(), randoCheckId)) {
                     if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&
                         randoStaticCheck.randoCheckType == RCTYPE_SONG) {
                         continue;

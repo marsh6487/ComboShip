@@ -50,6 +50,8 @@ const char* PakLoader_GetSkinSkeletonPath(void** skeleton);
 
 /* Active private seasonal root, or NULL for the normal/forced/remote body. */
 const char* PakLoader_GetSeasonalSkeletonPath(void);
+// Exact open-hand aliases from the active private Adult body, before equipment mix.
+Gfx* PakLoader_GetSeasonalOpenHand(u8 left);
 s32 PakLoader_GetOutfitSetCount(void);
 const char* PakLoader_GetOutfitSet(s32 index);
 
@@ -66,6 +68,7 @@ void PakLoader_RestoreSkeleton(Player* player);
  * @return Custom Gfx* to use instead, or NULL to use vanilla
  */
 Gfx* PakLoader_GetDLOverride(const char* otrPath);
+Gfx* PakLoader_GetSeasonalDLOverride(const char* otrPath);
 
 /**
  * Get the custom equipment DL for the given limb based on current hand/sheath type.
@@ -258,6 +261,9 @@ void PakLoader_ClearForcedEquipment(void);
  * Frees GbiWrap combined DLs from the previous frame.
  */
 void PakLoader_FrameBegin(void);
+
+/** Forget resource-manager-owned skeleton pointers before alternate-asset eviction. */
+void PakLoader_InvalidateO2rSkeletons(void);
 
 /**
  * Cleanup and free all loaded model data.

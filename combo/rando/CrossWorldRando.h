@@ -24,7 +24,6 @@
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
 #include "CrossDungeonReachability.h"
-#include "MagicMirrorShuffle.h"
 
 namespace ComboRando {
 
@@ -272,7 +271,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Cross topology can bootstrap MM without the portal, but an MM-start player
     // must still be able to reopen it after entering OOT without MM inventory.
     const bool portalRequired = portalGated || (mmStart && ootAccess != OotAccess::NO_LOGIC);
-    if (portalRequired && ootOracle.GetPortalOpen == nullptr) {
+    if (ootAccess != OotAccess::NO_LOGIC && ootOracle.GetPortalOpen == nullptr) {
         result.error = "OOT oracle is missing Combo_SOH_Rando_GetPortalOpen — rebuild soh.dll (the OOT->MM "
                        "portal cannot be gated without it)";
         return result;
@@ -884,10 +883,6 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                     portalOpen = ootOracle.GetPortalOpen() != 0;
                 mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
             }
-            // Read from this exact OOT search, whose owned set excludes the
-            // candidate being placed. The forest branch opens only its stump,
-            // independently of the main portal; it cannot open all of Termina.
-            MagicMirrorShuffle::AddOotRoute(ootReachable, mmReachable);
             bool changed = false;
             for (size_t i = 0; i < placements.size(); ++i) {
                 if (credited[i])

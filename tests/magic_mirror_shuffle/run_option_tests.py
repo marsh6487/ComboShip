@@ -43,7 +43,6 @@ fixture=r'''
 #include <nlohmann/json.hpp>
 #include "global.h"
 #include "2s2h/Rando/Rando.h"
-#include "rando/MagicMirrorShuffle.h"
 #include "rando/MagicMirrorSettingsSnapshot.h"
 #include "rando/RitoMaskSettingsSnapshot.h"
 #include "NeiGracePolicy.h"
@@ -191,7 +190,7 @@ int main(){
 # Verify the real launcher calls the normalizer before each native dump sequence.
 launcher=(ROOT/'combo/ComboShip.cpp').read_text()
 assert launcher.index('SOH_NormalizeComboGraceFromMM();',launcher.index('const bool haveOracles')) < launcher.index('SOH_DumpRandoStaticData()',launcher.index('const bool haveOracles'))
-assert 'RegionTable(RR_THE_LOST_WOODS)->HasAccess()' in extract(oot,'extern "C" COMBO_EXPORT const char* Combo_SOH_Rando_GetReachableChecks(')
+assert 'RR_THE_LOST_WOODS' not in extract(oot,'extern "C" COMBO_EXPORT const char* Combo_SOH_Rando_GetReachableChecks(')
 assert 'mContext->GetOption(RSK_SHUFFLE_MAGIC_MIRROR).Set(RO_GENERIC_OFF)' in extract(settings,'void Settings::ParseJson(')
 with tempfile.TemporaryDirectory(prefix='mirror-active-options-') as td:
  temp=Path(td);(temp/'test.cpp').write_text(fixture)

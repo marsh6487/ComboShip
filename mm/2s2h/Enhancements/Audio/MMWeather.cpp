@@ -201,6 +201,12 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
     return SelectedSeason();
 }
 
+extern "C" int MMWeather_IsWinterWater(const PlayState* play) {
+    return play != nullptr && gSaveContext.gameMode == GAMEMODE_NORMAL &&
+           ((Seasons_SeasonOwned(SEASON_WINTER) && Seasons_GetSeason() == SEASON_WINTER) ||
+            SelectedSeason() == SEASON_WINTER);
+}
+
 extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {
 #ifdef COMBO_BUILD
     // Preserve the established opening-forest foliage selection independently

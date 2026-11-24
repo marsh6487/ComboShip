@@ -1,6 +1,8 @@
 #include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include "test_require.h"
+#include "../../combo/audio/OptionalSfxMixer.h"
+#include "../../combo/audio/OptionalSfxSample.h"
 
 #include <algorithm>
 #include <array>
@@ -77,6 +79,37 @@ static std::vector<uint8_t> wav(std::initializer_list<int16_t> samples) {
         offset += 2;
     }
     return result;
+}
+
+static void optionalOneShots() {
+    constexpr size_t sample = 72;
+    constexpr size_t loop = sample + 10;
+    constexpr size_t book = loop + 16;
+    std::vector<uint8_t> packed(book + 12 + 16 * 2);
+    std::memcpy(packed.data() + 4, "PMSO\x02", 5);
+    le(packed, 68, 10, 4);
+    packed[sample] = 0x40; // Scale the signed nibbles by 16.
+    packed[sample + 1] = 0x78;
+    le(packed, loop + 4, 17, 4); // End past the one complete frame, as in the Navi extraction.
+    le(packed, book, 2, 4);
+    le(packed, book + 4, 1, 4);
+    le(packed, book + 8, 16, 4);
+
+    const std::vector<char> raw(packed.begin(), packed.end());
+    auto clip = ComboOptionalSfx::Decode(raw);
+    REQUIRE(clip.size() == 16 && clip[0] == 112 && clip[1] == -128);
+    REQUIRE(ComboOptionalSfx::Decode({ raw.begin(), raw.end() - 1 }).empty());
+
+    ComboOptionalSfx::Mixer<3, 2> mixer;
+    mixer.SetBank({ clip, clip, {} });
+    REQUIRE(!mixer.Play(2, 0)); // Missing optional asset leaves the cue unavailable.
+    REQUIRE(mixer.Play(0, 0) && mixer.Play(1, 1));
+    std::array<int16_t, 34> out{};
+    mixer.Mix(out.data(), out.size() / 2, 1.0f);
+    REQUIRE(out[0] == 224 && out[1] == 224 && out[2] == -256 && out[3] == -256);
+    out = {};
+    mixer.Mix(out.data(), out.size() / 2, 1.0f);
+    REQUIRE(std::all_of(out.begin(), out.end(), [](int16_t value) { return value == 0; }));
 }
 
 static void movementSpacing() {
@@ -362,6 +395,7 @@ int main() {
     optOut();
     movementSpacing();
     idleYawn();
-    puts(
-        "PASS: MM Midna archive choices, saved/live assignments, native fallback, PCM validation, mixing and teardown");
+    optionalOneShots();
+    puts("PASS: MM Midna archive choices, saved/live assignments, native fallback, WAV/ADPCM validation, one-shot "
+         "mixing and teardown");
 }

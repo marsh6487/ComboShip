@@ -120,19 +120,18 @@ def action(folder):
     interface = (ROOT / "soh/src/code/z_parameter.c").read_text()
     transform = (ROOT / "soh/mods/transformation_masks/transformation_masks.c").read_text()
     mask = (ROOT / "soh/mods/transformation_masks/mm_mask_wear.cpp").read_text()
+    form = (ROOT / "soh/mods/transformation_masks/mm_player_form.cpp").read_text()
+    resources = (ROOT / "soh/soh/ResourceManagerHelpers.cpp").read_text()
     fixture = (ROOT / "tests/blast_mask/action_test.cpp").read_text()
     table = re.search(r"static const char\* actionsTbl\[\] = \{.*?\n\};", interface, re.S)[0]
     interface_code = table + "\n" + "\n".join(function(interface, signature) for signature in (
+        "static const char* Interface_GetMmActionLabel(", "static const char* Interface_GetPlayerBActionLabel(",
         "void Interface_LoadActionLabel(", "void Interface_SetDoAction("))
     hud_source = (ROOT / "tests/blast_mask/hud_native.c").read_text()
     hud_defines = "\n".join(re.search(r"^#define " + re.escape(name) + r"[^\n]*", interface, re.M)[0]
                             for name in ("PLAYER_ON_REAL_HORSE", "DO_ACTION_TEX_WIDTH", "DO_ACTION_TEX_HEIGHT"))
     hud_end = interface.index("        // C-Left Button Icon & Ammo Count", interface.index("void Interface_Draw("))
-    hud_start = interface.rfind("        s32 blastMaskB =", 0, hud_end)
-    if hud_start < 0:
-        hud_start = interface.rfind("        if (!interfaceCtx->unk_1FA)", 0, hud_end)
-    if hud_start < 0:
-        raise RuntimeError("Missing native B HUD branch")
+    hud_start = interface.index("        bool bButtonHasAmmo =", interface.index("void Interface_Draw("))
     hud_source = hud_source.replace("/* NATIVE_HUD_DEFINES */", hud_defines)
     hud_source = hud_source.replace("/* NATIVE_B_HUD */", interface[hud_start:hud_end])
     player_code = "\n".join(definition(player, signature) for signature in (
@@ -143,12 +142,23 @@ def action(folder):
     # C's player-local identifier 'this' is reserved in the C++ fixture.
     player_code = re.sub(r"\bthis\b", "player", player_code)
     helpers, blast_update = blast_code(mask, transform)
+    helpers += "\n" + definition(mask, 'extern "C" DoAction MmMaskWear_GetBButtonDoAction(')
+    form_codes = "\n".join(re.search(rf"typedef enum {name} \{{.*?\}} {name};", form, re.S)[0]
+                           for name in ("MmFormStateId", "GoronActionId"))
+    form_prompts = "\n".join(definition(form, signature) for signature in (
+        "u8 MmForm_IsGoronRolling(", "DoAction MmForm_GetAButtonDoAction(", "DoAction MmForm_GetBButtonDoAction("))
+    route = definition(resources, 'extern "C" const char* ResourceMgr_ResolveMmHudLabel(')
+    fixture = (fixture.replace("/* FORM_STATES */", form_codes).replace("/* FORM_PROMPTS */", form_prompts)
+               .replace("/* RESOURCE_ROUTE */", route))
     fixture = fixture.replace("/* INTERFACE */", interface_code).replace("/* PLAYER_INTERFACE */", player_code)
     fixture = fixture.replace("/* BLAST_HELPERS */", helpers).replace("/* BLAST_UPDATE */", blast_update)
     # Execute the C interface code as C, preserving its original conversions.
     interface_path = folder / "interface.c"
     interface_path.write_text('#include "global.h"\n#include "textures/do_action_static/do_action_static.h"\n'
                               '#include "assets/soh_assets.h"\n#include <string.h>\n'
+                              '#include "mods/transformation_masks/transformation_masks.h"\n'
+                              '#include "mods/transformation_masks/mm_mask_wear.h"\n'
+                              '#include "soh/ResourceManagerHelpers.h"\n'
                               '#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"\n' + interface_code
                               + "\n" + hud_source)
     obj = folder / "interface.o"

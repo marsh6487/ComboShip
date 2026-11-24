@@ -252,6 +252,7 @@ mm = mm.replace('struct Play { int sceneId=0;', r'''struct Play { int sceneId=0,
     int transitionTrigger=0,transitionMode=0,transitionType=0;
     struct { bool running=true;int framerateDivisor=3; } state;
     struct { bool fillScreen=false;u8 screenFillColor[4]{};u8 sandstormPrimA=0,sandstormEnvA=0; } envCtx;
+    struct { int savePromptState=0; } pauseCtx;
     TransitionContext transitionCtx;''')
 mm = mm.replace('int queued=-1;', 'int queued=-1,queues=0;')
 mm = mm.replace('int QueuePeer(int index){queued=index;return 1;}',
@@ -276,6 +277,7 @@ constexpr int TRANS_TILE_READY=3,TRANS_TILE_OFF=0,HUD_VISIBILITY_NONE=0;
 constexpr int MINIGAME_STATUS_ACTIVE=1,MINIGAME_STATUS_END=2;
 constexpr int SEQ_PLAYER_BGM_MAIN=0,NA_BGM_FINAL_HOURS=1,NA_BGM_DISABLED=2,AMBIENCE_ID_DISABLED=0;
 constexpr int WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE=3,WEEKEVENTREG_CLEARED_STONE_TOWER_TEMPLE=4;
+constexpr int PAUSE_SAVEPROMPT_STATE_APPEARING=0,PAUSE_SAVEPROMPT_STATE_BETTER_TRANSITION=13;
 struct SceneEntranceTableEntry { void* table;int tableCount; };
 s32 gSceneEntranceTableCount=128;
 SceneEntranceTableEntry sSceneEntranceTable[128];
@@ -297,7 +299,9 @@ s32 Math_StepToS(s16* value,s16 target,s16 step) {
     else *value=std::max<int>(*value-step,target);
     return *value==target;
 }
-''' + fade_functions('mm') + r'''
+''' + fade_functions('mm') + '\n' + function(
+    (ROOT / 'mm/2s2h/Enhancements/Saving/BetterSaveMenu.cpp').read_text(),
+    'extern "C" bool BetterSaveMenu_ConsumeDirectTransition(') + r'''
 int Play_ChooseDynamicTransition(PlayState*,int type) { return type; }
 void Play_SetupTransition(PlayState* play,int type) {
     auto& ctx=play->transitionCtx;ctx={};ctx.transitionType=type;
@@ -386,7 +390,18 @@ int main() {
     NativeStep(&play);assert(play.transitionType==TRANS_TYPE_FADE_WHITE);
     for(int frame=0;frame<31 && nativeLoads==0;++frame) NativeStep(&play);
     assert(nativeLoads==1 && !play.state.running && queues==5);
-    std::cout<<"MM: native fade/wipe/fill/instant/sandstorm completion, one handoff, native local load and cancellation PASS\n";
+    assert(MM_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    play.state.running=true;
+    play.nextEntrance=ENTRANCE(GROTTOS,4);
+    play.pauseCtx.savePromptState=PAUSE_SAVEPROMPT_STATE_BETTER_TRANSITION;
+    play.transitionTrigger=TRANS_TRIGGER_START;play.transitionMode=TRANS_MODE_SETUP;
+    play.transitionType=TRANS_TYPE_FADE_BLACK;
+    NativeStep(&play);
+    assert(!Combo_MM_CrossDungeonTransitionPending());
+    assert(play.pauseCtx.savePromptState==PAUSE_SAVEPROMPT_STATE_APPEARING);
+    for(int frame=0;frame<31 && nativeLoads==1;++frame) NativeStep(&play);
+    assert(nativeLoads==2 && queues==5 && gSaveContext.save.entrance==ENTRANCE(GROTTOS,4));
+    std::cout<<"MM: native effect completion, handoff, cancellation and direct Better Save transition PASS\n";
 }
 '''
 

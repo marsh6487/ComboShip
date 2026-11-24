@@ -48,6 +48,7 @@ static void Stasis_UpdateOffer(PlayState* play,u8 enabled) { highlight=enabled; 
 static void ItemEquip_PlayUnequipSFX(PlayState* play,Player* player) { ++sfx; }
 static u8 Seasons_IsDrawn(void) { return 0; }
 static u8 CustomItems_CanStowWhip(void) { return 0; }
+static s32 Player_IsEnteringMittsClimb(const Player* player) { return 0; }
 '''
  # global.h already declares Message_CloseTextbox with external linkage
  code=code.replace('static void Message_CloseTextbox','void Message_CloseTextbox')

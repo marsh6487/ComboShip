@@ -86,12 +86,15 @@
 #include "mods/nei_oot_compat.h" // OoT->MM compat (PLAYER_STATE/PLAYER_IA/ITEM/M_PI) for the item files
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this); // defined below, called from power_keg.c
 void func_80837C20(PlayState* play, Player* this);         // native wall-climb continuation
+static s32 Player_IsEnteringMittsClimb(const Player* this);
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h"
 #include "mods/extended_player.h"
 #include "mods/extended_player.c"
 #include "mods/extended_inventory.h"
 #include "mods/extended_inventory.c"
+#include "mods/items/logic/adult_link_render.h"
+#include "mods/items/logic/item_minish_cap.h"
 #include "mods/items/logic/custom_items.c"
 #include "mods/extended_equipment.h"
 #include "mods/extended_equipment.c"
@@ -1288,7 +1291,17 @@ PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX] = {
     },
 };
 
+// Adult Link and his alternate outfits share the native tall swimmer's water depths.
+// Keep the player's other age properties and the shared form table intact.
+static const PlayerAgeProperties* Player_GetWaterAgeProperties(const Player* player) {
+    if (AdultLink_UsesAdultItemPresentation(player) && !MinishTiny_IsActive() && !PikachuForm_IsSelected()) {
+        return &sPlayerAgeProperties[PLAYER_FORM_ZORA];
+    }
+    return player->ageProperties;
+}
+
 #include "../../../../../combo/actors/ZeldaRun.h"
+#include "../../../../../combo/actors/ZoraLocomotion.h"
 PlayerAnimationHeader* D_8085BE84[PLAYER_ANIMGROUP_MAX][PLAYER_ANIMTYPE_MAX] = {
     // PLAYER_ANIMGROUP_wait
     {
@@ -2875,6 +2888,59 @@ u8 sFidgetAnimSfxTypes[] = {
     FIDGET_ANIMSFX_PIG_GRUNT,         // FIDGET_SNIFF (sword/shield in hand)
 };
 
+typedef enum ZoraLocomotionSlot {
+    ZORA_LOCOMOTION_IDLE,
+    ZORA_LOCOMOTION_WALK,
+    ZORA_LOCOMOTION_RUN,
+    ZORA_LOCOMOTION_COUNT,
+} ZoraLocomotionSlot;
+
+static PlayerAnimationHeader* Player_SelectZoraLocomotionAnim(Player* this, ZoraLocomotionSlot slot,
+                                                              PlayerAnimationHeader* fallback) {
+    if (this->transformation != PLAYER_FORM_ZORA || this->actor.id != ACTOR_PLAYER ||
+        this->skelAnime.limbCount != PLAYER_LIMB_MAX) {
+        return fallback;
+    }
+
+    static struct {
+        const char* path;
+        s16 frames;
+        bool loaded;
+        PlayerAnimationHeader* animation;
+    } clips[ZORA_LOCOMOTION_COUNT] = {
+        // Native locomotion samples these cycles at fixed frame ratios.
+        [ZORA_LOCOMOTION_IDLE] = { ZORA_LOCOMOTION_IDLE_PATH, 0 },
+        [ZORA_LOCOMOTION_WALK] = { ZORA_LOCOMOTION_WALK_PATH, 29 },
+        [ZORA_LOCOMOTION_RUN] = { ZORA_LOCOMOTION_RUN_PATH, 20 },
+    };
+    if (!clips[slot].loaded) {
+        PlayerAnimationHeader* clip =
+            ResourceMgr_LoadPlayerAnimAsHeaderInPlaceResampled(clips[slot].path, false, clips[slot].frames);
+        if (clip != NULL && clip->common.frameCount >= ZORA_LOCOMOTION_MIN_FRAMES) {
+            clips[slot].animation = clip;
+        }
+        clips[slot].loaded = true;
+    }
+    return clips[slot].animation != NULL ? clips[slot].animation : fallback;
+}
+
+// Custom idle clips have runtime headers. Only compare paths when both inputs are paths.
+static bool Player_IdleAnimEquals(PlayerAnimationHeader* animation, PlayerAnimationHeader* idle) {
+    return animation == idle || (ResourceMgr_OTRSigCheck((char*)animation) && ResourceMgr_OTRSigCheck((char*)idle) &&
+                                 strcmp((const char*)animation, (const char*)idle) == 0);
+}
+
+static PlayerAnimationHeader* Player_GetWalkAnim(Player* this) {
+    return Player_SelectZoraLocomotionAnim(this, ZORA_LOCOMOTION_WALK,
+                                           D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType]);
+}
+
+static PlayerAnimationHeader* Player_GetRunAnim(Player* this) {
+    PlayerAnimationHeader* original = D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType];
+    PlayerAnimationHeader* animation = Player_SelectZoraLocomotionAnim(this, ZORA_LOCOMOTION_RUN, original);
+    return animation != original ? animation : ZeldaRun_Select(this, original);
+}
+
 /**
  * Get the appropriate Idle animation based on either current `modelAnimType`,
  * or special cases for zora, non-player (kafei), goron, or while wearing mask of scents.
@@ -2892,7 +2958,7 @@ PlayerAnimationHeader* Player_GetIdleAnim(Player* this) {
         }
     }
     if ((this->transformation == PLAYER_FORM_ZORA) || (this->actor.id != ACTOR_PLAYER)) {
-        return &gPlayerAnim_pz_wait;
+        return Player_SelectZoraLocomotionAnim(this, ZORA_LOCOMOTION_IDLE, &gPlayerAnim_pz_wait);
     }
     if (this->transformation == PLAYER_FORM_GORON) {
         return &gPlayerAnim_pg_wait;
@@ -2920,7 +2986,7 @@ PlayerAnimationHeader* Player_GetIdleAnim(Player* this) {
 s32 Player_CheckForIdleAnim(Player* this) {
     if (!BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_link_normal_newroll_jump_end_20f) &&
         !BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_link_normal_newside_jump_end_20f)) {
-        if (!BEN_ANIM_EQUAL(this->skelAnime.animation, Player_GetIdleAnim(this)) ||
+        if (!Player_IdleAnimEquals(this->skelAnime.animation, Player_GetIdleAnim(this)) ||
             BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_cl_msbowait)) {
             PlayerAnimationHeader** fidgetAnim;
             s32 i;
@@ -2949,7 +3015,7 @@ PlayerAnimationHeader* func_8082EEE0(Player* this) {
     if (this->unk_B64 != 0) {
         return D_8085BE84[PLAYER_ANIMGROUP_damage_run][this->modelAnimType];
     } else {
-        return ZeldaRun_Select(this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]);
+        return Player_GetRunAnim(this);
     }
 }
 
@@ -4253,6 +4319,12 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
         }
         // #endregion
 
+        // Unresolved extended buttons are handled by their own item ticks.
+        // The marker's neutral action must never enter native put-away.
+        if (item == ITEM_EXT_BUTTON) {
+            return;
+        }
+
         if (item >= ITEM_FD) {
             for (i = 0; i < ARRAY_COUNT(sPlayerItemButtons); i++) {
                 if (CHECK_BTN_ALL(sPlayerControlInput->cur.button, sPlayerItemButtons[i])) {
@@ -4261,7 +4333,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
             }
 
             item = Player_GetItemOnButton(play, this, i);
-            if ((item < ITEM_FD) && (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
+            if ((item < ITEM_FD) && (item != ITEM_EXT_BUTTON) &&
+                (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
                 sPlayerHeldItemButtonIsHeldDown = true;
             }
             // #region 2S2H [Dpad]
@@ -4273,7 +4346,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 }
 
                 item = Player_Dpad_GetItemOnButton(play, this, i);
-                if ((item < ITEM_FD) && (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
+                if ((item < ITEM_FD) && (item != ITEM_EXT_BUTTON) &&
+                    (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
                     sPlayerHeldItemButtonIsHeldDown = true;
                 }
             }
@@ -4985,7 +5059,7 @@ s32 func_80831814(Player* this, PlayState* play, PlayerUnkAA5 arg2) {
           (PLAYER_STATE1_4 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_2000 | PLAYER_STATE1_4000))) {
         if (Camera_CheckValidMode(Play_GetCamera(play, CAM_ID_MAIN), CAM_MODE_FIRSTPERSON) != 0) {
             if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
-                (func_801242B4(this) && (this->actor.depthInWater < this->ageProperties->unk_2C))) {
+                (func_801242B4(this) && (this->actor.depthInWater < Player_GetWaterAgeProperties(this)->unk_2C))) {
                 this->unk_AA5 = arg2;
                 return true;
             }
@@ -5357,10 +5431,8 @@ s32 Player_SetupWaitForPutAwayWithCs(PlayState* play, Player* this, AfterPutAway
     func_8083249C(this);
     this->stateFlags2 |= PLAYER_STATE2_40;
 
-    // Mitts are the climbing equipment, so this native climb entry must retain them.
-    // Other interactions and explicit put-away still use the normal cleanup path.
-    if ((csId == CS_ID_NONE) && (afterPutAwayFunc == func_80837C20) && gMogmaMittsClimbActive &&
-        (this->heldItemAction == PLAYER_IA_MOGMA_MITTS)) {
+    if (Player_IsEnteringMittsClimb(this) && (this->heldItemAction == PLAYER_IA_MOGMA_MITTS) &&
+        !CustomItems_HasStowableHeldItem(this)) {
         return false;
     }
 
@@ -5598,9 +5670,8 @@ void Player_UpdateZTargeting(Player* this, PlayState* play) {
                     if (!(this->stateFlags1 & (PLAYER_STATE1_PARALLEL | PLAYER_STATE1_LOCK_ON_FORCED_TO_RELEASE)) &&
                         (Player_Action_95 != this->actionFunc)) {
                         Player_SetParallel(this);
-                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL &&
-                            ResourceMgr_FileExists(TP_TARGET_CAMERA_CUE)) {
-                            Audio_PlaySfx(NA_SE_SY_LOCK_ON_HUMAN);
+                        if (this == GET_PLAYER(play) && this->focusActor == NULL && this->autoLockOnActor == NULL) {
+                            MMTwilightPrincessTargeting_PlayCamera();
                         }
                     }
                 }
@@ -8038,7 +8109,7 @@ s32 func_80837730(PlayState* play, Player* this, f32 arg2, s32 scale) {
 s32 func_8083784C(Player* this) {
     if (this->actor.velocity.y < 0.0f) {
         if ((this->actor.depthInWater > 0.0f) &&
-            ((this->ageProperties->unk_2C - this->actor.depthInWater) < sPlayerYDistToFloor)) {
+            ((Player_GetWaterAgeProperties(this)->unk_2C - this->actor.depthInWater) < sPlayerYDistToFloor)) {
             if ((this->remainingHopsCounter != 0) && (gSaveContext.save.saveInfo.playerData.health != 0) &&
                 !(this->stateFlags1 & PLAYER_STATE1_4000000)) {
                 if (((this->talkActor == NULL) || !(this->talkActor->flags & ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED))) {
@@ -8132,6 +8203,11 @@ void func_80837C20(PlayState* play, Player* this) {
 
     this->av2.actionVar2 = sp1C;
     this->av1.actionVar1 = sp18;
+}
+
+static s32 Player_IsEnteringMittsClimb(const Player* this) {
+    return gMogmaMittsClimbActive && (this->actionFunc == Player_Action_WaitForPutAway) &&
+           (this->afterPutAwayFunc == func_80837C20) && (this->csId == CS_ID_NONE);
 }
 
 void func_80837C78(PlayState* play, Player* this) {
@@ -9443,8 +9519,7 @@ void func_8083A794(Player* this, PlayState* play) {
         this->unk_B70 = 0;
         this->unk_B34 = 0.0f;
         this->unk_B38 = 0.0f;
-        Player_Anim_PlayLoopMorph(play, this,
-                                  ZeldaRun_Select(this, D_8085BE84[PLAYER_ANIMGROUP_run][this->modelAnimType]));
+        Player_Anim_PlayLoopMorph(play, this, Player_GetRunAnim(this));
     }
 
     Player_SetAction(play, this, Player_IsZTargeting(this) ? Player_Action_14 : Player_Action_13, 1);
@@ -9462,8 +9537,19 @@ s32 func_8083A878(PlayState* play, Player* this, f32 arg2) {
 
     if (WaterBox_GetSurface1(play, &play->colCtx, this->actor.world.pos.x, this->actor.world.pos.z, &ySurface,
                              &waterBox)) {
-        ySurface -= this->actor.world.pos.y;
-        if (this->ageProperties->unk_24 <= ySurface) {
+        f32 depth = ySurface - this->actor.world.pos.y;
+        const PlayerAgeProperties* waterProperties = Player_GetWaterAgeProperties(this);
+        bool spawnSwimming = depth >= waterProperties->unk_24;
+        if (spawnSwimming && waterProperties != this->ageProperties && depth <= waterProperties->unk_2C) {
+            // This runs before the regular floor check, including on entrances above deep water.
+            CollisionPoly* floor = NULL;
+            s32 bgId;
+            Vec3f rayStart = this->actor.world.pos;
+            rayStart.y += 1.0f;
+            f32 floorY = BgCheck_EntityRaycastFloor5(&play->colCtx, &floor, &bgId, &this->actor, &rayStart);
+            spawnSwimming = floor == NULL || ySurface - floorY > waterProperties->unk_2C;
+        }
+        if (spawnSwimming) {
             Player_SetAction(play, this, Player_Action_55, 0);
             Player_Anim_PlayLoopSlowMorph(play, this, &gPlayerAnim_link_swimer_swim);
             this->stateFlags1 |= (PLAYER_STATE1_8000000 | PLAYER_STATE1_20000000);
@@ -9751,7 +9837,7 @@ s32 func_8083B3B4(PlayState* play, Player* this, Input* input) {
          ((this->stateFlags2 & PLAYER_STATE2_400) &&
           (((Player_Action_56 != this->actionFunc) && !(this->stateFlags3 & PLAYER_STATE3_8000)) ||
            (this->unk_AAA < -0x1555)))) &&
-        ((this->actor.depthInWater - this->actor.velocity.y) < this->ageProperties->unk_30)) {
+        ((this->actor.depthInWater - this->actor.velocity.y) < Player_GetWaterAgeProperties(this)->unk_30)) {
         s32 temp_v0_3;
         s16 sp2A;
         f32 sp24;
@@ -9871,7 +9957,8 @@ void func_8083B930(PlayState* play, Player* this) {
                                           : &gPlayerAnim_link_swimer_land2swim_wait);
         }
     }
-    if (!(this->stateFlags1 & PLAYER_STATE1_8000000) || (this->actor.depthInWater < this->ageProperties->unk_2C)) {
+    if (!(this->stateFlags1 & PLAYER_STATE1_8000000) ||
+        (this->actor.depthInWater < Player_GetWaterAgeProperties(this)->unk_2C)) {
         func_8083B8D0(play, this);
     }
 
@@ -9884,7 +9971,8 @@ void func_8083B930(PlayState* play, Player* this) {
 }
 
 void func_8083BB4C(PlayState* play, Player* this) {
-    f32 sp1C = this->actor.depthInWater - this->ageProperties->unk_2C;
+    const PlayerAgeProperties* waterProperties = Player_GetWaterAgeProperties(this);
+    f32 sp1C = this->actor.depthInWater - waterProperties->unk_2C;
 
     // Skijer's NEI: Iron boots underwater = MM's OWN bottom-walk mechanism, the one the Zora gets by
     // pressing B (func_8083A04C sets currentBoots = PLAYER_BOOTS_ZORA_UNDERWATER). Forcing that boot
@@ -9898,7 +9986,7 @@ void func_8083BB4C(PlayState* play, Player* this) {
     // MM's underwater-walk actions engage, so Link just bobbed at swim depth.
     if (this->transformation == PLAYER_FORM_HUMAN) {
         if (VanillaTB_IsIronBoots() && (this->stateFlags1 & PLAYER_STATE1_8000000) &&
-            (this->actor.depthInWater > this->ageProperties->unk_24)) {
+            (this->actor.depthInWater > waterProperties->unk_24)) {
             this->currentBoots = PLAYER_BOOTS_ZORA_UNDERWATER;
         } else if (this->currentBoots == PLAYER_BOOTS_ZORA_UNDERWATER) {
             this->currentBoots = PLAYER_BOOTS_HYLIAN;
@@ -9930,7 +10018,12 @@ void func_8083BB4C(PlayState* play, Player* this) {
     if ((this->actor.parent == NULL) && (Player_Action_33 != this->actionFunc) &&
         (Player_Action_49 != this->actionFunc) &&
         ((Player_Action_28 != this->actionFunc) || (this->actor.velocity.y < -2.0f))) {
-        if (this->ageProperties->unk_2C < this->actor.depthInWater) {
+        // Test the depth above the floor, since a swimmer also floats near the surface of deep water.
+        bool adultShallows =
+            waterProperties != this->ageProperties && this->currentBoots < PLAYER_BOOTS_ZORA_UNDERWATER &&
+            (this->actor.bgCheckFlags & BGCHECKFLAG_WATER) && this->actor.floorPoly != NULL &&
+            this->actor.world.pos.y + this->actor.depthInWater - this->actor.floorHeight <= waterProperties->unk_2C;
+        if (waterProperties->unk_2C < this->actor.depthInWater) {
             if (this->transformation == PLAYER_FORM_GORON) {
                 func_80834140(play, this, &gPlayerAnim_link_swimer_swim_down);
                 func_808345C8();
@@ -9971,7 +10064,7 @@ void func_8083BB4C(PlayState* play, Player* this) {
                 func_8083B930(play, this);
             }
         } else if ((this->stateFlags1 & PLAYER_STATE1_8000000) &&
-                   (this->actor.depthInWater < this->ageProperties->unk_24) &&
+                   ((this->actor.depthInWater < waterProperties->unk_24) || adultShallows) &&
                    (((Player_Action_56 != this->actionFunc) && !(this->stateFlags3 & PLAYER_STATE3_8000)) ||
                     (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND))) {
             if (this->skelAnime.movementFlags == 0) {
@@ -10113,7 +10206,7 @@ void func_8083BF54(PlayState* play, Player* this) {
             }
         }
 
-        if (this->ageProperties->unk_2C < this->actor.depthInWater) {
+        if (Player_GetWaterAgeProperties(this)->unk_2C < this->actor.depthInWater) {
             s32 numBubbles = 0;
             s32 i;
             f32 var_fv1;
@@ -10612,7 +10705,7 @@ s32 Player_ActionHandler_9(Player* this, PlayState* play) {
 s32 func_8083D860(Player* this, PlayState* play) {
     if ((this->yDistToLedge >= 79.0f) &&
         (!(this->stateFlags1 & PLAYER_STATE1_8000000) || (this->currentBoots == PLAYER_BOOTS_ZORA_UNDERWATER) ||
-         (this->actor.depthInWater < this->ageProperties->unk_2C))) {
+         (this->actor.depthInWater < Player_GetWaterAgeProperties(this)->unk_2C))) {
         s32 var_t0 = (sPlayerTouchedWallFlags & WALL_FLAG_3) ? 2 : 0;
         s32 temp_t2 = sPlayerTouchedWallFlags & WALL_FLAG_1;
 
@@ -11120,7 +11213,7 @@ void Player_ChooseNextIdleAnim(PlayState* play, Player* this) {
     }
 
     endFrame = Animation_GetLastFrame(anim);
-    if ((BEN_ANIM_EQUAL(this->skelAnime.animation, anim)) ||
+    if (Player_IdleAnimEquals(this->skelAnime.animation, anim) ||
         (BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_pz_attackAend)) ||
         (BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_pz_attackBend)) ||
         (BEN_ANIM_EQUAL(this->skelAnime.animation, gPlayerAnim_pz_attackCend))) {
@@ -11222,6 +11315,7 @@ void func_8083F27C(PlayState* play, Player* this) {
 }
 
 void func_8083F358(Player* this, s32 arg1, PlayState* play) {
+    PlayerAnimationHeader* walkAnim = Player_GetWalkAnim(this);
     PlayerAnimationHeader* climbAnim;
     f32 var_fv1;
     s16 var_a1;
@@ -11235,11 +11329,9 @@ void func_8083F358(Player* this, s32 arg1, PlayState* play) {
     Math_ScaledStepToS(&this->unk_B70, var_a1, 0x190);
     if ((this->modelAnimType == PLAYER_ANIMTYPE_3) || ((this->unk_B70 == 0) && (this->unk_AB8 <= 0.0f))) {
         if (!arg1) {
-            PlayerAnimation_LoadToJoint(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType],
-                                        this->unk_B38);
+            PlayerAnimation_LoadToJoint(play, &this->skelAnime, walkAnim, this->unk_B38);
         } else {
-            PlayerAnimation_LoadToMorph(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType],
-                                        this->unk_B38);
+            PlayerAnimation_LoadToMorph(play, &this->skelAnime, walkAnim, this->unk_B38);
         }
         return;
     }
@@ -11263,11 +11355,11 @@ void func_8083F358(Player* this, s32 arg1, PlayState* play) {
     }
 
     if (!arg1) {
-        PlayerAnimation_BlendToJoint(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType],
-                                     this->unk_B38, climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
+        PlayerAnimation_BlendToJoint(play, &this->skelAnime, walkAnim, this->unk_B38, climbAnim, this->unk_B38, var_fv1,
+                                     this->blendTableBuffer);
     } else {
-        PlayerAnimation_BlendToMorph(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType],
-                                     this->unk_B38, climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
+        PlayerAnimation_BlendToMorph(play, &this->skelAnime, walkAnim, this->unk_B38, climbAnim, this->unk_B38, var_fv1,
+                                     this->blendTableBuffer);
     }
 }
 
@@ -11280,8 +11372,7 @@ void func_8083F57C(Player* this, PlayState* play) {
 
         temp_fs0 = R_UPDATE_RATE / 2.0f;
         func_8083EA44(this, REG(35) / 1000.0f);
-        PlayerAnimation_LoadToJoint(play, &this->skelAnime, D_8085BE84[PLAYER_ANIMGROUP_walk][this->modelAnimType],
-                                    this->unk_B38);
+        PlayerAnimation_LoadToJoint(play, &this->skelAnime, Player_GetWalkAnim(this), this->unk_B38);
 
         // required
         this->unk_B34 += 1 * temp_fs0;
@@ -13609,11 +13700,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     Seasons_TickInput(play, this, input);
 
     // Sheikah Slate: C casts the active rune, hold L opens the rune row. Skijer's NEI
-    {
-        extern void Slate_TickInput(PlayState * play, Player * player);
-
-        Slate_TickInput(play, this);
-    }
+    Slate_TickInput(play, this, input);
 
     // Phantom Hourglass: C raises it, C recalls the painted target, C lets go. Skijer's NEI
     {
@@ -13724,7 +13811,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
             if (this->currentBoots == PLAYER_BOOTS_ZORA_UNDERWATER) {
                 if (this->stateFlags1 & PLAYER_STATE1_8000000) {
                     func_8082DC64(play, this);
-                    if (this->ageProperties->unk_2C < this->actor.depthInWater) {
+                    if (Player_GetWaterAgeProperties(this)->unk_2C < this->actor.depthInWater) {
                         this->stateFlags2 |= PLAYER_STATE2_400;
                     }
                 }
@@ -14694,9 +14781,6 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     // then hide vanilla Link. Same hide+draw contract as the SM64 block above. No-op unless adult
     // mode is ON and oot.o2r is loaded, so it cleanly falls back to vanilla Link when unavailable.
     {
-        extern s32 AdultLink_ShouldHide(void);
-        extern s32 AdultLink_UsesAdultItemPresentation(const Player* player);
-        extern void AdultLink_Draw(PlayState * play, Player * player);
         if (AdultLink_ShouldHide()) {
             DinFireSword_BeginPlayerDraw(play, this);
             AdultLink_Draw(play, this);
@@ -15238,7 +15322,7 @@ void func_808475B4(Player* this) {
     f32 temp_fa1;
     f32 temp_fv0;
     f32 var_ft4 = -5.0f;
-    f32 var_ft5 = this->ageProperties->unk_28;
+    f32 var_ft5 = Player_GetWaterAgeProperties(this)->unk_28;
     f32 var_ft5_4;
 
     temp_fv0 = this->actor.depthInWater - var_ft5;
@@ -16353,7 +16437,7 @@ void Player_Action_Idle(Player* this, PlayState* play) {
     } else {
         Math_ScaledStepToS(&this->actor.shape.rot.y, yawTarget, 0x4B0);
         this->yaw = this->actor.shape.rot.y;
-        if (BEN_ANIM_EQUAL(Player_GetIdleAnim(this), this->skelAnime.animation)) {
+        if (Player_IdleAnimEquals(this->skelAnime.animation, Player_GetIdleAnim(this))) {
             func_8083C6E8(this, play);
         }
     }
@@ -19021,7 +19105,8 @@ void Player_Action_56(Player* this, PlayState* play) {
             sp3E = CLAMP_MAX(sp3E, (s16)(this->floorPitch - 0xFA0));
         }
 
-        if ((this->unk_AAA >= -0x1555) && (this->actor.depthInWater < (this->ageProperties->unk_24 + 10.0f))) {
+        if ((this->unk_AAA >= -0x1555) &&
+            (this->actor.depthInWater < (Player_GetWaterAgeProperties(this)->unk_24 + 10.0f))) {
             sp3E = CLAMP_MIN(sp3E, 0x7D0);
         }
         Math_SmoothStepToS(&this->unk_AAA, sp3E, 4, 0xFA0, 0x190);
@@ -19176,7 +19261,7 @@ void Player_Action_59(Player* this, PlayState* play) {
             }
         }
 
-        temp_fv0 = (this->actor.depthInWater - this->ageProperties->unk_30) * 0.04f;
+        temp_fv0 = (this->actor.depthInWater - Player_GetWaterAgeProperties(this)->unk_30) * 0.04f;
         if (temp_fv0 < this->actor.velocity.y) {
             this->actor.velocity.y = temp_fv0;
         }

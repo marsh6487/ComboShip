@@ -33,8 +33,10 @@ def main():
     ri = sorted(set(re.findall(r"\bRI_[A-Z_0-9]+", relays[1])))
     fixture = fixture.replace("/* NATIVE_IDS */", "enum RandomizerGet {" + ",".join(rg) + "};\n" +
                               "enum RandoItemId {" + ",".join(ri) + "};")
-    fixture = fixture.replace("/* FLOOR_EXPORTS */", function(oot, "SOH_ApplySharedMagicFloor") + "\n" +
+    fixture = fixture.replace("/* MAGIC_EXPORTS */", function(oot, "SOH_ApplySharedMagicFloor") + "\n" +
                               function(mm, "MM_ApplySharedMagicFloor") + "\n" +
+                              function(oot, "SOH_GetRpgMagicProgress") + "\n" +
+                              function(mm, "MM_ApplyRpgMagicProgress") + "\n" +
                               function(read("mm/mods/combo_rpg.cpp"), "ComboRpg_NativeMagicTier"))
     getters = ""
     for host, source in (("Oot", oot), ("Mm", mm)):

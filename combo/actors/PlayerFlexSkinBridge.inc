@@ -54,6 +54,10 @@ const void* PlayerSkinResolve(void** skeleton, int matrixCount, const std::strin
 }
 } // namespace
 
+extern "C" void PlayerFlexSkin_ClearCache(void) {
+    playerSkinCache.clear();
+}
+
 extern "C" const void* PlayerFlexSkin_GetPlan(void** skeleton, s32 matrixCount) {
     if (!skeleton || matrixCount < 1 || matrixCount > 32) return nullptr;
     // A private PAK/o2r skeleton must use its own source, never a vanilla alias

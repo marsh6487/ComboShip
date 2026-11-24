@@ -1,4 +1,6 @@
 #include "global.h"
+#include "2s2h/resource/type/PlayerAnimation.h"
+#include "mods/forms/custom_forms.h"
 #include "BenPort.h"
 #include "2s2h/resource/type/Array.h"
 #include "2s2h/resource/type/Skeleton.h"
@@ -8,6 +10,7 @@
 #include <ship/resource/ResourceManager.h>
 #include <ship/resource/archive/ArchiveManager.h>
 extern "C" bool ResourceMgr_IsAltAssetsEnabled();
+extern "C" int ResourceMgr_OTRSigCheck(char* path);
 extern "C" uint8_t ResourceMgr_FileExists(const char* path);
 extern "C" uint8_t ResourceMgr_FileAltExists(const char* path);
 
@@ -22,3 +25,9 @@ static std::shared_ptr<Ship::IResource> PlayerFlexSkin_Load(const std::string& p
     return manager->LoadResource(path);
 }
 #include "../../../../combo/actors/PlayerFlexSkinBridge.inc"
+
+static bool PlayerFlexSkin_SeasonalIdleHostEligible(const Player& player) {
+    return player.transformation == PLAYER_FORM_HUMAN && !(player.stateFlags1 & PLAYER_STATE1_100000) &&
+           CustomForms_ActiveForm() == CUSTOM_FORM_NONE;
+}
+#include "../../../../combo/actors/SeasonalIdleBridge.inc"

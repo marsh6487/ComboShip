@@ -1735,8 +1735,13 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* dlPathOrPtr) {
     if (formDL != NULL) {
         return formDL;
     }
-    Gfx* resolved = ResourceMgr_LoadGfxByName(dlPathOrPtr);
-    if (dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0) {
+    const bool isResource = dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0;
+    // The third-person callback resolves a native resource to a pointer here,
+    // before GbiWrap has a chance to apply the seasonal alias used in FPS.
+    Gfx* resolved = isResource ? PakLoader_GetSeasonalDLOverride((const char*)dlPathOrPtr) : NULL;
+    if (resolved == NULL)
+        resolved = ResourceMgr_LoadGfxByName(dlPathOrPtr);
+    if (isResource) {
         const char* path = (const char*)dlPathOrPtr;
         int model = SwordAura_ResourceModel(path, NULL, 0);
         if (model >= 0) {

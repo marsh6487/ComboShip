@@ -11,6 +11,7 @@
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
+#include "2s2h/Enhancements/Saving/BetterSaveMenu.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] LUSLOG_ERROR (transition guard)
 #include "regs.h"
 #include "functions.h"
@@ -644,7 +645,7 @@ void Play_UpdateTransition(PlayState* this) {
         case TRANS_MODE_SETUP: {
 #ifdef COMBO_BUILD
             extern int Combo_MM_CrossDungeonTransition(int32_t * index);
-            if (this->transitionTrigger != TRANS_TRIGGER_END) {
+            if (this->transitionTrigger != TRANS_TRIGGER_END && !BetterSaveMenu_ConsumeDirectTransition(this)) {
                 int32_t composedEntrance = this->nextEntrance;
                 // A foreign route keeps its native movement/camera/effect until completion.
                 if (!Combo_MM_CrossDungeonTransition(&composedEntrance)) {

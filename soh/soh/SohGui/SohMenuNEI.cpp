@@ -559,8 +559,9 @@ void RegisterNEIMenu() {
         .PreFunc(
             [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
         .Options(CheckboxOptions().Tooltip(
-            "Adds exactly one Magic Mirror to the pool and randomizes the Lost Woods stump reward.\n"
-            "Off keeps the fixed Mirror on the stump. Works independently of Enable Custom Items."));
+            "Adds one Magic Mirror to the item pool. The Lost Woods stump stays optional in Combo.\n"
+            "In single-game mode, the stump reward shuffles too. Off keeps the Mirror on the stump.\n"
+            "Independent of Enable Custom Items."));
     mSohMenu
         ->AddWidgetAfter(seasonsPath, CVAR_RANDOMIZER_SETTING("ShuffleMagicMirror"), "Start with Rod of Seasons",
                          WIDGET_CVAR_CHECKBOX)
@@ -1027,7 +1028,7 @@ void RegisterNEIMenu() {
                 CheckboxOptions().DefaultValue(false).Tooltip("Automatically use outfits for the current season. Off "
                                                               "or a missing outfit keeps your normal player model."));
         mSohMenu->AddWidget(path, "Outfit Set", WIDGET_CVAR_COMBOBOX)
-            .CVar("gEnhancements.SeasonalOutfits.SetIndex")
+            .CVar(SEASONAL_OUTFITS_INDEX_CVAR)
             .PreFunc([](WidgetInfo& info) {
                 auto options = std::static_pointer_cast<UIWidgets::ComboboxOptions>(info.options);
                 options->comboMap.clear();
@@ -1041,7 +1042,7 @@ void RegisterNEIMenu() {
                     if (std::strcmp(selected, set) == 0)
                         selectedIndex = i;
                 }
-                CVarSetInteger("gEnhancements.SeasonalOutfits.SetIndex", selectedIndex);
+                CVarSetInteger(SEASONAL_OUTFITS_INDEX_CVAR, selectedIndex);
                 options->disabled = count == 0;
                 options->disabledTooltip = "Install an outfit set for this game, then restart.";
             })

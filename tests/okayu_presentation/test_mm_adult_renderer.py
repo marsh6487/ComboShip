@@ -83,7 +83,9 @@ def main():
     upgrade = (source / 'mm/mods/items/logic/weapon_upgrades.c').read_text()
     native = (source / 'mm/src/code/z_player_lib.c').read_text()
     production = adult[adult.index('static Gfx* sDL_LHOpen;'):adult.index('// A MOD head mesh')]
+    production = ''.join(line + '\n' for line in adult.splitlines() if line.startswith('#define ALC(')) + production
     for signature in ('static Gfx* AdultLink_LoadDL(', 'static Gfx* AdultLink_LoadModelDL(',
+                      'static Gfx* AdultLink_SeasonalChildEquipment(',
                       'static s32 AdultLink_Setup(', 'static void AdultLink_ApplyNeiHeldHand(',
                       'static void AdultLink_ApplyRootTransform(',
                       'static s32 AdultLink_OverrideLimb(', 'static s32 AdultLink_OverrideFirstPerson('):

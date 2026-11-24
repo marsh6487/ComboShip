@@ -519,7 +519,7 @@ static u8 PikaAnims_EnsureLoaded(void) {
         return 0;
     }
 
-    FILE* fp = fopen(path, "rb");
+    FILE* fp = Nei_OpenCrossoverFile(path);
     if (fp == NULL) {
         return 0;
     }
@@ -643,6 +643,12 @@ extern "C" u8 PikachuForm_LoadSkeleton(PlayState* play) {
     // Load them once and fill pikachu_ssbb_all_anims[]; without the binary Pikachu
     // cannot animate, so the transform is unavailable (drop the .bin in the nei folder).
     if (!PikaAnims_EnsureLoaded()) {
+        static bool reportedMissingPack = false;
+        if (!reportedMissingPack) {
+            lusprintf(__FILE__, __LINE__, 2,
+                      "[Pikachu] Could not load pikachu_anims.bin from nei/soh, nei, or the game directory.");
+            reportedMissingPack = true;
+        }
         return 0;
     }
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import re, subprocess, tempfile
 ROOT = Path(__file__).resolve().parents[2]
 def function(source, name):
-    found = re.search(r'^(?:extern "C" )?(?:static )?(?:inline )?(?:s32|void|bool|const char\*) '+name+r'\([^;{}]*\)\s*\{',source,re.M)
+    found = re.search(r'^(?:extern "C" )?(?:static )?(?:inline )?(?:s32|void|bool|const char\*|Gfx\*) '+name+r'\([^;{}]*\)\s*\{',source,re.M)
     assert found, name
     end=found.end();depth=1
     while depth:
@@ -94,3 +94,126 @@ int main(){
     assert 'MMWeather_' not in function(source,'PakLoader_UpdateSeasonalSelection')
     assert 'if (!privateBodyFile && archiveManager)' in source
 print('PASS source private discovery and weather-independent gameplay-season contract')
+
+with tempfile.TemporaryDirectory(prefix='seasonal-equipment-oot-') as directory:
+    path = Path(directory)
+    loader = (ROOT / 'soh/mods/pak_loader/pak_loader.cpp').read_text()
+    player = (ROOT / 'soh/src/code/z_player_lib.c').read_text()
+    native = function(loader, 'PakLoader_GetSeasonalDLOverride')
+    native += '\n' + function(player, 'Player_ResolveLimbDLForDummyOrLocal')
+    (path / 'test.cpp').write_text(r'''
+#include <cassert>
+#include <cstring>
+#include <string>
+struct Gfx { int marker; };
+Gfx stock{1}, outfit{2}, form{3}, remote{4};
+bool selected=true, available=true, customForm=false, peer=false;
+std::string requested;
+const char* PakLoader_GetSeasonalSkeletonPath() {
+    return selected && !peer ? "__OTR__objects/seasonal_outfits/din/adult/winter/gLinkAdultSkel" : nullptr;
+}
+bool ResourceMgr_FileExists(const char* path) {
+    requested=path;
+    return available;
+}
+Gfx* ResourceMgr_LoadGfxByName(const void* path) {
+    if (path == nullptr)
+        return nullptr;
+    return !std::strncmp(static_cast<const char*>(path), "__OTR__objects/seasonal_outfits/", 32) ? &outfit : &stock;
+}
+void* MmForm_KafeiWhistleHandDL(const char*) { return nullptr; }
+void* HarpoonSkinSync_ResolvePlayerLimbDL(const char*) { return peer ? &remote : nullptr; }
+void* CustomForms_ResolveVanillaResource(const char*) { return customForm ? &form : nullptr; }
+int SwordAura_ResourceModel(const char*, const Gfx*, size_t) { return -1; }
+size_t ResourceGetSizeByName(const char*) { return sizeof(Gfx); }
+const void* ResourceGetDataByName(const char*) { return nullptr; }
+void DinFireSword_SetHandModel(void*, const Gfx*, int) {}
+/* NATIVE */
+int main() {
+    char sword[] = "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsNearDL";
+    char shield[] = "__OTR__objects/object_link_boy/gLinkAdultRightHandHoldingHylianShieldFarDL";
+    char aim[] = "__OTR__alt/objects/object_link_boy/gLinkAdultRightHandHoldingBowFirstPersonDL";
+    char gi[] = "__OTR__objects/object_gi_sword/gGiSwordDL";
+    assert(Player_ResolveLimbDLForDummyOrLocal(sword) == &outfit);
+    assert(requested == "__OTR__objects/seasonal_outfits/din/adult/winter/gLinkAdultLeftHandHoldingBgsNearDL");
+    assert(Player_ResolveLimbDLForDummyOrLocal(shield) == &outfit);
+    assert(PakLoader_GetSeasonalDLOverride(aim) == &outfit);
+    assert(requested == "__OTR__objects/seasonal_outfits/din/adult/winter/gLinkAdultRightHandHoldingBowFirstPersonDL");
+    assert(Player_ResolveLimbDLForDummyOrLocal(gi) == &stock);
+    available=false;
+    assert(Player_ResolveLimbDLForDummyOrLocal(sword) == &stock);
+    available=true;selected=false;
+    assert(Player_ResolveLimbDLForDummyOrLocal(sword) == &stock);
+    selected=true;customForm=true;
+    assert(Player_ResolveLimbDLForDummyOrLocal(sword) == &form);
+    peer=true;
+    assert(Player_ResolveLimbDLForDummyOrLocal(sword) == &remote);
+    assert(PakLoader_GetSeasonalDLOverride(aim) == nullptr);
+}
+'''.replace('/* NATIVE */', native))
+    subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined',
+                    '-fno-omit-frame-pointer', '-fno-pie', '-no-pie', str(path / 'test.cpp'),
+                    '-o', str(path / 'test')], check=True)
+    subprocess.run([str(path / 'test')], check=True)
+print('PASS seasonal OoT gameplay and aiming aliases, ownership priority and GI isolation')
+
+with tempfile.TemporaryDirectory(prefix='seasonal-outfit-config-') as directory:
+    path = Path(directory)
+    context = path / 'ship/Context.h'
+    context.parent.mkdir()
+    context.write_text(r'''
+#pragma once
+#include "ship/config/ConsoleVariable.h"
+namespace Ship {
+class Context {
+  public:
+    static Context* GetRawInstance() {
+        static Context context;
+        return &context;
+    }
+    std::shared_ptr<ConsoleVariable> GetConsoleVariables() const { return variables; }
+  private:
+    std::shared_ptr<ConsoleVariable> variables = std::make_shared<ConsoleVariable>();
+};
+}
+''')
+    (path / 'test.cpp').write_text(r'''
+#include "combo/actors/SeasonalOutfitsConfig.h"
+#include <cassert>
+#include <map>
+
+static std::map<std::string, std::string> cvars;
+namespace Ship {
+ConsoleVariable::ConsoleVariable() = default;
+ConsoleVariable::~ConsoleVariable() = default;
+std::shared_ptr<CVar> ConsoleVariable::Get(const char* key) {
+    return cvars.contains(key) ? std::make_shared<CVar>() : nullptr;
+}
+void ConsoleVariable::CopyVariable(const char* from, const char* to) { cvars[to] = cvars.at(from); }
+void ConsoleVariable::ClearVariable(const char* key) { cvars.erase(key); }
+}
+
+int main() {
+    const char* oldSet = "gEnhancements.SeasonalOutfits.Set";
+    const char* oldIndex = "gEnhancements.SeasonalOutfits.SetIndex";
+    const std::string oldPrefix = std::string(SEASONAL_OUTFITS_CVAR) + ".";
+    cvars = {{SEASONAL_OUTFITS_CVAR, "1"}, {oldSet, "custom-set"}, {oldIndex, "5"}};
+    SeasonalOutfits::MigrateOutfitSetConfig();
+    assert(cvars.at(SEASONAL_OUTFITS_CVAR) == "1");
+    assert(cvars.at(SEASONAL_OUTFITS_SET_CVAR) == "custom-set");
+    assert(!CVarExists(oldSet) && !CVarExists(oldIndex));
+    assert(std::string(SEASONAL_OUTFITS_INDEX_CVAR).rfind(oldPrefix, 0) != 0);
+    assert(std::string(SEASONAL_OUTFITS_SET_CVAR).rfind(oldPrefix, 0) != 0);
+    cvars[oldSet] = "old-choice";
+    SeasonalOutfits::MigrateOutfitSetConfig();
+    SeasonalOutfits::MigrateOutfitSetConfig();
+    assert(cvars.at(SEASONAL_OUTFITS_SET_CVAR) == "custom-set");
+    assert(!CVarExists(oldSet));
+}
+''')
+    bridge = ROOT / 'libultraship/src/libultraship/bridge/consolevariablebridge.cpp'
+    subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
+                    '-Wl,--gc-sections', '-I', str(path), '-I', str(ROOT), '-I', str(ROOT / 'libultraship/include'),
+                    str(path / 'test.cpp'), str(bridge), '-o', str(path / 'test')], check=True)
+    subprocess.run([str(path / 'test')], check=True)
+print('PASS seasonal configuration migration and non-conflicting persistence keys')

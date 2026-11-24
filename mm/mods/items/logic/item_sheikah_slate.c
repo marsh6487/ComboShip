@@ -220,7 +220,7 @@ static s32 Slate_BuildWheel(BoxMenuEntry* out) {
  * Per-frame slate input, called from Player_UpdateCommon. Owns nothing else: if the slate is not
  * owned, or is on no button, this is a no-op.
  */
-void Slate_TickInput(PlayState* play, Player* player) {
+void Slate_TickInput(PlayState* play, Player* player, Input* input) {
     BoxMenuEntry entries[SLATE_RUNE_COUNT];
     u16 btnMask;
     u16 held;
@@ -335,10 +335,20 @@ void Slate_TickInput(PlayState* play, Player* player) {
             ItemEquip_PlayEquipSFX(play, player);
             return;
         }
-        Slate_CastPose(play, player);
-        if (!Slate_CastRune(player, play, Slate_GetRune())) {
-            // Every rune is still a stub, so this is the normal path today.
+        u8 rune = Slate_GetRune();
+        if (rune != SLATE_RUNE_BOMB) {
+            Slate_CastPose(play, player);
+        }
+        if (!Slate_CastRune(player, play, rune)) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
+        } else if (rune == SLATE_RUNE_BOMB) {
+            if (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) {
+                // Native carry handling runs after this tick. A cast press must not also
+                // drop or throw the bomb that it just spawned or armed.
+                input->press.button &= ~btnMask;
+            } else {
+                Slate_CastPose(play, player);
+            }
         }
     }
 }

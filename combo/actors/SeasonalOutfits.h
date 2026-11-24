@@ -5,7 +5,8 @@
 #include <string>
 
 #define SEASONAL_OUTFITS_CVAR "gEnhancements.SeasonalOutfits"
-#define SEASONAL_OUTFITS_SET_CVAR "gEnhancements.SeasonalOutfits.Set"
+#define SEASONAL_OUTFITS_SET_CVAR "gEnhancements.SeasonalOutfitSet"
+#define SEASONAL_OUTFITS_INDEX_CVAR "gEnhancements.SeasonalOutfitSetIndex"
 
 namespace SeasonalOutfits {
 // A reflected/cutscene/remote player can draw repeatedly in one graphics

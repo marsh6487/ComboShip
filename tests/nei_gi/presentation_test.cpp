@@ -49,6 +49,7 @@ bool SameVertices(const std::vector<Vtx>& a, const std::vector<Vtx>& b) {
 }
 bool portableSongLists=false;
 bool selectedCustomLists=false;
+bool legacyZssLongswordGi=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::map<std::string, int> cosmeticFlags;
@@ -79,6 +80,7 @@ void Reset() {
   arena.clear();
   portableSongLists=false;
   selectedCustomLists=false;
+  legacyZssLongswordGi=false;
   pendingVertices = nullptr;
   pendingVertexBytes = 0;
   vertexLoads.clear();
@@ -192,6 +194,7 @@ int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
   return Fixture::modFiles.contains({game,selected});
 }
 int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
+int ResourceMgr_IsLegacyZssLongswordGi() { return Fixture::legacyZssLongswordGi; }
 int ResourceMgr_IsGiModelAvailableForGame(const char* game,const char* path) {
   bool selectedAlt=Fixture::alt;
 #ifdef COMBO_BUILD
@@ -1223,13 +1226,26 @@ int main() {
     const size_t shimmerBefore = arena.size();
     assert(NeiGi_Draw(&play,&entry));
     assert(vanilla == nativeBefore && Drawn().back() == selected && arena.size() == shimmerBefore + 2);
-    files.erase(selected);
+    if (test.first == GID_SWORD_BGS) {
+      legacyZssLongswordGi = true;
+      assert(NeiGi_Draw(&play,&entry));
+      assert(vanilla == nativeBefore && Drawn().back() == path);
+      const std::string redesignedAlt = "alt/" + path;
+      files.insert(redesignedAlt);
+      modFiles.insert({"oot", redesignedAlt});
+      assert(NeiGi_Draw(&play,&entry));
+      assert(vanilla == nativeBefore && Drawn().back() == path);
+      files.erase(redesignedAlt);
+      modFiles.clear();
+    }
+    const size_t beforeFire = arena.size();
     const char* fire=test.first==GID_SWORD_KOKIRI ?
       "__OTR__objects/din_fire_sword/progressive/child/SwordDL" :
       "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     files.insert(fire); dinSword=1;
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 4);
+    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == beforeFire + 2);
+    files.erase(selected);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
   // A selected mod can also replace a redesigned GI pass itself. Exact path

@@ -61,7 +61,9 @@ extern "C" NeiSaveData* Nei_Save() {
 extern "C" u16 Nei_GetOwnedItem(u8 slot) {
     return Nei_Save()->ownedItems[slot - 24];
 }
+extern "C" {
 #include "weather_seasons.inc"
+}
 
 extern "C" void Skybox_Calculate128(SkyboxContext*, s32) {
     ++skyRebuilds;
@@ -654,6 +656,11 @@ static void GatedSeasonWeatherRegression() {
     WEEKEVENTREG(WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE >> 8) &= ~(WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE & 0xFF);
     WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE >> 8) &= ~(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE & 0xFF);
     assert(MMWeather_SeasonForPlay(&play) == SEASON_WINTER);
+    settings[MM_WEATHER_CVAR("Season")] = -1;
+    play.skyboxId = SKYBOX_NONE;
+    assert(MMWeather_SeasonForPlay(&play) == -1 && MMWeather_IsWinterWater(&play));
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    settings.erase(MM_WEATHER_CVAR("Season"));
     Seasons_SetSeason(SEASON_OFF);
     MMWeather_Update(&play);
     assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
@@ -691,11 +698,15 @@ static void ManualSeasonWeatherRegression() {
     for (int season : { SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
         settings[MM_WEATHER_CVAR("Season")] = season;
         assert(MMWeather_SeasonForPlay(&play) == season);
+        assert(MMWeather_IsWinterWater(&play) == (season == SEASON_WINTER));
         MMWeather_Update(&play);
         assert(MMWeather_Season() == season);
         assert(std::memcmp(&progress, &nei, sizeof(nei)) == 0);
         assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
     }
+    gSaveContext.gameMode = GAMEMODE_TITLE_SCREEN;
+    assert(!MMWeather_IsWinterWater(&play) && !MMWeather_IsWinterWater(nullptr));
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
     settings[MM_WEATHER_CVAR("Season")] = SEASON_SPRING;
     settings[MM_WEATHER_CVAR("Spring.RainMode")] = 1;
     AdvanceRain(&play);

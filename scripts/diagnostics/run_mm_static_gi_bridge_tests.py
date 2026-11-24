@@ -17,7 +17,8 @@ a = owner.index('    switch (rg) {', owner.index('// Bombchu Bag:'))
 b = owner.index('\n// Items whose model', a)
 stats=owner[owner.index('    // RPG stat models'):owner.index('    // Boss souls: bespoke')]
 body = 'static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {\n' + stats + owner[a:b]
-helpers = function(owner, 'CwSimple') + '\n' + function(owner, 'CwLayerEnv')
+helpers = ('int ResourceMgr_IsLegacyZssLongswordGi() { return 0; }\n' +
+           function(owner, 'CwSimple') + '\n' + function(owner, 'CwLayerEnv'))
 if '// Static custom GI bridge recipes.' in owner:
     a = owner.index('// Static custom GI bridge recipes.')
     b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)

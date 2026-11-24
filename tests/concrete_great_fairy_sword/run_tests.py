@@ -112,6 +112,7 @@ void Randomizer_DrawCaneSomariaUpgrade() {}
 #define CVAR_NEI_GI_EFFECTS "test.ItemEffects"
 bool HasLegacyGiMod(const Presentation&, bool) { return false; }
 bool HasRedesignGiMod(const Presentation&) { return false; }
+int ResourceMgr_IsLegacyZssLongswordGi() { return 0; }
 const char* NeiGi_BaseSwordPath(const char* path) { return path; }
 ''')
     for name in ("Kind PresentationShimmer(", "const char* SelectedSwordPath(", "bool HasSelectedSword(",

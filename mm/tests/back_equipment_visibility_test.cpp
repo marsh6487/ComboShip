@@ -168,6 +168,13 @@ extern Gfx* gPlayerSwordSheaths[];
 static u8 sIsMod = 0;
 static u8 sIsForm = 0;
 static u8 sIsChildRig = 0;
+static u8 sIsSeasonalRig = 0;
+extern "C" int ResourceMgr_OTRSigCheck(char* path) {
+    return path && std::strncmp(path, "__OTR__", 7) == 0;
+}
+static Gfx* AdultLink_LoadModelDL(const char*) {
+    return nullptr;
+}
 static Gfx* sDL_LHClosed;
 static Gfx* sDL_LHSword;
 static Gfx* sDL_LHBgs;

@@ -37,7 +37,7 @@ void LoadClips() {
     if (path == nullptr) {
         return;
     }
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    std::ifstream file(Crossover::Utf8Path(path), std::ios::binary | std::ios::ate);
     const std::streamoff size = file.tellg();
     std::array<char, 32> header;
     if (size < (std::streamoff)header.size() || !file.seekg(0).read(header.data(), header.size()) ||

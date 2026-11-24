@@ -53,6 +53,8 @@ const char* PakLoader_GetSkinSkeletonPath(void** skeleton);
 
 /* Active private seasonal root, or NULL for the normal/forced/remote body. */
 const char* PakLoader_GetSeasonalSkeletonPath(void);
+// Exact open-hand aliases from the active private Adult body, before equipment mix.
+Gfx* PakLoader_GetSeasonalOpenHand(u8 left);
 s32 PakLoader_GetOutfitSetCount(void);
 const char* PakLoader_GetOutfitSet(s32 index);
 

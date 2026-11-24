@@ -18,7 +18,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ("discard", "file-switch", "same-slot-load", "new-native", "new-rando",
          "same-slot-recreate", "preflight-refusal", "pending", "native-before-flash",
-         "native-after-flash", "scene", "fleet", "aim", "owned-model", "external-model")
+         "native-after-flash", "scene", "fleet", "aim", "owned-model", "external-model", "pikachu-selector")
 
 
 def function(source, name):
@@ -58,7 +58,8 @@ def build_source():
                     function(form, "MmForm_DiscardUnownedRitoReload"), function(form, "MmForm_Init"),
                     function(form, "MmForm_FleetApplyForm")]
     update = function(form, "MmForm_Update")
-    definitions.append(update[:update.index("    // === Pikachu Mode")] + "}\n")
+    definitions.append(function(form, "MmForm_IsPikachuActive"))
+    definitions.append(update[:update.index("    // Update blink whenever skeleton")] + "}\n")
     fixture = fixture.replace("/* PRODUCTION_FORM_FUNCTIONS */", "\n".join(definitions))
     for label, body in (("SELECT", function(choose, "FileChoose_LoadGame")),
                         ("CREATE", function(sram, "Sram_InitSave"))):

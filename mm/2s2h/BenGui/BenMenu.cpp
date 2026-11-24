@@ -26,7 +26,7 @@
 #include "DeveloperTools/CollisionViewer.h"
 #include "2s2h/Enhancements/Enhancements.h"
 #include "2s2h/Enhancements/Companion/CompanionStyle.h"
-#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/NaviAudio.h"
 #include "2s2h/Enhancements/GfxPatcher/AuthenticGfxPatches.h"
 #include "2s2h/PresetManager/PresetManager.h"
 #include "2s2h/Network/Harpoon/Harpoon.h"
@@ -1397,13 +1397,6 @@ void BenMenu::AddEnhancements() {
             "Place it in nei/ or set gSm64RomPath to its location.\n\n"
             "C-Left = Cappy, C-Right = Roll; these override equipped MM items in those slots.\n"
             "C-Down keeps its equipped item. D-pad controls Wing, Metal, Vanish, and Fire caps."));
-    AddWidget(path, "Mario Mask C-Down Toggle", WIDGET_CVAR_CHECKBOX)
-        .CVar("gSm64MarioMaskForce")
-        .Options(CheckboxOptions().Tooltip(
-            "When enabled, the Mario Mask icon appears in the C-Down slot and pressing C-Down "
-            "toggles Mario Mode on/off. The press is consumed so the equipped C-Down item "
-            "doesn't fire on the same frame.\n\n"
-            "Useful for transforming back to Link without opening the menu."));
     AddWidget(path, "Mario Master Volume", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gSm64MasterVolume")
         .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(0.8f).Step(0.05f).Format("%.2f").Tooltip(
@@ -1509,6 +1502,10 @@ void BenMenu::AddEnhancements() {
             "option to create a persistent Owl Save from your current location.\n\nWhen loading back "
             "into the game, you will be placed either at the entrance of the dungeon you saved in, or "
             "in South Clock Town, unless Remember Save Location is enabled."));
+    AddWidget(path, "Better Save Menu", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Saving.BetterSaveMenu")
+        .Options(CheckboxOptions().Tooltip("Press B in the pause menu to save your current cycle. After saving, "
+                                           "continue playing, return to the scene entrance, or go to Clock Town."));
     AddWidget(path, "Remember Save Location", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Saving.RememberSaveLocation")
         .Options(CheckboxOptions().Tooltip(
@@ -1625,10 +1622,10 @@ void BenMenu::AddEnhancements() {
 #endif
     AddWidget(path, "Navi Companion", WIDGET_CVAR_CHECKBOX)
         .CVar(MM_NAVI_COMPANION_CVAR)
-        .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
+        .Callback([](WidgetInfo&) { MMCompanionAudio_Reset(); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Give Link Navi's blue glow, voices, and fairy sounds using 2Ship's native sound bank. "
-            "Navi takes priority over Midna while enabled."));
+            "Give Link Navi's blue glow and fairy sounds. Play Navi's original voice clips when OoT game data is "
+            "available. Navi takes priority over Midna while enabled."));
     AddWidget(path, "Midna Companion (Tatl)", WIDGET_CVAR_CHECKBOX)
         .CVar(MM_MIDNA_COMPANION_CVAR)
         .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
@@ -1758,7 +1755,7 @@ void BenMenu::AddEnhancements() {
                                                                "or a missing outfit keeps your normal player model."));
     static std::unordered_map<int32_t, const char*> seasonalSetOptions = { { -1, "Selected set not installed" } };
     AddWidget(path, "Outfit Set", WIDGET_CVAR_COMBOBOX)
-        .CVar("gEnhancements.SeasonalOutfits.SetIndex")
+        .CVar(SEASONAL_OUTFITS_INDEX_CVAR)
         .PreFunc([](WidgetInfo& info) {
             auto options = std::static_pointer_cast<UIWidgets::ComboboxOptions>(info.options);
             seasonalSetOptions.clear();
@@ -1772,7 +1769,7 @@ void BenMenu::AddEnhancements() {
                 if (std::strcmp(selected, set) == 0)
                     selectedIndex = i;
             }
-            CVarSetInteger("gEnhancements.SeasonalOutfits.SetIndex", selectedIndex);
+            CVarSetInteger(SEASONAL_OUTFITS_INDEX_CVAR, selectedIndex);
             options->disabled = count == 0;
             options->disabledTooltip = "Install an outfit set for this game, then restart.";
         })

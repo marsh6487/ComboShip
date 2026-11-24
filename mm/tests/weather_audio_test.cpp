@@ -62,6 +62,17 @@ static void MMMidnaAudio_Reset() {
     ++midnaResetCalls;
     midnaVoicePending = false;
 }
+static bool optionalCuePending = true;
+static void MMOptionalSfx_Mix(int16_t* buffer, size_t frames) {
+    if (optionalCuePending) {
+        for (size_t i = 0; i < frames * 2; ++i) {
+            buffer[i] += 300;
+        }
+    }
+}
+static void MMOptionalSfx_Reset() {
+    optionalCuePending = false;
+}
 static void ComboEmotes_MixAudio(int16_t* buffer, size_t frames) {
     ++emoteMixCalls;
     for (size_t i = 0; i < frames * 2; ++i) {
@@ -116,7 +127,7 @@ int main() {
     assert(captured.size() == 2 && captured[0] == 0 && captured[1] == 0);
 #endif
     assert(midnaMixCalls == 1 && midnaResetCalls == 1 && !midnaVoicePending);
-    assert(emoteMixCalls == 1);
+    assert(emoteMixCalls == 1 && !optionalCuePending);
     gFscAudioMuted = false;
     for (int channel = 0; channel < 2; ++channel) {
         master = channel == 0 ? 0.0f : 1.0f;

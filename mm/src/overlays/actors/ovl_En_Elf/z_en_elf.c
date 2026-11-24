@@ -10,7 +10,7 @@
 #include "entrances/BlackMarketEntrance.h"
 #endif
 #include "2s2h/Enhancements/Companion/CompanionStyle.h"
-#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/NaviAudio.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <stdio.h>
@@ -364,18 +364,13 @@ static void EnElf_UpdateMidnaBlink(EnElf* this, PlayState* play) {
 }
 
 static void EnElf_PlayTatlSound(EnElf* this, MMMidnaAudioEvent event, u16 nativeSfx) {
-    static const u16 naviSfx[] = {
-        [MM_MIDNA_AUDIO_DASH] = NA_SE_EV_WHITE_FAIRY_DASH,   [MM_MIDNA_AUDIO_APPEAR] = NA_SE_EV_WHITE_FAIRY_DASH,
-        [MM_MIDNA_AUDIO_VANISH] = NA_SE_EV_NAVY_VANISH,      [MM_MIDNA_AUDIO_TARGET_NPC] = NA_SE_VO_NAVY_HELLO,
-        [MM_MIDNA_AUDIO_TARGET_ENEMY] = NA_SE_VO_NAVY_ENEMY, [MM_MIDNA_AUDIO_TARGET_OTHER] = NA_SE_VO_NAVY_HEAR,
-    };
     if (this->actor.params == FAIRY_TYPE_0) {
-        if (MMCompanion_UseNavi()) {
-            if ((unsigned)event < ARRAY_COUNT(naviSfx)) {
-                nativeSfx = naviSfx[event];
-            }
-        } else if (MMMidnaAudio_TryPlay(event)) {
+        if (MMCompanionAudio_TryPlay(event)) {
             return;
+        }
+        if (MMCompanion_UseNavi() && (event == MM_MIDNA_AUDIO_DASH || event == MM_MIDNA_AUDIO_APPEAR)) {
+            // MM's white fairy dash is OoT's two-note NA_SE_EV_FAIRY_DASH.
+            nativeSfx = NA_SE_EV_WHITE_FAIRY_DASH;
         }
     }
     Actor_PlaySfx(&this->actor, nativeSfx);
@@ -403,6 +398,7 @@ void EnElf_Init(Actor* thisx, PlayState* play2) {
 
     this->fairyFlags = 0;
     this->midnaBlinkTimer = 0;
+    this->naviAudioTarget = NULL;
     this->disappearTimer = 600;
     this->unk_240 = 0.0f;
     colorConfig = 0;
@@ -535,7 +531,7 @@ void EnElf_Destroy(Actor* thisx, PlayState* play) {
     EnElf* this = (EnElf*)thisx;
 
     if (this->actor.params == FAIRY_TYPE_0) {
-        MMMidnaAudio_Reset();
+        MMCompanionAudio_Reset();
     }
 
     LightContext_RemoveLight(play, &play->lightCtx, this->lightNodeGlow);
@@ -1185,6 +1181,25 @@ void func_8088EFA4(EnElf* this, PlayState* play) {
         }
     }
 
+    if (this->actor.params == FAIRY_TYPE_0 && MMCompanion_UseNavi()) {
+        // Track the actual Z target separately from Tatl's hover latch.
+        Actor* target = player->focusActor;
+        if (target != this->naviAudioTarget && target != NULL && !Play_InCsMode(play)) {
+            MMMidnaAudioEvent event = MM_MIDNA_AUDIO_TARGET_OTHER;
+            if (target->category == ACTORCAT_ENEMY || target->category == ACTORCAT_BOSS ||
+                (target->flags & ACTOR_FLAG_HOSTILE)) {
+                event = MM_MIDNA_AUDIO_TARGET_ENEMY;
+            } else if (target->category == ACTORCAT_NPC) {
+                event = MM_MIDNA_AUDIO_TARGET_NPC;
+            }
+            EnElf_PlayTatlSound(this, event, NA_SE_NONE);
+        }
+        this->naviAudioTarget = target;
+        this->fairyFlags &= ~1;
+        return;
+    }
+    this->naviAudioTarget = NULL;
+
     if (this->fairyFlags & 1) {
         if ((tatlHoverActor == NULL) || (player->focusActor == NULL)) {
             this->fairyFlags ^= 1;
@@ -1231,7 +1246,9 @@ void func_8088F214(EnElf* this, PlayState* play) {
         }
     } else if (this->unk_264 & 8) {
         sp34 = 1;
-        Actor_PlaySfx_Flagged(&this->actor, NA_SE_EV_BELL_ANGER - SFX_FLAG);
+        if (this->actor.params != FAIRY_TYPE_0 || !MMCompanion_UseNavi()) {
+            Actor_PlaySfx_Flagged(&this->actor, NA_SE_EV_BELL_ANGER - SFX_FLAG);
+        }
     } else {
         tatlHoverActor = play->actorCtx.attention.tatlHoverActor;
         if (player->stateFlags1 & PLAYER_STATE1_400) {
@@ -1560,6 +1577,7 @@ void func_8089010C(Actor* thisx, PlayState* play) {
         thisx->flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
         this->fairyFlags &= ~(0x10 | 0x20);
         this->elfMsg = NULL;
+        this->naviAudioTarget = NULL;
         // The light context draws the halo independently of the companion mesh.
         Lights_PointNoGlowSetInfo(&this->lightInfoGlow, thisx->world.pos.x, thisx->world.pos.y, thisx->world.pos.z, 255,
                                   255, 255, 0);
@@ -1589,7 +1607,7 @@ void func_8089010C(Actor* thisx, PlayState* play) {
     }
 
     if (Actor_TalkOfferAccepted(thisx, &play->state)) {
-        if (this->actor.params != FAIRY_TYPE_0 || !MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_TALK)) {
+        if (this->actor.params != FAIRY_TYPE_0 || !MMCompanionAudio_TryPlay(MM_MIDNA_AUDIO_TALK)) {
             Audio_PlaySfx_AtPosWithReverb(&gSfxDefaultPos, NA_SE_VO_NA_LISTEN, 0x20);
         }
         thisx->focus.pos = thisx->world.pos;

@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <vector>
 
@@ -139,6 +140,9 @@ extern "C" void func_80123140(PlayState*,Player*) {}
 static void Player_Action_55(Player*,PlayState*) {}
 static s32 Player_SetAction(PlayState*,Player*,PlayerActionFunc,s32) {return 1;}
 extern "C" s32 WaterBox_GetSurface1(PlayState*,CollisionContext*,f32,f32,f32*,WaterBox**) {return false;}
+// South Clock Town arrival is dry. Entering either water-only branch would invalidate the timing fixture.
+static const PlayerAgeProperties* Player_GetWaterAgeProperties(const Player*) { std::abort(); }
+extern "C" f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly**, s32*, Actor*, Vec3f*) { std::abort(); }
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "production.inc"
 

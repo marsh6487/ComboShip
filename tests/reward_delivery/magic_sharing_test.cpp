@@ -83,7 +83,7 @@ void ComboRpg_RecordNativeMagic(uint8_t tier) {
   nei.comboRpg.nativeMagicLevel = std::max(nei.comboRpg.nativeMagicLevel, tier);
 }
 
-/* FLOOR_EXPORTS */
+/* MAGIC_EXPORTS */
 /* NATIVE_TIER_GETTERS */
 
 void SharedLegacy(const char *) { ++echoes; }
@@ -198,6 +198,69 @@ int main() {
   SOH_ApplySharedMagicFloor(1);
   MM_ApplySharedMagicFloor(1);
   assert(persisted == 0);
-  std::cout << "PASS immediate magic floors, RPG capacity, duplicate/echo "
-               "suppression and invalid saves\n";
+
+  reset(true);
+  const int slot = 1;
+  gSaveContext.fileNum = slot;
+  nei.comboRpg = {}; // Fresh MM save with no snapshot from a previous game switch.
+  nei.comboRpg.level[COMBO_RPG_SPEED] = 3;
+  ComboRpgState progress{};
+  assert(!SOH_GetRpgMagicProgress(slot, &progress)); // No write for an uncollected stat.
+  ootRpg.level[COMBO_RPG_MAGIC] = 1;
+  ootRpg.level[COMBO_RPG_SPEED] = 1;
+  assert(!SOH_GetRpgMagicProgress(0, &progress));
+  assert(SOH_GetRpgMagicProgress(slot, &progress));
+  auto& mm = gSaveContext.save.saveInfo.playerData;
+  MM_ApplyRpgMagicProgress(0, &progress);
+  assert(!mm.isMagicAcquired && persisted == 0);
+
+  mm.magicLevel = 1;
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.isMagicAcquired && !mm.isDoubleMagicAcquired && mm.magic == 12);
+  assert(mm.magicLevel == 0 && gSaveContext.magicFillTarget == 12 && persisted == 1);
+  assert(nei.comboRpg.level[COMBO_RPG_MAGIC] == 1 && nei.comboRpg.level[COMBO_RPG_SPEED] == 3);
+  mm.magic = 0; // A repeated tick must preserve spent magic.
+  mm.magicLevel = 1;
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.magic == 0 && mm.magicLevel == 1 && persisted == 1);
+
+  ootRpg.level[COMBO_RPG_MAGIC] = 2;
+  assert(SOH_GetRpgMagicProgress(slot, &progress));
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.magic == 24 && persisted == 2);
+  progress.level[COMBO_RPG_MAGIC] = 1;
+  mm.magic = 5;
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.magic == 5 && nei.comboRpg.level[COMBO_RPG_MAGIC] == 2 && persisted == 2);
+
+  // Existing MM files that have the stat count but no initialized meter still recover.
+  mm.isMagicAcquired = false;
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.isMagicAcquired && mm.magic == 24 && persisted == 3);
+
+  reset(true);
+  gSaveContext.fileNum = slot;
+  MM_ApplySharedMagicFloor(1);
+  ootRpg.level[COMBO_RPG_MAGIC] = 1;
+  assert(SOH_GetRpgMagicProgress(slot, &progress));
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.magic == 48 && nei.comboRpg.nativeMagicLevel == 1 && persisted == 2);
+
+  reset(true);
+  gSaveContext.fileNum = slot;
+  ootRpg.level[COMBO_RPG_MAGIC] = 3;
+  ootRpg.required[COMBO_RPG_MAGIC] = 6;
+  ootRpg.magicTotal = 100;
+  assert(SOH_GetRpgMagicProgress(slot, &progress));
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.isDoubleMagicAcquired && mm.magic == 50 && persisted == 1);
+  assert(nei.comboRpg.required[COMBO_RPG_MAGIC] == 6 && nei.comboRpg.magicTotal == 100);
+
+  rando = false;
+  assert(!SOH_GetRpgMagicProgress(slot, &progress));
+  progress.level[COMBO_RPG_MAGIC] = 6;
+  MM_ApplyRpgMagicProgress(slot, &progress);
+  assert(mm.magic == 50 && persisted == 1);
+  std::cout << "PASS immediate native and RPG magic, save recovery, duplicate/echo "
+               "suppression and invalid slots\n";
 }

@@ -34,6 +34,7 @@ void MmMaskWear_Update(PlayState* play, Player* player);
 
 // Get the item ID of the currently worn MM mask (ITEM_NONE if not wearing any).
 s32 MmMaskWear_GetCurrent(void);
+DoAction MmMaskWear_GetBButtonDoAction(PlayState* play, Player* player);
 
 // Set the currently worn MM mask item ID (for remote player rendering override).
 void MmMaskWear_SetCurrent(s32 maskItem);

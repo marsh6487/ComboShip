@@ -95,6 +95,10 @@ void Inventory_ChangeAmmo(s16 item,s16 amount){}
 void Player_RequestRumble(PlayState*,Player*,u8,u8,u8,u8){}
 void GameInteractor_ExecuteOnPlayerReleaseHeldActor(PlayState*,Player*,Actor*){++shots;}
 bool func_801242B4(Player*){return false;}
+// These aim cases use the native land player; adult swimming has its own regression.
+static const PlayerAgeProperties* Player_GetWaterAgeProperties(const Player* player) {
+    return player->ageProperties;
+}
 s32 Player_CheckForIdleAnim(Player*){return 0;}
 s32 Math_ScaledStepToS(s16*,s16,s16){return 0;}
 void Ship_HandleConsoleCrashAsReset(){assert(false);}

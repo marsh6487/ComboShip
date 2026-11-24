@@ -11,9 +11,7 @@
  */
 
 #include "soh/ActorDB.h"
-
-// Include headers outside extern "C" — they transitively pull in C++ headers
-#include "global.h"
+#include "z64object.h"
 
 extern "C" {
 
@@ -26,31 +24,37 @@ extern void Sw97_MagicFire_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicFire_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicFire_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicFire_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicFireInstanceSize;
 
 extern void Sw97_MagicIce_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicIce_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicIce_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicIce_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicIceInstanceSize;
 
 extern void Sw97_MagicLight_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicLight_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicLight_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicLight_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicLightInstanceSize;
 
 extern void Sw97_MagicDark_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicDark_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicDark_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicDark_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicDarkInstanceSize;
 
 extern void Sw97_MagicSoul_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicSoul_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicSoul_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicSoul_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicSoulInstanceSize;
 
 extern void Sw97_MagicWind_Init(Actor* thisx, PlayState* play);
 extern void Sw97_MagicWind_Destroy(Actor* thisx, PlayState* play);
 extern void Sw97_MagicWind_Update(Actor* thisx, PlayState* play);
 extern void Sw97_MagicWind_Draw(Actor* thisx, PlayState* play);
+extern const size_t gSw97MagicWindInstanceSize;
 
 // Arrow variant actors
 extern void Sw97_ArrowFire_Init(Actor* thisx, PlayState* play);
@@ -99,13 +103,6 @@ s16 gSw97ActorId_ArrowWind = -1;
 
 } // extern "C"
 
-// Actor struct sizes
-#define SW97_MAGIC_FIRE_SIZE 0x250
-#define SW97_MAGIC_ICE_SIZE 0x280
-#define SW97_MAGIC_LIGHT_SIZE 0x200
-#define SW97_MAGIC_DARK_SIZE 0x200
-#define SW97_MAGIC_SOUL_SIZE 0x200
-#define SW97_MAGIC_WIND_SIZE 0x250
 #define SW97_ARROW_SIZE 0x200
 
 void Sw97_RegisterActors() {
@@ -117,7 +114,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_FIRE_SIZE;
+        init.instanceSize = gSw97MagicFireInstanceSize;
         init.init = Sw97_MagicFire_Init;
         init.destroy = Sw97_MagicFire_Destroy;
         init.update = Sw97_MagicFire_Update;
@@ -131,7 +128,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_ICE_SIZE;
+        init.instanceSize = gSw97MagicIceInstanceSize;
         init.init = Sw97_MagicIce_Init;
         init.destroy = Sw97_MagicIce_Destroy;
         init.update = Sw97_MagicIce_Update;
@@ -145,7 +142,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_LIGHT_SIZE;
+        init.instanceSize = gSw97MagicLightInstanceSize;
         init.init = Sw97_MagicLight_Init;
         init.destroy = Sw97_MagicLight_Destroy;
         init.update = Sw97_MagicLight_Update;
@@ -159,7 +156,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_DARK_SIZE;
+        init.instanceSize = gSw97MagicDarkInstanceSize;
         init.init = Sw97_MagicDark_Init;
         init.destroy = Sw97_MagicDark_Destroy;
         init.update = Sw97_MagicDark_Update;
@@ -173,7 +170,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_SOUL_SIZE;
+        init.instanceSize = gSw97MagicSoulInstanceSize;
         init.init = Sw97_MagicSoul_Init;
         init.destroy = Sw97_MagicSoul_Destroy;
         init.update = Sw97_MagicSoul_Update;
@@ -187,7 +184,7 @@ void Sw97_RegisterActors() {
         init.category = ACTORCAT_ITEMACTION;
         init.flags = 0x10000030;
         init.objectId = OBJECT_GAMEPLAY_KEEP;
-        init.instanceSize = SW97_MAGIC_WIND_SIZE;
+        init.instanceSize = gSw97MagicWindInstanceSize;
         init.init = Sw97_MagicWind_Init;
         init.destroy = Sw97_MagicWind_Destroy;
         init.update = Sw97_MagicWind_Update;

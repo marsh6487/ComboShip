@@ -767,7 +767,17 @@ typedef enum {
     /* 0x1C */ DO_ACTION_8,
     /* 0x1D */ DO_ACTION_MAX,
     // Keep the native 0x1D/0x1E no-action sentinels; custom labels start after them.
-    /* 0x1F */ DO_ACTION_EXPLODE = 0x1F
+    /* 0x1F */ DO_ACTION_EXPLODE = 0x1F,
+    DO_ACTION_MM_CURL,
+    DO_ACTION_MM_PUNCH,
+    DO_ACTION_MM_POUND,
+    DO_ACTION_MM_SWIM,
+    DO_ACTION_MM_DIVE,
+    DO_ACTION_MM_SURFACE,
+    DO_ACTION_MM_ATTACK,
+    DO_ACTION_MM_SHOOT,
+    DO_ACTION_MM_MARCH,
+    DO_ACTION_MM_DANCE,
 } DoAction;
 
 typedef struct {

@@ -14,7 +14,7 @@ s32 CustomItems_HasStowableHeldItem(Player* p) {
     }
     return gCustomItemState.lanternEquipped || gCustomItemState.lanternSwinging || fireRodActive ||
            fireRodFirstPerson || iceRodActive || iceRodFirstPerson || lightRodActive || lightRodFirstPerson ||
-           gCustomItemState.gustJarEquipped || gCustomItemState.mogmaMittsActive ||
+           gCustomItemState.gustJarEquipped || (gCustomItemState.mogmaMittsActive && !Player_IsEnteringMittsClimb(p)) ||
            gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn() || Slate_IsDrawn();
 }
 
@@ -33,7 +33,7 @@ void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
     if (gCustomItemState.gustJarEquipped) {
         GustJar_Unequip(play, p);
     }
-    if (gCustomItemState.mogmaMittsActive || sMittsEquipState.isEquipped) {
+    if ((gCustomItemState.mogmaMittsActive || sMittsEquipState.isEquipped) && !Player_IsEnteringMittsClimb(p)) {
         Mitts_OnUnequip(play, p);
         sMittsEquipState.isEquipped = 0;
     }

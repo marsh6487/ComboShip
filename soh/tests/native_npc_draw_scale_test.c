@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "global.h"
+#include "actors/SeasonalIdle.h"
 #include "soh/Enhancements/cosmetics/NativeNpcPose.h"
 void SkelAnime_DrawFlexOpaWithXlu(PlayState*, void**, Vec3s*, s32, OverrideLimbDrawOpa, PostLimbDrawOpa, void*);
 
@@ -40,6 +41,10 @@ void PlayerFlexSkin_BlendMatrix(const void* plan, s32 index, const MtxF* native,
 }
 Gfx* PlayerFlexSkin_SelectLimb(const void* plan, s32 index, Gfx* selected, Gfx* original) {
     return selected;
+}
+void PlayerFlexSkin_LoadSeasonalIdle(PlayState* play, const void* actor, void** skeleton, Vec3s* joints,
+                                     SeasonalIdleDraw* idle) {
+    assert(actor == NULL && !idle->active);
 }
 void* Graph_Alloc(GraphicsContext* context, size_t size) {
     assert(size <= sizeof(storage));

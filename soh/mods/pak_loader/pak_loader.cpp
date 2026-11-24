@@ -44,7 +44,7 @@ extern PlayState* gPlayState;
 #include <cstdint>
 #include <zlib.h>
 #include "../../../combo/PakNativeData.h"
-#include "../../../combo/actors/SeasonalOutfits.h"
+#include "../../../combo/actors/SeasonalOutfitsConfig.h"
 #include "mods/extended_inventory.h"
 
 // Upper bound for an estimated zobj decompression buffer. A player .zobj is a
@@ -2562,9 +2562,16 @@ static void UnmountO2rArchive(PakModel& model) {
     // which is strictly better than the previous mount/unmount cycle.
     //
     // Note: model.o2rArchiveMounted stays 1 so MountO2rArchive remains
-    // idempotent. model.o2rAdultSkel / o2rChildSkel are kept — their
-    // backing resource is still in cache and still mounted.
+    // idempotent. Skeleton pointers are tracked separately because scene
+    // teardown can evict loaded resources without unmounting the archive.
     (void)model;
+}
+
+extern "C" void PakLoader_InvalidateO2rSkeletons(void) {
+    for (auto& model : sModels) {
+        model.o2rAdultSkel = nullptr;
+        model.o2rChildSkel = nullptr;
+    }
 }
 
 // Resolve the o2r's body skeleton(s) via ResourceMgr_LoadSkeletonByName. The
@@ -2665,6 +2672,15 @@ extern "C" const char* PakLoader_GetSeasonalSkeletonPath(void) {
         return nullptr;
     const PakModel& model = sModels[sSeasonalModelIndex];
     return (LINK_AGE_IN_YEARS == YEARS_ADULT) ? model.o2rAdultSkelOtr : model.o2rChildSkelOtr;
+}
+
+extern "C" Gfx* PakLoader_GetSeasonalOpenHand(u8 left) {
+    const char* path = PakLoader_GetSeasonalSkeletonPath();
+    if (!path || SeasonalOutfits::Season(path, true) < 0)
+        return nullptr;
+    const auto& slots = sModels[sSeasonalModelIndex].adultEquipDLs;
+    const auto hand = slots.find(left ? 0x5098 : 0x50B0);
+    return hand == slots.end() ? nullptr : hand->second;
 }
 
 extern "C" void PakLoader_SwapSkeleton(Player* player) {
@@ -4031,7 +4047,7 @@ extern "C" Gfx* HarpoonSkinSync_GetDLOverride(const char* otrPath);
 // Native gameplay/first-person/pause callbacks still ask for canonical body
 // aliases. Resolve only aliases actually supplied beside the active private
 // skeleton; missing ones retain the established shared-equipment path.
-static Gfx* PakLoader_SeasonalDL(const char* otrPath) {
+extern "C" Gfx* PakLoader_GetSeasonalDLOverride(const char* otrPath) {
     const char* skeleton = PakLoader_GetSeasonalSkeletonPath();
     if (!skeleton || !otrPath)
         return NULL;
@@ -4064,7 +4080,7 @@ extern "C" Gfx* PakLoader_GetDLOverride(const char* otrPath) {
         return harpoonDl;
     }
 
-    if (Gfx* seasonal = PakLoader_SeasonalDL(otrPath))
+    if (Gfx* seasonal = PakLoader_GetSeasonalDLOverride(otrPath))
         return seasonal;
 
     // Check if any equipment source is active. Equipment-only selection is
@@ -4396,6 +4412,7 @@ extern "C" void PakLoader_Init(void) {
     if (!Ship::Context::GetRawInstance())
         return;
 
+    SeasonalOutfits::MigrateOutfitSetConfig();
     sInitialized = 1;
     PAK_LOG("Initializing...");
 
