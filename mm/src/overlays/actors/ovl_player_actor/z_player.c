@@ -86,6 +86,7 @@
 #include "mods/nei_oot_compat.h" // OoT->MM compat (PLAYER_STATE/PLAYER_IA/ITEM/M_PI) for the item files
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this); // defined below, called from power_keg.c
 void func_80837C20(PlayState* play, Player* this);         // native wall-climb continuation
+static s32 Player_IsEnteringMittsClimb(const Player* this);
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h"
 #include "mods/extended_player.h"
@@ -4318,6 +4319,12 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
         }
         // #endregion
 
+        // Unresolved extended buttons are handled by their own item ticks.
+        // The marker's neutral action must never enter native put-away.
+        if (item == ITEM_EXT_BUTTON) {
+            return;
+        }
+
         if (item >= ITEM_FD) {
             for (i = 0; i < ARRAY_COUNT(sPlayerItemButtons); i++) {
                 if (CHECK_BTN_ALL(sPlayerControlInput->cur.button, sPlayerItemButtons[i])) {
@@ -4326,7 +4333,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
             }
 
             item = Player_GetItemOnButton(play, this, i);
-            if ((item < ITEM_FD) && (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
+            if ((item < ITEM_FD) && (item != ITEM_EXT_BUTTON) &&
+                (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
                 sPlayerHeldItemButtonIsHeldDown = true;
             }
             // #region 2S2H [Dpad]
@@ -4338,7 +4346,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 }
 
                 item = Player_Dpad_GetItemOnButton(play, this, i);
-                if ((item < ITEM_FD) && (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
+                if ((item < ITEM_FD) && (item != ITEM_EXT_BUTTON) &&
+                    (Player_ItemToItemAction(this, item) == this->heldItemAction)) {
                     sPlayerHeldItemButtonIsHeldDown = true;
                 }
             }
@@ -5422,10 +5431,8 @@ s32 Player_SetupWaitForPutAwayWithCs(PlayState* play, Player* this, AfterPutAway
     func_8083249C(this);
     this->stateFlags2 |= PLAYER_STATE2_40;
 
-    // Mitts are the climbing equipment, so this native climb entry must retain them.
-    // Other interactions and explicit put-away still use the normal cleanup path.
-    if ((csId == CS_ID_NONE) && (afterPutAwayFunc == func_80837C20) && gMogmaMittsClimbActive &&
-        (this->heldItemAction == PLAYER_IA_MOGMA_MITTS)) {
+    if (Player_IsEnteringMittsClimb(this) && (this->heldItemAction == PLAYER_IA_MOGMA_MITTS) &&
+        !CustomItems_HasStowableHeldItem(this)) {
         return false;
     }
 
@@ -8196,6 +8203,11 @@ void func_80837C20(PlayState* play, Player* this) {
 
     this->av2.actionVar2 = sp1C;
     this->av1.actionVar1 = sp18;
+}
+
+static s32 Player_IsEnteringMittsClimb(const Player* this) {
+    return gMogmaMittsClimbActive && (this->actionFunc == Player_Action_WaitForPutAway) &&
+           (this->afterPutAwayFunc == func_80837C20) && (this->csId == CS_ID_NONE);
 }
 
 void func_80837C78(PlayState* play, Player* this) {
@@ -13688,11 +13700,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     Seasons_TickInput(play, this, input);
 
     // Sheikah Slate: C casts the active rune, hold L opens the rune row. Skijer's NEI
-    {
-        extern void Slate_TickInput(PlayState * play, Player * player);
-
-        Slate_TickInput(play, this);
-    }
+    Slate_TickInput(play, this, input);
 
     // Phantom Hourglass: C raises it, C recalls the painted target, C lets go. Skijer's NEI
     {

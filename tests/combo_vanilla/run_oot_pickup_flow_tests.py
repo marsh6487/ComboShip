@@ -184,6 +184,8 @@ void Player_SetupTalk(PlayState*, Player*);
 void Player_SetupActionPreserveAnimMovement(PlayState*, Player*, PlayerActionFunc, s32);
 s32 Player_SetupAction(PlayState*, Player*, PlayerActionFunc, s32);
 s32 Player_PutAwayHeldItem(PlayState*, Player*);
+static s32 Player_IsEnteringMittsClimb(const Player*) { return 0; }
+s32 CustomItems_HasStowableHeldItem(Player*) { return 0; }
 void Player_AnimPlayOnceAdjusted(PlayState*, Player*, LinkAnimationHeader*);
 void Player_AnimPlayLoop(PlayState*, Player*, LinkAnimationHeader*);
 LinkAnimationHeader* Player_GetIdleAnim(Player*);

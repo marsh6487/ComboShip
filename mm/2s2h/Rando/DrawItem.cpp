@@ -2809,24 +2809,33 @@ void DrawOotRutosLetter() {
     ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");
 }
 
-// Bottle with Blue Fire — no MM analog anywhere. Replica of OoT GetItem_DrawBlueFire (object_gi_fire,
-// OoT-unique folder): chamberstick Opa, flame Xlu billboarded on a two-tex scroll (segment 8).
+static Gfx* LoadOotBlueFirePart(const char* path) {
+    if (ResourceMgr_IsModAsset(path)) {
+        if (Gfx* mod = ResourceMgr_LoadGfxByName(path)) {
+            return mod;
+        }
+    }
+#ifdef COMBO_BUILD
+    // Resolve nested display lists and textures in the same owner as the root.
+    if (NeiResource_Available(path)) {
+        return reinterpret_cast<Gfx*>(const_cast<char*>(NeiResource_Route(path)));
+    }
+#endif
+    return static_cast<Gfx*>(OotAssets_LoadGfxDirect(path));
+}
+
+// Use the same chamberstick and scrolling, billboarded flame as the OoT GI.
 void DrawOotBlueFireBottle() {
-    static Gfx* sStickCache = NULL;
-    static Gfx* sFlameCache = NULL;
-    if (sStickCache == NULL) {
-        sStickCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_fire/gGiBlueFireChamberstickDL");
-    }
-    if (sFlameCache == NULL) {
-        sFlameCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_fire/gGiBlueFireFlameDL");
-    }
-    if (sStickCache == NULL || sFlameCache == NULL) {
+    Gfx* stick = LoadOotBlueFirePart("__OTR__objects/object_gi_fire/gGiBlueFireChamberstickDL");
+    Gfx* flame = LoadOotBlueFirePart("__OTR__objects/object_gi_fire/gGiBlueFireFlameDL");
+    if (!stick || !flame) {
+        GetItem_Draw(gPlayState, GID_BOTTLE);
         return;
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sStickCache);
+    gSPDisplayList(POLY_OPA_DISP++, stick);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
     gSPSegment(POLY_XLU_DISP++, 0x08,
                (uintptr_t)Gfx_TwoTexScrollEx(gPlayState->state.gfxCtx, G_TX_RENDERTILE, 0, 0, 16, 32, 1,
@@ -2836,8 +2845,9 @@ void DrawOotBlueFireBottle() {
     Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&gPlayState->billboardMtxF);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sFlameCache);
+    gSPDisplayList(POLY_XLU_DISP++, flame);
     Matrix_Pop();
+    gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)gEmptyDL);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
     const uint8_t color[4] = { 100, 160, 255, 255 };
     ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");

@@ -81,6 +81,7 @@ void Player_AnimPlayLoop(PlayState* play, Player* this, LinkAnimationHeader* ani
 void Player_SetIntangibility(Player* this, s32 timer);
 s32 func_80837B18(PlayState* play, Player* this, s32 damage);
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this);
+static s32 Player_IsEnteringMittsClimb(const Player* this);
 #ifdef COMBO_BUILD
 void func_8083C0E8(Player* this, PlayState* play);
 #endif
@@ -2996,6 +2997,12 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
         item = Player_GetItemOnButton(play, i);
         GameInteractor_Should(VB_OVERRIDE_BUTTON_ITEM_USED, true, &i, this, &item);
 
+        // Unresolved extended buttons are handled by their own item ticks.
+        // The marker's neutral action must never enter native put-away.
+        if (item == ITEM_EXT_BUTTON) {
+            return;
+        }
+
         if (item >= ITEM_NONE_FE) {
             for (i = 0; i < ARRAY_COUNT(sItemButtons); i++) {
                 if (CHECK_BTN_ALL(sControlInput->cur.button, sItemButtons[i])) {
@@ -3005,7 +3012,8 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
 
             item = Player_GetItemOnButton(play, i);
 
-            if ((item < ITEM_NONE_FE) && (Player_ItemToItemAction(item) == this->heldItemAction)) {
+            if ((item < ITEM_NONE_FE) && (item != ITEM_EXT_BUTTON) &&
+                (Player_ItemToItemAction(item) == this->heldItemAction)) {
                 sHeldItemButtonIsHeldDown = true;
             }
         } else if (GameInteractor_Should(VB_CHANGE_HELD_ITEM_AND_USE_ITEM, true, item)) {
@@ -4489,6 +4497,10 @@ s32 Player_SetupWaitForPutAway(PlayState* play, Player* this, AfterPutAwayFunc a
     Player_SetupAction(play, this, Player_Action_WaitForPutAway, 0);
     this->stateFlags2 |= PLAYER_STATE2_DISABLE_ROTATION_ALWAYS;
 
+    if (Player_IsEnteringMittsClimb(this) && (this->heldItemAction == PLAYER_IA_MOGMA_MITTS) &&
+        !CustomItems_HasStowableHeldItem(this)) {
+        return false;
+    }
     return Player_PutAwayHeldItem(play, this);
 }
 
@@ -6818,6 +6830,11 @@ void func_8083A3B0(PlayState* play, Player* this) {
 
     this->av2.actionVar2 = sp1C;
     this->av1.actionVar1 = sp18;
+}
+
+static s32 Player_IsEnteringMittsClimb(const Player* this) {
+    return gMogmaMittsClimbActive && (this->actionFunc == Player_Action_WaitForPutAway) &&
+           (this->afterPutAwayFunc == func_8083A3B0);
 }
 
 void func_8083A40C(PlayState* play, Player* this) {

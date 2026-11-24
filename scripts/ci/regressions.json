@@ -391,6 +391,12 @@
     "run": "python3 -B scripts/diagnostics/run_actor_db_registration_tests.py\npython3 -B scripts/diagnostics/run_actor_db_registration_tests.py --sanitize\npython3 -B scripts/diagnostics/run_combo_save_compat_tests.py --json-include /usr/include\npython3 -B tests/oot_equipment_pause/run_age_requirement_tests.py\npython3 -B scripts/diagnostics/run_silver_rupee_cosmetic_tests.py\npython3 -B scripts/diagnostics/run_silver_rupee_cosmetic_tests.py --sanitize\npython3 -B scripts/diagnostics/run_mm_fast_transformation_tests.py\npython3 -B scripts/diagnostics/run_hint_item_area_tests.py --sanitize"
   },
   {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "SW97 medallion spell actor lifetime and casting",
+    "run": "python3 -B scripts/diagnostics/run_medallion_cast_textures_tests.py"
+  },
+  {
     "suite": "systems",
     "origin": "nei",
     "name": "tests/solo_games/run_tests.py",

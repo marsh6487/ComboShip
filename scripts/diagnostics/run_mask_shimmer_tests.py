@@ -21,7 +21,7 @@ assert len(interpolation_declarations) == 2
 foreign_linkage = 'extern "C" {\n' + '\n'.join(interpolation_declarations) + '\n}'
 
 def function(source, name):
-    match = re.search(r'^(?:(?:static|inline) )?(?:void|s32|bool) ' + re.escape(name) + r'\([^;{}]*\)\s*\{', source, re.M)
+    match = re.search(r'^(?:(?:static|inline) )?(?:void|s32|bool|Gfx\*) ' + re.escape(name) + r'\([^;{}]*\)\s*\{', source, re.M)
     if not match:
         raise ValueError(name)
     pos, depth = match.end(), 1
@@ -72,7 +72,6 @@ void* Combo_ResolveSym(const char*, const char*) { ++ownerLookups; return nullpt
 #include "ComboSongDrawMM.h"
 #include "ComboItemDrawABI.h"
 ''' + bindings + '''
-extern "C" const char* NeiResource_Route(const char*) { assert(false); return nullptr; }
 void DrawOotSlateRuneFlame(u8, u8, u8) { assert(false); }
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
 bool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);
@@ -84,6 +83,9 @@ void DrawSong(RandoItemId) {assert(false && "songs have their own production dis
             foreign_oot = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
             macros = foreign_oot[foreign_oot.index('#define COMBO_FOREIGN_MTX'):foreign_oot.index('// Biggoron')]
             blue = macros + function(foreign_oot, 'OOT_DrawForeignBlueFire')
+        else:
+            mm_draw = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
+            blue = '\n'.join(function(mm_draw, name) for name in ['LoadOotBlueFirePart', 'DrawOotBlueFireBottle'])
         fixture = fixture.replace('/* PRODUCTION_BLUE_FIRE */', blue)
 
         if '--forest-particles' in sys.argv:

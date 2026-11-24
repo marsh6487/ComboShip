@@ -73,9 +73,27 @@ static void Mitts_OnUnequip(PlayState* play, Player* p) {
 // Main Handler
 // ============================================================================
 
+static u8 Mitts_IsAssigned(void) {
+    u8 slotCount = CVarGetInteger("gEnhancements.DpadEquips", 0) ? 8 : 4;
+    for (u8 slot = 0; slot < slotCount; ++slot) {
+        if (gSaveContext.equips.buttonItems[slot] == ITEM_MOGMA_MITTS) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void Handle_MogmaMitts(Player* this, PlayState* play) {
     ItemInputState input;
     ItemInput_Update(&input, ITEM_MOGMA_MITTS, this, play);
+
+    if (mmActive) {
+        // HUD restrictions can outlast the climb flag by a frame.
+        input.wasEquipped = input.wasEquipped || Mitts_IsAssigned();
+        if (this->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) {
+            input.otherButtonPressed = 0;
+        }
+    }
 
     // Not equipped - cleanup
     if (!input.wasEquipped) {

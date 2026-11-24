@@ -138,6 +138,14 @@
 #undef MagicWind_UpdateAlpha
 #undef MagicWind_OverrideLimbDraw
 
+// ActorDB allocates these sizes before any of the spell callbacks run.
+const size_t gSw97MagicFireInstanceSize = sizeof(MagicFire);
+const size_t gSw97MagicIceInstanceSize = sizeof(MagicIce);
+const size_t gSw97MagicLightInstanceSize = sizeof(MagicLight);
+const size_t gSw97MagicDarkInstanceSize = sizeof(MagicDark);
+const size_t gSw97MagicSoulInstanceSize = sizeof(MagicSoul);
+const size_t gSw97MagicWindInstanceSize = sizeof(MagicWind);
+
 // ============================================================
 // Arrow variant actors (prefixed to avoid COMDAT conflicts with OOT overlays)
 // ============================================================

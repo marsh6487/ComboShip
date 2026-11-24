@@ -42,6 +42,7 @@ extern u8 gOotSpellsWindNoTornado;
 // ============================================================
 
 struct MagicWind;
+enum { SW97_WIND_LIMB_COUNT = 3 };
 
 typedef void (*MagicWindFunc)(struct MagicWind* this, PlayState* play);
 
@@ -61,6 +62,7 @@ typedef struct MagicWind {
     s16 tornadoDamageTick;    // counts down to next damage tick
     f32 tornadoCurrentRadius; // grows 40 → 200 during phase 1
     Vec3f tornadoCenter;      // fixed at cast time
+    s16 transforms[SW97_WIND_LIMB_COUNT][9];
 } MagicWind;
 
 // Runtime actor ID (assigned by ActorDB in sw97_init.cpp)
@@ -486,8 +488,9 @@ static SkelCurveLimb* sWindLimbs[] = {
 
 static SkelCurveLimbList sWindLimbList = {
     sWindLimbs,
-    0x03,
+    ARRAY_COUNT(sWindLimbs),
 };
+_Static_assert(ARRAY_COUNT(sWindLimbs) == SW97_WIND_LIMB_COUNT, "Forest spell transforms must cover every limb");
 
 static u8 sAlphaUpdVals[] = {
     0x00, 0x03, 0x04, 0x07, 0x09, 0x0A, 0x0D, 0x0F, 0x11, 0x12, 0x15, 0x16, 0x19, 0x1B, 0x1C, 0x1F, 0x21, 0x23,
@@ -779,10 +782,9 @@ void MagicWind_Init(Actor* thisx, PlayState* play) {
     MagicWind* this = THIS;
     Player* player = PLAYER;
 
-    if (SkelCurve_Init(play, &this->skelCurve, &sWindLimbList, &sWindTransformUpdIdx) == 0) {
-        // Magic_Wind_Actor_ct (): Construct failed
-        osSyncPrintf("Magic_Wind_Actor_ct():コンストラクト失敗\n");
-    }
+    this->skelCurve.limbCount = sWindLimbList.limbCount;
+    this->skelCurve.skeleton = sWindLimbList.limbs;
+    this->skelCurve.jointTable = this->transforms;
     this->actor.room = -1;
     switch (this->actor.params) {
         case 0:
@@ -814,12 +816,13 @@ void MagicWind_Init(Actor* thisx, PlayState* play) {
             LOG_STRING("表示開始");
             func_8002F7DC(&player->actor, NA_SE_PL_MAGIC_WIND_WARP);
             break;
+        default:
+            Actor_Kill(thisx);
+            break;
     }
 }
 
 void MagicWind_Destroy(Actor* thisx, PlayState* play) {
-    MagicWind* this = THIS;
-    SkelCurve_Destroy(play, &this->skelCurve);
     func_800876C8(play);
     // wipe out
     LOG_STRING("消滅");

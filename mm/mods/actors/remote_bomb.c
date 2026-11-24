@@ -15,7 +15,8 @@
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 
 extern PlayState* gPlayState;
-extern void func_8082F5FC(Player* this, Actor* actor); // engine's own "start carrying this actor"
+extern void func_8082F5FC(Player* this, Actor* actor);    // engine's own "start carrying this actor"
+extern void func_808313F0(Player* this, PlayState* play); // start the native carry pose
 
 s32 RemoteBomb_Cast(PlayState* play, Player* player);
 void RemoteBomb_Tick(PlayState* play);
@@ -110,9 +111,9 @@ static s32 RemoteBomb_Lift(PlayState* play, Player* player) {
     ((EnBom*)bomb)->timer = REMOTE_BOMB_INERT;
     Actor_SetScale(bomb, REMOTE_BOMB_SCALE);
 
-    // The engine's own carry hand-off, which is also where a bomb from the bag gets its overhead
-    // pose — the slate has no item-action row of its own to take it from.
+    // Use the native carry hand-off and pose because the rune has no native item action.
     func_8082F5FC(player, bomb);
+    func_808313F0(player, play);
 
     sRemoteBomb = bomb;
     RemoteBomb_TintAttach(bomb);

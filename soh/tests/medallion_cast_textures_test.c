@@ -22,6 +22,10 @@ void Player_AnimPlayLoop(PlayState* play, Player* player, LinkAnimationHeader* a
 
 static GraphicsContext gfx;
 static PlayState play;
+static GameInfo gameInfo;
+GameInfo* gGameInfo = &gameInfo;
+static Player fireTestPlayer;
+static int fireMagicResets;
 static Gfx commands[128], reference[128], scrolls[4][1], allocations[4][16];
 static Mtx matrix;
 Mtx gMtxClear;
@@ -87,6 +91,41 @@ uint8_t ResourceMgr_FileAltExists(const char* path) {
     }
     REQUIRE(!"unexpected private resource name");
     return 0;
+}
+char* ResourceMgr_LoadTexOrDListByName(const char* path) {
+    return NULL;
+}
+int ResourceMgr_OTRSigCheck(char* data) {
+    return 0;
+}
+AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path) {
+    REQUIRE(!"the fire curve is stored in the actor source");
+    return NULL;
+}
+s32 Collider_InitCylinder(PlayState* context, ColliderCylinder* collider) {
+    return 1;
+}
+s32 Collider_SetCylinder(PlayState* context, ColliderCylinder* collider, Actor* actor, ColliderCylinderInit* init) {
+    return 1;
+}
+void Collider_UpdateCylinder(Actor* actor, ColliderCylinder* collider) {
+}
+s32 CollisionCheck_SetAT(PlayState* context, CollisionCheckContext* colChkCtx, Collider* collider) {
+    return 1;
+}
+void Magic_Reset(PlayState* context) {
+    REQUIRE(context == &play);
+    ++fireMagicResets;
+}
+void Actor_Kill(Actor* actor) {
+    actor->update = NULL;
+    actor->draw = NULL;
+}
+void Player_PlaySfx(Actor* actor, u16 sfxId) {
+    REQUIRE(actor == &fireTestPlayer.actor && sfxId == NA_SE_PL_MAGIC_FIRE);
+}
+f32 Math_SmoothStepToF(f32* value, f32 target, f32 fraction, f32 step, f32 minStep) {
+    return 0.0f;
 }
 void* Graph_Alloc(GraphicsContext* context, size_t size) {
     REQUIRE(context == &gfx && allocCount < 4 && size <= sizeof(allocations[0]));
@@ -359,6 +398,35 @@ static void testFireColors(void) {
     changedColors = 0;
 }
 
+static void testFireActorLifetime(void) {
+    MagicFire first = { 0 }, second = { 0 };
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &fireTestPlayer.actor;
+    R_UPDATE_RATE = 3;
+    MagicFire_Init(&first.actor, &play);
+    MagicFire_Init(&second.actor, &play);
+    REQUIRE(first.skelCurve.transforms == first.transforms);
+    REQUIRE(second.skelCurve.transforms == second.transforms);
+
+    first.actor.update(&first.actor, &play);
+    REQUIRE(first.actionTimer == 19 && first.transforms[0].scale.x == 0x400);
+    REQUIRE(second.actionTimer == 20 && second.transforms[0].scale.x == 0);
+
+    play.msgCtx.msgMode = 0xD;
+    first.actor.update(&first.actor, &play);
+    REQUIRE(first.actor.update == NULL);
+    MagicFire_Destroy(&first.actor, &play);
+    REQUIRE(fireMagicResets == 1);
+    play.msgCtx.msgMode = 0;
+
+    for (int frame = 0; second.actor.update && frame < 125; ++frame) {
+        second.actor.update(&second.actor, &play);
+    }
+    REQUIRE(second.actor.update == NULL);
+    MagicFire_Destroy(&second.actor, &play);
+    REQUIRE(fireMagicResets == 2);
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = NULL;
+}
+
 static uintptr_t drawDust(EffectSs* effect, size_t* count) {
     const EffectSs before = *effect;
     resetDraw();
@@ -524,6 +592,7 @@ int main(int argc, char** argv) {
         { "textures", testCastFallbacksAndReloads },
         { "colors", testCastColors },
         { "fire", testFireColors },
+        { "fire-actor", testFireActorLifetime },
         { "dust", testForestDustIsolation },
         { "dust-colors", testForestDustColors },
         { "spawn", testTornadoSpawnAndLifetime },
