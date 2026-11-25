@@ -29,6 +29,16 @@ def main():
     mm = read("mm/2s2h/BenPort.cpp")
     relays = [read(f"{prefix}/FleetShipCombo/FleetSharedItems.cpp") for prefix in ("soh/soh", "mm/2s2h")]
     fixture = read("tests/reward_delivery/magic_sharing_test.cpp")
+    for game, engine in (("Oot", "soh/soh"), ("Mm", "mm/2s2h")):
+        sync = read(f"{engine}/FleetShipCombo/FleetSync.cpp")
+        extract_start = sync.index("    const bool fillingMagic =")
+        extract_end = sync.index('    sh["schema"]', extract_start)
+        apply_start = sync.index('        if (const auto magic = v.find("magic");')
+        fixture = fixture.replace(
+            f"/* {game} Magic Carryover */",
+            f"int Extract{game}Magic() {{\n" + sync[extract_start:extract_end] + "return magic;\n}\n"
+            + f"void Apply{game}Magic(const Vitals& v) {{\n" + statement(sync, apply_start) + "\n}\n",
+        )
     rg = sorted(set(re.findall(r"\bRG_[A-Z_0-9]+", relays[0])))
     ri = sorted(set(re.findall(r"\bRI_[A-Z_0-9]+", relays[1])))
     fixture = fixture.replace("/* NATIVE_IDS */", "enum RandomizerGet {" + ",".join(rg) + "};\n" +
