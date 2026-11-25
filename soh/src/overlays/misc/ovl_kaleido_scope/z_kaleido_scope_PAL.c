@@ -2416,6 +2416,15 @@ void KaleidoScope_SetView(PauseContext* pauseCtx, f32 x, f32 y, f32 z) {
 
     func_800AA358(&pauseCtx->view, &eye, &lookAt, &up);
     func_800AAA50(&pauseCtx->view, 127);
+
+    if (pauseCtx->state >= 8 && pauseCtx->state <= 0x11) {
+        GraphicsContext* gfxCtx = pauseCtx->view.gfxCtx;
+        OPEN_DISPS(gfxCtx);
+        // Boss cameras can leave the world letterboxed when the game-over UI opens.
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        CLOSE_DISPS(gfxCtx);
+    }
 }
 
 static u8 sPageVtxColorR[][4] = {
@@ -4674,14 +4683,20 @@ void KaleidoScope_Update(PlayState* play) {
                     func_800981B8(&play->objectCtx);
                     func_800418D0(&play->colCtx, play);
                     if (pauseCtx->promptChoice == 0 && GameInteractor_Should(VB_BE_ABLE_TO_SAVE, true)) {
+#ifdef COMBO_BUILD
+                        const int32_t bossRetry = Combo_SOH_CrossDungeonDeathCheckpoint();
+                        if (bossRetry >= 0) {
+                            gSaveContext.entranceIndex = bossRetry;
+                        }
+#endif
+                        gSaveContext.health = CVarGetInteger(CVAR_ENHANCEMENT("FullHealthSpawn"), 0)
+                                                  ? gSaveContext.healthCapacity
+                                                  : STARTING_HEALTH;
                         Play_TriggerRespawn(play);
                         gSaveContext.respawnFlag = -2;
                         // Reset frame counter to prevent autosave on respawn
                         play->gameplayFrames = 0;
                         gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
-                        gSaveContext.health = CVarGetInteger(CVAR_ENHANCEMENT("FullHealthSpawn"), 0)
-                                                  ? gSaveContext.healthCapacity
-                                                  : STARTING_HEALTH;
                         Audio_QueueSeqCmd(0xF << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0xA);
                         gSaveContext.healthAccumulator = 0;
                         gSaveContext.magicState = MAGIC_STATE_IDLE;

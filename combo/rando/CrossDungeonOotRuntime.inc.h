@@ -236,7 +236,18 @@ extern "C" int Combo_SOH_CrossBossEnabled(void) {
 }
 extern "C" int32_t Combo_SOH_CrossDungeonDeathCheckpoint(void) {
     using namespace ComboCrossOotRuntime;
-    return RecoverBoss(checkpoint.Saved());
+    if (!gPlayState || !Combo_SOH_CrossBossEnabled())
+        return -1;
+    const int32_t arena = checkpoint.Saved();
+    const auto recovery = state.RecoveryForBoss({ 0, arena });
+    if (!recovery || !SceneMatchesEntrance(arena, gPlayState->sceneNum))
+        return -1;
+    // Keep a live retry in the arena when reaching it required a game switch.
+    // Reopening a saved arena still uses source-dungeon recovery.
+    const int32_t retry = recovery->source.game == 0 ? recovery->parent.index : arena;
+    checkpoint.Arrive(retry, true);
+    SPDLOG_INFO("[EntranceTrace] oot-boss-continue arena={:#x} retry={:#x}", arena, retry);
+    return Materialize(retry);
 }
 extern "C" void Combo_SOH_RestoreCrossDungeonCheckpoint(int32_t index) {
     using namespace ComboCrossOotRuntime;
@@ -330,8 +341,9 @@ extern "C" void Combo_SOH_LoadCrossDungeonCheckpoint(int32_t index) {
 }
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonRecovery(void) {
     using namespace ComboCrossOotRuntime;
-    // The native combo title path applies a queued frozen-source resume after load hooks.
-    if (state.HasBossRecovery())
+    // Native load hooks run before the title path consumes the new entrance.
+    // A checkpoint from the dormant save cannot route that arrival back out.
+    if (state.HasArrival() || state.HasBossRecovery())
         return -1;
     const int32_t index = checkpoint.ConsumeRecovery([](int32_t entry) { return state.IsRecoveryEntrance(entry); });
     if (index < 0)

@@ -253,6 +253,9 @@ class RuntimeState {
         }
         return false;
     }
+    bool HasArrival() const {
+        return arrival >= 0;
+    }
     int32_t ConsumeArrival() {
         int32_t result = arrival;
         arrival = -1;

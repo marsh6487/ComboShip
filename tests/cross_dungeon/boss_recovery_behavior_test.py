@@ -41,6 +41,7 @@ void* Combo_ResolveSym(const char*,const char* name) {
 ''')
 oot_title = (ROOT / 'soh/src/code/title_setup.c').read_text()
 oot_host = (ROOT / 'soh/soh/OTRGlobals.cpp').read_text(encoding='utf-8-sig')
+oot_kaleido = (ROOT / 'soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope_PAL.c').read_text()
 oot += r'''
 #include "combo/entrances/RegionalPassages.h"
 #include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
@@ -52,6 +53,17 @@ static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
 oot += block_from(oot_host, oot_host.index('extern "C" void SOH_ApplyComboPortalArrival(')) + '\n'
 oot_title = oot_title[oot_title.index('        s32 crossDungeonArrival ='):oot_title.index('        // A portal return')]
 oot += '\nint16_t Entrance_OverrideNextIndex(int16_t index) { return index; }\nvoid NativeTitleArrival() {\n' + oot_title + '\n}\n'
+continue_start = oot_kaleido.rindex('#ifdef COMBO_BUILD', 0, oot_kaleido.index('const int32_t bossRetry'))
+continue_end = oot_kaleido.index('gSaveContext.respawnFlag = -2;', continue_start) + len('gSaveContext.respawnFlag = -2;')
+oot += r'''
+static bool fullHealthSpawn = false;
+#define CVarGetInteger(key, fallback) (fullHealthSpawn)
+void Play_TriggerRespawn(PlayState* play) {
+    assert(gSaveContext.health > 0);
+    play->nextEntranceIndex = gSaveContext.entranceIndex;
+}
+void NativeContinueGameOver(PlayState* play) {
+''' + oot_kaleido[continue_start:continue_end] + '\n}\n'
 oot += r'''
 static Dungeon OotBoss(const char* name,int id,int entry,int reverse,int parent,int warp) {
     Dungeon d{name,{0,entry},{0,reverse},{0,reverse},{{0,warp}}};
@@ -67,6 +79,7 @@ int main() {
     auto seed=Encode({gohma,volvagia},{1,0});
     assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
     play.sceneNum=SCENE_FIRE_TEMPLE_BOSS;
+    gEntranceTable[volvagia.entrance.index].scene=play.sceneNum;
     assert(SOH_QueueCrossDungeonArrival(volvagia.entrance.index));
     assert(Combo_SOH_ConsumeCrossDungeonArrival()==volvagia.entrance.index);
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==volvagia.entrance.index); // Physical identity remains distinct.
@@ -121,21 +134,48 @@ int main() {
     assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
     assert(SOH_QueueCrossDungeonArrival(volvagia.entrance.index));
     Combo_SOH_ConsumeCrossDungeonArrival();
-    Combo_SOH_CrossDungeonDeathCheckpoint();
-    assert(PrepareSwitch() && resumes==1 && resumedGame==0 && resumedEntrance==volvagia.entrance.index &&
-           "foreign-source death must stage a frozen-source resume");
+    assert(Combo_SOH_CrossDungeonDeathCheckpoint()==volvagia.entrance.index && !PrepareSwitch());
     Combo_SOH_LoadCrossDungeonCheckpoint(volvagia.entrance.index);
     Combo_SOH_ConsumeCrossDungeonRecovery();
-    assert(PrepareSwitch() && resumes==2 && "foreign-source cold reload must also resume its source half");
+    assert(PrepareSwitch() && resumes==1 && resumedGame==0 && resumedEntrance==volvagia.entrance.index &&
+           "a foreign-source cold reload must resume its source half");
     Combo_SOH_LoadCrossDungeonCheckpoint(volvagia.entrance.index);
     Combo_SOH_ConsumeCrossDungeonRecovery();
     Combo_SOH_RestoreCrossDungeonCheckpoint(-1); // Explicit Farore arrival wins over ordinary recovery.
-    assert(!PrepareSwitch() && resumes==2);
+    assert(!PrepareSwitch() && resumes==1);
     Combo_SOH_LoadCrossDungeonCheckpoint(volvagia.entrance.index);
     Combo_SOH_ConsumeCrossDungeonRecovery();
     assert(SOH_QueueCrossDungeonArrival(volvagia.entrance.index));
     Combo_SOH_ConsumeCrossDungeonArrival();
     assert(!PrepareSwitch() && "a new routed ingress must cancel stale save recovery");
+    // Woodfall boss door -> Bongo. A dormant Bongo checkpoint is reloaded between
+    // the peer queue and the title path consuming that new door traversal.
+    const auto bongo=OotBoss("bongo",7,ENTR_SHADOW_TEMPLE_BOSS_ENTRANCE,ENTR_SHADOW_TEMPLE_BOSS_DOOR,
+                            ENTR_SHADOW_TEMPLE_ENTRANCE,ENTR_GRAVEYARD_SHADOW_TEMPLE_BLUE_WARP);
+    mm.entrance.index=0x3800;
+    seed=Encode({bongo,mm},{1,0});
+    assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+    assert(SOH_QueueCrossDungeonArrival(bongo.entrance.index));
+    Combo_SOH_LoadCrossDungeonCheckpoint(bongo.entrance.index);
+    assert(Combo_SOH_ConsumeCrossDungeonRecovery()==-1);
+    NativeTitleArrival();
+    assert(gSaveContext.entranceIndex==bongo.entrance.index && !PrepareSwitch());
+    gEntranceTable[bongo.entrance.index].scene=SCENE_SHADOW_TEMPLE_BOSS;
+    play.sceneNum=SCENE_SHADOW_TEMPLE;
+    assert(Combo_SOH_CrossDungeonDeathCheckpoint()==-1);
+    play.sceneNum=SCENE_SHADOW_TEMPLE_BOSS;
+    gSaveContext.healthCapacity=0x60;
+    for (bool fullHealth : {false, true}) {
+        fullHealthSpawn=fullHealth;
+        gSaveContext.health=0;
+        gSaveContext.entranceIndex=bongo.deathCheckpoint->index; // Native menu tentatively selects Shadow Temple.
+        NativeContinueGameOver(&play);
+        assert(play.nextEntranceIndex==bongo.entrance.index && !PrepareSwitch());
+        assert(gSaveContext.health==(fullHealth ? 0x60 : STARTING_HEALTH));
+        assert(gSaveContext.respawnFlag==-2 && Combo_SOH_SaveCrossDungeonCheckpoint()==bongo.entrance.index);
+    }
+    fullHealthSpawn=false;
+    seed=Encode({volvagia,mm},{1,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
     // The other direction: resume the real frozen source after its native save load.
     assert(!SOH_QueueCrossBossRecovery(1,0x1234));
     assert(!SOH_QueueCrossBossRecovery(0,volvagia.entrance.index));

@@ -392,17 +392,6 @@ u32 Entrance_SceneAndSpawnAre(u8 scene, u8 spawn) {
 void Entrance_SetGameOverEntrance(void) {
     s16 scene = gPlayState->sceneNum;
 
-#ifdef COMBO_BUILD
-    if (Combo_IsCombinedGame() && Combo_SOH_CrossBossEnabled() && scene >= SCENE_DEKU_TREE_BOSS &&
-        scene <= SCENE_SHADOW_TEMPLE_BOSS) {
-        const int32_t checkpoint = Combo_SOH_CrossDungeonDeathCheckpoint();
-        if (checkpoint >= 0) {
-            gSaveContext.entranceIndex = Grotto_OverrideSpecialEntrance(checkpoint);
-            return;
-        }
-    }
-#endif
-
     // When in a boss room and boss shuffle is on, use the boss scene to find the death warp entrance
     if (Randomizer_GetSettingValue(RSK_SHUFFLE_BOSS_ENTRANCES) != RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF &&
         scene >= SCENE_DEKU_TREE_BOSS && scene <= SCENE_SHADOW_TEMPLE_BOSS) {
