@@ -178,6 +178,8 @@ static LinkAnimationHeader* D_808543CC[2] = {&animations[0],&animations[1]};
 static LinkAnimationHeader* D_808543D4[2] = {&animations[2],&animations[3]};
 static u16 D_80854398[2] = {}, D_808543DC[2] = {};
 static int sMagicArrowCosts[6] = {};
+static constexpr int ARROW_SW97_FIRE = 17;
+static bool ItemMagic_HasEnough(PlayState*, int) { return false; }
 static u16 sItemButtons[8] = {BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT};
 static s32 Math_ScaledStepToS(s16* value, s16 target, s16) { *value = target; return 1; }
 static f32 Math_SinS(s16 value) { return std::sin(value * (3.14159265358979323846f / 32768.0f)); }

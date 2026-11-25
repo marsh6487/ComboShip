@@ -19,7 +19,10 @@ def source(path):
         return subprocess.check_output(['git', 'show', REF + ':' + path], cwd=ROOT, text=True)
     return (ROOT / path).read_text()
 
-player = functions(source('mm/src/overlays/actors/ovl_player_actor/z_player.c'))
+player_source = source('mm/src/overlays/actors/ovl_player_actor/z_player.c')
+player = functions(player_source)
+costs_start = player_source.index('u8 sMagicArrowCosts[] = {')
+costs_end = player_source.index('};', costs_start) + 2
 item = functions(source('mm/mods/items/logic/item_switchhook.c'))
 actor_source = source('mm/src/code/z_actor.c')
 actor = functions(actor_source[actor_source.index('bool func_800B7118'):actor_source.index('bool func_800B715C')])
@@ -27,7 +30,8 @@ equip = functions(source('mm/mods/items/helpers/equip_helper.c'))
 # The legacy projectile implementation is unreachable after the active handler's
 # unconditional return. Exclude that unreachable tail, without replacing logic.
 handler = item['Handle_SwitchHook'].split('\n    ItemInputState in;', 1)[0] + '\n}'
-parts = [equip[n] for n in ['ItemInput_IsBlockedEx', 'ItemInput_IsBlocked']]
+parts = [player_source[costs_start:costs_end]]
+parts += [equip[n] for n in ['ItemInput_IsBlockedEx', 'ItemInput_IsBlocked']]
 parts += [actor[n] for n in ['func_800B7118', 'func_800B7128']]
 parts += [item[n] for n in ['SwitchHook_IsAimingManual', 'SwitchHook_OnFired']]
 parts += [player[n] for n in ['Player_SetUpperAction', 'func_808306F8', 'func_80830E30', 'func_80831010', 'func_80831094', 'func_80831814', 'func_80831194', 'Player_UpperAction_6', 'Player_UpperAction_7', 'Player_UpperAction_8', 'func_8083868C', 'Player_ActionHandler_0', 'Player_Action_43']]
@@ -58,9 +62,10 @@ static Input* sPlayerControlInput;
 static bool sPlayerUseHeldItem=false,sPlayerHeldItemButtonIsHeldDown=false;
 static bool targeted=false,validCamera=true,animDone=true;
 static int exits=0,turns=0,shots=0,upperStarts=0,peekCalls=0,cameraUpdates=0;
+static int testMagic, testAmmoUsed, killedArrows;
 static s16 cameraMode=CAM_MODE_NORMAL;
 SaveContext gSaveContext={0};
-u16 D_8085CFB0[4]={0};u8 sMagicArrowCosts[4]={0};u16 D_8085D5FC[8]={0};
+u16 D_8085CFB0[4]={0};u16 D_8085D5FC[8]={0};
 PlayerAnimationHeader* D_8085D5E4[3]={0};PlayerAnimationHeader* D_8085D5F0[3]={0};
 void Player_Action_43(Player*,PlayState*);
 s32 Player_UpperAction_6(Player*,PlayState*);s32 Player_UpperAction_7(Player*,PlayState*);s32 Player_UpperAction_8(Player*,PlayState*);
@@ -80,10 +85,27 @@ void PlayerAnimation_PlayOnceSetSpeed(PlayState*,SkelAnime* sk,PlayerAnimationHe
 s32 PlayerAnimation_Update(PlayState*,SkelAnime*){return animDone;}
 PlayerAnimationHeader* Player_GetIdleAnim(Player* p){return NULL;}
 void Player_Anim_PlayLoop(PlayState* play,Player* p,void* anim){}
-s32 func_808305BC(PlayState*,Player*,ItemId*,ArrowType*){return 0;}
+s32 func_808305BC(PlayState*,Player*,ItemId* item,ArrowType* type){
+    *item=ITEM_BOW;
+    *type=ARROW_TYPE_SW97_FIRE;
+    return 0;
+}
 
 Actor* Actor_SpawnAsChild(ActorContext*,Actor*,PlayState*,s16,f32,f32,f32,s16,s16,s16,s32){return NULL;}
 s32 Magic_Consume(PlayState*,s16,s16){return 1;}
+s32 ItemMagic_HasEnough(PlayState*,s16 cost){return testMagic>=cost;}
+void ItemMagic_Consume(PlayState*,s16 cost){testMagic-=cost;}
+void Actor_Kill(Actor* actor){assert(actor->id==ACTOR_EN_ARROW);++killedArrows;}
+void Player_DetachHeldActor(PlayState*,Player* p){
+    p->heldActor->parent=NULL;
+    p->heldActor=NULL;
+    p->actor.child=NULL;
+}
+static void NockArrow(Player* p, Actor* arrow, ArrowType type){
+    *arrow=(Actor){.id=ACTOR_EN_ARROW,.params=type,.parent=&p->actor};
+    p->heldActor=arrow;
+    p->actor.child=arrow;
+}
 bool func_80830B88(PlayState*,Player*){return false;}
 bool func_80830F9C(PlayState*){return false;}
 bool func_80830FD4(PlayState*){return false;}
@@ -91,7 +113,7 @@ bool func_80831124(PlayState*,Player* p){return p->actor.child!=NULL;}
 bool func_80831194(PlayState*,Player*);
 u8 SwitchHook_GetCharges(void){return 5;}
 NeiSaveData* Nei_Save(void){static NeiSaveData data;return &data;}
-void Inventory_ChangeAmmo(s16 item,s16 amount){}
+void Inventory_ChangeAmmo(s16 item,s16 amount){assert(item==ITEM_BOW);testAmmoUsed-=amount;}
 void Player_RequestRumble(PlayState*,Player*,u8,u8,u8,u8){}
 void GameInteractor_ExecuteOnPlayerReleaseHeldActor(PlayState*,Player*,Actor*){++shots;}
 bool func_801242B4(Player*){return false;}
@@ -189,6 +211,20 @@ play.state.input[0].press.button=BTN_CUP;Handle_SwitchHook(&p,&play);
 assert(play.state.input[0].press.button&BTN_CUP);
 assert(!func_80831010(&p,&play) && p.unk_AA5==PLAYER_UNKAA5_3);
 puts("PASS native Switch Hook aim retention, input, launch, cancellation and native Hookshot admission");
+// Charge the actual nocked projectile once, before consuming its arrow ammo.
+Actor arrow;
+p.heldItemAction=PLAYER_IA_BOW;
+testMagic=7;
+NockArrow(&p,&arrow,ARROW_TYPE_SW97_FIRE);
+assert(func_80831194(&play,&p) && testMagic==3 && testAmmoUsed==1);
+assert(!func_80831194(&play,&p) && testMagic==3 && testAmmoUsed==1);
+NockArrow(&p,&arrow,ARROW_TYPE_SW97_FIRE);
+assert(!func_80831194(&play,&p) && testMagic==3 && testAmmoUsed==1 && killedArrows==1);
+assert(!arrow.parent && !p.heldActor && !p.actor.child);
+NockArrow(&p,&arrow,ARROW_TYPE_SW97_ICE);
+assert(func_80831194(&play,&p) && testMagic==3 && testAmmoUsed==2);
+puts("PASS Fire Medallion magic charge on release and ammo preservation on denial");
+
 '''
 with tempfile.TemporaryDirectory(prefix='mm-switchhook-aim-') as tmp:
     path=Path(tmp)/'aim.c'

@@ -88,9 +88,7 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { ITEM_CHATEAU_ROMANI, "Drink for infinite magic.\nOne-time consumable." },
     { ITEM_POKEBALL, "Transform into Pikachu.\nPress again to revert." },
 
-    // (The twelve SW97 arrow/bullet rows are gone — the elemental shot has no item id any more.
-    // sSw97ElemDescs below is keyed by SW97_ELEM_* instead, and the magic costs those rows
-    // advertised are gone with them: medallion shots are free now.)
+    // Elemental bow and slingshot shots use sSw97ElemDescs below.
 
     // Bottle-side custom items
     { ITEM_NET, "Catch bugs, fish and fairies.\nSwing it like a sword." },
@@ -105,7 +103,7 @@ static const ItemDescEntry sCustomItemDescs[] = {
 
 // Keyed by SW97_ELEM_*, NOT by item id — the elemental shot is a flag on the bow/slingshot now.
 static const ItemDescEntry sSw97ElemDescs[] = {
-    { SW97_ELEM_FIRE, "Fire elemental shot. Costs no magic." },
+    { SW97_ELEM_FIRE, "Fire arrows use magic.\nFire slingshot seeds use only ammo." },
     { SW97_ELEM_ICE, "Ice elemental shot. Costs no magic." },
     { SW97_ELEM_LIGHT, "Light elemental shot. Costs no magic." },
     { SW97_ELEM_DARK, "Dark elemental shot. Costs no magic." },
