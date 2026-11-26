@@ -1618,8 +1618,9 @@ extern "C" void WolfLinkForm_Cleanup(void) {
     sWolf.atActive = 0;
     // Hand the shadow back to OoT (MmForm_UpdateActive re-asserts DrawFeet for
     // other forms; vanilla Link needs it restored here).
-    if (gPlayState != NULL && GET_PLAYER(gPlayState) != NULL) {
-        GET_PLAYER(gPlayState)->actor.shape.shadowDraw = ActorShadow_DrawFeet;
+    Player* player = gPlayState != nullptr ? GET_PLAYER(gPlayState) : nullptr;
+    if (player != nullptr && player->actor.shape.shadowDraw == WolfLinkForm_DrawShadow) {
+        player->actor.shape.shadowDraw = ActorShadow_DrawFeet;
     }
 }
 

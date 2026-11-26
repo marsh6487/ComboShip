@@ -30,6 +30,7 @@
 #include "mods/items/logic/item_postman_hat.h"
 #include "mods/transformation_masks/mm_mask_wear.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/transformation_masks/wolf_link_form.h"
 #include <libultraship/libultraship.h>
 
 #include <time.h>
@@ -275,6 +276,8 @@ void Play_Destroy(GameState* thisx) {
     Player* player = GET_PLAYER(play);
 
     MmForm_OnPlayDestroy(play, player);
+    // Wolf's skin and joints belong to this scene's arena, even after returning to Link.
+    WolfLinkForm_Cleanup();
     GameInteractor_ExecuteOnPlayDestroy();
     TimeCtl_Reset(play);
     // Drop SM64 actor/header snapshots before any scene resources retire.
