@@ -23,6 +23,10 @@ ui_scope=visibility[visibility.index('typedef struct {'):visibility.rindex('#end
 play=(ROOT/'soh/src/code/z_play.c').read_text()
 destroy=block_from(play,play.index('void Play_Destroy('))
 teardown=destroy[destroy.index('{')+1:destroy.index('    play->state.gfxCtx->callback = NULL;')]
+wolf=(ROOT/'soh/mods/transformation_masks/wolf_link_form.cpp').read_text()
+wolf_cleanup=block_from(wolf,wolf.index('extern "C" void WolfLinkForm_Cleanup('))
+skin=(ROOT/'soh/expansions/ssbb/ssbb_skin.c').read_text()
+skin_cleanup=block_from(skin,skin.index('void SSBBSkin_Destroy('))
 play=block_from(play,play.index('void Play_Draw('))
 sky=play[play.index('        if ((HREG(80) != 10) || (HREG(83) != 0))'):play.index('        FrameTiming_EndNamedSpan("play_draw", "sun_moon", drawPhase);')]
 fairy=(ROOT/'soh/src/overlays/actors/ovl_En_Elf/z_en_elf.c').read_text()
@@ -38,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='cel-native-') as temporary:
  for name,marker,production in [('native_actor','NATIVE_ACTOR_DRAW_ALL',actor),('native_sky','NATIVE_SKY_PHASE',sky),('native_fairy','NATIVE_FAIRY_LIGHTS',fairy_lights),('native_light','NATIVE_LIGHT_SETTER',setter),('native_teardown','NATIVE_TEARDOWN_PHASE',teardown)]:
   if args.case and args.case!=name: continue
   cpp=build/(name+'.cpp')
-  cpp.write_text((ROOT/'tests/cel_sky'/(name+'_test.cpp')).read_text().replace('/* '+marker+' */',production).replace('/* NATIVE_FAIRY_UPDATE */',fairy_update).replace('/* PRODUCTION_UI_DRAW_SCOPE */',ui_scope))
+  cpp.write_text((ROOT/'tests/cel_sky'/(name+'_test.cpp')).read_text().replace('/* '+marker+' */',production).replace('/* NATIVE_FAIRY_UPDATE */',fairy_update).replace('/* PRODUCTION_UI_DRAW_SCOPE */',ui_scope).replace('/* NATIVE_WOLF_CLEANUP */',skin_cleanup+'\n'+wolf_cleanup))
   binary=build/name
   subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable',*flags,'-I'+str(ROOT),'-I'+str(ROOT/'libultraship/include'),str(cpp),'-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)

@@ -17077,6 +17077,10 @@ void MmForm_Init(PlayState* play, Player* player) {
     MmForm_RitoWindClear();
 
     // === Cleanup from previous scene ===
+    // Wolf's arena allocations were released before the old scene was destroyed.
+    if (gFormState.currentForm == MM_PLAYER_FORM_PIKACHU && !WolfLinkForm_IsSelected()) {
+        PikachuForm_Cleanup();
+    }
     if (gFormState.state == MMFORM_STATE_ACTIVE || gFormState.state == MMFORM_STATE_TRANSFORMING) {
         // (Strength is no longer mutated on transform — handled virtually in
         // Player_GetStrength — so there is nothing to roll back here.)
@@ -17084,14 +17088,6 @@ void MmForm_Init(PlayState* play, Player* player) {
         // Keep C-button equips as-is during soft-reload (no restore/re-save flip).
         // The equips are already restricted for the current form from the previous scene.
         // Restoring and re-restricting would cause a visible flip in the HUD.
-
-        // Pikachu-specific cleanup (colliders, projectile actors, etc.)
-        if (gFormState.currentForm == MM_PLAYER_FORM_PIKACHU) {
-            if (WolfLinkForm_IsSelected())
-                WolfLinkForm_Cleanup();
-            else
-                PikachuForm_Cleanup();
-        }
 
         // Mark for seamless reload — preserve form across scene transition (no flash)
         sPendingReactivateForm = gFormState.currentForm;
@@ -17105,14 +17101,6 @@ void MmForm_Init(PlayState* play, Player* player) {
     } else {
         sPendingSoftReload = 0;
         sPendingReactivate = 0;
-
-        // Pikachu-specific cleanup (colliders, projectile actors, etc.)
-        if (gFormState.currentForm == MM_PLAYER_FORM_PIKACHU) {
-            if (WolfLinkForm_IsSelected())
-                WolfLinkForm_Cleanup();
-            else
-                PikachuForm_Cleanup();
-        }
 
         // Only memset when NOT transformed — stale pointers don't matter
         memset(&gFormState, 0, sizeof(gFormState));

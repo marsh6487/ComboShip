@@ -591,12 +591,17 @@ void ExtractShared(nlohmann::json& sh) {
     FoldNativesIntoRegistry();
     RecordBombchuCapacity();
 
+    // A loaded file stages its saved amount before the native fill animation starts.
+    const bool fillingMagic = (gSaveContext.isMagicAcquired && gSaveContext.magicLevel == 0) ||
+                              gSaveContext.magicState == MAGIC_STATE_STEP_CAPACITY ||
+                              gSaveContext.magicState == MAGIC_STATE_FILL;
+    const int magic = fillingMagic ? gSaveContext.magicFillTarget : gSaveContext.magic;
     sh["schema"] = 1;
     sh["vitals"] = { { "health", gSaveContext.health },
                      { "healthCapacity", gSaveContext.healthCapacity },
                      { "doubleDefense", gSaveContext.isDoubleDefenseAcquired },
                      { "defenseHearts", gSaveContext.inventory.defenseHearts },
-                     { "magic", gSaveContext.magic },
+                     { "magic", magic },
                      // magicLevel is NOT published: it is the game's own meter-build handshake, not
                      // shared state. See the magic block in ApplyShared.
                      { "isMagic", gSaveContext.isMagicAcquired },
@@ -788,7 +793,7 @@ void ApplyShared(const nlohmann::json& sh) {
         gSaveContext.inventory.defenseHearts =
             (int8_t)std::max<int>(gSaveContext.inventory.defenseHearts, v.value("defenseHearts", 0));
 
-        // Magic syncs as the two OWNERSHIP FLAGS only -- magicLevel is deliberately not copied.
+        // Share the amount and two ownership flags. Keep magicLevel local to the meter.
         // magicLevel is not "how much magic you have", it is the handshake the game uses to build
         // the meter: z_parameter.c waits for (isMagicAcquired && magicLevel == 0), then sets
         // magicLevel = isDoubleMagicAcquired + 1 and steps magicCapacity up from zero. Copying the
@@ -807,7 +812,15 @@ void ApplyShared(const nlohmann::json& sh) {
         if ((hasMagic && !hadMagic) || (hasDouble && !hadDouble)) {
             gSaveContext.magicLevel = 0; // re-run the native meter init (grows magicCapacity)
         }
-        gSaveContext.magic = (int8_t)v.value("magic", (int)gSaveContext.magic);
+        if (const auto magic = v.find("magic"); magic != v.end()) {
+            gSaveContext.magic = (int8_t)magic->get<int>();
+            // A cross-game boot rebuilds the meter using a target staged from the
+            // local save. Replace that target as well as the current amount.
+            if (gSaveContext.magicLevel == 0 || gSaveContext.magicState == MAGIC_STATE_STEP_CAPACITY ||
+                gSaveContext.magicState == MAGIC_STATE_FILL) {
+                gSaveContext.magicFillTarget = gSaveContext.magic;
+            }
+        }
         gSaveContext.rupees = (int16_t)v.value("rupees", (int)gSaveContext.rupees);
     }
     if (sh.contains("upgrades")) {

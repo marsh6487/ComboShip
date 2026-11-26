@@ -4575,13 +4575,9 @@ s32 func_808306F8(Player* this, PlayState* play) {
                     } else if ((arrowType == ARROW_TYPE_DEKU_BUBBLE) &&
                                (!CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) || (play->sceneId != SCENE_BOWLING))) {
                         magicArrowType = ARROW_MAGIC_DEKU_BUBBLE;
-                    } else if (((arrowType >= ARROW_TYPE_SEED_FIRE) && (arrowType <= ARROW_TYPE_SEED_WIND)) ||
-                               ((arrowType >= ARROW_TYPE_SW97_FIRE) && (arrowType <= ARROW_TYPE_SW97_WIND))) {
-                        // Skijer's NEI: medallion shots cost NO magic (user decision). This branch
-                        // used to charge a flat 4 MP and downgrade to a plain projectile when you
-                        // were short — both are gone. Note SoH never charged for these either (its
-                        // ARROW_SW97_* params fall outside the magic-cost range), so the two games
-                        // agree now. The VANILLA MM magic arrows above keep their cost untouched.
+                    } else if ((arrowType == ARROW_TYPE_SW97_FIRE) &&
+                               !ItemMagic_HasEnough(play, sMagicArrowCosts[ARROW_MAGIC_FIRE])) {
+                        arrowType = ARROW_TYPE_NORMAL;
                         magicArrowType = ARROW_MAGIC_INVALID;
                     } else {
                         magicArrowType = ARROW_MAGIC_INVALID;
@@ -4848,6 +4844,19 @@ bool func_80831194(PlayState* play, Player* this) {
         if (!Player_IsHoldingHookshot(this)) {
             ItemId item;
             ArrowType arrowType;
+
+            // Charge the nocked Fire Medallion arrow only when it is released.
+            if ((this->heldActor->id == ACTOR_EN_ARROW) && (this->heldActor->params == ARROW_TYPE_SW97_FIRE)) {
+                s16 magicCost = sMagicArrowCosts[ARROW_MAGIC_FIRE];
+
+                if (!ItemMagic_HasEnough(play, magicCost)) {
+                    Audio_PlaySfx(NA_SE_SY_ERROR);
+                    Actor_Kill(this->heldActor);
+                    Player_DetachHeldActor(play, this);
+                    return false;
+                }
+                ItemMagic_Consume(play, magicCost);
+            }
 
             func_808305BC(play, this, &item, &arrowType);
             if ((this->transformation != PLAYER_FORM_DEKU) && !(this->stateFlags3 & PLAYER_STATE3_400)) {

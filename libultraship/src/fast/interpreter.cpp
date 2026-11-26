@@ -6651,6 +6651,20 @@ static void gfx_step(Interpreter* gfx) {
     auto cmd0 = cmd;
     int8_t opcode = (int8_t)(cmd->words.w0 >> 24);
 
+    // OoT fills uninitialized and retired scene arenas with 0xAB. Walking this
+    // as a display list can reach an unmapped page before an ENDDL is seen.
+    constexpr uintptr_t arenaFill = static_cast<uintptr_t>(0xABABABABABABABABull);
+    if (cmd->words.w0 == arenaFill && cmd->words.w1 == arenaFill) [[unlikely]] {
+        const auto& path = g_exec_stack.gfx_path;
+        const auto* caller = path.empty() ? nullptr : path.back();
+        SPDLOG_ERROR("Display list entered OoT arena fill at {}; caller={}; depth={}",
+                     static_cast<void*>(cmd), static_cast<const void*>(caller), g_exec_stack.cmd_stack.size());
+        gfx->mTriangleState.valid = false;
+        gfx->mIndexedVertexMask = 0;
+        gfx_end_dl_handler_common(gfx, &cmd);
+        return;
+    }
+
 #ifdef USE_GBI_TRACE
     if (cmd->words.trace.valid &&
         Ship::Context::GetRawInstance()->GetConsoleVariables()->GetInteger("gEnableGFXTrace", 0)) {

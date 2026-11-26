@@ -740,12 +740,16 @@ void ExtractShared(nlohmann::json& sh) {
     FoldNativesIntoRegistry();
     RepairBombchuCapacity();
 
+    // During the native fill animation, magic is only the displayed amount.
+    const bool fillingMagic =
+        gSaveContext.magicState == MAGIC_STATE_STEP_CAPACITY || gSaveContext.magicState == MAGIC_STATE_FILL;
+    const int magic = fillingMagic ? gSaveContext.magicFillTarget : MM_PD.magic;
     sh["schema"] = 1;
     sh["vitals"] = { { "health", MM_PD.health },
                      { "healthCapacity", MM_PD.healthCapacity },
                      { "doubleDefense", MM_PD.doubleDefense },
                      { "defenseHearts", MM_INV.defenseHearts },
-                     { "magic", MM_PD.magic },
+                     { "magic", magic },
                      // magicLevel is NOT published: it is the game's own meter-build handshake, not
                      // shared state. See the magic block in ApplyShared.
                      { "isMagic", MM_PD.isMagicAcquired },
@@ -966,7 +970,7 @@ void ApplyShared(const nlohmann::json& sh) {
         MM_PD.doubleDefense = (uint8_t)std::max<int>(MM_PD.doubleDefense, v.value("doubleDefense", 0));
         MM_INV.defenseHearts = (int8_t)std::max<int>(MM_INV.defenseHearts, v.value("defenseHearts", 0));
 
-        // Magic syncs as the two OWNERSHIP FLAGS only -- magicLevel is deliberately not copied.
+        // Share the amount and two ownership flags. Keep magicLevel local to the meter.
         // magicLevel is not "how much magic you have", it is the handshake the game uses to build
         // the meter: z_parameter.c waits for (isMagicAcquired && magicLevel == 0), then sets
         // magicLevel = isDoubleMagicAcquired + 1 and steps magicCapacity up from zero. Copying the
@@ -985,7 +989,13 @@ void ApplyShared(const nlohmann::json& sh) {
         if ((hasMagic && !hadMagic) || (hasDouble && !hadDouble)) {
             MM_PD.magicLevel = 0; // re-run the native meter init (grows magicCapacity)
         }
-        MM_PD.magic = (int8_t)v.value("magic", (int)MM_PD.magic);
+        if (const auto magic = v.find("magic"); magic != v.end()) {
+            MM_PD.magic = (int8_t)magic->get<int>();
+            // A running meter animation must finish at the imported amount.
+            if (gSaveContext.magicState == MAGIC_STATE_STEP_CAPACITY || gSaveContext.magicState == MAGIC_STATE_FILL) {
+                gSaveContext.magicFillTarget = MM_PD.magic;
+            }
+        }
         MM_PD.rupees = (int16_t)v.value("rupees", (int)MM_PD.rupees);
     }
     if (sh.contains("upgrades")) {

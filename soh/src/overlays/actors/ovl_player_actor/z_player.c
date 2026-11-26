@@ -3194,6 +3194,9 @@ s32 func_8083442C(Player* this, PlayState* play) {
 
             if (!sDekuBubbleActive && !Player_HoldsHookshot(this) &&
                 (func_80834380(play, this, &item, &arrowType) > 0)) {
+                if ((arrowType == ARROW_SW97_FIRE) && !ItemMagic_HasEnough(play, sMagicArrowCosts[0])) {
+                    arrowType = ARROW_NORMAL;
+                }
                 magicArrowType = arrowType - ARROW_FIRE;
 
                 if (this->unk_860 >= 0) {
@@ -3571,6 +3574,19 @@ s32 func_808350A4(PlayState* play, Player* this) {
 
     if (this->heldActor != NULL) {
         if (!Player_HoldsHookshot(this)) {
+            // In-aim cycling can replace the nocked arrow. Charge the projectile being released.
+            if ((this->heldActor->id == ACTOR_EN_ARROW) && (this->heldActor->params == ARROW_SW97_FIRE)) {
+                s16 magicCost = sMagicArrowCosts[0];
+
+                if (!ItemMagic_HasEnough(play, magicCost)) {
+                    Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+                    Actor_Kill(this->heldActor);
+                    Player_DetachHeldActor(play, this);
+                    return false;
+                }
+                ItemMagic_Consume(play, magicCost);
+            }
+
             func_80834380(play, this, &item, &arrowType);
 
             if (gSaveContext.minigameState == 1) {

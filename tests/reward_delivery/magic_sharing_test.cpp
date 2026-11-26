@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <string>
 
 #define COMBO_EXPORT
@@ -21,6 +22,8 @@ void FleetShared_RequestPullFromPeer() { assert(false && "unexpected Vanilla pul
 #define SPDLOG_WARN(...) ((void)0)
 #define MAGIC_NORMAL_METER 48
 
+enum { MAGIC_STATE_IDLE, MAGIC_STATE_STEP_CAPACITY, MAGIC_STATE_FILL };
+
 /* NATIVE_IDS */
 
 struct PlayerData {
@@ -28,7 +31,7 @@ struct PlayerData {
   int magic = 0, magicLevel = 0;
 };
 struct {
-  int fileNum = 0, magicFillTarget = 0;
+  int fileNum = 0, magicState = MAGIC_STATE_IDLE, magicFillTarget = 0;
   bool isMagicAcquired = false, isDoubleMagicAcquired = false;
   int magic = 0, magicLevel = 0;
   struct {
@@ -46,6 +49,61 @@ struct {
     } saveInfo;
   } save;
 } gSaveContext;
+
+struct Vitals {
+  struct Magic {
+    int amount;
+    template <class T> T get() const { return static_cast<T>(amount); }
+  };
+  std::optional<Magic> magic;
+  const Magic* find(const char* key) const {
+    assert(std::strcmp(key, "magic") == 0);
+    return magic ? &*magic : nullptr;
+  }
+  const Magic* end() const { return nullptr; }
+};
+
+/* Oot Magic Carryover */
+#define MM_PD gSaveContext.save.saveInfo.playerData
+/* Mm Magic Carryover */
+#undef MM_PD
+
+static void TestMagicCarryover() {
+  auto& mm = gSaveContext.save.saveInfo.playerData;
+  gSaveContext.magicState = MAGIC_STATE_IDLE;
+  gSaveContext.isMagicAcquired = true;
+  gSaveContext.magicLevel = 0;
+  gSaveContext.magicFillTarget = 0;
+  mm.magic = 100;
+  ApplyOotMagic({Vitals::Magic{ExtractMmMagic()}});
+  assert(gSaveContext.magic == 100 && gSaveContext.magicFillTarget == 100);
+  gSaveContext.magic = 0;
+  assert(ExtractOotMagic() == 100); // Staged amount survives even before the first HUD tick.
+  ApplyOotMagic({Vitals::Magic{96}});
+  gSaveContext.magic = 0; // The OoT meter is still building as the next switch starts.
+  gSaveContext.magicLevel = 2;
+  gSaveContext.magicState = MAGIC_STATE_STEP_CAPACITY;
+  assert(ExtractOotMagic() == 96);
+
+  mm.magic = 40;
+  gSaveContext.magicState = MAGIC_STATE_FILL;
+  ApplyMmMagic({Vitals::Magic{ExtractOotMagic()}});
+  assert(mm.magic == 96 && gSaveContext.magicFillTarget == 96);
+  ApplyMmMagic({Vitals::Magic{0}});
+  assert(mm.magic == 0 && ExtractMmMagic() == 0);
+  ApplyOotMagic({Vitals::Magic{ExtractMmMagic()}});
+  assert(gSaveContext.magic == 0 && gSaveContext.magicFillTarget == 0);
+
+  gSaveContext.magicLevel = 2;
+  gSaveContext.magicState = MAGIC_STATE_IDLE;
+  ApplyOotMagic({Vitals::Magic{37}});
+  ApplyOotMagic({});
+  assert(ExtractOotMagic() == 37 && gSaveContext.magicFillTarget == 0);
+  ApplyMmMagic({Vitals::Magic{ExtractOotMagic()}});
+  ApplyMmMagic({});
+  assert(ExtractMmMagic() == 37 && gSaveContext.magicFillTarget == 0);
+}
+
 bool rando = true;
 #define IS_RANDO rando
 struct {
@@ -131,6 +189,7 @@ void reset(bool rpg) {
   }
 }
 int main() {
+  TestMagicCarryover();
   for (bool rpg : {false, true}) {
     reset(rpg);
     // Foreign MM magic collected in OoT: the receiver can be dormant, and

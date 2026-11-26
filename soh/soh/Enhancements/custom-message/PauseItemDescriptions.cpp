@@ -137,9 +137,9 @@ static const ItemDescEntry sMaskDescs[] = {
 };
 
 // Keyed by SW97_ELEM_*, NOT by item id — the elemental shot has no item id any more, it is a flag on
-// the bow/slingshot. The old strings advertised a magic cost; medallion shots are free.
+// the bow/slingshot.
 static const ItemDescEntry sSw97ElemDescs[] = {
-    { SW97_ELEM_FIRE, TEXT_DESC_SW97_ARROW_FIRE, "Fire elemental shot. Costs no magic." },
+    { SW97_ELEM_FIRE, TEXT_DESC_SW97_ARROW_FIRE, "Fire arrows use magic.&Fire slingshot seeds use only ammo." },
     { SW97_ELEM_ICE, TEXT_DESC_SW97_ARROW_ICE, "Ice elemental shot. Costs no magic." },
     { SW97_ELEM_LIGHT, TEXT_DESC_SW97_ARROW_LIGHT, "Light elemental shot. Costs no magic." },
     { SW97_ELEM_DARK, TEXT_DESC_SW97_ARROW_DARK, "Dark elemental shot. Costs no magic." },
